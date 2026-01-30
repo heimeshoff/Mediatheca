@@ -23,7 +23,7 @@ Designed for a single user, deployed as a Docker container, accessed via a mobil
 | Movie     | Single item                          | TMDB, Rotten Tomatoes, Trakt.tv, Jellyfin, YouTube (trailers) |
 | TV Series | Series > Season > Episode            | TMDB, Trakt.tv, Jellyfin              |
 | Game      | Single item                          | Steam, HowLongToBeat                  |
-| Book      | Single item                          | Goodreads                              |
+| Book      | Single item                          | Goodreads, Audible                     |
 
 ## Bounded Contexts
 
@@ -105,6 +105,7 @@ External system adapters. The bridge between Mediatheca and third-party services
 - **Jellyfin**: Sync watch history from local media server
 - **Steam**: Import play hours and game library
 - **Goodreads**: Import book library and reading status
+- **Audible**: Import audiobook library and listening progress
 - **Rotten Tomatoes**: Fetch critic/audience scores
 - **HowLongToBeat**: Fetch average game completion times
 - **YouTube / Trailers**: Link to trailers for movies and games
