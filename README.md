@@ -1,2 +1,2 @@
 # Mediatheca
-Mediatheca — your personal media library for tracking and managing movies, TV series, games, and books.
+Mediatheca — your personal media library for tracking movies, series, games, and books.
