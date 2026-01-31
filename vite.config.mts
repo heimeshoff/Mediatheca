@@ -1,10 +1,11 @@
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import fable from "vite-plugin-fable";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
+    root: "./src/Client",
     plugins: [
-        react({ jsxRuntime: "classic", include: /\.(fs\.js|jsx?)$/ }),
+        fable({ fsproj: "./src/Client/Client.fsproj" }),
         tailwindcss(),
     ],
     server: {

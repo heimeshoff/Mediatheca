@@ -5,10 +5,10 @@ Personal media library app (movies, series, games, books) built with full-stack 
 ## Build & Run
 
 - `npm start` - Run server + client concurrently (dev mode)
-- `npm run server` - Server only (dotnet watch, port 5000)
-- `npm run client` - Client only (Fable watch + Vite, port 5173)
+- `npm run dev:server` - Server only (dotnet watch, port 5000)
+- `npm run dev:client` - Client only (Vite + vite-plugin-fable, port 5173)
 - `npm test` - Run Expecto tests (`dotnet run --project tests/Server.Tests/Server.Tests.fsproj`)
-- `npm run build:client` - Production client build
+- `npm run build` - Production client build
 
 ## Tech Stack
 
@@ -32,7 +32,7 @@ Personal media library app (movies, series, games, books) built with full-stack 
 
 - `src/Shared/` - Shared F# types and API contracts (compiled for both server and client)
 - `src/Server/` - ASP.NET Core server (Giraffe, event store, projections)
-- `src/Client/` - Fable/Feliz SPA (output to src/Client/output/, deployed to deploy/public/)
+- `src/Client/` - Fable/Feliz SPA (compiled via vite-plugin-fable, deployed to deploy/public/)
 - `tests/Server.Tests/` - Expecto tests
 - `.planning/` - PROJECT.md, ROADMAP.md, REQUIREMENTS.md, STATE.md
 
@@ -41,6 +41,12 @@ Personal media library app (movies, series, games, books) built with full-stack 
 - F# modules for code organization (not classes)
 - Async workflows for I/O operations
 - Event types as discriminated unions per bounded context
-- Fable output uses `.fs.js` extension
+- Fable compilation integrated via vite-plugin-fable (no separate dotnet fable step)
 - Single-user app — no authentication
 - Docker deployment on Linux; development on Windows
+
+## Gotchas
+
+- `vite-plugin-fable@0.1.x` requires Vite 6; `0.2.x` requires Vite 7 — don't upgrade one without the other
+- `ts-lsp-client@1.1.0` breaks vite-plugin-fable ESM imports — pinned to `1.0.4` via npm overrides
+- Warnings from `fable_modules/` vendored code: suppress in `.fsproj` via `<NoWarn>`, never edit vendored files

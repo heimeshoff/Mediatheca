@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
+    <NoWarn>FS3548;FS0044</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

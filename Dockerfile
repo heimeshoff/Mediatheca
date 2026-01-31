@@ -20,17 +20,14 @@ RUN dotnet publish src/Server/Server.fsproj -c Release -o /app/publish
 FROM server-build AS client-build
 WORKDIR /app
 
-RUN dotnet tool restore
-
-COPY .config/ .config/
 COPY src/Client/ src/Client/
 COPY package.json ./
+COPY vite.config.mts ./
 
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && npm install \
-    && dotnet fable src/Client -o src/Client/output \
-    && npx vite build src/Client
+    && npx vite build
 
 # Stage 3: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:9.0
