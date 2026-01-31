@@ -2,12 +2,21 @@ module Mediatheca.Client.App
 
 open Fable.Core.JsInterop
 open Elmish
-open Feliz
-open Feliz.DaisyUI
+open Elmish.React
 open Fable.Remoting.Client
 open Mediatheca.Shared
+open Mediatheca.Client.State
+open Mediatheca.Client.Views
 
-// Side-effect import for CSS
+// Side-effect imports for fonts and CSS
+importSideEffects "@fontsource/inter/400.css"
+importSideEffects "@fontsource/inter/500.css"
+importSideEffects "@fontsource/inter/600.css"
+importSideEffects "@fontsource/inter/700.css"
+importSideEffects "@fontsource/oswald/400.css"
+importSideEffects "@fontsource/oswald/500.css"
+importSideEffects "@fontsource/oswald/600.css"
+importSideEffects "@fontsource/oswald/700.css"
 importSideEffects "./index.css"
 
 // API proxy
@@ -16,69 +25,7 @@ let api: IMediathecaApi =
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<IMediathecaApi>
 
-// Model
-type Model = {
-    Message: string
-    Loading: bool
-}
-
-type Msg =
-    | CheckHealth
-    | HealthChecked of string
-    | HealthCheckFailed of exn
-
-// Init
-let init () : Model * Cmd<Msg> =
-    { Message = ""; Loading = true },
-    Cmd.OfAsync.either api.healthCheck () HealthChecked HealthCheckFailed
-
-// Update
-let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
-    match msg with
-    | CheckHealth ->
-        { model with Loading = true },
-        Cmd.OfAsync.either api.healthCheck () HealthChecked HealthCheckFailed
-    | HealthChecked message ->
-        { model with Message = message; Loading = false }, Cmd.none
-    | HealthCheckFailed _ ->
-        { model with Message = "Failed to connect to server"; Loading = false }, Cmd.none
-
-// View
-let view (model: Model) (dispatch: Msg -> unit) =
-    Html.div [
-        prop.className "min-h-screen flex items-center justify-center bg-base-200"
-        prop.children [
-            Daisy.card [
-                prop.className "bg-base-100 shadow-xl p-8"
-                prop.children [
-                    Html.h1 [
-                        prop.className "text-3xl font-bold text-primary mb-4"
-                        prop.text "Mediatheca"
-                    ]
-                    if model.Loading then
-                        Daisy.loading [
-                            loading.spinner
-                            loading.lg
-                        ]
-                    else
-                        Html.p [
-                            prop.className "text-lg"
-                            prop.text model.Message
-                        ]
-                    Daisy.button.button [
-                        button.primary
-                        prop.className "mt-4"
-                        prop.text "Check Health"
-                        prop.onClick (fun _ -> dispatch CheckHealth)
-                    ]
-                ]
-            ]
-        ]
-    ]
-
 // Entry point
-open Elmish.React
-
 Program.mkProgram init update view
 |> Program.withReactSynchronous "feliz-app"
 |> Program.run

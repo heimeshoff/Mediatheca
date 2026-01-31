@@ -1,0 +1,40 @@
+module Mediatheca.Client.Components.BottomNav
+
+open Feliz
+open Feliz.DaisyUI
+open Feliz.Router
+open Mediatheca.Client.Router
+
+type DockItem = {
+    Label: string
+    Page: Page
+    Icon: unit -> ReactElement
+    Href: string
+}
+
+let private dockItems = [
+    { Label = "Dashboard"; Page = Dashboard; Icon = Icons.dashboard; Href = Router.format "" }
+    { Label = "Movies"; Page = Movies; Icon = Icons.movie; Href = Router.format "movies" }
+    { Label = "Friends"; Page = Friends; Icon = Icons.friends; Href = Router.format "friends" }
+    { Label = "Settings"; Page = Settings; Icon = Icons.settings; Href = Router.format "settings" }
+]
+
+let view (currentPage: Page) =
+    Daisy.dock [
+        prop.className "lg:hidden"
+        prop.children [
+            for item in dockItems do
+                Html.a [
+                    prop.className (if currentPage = item.Page then "dock-active" else "")
+                    prop.href item.Href
+                    prop.onClick (fun e ->
+                        e.preventDefault()
+                        Router.navigate item.Href
+                    )
+                    prop.children [
+                        item.Icon()
+                        Daisy.dockLabel [ prop.text item.Label ]
+                    ]
+                ]
+        ]
+    ]

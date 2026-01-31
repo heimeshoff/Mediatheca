@@ -9,7 +9,7 @@
 - [x] REQ-003: TailwindCSS + DaisyUI integration with Fable/Feliz frontend [Phase 1]
 - [x] REQ-004: SQLite-based append-only event store with event serialization and stream support [Phase 1]
 - [x] REQ-005: Projection engine that replays events into SQLite read model tables [Phase 1]
-- [ ] REQ-006: App shell with mobile-first responsive layout and navigation (sidebar/bottom nav) [Phase 1]
+- [x] REQ-006: App shell with mobile-first responsive layout and navigation (sidebar/bottom nav) [Phase 1]
 - [x] REQ-007: Dockerfile for production deployment on Linux [Phase 1]
 - [x] REQ-008: Expecto test project with build integration [Phase 1]
 

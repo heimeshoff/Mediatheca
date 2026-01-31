@@ -4,6 +4,7 @@ Personal media library app (movies, series, games, books) built with full-stack 
 
 ## Build & Run
 
+- `npm run build` is the fastest way to verify client Fable compilation — catches type errors and transform issues
 - `npm start` - Run server + client concurrently (dev mode)
 - `npm run dev:server` - Server only (dotnet watch, port 5000)
 - `npm run dev:client` - Client only (Vite + vite-plugin-fable, port 5173)
@@ -33,11 +34,18 @@ Personal media library app (movies, series, games, books) built with full-stack 
 - `src/Shared/` - Shared F# types and API contracts (compiled for both server and client)
 - `src/Server/` - ASP.NET Core server (Giraffe, event store, projections)
 - `src/Client/` - Fable/Feliz SPA (compiled via vite-plugin-fable, deployed to deploy/public/)
+  - `Router.fs` - Page DU and URL parsing
+  - `Components/` - Reusable UI (Icons, Sidebar, BottomNav, Layout, PageContainer)
+  - `Pages/<Name>/Types.fs|State.fs|Views.fs` - Per-page MVU modules
+  - `Types.fs|State.fs|Views.fs` - Root MVU (delegates to child pages via Cmd.map)
+  - `App.fs` - Entry point only (CSS import, API proxy, Program.mkProgram)
 - `tests/Server.Tests/` - Expecto tests
 - `.planning/` - PROJECT.md, ROADMAP.md, REQUIREMENTS.md, STATE.md
 
 ## Conventions
 
+- Fonts: Oswald (`font-display`, headings) and Inter (`font-sans`, body) via Google Fonts
+- Theme: custom "dim" dark theme in `index.css` via `@plugin "daisyui/theme"`, selected by `data-theme="dim"` on `<html>`
 - F# modules for code organization (not classes)
 - Async workflows for I/O operations
 - Event types as discriminated unions per bounded context
@@ -47,6 +55,7 @@ Personal media library app (movies, series, games, books) built with full-stack 
 
 ## Gotchas
 
+- F# `open Module.Foo` opens Foo's *contents* — use `open Module` to access `Foo.bar`. Sibling modules in the same namespace are accessible by name without `open`.
 - `vite-plugin-fable@0.1.x` requires Vite 6; `0.2.x` requires Vite 7 — don't upgrade one without the other
 - `ts-lsp-client@1.1.0` breaks vite-plugin-fable ESM imports — pinned to `1.0.4` via npm overrides
 - Warnings from `fable_modules/` vendored code: suppress in `.fsproj` via `<NoWarn>`, never edit vendored files
