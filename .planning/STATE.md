@@ -1,8 +1,8 @@
 # Current State
 
-**Last Updated:** 2026-01-30
+**Last Updated:** 2026-01-31
 **Current Phase:** 1 (Skeleton)
-**Current Task:** Not started
+**Current Task:** REQ-006 (App shell with navigation)
 
 ## Active Decisions
 
@@ -23,11 +23,9 @@
 - 2026-01-30 Brainstorm completed — PROJECT.md created with full vision
 - 2026-01-30 Requirements categorized (v1/v2), 4-phase roadmap approved
 - 2026-01-30 Added Audible as book integration source alongside Goodreads (REQ-121)
+- 2026-01-31 Updated REQUIREMENTS.md — marked Phase 1 completions (REQ-001..005, 007, 008 done)
 
 ## Next Actions
 
-1. Begin Phase 1: Scaffold F# solution structure (Shared, Server, Client projects)
-2. Set up Vite + concurrently dev pipeline
-3. Configure TailwindCSS + DaisyUI
-4. Implement SQLite event store infrastructure
-5. Build app shell with navigation
+1. Build app shell with mobile-first navigation (REQ-006) — only remaining Phase 1 item
+2. Begin Phase 2: Catalog + Friends

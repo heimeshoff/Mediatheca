@@ -1,0 +1,45 @@
+# Stage 1: Build server
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS server-build
+WORKDIR /app
+
+COPY global.json ./
+COPY Mediatheca.sln ./
+COPY src/Shared/Shared.fsproj src/Shared/
+COPY src/Server/Server.fsproj src/Server/
+COPY src/Client/Client.fsproj src/Client/
+COPY tests/Server.Tests/Server.Tests.fsproj tests/Server.Tests/
+
+RUN dotnet restore
+
+COPY src/Shared/ src/Shared/
+COPY src/Server/ src/Server/
+
+RUN dotnet publish src/Server/Server.fsproj -c Release -o /app/publish
+
+# Stage 2: Build client
+FROM server-build AS client-build
+WORKDIR /app
+
+RUN dotnet tool restore
+
+COPY .config/ .config/
+COPY src/Client/ src/Client/
+COPY package.json ./
+
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install \
+    && dotnet fable src/Client -o src/Client/output \
+    && npx vite build src/Client
+
+# Stage 3: Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:9.0
+WORKDIR /app
+
+COPY --from=server-build /app/publish ./
+COPY --from=client-build /app/deploy/public ./deploy/public
+
+ENV ASPNETCORE_URLS=http://+:5000
+EXPOSE 5000
+
+ENTRYPOINT ["dotnet", "Server.dll"]

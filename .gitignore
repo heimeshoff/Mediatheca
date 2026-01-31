@@ -1,0 +1,29 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.vs/
+.ionide/
+
+## Node
+node_modules/
+
+## Build output
+deploy/
+src/Client/output/
+
+## SQLite
+*.db
+*.db-wal
+*.db-shm
+
+## Uploads
+uploads/
+
+## IDE
+.idea/
+.vscode/
+*.swp
+*.swo

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="App.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Shared\Shared.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fable.Core" Version="4.*" />
+    <PackageReference Include="Feliz" Version="2.*" />
+    <PackageReference Include="Feliz.UseElmish" Version="2.*" />
+    <PackageReference Include="Feliz.Router" Version="4.*" />
+    <PackageReference Include="Feliz.DaisyUI" Version="5.*" />
+    <PackageReference Include="Fable.Elmish" Version="4.*" />
+    <PackageReference Include="Fable.Elmish.React" Version="4.*" />
+    <PackageReference Include="Fable.Elmish.HMR" Version="7.*" />
+    <PackageReference Include="Fable.Remoting.Client" Version="7.*" />
+  </ItemGroup>
+
+</Project>

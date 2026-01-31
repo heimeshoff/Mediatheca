@@ -4,14 +4,14 @@
 
 ### Phase 1: Skeleton
 
-- [ ] REQ-001: F# solution structure with Shared, Server, and Client projects using Fable, Giraffe, and Fable.Remoting [Phase 1]
-- [ ] REQ-002: Vite + concurrently dev pipeline for simultaneous frontend and backend development [Phase 1]
-- [ ] REQ-003: TailwindCSS + DaisyUI integration with Fable/Feliz frontend [Phase 1]
-- [ ] REQ-004: SQLite-based append-only event store with event serialization and stream support [Phase 1]
-- [ ] REQ-005: Projection engine that replays events into SQLite read model tables [Phase 1]
+- [x] REQ-001: F# solution structure with Shared, Server, and Client projects using Fable, Giraffe, and Fable.Remoting [Phase 1]
+- [x] REQ-002: Vite + concurrently dev pipeline for simultaneous frontend and backend development [Phase 1]
+- [x] REQ-003: TailwindCSS + DaisyUI integration with Fable/Feliz frontend [Phase 1]
+- [x] REQ-004: SQLite-based append-only event store with event serialization and stream support [Phase 1]
+- [x] REQ-005: Projection engine that replays events into SQLite read model tables [Phase 1]
 - [ ] REQ-006: App shell with mobile-first responsive layout and navigation (sidebar/bottom nav) [Phase 1]
-- [ ] REQ-007: Dockerfile for production deployment on Linux [Phase 1]
-- [ ] REQ-008: Expecto test project with build integration [Phase 1]
+- [x] REQ-007: Dockerfile for production deployment on Linux [Phase 1]
+- [x] REQ-008: Expecto test project with build integration [Phase 1]
 
 ### Phase 2: Catalog + Friends
 
