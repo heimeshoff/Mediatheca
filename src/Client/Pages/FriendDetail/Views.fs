@@ -1,0 +1,167 @@
+module Mediatheca.Client.Pages.FriendDetail.Views
+
+open Feliz
+open Feliz.DaisyUI
+open Feliz.Router
+open Mediatheca.Client.Pages.FriendDetail.Types
+open Mediatheca.Client.Components
+
+let view (model: Model) (dispatch: Msg -> unit) =
+    match model.IsLoading, model.Friend with
+    | true, _ ->
+        Html.div [
+            prop.className "flex justify-center py-12"
+            prop.children [
+                Daisy.loading [ loading.spinner; loading.lg ]
+            ]
+        ]
+    | false, None ->
+        PageContainer.view "Friend Not Found" [
+            Html.p [
+                prop.className "text-base-content/70"
+                prop.text "The friend you're looking for doesn't exist."
+            ]
+            Html.a [
+                prop.className "link link-primary mt-4 inline-block"
+                prop.href (Router.format "friends")
+                prop.onClick (fun e ->
+                    e.preventDefault()
+                    Router.navigate "friends"
+                )
+                prop.text "Back to Friends"
+            ]
+        ]
+    | false, Some friend ->
+        Html.div [
+            prop.className "p-4 lg:p-6"
+            prop.children [
+                // Back button
+                Html.div [
+                    prop.className "mb-4"
+                    prop.children [
+                        Daisy.button.button [
+                            button.ghost
+                            button.sm
+                            prop.onClick (fun _ -> Router.navigate "friends")
+                            prop.text "< Back to Friends"
+                        ]
+                    ]
+                ]
+                Daisy.card [
+                    prop.className "bg-base-100 shadow-xl"
+                    prop.children [
+                        Daisy.cardBody [
+                            prop.children [
+                                if model.IsEditing then
+                                    // Edit form
+                                    Html.h2 [
+                                        prop.className "card-title font-display mb-4"
+                                        prop.text "Edit Friend"
+                                    ]
+                                    Html.div [
+                                        prop.className "form-control mb-4"
+                                        prop.children [
+                                            Html.label [
+                                                prop.className "label"
+                                                prop.children [
+                                                    Html.span [
+                                                        prop.className "label-text"
+                                                        prop.text "Name"
+                                                    ]
+                                                ]
+                                            ]
+                                            Daisy.input [
+                                                prop.value model.EditForm.Name
+                                                prop.onChange (EditNameChanged >> dispatch)
+                                            ]
+                                        ]
+                                    ]
+                                    match model.Error with
+                                    | Some err ->
+                                        Daisy.alert [
+                                            alert.error
+                                            prop.className "mb-4"
+                                            prop.text err
+                                        ]
+                                    | None -> ()
+                                    Html.div [
+                                        prop.className "flex gap-2"
+                                        prop.children [
+                                            Daisy.button.button [
+                                                button.primary
+                                                prop.onClick (fun _ -> dispatch SubmitUpdate)
+                                                prop.text "Save"
+                                            ]
+                                            Daisy.button.button [
+                                                button.ghost
+                                                prop.onClick (fun _ -> dispatch CancelEditing)
+                                                prop.text "Cancel"
+                                            ]
+                                        ]
+                                    ]
+                                else
+                                    // View
+                                    Html.div [
+                                        prop.className "flex items-center gap-6"
+                                        prop.children [
+                                            Daisy.avatar [
+                                                prop.children [
+                                                    Html.div [
+                                                        prop.className "w-24 h-24 rounded-full bg-base-300"
+                                                        prop.children [
+                                                            match friend.ImageRef with
+                                                            | Some ref ->
+                                                                Html.img [
+                                                                    prop.src $"/images/{ref}"
+                                                                    prop.alt friend.Name
+                                                                ]
+                                                            | None ->
+                                                                Html.div [
+                                                                    prop.className "flex items-center justify-center w-full h-full text-base-content/30"
+                                                                    prop.children [ Icons.friends () ]
+                                                                ]
+                                                        ]
+                                                    ]
+                                                ]
+                                            ]
+                                            Html.div [
+                                                prop.children [
+                                                    Html.h2 [
+                                                        prop.className "text-2xl font-bold font-display"
+                                                        prop.text friend.Name
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                                    match model.Error with
+                                    | Some err ->
+                                        Daisy.alert [
+                                            alert.error
+                                            prop.className "mt-4"
+                                            prop.text err
+                                        ]
+                                    | None -> ()
+                                    Html.div [
+                                        prop.className "flex gap-2 mt-6"
+                                        prop.children [
+                                            Daisy.button.button [
+                                                button.primary
+                                                button.outline
+                                                prop.onClick (fun _ -> dispatch StartEditing)
+                                                prop.text "Edit"
+                                            ]
+                                            Daisy.button.button [
+                                                button.error
+                                                button.outline
+                                                prop.onClick (fun _ -> dispatch RemoveFriend)
+                                                prop.text "Remove"
+                                            ]
+                                        ]
+                                    ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]

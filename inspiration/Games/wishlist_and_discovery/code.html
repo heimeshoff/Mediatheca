@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Wishlist &amp; Discovery | GameTracker Pro</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#3713ec",
+                        "brand-blue": "#33A9FF",
+                        "brand-orange": "#F98C11",
+                        "brand-yellow": "#FFEB3B",
+                        "brand-pink": "#F06292",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#0f0d1a",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #292348;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen">
+<div class="layout-container flex flex-col h-full">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 dark:border-[#292348] px-6 lg:px-10 py-3 bg-[var(--brand-blue)] sticky top-0 z-50">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-4 text-white">
+<div class="size-6 text-white">
+<svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path>
+</svg>
+</div>
+<h2 class="text-lg font-bold leading-tight tracking-[-0.015em] font-display">GameTracker Pro</h2>
+</div>
+<nav class="hidden md:flex items-center gap-9">
+<a class="text-sm font-medium leading-normal text-white/80 hover:text-white transition-colors" href="#">Library</a>
+<a class="text-white text-sm font-bold leading-normal border-b-2 border-white" href="#">Wishlist</a>
+<a class="text-sm font-medium leading-normal text-white/80 hover:text-white transition-colors" href="#">Discovery</a>
+<a class="text-sm font-medium leading-normal text-white/80 hover:text-white transition-colors" href="#">Community</a>
+</nav>
+</div>
+<div class="flex flex-1 justify-end gap-4 lg:gap-8">
+<label class="hidden sm:flex flex-col min-w-40 !h-10 max-w-64">
+<div class="flex w-full flex-1 items-stretch rounded-lg h-full bg-white/20 backdrop-blur-sm border border-white/10">
+<div class="text-white/70 flex items-center justify-center pl-4 rounded-l-lg">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 border-none bg-transparent focus:ring-0 h-full placeholder:text-white/60 px-4 pl-2 text-base font-normal leading-normal text-white" placeholder="Search games..." value=""/>
+</div>
+</label>
+<div class="flex gap-2">
+<button class="flex size-10 items-center justify-center rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="flex size-10 items-center justify-center rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-white/30" data-alt="User profile avatar with neon border" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBB029iPKnGgNozvLqV5EBFRhGzM0DvOxpfP-9FJVKyf5xa4icXsn8SaJJw9cAxFnp7igO6Mh21Hvk9etwbmkLYU8aVGJU-YqCJ2OgEkHcLtRdgOefSPdtEzow9PbvioamDMzw5iEtfhnkZcoPmruNzrPFcFY2-ioM6xrg4owmSqNimNhwa4nUePuxHvRe-EygsgWr_RT4rTLQwkkOWE4HeGae9pMBkn3HDhAOZUMrxlJCZ-1rSEyIJuVHdSO4d7hQ8AWDcoEH1agaV");'></div>
+</div>
+</header>
+<main class="flex-1 max-w-[1400px] mx-auto w-full px-6 lg:px-10 py-8">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
+<div class="flex flex-col gap-2">
+<h1 class="text-4xl font-black leading-tight tracking-[-0.033em] font-display">Wishlist &amp; Discovery</h1>
+<p class="text-slate-500 dark:text-[#9b92c9] text-base font-normal leading-normal">Monitor your most wanted titles and find hidden gems.</p>
+</div>
+<div class="flex gap-2 flex-wrap">
+<button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-lg bg-brand-blue text-white px-3 font-medium">
+<span class="material-symbols-outlined text-[18px]">apps</span>
+<p class="text-sm">All</p>
+</button>
+<button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-lg bg-slate-100 dark:bg-[#292348] px-3 text-slate-700 dark:text-white hover:bg-brand-blue/20 transition-colors">
+<span class="material-symbols-outlined text-[18px]">sports_esports</span>
+<p class="text-sm">Steam</p>
+</button>
+<button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-lg bg-slate-100 dark:bg-[#292348] px-3 text-slate-700 dark:text-white hover:bg-brand-blue/20 transition-colors">
+<span class="material-symbols-outlined text-[18px]">videogame_asset</span>
+<p class="text-sm">Epic</p>
+</button>
+<button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-lg bg-slate-100 dark:bg-[#292348] px-3 text-slate-700 dark:text-white hover:bg-brand-blue/20 transition-colors">
+<span class="material-symbols-outlined text-[18px]">search_logo</span>
+<p class="text-sm">PS5</p>
+</button>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<div class="lg:col-span-7 flex flex-col gap-4">
+<div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#292348]">
+<h2 class="text-xl font-bold font-display">My Wishlist (12)</h2>
+<div class="flex gap-2 items-center cursor-pointer text-slate-500 hover:text-white">
+<span class="text-sm">Sorted by: Discount</span>
+<span class="material-symbols-outlined text-[18px]">expand_more</span>
+</div>
+</div>
+<div class="group flex flex-col sm:flex-row gap-4 p-4 rounded-xl bg-white dark:bg-[#1a162e] border border-slate-200 dark:border-[#292348] hover:border-brand-blue transition-all">
+<div class="relative w-full sm:w-48 h-32 rounded-lg overflow-hidden shrink-0">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="Cyberpunk sci-fi game cover art" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuABKz8JrrkTmtAO4EqTE2DXTcmFU2razBHYJEnrnDFOLL35vsMlNbj1lYGAN0Xyx6k1MzjWj-4VR8c9gMvaoHF9c3XRIBzTUL0gV1rhgOSeXXZUQB3DZNvnGJxgx5IDC6QWN356W83iyE09BUOyE1CwveYNzqwYY3SQyDI8hwsiOPlNdKKe_b7_T8ZD312c07HiDlzzA69o4RSDvKKV8TAdlz0rdGZAzl_6_UeTzqAJXMIuUN6hW7OemFckJbLLsX9WrKVnPv_AUSxk");'></div>
+<div class="absolute top-2 left-2 px-2 py-0.5 bg-brand-yellow text-slate-900 text-[10px] font-bold rounded uppercase">Best Price</div>
+</div>
+<div class="flex flex-col flex-1 justify-between py-1">
+<div>
+<div class="flex justify-between items-start">
+<h3 class="text-lg font-bold leading-tight group-hover:text-brand-blue transition-colors">Neon Nights: Overdrive</h3>
+<button class="text-slate-400 hover:text-red-500 transition-colors"><span class="material-symbols-outlined text-[20px]">delete</span></button>
+</div>
+<div class="flex gap-2 mt-1">
+<span class="text-xs text-[#9b92c9] flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">sports_esports</span> Steam</span>
+<span class="text-xs text-[#9b92c9] flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">calendar_today</span> Added 2mo ago</span>
+</div>
+</div>
+<div class="flex items-center justify-between mt-4">
+<div class="flex items-center gap-3">
+<div class="bg-brand-pink/20 text-brand-pink px-2 py-1 rounded font-bold text-sm">-60%</div>
+<div class="flex flex-col">
+<span class="text-xs text-slate-400 line-through">$59.99</span>
+<span class="text-xl font-black text-white">$23.99</span>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="px-4 h-9 bg-brand-orange text-white rounded-lg text-sm font-bold hover:brightness-110 transition-all shadow-lg shadow-brand-orange/20">Buy Now</button>
+<button class="size-9 flex items-center justify-center border border-[#3b3267] rounded-lg hover:bg-[#3b3267] transition-colors text-white"><span class="material-symbols-outlined text-[20px]">library_add</span></button>
+</div>
+</div>
+</div>
+</div>
+<div class="group flex flex-col sm:flex-row gap-4 p-4 rounded-xl bg-white dark:bg-[#1a162e] border border-slate-200 dark:border-[#292348] hover:border-brand-blue transition-all">
+<div class="relative w-full sm:w-48 h-32 rounded-lg overflow-hidden shrink-0">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="Fantasy landscape game cover art" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCiyl6wLMvrttQ5IaFbUzIAbCCmMF2uUG0Pem68BkD-rk_cVATZuB9Upu9TagdcAKclOtjjNOM_weWXKMAyUOhQZ2QmVZBZLQR3F_MZhsGKWofp0rt2mC5ZScIal7R1udfGIcKZLC-Wdo7jJHoT-0wbQX9gJa-qUkstsBSE2AcudbkgawJGwMljuf1F-NxNx2Wtzn7KMh_MuNE294NKGr6pwP6VuAPsTcXmbA76RIY1hzsGWqU6BI-SK8Vfm_Gf7viXrXsGInkLIG0V");'></div>
+</div>
+<div class="flex flex-col flex-1 justify-between py-1">
+<div>
+<div class="flex justify-between items-start">
+<h3 class="text-lg font-bold leading-tight group-hover:text-brand-blue transition-colors">Elder Runes: Forgotten Realms</h3>
+<button class="text-slate-400 hover:text-red-500 transition-colors"><span class="material-symbols-outlined text-[20px]">delete</span></button>
+</div>
+<div class="flex gap-2 mt-1">
+<span class="text-xs text-[#9b92c9] flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">videogame_asset</span> Epic Games</span>
+<span class="text-xs text-[#9b92c9] flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">calendar_today</span> Added 5d ago</span>
+</div>
+</div>
+<div class="flex items-center justify-between mt-4">
+<div class="flex items-center gap-3">
+<div class="bg-brand-pink/20 text-brand-pink px-2 py-1 rounded font-bold text-sm">-10%</div>
+<div class="flex flex-col">
+<span class="text-xs text-slate-400 line-through">$39.99</span>
+<span class="text-xl font-black text-white">$35.99</span>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="px-4 h-9 bg-brand-orange text-white rounded-lg text-sm font-bold hover:brightness-110 transition-all shadow-lg shadow-brand-orange/20">Buy Now</button>
+<button class="size-9 flex items-center justify-center border border-[#3b3267] rounded-lg hover:bg-[#3b3267] transition-colors text-white"><span class="material-symbols-outlined text-[20px]">library_add</span></button>
+</div>
+</div>
+</div>
+</div>
+<div class="group flex flex-col sm:flex-row gap-4 p-4 rounded-xl bg-white dark:bg-[#1a162e] border border-slate-200 dark:border-[#292348] hover:border-brand-blue transition-all">
+<div class="relative w-full sm:w-48 h-32 rounded-lg overflow-hidden shrink-0">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="Space exploration game cover art" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCXzxLwtE_rYkas5NZlc02BSWMcZrxqrisMjPispDdVOXvkaOITZWh8xr8qctbApTm0hXfE7oWsBY2hVJOqjYF5jYIOZxxbIHSQC94GKav3IqbtG5RndgflRCBnrXBfBXStO3_NKGFVF_rhMEOI94GalRH4D1iFZ1tIQtfjU4GaDK4vZjkWOMcxLCB92_uLgi4OQqLQIy7VsJCOyRAi63ELwNI3_DOl0z8I2I3PYqmb7MWXyGC2BP0wWklUUvjYJxWc3v8dChSF9aQ7");'></div>
+<div class="absolute top-2 left-2 px-2 py-0.5 bg-brand-blue text-white text-[10px] font-bold rounded uppercase">New Release</div>
+</div>
+<div class="flex flex-col flex-1 justify-between py-1">
+<div>
+<div class="flex justify-between items-start">
+<h3 class="text-lg font-bold leading-tight group-hover:text-brand-blue transition-colors">Void Voyager</h3>
+<button class="text-slate-400 hover:text-red-500 transition-colors"><span class="material-symbols-outlined text-[20px]">delete</span></button>
+</div>
+<div class="flex gap-2 mt-1">
+<span class="text-xs text-[#9b92c9] flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">sports_esports</span> Steam</span>
+<span class="text-xs text-[#9b92c9] flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">calendar_today</span> Added today</span>
+</div>
+</div>
+<div class="flex items-center justify-between mt-4">
+<div class="flex items-center gap-3">
+<div class="flex flex-col">
+<span class="text-xl font-black text-white">$49.99</span>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="px-4 h-9 bg-brand-orange text-white rounded-lg text-sm font-bold hover:brightness-110 transition-all shadow-lg shadow-brand-orange/20">Buy Now</button>
+<button class="size-9 flex items-center justify-center border border-[#3b3267] rounded-lg hover:bg-[#3b3267] transition-colors text-white"><span class="material-symbols-outlined text-[20px]">library_add</span></button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="lg:col-span-5 flex flex-col gap-6">
+<div>
+<h2 class="text-xl font-bold font-display border-b border-slate-200 dark:border-[#292348] pb-2 mb-4">Discovery Feed</h2>
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-2 text-brand-yellow">
+<span class="material-symbols-outlined">trending_up</span>
+<span class="font-bold text-sm tracking-wide uppercase">Trending Now</span>
+</div>
+<div class="relative group rounded-xl overflow-hidden h-56 w-full border border-white/5">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110" data-alt="High speed racing game scenery" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAZ46Gc5OgYuIJtP__wjI2-LVLLf9kf8hBKEsykKcgookB2-HZYDD9c5klMiroxs4xnR05l6IZL7TKdgCy5sE3cgTTVwT1n1D1IYpzH8GH2k9bGP5bIP7BWOIVTAZLVW9as-odC6qn9IDctR-n3-w6MCmkscUDt35b-wiOAqCOBYDD2HBufW4O0Ux3dgsXroj-pDKNm5WJKbVY0AUaDBB7mBYc70eygUlqE-5hVlaEKIJFNQmIEIs3TZUfmZ3po1grViu_krPvJRIrn");'></div>
+<div class="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/20 to-transparent"></div>
+<div class="absolute bottom-4 left-4 right-4">
+<div class="flex items-center gap-2 mb-1">
+<span class="px-2 py-0.5 bg-brand-pink text-[10px] font-bold rounded text-white">RACING</span>
+<span class="px-2 py-0.5 bg-brand-yellow text-[10px] font-bold rounded text-slate-900">4.8 ★</span>
+</div>
+<h4 class="text-xl font-bold text-white leading-tight">Velocity X: Nitro Rush</h4>
+<p class="text-xs text-white/70 line-clamp-1 mb-3">Experience the next generation of urban street racing.</p>
+<div class="flex gap-2">
+<button class="flex-1 bg-white text-background-dark py-2 rounded font-bold text-xs hover:bg-slate-200 transition-colors">View Details</button>
+<button class="bg-brand-blue text-white px-3 py-2 rounded text-xs font-bold hover:brightness-110 transition-all">Add to Wishlist</button>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-8">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2 text-slate-400 dark:text-[#9b92c9]">
+<span class="material-symbols-outlined">auto_awesome</span>
+<span class="font-bold text-sm tracking-wide uppercase">Recommended for you</span>
+</div>
+<a class="text-xs text-brand-blue font-bold hover:underline" href="#">See More</a>
+</div>
+<div class="grid grid-cols-1 gap-4">
+<div class="flex items-center gap-4 p-3 rounded-lg bg-slate-100 dark:bg-[#1a162e] border border-transparent hover:border-brand-blue/50 transition-all cursor-pointer">
+<div class="size-16 rounded overflow-hidden shrink-0">
+<div class="h-full w-full bg-cover bg-center" data-alt="Horror survival game icon" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDEhfS-wsfJNByZG3goCdnQEC-QJfsLEWMz9DOTTHc2mv9AdvZmod-EFc3Lvd0mZQlRNoM08eoApoBaKDd8_zNM9--YhhvJmzpMupq51Xf4FIFO-9cugSeE7afi1bFDocw_a_fRXgmOtWBQBE6i0ja9f4fQKfdXTPHz5WjzXkQRqwMKyjKsipTTCTWN5qDltEHjXuOLPBz_h_tgEpb5WEZZgwDzx2kWwCMuzw1ctRt3NFvXP2d-X7Dx-Z8INX5XOTapN24fCmqgmpjj");'></div>
+</div>
+<div class="flex-1 min-w-0">
+<h5 class="font-bold text-sm truncate">Shadows of Aetheria</h5>
+<p class="text-xs text-slate-500 dark:text-[#9b92c9]">Because you played RPGs</p>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-xs font-bold text-white">$19.99</span>
+<span class="text-[10px] text-brand-pink font-bold bg-brand-pink/10 px-1 rounded">MATCHING</span>
+</div>
+</div>
+<button class="text-brand-blue hover:bg-brand-blue/20 p-1 rounded-full transition-colors">
+<span class="material-symbols-outlined text-[24px]">add_circle</span>
+</button>
+</div>
+<div class="flex items-center gap-4 p-3 rounded-lg bg-slate-100 dark:bg-[#1a162e] border border-transparent hover:border-brand-blue/50 transition-all cursor-pointer">
+<div class="size-16 rounded overflow-hidden shrink-0">
+<div class="h-full w-full bg-cover bg-center" data-alt="Cyberpunk city icon" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCA8uRgaTBfeZ0TiO5N2CC9s7gJmiVPRBMhrYZeVhg9OyMsITJKTOpi-cvI4JwlhUhNYQ7PQdrW_Cz4PFClzFIpiKghOEARw2dRpPl3bK6mKsJqDsA8lBCzSyRBl6PWtZiqvkwDB8H-yTIWIWRkDg_1wgzV7ce3wZT5k3cvOYQ9NLOdWtbhS-aiPPrt6mRf0_ACJPnlgcWGk6tQGLU6r547VDdybVhVlbg7lFnUfXGRakfsgDpU0ljQoc5_mlnrZbatuQwgHIyFZOfj");'></div>
+</div>
+<div class="flex-1 min-w-0">
+<h5 class="font-bold text-sm truncate">Protocol: 7</h5>
+<p class="text-xs text-slate-500 dark:text-[#9b92c9]">Hot in your region</p>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-xs font-bold text-white">$29.99</span>
+<span class="text-[10px] text-brand-yellow font-bold bg-brand-yellow/10 px-1 rounded uppercase">Trending</span>
+</div>
+</div>
+<button class="text-brand-blue hover:bg-brand-blue/20 p-1 rounded-full transition-colors">
+<span class="material-symbols-outlined text-[24px]">add_circle</span>
+</button>
+</div>
+<div class="flex items-center gap-4 p-3 rounded-lg bg-slate-100 dark:bg-[#1a162e] border border-transparent hover:border-brand-blue/50 transition-all cursor-pointer">
+<div class="size-16 rounded overflow-hidden shrink-0">
+<div class="h-full w-full bg-cover bg-center" data-alt="Pixel art adventure icon" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAPsfAd50JrzttgT4La7csNZFvtdbjk23FOifSjWDXbXQs4X_2FH7WGoxQ37ueTm6_1Ouq7raxB5yO-WUIpUOPVRqaRovBR2KOq40oby9MWtxGLCs9Cpd_P_CHueZFnzC_NxWjW9nBfKkWCYDitVTLgCbcS9u8MzLngG9ujMT63l9aL6ijdGs9mXyCf4ynLP-5zAPO_jlOkfU-nGH5el8NAppk2aZIqLB3qUsVce0_rRqRaL6YeHoHeBJO_UUxdxKv6GetTOHaogLwR");'></div>
+</div>
+<div class="flex-1 min-w-0">
+<h5 class="font-bold text-sm truncate">Pixel Quest: Legends</h5>
+<p class="text-xs text-slate-500 dark:text-[#9b92c9]">Fans of "Indie" like this</p>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-xs font-bold text-white">$9.99</span>
+<span class="text-[10px] text-brand-pink font-bold bg-brand-pink/10 px-1 rounded">GREAT DEAL</span>
+</div>
+</div>
+<button class="text-brand-blue hover:bg-brand-blue/20 p-1 rounded-full transition-colors">
+<span class="material-symbols-outlined text-[24px]">add_circle</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-4 p-6 rounded-xl bg-brand-blue/10 border border-brand-blue/30 relative overflow-hidden">
+<div class="relative z-10">
+<h3 class="text-lg font-bold font-display mb-2 text-white">Sync with Mobile</h3>
+<p class="text-sm text-[#9b92c9] mb-4">Get instant price drop alerts on your phone. Never miss a deal again.</p>
+<button class="bg-brand-orange text-white px-5 py-2.5 rounded-lg font-bold text-sm shadow-lg shadow-brand-orange/20 hover:scale-[1.02] transition-transform">Download App</button>
+</div>
+<div class="absolute -bottom-6 -right-6 opacity-10 text-brand-blue">
+<span class="material-symbols-outlined text-[120px]">smartphone</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<footer class="border-t border-slate-200 dark:border-[#292348] mt-12 py-8 bg-white dark:bg-background-dark/50">
+<div class="max-w-[1400px] mx-auto px-6 lg:px-10 flex flex-col md:flex-row justify-between items-center gap-6">
+<div class="flex items-center gap-2 text-slate-400">
+<span class="material-symbols-outlined text-[18px]">copyright</span>
+<span class="text-xs font-medium uppercase tracking-widest">2024 GameTracker Pro . All rights reserved.</span>
+</div>
+<div class="flex gap-6">
+<a class="text-xs font-medium text-slate-500 hover:text-brand-blue" href="#">Privacy Policy</a>
+<a class="text-xs font-medium text-slate-500 hover:text-brand-blue" href="#">Terms of Service</a>
+<a class="text-xs font-medium text-slate-500 hover:text-brand-blue" href="#">API Documentation</a>
+</div>
+</div>
+</footer>
+</div>
+
+</body></html>

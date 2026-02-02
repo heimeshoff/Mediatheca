@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Platform Import Settings - GameTracker Pro</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,FILL@0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#33A9FF", // Blue from the logo
+                        "accent-orange": "#FF8C00", // Orange from the logo
+                        "accent-pink": "#F06292",
+                        "accent-yellow": "#FFEB3B",
+                        "accent-green": "#8BC34A",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#0F0C1D",
+                        "card-dark": "#1A162E",
+                        "border-dark": "#2D264E",
+                        "text-muted": "#9b92c9",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .connected-state {
+            @apply border-[var(--primary-color)];
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-white min-h-screen">
+<div class="layout-container flex h-full grow flex-col">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-border-dark px-10 py-3 bg-background-light dark:bg-background-dark">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-4 text-white">
+<div class="size-6 text-primary">
+<svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path>
+</svg>
+</div>
+<h2 class="text-black dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] font-display">GameTracker Pro</h2>
+</div>
+<label class="flex flex-col min-w-40 h-10 max-w-64">
+<div class="flex w-full flex-1 items-stretch rounded-lg h-full">
+<div class="text-text-muted flex border-none bg-white dark:bg-border-dark items-center justify-center pl-4 rounded-l-lg" data-icon="search">
+<span class="material-symbols-outlined">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-black dark:text-white focus:outline-0 focus:ring-0 border-none bg-white dark:bg-border-dark focus:border-none h-full placeholder:text-text-muted px-4 rounded-l-none border-l-0 pl-2 text-base font-normal leading-normal font-display" placeholder="Search platforms..." value=""/>
+</div>
+</label>
+</div>
+<div class="flex flex-1 justify-end gap-8">
+<div class="flex items-center gap-9">
+<a class="text-black dark:text-white text-sm font-medium leading-normal hover:text-primary transition-colors font-display" href="#">Library</a>
+<a class="text-black dark:text-white text-sm font-medium leading-normal hover:text-primary transition-colors font-display" href="#">Stats</a>
+<a class="text-black dark:text-white text-sm font-medium leading-normal hover:text-primary transition-colors font-display" href="#">Platforms</a>
+<a class="text-black dark:text-white text-sm font-medium leading-normal hover:text-primary transition-colors font-display" href="#">Settings</a>
+</div>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-primary" data-alt="User profile avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAqDJK95mFeaEz374YBszkfbfZZnfBYkaoMmbNwmtVJwoX4luxJsbtKO8qIrK31zZtH5r6OUUzfAE68lI-G2vW7tu833zSyJ0SkrMYvS-uYymH1f43YvNOQ8UAsHXaMe66aHu575lxyPuDG_96tWiqoDThD8x5fSUoB3h1isPT0Cc8NxcebgRQ28BohWYuvJMdgLDKjOsr-DwJTUV8SwHQov_Wu5RugNEvTQcVIU68Ry2RWDNzAdVa-TibZKq5OPVIAp37L6WET50eD");'></div>
+</div>
+</header>
+<main class="flex-1 flex justify-center py-10">
+<div class="layout-content-container flex flex-col max-w-[960px] flex-1 px-4 sm:px-10">
+<div class="flex flex-wrap justify-between items-end gap-3 p-4 mb-2">
+<div class="flex min-w-72 flex-col gap-3">
+<h1 class="text-black dark:text-white text-4xl font-black leading-tight tracking-[-0.033em] font-display">Platform Import Settings</h1>
+<p class="text-text-muted text-base font-normal leading-normal font-display">Manage your digital library integrations and physical collection sync.</p>
+</div>
+<div class="flex flex-col items-end gap-3">
+<button class="flex min-w-[140px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-6 bg-accent-orange text-white text-sm font-bold leading-normal tracking-[0.015em] hover:brightness-110 shadow-lg shadow-accent-orange/20 transition-all font-display">
+<span class="material-symbols-outlined mr-2">sync</span>
+<span class="truncate">Sync Now</span>
+</button>
+<p class="text-text-muted text-xs font-normal leading-normal font-display">Last global sync: 2 minutes ago</p>
+</div>
+</div>
+<div class="h-px bg-border-dark mx-4 mb-8"></div>
+<div class="flex items-center gap-2 px-4 pb-3 pt-5">
+<span class="material-symbols-outlined text-primary">cloud_sync</span>
+<h2 class="text-black dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em] font-display">Digital Accounts</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4">
+<div class="flex flex-col gap-4 p-5 bg-white dark:bg-card-dark rounded-xl border border-primary/40 shadow-lg shadow-primary/5 transition-all group">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 bg-center bg-no-repeat bg-cover rounded-lg border-2 border-accent-green/30" data-alt="Steam logo icon" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDgvsACB-svoq4IWj2b_qxD6oWqbpjcuuNkTlKwpD3ulStn-Dn6_xp7ASWgw9pGHQbn3jZDvp63CgvvYDsoZAHBguk32-e4gzuvxR7MeIBlkzNYyA54PFfenb1rsLb6cqd87Hdo0NTT631IqiDWNNpk-ZN2YwRwB7E9T-TX7TfSno8NZ7JjWJxpSBf_jbwvkEnRHi6eWQwwdUOHs7Si66WdKemqqLYW60cg7bmJQkHbsGxYMmsJPxvBu7qsO59_fh3yiYFSttFGmLqm");'></div>
+<span class="px-3 py-1 bg-accent-green/10 text-accent-green text-[10px] font-bold tracking-wider rounded-full border border-accent-green/20">CONNECTED</span>
+</div>
+<div>
+<p class="text-black dark:text-white text-lg font-bold leading-tight font-display">Steam</p>
+<p class="text-text-muted text-sm font-normal leading-normal font-display">452 Games found</p>
+</div>
+<button class="w-full py-2 bg-border-dark hover:bg-border-dark/80 text-white rounded-lg text-sm font-medium transition-colors font-display">Configure</button>
+</div>
+<div class="flex flex-col gap-4 p-5 bg-white dark:bg-card-dark rounded-xl border border-transparent hover:border-border-dark transition-all group">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 bg-center bg-no-repeat bg-cover rounded-lg border-2 border-accent-pink/30" data-alt="Epic Games logo icon" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCDCmG_riQTagAxBZnPrthN82IGLzF-x60_QJ90RBKpr05ANk44ZFLECDhO6pdfvyMNOZq1vHpNr63-ReZIUKpfziSxPqegh4z5PF9TWQK0OSp_MCb1xAKH1bvOCI56A2BJiuWL-UVsc9zvTIrHvnXE1nsgGXkn1GQenFQ9MMgwSxUXYkh67DyYmikWZXu7r0WUezIR-2-YaYiam0BmbUnYCVQ498odTSkKwBpH0aFsfrF9aMrK240Ze6b5LBihgE8wmcrIa285Kc8a");'></div>
+<span class="px-3 py-1 bg-text-muted/10 text-text-muted text-[10px] font-bold tracking-wider rounded-full border border-text-muted/20">NOT LINKED</span>
+</div>
+<div>
+<p class="text-black dark:text-white text-lg font-bold leading-tight font-display">Epic Games Store</p>
+<p class="text-text-muted text-sm font-normal leading-normal font-display">Link your account to sync</p>
+</div>
+<button class="w-full py-2 bg-primary hover:brightness-110 text-white rounded-lg text-sm font-medium transition-colors font-display">Connect</button>
+</div>
+<div class="flex flex-col gap-4 p-5 bg-white dark:bg-card-dark rounded-xl border border-accent-orange/40 transition-all group">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 bg-center bg-no-repeat bg-cover rounded-lg border-2 border-accent-yellow/30" data-alt="PlayStation Network logo icon" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDFUFjfJZFL39hbx8BT-igwkDpKVihEBk5bwuqI2l0nNl9GhT0Cjxu-h7TJ0mB2Qr55yePmy1sFO-X605AgNKoRRH30ZloNZP7PHSTlguD-94VtwrOyQsc4kvl98cQk8KzCMRGuY0vnttEAFXllnH89AVY4cGsr000eo1vtYcf_tO6S58A3VZqnQlvaLh3gr7y7r9MabrEEi_8BSxJIw9r9SFBVTpDZ3KXQpT7gn8HLjn1T2Iz1RB-Os6VSUahXMmLvZgpSDlbNee9g");'></div>
+<span class="px-3 py-1 bg-accent-orange/10 text-accent-orange text-[10px] font-bold tracking-wider rounded-full border border-accent-orange/20">ACTION REQUIRED</span>
+</div>
+<div>
+<p class="text-black dark:text-white text-lg font-bold leading-tight font-display">PlayStation Network</p>
+<p class="text-accent-orange/80 text-sm font-normal leading-normal font-display">Re-authenticate account</p>
+</div>
+<button class="w-full py-2 bg-primary hover:brightness-110 text-white rounded-lg text-sm font-medium transition-colors font-display">Authorize</button>
+</div>
+<div class="flex flex-col gap-4 p-5 bg-white dark:bg-card-dark rounded-xl border border-transparent hover:border-border-dark transition-all group">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 bg-center bg-no-repeat bg-cover rounded-lg border-2 border-accent-green/30" data-alt="Xbox Live logo icon" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCElMfaDX8ElbiXiRxHqsgE6EZ3DxNoWhPxb8M53Vxh_jAFSSJe_drVLab9uvnJavrvoXZPF3pDV0NC333i12vHE-n8RklOuhiqzjVdp-ARjtvgQN3r-6L-PjBQA4xpwH4MtKHths7xvtP6spEvkyN-4pr203PO7Lf-CA6GYycKnwFNWM9W-K9MPNw9STtUKRYdyjVW-uvuwO8dgDIkRFmB-VgaAzQYf-1WtHa_eo6UDuyHGhVErb8RtQfw8pZxhO1kV4as4h1AqSqb");'></div>
+<span class="px-3 py-1 bg-text-muted/10 text-text-muted text-[10px] font-bold tracking-wider rounded-full border border-text-muted/20">NOT LINKED</span>
+</div>
+<div>
+<p class="text-black dark:text-white text-lg font-bold leading-tight font-display">Xbox Live</p>
+<p class="text-text-muted text-sm font-normal leading-normal font-display">Sync GamePass &amp; Purchases</p>
+</div>
+<button class="w-full py-2 bg-primary hover:brightness-110 text-white rounded-lg text-sm font-medium transition-colors font-display">Connect</button>
+</div>
+<div class="flex flex-col gap-4 p-5 bg-white dark:bg-card-dark rounded-xl border border-primary/40 shadow-lg shadow-primary/5 transition-all group">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 bg-center bg-no-repeat bg-cover rounded-lg border-2 border-accent-pink/30" data-alt="GOG.com logo icon" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCxsVbi64gUydcgeAin0rYOQ2vbELPft8j9MB7Gjdf2E0nvTMc6yC0osGqj4ENGXZ6VRCcPZMWmopjBs8parnFipQgnx7Al9GMEUNy3iPyXBwO0PtP8Wc_Dvb5KndxlD6HmDQ7MhZ0ZvN8WejINDX6ALs5Kc8ELhFIRMoF4_wgN3I25kQvkoWFiqwaQ1FKndIiLW3aRFqWnnjhOMUT1NvkRixScyMjMUjFllQ7w1OCfwVu9oj-uSJccQzua6vCihxeW3YaGRfTxZozh");'></div>
+<span class="px-3 py-1 bg-accent-green/10 text-accent-green text-[10px] font-bold tracking-wider rounded-full border border-accent-green/20">CONNECTED</span>
+</div>
+<div>
+<p class="text-black dark:text-white text-lg font-bold leading-tight font-display">GOG.com</p>
+<p class="text-text-muted text-sm font-normal leading-normal font-display">120 Games found</p>
+</div>
+<button class="w-full py-2 bg-border-dark hover:bg-border-dark/80 text-white rounded-lg text-sm font-medium transition-colors font-display">Configure</button>
+</div>
+<div class="flex flex-col gap-4 p-5 bg-white dark:bg-card-dark rounded-xl border border-primary/40 shadow-lg shadow-primary/5 transition-all group">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 bg-center bg-no-repeat bg-cover rounded-lg border-2 border-accent-yellow/30" data-alt="Nintendo eShop logo icon" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAooaFfdvyA63Ea_q5ts49X474hggOpCDn9Pgw9j38tDd2vsGlZ3mzByxiN-yO2PHzpDyhlLf_mrzLB6ymbAAwI9dEWLsEXhN619A79EnkJek9zrKFYR7clIbfRyfmAiYRcuvOODrXKR_EACw5KEhsVZP6f_L-Zs5TVC-Z57UYV_DHy_RMlav_0ECfeFmemczG_00QwcdL-c4TxI9g0i3uHja_YJLJclk59kQjRWnK7JT4AYWOWJodjV-Do2x_zq_odBzccEQMP0yGx");'></div>
+<span class="px-3 py-1 bg-accent-green/10 text-accent-green text-[10px] font-bold tracking-wider rounded-full border border-accent-green/20">CONNECTED</span>
+</div>
+<div>
+<p class="text-black dark:text-white text-lg font-bold leading-tight font-display">Nintendo eShop</p>
+<p class="text-text-muted text-sm font-normal leading-normal font-display">85 Games found</p>
+</div>
+<button class="w-full py-2 bg-border-dark hover:bg-border-dark/80 text-white rounded-lg text-sm font-medium transition-colors font-display">Configure</button>
+</div>
+</div>
+<div class="flex items-center gap-2 px-4 pb-3 pt-10">
+<span class="material-symbols-outlined text-primary">shelves</span>
+<h2 class="text-black dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em] font-display">Manual Entry</h2>
+</div>
+<div class="mx-4 p-8 bg-white dark:bg-card-dark rounded-xl border border-dashed border-border-dark flex flex-col items-center text-center gap-6">
+<div class="p-5 bg-primary/10 rounded-full text-primary ring-4 ring-primary/5">
+<span class="material-symbols-outlined !text-4xl">add_box</span>
+</div>
+<div>
+<h3 class="text-black dark:text-white text-xl font-bold font-display">Add Physical Games</h3>
+<p class="text-text-muted text-sm max-w-md mx-auto font-display">Have a collection of physical discs or cartridges? Manually add them to your library by title or UPC code.</p>
+</div>
+<button class="flex min-w-[220px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-6 bg-border-dark text-white text-sm font-bold leading-normal hover:bg-primary transition-all font-display border border-transparent hover:border-primary/50">
+<span class="material-symbols-outlined mr-2">playlist_add</span>
+<span class="truncate">Add Physical Media</span>
+</button>
+</div>
+<div class="px-4 py-8 flex items-center justify-center gap-2 opacity-60">
+<span class="material-symbols-outlined text-text-muted text-sm">lock</span>
+<p class="text-text-muted text-xs font-normal font-display">We use secure OAuth 2.0. Your login credentials are never stored directly on our servers.</p>
+</div>
+</div>
+</main>
+</div>
+
+</body></html>

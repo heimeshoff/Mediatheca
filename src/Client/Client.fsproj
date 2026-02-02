@@ -9,6 +9,7 @@
     <Compile Include="Router.fs" />
     <Compile Include="Components\Icons.fs" />
     <Compile Include="Components\PageContainer.fs" />
+    <Compile Include="Components\TmdbSearchModal.fs" />
     <Compile Include="Components\Sidebar.fs" />
     <Compile Include="Components\BottomNav.fs" />
     <Compile Include="Components\Layout.fs" />
@@ -18,12 +19,15 @@
     <Compile Include="Pages\Movies\Types.fs" />
     <Compile Include="Pages\Movies\State.fs" />
     <Compile Include="Pages\Movies\Views.fs" />
+    <Compile Include="Pages\MovieDetail\Types.fs" />
+    <Compile Include="Pages\MovieDetail\State.fs" />
+    <Compile Include="Pages\MovieDetail\Views.fs" />
     <Compile Include="Pages\Friends\Types.fs" />
     <Compile Include="Pages\Friends\State.fs" />
     <Compile Include="Pages\Friends\Views.fs" />
-    <Compile Include="Pages\Catalog\Types.fs" />
-    <Compile Include="Pages\Catalog\State.fs" />
-    <Compile Include="Pages\Catalog\Views.fs" />
+    <Compile Include="Pages\FriendDetail\Types.fs" />
+    <Compile Include="Pages\FriendDetail\State.fs" />
+    <Compile Include="Pages\FriendDetail\Views.fs" />
     <Compile Include="Pages\Settings\Types.fs" />
     <Compile Include="Pages\Settings\State.fs" />
     <Compile Include="Pages\Settings\Views.fs" />

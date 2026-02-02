@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cinemarko - TV Series Episode List</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Oswald:wght@500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#E50914",
+                        "background-light": "#F8F9FA",
+                        "background-dark": "#0A0A0B",
+                        "glass-dark": "rgba(20, 20, 22, 0.8)",
+                    },
+                    fontFamily: {
+                        display: ["Oswald", "sans-serif"],
+                        sans: ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.75rem",
+                    },
+                },
+            },
+        };
+    </script>
+<style>
+        .glass {
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        body {
+            -webkit-tap-highlight-color: transparent;
+        }
+        .season-nav-item.active {
+            border-bottom: 3px solid #E50914;
+            color: #E50914;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-sans min-h-screen">
+<header class="sticky top-0 z-50 glass bg-white/70 dark:bg-glass-dark px-4 py-3 flex items-center justify-between">
+<button class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">
+<span class="material-icons-round leading-none">arrow_back_ios_new</span>
+</button>
+<div class="flex-1 text-center">
+<h1 class="font-display uppercase tracking-widest text-lg">The Sandman</h1>
+</div>
+<button class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">
+<span class="material-icons-round leading-none">more_horiz</span>
+</button>
+</header>
+<main class="pb-24">
+<div class="relative w-full aspect-[4/3] overflow-hidden">
+<img alt="The Sandman Poster" class="w-full h-full object-cover object-top" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAt0u9fQtwt5MKUvQLBr1kkVLicMZFIacBkfYE9LikcqMFHo9KVCSQ6xqwA1fczem1zP3fAFVdfJ_59oJmytE8g93dRjb5SG2ZPqs5wGmhkcpR6SaMxy7jgGpLSSRMX3HX2pnmE6CMlM5mc4jk-Tzl3AnRC2dsn3RCIZtW8PwMFeGYsTO7kuwyEtyibw2Y53qC_i4Fu1ufyZEyoGBtirkL_cgsPkpi2jNxHLzsocCVdY366lTNNVQvmGBrx10tuPbmgFHv5wX6eRYiZ"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background-light dark:from-background-dark via-background-dark/20 to-transparent"></div>
+<div class="absolute bottom-4 left-4 right-4 flex flex-col gap-1">
+<p class="text-xs uppercase tracking-widest opacity-70 font-medium">Sci-Fi &amp; Fantasy • 2022 • 2 Seasons</p>
+<div class="flex items-center gap-4 mt-2">
+<div class="flex items-center gap-1.5 bg-primary px-3 py-1 rounded-full text-xs font-bold">
+<span class="material-icons-round text-sm">play_arrow</span>
+                    NEXT: S2 E1
+                </div>
+<div class="flex items-center gap-1.5 bg-white/10 glass px-3 py-1 rounded-full text-xs font-bold">
+<span class="material-icons-round text-sm text-yellow-500">star</span>
+                    8.4
+                </div>
+</div>
+</div>
+</div>
+<div class="px-4 mt-4 mb-4">
+<div class="flex gap-2 p-1 bg-slate-200/50 dark:bg-white/5 rounded-2xl">
+<button class="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all opacity-60">Overview</button>
+<button class="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all opacity-60">Cast &amp; Crew</button>
+<button class="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all bg-white dark:bg-white/10 shadow-sm">Episodes</button>
+</div>
+</div>
+<div class="px-4 mb-4">
+<div class="flex items-center gap-3 overflow-x-auto pb-1 no-scrollbar">
+<button class="flex items-center gap-2 whitespace-nowrap bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 px-4 py-2 rounded-xl text-sm font-medium">
+<span>Personal</span>
+<span class="material-icons-round text-sm opacity-50">keyboard_arrow_down</span>
+</button>
+<button class="flex items-center gap-2 whitespace-nowrap bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 px-4 py-2 rounded-xl text-sm font-medium">
+<span>with Alica</span>
+<span class="material-icons-round text-sm opacity-50 text-red-400">close</span>
+</button>
+<button class="flex items-center gap-2 whitespace-nowrap bg-slate-100 dark:bg-white/5 border border-dashed border-slate-300 dark:border-white/20 px-4 py-2 rounded-xl text-sm font-medium opacity-70">
+<span class="material-icons-round text-sm">add</span>
+<span>New Group</span>
+</button>
+</div>
+</div>
+<nav class="sticky top-[56px] z-40 bg-white dark:bg-background-dark/95 backdrop-blur-md border-b border-slate-200 dark:border-white/10 mb-2 overflow-x-auto no-scrollbar">
+<div class="flex px-4 min-w-max">
+<button class="season-nav-item active px-6 py-4 font-bold text-sm tracking-widest uppercase transition-colors">Season 1</button>
+<button class="season-nav-item px-6 py-4 font-bold text-sm tracking-widest uppercase opacity-40 transition-colors">Season 2</button>
+<button class="season-nav-item px-6 py-4 font-bold text-sm tracking-widest uppercase opacity-40 transition-colors">Season 3</button>
+<button class="season-nav-item px-6 py-4 font-bold text-sm tracking-widest uppercase opacity-40 transition-colors">Specials</button>
+</div>
+</nav>
+<section class="px-4">
+<div class="flex items-center justify-between py-2 border-b border-white/5 mb-2">
+<div class="flex items-baseline gap-2">
+<span class="text-xs uppercase tracking-widest font-bold text-primary">Season 1</span>
+<span class="text-[10px] opacity-50 font-medium">11/11 Episodes</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-1 text-[10px] font-bold text-primary">
+<span class="material-icons-round text-sm">done_all</span>
+                    ALL
+                </button>
+</div>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-3 py-3 border-b border-slate-200 dark:border-white/5 active:bg-white/5 transition-colors">
+<div class="relative flex-shrink-0">
+<img alt="Episode Thumbnail" class="w-16 h-16 object-cover rounded-lg" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmxwloUDgqHMnfxEPy0--ONrpkND7MZON4b1us-IjZAKk2MFV-S15KVI6tBUpiW53bnmf8p74VSCRYoa6AtUyqaePKdHDwj9gcCqa1tvqD1bDlupEp1B7DY6JpWrCIVyQ-4PL8h4OG99GiZYopdH7WR16QEDQebQxhglP2x3-D9sCir2l0vrK0TkKnWsY7Z2KVfRS3zq_dXwTyxUbtLqL6NwKwKgCrIN3mOpcd6uaVz7RMbiGNaTpJpM2QHpri6k4pJskNnvWq8_5s"/>
+<div class="absolute -top-1 -right-1 bg-green-500 text-white rounded-full p-0.5 shadow-sm border border-background-dark">
+<span class="material-icons-round text-[10px] block">check</span>
+</div>
+<div class="absolute bottom-0 left-0 right-0 h-1 bg-white/20 rounded-b-lg overflow-hidden">
+<div class="h-full bg-primary w-full"></div>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-[10px] font-bold text-primary uppercase tracking-wider mb-0.5">E01</p>
+<h3 class="text-sm font-semibold truncate leading-tight">Sleep of the Just</h3>
+<p class="text-[10px] opacity-40 font-bold mt-0.5">45m</p>
+</div>
+<button class="p-2 opacity-40">
+<span class="material-icons-round text-xl">info_outline</span>
+</button>
+</div>
+<div class="flex items-center gap-3 py-3 border-b border-slate-200 dark:border-white/5 active:bg-white/5 transition-colors">
+<div class="relative flex-shrink-0">
+<img alt="Episode Thumbnail" class="w-16 h-16 object-cover rounded-lg" src="https://lh3.googleusercontent.com/aida-public/AB6AXuADiDa11pp9qiZM1c4E-t9SMI-kUZ1hqBya1gzI2xQHHOL3BVLXeOUcsjrRqVWob2Dz78YQaAAQemU_JJ4G-XAsk5ZqZsAbdwdC6-ecbHrlSusp9rFlsaEmnwi8s5TGg78pOuz4YSAkGtipv2VktbikNzYEjsVFzViL08E4D68ZLOCp4aT_bqKns1OGXiG-4CzJPlVpLEUdOdthjspnSMme4RUR5ooATcMuLfo6rV-kbAQvANZI0Lr6kCm2cjZUJbzJHgK1VaXlIhVJ"/>
+<div class="absolute -top-1 -right-1 bg-green-500 text-white rounded-full p-0.5 shadow-sm border border-background-dark">
+<span class="material-icons-round text-[10px] block">check</span>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-[10px] font-bold text-primary uppercase tracking-wider mb-0.5">E02</p>
+<h3 class="text-sm font-semibold truncate leading-tight">Imperfect Hosts</h3>
+<p class="text-[10px] opacity-40 font-bold mt-0.5">38m</p>
+</div>
+<button class="p-2 opacity-40">
+<span class="material-icons-round text-xl">info_outline</span>
+</button>
+</div>
+<div class="flex items-center justify-between py-2 border-b border-white/5 mt-6 mb-2">
+<div class="flex items-baseline gap-2">
+<span class="text-xs uppercase tracking-widest font-bold opacity-40">Season 2</span>
+<span class="text-[10px] opacity-50 font-medium">0/12 Episodes</span>
+</div>
+<button class="flex items-center gap-1 text-[10px] font-bold opacity-40">
+<span class="material-icons-round text-sm">done_all</span>
+                    ALL
+                </button>
+</div>
+<div class="flex items-center gap-3 py-3 border-b border-slate-200 dark:border-white/5 active:bg-white/5 transition-colors">
+<div class="relative flex-shrink-0 ring-1 ring-primary/50 rounded-lg">
+<img alt="Episode Thumbnail" class="w-16 h-16 object-cover rounded-lg" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1g5TzDGBVbmLxsNN1Jiw4UAz6f3aJYhqDzTV_QaNB4_jSE4LWegG1d0VvHg7IgTGEliTEoQfkOjVvvOz_gcE8HQq4fFPsNeFPO3u1UiPeTjXHXFLqopnmAmB3Jez0vDOO7_SwC0ldYbxe1PUizyiat8an6XuxGavPOKCAZZYaHorzeK3GD-n_3kxRN8M8khAtHJR1nQdgdB6VwOtlIAV92NxZz3MDgJarPxrsZYNaVhLdOnz-BtwYmcRK3Iwp9hXRykiPow_JzMbg"/>
+<div class="absolute inset-0 bg-primary/20 rounded-lg flex items-center justify-center">
+<span class="material-icons-round text-white text-xl">play_arrow</span>
+</div>
+<div class="absolute top-0 left-0 bg-primary text-[8px] font-black px-1 rounded-tl-lg rounded-br-lg tracking-tighter">NEXT</div>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-[10px] font-bold text-primary uppercase tracking-wider mb-0.5">E01</p>
+<h3 class="text-sm font-semibold truncate leading-tight">Season of Mists</h3>
+<p class="text-[10px] opacity-40 font-bold mt-0.5">52m</p>
+</div>
+<button class="p-2 opacity-40">
+<span class="material-icons-round text-xl">info_outline</span>
+</button>
+</div>
+<div class="flex items-center gap-3 py-3 border-b border-slate-200 dark:border-white/5 opacity-40 grayscale-[0.3]">
+<div class="relative flex-shrink-0">
+<img alt="Episode Thumbnail" class="w-16 h-16 object-cover rounded-lg" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfn_X_jikZ7wVHjtIcNIl7zJ9se1JB9BMfSp3rbLzEGcKKhwYKi9DPQoR27P9DK_tOLnMfNSYdtrFd2wPGWLwaqEVNj03WesMUaQsR0gYAzxAdzIbWbksFVBTsXPOXgHl3gs55Meg_fBLbAidNGzsvJHXyRMtJW0Ov7zJcAxbK2iFYaOIsojbKj-L8TpMUNY5sqFfiCeZGZyI9QeIrVSqnAnixLW4iN2oFiIkn1s8SbxQuLnwR4XjsQpwA3RDfpD28ZfBT57NuKknu"/>
+<div class="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center">
+<span class="material-icons-round text-white/50 text-xl">lock</span>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-[10px] font-bold uppercase tracking-wider mb-0.5">E02</p>
+<h3 class="text-sm font-semibold truncate leading-tight">The Ruler of Hell</h3>
+<p class="text-[10px] opacity-40 font-bold mt-0.5">48m</p>
+</div>
+<button class="p-2 opacity-40">
+<span class="material-icons-round text-xl">info_outline</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+<nav class="fixed bottom-0 left-0 right-0 z-50 glass bg-white/80 dark:bg-glass-dark border-t border-slate-200 dark:border-white/10 px-6 py-4 flex items-center justify-between safe-area-bottom">
+<button class="text-primary flex flex-col items-center gap-1">
+<span class="material-icons-round">home</span>
+<span class="text-[10px] font-bold">Home</span>
+</button>
+<button class="opacity-40 dark:text-white flex flex-col items-center gap-1">
+<span class="material-icons-round">search</span>
+<span class="text-[10px] font-bold">Explore</span>
+</button>
+<button class="opacity-40 dark:text-white flex flex-col items-center gap-1">
+<span class="material-icons-round">calendar_today</span>
+<span class="text-[10px] font-bold">Calendar</span>
+</button>
+<button class="opacity-40 dark:text-white flex flex-col items-center gap-1">
+<span class="material-icons-round">person_outline</span>
+<span class="text-[10px] font-bold">Profile</span>
+</button>
+</nav>
+
+</body></html>

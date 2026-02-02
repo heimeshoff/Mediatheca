@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Statistics and Insights - GameTracker Pro</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2eb1ff",
+                        "secondary": "#ff8a00",
+                        "accent-yellow": "#ffeb3b",
+                        "accent-pink": "#f06292",
+                        "accent-green": "#8bc34a",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#0d0b1a",
+                        "card-dark": "#16132b",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+:root {
+  --primary-color: #2eb1ff;
+  --secondary-color: #ff8a00;
+  --accent-yellow: #ffeb3b;
+  --accent-pink: #f06292;
+  --accent-green: #8bc34a;
+}
+</style>
+<style>
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .radar-grid {
+            clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen">
+<div class="layout-container flex h-full grow flex-col">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 dark:border-[#292348] px-10 py-3 bg-white dark:bg-background-dark sticky top-0 z-50">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-4 text-primary">
+<div class="size-6">
+<svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path>
+</svg>
+</div>
+<h2 class="text-lg font-bold leading-tight tracking-[-0.015em] dark:text-white">GameTracker Pro</h2>
+</div>
+<nav class="hidden md:flex items-center gap-9">
+<a class="text-slate-600 dark:text-[#9b92c9] hover:text-primary dark:hover:text-white text-sm font-medium transition-colors" href="#">Library</a>
+<a class="text-primary dark:text-primary text-sm font-bold border-b-2 border-primary pb-1" href="#">Statistics</a>
+<a class="text-slate-600 dark:text-[#9b92c9] hover:text-primary dark:hover:text-white text-sm font-medium transition-colors" href="#">Discover</a>
+<a class="text-slate-600 dark:text-[#9b92c9] hover:text-primary dark:hover:text-white text-sm font-medium transition-colors" href="#">Community</a>
+</nav>
+</div>
+<div class="flex flex-1 justify-end gap-4 lg:gap-8 items-center">
+<label class="hidden sm:flex flex-col min-w-40 !h-10 max-w-64">
+<div class="flex w-full flex-1 items-stretch rounded-lg h-full overflow-hidden border border-slate-200 dark:border-none">
+<div class="text-slate-400 dark:text-[#9b92c9] flex bg-slate-50 dark:bg-[#1e1a3d] items-center justify-center pl-4">
+<span class="material-symbols-outlined text-xl">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 border-none bg-slate-50 dark:bg-[#1e1a3d] text-slate-900 dark:text-white focus:ring-0 h-full placeholder:text-slate-400 dark:placeholder:text-[#9b92c9] px-4 pl-2 text-sm" placeholder="Search collection..."/>
+</div>
+</label>
+<div class="flex gap-2">
+<button class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-100 dark:bg-[#1e1a3d] text-slate-600 dark:text-white hover:bg-slate-200 dark:hover:bg-[#2c265a] transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<button class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-100 dark:bg-[#1e1a3d] text-slate-600 dark:text-white hover:bg-slate-200 dark:hover:bg-[#2c265a] transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-secondary rounded-full"></span>
+</button>
+</div>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-primary" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCD_-gC48Vi3D027qSTmjZ1-wNLThylq_xoi-5RQU-y1kFTFfSzYsO6Q0aJJ4qo_9dezilmvKM2cej9N_NNv35MzPoB0w04lLmD5-jy_IqIVR0LZFQkqCluKcPk9cviqgZcD20J_8w_8sm2kPIh79gpaIsJWJ42H985HkzA4m8tc1ugN0CHs676mHWd8isYhufiYmAhOtRoxmYlSOmx-X7dlTHe16a910tk8ZoKL6rKazoYUPk7HmuZEcSrWXTvGjnrrM4nB6QgC-JR");'></div>
+</div>
+</header>
+<main class="flex-1 overflow-y-auto">
+<div class="max-w-[1200px] mx-auto px-6 py-10">
+<div class="flex flex-wrap justify-between items-end gap-4 mb-8">
+<div class="flex flex-col gap-1">
+<h1 class="text-slate-900 dark:text-white text-4xl font-black leading-tight tracking-tight font-display">Statistics &amp; Insights</h1>
+<p class="text-slate-500 dark:text-[#9b92c9] text-base flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">sync</span>
+                            Last synced: 2 minutes ago
+                        </p>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center justify-center gap-2 rounded-lg h-11 px-6 bg-slate-100 dark:bg-[#1e1a3d] text-slate-700 dark:text-white text-sm font-bold hover:bg-slate-200 dark:hover:bg-[#2c265a] transition-all">
+<span class="material-symbols-outlined text-lg">download</span>
+                            Export Data
+                        </button>
+<button class="flex items-center justify-center gap-2 rounded-lg h-11 px-6 bg-primary text-white text-sm font-bold hover:brightness-110 transition-all shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-lg">share</span>
+                            Share Report
+                        </button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+<div class="flex flex-col gap-2 rounded-xl p-6 bg-white dark:bg-card-dark border border-slate-200 dark:border-[#2c265a] shadow-sm">
+<div class="flex justify-between items-start">
+<p class="text-slate-500 dark:text-[#9b92c9] text-sm font-medium uppercase tracking-wider">Total Library Value</p>
+<span class="material-symbols-outlined text-primary">payments</span>
+</div>
+<p class="text-slate-900 dark:text-white tracking-tight text-3xl font-bold font-display">$1,240.50</p>
+<div class="flex items-center gap-1 text-accent-green text-sm font-bold">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+                            +5.2% <span class="text-slate-400 dark:text-[#9b92c9] font-normal ml-1">vs last month</span>
+</div>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-6 bg-white dark:bg-card-dark border border-slate-200 dark:border-[#2c265a] shadow-sm">
+<div class="flex justify-between items-start">
+<p class="text-slate-500 dark:text-[#9b92c9] text-sm font-medium uppercase tracking-wider">Total Playtime</p>
+<span class="material-symbols-outlined text-primary">schedule</span>
+</div>
+<p class="text-slate-900 dark:text-white tracking-tight text-3xl font-bold font-display">4,820 hrs</p>
+<div class="flex items-center gap-1 text-accent-green text-sm font-bold">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+                            +12% <span class="text-slate-400 dark:text-[#9b92c9] font-normal ml-1">increase</span>
+</div>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-6 bg-white dark:bg-card-dark border border-slate-200 dark:border-[#2c265a] shadow-sm">
+<div class="flex justify-between items-start">
+<p class="text-slate-500 dark:text-[#9b92c9] text-sm font-medium uppercase tracking-wider">Completion Rate</p>
+<span class="material-symbols-outlined text-primary">check_circle</span>
+</div>
+<p class="text-slate-900 dark:text-white tracking-tight text-3xl font-bold font-display">64%</p>
+<div class="flex items-center gap-1 text-secondary text-sm font-bold">
+<span class="material-symbols-outlined text-sm">trending_down</span>
+                            -2% <span class="text-slate-400 dark:text-[#9b92c9] font-normal ml-1">this period</span>
+</div>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-6 bg-white dark:bg-card-dark border border-slate-200 dark:border-[#2c265a] shadow-sm">
+<div class="flex justify-between items-start">
+<p class="text-slate-500 dark:text-[#9b92c9] text-sm font-medium uppercase tracking-wider">Owned Games</p>
+<span class="material-symbols-outlined text-primary">sports_esports</span>
+</div>
+<p class="text-slate-900 dark:text-white tracking-tight text-3xl font-bold font-display">342</p>
+<div class="flex items-center gap-1 text-primary text-sm font-bold">
+<span class="material-symbols-outlined text-sm">add</span>
+                            14 <span class="text-slate-400 dark:text-[#9b92c9] font-normal ml-1">new this month</span>
+</div>
+</div>
+</div>
+<div class="mb-8 overflow-x-auto">
+<div class="flex border-b border-slate-200 dark:border-[#2c265a] gap-8 min-w-max">
+<button class="flex items-center gap-2 border-b-2 border-primary text-primary dark:text-white pb-4 px-2 font-bold text-sm">
+<span class="material-symbols-outlined text-lg">grid_view</span> All Platforms
+                        </button>
+<button class="flex items-center gap-2 border-b-2 border-transparent text-slate-500 dark:text-[#9b92c9] hover:text-primary dark:hover:text-white pb-4 px-2 font-medium text-sm transition-all">
+<span class="material-symbols-outlined text-lg">database</span> Steam
+                        </button>
+<button class="flex items-center gap-2 border-b-2 border-transparent text-slate-500 dark:text-[#9b92c9] hover:text-primary dark:hover:text-white pb-4 px-2 font-medium text-sm transition-all">
+<span class="material-symbols-outlined text-lg">videogame_asset</span> PlayStation
+                        </button>
+<button class="flex items-center gap-2 border-b-2 border-transparent text-slate-500 dark:text-[#9b92c9] hover:text-primary dark:hover:text-white pb-4 px-2 font-medium text-sm transition-all">
+<span class="material-symbols-outlined text-lg">games</span> Xbox
+                        </button>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+<div class="lg:col-span-2 flex flex-col gap-6 rounded-xl border border-slate-200 dark:border-[#2c265a] bg-white dark:bg-card-dark p-8">
+<div class="flex justify-between items-center">
+<div>
+<p class="text-slate-500 dark:text-[#9b92c9] text-sm font-medium">Monthly Insight</p>
+<h3 class="text-slate-900 dark:text-white text-2xl font-bold font-display">Playtime by Month</h3>
+</div>
+<select class="bg-slate-100 dark:bg-[#1e1a3d] border-none rounded-lg text-sm text-slate-700 dark:text-white px-4 focus:ring-1 focus:ring-primary">
+<option>Last 6 Months</option>
+<option>Last Year</option>
+</select>
+</div>
+<div class="flex items-end justify-between h-64 gap-2 pt-4">
+<div class="flex-1 flex flex-col items-center gap-3 h-full justify-end group">
+<div class="relative w-full bg-primary/20 dark:bg-[#1e1a3d] rounded-t-lg transition-all group-hover:bg-primary/40" style="height: 35%">
+<div class="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">120h</div>
+</div>
+<p class="text-slate-400 dark:text-[#9b92c9] text-[13px] font-bold">JAN</p>
+</div>
+<div class="flex-1 flex flex-col items-center gap-3 h-full justify-end group">
+<div class="relative w-full bg-primary rounded-t-lg transition-all hover:brightness-110 shadow-lg shadow-primary/20" style="height: 85%">
+<div class="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">285h</div>
+</div>
+<p class="text-slate-900 dark:text-white text-[13px] font-bold">FEB</p>
+</div>
+<div class="flex-1 flex flex-col items-center gap-3 h-full justify-end group">
+<div class="relative w-full bg-secondary/80 rounded-t-lg transition-all hover:bg-secondary shadow-lg shadow-secondary/20" style="height: 60%">
+<div class="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">190h</div>
+</div>
+<p class="text-slate-400 dark:text-[#9b92c9] text-[13px] font-bold">MAR</p>
+</div>
+<div class="flex-1 flex flex-col items-center gap-3 h-full justify-end group">
+<div class="relative w-full bg-accent-pink/80 rounded-t-lg transition-all hover:bg-accent-pink shadow-lg shadow-accent-pink/20" style="height: 45%">
+<div class="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">155h</div>
+</div>
+<p class="text-slate-400 dark:text-[#9b92c9] text-[13px] font-bold">APR</p>
+</div>
+<div class="flex-1 flex flex-col items-center gap-3 h-full justify-end group">
+<div class="relative w-full bg-accent-yellow rounded-t-lg transition-all hover:brightness-110 shadow-lg shadow-accent-yellow/20" style="height: 95%">
+<div class="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">320h</div>
+</div>
+<p class="text-slate-400 dark:text-[#9b92c9] text-[13px] font-bold">MAY</p>
+</div>
+<div class="flex-1 flex flex-col items-center gap-3 h-full justify-end group">
+<div class="relative w-full bg-accent-green/80 rounded-t-lg transition-all hover:bg-accent-green shadow-lg shadow-accent-green/20" style="height: 75%">
+<div class="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">240h</div>
+</div>
+<p class="text-slate-400 dark:text-[#9b92c9] text-[13px] font-bold">JUN</p>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-6 rounded-xl border border-slate-200 dark:border-[#2c265a] bg-white dark:bg-card-dark p-8">
+<div>
+<p class="text-slate-500 dark:text-[#9b92c9] text-sm font-medium">Player DNA</p>
+<h3 class="text-slate-900 dark:text-white text-2xl font-bold font-display">Genre Preference</h3>
+</div>
+<div class="relative h-64 w-full flex items-center justify-center">
+<div class="absolute inset-0 border border-slate-100 dark:border-[#1e1a3d] radar-grid scale-100 opacity-20"></div>
+<div class="absolute inset-0 border border-slate-100 dark:border-[#1e1a3d] radar-grid scale-75 opacity-40"></div>
+<div class="absolute inset-0 border border-slate-100 dark:border-[#1e1a3d] radar-grid scale-50 opacity-60"></div>
+<div class="absolute inset-0 border border-slate-100 dark:border-[#1e1a3d] radar-grid scale-25 opacity-80"></div>
+<div class="absolute inset-0 bg-primary/20 border-2 border-primary" style="clip-path: polygon(50% 10%, 90% 40%, 75% 85%, 35% 95%, 15% 45%);"></div>
+<div class="absolute inset-0 bg-secondary/10 border border-secondary" style="clip-path: polygon(50% 30%, 70% 50%, 65% 75%, 45% 70%, 25% 40%);"></div>
+<span class="absolute top-0 text-[11px] font-black text-slate-500 dark:text-[#9b92c9]">RPG</span>
+<span class="absolute right-0 top-[38%] translate-x-1/2 text-[11px] font-black text-slate-500 dark:text-[#9b92c9]">FPS</span>
+<span class="absolute right-[15%] bottom-0 text-[11px] font-black text-slate-500 dark:text-[#9b92c9]">ACTION</span>
+<span class="absolute left-[15%] bottom-0 text-[11px] font-black text-slate-500 dark:text-[#9b92c9]">INDIE</span>
+<span class="absolute left-0 top-[38%] -translate-x-1/2 text-[11px] font-black text-slate-500 dark:text-[#9b92c9]">SIM</span>
+</div>
+<div class="grid grid-cols-2 gap-2 text-sm mt-4">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-primary"></span>
+<span class="text-slate-600 dark:text-[#9b92c9]">RPG (42%)</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-secondary"></span>
+<span class="text-slate-600 dark:text-[#9b92c9]">FPS (28%)</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-accent-pink"></span>
+<span class="text-slate-600 dark:text-[#9b92c9]">Indie (15%)</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-accent-yellow"></span>
+<span class="text-slate-600 dark:text-[#9b92c9]">Others (15%)</span>
+</div>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-6 rounded-xl border border-slate-200 dark:border-[#2c265a] bg-white dark:bg-card-dark p-8">
+<div class="flex justify-between items-center mb-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-accent-yellow text-3xl">emoji_events</span>
+<h3 class="text-slate-900 dark:text-white text-2xl font-bold font-display">Platinum Trophies &amp; 100% Completions</h3>
+</div>
+<p class="text-primary font-bold text-sm">34 Total Milestones</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<div class="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-[#1e1a3d] border border-transparent hover:border-primary/50 transition-all cursor-pointer">
+<div class="w-16 h-20 rounded-lg bg-cover bg-center shrink-0 shadow-lg" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAbUSSzhXOUO89jf9jKAZy9Ut3Wbspb0oqaTQMjSoZAXxG35XnQA-XiGm1xi6S9zPO1pidGr4YSRKaKRK4dqTbUYEdSkcSH9viVvMLfr0Z6WLba5bB4XfVYrF4OOA-f7XPfZU-ixDGwwF8MWe8Avz1AQy2DWVf-ECLc0Qy40Rw4iYNIiTvgQwCXvPizqWAOQqbYONcKun0Y7fJLl2VGzQBBt_8vFATBSSVgmmqpYLCzGNvsHDmwbSC_wBoNmkaQOBEyRdnsHNQ79Hl1");'></div>
+<div class="flex flex-col overflow-hidden">
+<h4 class="text-slate-900 dark:text-white font-bold truncate">Cyberpunk 2077</h4>
+<p class="text-slate-500 dark:text-[#9b92c9] text-xs">PlayStation 5</p>
+<div class="flex items-center gap-2 mt-2">
+<div class="h-1.5 flex-1 bg-slate-200 dark:bg-[#2c265a] rounded-full overflow-hidden">
+<div class="h-full bg-primary w-full shadow-[0_0_8px_rgba(46,177,255,0.6)]"></div>
+</div>
+<span class="text-[10px] font-black text-primary">PLATINUM</span>
+</div>
+<p class="text-[10px] text-slate-400 dark:text-[#9b92c9] mt-1">Unlocked Jun 12, 2024</p>
+</div>
+</div>
+<div class="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-[#1e1a3d] border border-transparent hover:border-primary/50 transition-all cursor-pointer">
+<div class="w-16 h-20 rounded-lg bg-cover bg-center shrink-0 shadow-lg" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDMCyg4zQ115Z0YnI2edvZ_fWpBoTv1CzrE07-sEc75gPVeGGewPb-8kXklUEFtnpkldbv7b5oAYCa75NU71d5ya7oqI4XXuzeh5w9Q5w1ci4-oQwUCGs9hntE1jEWMt2-HUr82z6pGdfJYODo0dd_FpBqK3C1w7XdwF7wA4OT46FbfRyu7kOibg8utweg-AJasYa7Nr85sX60IvZUa080qAciBwazhjFT3rXzOfJkVh3G3wAVdlgRoM8AdNB-Bq6ENOob5LTBF2PF_");'></div>
+<div class="flex flex-col overflow-hidden">
+<h4 class="text-slate-900 dark:text-white font-bold truncate">Elden Ring</h4>
+<p class="text-slate-500 dark:text-[#9b92c9] text-xs">Steam</p>
+<div class="flex items-center gap-2 mt-2">
+<div class="h-1.5 flex-1 bg-slate-200 dark:bg-[#2c265a] rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-full shadow-[0_0_8px_rgba(255,138,0,0.6)]"></div>
+</div>
+<span class="text-[10px] font-black text-secondary">100%</span>
+</div>
+<p class="text-[10px] text-slate-400 dark:text-[#9b92c9] mt-1">Unlocked May 28, 2024</p>
+</div>
+</div>
+<div class="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-[#1e1a3d] border border-transparent hover:border-primary/50 transition-all cursor-pointer">
+<div class="w-16 h-20 rounded-lg bg-cover bg-center shrink-0 shadow-lg" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuC8Z8qCjkMbvycZ_Nl4Rp0DPtFTSAbAuCxGRNGeEwIZplI-26lXk0W0caOaIAGMoRqCQ2QDBhv18H_iaQh2NrxPLQE_hJNTfB5WN4bYEHVQaZaxIZqH1QLtZpWUbUGEqNmVsATcGnzdt6QURTrp6aozQEeb32BHBw77lRnwE0_mqO6YZYBRDoL97OJU8qiFTn1ZX6vnqz66inOTbuDkiSpbRQ-d09zoAfkiRwtzwBREkZRwEmZedjpG0fLVrNVGoeLN8nIJakHIVtEl");'></div>
+<div class="flex flex-col overflow-hidden">
+<h4 class="text-slate-900 dark:text-white font-bold truncate">Hades</h4>
+<p class="text-slate-500 dark:text-[#9b92c9] text-xs">Xbox Series X</p>
+<div class="flex items-center gap-2 mt-2">
+<div class="h-1.5 flex-1 bg-slate-200 dark:bg-[#2c265a] rounded-full overflow-hidden">
+<div class="h-full bg-accent-green w-full shadow-[0_0_8px_rgba(139,195,74,0.6)]"></div>
+</div>
+<span class="text-[10px] font-black text-accent-green">1000 G</span>
+</div>
+<p class="text-[10px] text-slate-400 dark:text-[#9b92c9] mt-1">Unlocked Apr 15, 2024</p>
+</div>
+</div>
+</div>
+<button class="w-full py-3 mt-4 text-sm font-bold text-slate-500 dark:text-[#9b92c9] border-2 border-dashed border-slate-200 dark:border-[#2c265a] rounded-xl hover:border-primary hover:text-primary transition-all">
+                        View All Completed Games
+                    </button>
+</div>
+</div>
+</main>
+<footer class="border-t border-slate-200 dark:border-[#292348] py-6 px-10 bg-white dark:bg-background-dark">
+<div class="max-w-[1200px] mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+<p class="text-slate-500 dark:text-[#9b92c9] text-sm">© 2024 GameTracker Pro. All rights reserved.</p>
+<div class="flex gap-6">
+<a class="text-slate-500 dark:text-[#9b92c9] hover:text-primary text-sm transition-colors" href="#">Privacy Policy</a>
+<a class="text-slate-500 dark:text-[#9b92c9] hover:text-primary text-sm transition-colors" href="#">Terms of Service</a>
+<a class="text-slate-500 dark:text-[#9b92c9] hover:text-primary text-sm transition-colors" href="#">Support</a>
+</div>
+</div>
+</footer>
+</div>
+
+</body></html>

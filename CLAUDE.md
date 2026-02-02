@@ -4,12 +4,11 @@ Personal media library app (movies, series, games, books) built with full-stack 
 
 ## Build & Run
 
-- `npm run build` is the fastest way to verify client Fable compilation — catches type errors and transform issues
+- `npm run build` - Production client build; also the fastest way to verify Fable compilation (catches type errors and transform issues)
 - `npm start` - Run server + client concurrently (dev mode)
 - `npm run dev:server` - Server only (dotnet watch, port 5000)
 - `npm run dev:client` - Client only (Vite + vite-plugin-fable, port 5173)
 - `npm test` - Run Expecto tests (`dotnet run --project tests/Server.Tests/Server.Tests.fsproj`)
-- `npm run build` - Production client build
 
 ## Tech Stack
 

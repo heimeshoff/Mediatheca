@@ -15,13 +15,14 @@
 
 ### Phase 2: Catalog + Friends
 
-- [ ] REQ-009: Create and edit a Movie with title, year, and genres [Phase 2]
-- [ ] REQ-010: Import movie metadata from TMDB API (search + import) [Phase 2]
-- [ ] REQ-011: Movie detail page showing metadata, trailer link, and associated data [Phase 2]
-- [ ] REQ-012: Movie list view with search and filtering [Phase 2]
-- [ ] REQ-013: Create and edit a Friend with name and profile image [Phase 2]
-- [ ] REQ-014: Friend list view [Phase 2]
-- [ ] REQ-015: Associate a Friend as "recommended by" on a Movie [Phase 2]
+- [x] REQ-009: Movie aggregate with events: MovieAddedToLibrary (fat TMDB import event), MovieRemovedFromLibrary, MovieCategorized, MoviePosterReplaced, MovieBackdropReplaced, MovieRecommendedBy, RecommendationRemoved, WantToWatchWith, RemovedWantToWatchWith [Phase 2]
+- [x] REQ-010: TMDB API integration — search movies, import metadata (name, year, runtime, overview, genres, poster, backdrop, TMDB rating), download images to local filesystem [Phase 2]
+- [x] REQ-010a: Cast table (non-event-sourced) — store top-billed and full cast per movie, shared across movies, garbage-collect orphaned cast members and their images on movie removal [Phase 2]
+- [x] REQ-011: Movie detail page showing metadata, cast, genres, recommendations, and "want to watch with" list [Phase 2]
+- [x] REQ-012: Movie list view with search and filtering [Phase 2]
+- [x] REQ-013: Friend aggregate with events: FriendAdded, FriendUpdated, FriendRemoved — name and image reference only [Phase 2]
+- [x] REQ-014: Friend list view with add/edit [Phase 2]
+- [x] REQ-015: "Recommended by" and "Want to watch with" associations on Movie aggregate, manageable from movie detail page [Phase 2]
 
 ### Phase 3: Journal + Content Blocks
 

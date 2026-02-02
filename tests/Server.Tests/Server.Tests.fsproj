@@ -6,7 +6,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="SlugTests.fs" />
+    <Compile Include="CatalogTests.fs" />
+    <Compile Include="FriendsTests.fs" />
     <Compile Include="EventStoreTests.fs" />
+    <Compile Include="CatalogIntegrationTests.fs" />
+    <Compile Include="FriendIntegrationTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

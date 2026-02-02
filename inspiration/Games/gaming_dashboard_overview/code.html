@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Gaming Dashboard Overview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,FILL@0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        :root {
+            --primary-blue: #30A9FF;
+            --accent-orange: #FF8E15;
+            --highlight-yellow: #FFEC40;
+            --highlight-pink: #F0659B;
+            --highlight-green: #94C11F;
+            --bg-dark: #070708;
+            --card-dark: #121214;
+            --border-dark: rgba(255, 255, 255, 0.08);
+        }
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: var(--bg-dark);
+            color: #ffffff;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: var(--primary-blue);
+            border-radius: 10px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-blue": "#30A9FF",
+                        "accent-orange": "#FF8E15",
+                        "highlight-yellow": "#FFEC40",
+                        "highlight-pink": "#F0659B",
+                        "highlight-green": "#94C11F",
+                        "background-dark": "#070708",
+                        "card-dark": "#121214",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="min-h-screen flex overflow-hidden">
+<aside class="w-64 border-r border-white/5 flex flex-col bg-background-dark h-screen sticky top-0">
+<div class="p-6 flex items-center gap-3">
+<div class="size-9 bg-primary-blue rounded-lg flex items-center justify-center text-white shadow-[0_0_15px_rgba(48,169,255,0.3)]">
+<span class="material-symbols-outlined text-xl">grid_view</span>
+</div>
+<h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-primary-blue to-accent-orange bg-clip-text text-transparent">GameVault</h1>
+</div>
+<nav class="flex-1 px-4 space-y-1.5 mt-4">
+<div class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary-blue/10 text-primary-blue border border-primary-blue/20">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-sm font-semibold">Dashboard</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 text-slate-400 hover:text-white transition-all cursor-pointer">
+<span class="material-symbols-outlined">sports_esports</span>
+<span class="text-sm font-medium">My Library</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 text-slate-400 hover:text-white transition-all cursor-pointer">
+<span class="material-symbols-outlined">shopping_bag</span>
+<span class="text-sm font-medium">Store</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 text-slate-400 hover:text-white transition-all cursor-pointer">
+<span class="material-symbols-outlined">monitoring</span>
+<span class="text-sm font-medium">Statistics</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 text-slate-400 hover:text-white transition-all cursor-pointer">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-sm font-medium">Settings</span>
+</div>
+</nav>
+<div class="p-4 border-t border-white/5">
+<div class="flex items-center gap-3 p-2">
+<div class="size-10 rounded-full border-2 border-primary-blue bg-cover bg-center" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAMIddmboRU4EV_77NrTPLB2ddBjUImsii11ewZxGqb5hbPeM8Mmro93mvO9NzL28wRN5qeKQLvCw632N8sLHcDXcopvu3YIi4my8ZAsnCii5B87XC-jOXUBz0kLovReCQUGAAUVHxXKwtHsr9MH-geqDMtK6hoSZLQHyshY_czSOkyvYeoFEIw2YE0T1k9DmTzNA5vmyYKk7lFJ_X-5yu9WEg_p6BQwHHz6x9zsYsU2aJmaNPKuFEbJlqY5pgmBM3TwmspmJUEWbSH");'></div>
+<div class="flex flex-col">
+<p class="text-sm font-bold">ProGamer99</p>
+<p class="text-[11px] text-primary-blue font-medium uppercase tracking-wider">Level 42 Explorer</p>
+</div>
+</div>
+<div class="mt-4">
+<div class="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-highlight-pink/10 text-slate-400 hover:text-highlight-pink transition-all cursor-pointer group">
+<span class="material-symbols-outlined group-hover:rotate-12 transition-transform">logout</span>
+<span class="text-sm font-medium">Logout</span>
+</div>
+</div>
+</div>
+</aside>
+<main class="flex-1 overflow-y-auto custom-scrollbar">
+<header class="sticky top-0 z-10 bg-background-dark/90 backdrop-blur-xl border-b border-white/5 px-8 py-4 flex items-center justify-between">
+<div class="flex items-center gap-4 flex-1 max-w-xl">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xl">search</span>
+<input class="w-full bg-card-dark border border-white/5 rounded-xl pl-10 pr-4 py-2.5 focus:ring-1 focus:ring-primary-blue focus:border-primary-blue text-sm placeholder:text-slate-500 transition-all" placeholder="Search your library..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<button class="relative p-2.5 rounded-xl bg-card-dark text-slate-400 hover:text-white border border-white/5 transition-all">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2.5 right-2.5 size-2 bg-accent-orange rounded-full border-2 border-card-dark"></span>
+</button>
+<button class="p-2.5 rounded-xl bg-card-dark text-slate-400 hover:text-white border border-white/5 transition-all">
+<span class="material-symbols-outlined">chat_bubble</span>
+</button>
+</div>
+</header>
+<div class="p-8 space-y-8">
+<section class="@container">
+<div class="relative overflow-hidden rounded-2xl bg-card-dark min-h-[300px] flex flex-col justify-end p-10 border border-white/5 group shadow-2xl">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-1000 group-hover:scale-105 opacity-60" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBcB-_IjnESDCZJsWpwTXCBngYr6dsdj56dzdJ4nzM_OPjHB7H00HL0_CWutCyZHoQFqb4MTOlYYNwRv7v-4z3gp7gwF-rrhVb1VJ2RhtltanUWYR7FuOT0jJgmiS6Ie02k9Wq1udEFcAYRA7jIYOJhz2HPkUa_C8-DryE1yfEibIjpK1HA97RpeLCCDuFtJyp4Rpbklt-5qLtUXhene6t1iqBFRCt3yryw2HqwFOCgG_5MngQh9_84JGoBHF1Hfsr5mLSqIb2e-4Eg");'></div>
+<div class="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/40 to-transparent"></div>
+<div class="relative z-10 space-y-5">
+<div class="flex items-center gap-2">
+<span class="bg-primary-blue/20 text-primary-blue text-[11px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 rounded-full border border-primary-blue/30 backdrop-blur-md">Resume Journey</span>
+</div>
+<h2 class="text-5xl font-black tracking-tighter">ELDEN RING</h2>
+<div class="flex flex-wrap items-center gap-x-8 gap-y-2 text-slate-300">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-blue">schedule</span>
+<span class="text-sm font-medium">Last played: 2 hours ago</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-blue">timer</span>
+<span class="text-sm font-medium">Total: 148.5h</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-blue">emoji_events</span>
+<span class="text-sm font-medium">Achievements: 32/42</span>
+</div>
+</div>
+<div class="pt-2 flex gap-4">
+<button class="bg-primary-blue hover:bg-primary-blue/90 text-white px-10 py-3.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-[0_0_20px_rgba(48,169,255,0.4)] active:scale-95">
+<span class="material-symbols-outlined">play_arrow</span>
+                            PLAY NOW
+                        </button>
+<button class="bg-white/10 hover:bg-white/20 text-white px-6 py-3.5 rounded-xl font-bold flex items-center gap-2 transition-all backdrop-blur-md border border-white/10">
+<span class="material-symbols-outlined text-accent-orange">favorite</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<div class="lg:col-span-2 space-y-8">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="bg-card-dark border border-white/5 p-8 rounded-2xl relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary-blue/5 blur-3xl rounded-full -mr-16 -mt-16"></div>
+<div class="flex justify-between items-start mb-6 relative z-10">
+<div>
+<p class="text-slate-400 text-sm font-semibold uppercase tracking-wider">Platform Distribution</p>
+<h3 class="text-3xl font-bold mt-2">248 Games</h3>
+</div>
+<span class="text-highlight-green bg-highlight-green/10 border border-highlight-green/20 px-3 py-1 rounded-full text-xs font-bold">+12%</span>
+</div>
+<div class="flex items-end justify-between h-36 gap-3 px-2 mt-8">
+<div class="flex flex-col items-center gap-3 flex-1">
+<div class="w-full bg-primary-blue rounded-t-lg shadow-[0_0_15px_rgba(48,169,255,0.2)]" style="height: 85%"></div>
+<span class="text-[10px] font-bold text-slate-500 uppercase">Steam</span>
+</div>
+<div class="flex flex-col items-center gap-3 flex-1">
+<div class="w-full bg-accent-orange rounded-t-lg shadow-[0_0_15px_rgba(255,142,21,0.2)]" style="height: 45%"></div>
+<span class="text-[10px] font-bold text-slate-500 uppercase">Epic</span>
+</div>
+<div class="flex flex-col items-center gap-3 flex-1">
+<div class="w-full bg-highlight-pink rounded-t-lg shadow-[0_0_15px_rgba(240,101,155,0.2)]" style="height: 25%"></div>
+<span class="text-[10px] font-bold text-slate-500 uppercase">PS5</span>
+</div>
+<div class="flex flex-col items-center gap-3 flex-1">
+<div class="w-full bg-highlight-green rounded-t-lg shadow-[0_0_15px_rgba(148,193,31,0.2)]" style="height: 60%"></div>
+<span class="text-[10px] font-bold text-slate-500 uppercase">Xbox</span>
+</div>
+<div class="flex flex-col items-center gap-3 flex-1">
+<div class="w-full bg-highlight-yellow rounded-t-lg shadow-[0_0_15px_rgba(255,236,64,0.2)]" style="height: 40%"></div>
+<span class="text-[10px] font-bold text-slate-500 uppercase">Switch</span>
+</div>
+</div>
+</div>
+<div class="bg-card-dark border border-white/5 p-8 rounded-2xl relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-accent-orange/5 blur-3xl rounded-full -mr-16 -mt-16"></div>
+<div class="flex justify-between items-start mb-6 relative z-10">
+<div>
+<p class="text-slate-400 text-sm font-semibold uppercase tracking-wider">Monthly Playtime</p>
+<h3 class="text-3xl font-bold mt-2">32h <span class="text-lg font-normal text-slate-500 italic">this week</span></h3>
+</div>
+<span class="text-highlight-green bg-highlight-green/10 border border-highlight-green/20 px-3 py-1 rounded-full text-xs font-bold">+5%</span>
+</div>
+<div class="h-36 mt-8 relative">
+<svg class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 400 100">
+<path d="M0,80 Q50,40 100,60 T200,30 T300,70 T400,20" fill="none" stroke="var(--primary-blue)" stroke-linecap="round" stroke-width="4"></path>
+<path d="M0,80 Q50,40 100,60 T200,30 T300,70 T400,20 L400,100 L0,100 Z" fill="url(#grad)" opacity="0.15"></path>
+<defs>
+<linearGradient id="grad" x1="0%" x2="0%" y1="0%" y2="100%">
+<stop offset="0%" style="stop-color:var(--primary-blue);stop-opacity:1"></stop>
+<stop offset="100%" style="stop-color:var(--primary-blue);stop-opacity:0"></stop>
+</linearGradient>
+</defs>
+</svg>
+<div class="flex justify-between mt-4 px-1">
+<span class="text-[10px] font-bold text-slate-500">MON</span>
+<span class="text-[10px] font-bold text-slate-500">WED</span>
+<span class="text-[10px] font-bold text-slate-500">FRI</span>
+<span class="text-[10px] font-bold text-slate-500">SUN</span>
+</div>
+</div>
+</div>
+</div>
+<section class="space-y-6">
+<div class="flex items-center justify-between">
+<h2 class="text-2xl font-bold tracking-tight border-l-4 border-accent-orange pl-4">Smart Suggestions</h2>
+<button class="text-primary-blue text-sm font-bold hover:underline">View Backlog</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="bg-card-dark border border-white/5 rounded-2xl overflow-hidden group cursor-pointer hover:border-primary-blue/30 transition-all">
+<div class="h-44 bg-cover bg-center relative" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuACe1wFYlrg1xp7WRRHA-VDvuDTOz3RSpG-cnd-iyeBrIQxEHC7xkh_g3lzijdeCABRzE4YbuBM4a__zoOaf62rQkH2iyaShlOCVxpMv1PTJVe6HW73k5QqumNKkmEq9YSPw0grNu76p5ElEn87VWxFWkvFs6-na6M_g3EXJGLocVXIb-dR4rCrRkPP8PzMtRt_32tg__7xP1SEnnholJHpZLLjV6Iz5adsE-4-1OJcg3JOABXPlPKpWZUb77ladrraa2dmvDqlfWXL");'>
+<div class="absolute inset-0 bg-gradient-to-t from-card-dark via-card-dark/20 to-transparent"></div>
+<div class="absolute top-4 left-4">
+<span class="bg-highlight-pink text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-lg">High Priority</span>
+</div>
+</div>
+<div class="p-6">
+<h4 class="text-xl font-bold group-hover:text-primary-blue transition-colors">Cyberpunk 2077</h4>
+<p class="text-xs text-slate-400 mt-2 font-medium">Acquired 3 months ago • 0% Complete</p>
+<button class="mt-6 w-full py-3 bg-white/5 border border-white/5 hover:bg-accent-orange hover:text-white rounded-xl text-sm font-bold transition-all uppercase tracking-widest">Start Playing</button>
+</div>
+</div>
+<div class="bg-card-dark border border-white/5 rounded-2xl overflow-hidden group cursor-pointer hover:border-primary-blue/30 transition-all">
+<div class="h-44 bg-cover bg-center relative" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAyqpk0uJbwoGDZjP2aSU6-4CUmklA0GyLeP3_MsZKyqcxVOWnNec8GuZsud9q3tibGyVWpfim9vmwMbqhNCc_7fUXFa5Wx4QZK8QvVi6r2r5RFvs-0729KQ_d_-4aiaCWpwW0kcmcS6F0_WOcThWrj-opyPbP2Domyz9UzH5IOsSTkFwrYGFkFIHIlMXM3xGSpJrPSck0_JvaG9RP4l3EduR8E8DJDlPwpavWJkM2oxMv7StlOrBTjQsNu3troHsZ7S1acOiF14KqB");'>
+<div class="absolute inset-0 bg-gradient-to-t from-card-dark via-card-dark/20 to-transparent"></div>
+<div class="absolute top-4 left-4">
+<span class="bg-accent-orange text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-lg">Trending</span>
+</div>
+</div>
+<div class="p-6">
+<h4 class="text-xl font-bold group-hover:text-primary-blue transition-colors">God of War: Ragnarök</h4>
+<p class="text-xs text-slate-400 mt-2 font-medium">Friends playing: 4 • Best Seller</p>
+<button class="mt-6 w-full py-3 bg-white/5 border border-white/5 hover:bg-accent-orange hover:text-white rounded-xl text-sm font-bold transition-all uppercase tracking-widest">Check Library</button>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div class="space-y-6">
+<div class="bg-card-dark border border-white/5 rounded-2xl p-8 h-full flex flex-col relative overflow-hidden">
+<div class="absolute bottom-0 right-0 w-32 h-32 bg-highlight-pink/5 blur-3xl rounded-full -mr-16 -mb-16"></div>
+<div class="flex items-center justify-between mb-8 relative z-10">
+<h2 class="text-xl font-bold tracking-tight">Recent Activity</h2>
+<span class="material-symbols-outlined text-primary-blue">history</span>
+</div>
+<div class="space-y-8 overflow-y-auto pr-2 custom-scrollbar flex-1 relative z-10">
+<div class="flex gap-4 group cursor-pointer">
+<div class="size-14 rounded-xl bg-cover bg-center flex-shrink-0 border-2 border-white/5 group-hover:border-primary-blue/50 transition-all" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAZ_Bnhs58yf2hTqND6q895ptuLUUZZRCv_ch-ST1ZBAzvB7mn1vO85KnYOtyAX5KO7-_tADZwN3ajE283yQkkMUuJU2eNYdKT5mGLYlGZItkeqAkp_rxImkTwJjDBWjD0pSz_1T--RpFJAoaKLd_yVUGXYguLjLEibP6813i79wJG25UNhDf8Fs6fEk2hjotufpnTOBksDATNzaiygXB6xfg7yDG8KG_a_4PhmsBXiomWKkLyyLTOLFGF0xWkXWpEbuStGy7Fn2R5U");'></div>
+<div class="space-y-1">
+<p class="text-[10px] text-highlight-yellow font-black uppercase tracking-widest">Achievement</p>
+<p class="text-sm font-bold leading-tight group-hover:text-primary-blue transition-colors">Godslayer</p>
+<p class="text-[11px] text-slate-400">Defeated the final boss in Elden Ring.</p>
+<p class="text-[10px] text-slate-600 font-medium pt-1">2 hours ago</p>
+</div>
+</div>
+<div class="flex gap-4 group cursor-pointer">
+<div class="size-14 rounded-xl bg-primary-blue/10 flex items-center justify-center flex-shrink-0 border border-primary-blue/20">
+<span class="material-symbols-outlined text-primary-blue">download</span>
+</div>
+<div class="space-y-1">
+<p class="text-[10px] text-primary-blue font-black uppercase tracking-widest">System Update</p>
+<p class="text-sm font-bold leading-tight group-hover:text-primary-blue transition-colors">Steam Client Updated</p>
+<p class="text-[11px] text-slate-400">Version 2.4.12 optimization patch.</p>
+<p class="text-[10px] text-slate-600 font-medium pt-1">5 hours ago</p>
+</div>
+</div>
+<div class="flex gap-4 group cursor-pointer">
+<div class="size-14 rounded-xl bg-cover bg-center flex-shrink-0 border-2 border-white/5 group-hover:border-primary-blue/50 transition-all" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDVOqdTK-MtbkdBpfAZQ_B4ZBuol1T89rq_XPKQnOUbRXzts6C27BAJzjqhkKj2KBgp5Z91usoCQWuitQmqFnhZzn1UBpxrb3gmnuT-TiPMfoN4k9AXdzCXn_g9KXMChBdPNd1KmEEEhL4EF1AnKFuenY_F-zBnL7gqmpN-Go8wjRzuijF61auEVJXApwYXXhiPqEuXFSlRHUQp2sVTV6IzSKVANj0FvY0KL4gifV0hGmUYJ2SI8NshlYd4RjA1M8VgVNMWRjijBJ6p");'></div>
+<div class="space-y-1">
+<p class="text-[10px] text-accent-orange font-black uppercase tracking-widest">Library Added</p>
+<p class="text-sm font-bold leading-tight group-hover:text-primary-blue transition-colors">Cyberpunk 2077</p>
+<p class="text-[11px] text-slate-400">DLC "Phantom Liberty" detected.</p>
+<p class="text-[10px] text-slate-600 font-medium pt-1">Yesterday</p>
+</div>
+</div>
+<div class="flex gap-4 group cursor-pointer">
+<div class="size-14 rounded-xl bg-highlight-green/10 flex items-center justify-center flex-shrink-0 border border-highlight-green/20">
+<span class="material-symbols-outlined text-highlight-green">person_add</span>
+</div>
+<div class="space-y-1">
+<p class="text-[10px] text-highlight-green font-black uppercase tracking-widest">Friend Activity</p>
+<p class="text-sm font-bold leading-tight group-hover:text-primary-blue transition-colors">Alex_J joined</p>
+<p class="text-[11px] text-slate-400">Alex is now playing Halo Infinite.</p>
+<p class="text-[10px] text-slate-600 font-medium pt-1">Yesterday</p>
+</div>
+</div>
+<div class="flex gap-4 group cursor-pointer">
+<div class="size-14 rounded-xl bg-cover bg-center flex-shrink-0 border-2 border-white/5 group-hover:border-primary-blue/50 transition-all" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBGQTc3Whsoym9uTU_4SnaSuYToC5A_Dv8C8U9Yx2a2Loywok774czfdLmvnvh2wDMon-8JrNhhofiZGpkJWt2fDsvnoUneIWngpHt21aFPd_W-56GtJiGuWCv8Oc3lNjA9ljmjr38Fb-0N1jFuGLj7ijb_vYMjmWii_3YpFE6tL3XnPSHszEniPSSevfCelOtfKt1Al-RXfBcTKTcVapPLA8RZaMpLXsnF0K-W68-uRQ-Ay1olgrJ_4LkWrvjwu_lgvGmJnIhqblAc");'></div>
+<div class="space-y-1">
+<p class="text-[10px] text-highlight-pink font-black uppercase tracking-widest">Achievement</p>
+<p class="text-sm font-bold leading-tight group-hover:text-primary-blue transition-colors">First Blood</p>
+<p class="text-[11px] text-slate-400">Defeated first boss in God of War.</p>
+<p class="text-[10px] text-slate-600 font-medium pt-1">2 days ago</p>
+</div>
+</div>
+</div>
+<button class="mt-8 w-full py-4 bg-white/5 border border-white/5 rounded-xl text-sm font-bold hover:bg-primary-blue hover:text-white transition-all uppercase tracking-[0.2em] relative z-10">
+                        View All Activity
+                    </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>

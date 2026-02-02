@@ -26,6 +26,6 @@ let api: IMediathecaApi =
     |> Remoting.buildProxy<IMediathecaApi>
 
 // Entry point
-Program.mkProgram init update view
+Program.mkProgram (init api) (update api) view
 |> Program.withReactSynchronous "feliz-app"
 |> Program.run

@@ -36,6 +36,11 @@ WORKDIR /app
 COPY --from=server-build /app/publish ./
 COPY --from=client-build /app/deploy/public ./deploy/public
 
+# Image storage volume for posters, backdrops, cast photos, and friend images
+VOLUME /app/images
+
+# Set TMDB_API_KEY environment variable to enable TMDB integration
+# Example: docker run -e TMDB_API_KEY=your_key_here ...
 ENV ASPNETCORE_URLS=http://+:5000
 EXPOSE 5000
 

@@ -5,7 +5,7 @@
 | Phase | Name | Status | Requirements |
 |-------|------|--------|--------------|
 | 1 | Skeleton | :white_check_mark: Done | REQ-001, REQ-002, REQ-003, REQ-004, REQ-005, REQ-006, REQ-007, REQ-008 |
-| 2 | Catalog + Friends | :hourglass: Planned | REQ-009, REQ-010, REQ-011, REQ-012, REQ-013, REQ-014, REQ-015 |
+| 2 | Catalog + Friends | :white_check_mark: Done | REQ-009, REQ-010, REQ-010a, REQ-011, REQ-012, REQ-013, REQ-014, REQ-015 |
 | 3 | Journal + Content Blocks | :hourglass: Planned | REQ-016, REQ-017, REQ-018, REQ-019, REQ-020, REQ-021 |
 | 4 | Curation + Dashboards + Admin | :hourglass: Planned | REQ-022, REQ-023, REQ-024, REQ-025, REQ-026, REQ-027, REQ-028 |
 
@@ -25,15 +25,16 @@ Deliverable: A running F# web app with empty pages, working build pipeline, even
 
 ### Phase 2: Catalog + Friends
 
-Deliverable: Users can add movies (manually or via TMDB), browse their movie library, and manage friends.
+Deliverable: Users can add movies via TMDB import, browse their library, manage friends, and track recommendations and watch-with intentions.
 
-- Catalog bounded context: Movie aggregate with events (MovieAdded, MovieUpdated)
-- TMDB API integration for movie search and metadata import
+- Catalog bounded context: Movie aggregate with granular events (MovieAddedToLibrary, MovieRemovedFromLibrary, MovieCategorized, MoviePosterReplaced, MovieBackdropReplaced, MovieRecommendedBy, RecommendationRemoved, WantToWatchWith, RemovedWantToWatchWith)
+- TMDB API integration: search movies, import metadata + images to local filesystem
+- Cast table (non-event-sourced): shared across movies, many-to-many, orphan cleanup on movie removal
 - Movie list page with search/filter
-- Movie detail page
-- Friends bounded context: Friend aggregate with events (FriendAdded, FriendUpdated)
+- Movie detail page (metadata, cast, genres, recommendations, want-to-watch-with)
+- Friends bounded context: Friend aggregate (FriendAdded, FriendUpdated, FriendRemoved) — name + image reference
 - Friend list page with add/edit
-- "Recommended by" association between Friend and Movie
+- "Recommended by" and "Want to watch with" on movie detail page
 
 ### Phase 3: Journal + Content Blocks
 
@@ -62,3 +63,4 @@ Deliverable: Users can organize movies into collections, view dashboards with st
 ## Completed Milestones
 
 - Phase 1: Skeleton (2026-01-31)
+- Phase 2: Catalog + Friends (2026-02-01)
