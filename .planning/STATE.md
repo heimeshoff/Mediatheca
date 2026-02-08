@@ -6,6 +6,7 @@
 
 ## Recent Progress
 
+- **2026-02-08**: Frontend visual refresh — sidebar with active indicator bar + gradient logo, movie cards with hover-lift animation + rating badge overlay + poster hover overlay, friend cards with ring-on-hover avatars, dashboard redesigned with hero gradient section + stat cards (movie/friend counts) + recent movies list, staggered fade-in animations on grids, gradient text on page headings, search icon in movies search bar, improved empty states with large icons.
 - **2026-02-08**: Renamed "Catalog" bounded context to "Movies". Renamed all DU cases (events, commands, messages, page routes) from PascalCase to Snake_case convention (e.g., `MovieRemovedFromLibrary` → `Movie_removed_from_library`). Updated serialization strings, test files, projections, and all client references. Note: existing `mediatheca.db` must be recreated due to serialization string changes.
 
 ## Active Decisions

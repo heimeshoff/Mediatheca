@@ -25,6 +25,8 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
 
     let cmd = Cmd.batch [
         Cmd.map Dashboard_msg dashboardCmd
+        Cmd.OfAsync.perform api.getMovies () (fun movies -> Dashboard_msg (Pages.Dashboard.Types.Movies_loaded movies))
+        Cmd.OfAsync.perform api.getFriends () (fun friends -> Dashboard_msg (Pages.Dashboard.Types.Friends_loaded friends))
         Cmd.map Movie_list_msg movieListCmd
         Cmd.map Settings_msg settingsCmd
     ]
@@ -57,10 +59,18 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             let childModel, childCmd = Pages.Settings.State.init ()
             { model with SettingsModel = childModel },
             Cmd.map Settings_msg childCmd
+        | Dashboard ->
+            let childModel, childCmd = Pages.Dashboard.State.init ()
+            { model with DashboardModel = childModel },
+            Cmd.batch [
+                Cmd.map Dashboard_msg childCmd
+                Cmd.OfAsync.perform api.getMovies () (fun movies -> Dashboard_msg (Pages.Dashboard.Types.Movies_loaded movies))
+                Cmd.OfAsync.perform api.getFriends () (fun friends -> Dashboard_msg (Pages.Dashboard.Types.Friends_loaded friends))
+            ]
         | _ -> model, Cmd.none
 
     | Dashboard_msg childMsg ->
-        let childModel, childCmd = Pages.Dashboard.State.update childMsg model.DashboardModel
+        let childModel, childCmd = Pages.Dashboard.State.update api childMsg model.DashboardModel
         { model with DashboardModel = childModel }, Cmd.map Dashboard_msg childCmd
 
     | Movie_list_msg childMsg ->

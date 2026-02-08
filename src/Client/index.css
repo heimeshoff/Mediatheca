@@ -43,6 +43,126 @@ h1, h2, h3, h4, h5, h6 {
     --size-selector: 0.25rem;
     --size-field: 0.25rem;
     --border: 1px;
-    --depth: 0;
+    --depth: 1;
     --noise: 0;
+}
+
+/* ── Animations ── */
+@keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes scale-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.animate-fade-in-up {
+    animation: fade-in-up 0.4s ease-out both;
+}
+
+.animate-fade-in {
+    animation: fade-in 0.3s ease-out both;
+}
+
+.animate-scale-in {
+    animation: scale-in 0.3s ease-out both;
+}
+
+/* Stagger children in grids */
+.stagger-grid > * {
+    animation: fade-in-up 0.4s ease-out both;
+}
+.stagger-grid > *:nth-child(1)  { animation-delay: 0ms; }
+.stagger-grid > *:nth-child(2)  { animation-delay: 40ms; }
+.stagger-grid > *:nth-child(3)  { animation-delay: 80ms; }
+.stagger-grid > *:nth-child(4)  { animation-delay: 120ms; }
+.stagger-grid > *:nth-child(5)  { animation-delay: 160ms; }
+.stagger-grid > *:nth-child(6)  { animation-delay: 200ms; }
+.stagger-grid > *:nth-child(7)  { animation-delay: 240ms; }
+.stagger-grid > *:nth-child(8)  { animation-delay: 280ms; }
+.stagger-grid > *:nth-child(9)  { animation-delay: 320ms; }
+.stagger-grid > *:nth-child(10) { animation-delay: 360ms; }
+.stagger-grid > *:nth-child(11) { animation-delay: 400ms; }
+.stagger-grid > *:nth-child(12) { animation-delay: 440ms; }
+
+/* ── Card lift effect ── */
+.card-hover {
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow:
+        0 12px 24px -8px oklch(0% 0 0 / 0.3),
+        0 0 0 1px oklch(100% 0 0 / 0.05);
+}
+
+/* ── Poster overlay on hover ── */
+.poster-card .poster-overlay {
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+.poster-card:hover .poster-overlay {
+    opacity: 1;
+}
+
+/* ── Sidebar nav item glow ── */
+.nav-glow {
+    position: relative;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+.nav-glow::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 25%;
+    bottom: 25%;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: oklch(86.133% 0.141 139.549);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.nav-glow.active::before {
+    opacity: 1;
+}
+
+/* ── Gradient text ── */
+.text-gradient-primary {
+    background: linear-gradient(135deg, oklch(86.133% 0.141 139.549), oklch(86.078% 0.142 206.182));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* ── Glass card ── */
+.glass-card {
+    background: oklch(30.857% 0.023 264.149 / 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid oklch(100% 0 0 / 0.08);
+}
+
+/* ── Stat card subtle glow ── */
+.stat-glow {
+    position: relative;
+    overflow: hidden;
+}
+.stat-glow::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at 30% 30%, oklch(86.133% 0.141 139.549 / 0.08), transparent 60%);
+    pointer-events: none;
 }
