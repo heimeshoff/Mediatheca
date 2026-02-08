@@ -16,6 +16,9 @@ module Slug =
     let friendSlug (name: string) =
         slugify name
 
+    let catalogSlug (name: string) =
+        slugify name
+
 // DTOs
 
 type TmdbSearchResult = {
@@ -97,6 +100,89 @@ type UpdateContentBlockRequest = {
     Caption: string option
 }
 
+// Catalogs
+
+type CatalogEntryDto = {
+    EntryId: string
+    MovieSlug: string
+    MovieName: string
+    MovieYear: int
+    MoviePosterRef: string option
+    Note: string option
+    Position: int
+}
+
+type CatalogListItem = {
+    Slug: string
+    Name: string
+    Description: string
+    IsSorted: bool
+    EntryCount: int
+}
+
+type CatalogDetail = {
+    Slug: string
+    Name: string
+    Description: string
+    IsSorted: bool
+    Entries: CatalogEntryDto list
+}
+
+type CreateCatalogRequest = {
+    Name: string
+    Description: string
+    IsSorted: bool
+}
+
+type UpdateCatalogRequest = {
+    Name: string
+    Description: string
+}
+
+type AddCatalogEntryRequest = {
+    MovieSlug: string
+    Note: string option
+}
+
+type UpdateCatalogEntryRequest = {
+    Note: string option
+}
+
+// Dashboard
+
+type DashboardStats = {
+    MovieCount: int
+    FriendCount: int
+    CatalogCount: int
+    WatchSessionCount: int
+    TotalWatchTimeMinutes: int
+}
+
+type RecentActivityItem = {
+    Timestamp: string
+    StreamId: string
+    EventType: string
+    Description: string
+}
+
+// Event Store Browser
+
+type EventDto = {
+    GlobalPosition: int64
+    StreamId: string
+    StreamPosition: int64
+    EventType: string
+    Data: string
+    Timestamp: string
+}
+
+type EventQuery = {
+    StreamFilter: string option
+    EventTypeFilter: string option
+    Limit: int
+    Offset: int
+}
+
 // Movie DTOs (after WatchSession and ContentBlock since they reference those types)
 
 type MovieListItem = {
@@ -162,6 +248,23 @@ type IMediathecaApi = {
     reorderContentBlocks: string -> string option -> string list -> Async<Result<unit, string>>
     getContentBlocks: string -> string option -> Async<ContentBlockDto list>
     uploadContentImage: byte array -> string -> Async<Result<string, string>>
+    // Catalogs
+    createCatalog: CreateCatalogRequest -> Async<Result<string, string>>
+    updateCatalog: string -> UpdateCatalogRequest -> Async<Result<unit, string>>
+    removeCatalog: string -> Async<Result<unit, string>>
+    getCatalog: string -> Async<CatalogDetail option>
+    getCatalogs: unit -> Async<CatalogListItem list>
+    addCatalogEntry: string -> AddCatalogEntryRequest -> Async<Result<string, string>>
+    updateCatalogEntry: string -> string -> UpdateCatalogEntryRequest -> Async<Result<unit, string>>
+    removeCatalogEntry: string -> string -> Async<Result<unit, string>>
+    reorderCatalogEntries: string -> string list -> Async<Result<unit, string>>
+    // Dashboard
+    getDashboardStats: unit -> Async<DashboardStats>
+    getRecentActivity: int -> Async<RecentActivityItem list>
+    // Event Store Browser
+    getEvents: EventQuery -> Async<EventDto list>
+    getEventStreams: unit -> Async<string list>
+    getEventTypes: unit -> Async<string list>
     // Settings
     getTmdbApiKey: unit -> Async<string>
     setTmdbApiKey: string -> Async<Result<unit, string>>

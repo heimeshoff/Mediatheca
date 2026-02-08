@@ -105,6 +105,56 @@ module EventStore =
         ]
         |> Db.query readEvent
 
+    let queryEvents (conn: SqliteConnection) (streamFilter: string option) (eventTypeFilter: string option) (limit: int) (offset: int) : StoredEvent list =
+        let mutable conditions = []
+        let mutable paramList = []
+
+        match streamFilter with
+        | Some f when f <> "" ->
+            conditions <- "stream_id LIKE @stream_filter" :: conditions
+            paramList <- ("stream_filter", SqlType.String ($"%%{f}%%")) :: paramList
+        | _ -> ()
+
+        match eventTypeFilter with
+        | Some f when f <> "" ->
+            conditions <- "event_type LIKE @event_type_filter" :: conditions
+            paramList <- ("event_type_filter", SqlType.String ($"%%{f}%%")) :: paramList
+        | _ -> ()
+
+        let whereClause =
+            if conditions.IsEmpty then ""
+            else " WHERE " + (conditions |> List.rev |> String.concat " AND ")
+
+        paramList <- ("limit", SqlType.Int32 limit) :: paramList
+        paramList <- ("offset", SqlType.Int32 offset) :: paramList
+
+        conn
+        |> Db.newCommand ($"SELECT global_position, stream_id, stream_position, event_type, data, metadata, timestamp FROM events{whereClause} ORDER BY global_position DESC LIMIT @limit OFFSET @offset")
+        |> Db.setParams (List.rev paramList)
+        |> Db.query readEvent
+
+    let getDistinctStreams (conn: SqliteConnection) : string list =
+        conn
+        |> Db.newCommand "SELECT DISTINCT stream_id FROM events ORDER BY stream_id"
+        |> Db.query (fun rd -> rd.ReadString "stream_id")
+
+    let getDistinctEventTypes (conn: SqliteConnection) : string list =
+        conn
+        |> Db.newCommand "SELECT DISTINCT event_type FROM events ORDER BY event_type"
+        |> Db.query (fun rd -> rd.ReadString "event_type")
+
+    let getRecentEvents (conn: SqliteConnection) (count: int) : StoredEvent list =
+        conn
+        |> Db.newCommand "SELECT global_position, stream_id, stream_position, event_type, data, metadata, timestamp FROM events ORDER BY global_position DESC LIMIT @count"
+        |> Db.setParams [ "count", SqlType.Int32 count ]
+        |> Db.query readEvent
+
+    let getTotalEventCount (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand "SELECT COUNT(*) as cnt FROM events"
+        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+        |> Option.defaultValue 0
+
     // Writing
 
     let appendToStream (conn: SqliteConnection) (streamId: string) (expectedPosition: int64) (events: EventData list) : AppendResult =

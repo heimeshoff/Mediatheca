@@ -10,6 +10,7 @@
     <Compile Include="MoviesTests.fs" />
     <Compile Include="FriendsTests.fs" />
     <Compile Include="ContentBlocksTests.fs" />
+    <Compile Include="CatalogsTests.fs" />
     <Compile Include="EventStoreTests.fs" />
     <Compile Include="MoviesIntegrationTests.fs" />
     <Compile Include="FriendIntegrationTests.fs" />

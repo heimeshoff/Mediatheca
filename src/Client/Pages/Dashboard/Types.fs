@@ -1,14 +1,17 @@
 module Mediatheca.Client.Pages.Dashboard.Types
 
+open Mediatheca.Shared
+
 type Model = {
     Placeholder: string
-    MovieCount: int
-    FriendCount: int
-    RecentMovies: Mediatheca.Shared.MovieListItem list
+    Stats: DashboardStats option
+    RecentMovies: MovieListItem list
+    RecentActivity: RecentActivityItem list
     IsLoading: bool
 }
 
 type Msg =
     | NoOp
-    | Movies_loaded of Mediatheca.Shared.MovieListItem list
-    | Friends_loaded of Mediatheca.Shared.FriendListItem list
+    | Stats_loaded of DashboardStats
+    | Movies_loaded of MovieListItem list
+    | Activity_loaded of RecentActivityItem list

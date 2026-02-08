@@ -74,6 +74,7 @@ let main args =
         MovieProjection.handler
         FriendProjection.handler
         ContentBlockProjection.handler
+        CatalogProjection.handler
     ]
 
     // Start projections

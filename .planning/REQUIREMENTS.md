@@ -35,13 +35,13 @@
 
 ### Phase 4: Curation + Dashboards + Admin
 
-- [ ] REQ-022: Create a Collection with name, description, and sorted/unsorted flag [Phase 4]
-- [ ] REQ-023: Add Entries (movies) to a Collection with optional position and per-item note [Phase 4]
-- [ ] REQ-024: Collection detail view showing entries in order with notes [Phase 4]
-- [ ] REQ-025: Collection list view [Phase 4]
-- [ ] REQ-026: Main Dashboard — overview of recent watch sessions, recently added movies, and quick stats [Phase 4]
-- [ ] REQ-027: Movies Dashboard — movie-specific stats (total watched, watch time, top friends watched with) [Phase 4]
-- [ ] REQ-028: Event Store Browser — view and search events by stream, type, and date [Phase 4]
+- [x] REQ-022: Create a Catalog with name, description, and sorted/unsorted flag [Phase 4]
+- [x] REQ-023: Add Entries (movies) to a Catalog with optional position and per-item note [Phase 4]
+- [x] REQ-024: Catalog detail view showing entries in order with notes [Phase 4]
+- [x] REQ-025: Catalog list view [Phase 4]
+- [x] REQ-026: Main Dashboard — overview of recent activity, recently added movies, and quick stats (movies, friends, catalogs, watch time) [Phase 4]
+- [x] REQ-027: Dashboard — stats (total watched, watch time, catalog count) [Phase 4]
+- [x] REQ-028: Event Store Browser — view and search events by stream, type, and date [Phase 4]
 
 ## v2 (Future)
 

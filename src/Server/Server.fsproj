@@ -15,6 +15,8 @@
     <Compile Include="SettingsStore.fs" />
     <Compile Include="ContentBlocks.fs" />
     <Compile Include="ContentBlockProjection.fs" />
+    <Compile Include="Catalogs.fs" />
+    <Compile Include="CatalogProjection.fs" />
     <Compile Include="MovieProjection.fs" />
     <Compile Include="FriendProjection.fs" />
     <Compile Include="Api.fs" />

@@ -18,6 +18,12 @@ let private pageContent (model: Model) (dispatch: Msg -> unit) =
         Pages.Friends.Views.view model.FriendListModel (Friend_list_msg >> dispatch)
     | Friend_detail _ ->
         Pages.FriendDetail.Views.view model.FriendDetailModel (Friend_detail_msg >> dispatch)
+    | Catalog_list ->
+        Pages.Catalogs.Views.view model.CatalogListModel (Catalog_list_msg >> dispatch)
+    | Catalog_detail _ ->
+        Pages.CatalogDetail.Views.view model.CatalogDetailModel (Catalog_detail_msg >> dispatch)
+    | Event_browser ->
+        Pages.EventBrowser.Views.view model.EventBrowserModel (Event_browser_msg >> dispatch)
     | Settings ->
         Pages.Settings.Views.view model.SettingsModel (Settings_msg >> dispatch)
     | Not_found ->

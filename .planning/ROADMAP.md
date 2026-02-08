@@ -7,7 +7,7 @@
 | 1 | Skeleton | :white_check_mark: Done | REQ-001, REQ-002, REQ-003, REQ-004, REQ-005, REQ-006, REQ-007, REQ-008 |
 | 2 | Catalog + Friends | :white_check_mark: Done | REQ-009, REQ-010, REQ-010a, REQ-011, REQ-012, REQ-013, REQ-014, REQ-015 |
 | 3 | Journal + Content Blocks | :white_check_mark: Done | REQ-016, REQ-017, REQ-018, REQ-019, REQ-020, REQ-021 |
-| 4 | Curation + Dashboards + Admin | :hourglass: Planned | REQ-022, REQ-023, REQ-024, REQ-025, REQ-026, REQ-027, REQ-028 |
+| 4 | Curation + Dashboards + Admin | :white_check_mark: Done | REQ-022, REQ-023, REQ-024, REQ-025, REQ-026, REQ-027, REQ-028 |
 
 ### Phase 1: Skeleton
 
@@ -50,18 +50,18 @@ Deliverable: Users can log watch sessions with friends and attach rich content b
 
 ### Phase 4: Curation + Dashboards + Admin
 
-Deliverable: Users can organize movies into collections, view dashboards with stats, and inspect the event store.
+Deliverable: Users can organize movies into catalogs, view dashboards with stats, and inspect the event store.
 
-- Curation bounded context: Collection aggregate with events
-- Create sorted/unsorted collections with descriptions
-- Add entries with position and per-item notes
-- Collection list and detail pages
-- Main dashboard (recent activity, quick stats)
-- Movies dashboard (movie-specific stats and views)
-- Administration: Event store browser (view/search events)
+- Curation bounded context: Catalog aggregate with events (Catalog_created, Catalog_updated, Catalog_removed, Entry_added, Entry_updated, Entry_removed, Entries_reordered)
+- Create sorted/unsorted catalogs with descriptions
+- Add entries (movies) with position and per-item notes
+- Catalog list and detail pages
+- Main dashboard (recent activity, quick stats: movies, friends, catalogs, watch time)
+- Administration: Event store browser (view/search/filter events by stream and type)
 
 ## Completed Milestones
 
 - Phase 1: Skeleton (2026-01-31)
 - Phase 2: Catalog + Friends (2026-02-01)
 - Phase 3: Journal + Content Blocks (2026-02-08)
+- Phase 4: Curation + Dashboards + Admin (2026-02-08)

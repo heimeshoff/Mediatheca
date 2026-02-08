@@ -6,7 +6,7 @@ open Feliz.Router
 open Mediatheca.Client.Pages.Dashboard.Types
 open Mediatheca.Client.Components
 
-let private statCard (icon: unit -> ReactElement) (label: string) (value: int) (color: string) (delay: int) =
+let private statCard (icon: unit -> ReactElement) (label: string) (value: string) (color: string) (delay: int) =
     Html.div [
         prop.className $"stat-glow bg-base-100 rounded-2xl p-6 shadow-md card-hover"
         prop.style [ style.custom ("animationDelay", $"{delay}ms") ]
@@ -22,7 +22,7 @@ let private statCard (icon: unit -> ReactElement) (label: string) (value: int) (
                             ]
                             Html.p [
                                 prop.className $"text-4xl font-bold font-display mt-1 {color}"
-                                prop.text (string value)
+                                prop.text value
                             ]
                         ]
                     ]
@@ -34,6 +34,15 @@ let private statCard (icon: unit -> ReactElement) (label: string) (value: int) (
             ]
         ]
     ]
+
+let private formatWatchTime (minutes: int) =
+    if minutes = 0 then "0h"
+    elif minutes < 60 then $"{minutes}m"
+    else
+        let hours = minutes / 60
+        let mins = minutes % 60
+        if mins = 0 then $"{hours}h"
+        else $"{hours}h {mins}m"
 
 let private recentMovieCard (movie: Mediatheca.Shared.MovieListItem) =
     Html.a [
@@ -83,7 +92,36 @@ let private recentMovieCard (movie: Mediatheca.Shared.MovieListItem) =
         ]
     ]
 
+let private activityItem (item: Mediatheca.Shared.RecentActivityItem) =
+    Html.div [
+        prop.className "flex items-center gap-3 py-2"
+        prop.children [
+            Html.div [
+                prop.className "w-2 h-2 rounded-full bg-primary/50 flex-none"
+            ]
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.p [
+                        prop.className "text-sm truncate"
+                        prop.text item.Description
+                    ]
+                    Html.p [
+                        prop.className "text-xs text-base-content/40"
+                        prop.text (
+                            try
+                                let dt = System.DateTimeOffset.Parse(item.Timestamp)
+                                dt.LocalDateTime.ToString("MMM d, HH:mm")
+                            with _ -> item.Timestamp
+                        )
+                    ]
+                ]
+            ]
+        ]
+    ]
+
 let view (model: Model) (_dispatch: Msg -> unit) =
+    let stats = model.Stats |> Option.defaultValue { MovieCount = 0; FriendCount = 0; CatalogCount = 0; WatchSessionCount = 0; TotalWatchTimeMinutes = 0 }
     Html.div [
         prop.className "animate-fade-in"
         prop.children [
@@ -121,66 +159,115 @@ let view (model: Model) (_dispatch: Msg -> unit) =
                     Html.div [
                         prop.className "grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-grid"
                         prop.children [
-                            statCard Icons.movie "Movies" model.MovieCount "text-primary" 0
-                            statCard Icons.friends "Friends" model.FriendCount "text-secondary" 100
+                            statCard Icons.movie "Movies" (string stats.MovieCount) "text-primary" 0
+                            statCard Icons.friends "Friends" (string stats.FriendCount) "text-secondary" 100
+                            statCard Icons.catalog "Catalogs" (string stats.CatalogCount) "text-accent" 200
+                            statCard Icons.events "Watch Time" (formatWatchTime stats.TotalWatchTimeMinutes) "text-info" 300
                         ]
                     ]
 
-                    // Recent movies section
-                    if not (List.isEmpty model.RecentMovies) then
-                        Html.div [
-                            prop.className "animate-fade-in-up"
-                            prop.children [
-                                Html.div [
-                                    prop.className "flex items-center justify-between mb-4"
-                                    prop.children [
-                                        Html.h2 [
-                                            prop.className "text-lg font-bold font-display"
-                                            prop.text "Recent Movies"
-                                        ]
-                                        Html.a [
-                                            prop.href (Router.format "movies")
-                                            prop.onClick (fun e ->
-                                                e.preventDefault()
-                                                Router.navigate "movies"
-                                            )
-                                            prop.className "text-sm text-primary hover:text-primary/80 transition-colors font-medium"
-                                            prop.text "View all"
-                                        ]
-                                    ]
-                                ]
-                                Daisy.card [
-                                    prop.className "bg-base-100 shadow-md"
-                                    prop.children [
-                                        Daisy.cardBody [
-                                            prop.className "p-2"
+                    Html.div [
+                        prop.className "grid grid-cols-1 lg:grid-cols-2 gap-6"
+                        prop.children [
+                            // Recent movies section
+                            Html.div [
+                                prop.className "animate-fade-in-up"
+                                prop.children [
+                                    if not (List.isEmpty model.RecentMovies) then
+                                        Html.div [
                                             prop.children [
-                                                for movie in model.RecentMovies do
-                                                    recentMovieCard movie
+                                                Html.div [
+                                                    prop.className "flex items-center justify-between mb-4"
+                                                    prop.children [
+                                                        Html.h2 [
+                                                            prop.className "text-lg font-bold font-display"
+                                                            prop.text "Recent Movies"
+                                                        ]
+                                                        Html.a [
+                                                            prop.href (Router.format "movies")
+                                                            prop.onClick (fun e ->
+                                                                e.preventDefault()
+                                                                Router.navigate "movies"
+                                                            )
+                                                            prop.className "text-sm text-primary hover:text-primary/80 transition-colors font-medium"
+                                                            prop.text "View all"
+                                                        ]
+                                                    ]
+                                                ]
+                                                Daisy.card [
+                                                    prop.className "bg-base-100 shadow-md"
+                                                    prop.children [
+                                                        Daisy.cardBody [
+                                                            prop.className "p-2"
+                                                            prop.children [
+                                                                for movie in model.RecentMovies do
+                                                                    recentMovieCard movie
+                                                            ]
+                                                        ]
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                    else if not model.IsLoading then
+                                        Html.div [
+                                            prop.className "text-center py-12 animate-fade-in"
+                                            prop.children [
+                                                Html.div [
+                                                    prop.className "text-base-content/15 mb-4"
+                                                    prop.children [ Icons.mediatheca () ]
+                                                ]
+                                                Html.p [
+                                                    prop.className "text-base-content/40 font-medium"
+                                                    prop.text "Your library is empty."
+                                                ]
+                                                Html.p [
+                                                    prop.className "text-base-content/30 text-sm mt-1"
+                                                    prop.text "Head to Movies to start building your collection."
+                                                ]
+                                            ]
+                                        ]
+                                ]
+                            ]
+
+                            // Recent activity section
+                            if not (List.isEmpty model.RecentActivity) then
+                                Html.div [
+                                    prop.className "animate-fade-in-up"
+                                    prop.children [
+                                        Html.div [
+                                            prop.className "flex items-center justify-between mb-4"
+                                            prop.children [
+                                                Html.h2 [
+                                                    prop.className "text-lg font-bold font-display"
+                                                    prop.text "Recent Activity"
+                                                ]
+                                                Html.a [
+                                                    prop.href (Router.format "events")
+                                                    prop.onClick (fun e ->
+                                                        e.preventDefault()
+                                                        Router.navigate "events"
+                                                    )
+                                                    prop.className "text-sm text-primary hover:text-primary/80 transition-colors font-medium"
+                                                    prop.text "View all"
+                                                ]
+                                            ]
+                                        ]
+                                        Daisy.card [
+                                            prop.className "bg-base-100 shadow-md"
+                                            prop.children [
+                                                Daisy.cardBody [
+                                                    prop.className "p-4"
+                                                    prop.children [
+                                                        for item in model.RecentActivity |> List.truncate 8 do
+                                                            activityItem item
+                                                    ]
+                                                ]
                                             ]
                                         ]
                                     ]
                                 ]
-                            ]
                         ]
-                    else if not model.IsLoading then
-                        Html.div [
-                            prop.className "text-center py-12 animate-fade-in"
-                            prop.children [
-                                Html.div [
-                                    prop.className "text-base-content/15 mb-4"
-                                    prop.children [ Icons.mediatheca () ]
-                                ]
-                                Html.p [
-                                    prop.className "text-base-content/40 font-medium"
-                                    prop.text "Your library is empty."
-                                ]
-                                Html.p [
-                                    prop.className "text-base-content/30 text-sm mt-1"
-                                    prop.text "Head to Movies to start building your collection."
-                                ]
-                            ]
-                        ]
+                    ]
                 ]
             ]
         ]

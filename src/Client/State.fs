@@ -11,6 +11,9 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
     let movieDetailModel, movieDetailCmd = Pages.MovieDetail.State.init ""
     let friendListModel, friendListCmd = Pages.Friends.State.init ()
     let friendDetailModel, friendDetailCmd = Pages.FriendDetail.State.init ""
+    let catalogListModel, catalogListCmd = Pages.Catalogs.State.init ()
+    let catalogDetailModel, catalogDetailCmd = Pages.CatalogDetail.State.init ""
+    let eventBrowserModel, eventBrowserCmd = Pages.EventBrowser.State.init ()
     let settingsModel, settingsCmd = Pages.Settings.State.init ()
 
     let model = {
@@ -20,13 +23,17 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
         MovieDetailModel = movieDetailModel
         FriendListModel = friendListModel
         FriendDetailModel = friendDetailModel
+        CatalogListModel = catalogListModel
+        CatalogDetailModel = catalogDetailModel
+        EventBrowserModel = eventBrowserModel
         SettingsModel = settingsModel
     }
 
     let cmd = Cmd.batch [
         Cmd.map Dashboard_msg dashboardCmd
+        Cmd.OfAsync.perform api.getDashboardStats () (fun stats -> Dashboard_msg (Pages.Dashboard.Types.Stats_loaded stats))
+        Cmd.OfAsync.perform api.getRecentActivity 10 (fun activity -> Dashboard_msg (Pages.Dashboard.Types.Activity_loaded activity))
         Cmd.OfAsync.perform api.getMovies () (fun movies -> Dashboard_msg (Pages.Dashboard.Types.Movies_loaded movies))
-        Cmd.OfAsync.perform api.getFriends () (fun friends -> Dashboard_msg (Pages.Dashboard.Types.Friends_loaded friends))
         Cmd.map Movie_list_msg movieListCmd
         Cmd.map Settings_msg settingsCmd
     ]
@@ -55,6 +62,18 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             let childModel, childCmd = Pages.FriendDetail.State.init slug
             { model with FriendDetailModel = childModel },
             Cmd.map Friend_detail_msg childCmd
+        | Catalog_list ->
+            let childModel, childCmd = Pages.Catalogs.State.init ()
+            { model with CatalogListModel = childModel },
+            Cmd.map Catalog_list_msg childCmd
+        | Catalog_detail slug ->
+            let childModel, childCmd = Pages.CatalogDetail.State.init slug
+            { model with CatalogDetailModel = childModel },
+            Cmd.map Catalog_detail_msg childCmd
+        | Event_browser ->
+            let childModel, childCmd = Pages.EventBrowser.State.init ()
+            { model with EventBrowserModel = childModel },
+            Cmd.map Event_browser_msg childCmd
         | Settings ->
             let childModel, childCmd = Pages.Settings.State.init ()
             { model with SettingsModel = childModel },
@@ -64,8 +83,9 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             { model with DashboardModel = childModel },
             Cmd.batch [
                 Cmd.map Dashboard_msg childCmd
+                Cmd.OfAsync.perform api.getDashboardStats () (fun stats -> Dashboard_msg (Pages.Dashboard.Types.Stats_loaded stats))
+                Cmd.OfAsync.perform api.getRecentActivity 10 (fun activity -> Dashboard_msg (Pages.Dashboard.Types.Activity_loaded activity))
                 Cmd.OfAsync.perform api.getMovies () (fun movies -> Dashboard_msg (Pages.Dashboard.Types.Movies_loaded movies))
-                Cmd.OfAsync.perform api.getFriends () (fun friends -> Dashboard_msg (Pages.Dashboard.Types.Friends_loaded friends))
             ]
         | _ -> model, Cmd.none
 
@@ -88,6 +108,18 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Friend_detail_msg childMsg ->
         let childModel, childCmd = Pages.FriendDetail.State.update api childMsg model.FriendDetailModel
         { model with FriendDetailModel = childModel }, Cmd.map Friend_detail_msg childCmd
+
+    | Catalog_list_msg childMsg ->
+        let childModel, childCmd = Pages.Catalogs.State.update api childMsg model.CatalogListModel
+        { model with CatalogListModel = childModel }, Cmd.map Catalog_list_msg childCmd
+
+    | Catalog_detail_msg childMsg ->
+        let childModel, childCmd = Pages.CatalogDetail.State.update api childMsg model.CatalogDetailModel
+        { model with CatalogDetailModel = childModel }, Cmd.map Catalog_detail_msg childCmd
+
+    | Event_browser_msg childMsg ->
+        let childModel, childCmd = Pages.EventBrowser.State.update api childMsg model.EventBrowserModel
+        { model with EventBrowserModel = childModel }, Cmd.map Event_browser_msg childCmd
 
     | Settings_msg childMsg ->
         let childModel, childCmd = Pages.Settings.State.update api childMsg model.SettingsModel

@@ -29,6 +29,15 @@
     <Compile Include="Pages\FriendDetail\Types.fs" />
     <Compile Include="Pages\FriendDetail\State.fs" />
     <Compile Include="Pages\FriendDetail\Views.fs" />
+    <Compile Include="Pages\Catalogs\Types.fs" />
+    <Compile Include="Pages\Catalogs\State.fs" />
+    <Compile Include="Pages\Catalogs\Views.fs" />
+    <Compile Include="Pages\CatalogDetail\Types.fs" />
+    <Compile Include="Pages\CatalogDetail\State.fs" />
+    <Compile Include="Pages\CatalogDetail\Views.fs" />
+    <Compile Include="Pages\EventBrowser\Types.fs" />
+    <Compile Include="Pages\EventBrowser\State.fs" />
+    <Compile Include="Pages\EventBrowser\Views.fs" />
     <Compile Include="Pages\Settings\Types.fs" />
     <Compile Include="Pages\Settings\State.fs" />
     <Compile Include="Pages\Settings\Views.fs" />

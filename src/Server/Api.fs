@@ -1,7 +1,9 @@
 namespace Mediatheca.Server
 
+open System.Data
 open System.Net.Http
 open Microsoft.Data.Sqlite
+open Donald
 open Mediatheca.Shared
 
 module Api =
@@ -41,10 +43,10 @@ module Api =
                         Projection.runProjection conn handler
                     Ok ()
 
-    let private generateUniqueSlug (conn: SqliteConnection) (baseSlug: string) : string =
+    let private generateUniqueSlug (conn: SqliteConnection) (streamIdFn: string -> string) (baseSlug: string) : string =
         let mutable slug = baseSlug
         let mutable suffix = 2
-        while EventStore.getStreamPosition conn (Movies.streamId slug) >= 0L do
+        while EventStore.getStreamPosition conn (streamIdFn slug) >= 0L do
             slug <- sprintf "%s-%d" baseSlug suffix
             suffix <- suffix + 1
         slug
@@ -86,7 +88,7 @@ module Api =
 
                     // 2. Generate unique slug
                     let baseSlug = Slug.movieSlug details.Title year
-                    let slug = generateUniqueSlug conn baseSlug
+                    let slug = generateUniqueSlug conn Movies.streamId baseSlug
                     let sid = Movies.streamId slug
 
                     // 3. Download poster + backdrop
@@ -432,6 +434,212 @@ module Api =
                     return Ok ref
                 with ex ->
                     return Error $"Failed to upload image: {ex.Message}"
+            }
+
+            // Catalogs
+            createCatalog = fun request -> async {
+                let baseSlug = Slug.catalogSlug request.Name
+                let slug = generateUniqueSlug conn Catalogs.streamId baseSlug
+                let sid = Catalogs.streamId slug
+                let data: Catalogs.CatalogCreatedData = {
+                    Name = request.Name
+                    Description = request.Description
+                    IsSorted = request.IsSorted
+                }
+                let result =
+                    executeCommand
+                        conn sid
+                        Catalogs.Serialization.fromStoredEvent
+                        Catalogs.reconstitute
+                        Catalogs.decide
+                        Catalogs.Serialization.toEventData
+                        (Catalogs.Create_catalog data)
+                        projectionHandlers
+                match result with
+                | Ok () -> return Ok slug
+                | Error e -> return Error e
+            }
+
+            updateCatalog = fun slug request -> async {
+                let sid = Catalogs.streamId slug
+                let data: Catalogs.CatalogUpdatedData = {
+                    Name = request.Name
+                    Description = request.Description
+                }
+                return
+                    executeCommand
+                        conn sid
+                        Catalogs.Serialization.fromStoredEvent
+                        Catalogs.reconstitute
+                        Catalogs.decide
+                        Catalogs.Serialization.toEventData
+                        (Catalogs.Update_catalog data)
+                        projectionHandlers
+            }
+
+            removeCatalog = fun slug -> async {
+                let sid = Catalogs.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Catalogs.Serialization.fromStoredEvent
+                        Catalogs.reconstitute
+                        Catalogs.decide
+                        Catalogs.Serialization.toEventData
+                        Catalogs.Remove_catalog
+                        projectionHandlers
+            }
+
+            getCatalog = fun slug -> async {
+                return CatalogProjection.getBySlug conn slug
+            }
+
+            getCatalogs = fun () -> async {
+                return CatalogProjection.getAll conn
+            }
+
+            addCatalogEntry = fun slug request -> async {
+                let sid = Catalogs.streamId slug
+                let entryId = System.Guid.NewGuid().ToString("N")
+                let data: Catalogs.EntryAddedData = {
+                    EntryId = entryId
+                    MovieSlug = request.MovieSlug
+                    Note = request.Note
+                }
+                let result =
+                    executeCommand
+                        conn sid
+                        Catalogs.Serialization.fromStoredEvent
+                        Catalogs.reconstitute
+                        Catalogs.decide
+                        Catalogs.Serialization.toEventData
+                        (Catalogs.Add_entry data)
+                        projectionHandlers
+                match result with
+                | Ok () -> return Ok entryId
+                | Error e -> return Error e
+            }
+
+            updateCatalogEntry = fun slug entryId request -> async {
+                let sid = Catalogs.streamId slug
+                let data: Catalogs.EntryUpdatedData = {
+                    EntryId = entryId
+                    Note = request.Note
+                }
+                return
+                    executeCommand
+                        conn sid
+                        Catalogs.Serialization.fromStoredEvent
+                        Catalogs.reconstitute
+                        Catalogs.decide
+                        Catalogs.Serialization.toEventData
+                        (Catalogs.Update_entry data)
+                        projectionHandlers
+            }
+
+            removeCatalogEntry = fun slug entryId -> async {
+                let sid = Catalogs.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Catalogs.Serialization.fromStoredEvent
+                        Catalogs.reconstitute
+                        Catalogs.decide
+                        Catalogs.Serialization.toEventData
+                        (Catalogs.Remove_entry entryId)
+                        projectionHandlers
+            }
+
+            reorderCatalogEntries = fun slug entryIds -> async {
+                let sid = Catalogs.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Catalogs.Serialization.fromStoredEvent
+                        Catalogs.reconstitute
+                        Catalogs.decide
+                        Catalogs.Serialization.toEventData
+                        (Catalogs.Reorder_entries entryIds)
+                        projectionHandlers
+            }
+
+            // Dashboard
+            getDashboardStats = fun () -> async {
+                let movieCount =
+                    conn
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM movie_list"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+                    |> Option.defaultValue 0
+                let friendCount =
+                    conn
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM friend_list"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+                    |> Option.defaultValue 0
+                let catalogCount =
+                    conn
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM catalog_list"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+                    |> Option.defaultValue 0
+                let watchSessionCount =
+                    conn
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM watch_sessions"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+                    |> Option.defaultValue 0
+                let totalWatchTime =
+                    conn
+                    |> Db.newCommand "SELECT COALESCE(SUM(duration), 0) as total FROM watch_sessions"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
+                    |> Option.defaultValue 0
+                return {
+                    Mediatheca.Shared.DashboardStats.MovieCount = movieCount
+                    FriendCount = friendCount
+                    CatalogCount = catalogCount
+                    WatchSessionCount = watchSessionCount
+                    TotalWatchTimeMinutes = totalWatchTime
+                }
+            }
+
+            getRecentActivity = fun count -> async {
+                let events = EventStore.getRecentEvents conn count
+                return events |> List.map (fun e ->
+                    let description =
+                        match e.EventType with
+                        | "Movie_added_to_library" -> "Movie added to library"
+                        | "Movie_removed_from_library" -> "Movie removed from library"
+                        | "Watch_session_recorded" -> "Watch session recorded"
+                        | "Friend_added" -> "Friend added"
+                        | "Friend_removed" -> "Friend removed"
+                        | "Catalog_created" -> "Catalog created"
+                        | "Catalog_removed" -> "Catalog removed"
+                        | "Entry_added" -> "Entry added to catalog"
+                        | "Content_block_added" -> "Content block added"
+                        | other -> other.Replace("_", " ")
+                    { Mediatheca.Shared.RecentActivityItem.Timestamp = e.Timestamp.ToString("o")
+                      StreamId = e.StreamId
+                      EventType = e.EventType
+                      Description = description }
+                )
+            }
+
+            // Event Store Browser
+            getEvents = fun query -> async {
+                let events = EventStore.queryEvents conn query.StreamFilter query.EventTypeFilter query.Limit query.Offset
+                return events |> List.map (fun e ->
+                    { Mediatheca.Shared.EventDto.GlobalPosition = e.GlobalPosition
+                      StreamId = e.StreamId
+                      StreamPosition = e.StreamPosition
+                      EventType = e.EventType
+                      Data = e.Data
+                      Timestamp = e.Timestamp.ToString("o") }
+                )
+            }
+
+            getEventStreams = fun () -> async {
+                return EventStore.getDistinctStreams conn
+            }
+
+            getEventTypes = fun () -> async {
+                return EventStore.getDistinctEventTypes conn
             }
 
             addFriend = fun name -> async {
