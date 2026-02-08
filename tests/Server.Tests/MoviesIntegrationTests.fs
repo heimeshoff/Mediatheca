@@ -1,4 +1,4 @@
-module Mediatheca.Tests.CatalogIntegrationTests
+module Mediatheca.Tests.MoviesIntegrationTests
 
 open Expecto
 open Microsoft.Data.Sqlite
@@ -11,7 +11,7 @@ let private createInMemoryConnection () =
     CastStore.initialize conn
     conn
 
-let private sampleMovieData: Catalog.MovieAddedData = {
+let private sampleMovieData: Movies.MovieAddedData = {
     Name = "The Matrix"
     Year = 1999
     Runtime = Some 136
@@ -25,13 +25,13 @@ let private sampleMovieData: Catalog.MovieAddedData = {
 
 [<Tests>]
 let catalogIntegrationTests =
-    testList "Catalog Integration" [
+    testList "Movies Integration" [
 
         testCase "serialize event, store, read back, deserialize round-trip" <| fun _ ->
             let conn = createInMemoryConnection ()
-            let event = Catalog.MovieAddedToLibrary sampleMovieData
-            let eventData = Catalog.Serialization.toEventData event
-            let streamId = Catalog.streamId "the-matrix-1999"
+            let event = Movies.Movie_added_to_library sampleMovieData
+            let eventData = Movies.Serialization.toEventData event
+            let streamId = Movies.streamId "the-matrix-1999"
 
             // Append
             let result = EventStore.appendToStream conn streamId -1L [ eventData ]
@@ -44,19 +44,19 @@ let catalogIntegrationTests =
             Expect.equal (List.length stored) 1 "Should have 1 event"
 
             // Deserialize
-            let deserialized = Catalog.Serialization.fromStoredEvent stored.[0]
+            let deserialized = Movies.Serialization.fromStoredEvent stored.[0]
             Expect.equal deserialized (Some event) "Should round-trip through event store"
 
         testCase "movie projection populates read model after event" <| fun _ ->
             let conn = createInMemoryConnection ()
-            let streamId = Catalog.streamId "the-matrix-1999"
+            let streamId = Movies.streamId "the-matrix-1999"
 
             // Initialize projection
             MovieProjection.handler.Init conn
 
             // Append movie added event
-            let event = Catalog.MovieAddedToLibrary sampleMovieData
-            let eventData = Catalog.Serialization.toEventData event
+            let event = Movies.Movie_added_to_library sampleMovieData
+            let eventData = Movies.Serialization.toEventData event
             EventStore.appendToStream conn streamId -1L [ eventData ] |> ignore
 
             // Run projection
@@ -78,16 +78,16 @@ let catalogIntegrationTests =
 
         testCase "movie removal clears read model" <| fun _ ->
             let conn = createInMemoryConnection ()
-            let streamId = Catalog.streamId "the-matrix-1999"
+            let streamId = Movies.streamId "the-matrix-1999"
 
             MovieProjection.handler.Init conn
 
             // Add movie
-            let addEvent = Catalog.Serialization.toEventData (Catalog.MovieAddedToLibrary sampleMovieData)
+            let addEvent = Movies.Serialization.toEventData (Movies.Movie_added_to_library sampleMovieData)
             EventStore.appendToStream conn streamId -1L [ addEvent ] |> ignore
 
             // Remove movie
-            let removeEvent = Catalog.Serialization.toEventData Catalog.MovieRemovedFromLibrary
+            let removeEvent = Movies.Serialization.toEventData Movies.Movie_removed_from_library
             EventStore.appendToStream conn streamId 0L [ removeEvent ] |> ignore
 
             Projection.runProjection conn MovieProjection.handler
@@ -100,14 +100,14 @@ let catalogIntegrationTests =
 
         testCase "categorize movie updates genres in read model" <| fun _ ->
             let conn = createInMemoryConnection ()
-            let streamId = Catalog.streamId "the-matrix-1999"
+            let streamId = Movies.streamId "the-matrix-1999"
 
             MovieProjection.handler.Init conn
 
-            let addEvent = Catalog.Serialization.toEventData (Catalog.MovieAddedToLibrary sampleMovieData)
+            let addEvent = Movies.Serialization.toEventData (Movies.Movie_added_to_library sampleMovieData)
             EventStore.appendToStream conn streamId -1L [ addEvent ] |> ignore
 
-            let catEvent = Catalog.Serialization.toEventData (Catalog.MovieCategorized [ "Drama"; "Mystery" ])
+            let catEvent = Movies.Serialization.toEventData (Movies.Movie_categorized [ "Drama"; "Mystery" ])
             EventStore.appendToStream conn streamId 0L [ catEvent ] |> ignore
 
             Projection.runProjection conn MovieProjection.handler
@@ -117,14 +117,14 @@ let catalogIntegrationTests =
 
         testCase "recommend movie updates read model" <| fun _ ->
             let conn = createInMemoryConnection ()
-            let streamId = Catalog.streamId "the-matrix-1999"
+            let streamId = Movies.streamId "the-matrix-1999"
 
             MovieProjection.handler.Init conn
 
-            let addEvent = Catalog.Serialization.toEventData (Catalog.MovieAddedToLibrary sampleMovieData)
+            let addEvent = Movies.Serialization.toEventData (Movies.Movie_added_to_library sampleMovieData)
             EventStore.appendToStream conn streamId -1L [ addEvent ] |> ignore
 
-            let recEvent = Catalog.Serialization.toEventData (Catalog.MovieRecommendedBy "marco")
+            let recEvent = Movies.Serialization.toEventData (Movies.Movie_recommended_by "marco")
             EventStore.appendToStream conn streamId 0L [ recEvent ] |> ignore
 
             Projection.runProjection conn MovieProjection.handler

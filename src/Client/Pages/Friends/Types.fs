@@ -15,11 +15,11 @@ type Model = {
 }
 
 type Msg =
-    | LoadFriends
-    | FriendsLoaded of FriendListItem list
-    | ToggleAddForm
-    | AddFormNameChanged of string
-    | SubmitAddFriend
-    | FriendAdded of Result<string, string>
-    | RemoveFriend of string
-    | FriendRemoved of Result<unit, string>
+    | Load_friends
+    | Friends_loaded of FriendListItem list
+    | Toggle_add_form
+    | Add_form_name_changed of string
+    | Submit_add_friend
+    | Friend_added of Result<string, string>
+    | Remove_friend of string
+    | Friend_removed of Result<unit, string>

@@ -72,7 +72,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             ]
                                             Daisy.input [
                                                 prop.value model.EditForm.Name
-                                                prop.onChange (EditNameChanged >> dispatch)
+                                                prop.onChange (Edit_name_changed >> dispatch)
                                             ]
                                         ]
                                     ]
@@ -89,12 +89,12 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                         prop.children [
                                             Daisy.button.button [
                                                 button.primary
-                                                prop.onClick (fun _ -> dispatch SubmitUpdate)
+                                                prop.onClick (fun _ -> dispatch Submit_update)
                                                 prop.text "Save"
                                             ]
                                             Daisy.button.button [
                                                 button.ghost
-                                                prop.onClick (fun _ -> dispatch CancelEditing)
+                                                prop.onClick (fun _ -> dispatch Cancel_editing)
                                                 prop.text "Cancel"
                                             ]
                                         ]
@@ -148,13 +148,13 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             Daisy.button.button [
                                                 button.primary
                                                 button.outline
-                                                prop.onClick (fun _ -> dispatch StartEditing)
+                                                prop.onClick (fun _ -> dispatch Start_editing)
                                                 prop.text "Edit"
                                             ]
                                             Daisy.button.button [
                                                 button.error
                                                 button.outline
-                                                prop.onClick (fun _ -> dispatch RemoveFriend)
+                                                prop.onClick (fun _ -> dispatch Remove_friend)
                                                 prop.text "Remove"
                                             ]
                                         ]

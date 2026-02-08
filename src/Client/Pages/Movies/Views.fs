@@ -79,7 +79,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     ]
                     Daisy.button.button [
                         button.primary
-                        prop.onClick (fun _ -> dispatch OpenTmdbSearch)
+                        prop.onClick (fun _ -> dispatch Open_tmdb_search)
                         prop.text "Add Movie"
                     ]
                 ]
@@ -92,7 +92,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         prop.className "flex-1"
                         prop.placeholder "Search movies..."
                         prop.value model.SearchQuery
-                        prop.onChange (SearchChanged >> dispatch)
+                        prop.onChange (Search_changed >> dispatch)
                     ]
                     Html.div [
                         prop.className "flex gap-2 flex-wrap"
@@ -100,14 +100,14 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             Daisy.button.button [
                                 if model.GenreFilter.IsNone then button.primary else button.ghost
                                 button.sm
-                                prop.onClick (fun _ -> dispatch (GenreFilterChanged None))
+                                prop.onClick (fun _ -> dispatch (Genre_filter_changed None))
                                 prop.text "All"
                             ]
                             for genre in allGenres model.Movies do
                                 Daisy.button.button [
                                     if model.GenreFilter = Some genre then button.primary else button.ghost
                                     button.sm
-                                    prop.onClick (fun _ -> dispatch (GenreFilterChanged (Some genre)))
+                                    prop.onClick (fun _ -> dispatch (Genre_filter_changed (Some genre)))
                                     prop.text genre
                                 ]
                         ]
@@ -156,7 +156,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
             // TMDB Search Modal
             match model.TmdbSearch with
             | Some searchModel ->
-                TmdbSearchModal.view searchModel (TmdbSearchMsg >> dispatch)
+                TmdbSearchModal.view searchModel (Tmdb_search_msg >> dispatch)
             | None -> ()
         ]
     ]

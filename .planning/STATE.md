@@ -1,8 +1,12 @@
 # Current State
 
-**Last Updated:** 2026-02-01
-**Current Phase:** 2 (Catalog + Friends) — Complete
+**Last Updated:** 2026-02-08
+**Current Phase:** 2 (Movies + Friends) — Complete
 **Current Task:** Phase 2 fully implemented, ready for Phase 3
+
+## Recent Progress
+
+- **2026-02-08**: Renamed "Catalog" bounded context to "Movies". Renamed all DU cases (events, commands, messages, page routes) from PascalCase to Snake_case convention (e.g., `MovieRemovedFromLibrary` → `Movie_removed_from_library`). Updated serialization strings, test files, projections, and all client references. Note: existing `mediatheca.db` must be recreated due to serialization string changes.
 
 ## Active Decisions
 
@@ -10,7 +14,7 @@
 - SQLite-based event store, single file for events + read models (decided: 2026-01-30)
 - Local filesystem for image storage (decided: 2026-01-30)
 - F# end-to-end: Fable + Giraffe + Fable.Remoting (decided: 2026-01-30)
-- DDD with 7 bounded contexts: Catalog, Journal, Friends, Curation, Intelligence, Integration, Administration (decided: 2026-01-30)
+- DDD with 7 bounded contexts: Movies, Journal, Friends, Curation, Intelligence, Integration, Administration (decided: 2026-01-30)
 - Content blocks use Notion-style flexible blocks (TextBlock, ImageBlock, LinkBlock) (decided: 2026-01-30)
 - Serena MCP deferred until codebase is large enough (decided: 2026-01-30)
 - Self-hosted fonts (Oswald headings, Inter body) via @fontsource (decided: 2026-01-31)

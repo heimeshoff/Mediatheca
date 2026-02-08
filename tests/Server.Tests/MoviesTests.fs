@@ -1,7 +1,7 @@
-module Mediatheca.Tests.CatalogTests
+module Mediatheca.Tests.MoviesTests
 
 open Expecto
-open Mediatheca.Server.Catalog
+open Mediatheca.Server.Movies
 
 let private sampleMovieData: MovieAddedData = {
     Name = "The Matrix"
@@ -21,159 +21,159 @@ let private givenWhenThen (given: MovieEvent list) (command: MovieCommand) =
 
 [<Tests>]
 let catalogTests =
-    testList "Catalog" [
+    testList "Movies" [
 
-        testList "AddMovieToLibrary" [
+        testList "Add_movie_to_library" [
             testCase "adding movie to empty library succeeds" <| fun _ ->
-                let result = givenWhenThen [] (AddMovieToLibrary sampleMovieData)
+                let result = givenWhenThen [] (Add_movie_to_library sampleMovieData)
                 match result with
                 | Ok events ->
                     Expect.equal (List.length events) 1 "Should produce one event"
                     match events.[0] with
-                    | MovieAddedToLibrary data ->
+                    | Movie_added_to_library data ->
                         Expect.equal data.Name "The Matrix" "Name should match"
                         Expect.equal data.Year 1999 "Year should match"
-                    | _ -> failtest "Expected MovieAddedToLibrary"
+                    | _ -> failtest "Expected Movie_added_to_library"
                 | Error e -> failtest $"Expected success but got: {e}"
 
             testCase "adding movie that already exists fails" <| fun _ ->
-                let result = givenWhenThen [ MovieAddedToLibrary sampleMovieData ] (AddMovieToLibrary sampleMovieData)
+                let result = givenWhenThen [ Movie_added_to_library sampleMovieData ] (Add_movie_to_library sampleMovieData)
                 match result with
                 | Error msg -> Expect.stringContains msg "already exists" "Should say already exists"
                 | Ok _ -> failtest "Expected error"
         ]
 
-        testList "RemoveMovieFromLibrary" [
-            testCase "removing active movie produces MovieRemovedFromLibrary" <| fun _ ->
-                let result = givenWhenThen [ MovieAddedToLibrary sampleMovieData ] RemoveMovieFromLibrary
+        testList "Remove_movie_from_library" [
+            testCase "removing active movie produces Movie_removed_from_library" <| fun _ ->
+                let result = givenWhenThen [ Movie_added_to_library sampleMovieData ] Remove_movie_from_library
                 match result with
                 | Ok events ->
                     Expect.equal (List.length events) 1 "Should produce one event"
-                    Expect.equal events.[0] MovieRemovedFromLibrary "Should be MovieRemovedFromLibrary"
+                    Expect.equal events.[0] Movie_removed_from_library "Should be Movie_removed_from_library"
                 | Error e -> failtest $"Expected success but got: {e}"
 
             testCase "removing non-existent movie fails" <| fun _ ->
-                let result = givenWhenThen [] RemoveMovieFromLibrary
+                let result = givenWhenThen [] Remove_movie_from_library
                 match result with
                 | Error msg -> Expect.stringContains msg "does not exist" "Should say does not exist"
                 | Ok _ -> failtest "Expected error"
         ]
 
-        testList "CategorizeMovie" [
+        testList "Categorize_movie" [
             testCase "categorizing changes genres" <| fun _ ->
-                let result = givenWhenThen [ MovieAddedToLibrary sampleMovieData ] (CategorizeMovie [ "Drama"; "Thriller" ])
+                let result = givenWhenThen [ Movie_added_to_library sampleMovieData ] (Categorize_movie [ "Drama"; "Thriller" ])
                 match result with
                 | Ok events ->
                     Expect.equal (List.length events) 1 "Should produce one event"
                     match events.[0] with
-                    | MovieCategorized genres -> Expect.equal genres [ "Drama"; "Thriller" ] "Genres should match"
-                    | _ -> failtest "Expected MovieCategorized"
+                    | Movie_categorized genres -> Expect.equal genres [ "Drama"; "Thriller" ] "Genres should match"
+                    | _ -> failtest "Expected Movie_categorized"
                 | Error e -> failtest $"Expected success but got: {e}"
 
             testCase "categorizing with same genres produces no events (idempotent)" <| fun _ ->
-                let result = givenWhenThen [ MovieAddedToLibrary sampleMovieData ] (CategorizeMovie [ "Action"; "Sci-Fi" ])
+                let result = givenWhenThen [ Movie_added_to_library sampleMovieData ] (Categorize_movie [ "Action"; "Sci-Fi" ])
                 match result with
                 | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
                 | Error e -> failtest $"Expected success but got: {e}"
         ]
 
-        testList "ReplacePoster" [
+        testList "Replace_poster" [
             testCase "replacing poster produces event" <| fun _ ->
-                let result = givenWhenThen [ MovieAddedToLibrary sampleMovieData ] (ReplacePoster "posters/new-poster.jpg")
+                let result = givenWhenThen [ Movie_added_to_library sampleMovieData ] (Replace_poster "posters/new-poster.jpg")
                 match result with
                 | Ok events ->
                     Expect.equal (List.length events) 1 "Should produce one event"
                     match events.[0] with
-                    | MoviePosterReplaced ref -> Expect.equal ref "posters/new-poster.jpg" "Poster ref should match"
-                    | _ -> failtest "Expected MoviePosterReplaced"
+                    | Movie_poster_replaced ref -> Expect.equal ref "posters/new-poster.jpg" "Poster ref should match"
+                    | _ -> failtest "Expected Movie_poster_replaced"
                 | Error e -> failtest $"Expected success but got: {e}"
         ]
 
-        testList "ReplaceBackdrop" [
+        testList "Replace_backdrop" [
             testCase "replacing backdrop produces event" <| fun _ ->
-                let result = givenWhenThen [ MovieAddedToLibrary sampleMovieData ] (ReplaceBackdrop "backdrops/new-backdrop.jpg")
+                let result = givenWhenThen [ Movie_added_to_library sampleMovieData ] (Replace_backdrop "backdrops/new-backdrop.jpg")
                 match result with
                 | Ok events ->
                     Expect.equal (List.length events) 1 "Should produce one event"
                     match events.[0] with
-                    | MovieBackdropReplaced ref -> Expect.equal ref "backdrops/new-backdrop.jpg" "Backdrop ref should match"
-                    | _ -> failtest "Expected MovieBackdropReplaced"
+                    | Movie_backdrop_replaced ref -> Expect.equal ref "backdrops/new-backdrop.jpg" "Backdrop ref should match"
+                    | _ -> failtest "Expected Movie_backdrop_replaced"
                 | Error e -> failtest $"Expected success but got: {e}"
         ]
 
-        testList "RecommendBy" [
+        testList "Recommend_by" [
             testCase "recommending by friend adds to set" <| fun _ ->
-                let result = givenWhenThen [ MovieAddedToLibrary sampleMovieData ] (RecommendBy "marco")
+                let result = givenWhenThen [ Movie_added_to_library sampleMovieData ] (Recommend_by "marco")
                 match result with
                 | Ok events ->
                     Expect.equal (List.length events) 1 "Should produce one event"
                     match events.[0] with
-                    | MovieRecommendedBy slug -> Expect.equal slug "marco" "Friend slug should match"
-                    | _ -> failtest "Expected MovieRecommendedBy"
+                    | Movie_recommended_by slug -> Expect.equal slug "marco" "Friend slug should match"
+                    | _ -> failtest "Expected Movie_recommended_by"
                 | Error e -> failtest $"Expected success but got: {e}"
 
             testCase "recommending same friend twice is idempotent" <| fun _ ->
                 let result = givenWhenThen
-                                [ MovieAddedToLibrary sampleMovieData; MovieRecommendedBy "marco" ]
-                                (RecommendBy "marco")
+                                [ Movie_added_to_library sampleMovieData; Movie_recommended_by "marco" ]
+                                (Recommend_by "marco")
                 match result with
                 | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
                 | Error e -> failtest $"Expected success but got: {e}"
         ]
 
-        testList "RemoveRecommendation" [
+        testList "Remove_recommendation" [
             testCase "removing existing recommendation produces event" <| fun _ ->
                 let result = givenWhenThen
-                                [ MovieAddedToLibrary sampleMovieData; MovieRecommendedBy "marco" ]
-                                (RemoveRecommendation "marco")
+                                [ Movie_added_to_library sampleMovieData; Movie_recommended_by "marco" ]
+                                (Remove_recommendation "marco")
                 match result with
                 | Ok events ->
                     Expect.equal (List.length events) 1 "Should produce one event"
                     match events.[0] with
-                    | RecommendationRemoved slug -> Expect.equal slug "marco" "Friend slug should match"
-                    | _ -> failtest "Expected RecommendationRemoved"
+                    | Recommendation_removed slug -> Expect.equal slug "marco" "Friend slug should match"
+                    | _ -> failtest "Expected Recommendation_removed"
                 | Error e -> failtest $"Expected success but got: {e}"
 
             testCase "removing non-existing recommendation produces no events" <| fun _ ->
-                let result = givenWhenThen [ MovieAddedToLibrary sampleMovieData ] (RemoveRecommendation "marco")
+                let result = givenWhenThen [ Movie_added_to_library sampleMovieData ] (Remove_recommendation "marco")
                 match result with
                 | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
                 | Error e -> failtest $"Expected success but got: {e}"
         ]
 
-        testList "WantToWatchWith" [
+        testList "Want_to_watch_with" [
             testCase "adding want-to-watch-with produces event" <| fun _ ->
-                let result = givenWhenThen [ MovieAddedToLibrary sampleMovieData ] (AddWantToWatchWith "sarah")
+                let result = givenWhenThen [ Movie_added_to_library sampleMovieData ] (Add_want_to_watch_with "sarah")
                 match result with
                 | Ok events ->
                     Expect.equal (List.length events) 1 "Should produce one event"
                     match events.[0] with
-                    | WantToWatchWith slug -> Expect.equal slug "sarah" "Friend slug should match"
-                    | _ -> failtest "Expected WantToWatchWith"
+                    | Want_to_watch_with slug -> Expect.equal slug "sarah" "Friend slug should match"
+                    | _ -> failtest "Expected Want_to_watch_with"
                 | Error e -> failtest $"Expected success but got: {e}"
 
             testCase "adding same friend twice is idempotent" <| fun _ ->
                 let result = givenWhenThen
-                                [ MovieAddedToLibrary sampleMovieData; WantToWatchWith "sarah" ]
-                                (AddWantToWatchWith "sarah")
+                                [ Movie_added_to_library sampleMovieData; Want_to_watch_with "sarah" ]
+                                (Add_want_to_watch_with "sarah")
                 match result with
                 | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
                 | Error e -> failtest $"Expected success but got: {e}"
 
             testCase "removing want-to-watch-with produces event" <| fun _ ->
                 let result = givenWhenThen
-                                [ MovieAddedToLibrary sampleMovieData; WantToWatchWith "sarah" ]
-                                (RemoveFromWantToWatchWith "sarah")
+                                [ Movie_added_to_library sampleMovieData; Want_to_watch_with "sarah" ]
+                                (Remove_from_want_to_watch_with "sarah")
                 match result with
                 | Ok events ->
                     Expect.equal (List.length events) 1 "Should produce one event"
                     match events.[0] with
-                    | RemovedWantToWatchWith slug -> Expect.equal slug "sarah" "Friend slug should match"
-                    | _ -> failtest "Expected RemovedWantToWatchWith"
+                    | Removed_want_to_watch_with slug -> Expect.equal slug "sarah" "Friend slug should match"
+                    | _ -> failtest "Expected Removed_want_to_watch_with"
                 | Error e -> failtest $"Expected success but got: {e}"
 
             testCase "removing non-existing want-to-watch-with produces no events" <| fun _ ->
-                let result = givenWhenThen [ MovieAddedToLibrary sampleMovieData ] (RemoveFromWantToWatchWith "sarah")
+                let result = givenWhenThen [ Movie_added_to_library sampleMovieData ] (Remove_from_want_to_watch_with "sarah")
                 match result with
                 | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
                 | Error e -> failtest $"Expected success but got: {e}"
@@ -181,17 +181,17 @@ let catalogTests =
 
         testList "Removed movie" [
             testCase "commands on removed movie fail" <| fun _ ->
-                let removedEvents = [ MovieAddedToLibrary sampleMovieData; MovieRemovedFromLibrary ]
+                let removedEvents = [ Movie_added_to_library sampleMovieData; Movie_removed_from_library ]
                 let commands = [
-                    AddMovieToLibrary sampleMovieData
-                    RemoveMovieFromLibrary
-                    CategorizeMovie [ "Drama" ]
-                    ReplacePoster "x"
-                    ReplaceBackdrop "x"
-                    RecommendBy "marco"
-                    RemoveRecommendation "marco"
-                    AddWantToWatchWith "sarah"
-                    RemoveFromWantToWatchWith "sarah"
+                    Add_movie_to_library sampleMovieData
+                    Remove_movie_from_library
+                    Categorize_movie [ "Drama" ]
+                    Replace_poster "x"
+                    Replace_backdrop "x"
+                    Recommend_by "marco"
+                    Remove_recommendation "marco"
+                    Add_want_to_watch_with "sarah"
+                    Remove_from_want_to_watch_with "sarah"
                 ]
                 for cmd in commands do
                     let result = givenWhenThen removedEvents cmd
@@ -201,32 +201,32 @@ let catalogTests =
         ]
 
         testList "Serialization" [
-            testCase "MovieAddedToLibrary round-trip" <| fun _ ->
-                let event = MovieAddedToLibrary sampleMovieData
+            testCase "Movie_added_to_library round-trip" <| fun _ ->
+                let event = Movie_added_to_library sampleMovieData
                 let eventType, data = Serialization.serialize event
                 let deserialized = Serialization.deserialize eventType data
                 Expect.equal deserialized (Some event) "Should round-trip"
 
-            testCase "MovieRemovedFromLibrary round-trip" <| fun _ ->
-                let event = MovieRemovedFromLibrary
+            testCase "Movie_removed_from_library round-trip" <| fun _ ->
+                let event = Movie_removed_from_library
                 let eventType, data = Serialization.serialize event
                 let deserialized = Serialization.deserialize eventType data
                 Expect.equal deserialized (Some event) "Should round-trip"
 
-            testCase "MovieCategorized round-trip" <| fun _ ->
-                let event = MovieCategorized [ "Drama"; "Comedy" ]
+            testCase "Movie_categorized round-trip" <| fun _ ->
+                let event = Movie_categorized [ "Drama"; "Comedy" ]
                 let eventType, data = Serialization.serialize event
                 let deserialized = Serialization.deserialize eventType data
                 Expect.equal deserialized (Some event) "Should round-trip"
 
-            testCase "MovieRecommendedBy round-trip" <| fun _ ->
-                let event = MovieRecommendedBy "marco"
+            testCase "Movie_recommended_by round-trip" <| fun _ ->
+                let event = Movie_recommended_by "marco"
                 let eventType, data = Serialization.serialize event
                 let deserialized = Serialization.deserialize eventType data
                 Expect.equal deserialized (Some event) "Should round-trip"
 
-            testCase "WantToWatchWith round-trip" <| fun _ ->
-                let event = WantToWatchWith "sarah"
+            testCase "Want_to_watch_with round-trip" <| fun _ ->
+                let event = Want_to_watch_with "sarah"
                 let eventType, data = Serialization.serialize event
                 let deserialized = Serialization.deserialize eventType data
                 Expect.equal deserialized (Some event) "Should round-trip"

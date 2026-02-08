@@ -291,7 +291,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 Daisy.button.button [
                                     button.sm
                                     button.ghost
-                                    prop.onClick (fun _ -> dispatch (OpenFriendPicker RecommendPicker))
+                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
                                     prop.text "+ Add"
                                 ]
                             ]
@@ -306,7 +306,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 prop.className "flex flex-wrap gap-2"
                                 prop.children [
                                     for fr in movie.RecommendedBy do
-                                        friendChip fr (fun slug -> dispatch (RemoveRecommendation slug))
+                                        friendChip fr (fun slug -> dispatch (Remove_recommendation slug))
                                 ]
                             ]
                     ]
@@ -325,7 +325,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 Daisy.button.button [
                                     button.sm
                                     button.ghost
-                                    prop.onClick (fun _ -> dispatch (OpenFriendPicker WatchWithPicker))
+                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Watch_with_picker))
                                     prop.text "+ Add"
                                 ]
                             ]
@@ -340,7 +340,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 prop.className "flex flex-wrap gap-2"
                                 prop.children [
                                     for fr in movie.WantToWatchWith do
-                                        friendChip fr (fun slug -> dispatch (RemoveWantToWatchWith slug))
+                                        friendChip fr (fun slug -> dispatch (Remove_want_to_watch_with slug))
                                 ]
                             ]
                     ]
@@ -365,23 +365,23 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         Daisy.button.button [
                             button.error
                             button.outline
-                            prop.onClick (fun _ -> dispatch RemoveMovie)
+                            prop.onClick (fun _ -> dispatch Remove_movie)
                             prop.text "Remove Movie"
                         ]
                     ]
                 ]
                 // Friend picker modal
                 match model.ShowFriendPicker with
-                | Some RecommendPicker ->
+                | Some Recommend_picker ->
                     let excludeSlugs = movie.RecommendedBy |> List.map (fun f -> f.Slug)
                     friendPicker model.AllFriends excludeSlugs
-                        (fun slug -> dispatch (RecommendFriend slug))
-                        (fun () -> dispatch CloseFriendPicker)
-                | Some WatchWithPicker ->
+                        (fun slug -> dispatch (Recommend_friend slug))
+                        (fun () -> dispatch Close_friend_picker)
+                | Some Watch_with_picker ->
                     let excludeSlugs = movie.WantToWatchWith |> List.map (fun f -> f.Slug)
                     friendPicker model.AllFriends excludeSlugs
-                        (fun slug -> dispatch (WantToWatchWith slug))
-                        (fun () -> dispatch CloseFriendPicker)
+                        (fun slug -> dispatch (Want_to_watch_with slug))
+                        (fun () -> dispatch Close_friend_picker)
                 | None -> ()
             ]
         ]

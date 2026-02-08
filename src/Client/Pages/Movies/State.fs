@@ -11,69 +11,69 @@ let init () : Model * Cmd<Msg> =
       GenreFilter = None
       IsLoading = true
       TmdbSearch = None },
-    Cmd.ofMsg LoadMovies
+    Cmd.ofMsg Load_movies
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
-    | LoadMovies ->
+    | Load_movies ->
         { model with IsLoading = true },
-        Cmd.OfAsync.perform api.getMovies () MoviesLoaded
+        Cmd.OfAsync.perform api.getMovies () Movies_loaded
 
-    | MoviesLoaded movies ->
+    | Movies_loaded movies ->
         { model with Movies = movies; IsLoading = false }, Cmd.none
 
-    | SearchChanged query ->
+    | Search_changed query ->
         { model with SearchQuery = query }, Cmd.none
 
-    | GenreFilterChanged genre ->
+    | Genre_filter_changed genre ->
         { model with GenreFilter = genre }, Cmd.none
 
-    | OpenTmdbSearch ->
+    | Open_tmdb_search ->
         { model with TmdbSearch = Some (TmdbSearchModal.init ()) }, Cmd.none
 
-    | CloseTmdbSearch ->
+    | Close_tmdb_search ->
         { model with TmdbSearch = None }, Cmd.none
 
-    | TmdbSearchMsg childMsg ->
+    | Tmdb_search_msg childMsg ->
         match model.TmdbSearch with
         | None -> model, Cmd.none
         | Some searchModel ->
             match childMsg with
             | TmdbSearchModal.Close ->
                 { model with TmdbSearch = None }, Cmd.none
-            | TmdbSearchModal.QueryChanged q ->
+            | TmdbSearchModal.Query_changed q ->
                 { model with TmdbSearch = Some { searchModel with Query = q } }, Cmd.none
             | TmdbSearchModal.Search ->
                 { model with TmdbSearch = Some { searchModel with IsSearching = true; Error = None } },
-                Cmd.OfAsync.either api.searchTmdb searchModel.Query TmdbSearchCompleted (fun ex -> TmdbSearchFailed ex.Message)
-            | TmdbSearchModal.SearchCompleted results ->
+                Cmd.OfAsync.either api.searchTmdb searchModel.Query Tmdb_search_completed (fun ex -> Tmdb_search_failed ex.Message)
+            | TmdbSearchModal.Search_completed results ->
                 { model with TmdbSearch = Some { searchModel with Results = results; IsSearching = false } }, Cmd.none
-            | TmdbSearchModal.SearchFailed err ->
+            | TmdbSearchModal.Search_failed err ->
                 { model with TmdbSearch = Some { searchModel with Error = Some err; IsSearching = false } }, Cmd.none
             | TmdbSearchModal.Import tmdbId ->
                 { model with TmdbSearch = Some { searchModel with IsImporting = true } },
-                Cmd.OfAsync.either api.addMovie tmdbId TmdbImportCompleted (fun ex -> TmdbImportCompleted (Error ex.Message))
-            | TmdbSearchModal.ImportCompleted _ ->
+                Cmd.OfAsync.either api.addMovie tmdbId Tmdb_import_completed (fun ex -> Tmdb_import_completed (Error ex.Message))
+            | TmdbSearchModal.Import_completed _ ->
                 model, Cmd.none
 
-    | TmdbSearchCompleted results ->
+    | Tmdb_search_completed results ->
         match model.TmdbSearch with
         | None -> model, Cmd.none
         | Some searchModel ->
             { model with TmdbSearch = Some { searchModel with Results = results; IsSearching = false } }, Cmd.none
 
-    | TmdbSearchFailed err ->
+    | Tmdb_search_failed err ->
         match model.TmdbSearch with
         | None -> model, Cmd.none
         | Some searchModel ->
             { model with TmdbSearch = Some { searchModel with Error = Some err; IsSearching = false } }, Cmd.none
 
-    | TmdbImportCompleted result ->
+    | Tmdb_import_completed result ->
         match result with
         | Ok slug ->
             { model with TmdbSearch = None },
             Cmd.batch [
-                Cmd.ofMsg LoadMovies
+                Cmd.ofMsg Load_movies
                 Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate ("movies", slug))
             ]
         | Error err ->

@@ -22,7 +22,7 @@ Personal media library app (movies, series, games, books) built with full-stack 
 ## Architecture
 
 - **Event Sourcing + CQRS**: Append-only event store in SQLite, projections for read models
-- **DDD Bounded Contexts**: Catalog, Journal, Friends, Curation, Intelligence, Integration, Administration
+- **DDD Bounded Contexts**: Movies, Journal, Friends, Curation, Intelligence, Integration, Administration
 - API routes: `/api/{TypeName}/{MethodName}` via Fable.Remoting
 - Shared API contract: `IMediathecaApi` in src/Shared/Shared.fs
 - DB file: `mediatheca.db` in server's AppContext.BaseDirectory

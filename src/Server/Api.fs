@@ -44,7 +44,7 @@ module Api =
     let private generateUniqueSlug (conn: SqliteConnection) (baseSlug: string) : string =
         let mutable slug = baseSlug
         let mutable suffix = 2
-        while EventStore.getStreamPosition conn (Catalog.streamId slug) >= 0L do
+        while EventStore.getStreamPosition conn (Movies.streamId slug) >= 0L do
             slug <- sprintf "%s-%d" baseSlug suffix
             suffix <- suffix + 1
         slug
@@ -86,7 +86,7 @@ module Api =
                     // 2. Generate unique slug
                     let baseSlug = Slug.movieSlug details.Title year
                     let slug = generateUniqueSlug conn baseSlug
-                    let sid = Catalog.streamId slug
+                    let sid = Movies.streamId slug
 
                     // 3. Download poster + backdrop
                     let posterRef =
@@ -112,7 +112,7 @@ module Api =
                         | None -> None
 
                     // 4. Execute command
-                    let movieData: Catalog.MovieAddedData = {
+                    let movieData: Movies.MovieAddedData = {
                         Name = details.Title
                         Year = year
                         Runtime = details.Runtime
@@ -127,11 +127,11 @@ module Api =
                     let result =
                         executeCommand
                             conn sid
-                            Catalog.Serialization.fromStoredEvent
-                            Catalog.reconstitute
-                            Catalog.decide
-                            Catalog.Serialization.toEventData
-                            (Catalog.AddMovieToLibrary movieData)
+                            Movies.Serialization.fromStoredEvent
+                            Movies.reconstitute
+                            Movies.decide
+                            Movies.Serialization.toEventData
+                            (Movies.Add_movie_to_library movieData)
                             movieProjections
 
                     match result with
@@ -161,15 +161,15 @@ module Api =
             }
 
             removeMovie = fun slug -> async {
-                let sid = Catalog.streamId slug
+                let sid = Movies.streamId slug
                 let result =
                     executeCommand
                         conn sid
-                        Catalog.Serialization.fromStoredEvent
-                        Catalog.reconstitute
-                        Catalog.decide
-                        Catalog.Serialization.toEventData
-                        Catalog.RemoveMovieFromLibrary
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        Movies.Remove_movie_from_library
                         movieProjections
                 match result with
                 | Ok () ->
@@ -190,93 +190,93 @@ module Api =
             }
 
             categorizeMovie = fun slug genres -> async {
-                let sid = Catalog.streamId slug
+                let sid = Movies.streamId slug
                 return
                     executeCommand
                         conn sid
-                        Catalog.Serialization.fromStoredEvent
-                        Catalog.reconstitute
-                        Catalog.decide
-                        Catalog.Serialization.toEventData
-                        (Catalog.CategorizeMovie genres)
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        (Movies.Categorize_movie genres)
                         movieProjections
             }
 
             replacePoster = fun slug posterRef -> async {
-                let sid = Catalog.streamId slug
+                let sid = Movies.streamId slug
                 return
                     executeCommand
                         conn sid
-                        Catalog.Serialization.fromStoredEvent
-                        Catalog.reconstitute
-                        Catalog.decide
-                        Catalog.Serialization.toEventData
-                        (Catalog.ReplacePoster posterRef)
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        (Movies.Replace_poster posterRef)
                         movieProjections
             }
 
             replaceBackdrop = fun slug backdropRef -> async {
-                let sid = Catalog.streamId slug
+                let sid = Movies.streamId slug
                 return
                     executeCommand
                         conn sid
-                        Catalog.Serialization.fromStoredEvent
-                        Catalog.reconstitute
-                        Catalog.decide
-                        Catalog.Serialization.toEventData
-                        (Catalog.ReplaceBackdrop backdropRef)
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        (Movies.Replace_backdrop backdropRef)
                         movieProjections
             }
 
             recommendMovie = fun slug friendSlug -> async {
-                let sid = Catalog.streamId slug
+                let sid = Movies.streamId slug
                 return
                     executeCommand
                         conn sid
-                        Catalog.Serialization.fromStoredEvent
-                        Catalog.reconstitute
-                        Catalog.decide
-                        Catalog.Serialization.toEventData
-                        (Catalog.RecommendBy friendSlug)
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        (Movies.Recommend_by friendSlug)
                         movieProjections
             }
 
             removeRecommendation = fun slug friendSlug -> async {
-                let sid = Catalog.streamId slug
+                let sid = Movies.streamId slug
                 return
                     executeCommand
                         conn sid
-                        Catalog.Serialization.fromStoredEvent
-                        Catalog.reconstitute
-                        Catalog.decide
-                        Catalog.Serialization.toEventData
-                        (Catalog.RemoveRecommendation friendSlug)
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        (Movies.Remove_recommendation friendSlug)
                         movieProjections
             }
 
             wantToWatchWith = fun slug friendSlug -> async {
-                let sid = Catalog.streamId slug
+                let sid = Movies.streamId slug
                 return
                     executeCommand
                         conn sid
-                        Catalog.Serialization.fromStoredEvent
-                        Catalog.reconstitute
-                        Catalog.decide
-                        Catalog.Serialization.toEventData
-                        (Catalog.AddWantToWatchWith friendSlug)
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        (Movies.Add_want_to_watch_with friendSlug)
                         movieProjections
             }
 
             removeWantToWatchWith = fun slug friendSlug -> async {
-                let sid = Catalog.streamId slug
+                let sid = Movies.streamId slug
                 return
                     executeCommand
                         conn sid
-                        Catalog.Serialization.fromStoredEvent
-                        Catalog.reconstitute
-                        Catalog.decide
-                        Catalog.Serialization.toEventData
-                        (Catalog.RemoveFromWantToWatchWith friendSlug)
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        (Movies.Remove_from_want_to_watch_with friendSlug)
                         movieProjections
             }
 
@@ -290,7 +290,7 @@ module Api =
                         Friends.reconstitute
                         Friends.decide
                         Friends.Serialization.toEventData
-                        (Friends.AddFriend (name, None))
+                        (Friends.Add_friend (name, None))
                         friendProjections
                 match result with
                 | Ok () -> return Ok slug
@@ -306,7 +306,7 @@ module Api =
                         Friends.reconstitute
                         Friends.decide
                         Friends.Serialization.toEventData
-                        (Friends.UpdateFriend (name, imageRef))
+                        (Friends.Update_friend (name, imageRef))
                         friendProjections
             }
 
@@ -319,7 +319,7 @@ module Api =
                         Friends.reconstitute
                         Friends.decide
                         Friends.Serialization.toEventData
-                        Friends.RemoveFriend
+                        Friends.Remove_friend
                         friendProjections
             }
 

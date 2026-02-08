@@ -17,12 +17,12 @@ type Model = {
 }
 
 type Msg =
-    | LoadFriend of string
-    | FriendLoaded of FriendDetail option
-    | StartEditing
-    | CancelEditing
-    | EditNameChanged of string
-    | SubmitUpdate
-    | UpdateResult of Result<unit, string>
-    | RemoveFriend
-    | RemoveResult of Result<unit, string>
+    | Load_friend of string
+    | Friend_loaded of FriendDetail option
+    | Start_editing
+    | Cancel_editing
+    | Edit_name_changed of string
+    | Submit_update
+    | Update_result of Result<unit, string>
+    | Remove_friend
+    | Remove_result of Result<unit, string>

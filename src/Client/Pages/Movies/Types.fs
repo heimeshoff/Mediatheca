@@ -12,13 +12,13 @@ type Model = {
 }
 
 type Msg =
-    | LoadMovies
-    | MoviesLoaded of MovieListItem list
-    | SearchChanged of string
-    | GenreFilterChanged of string option
-    | OpenTmdbSearch
-    | CloseTmdbSearch
-    | TmdbSearchMsg of TmdbSearchModal.Msg
-    | TmdbSearchCompleted of TmdbSearchResult list
-    | TmdbSearchFailed of string
-    | TmdbImportCompleted of Result<string, string>
+    | Load_movies
+    | Movies_loaded of MovieListItem list
+    | Search_changed of string
+    | Genre_filter_changed of string option
+    | Open_tmdb_search
+    | Close_tmdb_search
+    | Tmdb_search_msg of TmdbSearchModal.Msg
+    | Tmdb_search_completed of TmdbSearchResult list
+    | Tmdb_search_failed of string
+    | Tmdb_import_completed of Result<string, string>

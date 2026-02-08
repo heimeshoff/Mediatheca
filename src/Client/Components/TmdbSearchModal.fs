@@ -13,12 +13,12 @@ type Model = {
 }
 
 type Msg =
-    | QueryChanged of string
+    | Query_changed of string
     | Search
-    | SearchCompleted of TmdbSearchResult list
-    | SearchFailed of string
+    | Search_completed of TmdbSearchResult list
+    | Search_failed of string
     | Import of tmdbId: int
-    | ImportCompleted of Result<string, string>
+    | Import_completed of Result<string, string>
     | Close
 
 let init () : Model = {
@@ -48,7 +48,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 prop.className "flex-1"
                                 prop.placeholder "Search for a movie..."
                                 prop.value model.Query
-                                prop.onChange (QueryChanged >> dispatch)
+                                prop.onChange (Query_changed >> dispatch)
                                 prop.onKeyDown (fun e ->
                                     if e.key = "Enter" then dispatch Search
                                 )

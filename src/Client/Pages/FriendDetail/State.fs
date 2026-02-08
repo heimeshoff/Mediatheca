@@ -11,18 +11,18 @@ let init (slug: string) : Model * Cmd<Msg> =
       IsEditing = false
       EditForm = { Name = ""; ImageRef = None }
       Error = None },
-    Cmd.ofMsg (LoadFriend slug)
+    Cmd.ofMsg (Load_friend slug)
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
-    | LoadFriend slug ->
+    | Load_friend slug ->
         { model with IsLoading = true; Slug = slug },
-        Cmd.OfAsync.perform api.getFriend slug FriendLoaded
+        Cmd.OfAsync.perform api.getFriend slug Friend_loaded
 
-    | FriendLoaded friend ->
+    | Friend_loaded friend ->
         { model with Friend = friend; IsLoading = false }, Cmd.none
 
-    | StartEditing ->
+    | Start_editing ->
         match model.Friend with
         | Some f ->
             { model with
@@ -31,13 +31,13 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 Error = None }, Cmd.none
         | None -> model, Cmd.none
 
-    | CancelEditing ->
+    | Cancel_editing ->
         { model with IsEditing = false; Error = None }, Cmd.none
 
-    | EditNameChanged name ->
+    | Edit_name_changed name ->
         { model with EditForm = { model.EditForm with Name = name } }, Cmd.none
 
-    | SubmitUpdate ->
+    | Submit_update ->
         let trimmedName = model.EditForm.Name.Trim()
         if trimmedName = "" then
             { model with Error = Some "Name is required" }, Cmd.none
@@ -46,26 +46,26 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             Cmd.OfAsync.either
                 (fun () -> api.updateFriend model.Slug trimmedName model.EditForm.ImageRef)
                 ()
-                UpdateResult
-                (fun ex -> UpdateResult (Error ex.Message))
+                Update_result
+                (fun ex -> Update_result (Error ex.Message))
 
-    | UpdateResult (Ok ()) ->
+    | Update_result (Ok ()) ->
         { model with IsEditing = false },
-        Cmd.OfAsync.perform api.getFriend model.Slug FriendLoaded
+        Cmd.OfAsync.perform api.getFriend model.Slug Friend_loaded
 
-    | UpdateResult (Error err) ->
+    | Update_result (Error err) ->
         { model with Error = Some err }, Cmd.none
 
-    | RemoveFriend ->
+    | Remove_friend ->
         model,
         Cmd.OfAsync.either
             api.removeFriend model.Slug
-            RemoveResult
-            (fun ex -> RemoveResult (Error ex.Message))
+            Remove_result
+            (fun ex -> Remove_result (Error ex.Message))
 
-    | RemoveResult (Ok ()) ->
+    | Remove_result (Ok ()) ->
         model,
         Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate "friends")
 
-    | RemoveResult (Error err) ->
+    | Remove_result (Error err) ->
         { model with Error = Some err }, Cmd.none

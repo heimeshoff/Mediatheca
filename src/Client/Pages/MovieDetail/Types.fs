@@ -12,19 +12,19 @@ type Model = {
 }
 
 and FriendPickerKind =
-    | RecommendPicker
-    | WatchWithPicker
+    | Recommend_picker
+    | Watch_with_picker
 
 type Msg =
-    | LoadMovie of string
-    | MovieLoaded of MovieDetail option
-    | FriendsLoaded of FriendListItem list
-    | RecommendFriend of friendSlug: string
-    | RemoveRecommendation of friendSlug: string
-    | WantToWatchWith of friendSlug: string
-    | RemoveWantToWatchWith of friendSlug: string
-    | CommandResult of Result<unit, string>
-    | RemoveMovie
-    | MovieRemoved of Result<unit, string>
-    | OpenFriendPicker of FriendPickerKind
-    | CloseFriendPicker
+    | Load_movie of string
+    | Movie_loaded of MovieDetail option
+    | Friends_loaded of FriendListItem list
+    | Recommend_friend of friendSlug: string
+    | Remove_recommendation of friendSlug: string
+    | Want_to_watch_with of friendSlug: string
+    | Remove_want_to_watch_with of friendSlug: string
+    | Command_result of Result<unit, string>
+    | Remove_movie
+    | Movie_removed of Result<unit, string>
+    | Open_friend_picker of FriendPickerKind
+    | Close_friend_picker

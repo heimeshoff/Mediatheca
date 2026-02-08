@@ -12,59 +12,59 @@ let init (slug: string) : Model * Cmd<Msg> =
       ShowFriendPicker = None
       Error = None },
     Cmd.batch [
-        Cmd.ofMsg (LoadMovie slug)
+        Cmd.ofMsg (Load_movie slug)
     ]
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
-    | LoadMovie slug ->
+    | Load_movie slug ->
         { model with IsLoading = true; Slug = slug },
         Cmd.batch [
-            Cmd.OfAsync.perform api.getMovie slug MovieLoaded
-            Cmd.OfAsync.perform api.getFriends () FriendsLoaded
+            Cmd.OfAsync.perform api.getMovie slug Movie_loaded
+            Cmd.OfAsync.perform api.getFriends () Friends_loaded
         ]
 
-    | MovieLoaded movie ->
+    | Movie_loaded movie ->
         { model with Movie = movie; IsLoading = false }, Cmd.none
 
-    | FriendsLoaded friends ->
+    | Friends_loaded friends ->
         { model with AllFriends = friends }, Cmd.none
 
-    | RecommendFriend friendSlug ->
+    | Recommend_friend friendSlug ->
         { model with ShowFriendPicker = None },
-        Cmd.OfAsync.perform (fun () -> api.recommendMovie model.Slug friendSlug) () CommandResult
+        Cmd.OfAsync.perform (fun () -> api.recommendMovie model.Slug friendSlug) () Command_result
 
-    | RemoveRecommendation friendSlug ->
+    | Remove_recommendation friendSlug ->
         model,
-        Cmd.OfAsync.perform (fun () -> api.removeRecommendation model.Slug friendSlug) () CommandResult
+        Cmd.OfAsync.perform (fun () -> api.removeRecommendation model.Slug friendSlug) () Command_result
 
-    | WantToWatchWith friendSlug ->
+    | Want_to_watch_with friendSlug ->
         { model with ShowFriendPicker = None },
-        Cmd.OfAsync.perform (fun () -> api.wantToWatchWith model.Slug friendSlug) () CommandResult
+        Cmd.OfAsync.perform (fun () -> api.wantToWatchWith model.Slug friendSlug) () Command_result
 
-    | RemoveWantToWatchWith friendSlug ->
+    | Remove_want_to_watch_with friendSlug ->
         model,
-        Cmd.OfAsync.perform (fun () -> api.removeWantToWatchWith model.Slug friendSlug) () CommandResult
+        Cmd.OfAsync.perform (fun () -> api.removeWantToWatchWith model.Slug friendSlug) () Command_result
 
-    | CommandResult (Ok ()) ->
-        model, Cmd.OfAsync.perform api.getMovie model.Slug MovieLoaded
+    | Command_result (Ok ()) ->
+        model, Cmd.OfAsync.perform api.getMovie model.Slug Movie_loaded
 
-    | CommandResult (Error err) ->
+    | Command_result (Error err) ->
         { model with Error = Some err }, Cmd.none
 
-    | RemoveMovie ->
+    | Remove_movie ->
         model,
-        Cmd.OfAsync.perform (fun () -> api.removeMovie model.Slug) () MovieRemoved
+        Cmd.OfAsync.perform (fun () -> api.removeMovie model.Slug) () Movie_removed
 
-    | MovieRemoved (Ok ()) ->
+    | Movie_removed (Ok ()) ->
         model,
         Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate "movies")
 
-    | MovieRemoved (Error err) ->
+    | Movie_removed (Error err) ->
         { model with Error = Some err }, Cmd.none
 
-    | OpenFriendPicker kind ->
+    | Open_friend_picker kind ->
         { model with ShowFriendPicker = Some kind }, Cmd.none
 
-    | CloseFriendPicker ->
+    | Close_friend_picker ->
         { model with ShowFriendPicker = None }, Cmd.none

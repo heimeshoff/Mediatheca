@@ -2,7 +2,7 @@ namespace Mediatheca.Server
 
 open Thoth.Json.Net
 
-module Catalog =
+module Movies =
 
     // Data records for events
 
@@ -21,15 +21,15 @@ module Catalog =
     // Events
 
     type MovieEvent =
-        | MovieAddedToLibrary of MovieAddedData
-        | MovieRemovedFromLibrary
-        | MovieCategorized of genres: string list
-        | MoviePosterReplaced of posterRef: string
-        | MovieBackdropReplaced of backdropRef: string
-        | MovieRecommendedBy of friendSlug: string
-        | RecommendationRemoved of friendSlug: string
-        | WantToWatchWith of friendSlug: string
-        | RemovedWantToWatchWith of friendSlug: string
+        | Movie_added_to_library of MovieAddedData
+        | Movie_removed_from_library
+        | Movie_categorized of genres: string list
+        | Movie_poster_replaced of posterRef: string
+        | Movie_backdrop_replaced of backdropRef: string
+        | Movie_recommended_by of friendSlug: string
+        | Recommendation_removed of friendSlug: string
+        | Want_to_watch_with of friendSlug: string
+        | Removed_want_to_watch_with of friendSlug: string
 
     // State
 
@@ -44,32 +44,32 @@ module Catalog =
         TmdbId: int
         TmdbRating: float option
         RecommendedBy: Set<string>
-        WantToWatchWith: Set<string>
+        Want_to_watch_with: Set<string>
     }
 
     type MovieState =
-        | NotCreated
+        | Not_created
         | Active of ActiveMovie
         | Removed
 
     // Commands
 
     type MovieCommand =
-        | AddMovieToLibrary of MovieAddedData
-        | RemoveMovieFromLibrary
-        | CategorizeMovie of genres: string list
-        | ReplacePoster of posterRef: string
-        | ReplaceBackdrop of backdropRef: string
-        | RecommendBy of friendSlug: string
-        | RemoveRecommendation of friendSlug: string
-        | AddWantToWatchWith of friendSlug: string
-        | RemoveFromWantToWatchWith of friendSlug: string
+        | Add_movie_to_library of MovieAddedData
+        | Remove_movie_from_library
+        | Categorize_movie of genres: string list
+        | Replace_poster of posterRef: string
+        | Replace_backdrop of backdropRef: string
+        | Recommend_by of friendSlug: string
+        | Remove_recommendation of friendSlug: string
+        | Add_want_to_watch_with of friendSlug: string
+        | Remove_from_want_to_watch_with of friendSlug: string
 
     // Evolve
 
     let evolve (state: MovieState) (event: MovieEvent) : MovieState =
         match state, event with
-        | NotCreated, MovieAddedToLibrary data ->
+        | Not_created, Movie_added_to_library data ->
             Active {
                 Name = data.Name
                 Year = data.Year
@@ -81,64 +81,64 @@ module Catalog =
                 TmdbId = data.TmdbId
                 TmdbRating = data.TmdbRating
                 RecommendedBy = Set.empty
-                WantToWatchWith = Set.empty
+                Want_to_watch_with = Set.empty
             }
-        | Active _, MovieRemovedFromLibrary -> Removed
-        | Active movie, MovieCategorized genres ->
+        | Active _, Movie_removed_from_library -> Removed
+        | Active movie, Movie_categorized genres ->
             Active { movie with Genres = genres }
-        | Active movie, MoviePosterReplaced posterRef ->
+        | Active movie, Movie_poster_replaced posterRef ->
             Active { movie with PosterRef = Some posterRef }
-        | Active movie, MovieBackdropReplaced backdropRef ->
+        | Active movie, Movie_backdrop_replaced backdropRef ->
             Active { movie with BackdropRef = Some backdropRef }
-        | Active movie, MovieRecommendedBy friendSlug ->
+        | Active movie, Movie_recommended_by friendSlug ->
             Active { movie with RecommendedBy = movie.RecommendedBy |> Set.add friendSlug }
-        | Active movie, RecommendationRemoved friendSlug ->
+        | Active movie, Recommendation_removed friendSlug ->
             Active { movie with RecommendedBy = movie.RecommendedBy |> Set.remove friendSlug }
-        | Active movie, WantToWatchWith friendSlug ->
-            Active { movie with WantToWatchWith = movie.WantToWatchWith |> Set.add friendSlug }
-        | Active movie, RemovedWantToWatchWith friendSlug ->
-            Active { movie with WantToWatchWith = movie.WantToWatchWith |> Set.remove friendSlug }
+        | Active movie, Want_to_watch_with friendSlug ->
+            Active { movie with Want_to_watch_with = movie.Want_to_watch_with |> Set.add friendSlug }
+        | Active movie, Removed_want_to_watch_with friendSlug ->
+            Active { movie with Want_to_watch_with = movie.Want_to_watch_with |> Set.remove friendSlug }
         | _ -> state
 
     let reconstitute (events: MovieEvent list) : MovieState =
-        List.fold evolve NotCreated events
+        List.fold evolve Not_created events
 
     // Decide
 
     let decide (state: MovieState) (command: MovieCommand) : Result<MovieEvent list, string> =
         match state, command with
-        | NotCreated, AddMovieToLibrary data ->
-            Ok [ MovieAddedToLibrary data ]
-        | Active _, AddMovieToLibrary _ ->
+        | Not_created, Add_movie_to_library data ->
+            Ok [ Movie_added_to_library data ]
+        | Active _, Add_movie_to_library _ ->
             Error "Movie already exists in library"
-        | Active movie, RemoveMovieFromLibrary ->
-            Ok [ MovieRemovedFromLibrary ]
-        | NotCreated, RemoveMovieFromLibrary ->
+        | Active movie, Remove_movie_from_library ->
+            Ok [ Movie_removed_from_library ]
+        | Not_created, Remove_movie_from_library ->
             Error "Movie does not exist"
-        | Active movie, CategorizeMovie genres ->
+        | Active movie, Categorize_movie genres ->
             if movie.Genres = genres then Ok []
-            else Ok [ MovieCategorized genres ]
-        | Active movie, ReplacePoster posterRef ->
-            Ok [ MoviePosterReplaced posterRef ]
-        | Active movie, ReplaceBackdrop backdropRef ->
-            Ok [ MovieBackdropReplaced backdropRef ]
-        | Active movie, RecommendBy friendSlug ->
+            else Ok [ Movie_categorized genres ]
+        | Active movie, Replace_poster posterRef ->
+            Ok [ Movie_poster_replaced posterRef ]
+        | Active movie, Replace_backdrop backdropRef ->
+            Ok [ Movie_backdrop_replaced backdropRef ]
+        | Active movie, Recommend_by friendSlug ->
             if movie.RecommendedBy |> Set.contains friendSlug then Ok []
-            else Ok [ MovieRecommendedBy friendSlug ]
-        | Active movie, RemoveRecommendation friendSlug ->
+            else Ok [ Movie_recommended_by friendSlug ]
+        | Active movie, Remove_recommendation friendSlug ->
             if movie.RecommendedBy |> Set.contains friendSlug then
-                Ok [ RecommendationRemoved friendSlug ]
+                Ok [ Recommendation_removed friendSlug ]
             else Ok []
-        | Active movie, AddWantToWatchWith friendSlug ->
-            if movie.WantToWatchWith |> Set.contains friendSlug then Ok []
-            else Ok [ WantToWatchWith friendSlug ]
-        | Active movie, RemoveFromWantToWatchWith friendSlug ->
-            if movie.WantToWatchWith |> Set.contains friendSlug then
-                Ok [ RemovedWantToWatchWith friendSlug ]
+        | Active movie, Add_want_to_watch_with friendSlug ->
+            if movie.Want_to_watch_with |> Set.contains friendSlug then Ok []
+            else Ok [ Want_to_watch_with friendSlug ]
+        | Active movie, Remove_from_want_to_watch_with friendSlug ->
+            if movie.Want_to_watch_with |> Set.contains friendSlug then
+                Ok [ Removed_want_to_watch_with friendSlug ]
             else Ok []
         | Removed, _ ->
             Error "Movie has been removed"
-        | NotCreated, _ ->
+        | Not_created, _ ->
             Error "Movie does not exist"
 
     // Stream ID
@@ -177,61 +177,61 @@ module Catalog =
 
         let serialize (event: MovieEvent) : string * string =
             match event with
-            | MovieAddedToLibrary data ->
-                "MovieAddedToLibrary", Encode.toString 0 (encodeMovieAddedData data)
-            | MovieRemovedFromLibrary ->
-                "MovieRemovedFromLibrary", "{}"
-            | MovieCategorized genres ->
-                "MovieCategorized", Encode.toString 0 (Encode.object [ "genres", genres |> List.map Encode.string |> Encode.list ])
-            | MoviePosterReplaced posterRef ->
-                "MoviePosterReplaced", Encode.toString 0 (Encode.object [ "posterRef", Encode.string posterRef ])
-            | MovieBackdropReplaced backdropRef ->
-                "MovieBackdropReplaced", Encode.toString 0 (Encode.object [ "backdropRef", Encode.string backdropRef ])
-            | MovieRecommendedBy friendSlug ->
-                "MovieRecommendedBy", Encode.toString 0 (Encode.object [ "friendSlug", Encode.string friendSlug ])
-            | RecommendationRemoved friendSlug ->
-                "RecommendationRemoved", Encode.toString 0 (Encode.object [ "friendSlug", Encode.string friendSlug ])
-            | WantToWatchWith friendSlug ->
-                "WantToWatchWith", Encode.toString 0 (Encode.object [ "friendSlug", Encode.string friendSlug ])
-            | RemovedWantToWatchWith friendSlug ->
-                "RemovedWantToWatchWith", Encode.toString 0 (Encode.object [ "friendSlug", Encode.string friendSlug ])
+            | Movie_added_to_library data ->
+                "Movie_added_to_library", Encode.toString 0 (encodeMovieAddedData data)
+            | Movie_removed_from_library ->
+                "Movie_removed_from_library", "{}"
+            | Movie_categorized genres ->
+                "Movie_categorized", Encode.toString 0 (Encode.object [ "genres", genres |> List.map Encode.string |> Encode.list ])
+            | Movie_poster_replaced posterRef ->
+                "Movie_poster_replaced", Encode.toString 0 (Encode.object [ "posterRef", Encode.string posterRef ])
+            | Movie_backdrop_replaced backdropRef ->
+                "Movie_backdrop_replaced", Encode.toString 0 (Encode.object [ "backdropRef", Encode.string backdropRef ])
+            | Movie_recommended_by friendSlug ->
+                "Movie_recommended_by", Encode.toString 0 (Encode.object [ "friendSlug", Encode.string friendSlug ])
+            | Recommendation_removed friendSlug ->
+                "Recommendation_removed", Encode.toString 0 (Encode.object [ "friendSlug", Encode.string friendSlug ])
+            | Want_to_watch_with friendSlug ->
+                "Want_to_watch_with", Encode.toString 0 (Encode.object [ "friendSlug", Encode.string friendSlug ])
+            | Removed_want_to_watch_with friendSlug ->
+                "Removed_want_to_watch_with", Encode.toString 0 (Encode.object [ "friendSlug", Encode.string friendSlug ])
 
         let deserialize (eventType: string) (data: string) : MovieEvent option =
             match eventType with
-            | "MovieAddedToLibrary" ->
+            | "Movie_added_to_library" ->
                 Decode.fromString decodeMovieAddedData data
                 |> Result.toOption
-                |> Option.map MovieAddedToLibrary
-            | "MovieRemovedFromLibrary" ->
-                Some MovieRemovedFromLibrary
-            | "MovieCategorized" ->
+                |> Option.map Movie_added_to_library
+            | "Movie_removed_from_library" ->
+                Some Movie_removed_from_library
+            | "Movie_categorized" ->
                 Decode.fromString (Decode.field "genres" (Decode.list Decode.string)) data
                 |> Result.toOption
-                |> Option.map MovieCategorized
-            | "MoviePosterReplaced" ->
+                |> Option.map Movie_categorized
+            | "Movie_poster_replaced" ->
                 Decode.fromString (Decode.field "posterRef" Decode.string) data
                 |> Result.toOption
-                |> Option.map MoviePosterReplaced
-            | "MovieBackdropReplaced" ->
+                |> Option.map Movie_poster_replaced
+            | "Movie_backdrop_replaced" ->
                 Decode.fromString (Decode.field "backdropRef" Decode.string) data
                 |> Result.toOption
-                |> Option.map MovieBackdropReplaced
-            | "MovieRecommendedBy" ->
+                |> Option.map Movie_backdrop_replaced
+            | "Movie_recommended_by" ->
                 Decode.fromString (Decode.field "friendSlug" Decode.string) data
                 |> Result.toOption
-                |> Option.map MovieRecommendedBy
-            | "RecommendationRemoved" ->
+                |> Option.map Movie_recommended_by
+            | "Recommendation_removed" ->
                 Decode.fromString (Decode.field "friendSlug" Decode.string) data
                 |> Result.toOption
-                |> Option.map RecommendationRemoved
-            | "WantToWatchWith" ->
+                |> Option.map Recommendation_removed
+            | "Want_to_watch_with" ->
                 Decode.fromString (Decode.field "friendSlug" Decode.string) data
                 |> Result.toOption
-                |> Option.map WantToWatchWith
-            | "RemovedWantToWatchWith" ->
+                |> Option.map Want_to_watch_with
+            | "Removed_want_to_watch_with" ->
                 Decode.fromString (Decode.field "friendSlug" Decode.string) data
                 |> Result.toOption
-                |> Option.map RemovedWantToWatchWith
+                |> Option.map Removed_want_to_watch_with
             | _ -> None
 
         let toEventData (event: MovieEvent) : EventStore.EventData =

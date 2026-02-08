@@ -16,7 +16,7 @@ let friendIntegrationTests =
 
         testCase "serialize event, store, read back, deserialize round-trip" <| fun _ ->
             let conn = createInMemoryConnection ()
-            let event = Friends.FriendAdded { Name = "Marco"; ImageRef = Some "friends/marco.jpg" }
+            let event = Friends.Friend_added { Name = "Marco"; ImageRef = Some "friends/marco.jpg" }
             let eventData = Friends.Serialization.toEventData event
             let streamId = Friends.streamId "marco"
 
@@ -37,7 +37,7 @@ let friendIntegrationTests =
 
             FriendProjection.handler.Init conn
 
-            let event = Friends.FriendAdded { Name = "Marco"; ImageRef = None }
+            let event = Friends.Friend_added { Name = "Marco"; ImageRef = None }
             let eventData = Friends.Serialization.toEventData event
             EventStore.appendToStream conn streamId -1L [ eventData ] |> ignore
 
@@ -58,10 +58,10 @@ let friendIntegrationTests =
 
             FriendProjection.handler.Init conn
 
-            let addEvent = Friends.Serialization.toEventData (Friends.FriendAdded { Name = "Marco"; ImageRef = None })
+            let addEvent = Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None })
             EventStore.appendToStream conn streamId -1L [ addEvent ] |> ignore
 
-            let updateEvent = Friends.Serialization.toEventData (Friends.FriendUpdated { Name = "Marco H."; ImageRef = Some "friends/marco.jpg" })
+            let updateEvent = Friends.Serialization.toEventData (Friends.Friend_updated { Name = "Marco H."; ImageRef = Some "friends/marco.jpg" })
             EventStore.appendToStream conn streamId 0L [ updateEvent ] |> ignore
 
             Projection.runProjection conn FriendProjection.handler
@@ -77,10 +77,10 @@ let friendIntegrationTests =
 
             FriendProjection.handler.Init conn
 
-            let addEvent = Friends.Serialization.toEventData (Friends.FriendAdded { Name = "Marco"; ImageRef = None })
+            let addEvent = Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None })
             EventStore.appendToStream conn streamId -1L [ addEvent ] |> ignore
 
-            let removeEvent = Friends.Serialization.toEventData Friends.FriendRemoved
+            let removeEvent = Friends.Serialization.toEventData Friends.Friend_removed
             EventStore.appendToStream conn streamId 0L [ removeEvent ] |> ignore
 
             Projection.runProjection conn FriendProjection.handler

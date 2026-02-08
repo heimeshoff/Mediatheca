@@ -24,57 +24,57 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
     }
 
     let cmd = Cmd.batch [
-        Cmd.map DashboardMsg dashboardCmd
-        Cmd.map MovieListMsg movieListCmd
-        Cmd.map SettingsMsg settingsCmd
+        Cmd.map Dashboard_msg dashboardCmd
+        Cmd.map Movie_list_msg movieListCmd
+        Cmd.map Settings_msg settingsCmd
     ]
 
     model, cmd
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
-    | UrlChanged segments ->
+    | Url_changed segments ->
         let page = Route.parseUrl segments
         let model = { model with CurrentPage = page }
         match page with
-        | MovieList ->
+        | Movie_list ->
             let childModel, childCmd = Pages.Movies.State.init ()
             { model with MovieListModel = childModel },
-            Cmd.map MovieListMsg childCmd
-        | MovieDetail slug ->
+            Cmd.map Movie_list_msg childCmd
+        | Movie_detail slug ->
             let childModel, childCmd = Pages.MovieDetail.State.init slug
             { model with MovieDetailModel = childModel },
-            Cmd.map MovieDetailMsg childCmd
-        | FriendList ->
+            Cmd.map Movie_detail_msg childCmd
+        | Friend_list ->
             let childModel, childCmd = Pages.Friends.State.init ()
             { model with FriendListModel = childModel },
-            Cmd.map FriendListMsg childCmd
-        | FriendDetail slug ->
+            Cmd.map Friend_list_msg childCmd
+        | Friend_detail slug ->
             let childModel, childCmd = Pages.FriendDetail.State.init slug
             { model with FriendDetailModel = childModel },
-            Cmd.map FriendDetailMsg childCmd
+            Cmd.map Friend_detail_msg childCmd
         | _ -> model, Cmd.none
 
-    | DashboardMsg childMsg ->
+    | Dashboard_msg childMsg ->
         let childModel, childCmd = Pages.Dashboard.State.update childMsg model.DashboardModel
-        { model with DashboardModel = childModel }, Cmd.map DashboardMsg childCmd
+        { model with DashboardModel = childModel }, Cmd.map Dashboard_msg childCmd
 
-    | MovieListMsg childMsg ->
+    | Movie_list_msg childMsg ->
         let childModel, childCmd = Pages.Movies.State.update api childMsg model.MovieListModel
-        { model with MovieListModel = childModel }, Cmd.map MovieListMsg childCmd
+        { model with MovieListModel = childModel }, Cmd.map Movie_list_msg childCmd
 
-    | MovieDetailMsg childMsg ->
+    | Movie_detail_msg childMsg ->
         let childModel, childCmd = Pages.MovieDetail.State.update api childMsg model.MovieDetailModel
-        { model with MovieDetailModel = childModel }, Cmd.map MovieDetailMsg childCmd
+        { model with MovieDetailModel = childModel }, Cmd.map Movie_detail_msg childCmd
 
-    | FriendListMsg childMsg ->
+    | Friend_list_msg childMsg ->
         let childModel, childCmd = Pages.Friends.State.update api childMsg model.FriendListModel
-        { model with FriendListModel = childModel }, Cmd.map FriendListMsg childCmd
+        { model with FriendListModel = childModel }, Cmd.map Friend_list_msg childCmd
 
-    | FriendDetailMsg childMsg ->
+    | Friend_detail_msg childMsg ->
         let childModel, childCmd = Pages.FriendDetail.State.update api childMsg model.FriendDetailModel
-        { model with FriendDetailModel = childModel }, Cmd.map FriendDetailMsg childCmd
+        { model with FriendDetailModel = childModel }, Cmd.map Friend_detail_msg childCmd
 
-    | SettingsMsg childMsg ->
+    | Settings_msg childMsg ->
         let childModel, childCmd = Pages.Settings.State.update childMsg model.SettingsModel
-        { model with SettingsModel = childModel }, Cmd.map SettingsMsg childCmd
+        { model with SettingsModel = childModel }, Cmd.map Settings_msg childCmd

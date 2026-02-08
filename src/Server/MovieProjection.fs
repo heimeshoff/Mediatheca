@@ -48,11 +48,11 @@ module MovieProjection =
         if not (event.StreamId.StartsWith("Movie-")) then ()
         else
             let slug = event.StreamId.Substring(6) // Remove "Movie-" prefix
-            match Catalog.Serialization.fromStoredEvent event with
+            match Movies.Serialization.fromStoredEvent event with
             | None -> ()
             | Some movieEvent ->
                 match movieEvent with
-                | Catalog.MovieAddedToLibrary data ->
+                | Movies.Movie_added_to_library data ->
                     let genresJson = data.Genres |> List.map Encode.string |> Encode.list |> Encode.toString 0
                     conn
                     |> Db.newCommand """
@@ -88,7 +88,7 @@ module MovieProjection =
                     ]
                     |> Db.exec
 
-                | Catalog.MovieRemovedFromLibrary ->
+                | Movies.Movie_removed_from_library ->
                     conn
                     |> Db.newCommand "DELETE FROM movie_list WHERE slug = @slug"
                     |> Db.setParams [ "slug", SqlType.String slug ]
@@ -98,7 +98,7 @@ module MovieProjection =
                     |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.exec
 
-                | Catalog.MovieCategorized genres ->
+                | Movies.Movie_categorized genres ->
                     let genresJson = genres |> List.map Encode.string |> Encode.list |> Encode.toString 0
                     conn
                     |> Db.newCommand "UPDATE movie_list SET genres = @genres WHERE slug = @slug"
@@ -109,7 +109,7 @@ module MovieProjection =
                     |> Db.setParams [ "slug", SqlType.String slug; "genres", SqlType.String genresJson ]
                     |> Db.exec
 
-                | Catalog.MoviePosterReplaced posterRef ->
+                | Movies.Movie_poster_replaced posterRef ->
                     conn
                     |> Db.newCommand "UPDATE movie_list SET poster_ref = @poster_ref WHERE slug = @slug"
                     |> Db.setParams [ "slug", SqlType.String slug; "poster_ref", SqlType.String posterRef ]
@@ -119,13 +119,13 @@ module MovieProjection =
                     |> Db.setParams [ "slug", SqlType.String slug; "poster_ref", SqlType.String posterRef ]
                     |> Db.exec
 
-                | Catalog.MovieBackdropReplaced backdropRef ->
+                | Movies.Movie_backdrop_replaced backdropRef ->
                     conn
                     |> Db.newCommand "UPDATE movie_detail SET backdrop_ref = @backdrop_ref WHERE slug = @slug"
                     |> Db.setParams [ "slug", SqlType.String slug; "backdrop_ref", SqlType.String backdropRef ]
                     |> Db.exec
 
-                | Catalog.MovieRecommendedBy friendSlug ->
+                | Movies.Movie_recommended_by friendSlug ->
                     let currentJson =
                         conn
                         |> Db.newCommand "SELECT recommended_by FROM movie_detail WHERE slug = @slug"
@@ -142,7 +142,7 @@ module MovieProjection =
                     |> Db.setParams [ "slug", SqlType.String slug; "recommended_by", SqlType.String updatedJson ]
                     |> Db.exec
 
-                | Catalog.RecommendationRemoved friendSlug ->
+                | Movies.Recommendation_removed friendSlug ->
                     let currentJson =
                         conn
                         |> Db.newCommand "SELECT recommended_by FROM movie_detail WHERE slug = @slug"
@@ -159,7 +159,7 @@ module MovieProjection =
                     |> Db.setParams [ "slug", SqlType.String slug; "recommended_by", SqlType.String updatedJson ]
                     |> Db.exec
 
-                | Catalog.WantToWatchWith friendSlug ->
+                | Movies.Want_to_watch_with friendSlug ->
                     let currentJson =
                         conn
                         |> Db.newCommand "SELECT want_to_watch_with FROM movie_detail WHERE slug = @slug"
@@ -176,7 +176,7 @@ module MovieProjection =
                     |> Db.setParams [ "slug", SqlType.String slug; "want_to_watch_with", SqlType.String updatedJson ]
                     |> Db.exec
 
-                | Catalog.RemovedWantToWatchWith friendSlug ->
+                | Movies.Removed_want_to_watch_with friendSlug ->
                     let currentJson =
                         conn
                         |> Db.newCommand "SELECT want_to_watch_with FROM movie_detail WHERE slug = @slug"
@@ -239,7 +239,7 @@ module MovieProjection =
             let wantToWatchWithSlugs =
                 Decode.fromString (Decode.list Decode.string) wantToWatchWithJson
                 |> Result.defaultValue []
-            let streamId = Catalog.streamId slug
+            let streamId = Movies.streamId slug
             let cast = CastStore.getMovieCast conn streamId
             { Mediatheca.Shared.MovieDetail.Slug = rd.ReadString "slug"
               Name = rd.ReadString "name"

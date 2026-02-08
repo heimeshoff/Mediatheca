@@ -4,40 +4,40 @@ open Feliz.Router
 
 type Page =
     | Dashboard
-    | MovieList
-    | MovieDetail of slug: string
-    | FriendList
-    | FriendDetail of slug: string
+    | Movie_list
+    | Movie_detail of slug: string
+    | Friend_list
+    | Friend_detail of slug: string
     | Settings
-    | NotFound
+    | Not_found
 
 module Route =
     let parseUrl (segments: string list) =
         match segments with
         | [] -> Dashboard
-        | [ "movies" ] -> MovieList
-        | [ "movies"; slug ] -> MovieDetail slug
-        | [ "friends" ] -> FriendList
-        | [ "friends"; slug ] -> FriendDetail slug
+        | [ "movies" ] -> Movie_list
+        | [ "movies"; slug ] -> Movie_detail slug
+        | [ "friends" ] -> Friend_list
+        | [ "friends"; slug ] -> Friend_detail slug
         | [ "settings" ] -> Settings
-        | _ -> NotFound
+        | _ -> Not_found
 
     let toUrl (page: Page) =
         match page with
         | Dashboard -> Router.format ""
-        | MovieList -> Router.format "movies"
-        | MovieDetail slug -> Router.format ("movies", slug)
-        | FriendList -> Router.format "friends"
-        | FriendDetail slug -> Router.format ("friends", slug)
+        | Movie_list -> Router.format "movies"
+        | Movie_detail slug -> Router.format ("movies", slug)
+        | Friend_list -> Router.format "friends"
+        | Friend_detail slug -> Router.format ("friends", slug)
         | Settings -> Router.format "settings"
-        | NotFound -> Router.format "not-found"
+        | Not_found -> Router.format "not-found"
 
     let isMoviesSection (page: Page) =
         match page with
-        | MovieList | MovieDetail _ -> true
+        | Movie_list | Movie_detail _ -> true
         | _ -> false
 
     let isFriendsSection (page: Page) =
         match page with
-        | FriendList | FriendDetail _ -> true
+        | Friend_list | Friend_detail _ -> true
         | _ -> false

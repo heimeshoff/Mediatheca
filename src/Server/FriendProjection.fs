@@ -30,7 +30,7 @@ module FriendProjection =
             | None -> ()
             | Some friendEvent ->
                 match friendEvent with
-                | Friends.FriendAdded data ->
+                | Friends.Friend_added data ->
                     conn
                     |> Db.newCommand """
                         INSERT OR REPLACE INTO friend_list (slug, name, image_ref)
@@ -43,7 +43,7 @@ module FriendProjection =
                     ]
                     |> Db.exec
 
-                | Friends.FriendUpdated data ->
+                | Friends.Friend_updated data ->
                     conn
                     |> Db.newCommand """
                         UPDATE friend_list SET name = @name, image_ref = @image_ref WHERE slug = @slug
@@ -55,7 +55,7 @@ module FriendProjection =
                     ]
                     |> Db.exec
 
-                | Friends.FriendRemoved ->
+                | Friends.Friend_removed ->
                     conn
                     |> Db.newCommand "DELETE FROM friend_list WHERE slug = @slug"
                     |> Db.setParams [ "slug", SqlType.String slug ]

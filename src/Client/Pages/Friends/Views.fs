@@ -65,7 +65,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     ]
                     Daisy.button.button [
                         button.primary
-                        prop.onClick (fun _ -> dispatch ToggleAddForm)
+                        prop.onClick (fun _ -> dispatch Toggle_add_form)
                         prop.text (if model.ShowAddForm then "Cancel" else "Add Friend")
                     ]
                 ]
@@ -88,14 +88,14 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             prop.className "flex-1"
                                             prop.placeholder "Friend name..."
                                             prop.value model.AddForm.Name
-                                            prop.onChange (AddFormNameChanged >> dispatch)
+                                            prop.onChange (Add_form_name_changed >> dispatch)
                                             prop.onKeyDown (fun e ->
-                                                if e.key = "Enter" then dispatch SubmitAddFriend
+                                                if e.key = "Enter" then dispatch Submit_add_friend
                                             )
                                         ]
                                         Daisy.button.button [
                                             button.primary
-                                            prop.onClick (fun _ -> dispatch SubmitAddFriend)
+                                            prop.onClick (fun _ -> dispatch Submit_add_friend)
                                             prop.text "Add"
                                         ]
                                     ]

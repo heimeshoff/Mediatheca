@@ -15,8 +15,8 @@ type DockItem = {
 
 let private dockItems = [
     { Label = "Dashboard"; Page = Dashboard; IsActive = (fun p -> p = Dashboard); Icon = Icons.dashboard; Href = Router.format "" }
-    { Label = "Movies"; Page = MovieList; IsActive = Route.isMoviesSection; Icon = Icons.movie; Href = Router.format "movies" }
-    { Label = "Friends"; Page = FriendList; IsActive = Route.isFriendsSection; Icon = Icons.friends; Href = Router.format "friends" }
+    { Label = "Movies"; Page = Movie_list; IsActive = Route.isMoviesSection; Icon = Icons.movie; Href = Router.format "movies" }
+    { Label = "Friends"; Page = Friend_list; IsActive = Route.isFriendsSection; Icon = Icons.friends; Href = Router.format "friends" }
     { Label = "Settings"; Page = Settings; IsActive = (fun p -> p = Settings); Icon = Icons.settings; Href = Router.format "settings" }
 ]
 

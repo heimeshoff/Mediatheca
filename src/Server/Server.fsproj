@@ -7,7 +7,7 @@
   <ItemGroup>
     <Compile Include="EventStore.fs" />
     <Compile Include="Projection.fs" />
-    <Compile Include="Catalog.fs" />
+    <Compile Include="Movies.fs" />
     <Compile Include="Friends.fs" />
     <Compile Include="Tmdb.fs" />
     <Compile Include="ImageStore.fs" />

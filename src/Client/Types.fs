@@ -13,10 +13,10 @@ type Model = {
 }
 
 type Msg =
-    | UrlChanged of string list
-    | DashboardMsg of Pages.Dashboard.Types.Msg
-    | MovieListMsg of Pages.Movies.Types.Msg
-    | MovieDetailMsg of Pages.MovieDetail.Types.Msg
-    | FriendListMsg of Pages.Friends.Types.Msg
-    | FriendDetailMsg of Pages.FriendDetail.Types.Msg
-    | SettingsMsg of Pages.Settings.Types.Msg
+    | Url_changed of string list
+    | Dashboard_msg of Pages.Dashboard.Types.Msg
+    | Movie_list_msg of Pages.Movies.Types.Msg
+    | Movie_detail_msg of Pages.MovieDetail.Types.Msg
+    | Friend_list_msg of Pages.Friends.Types.Msg
+    | Friend_detail_msg of Pages.FriendDetail.Types.Msg
+    | Settings_msg of Pages.Settings.Types.Msg
