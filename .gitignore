@@ -26,3 +26,5 @@ uploads/
 .vscode/
 *.swp
 *.swo
+
+.fake

@@ -8,13 +8,23 @@ Use when: User asks "where are we?", runs /status, or starts a new session
 2. Summarize concisely: current phase, recent progress, active decisions, blockers
 3. List the next actions from STATE.md as the current task list
 
-## Step 2: Ask About Modeling
+## Step 2: Survey and Model
+
+### 2a: Codebase Survey (automatic)
+
+Before asking the user about modeling, run the codebase survey in the background to pre-load architectural context. Read `.claude/skills/workflow/codebase-survey.md` and follow it — launch the 4 parallel Explore agents while presenting the status summary to the user.
+
+The survey results will be ready by the time the user responds to the modeling question, giving you instant deep context for the conversation.
+
+### 2b: Ask About Modeling
 
 Ask the user (using AskUserQuestion):
 
-> "Before we start implementing — do you have any further thoughts, questions, or modeling you'd like to explore first?"
+> "Before we start implementing — do you have any further thoughts, questions, or modeling you'd like to explore first? (A codebase survey is running in the background to give us full context.)"
 
 ### If YES → Enter Modeling Mode
+
+Use the codebase survey results to inform the conversation. Reference specific types, patterns, and gaps from the snapshot rather than needing to read files on-the-fly.
 
 Guide a collaborative modeling conversation. Ask probing questions one or two at a time, such as:
 
@@ -40,8 +50,63 @@ When the user signals they're done modeling (or the conversation reaches a natur
 
 Acknowledge and move on.
 
-## Step 3: Execute
+## Step 3: Execute with Parallel Agents
 
-1. Create a task list (using TaskCreate) from the next actions
-2. Start working through the tasks in order, marking them in-progress and completed as you go
-3. After completing tasks, update `.planning/STATE.md` to reflect progress
+Before starting implementation, analyze the next actions for parallelization opportunities.
+
+### 3a: Dependency Analysis
+
+1. Read the next actions from STATE.md
+2. For each action, determine:
+   - What it produces (new types, new files, new API endpoints)
+   - What it consumes (types/files/APIs from other actions)
+3. Build a dependency graph and identify **parallel tracks** — groups of actions that are independent of each other
+
+**Common parallel patterns in this codebase:**
+
+- **Independent bounded contexts**: Domain work in Catalog vs. Journal vs. Friends can run in parallel
+- **Independent aggregates**: New aggregate definitions that don't share types can be built concurrently
+- **Vertical slices**: Two features touching different pages/routes are independent
+- **Shared→Fan-out**: When multiple actions depend on the same shared types, define the shared types first, then fan out the dependent work in parallel
+
+### 3b: Parallel Dispatch
+
+1. Create a task list (using TodoWrite) showing all tracks and their ordering
+2. For actions with no dependencies between them, launch parallel Task agents (using `subagent_type: "general-purpose"`). Each agent receives:
+   - The specific requirement(s) to implement
+   - Relevant project context: conventions from CLAUDE.md, domain model from STATE.md
+   - The specific files it should read and modify
+   - Instruction to follow existing patterns in the codebase
+3. For actions that depend on a previous action's output, run them sequentially after the dependency completes
+4. **Boundary rule**: Each agent works on its own set of files. If two actions need to modify the same file (e.g., `Shared.fs` for API contracts), sequence them or handle the shared file in a dedicated step first.
+
+**Example — Phase 3 next actions parallelized:**
+
+```
+Step 1 (sequential): Define shared types for WatchSession and ContentBlock in Shared.fs
+
+Step 2 (parallel agents):
+  Agent A — Journal track: WatchSession domain model, commands, events, projection, API
+  Agent B — Content track: ContentBlock domain model, commands, events, projection, API
+
+Step 3 (parallel agents, after Step 2):
+  Agent C — Watch history UI (depends on Agent A's API)
+  Agent D — Content block editor UI (depends on Agent B's API)
+
+Step 4 (parallel — see Step 4 below): Verification
+```
+
+### 3c: Sequential Fallback
+
+If all next actions are tightly coupled (modifying the same aggregate, same files), skip parallelization and work through them sequentially. Don't force parallelism where it adds coordination overhead without benefit.
+
+## Step 4: Verify in Parallel
+
+After implementation work completes (whether parallel or sequential), run verification agents concurrently:
+
+1. Launch in parallel using Task agents (`subagent_type: "Bash"`):
+   - **Build agent**: `npm run build` — catches Fable compilation and type errors
+   - **Test agent**: `npm test` — runs Expecto test suite
+2. If either fails, fix the issues before proceeding
+3. Once both pass, update `.planning/STATE.md` to reflect completed work
+4. Commit the changes
