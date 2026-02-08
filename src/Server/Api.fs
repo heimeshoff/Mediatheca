@@ -281,6 +281,159 @@ module Api =
                         movieProjections
             }
 
+            // Watch Sessions
+            recordWatchSession = fun slug request -> async {
+                let sid = Movies.streamId slug
+                let sessionId = System.Guid.NewGuid().ToString("N")
+                let sessionData: Movies.WatchSessionRecordedData = {
+                    SessionId = sessionId
+                    Date = request.Date
+                    Duration = request.Duration
+                    FriendSlugs = request.FriendSlugs
+                }
+                let result =
+                    executeCommand
+                        conn sid
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        (Movies.Record_watch_session sessionData)
+                        movieProjections
+                match result with
+                | Ok () -> return Ok sessionId
+                | Error e -> return Error e
+            }
+
+            updateWatchSessionDate = fun slug sessionId date -> async {
+                let sid = Movies.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        (Movies.Change_watch_session_date (sessionId, date))
+                        movieProjections
+            }
+
+            addFriendToWatchSession = fun slug sessionId friendSlug -> async {
+                let sid = Movies.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        (Movies.Add_friend_to_watch_session (sessionId, friendSlug))
+                        movieProjections
+            }
+
+            removeFriendFromWatchSession = fun slug sessionId friendSlug -> async {
+                let sid = Movies.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        (Movies.Remove_friend_from_watch_session (sessionId, friendSlug))
+                        movieProjections
+            }
+
+            getWatchSessions = fun slug -> async {
+                return MovieProjection.getWatchSessions conn slug
+            }
+
+            // Content Blocks
+            addContentBlock = fun slug sessionId request -> async {
+                let sid = ContentBlocks.streamId slug
+                let blockId = System.Guid.NewGuid().ToString("N")
+                let blockData: ContentBlocks.ContentBlockData = {
+                    BlockId = blockId
+                    BlockType = request.BlockType
+                    Content = request.Content
+                    ImageRef = request.ImageRef
+                    Url = request.Url
+                    Caption = request.Caption
+                }
+                let result =
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Add_content_block (blockData, sessionId))
+                        projectionHandlers
+                match result with
+                | Ok () -> return Ok blockId
+                | Error e -> return Error e
+            }
+
+            updateContentBlock = fun slug blockId request -> async {
+                let sid = ContentBlocks.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Update_content_block (blockId, request.Content, request.ImageRef, request.Url, request.Caption))
+                        projectionHandlers
+            }
+
+            removeContentBlock = fun slug blockId -> async {
+                let sid = ContentBlocks.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Remove_content_block blockId)
+                        projectionHandlers
+            }
+
+            reorderContentBlocks = fun slug sessionId blockIds -> async {
+                let sid = ContentBlocks.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Reorder_content_blocks (blockIds, sessionId))
+                        projectionHandlers
+            }
+
+            getContentBlocks = fun slug sessionId -> async {
+                match sessionId with
+                | Some sid -> return ContentBlockProjection.getBySession conn slug sid
+                | None -> return ContentBlockProjection.getForMovieDetail conn slug
+            }
+
+            uploadContentImage = fun data filename -> async {
+                try
+                    let ext = System.IO.Path.GetExtension(filename).ToLowerInvariant()
+                    let imageId = System.Guid.NewGuid().ToString("N")
+                    let ref = sprintf "content/%s%s" imageId ext
+                    let destPath = System.IO.Path.Combine(imageBasePath, ref)
+                    let dir = System.IO.Path.GetDirectoryName(destPath)
+                    if not (System.IO.Directory.Exists(dir)) then
+                        System.IO.Directory.CreateDirectory(dir) |> ignore
+                    System.IO.File.WriteAllBytes(destPath, data)
+                    return Ok ref
+                with ex ->
+                    return Error $"Failed to upload image: {ex.Message}"
+            }
+
             addFriend = fun name -> async {
                 let slug = Slug.friendSlug name
                 let sid = Friends.streamId slug

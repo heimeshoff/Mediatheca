@@ -345,6 +345,91 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             ]
                     ]
                 ]
+                // Watch History section
+                Html.div [
+                    prop.className "px-4 lg:px-6 mt-8"
+                    prop.children [
+                        Html.div [
+                            prop.className "flex items-center justify-between mb-3"
+                            prop.children [
+                                Html.h2 [
+                                    prop.className "text-lg font-bold font-display"
+                                    prop.text "Watch History"
+                                ]
+                                Daisy.button.button [
+                                    button.sm
+                                    button.ghost
+                                    prop.onClick (fun _ -> dispatch Open_record_session)
+                                    prop.text "+ Record Session"
+                                ]
+                            ]
+                        ]
+                        if List.isEmpty movie.WatchSessions then
+                            Html.p [
+                                prop.className "text-base-content/50 text-sm"
+                                prop.text "No watch sessions yet."
+                            ]
+                        else
+                            Html.div [
+                                prop.className "space-y-3"
+                                prop.children [
+                                    for session in movie.WatchSessions do
+                                        Daisy.card [
+                                            prop.className "bg-base-200 shadow-sm"
+                                            prop.children [
+                                                Daisy.cardBody [
+                                                    prop.className "p-4"
+                                                    prop.children [
+                                                        Html.div [
+                                                            prop.className "flex items-center justify-between"
+                                                            prop.children [
+                                                                Html.span [
+                                                                    prop.className "font-semibold"
+                                                                    prop.text session.Date
+                                                                ]
+                                                                match session.Duration with
+                                                                | Some d ->
+                                                                    Html.span [
+                                                                        prop.className "text-base-content/60 text-sm"
+                                                                        prop.text $"{d} min"
+                                                                    ]
+                                                                | None -> ()
+                                                            ]
+                                                        ]
+                                                        if not (List.isEmpty session.Friends) then
+                                                            Html.div [
+                                                                prop.className "flex flex-wrap gap-1 mt-2"
+                                                                prop.children [
+                                                                    for friend in session.Friends do
+                                                                        Daisy.badge [
+                                                                            badge.sm
+                                                                            prop.text friend.Name
+                                                                        ]
+                                                                ]
+                                                            ]
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                ]
+                            ]
+                    ]
+                ]
+                // Notes section
+                Html.div [
+                    prop.className "px-4 lg:px-6 mt-8"
+                    prop.children [
+                        Html.h2 [
+                            prop.className "text-lg font-bold font-display mb-3"
+                            prop.text "Notes"
+                        ]
+                        ContentBlockEditor.view
+                            movie.ContentBlocks
+                            (fun req -> dispatch (Add_content_block req))
+                            (fun bid req -> dispatch (Update_content_block (bid, req)))
+                            (fun bid -> dispatch (Remove_content_block bid))
+                    ]
+                ]
                 // Error display
                 match model.Error with
                 | Some err ->
@@ -383,5 +468,101 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         (fun slug -> dispatch (Want_to_watch_with slug))
                         (fun () -> dispatch Close_friend_picker)
                 | None -> ()
+                // Record session modal
+                if model.ShowRecordSession then
+                    Daisy.modal.dialog [
+                        modal.open'
+                        prop.children [
+                            Daisy.modalBackdrop [ prop.onClick (fun _ -> dispatch Close_record_session) ]
+                            Daisy.modalBox.div [
+                                prop.children [
+                                    Html.h3 [
+                                        prop.className "font-bold text-lg font-display mb-4"
+                                        prop.text "Record Watch Session"
+                                    ]
+                                    Html.div [
+                                        prop.className "space-y-4"
+                                        prop.children [
+                                            // Date input
+                                            Html.div [
+                                                prop.children [
+                                                    Html.label [
+                                                        prop.className "label"
+                                                        prop.children [
+                                                            Html.span [ prop.className "label-text"; prop.text "Date" ]
+                                                        ]
+                                                    ]
+                                                    Daisy.input [
+                                                        prop.className "w-full"
+                                                        prop.type' "date"
+                                                        prop.value model.SessionForm.Date
+                                                        prop.onChange (fun (v: string) -> dispatch (Session_date_changed v))
+                                                    ]
+                                                ]
+                                            ]
+                                            // Duration input
+                                            Html.div [
+                                                prop.children [
+                                                    Html.label [
+                                                        prop.className "label"
+                                                        prop.children [
+                                                            Html.span [ prop.className "label-text"; prop.text "Duration" ]
+                                                        ]
+                                                    ]
+                                                    Daisy.input [
+                                                        prop.className "w-full"
+                                                        prop.type' "number"
+                                                        prop.placeholder "Minutes (optional)"
+                                                        prop.value model.SessionForm.Duration
+                                                        prop.onChange (fun (v: string) -> dispatch (Session_duration_changed v))
+                                                    ]
+                                                ]
+                                            ]
+                                            // Friend multi-select
+                                            if not (List.isEmpty model.AllFriends) then
+                                                Html.div [
+                                                    prop.children [
+                                                        Html.label [
+                                                            prop.className "label"
+                                                            prop.children [
+                                                                Html.span [ prop.className "label-text"; prop.text "Watched with" ]
+                                                            ]
+                                                        ]
+                                                        Html.div [
+                                                            prop.className "flex flex-wrap gap-2"
+                                                            prop.children [
+                                                                for friend in model.AllFriends do
+                                                                    let isSelected = model.SessionForm.SelectedFriends.Contains friend.Slug
+                                                                    Daisy.badge [
+                                                                        if isSelected then badge.primary
+                                                                        badge.lg
+                                                                        prop.className "cursor-pointer select-none"
+                                                                        prop.onClick (fun _ -> dispatch (Toggle_session_friend friend.Slug))
+                                                                        prop.text friend.Name
+                                                                    ]
+                                                            ]
+                                                        ]
+                                                    ]
+                                                ]
+                                        ]
+                                    ]
+                                    Html.div [
+                                        prop.className "modal-action"
+                                        prop.children [
+                                            Daisy.button.button [
+                                                prop.onClick (fun _ -> dispatch Close_record_session)
+                                                prop.text "Cancel"
+                                            ]
+                                            Daisy.button.button [
+                                                button.primary
+                                                prop.onClick (fun _ -> dispatch Submit_record_session)
+                                                prop.text "Record Session"
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
             ]
         ]

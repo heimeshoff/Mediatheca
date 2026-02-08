@@ -6,7 +6,7 @@
 |-------|------|--------|--------------|
 | 1 | Skeleton | :white_check_mark: Done | REQ-001, REQ-002, REQ-003, REQ-004, REQ-005, REQ-006, REQ-007, REQ-008 |
 | 2 | Catalog + Friends | :white_check_mark: Done | REQ-009, REQ-010, REQ-010a, REQ-011, REQ-012, REQ-013, REQ-014, REQ-015 |
-| 3 | Journal + Content Blocks | :hourglass: Planned | REQ-016, REQ-017, REQ-018, REQ-019, REQ-020, REQ-021 |
+| 3 | Journal + Content Blocks | :white_check_mark: Done | REQ-016, REQ-017, REQ-018, REQ-019, REQ-020, REQ-021 |
 | 4 | Curation + Dashboards + Admin | :hourglass: Planned | REQ-022, REQ-023, REQ-024, REQ-025, REQ-026, REQ-027, REQ-028 |
 
 ### Phase 1: Skeleton
@@ -64,3 +64,4 @@ Deliverable: Users can organize movies into collections, view dashboards with st
 
 - Phase 1: Skeleton (2026-01-31)
 - Phase 2: Catalog + Friends (2026-02-01)
+- Phase 3: Journal + Content Blocks (2026-02-08)

@@ -26,12 +26,12 @@
 
 ### Phase 3: Journal + Content Blocks
 
-- [ ] REQ-016: Record a WatchSession for a Movie with date, optional duration, and friends present [Phase 3]
-- [ ] REQ-017: View watch history for a Movie (list of sessions with dates and friends) [Phase 3]
-- [ ] REQ-018: Content blocks (TextBlock, ImageBlock, LinkBlock) attachable to a Movie [Phase 3]
-- [ ] REQ-019: Content blocks attachable to a WatchSession [Phase 3]
-- [ ] REQ-020: Image upload and storage on local filesystem for ImageBlocks [Phase 3]
-- [ ] REQ-021: Inline content block editor (add, edit, reorder, delete blocks) [Phase 3]
+- [x] REQ-016: Record a WatchSession for a Movie with date, optional duration, and friends present [Phase 3]
+- [x] REQ-017: View watch history for a Movie (list of sessions with dates and friends) [Phase 3]
+- [x] REQ-018: Content blocks (TextBlock, ImageBlock, LinkBlock) attachable to a Movie [Phase 3]
+- [x] REQ-019: Content blocks attachable to a WatchSession [Phase 3]
+- [x] REQ-020: Image upload and storage on local filesystem for ImageBlocks [Phase 3]
+- [x] REQ-021: Inline content block editor (add, edit, reorder, delete blocks) [Phase 3]
 
 ### Phase 4: Curation + Dashboards + Admin
 

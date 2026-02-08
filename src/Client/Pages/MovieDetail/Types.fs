@@ -2,12 +2,20 @@ module Mediatheca.Client.Pages.MovieDetail.Types
 
 open Mediatheca.Shared
 
+type SessionFormState = {
+    Date: string
+    Duration: string
+    SelectedFriends: Set<string>
+}
+
 type Model = {
     Slug: string
     Movie: MovieDetail option
     AllFriends: FriendListItem list
     IsLoading: bool
     ShowFriendPicker: FriendPickerKind option
+    ShowRecordSession: bool
+    SessionForm: SessionFormState
     Error: string option
 }
 
@@ -28,3 +36,14 @@ type Msg =
     | Movie_removed of Result<unit, string>
     | Open_friend_picker of FriendPickerKind
     | Close_friend_picker
+    | Open_record_session
+    | Close_record_session
+    | Session_date_changed of string
+    | Session_duration_changed of string
+    | Toggle_session_friend of string
+    | Submit_record_session
+    | Session_recorded of Result<string, string>
+    | Add_content_block of AddContentBlockRequest
+    | Update_content_block of blockId: string * UpdateContentBlockRequest
+    | Remove_content_block of blockId: string
+    | Content_block_result of Result<unit, string>

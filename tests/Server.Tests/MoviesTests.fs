@@ -179,9 +179,180 @@ let catalogTests =
                 | Error e -> failtest $"Expected success but got: {e}"
         ]
 
+        testList "Watch sessions" [
+            testCase "recording watch session produces event" <| fun _ ->
+                let sessionData: WatchSessionRecordedData = {
+                    SessionId = System.Guid.NewGuid().ToString("N")
+                    Date = "2025-01-15"
+                    Duration = Some 136
+                    FriendSlugs = [ "marco"; "sarah" ]
+                }
+                let result = givenWhenThen [ Movie_added_to_library sampleMovieData ] (Record_watch_session sessionData)
+                match result with
+                | Ok events ->
+                    Expect.equal (List.length events) 1 "Should produce one event"
+                    match events.[0] with
+                    | Watch_session_recorded data ->
+                        Expect.equal data.SessionId sessionData.SessionId "SessionId should match"
+                        Expect.equal data.Date "2025-01-15" "Date should match"
+                        Expect.equal data.Duration (Some 136) "Duration should match"
+                        Expect.equal data.FriendSlugs [ "marco"; "sarah" ] "FriendSlugs should match"
+                    | _ -> failtest "Expected Watch_session_recorded"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "recording watch session auto-removes friends from want-to-watch-with" <| fun _ ->
+                let sessionId = System.Guid.NewGuid().ToString("N")
+                let sessionData: WatchSessionRecordedData = {
+                    SessionId = sessionId
+                    Date = "2025-01-15"
+                    Duration = None
+                    FriendSlugs = [ "sarah" ]
+                }
+                let given = [
+                    Movie_added_to_library sampleMovieData
+                    Want_to_watch_with "sarah"
+                    Want_to_watch_with "marco"
+                ]
+                let result = givenWhenThen given (Record_watch_session sessionData)
+                match result with
+                | Ok events ->
+                    Expect.equal (List.length events) 1 "Should produce one event"
+                    // Apply events and check state
+                    let state = reconstitute (given @ events)
+                    match state with
+                    | Active movie ->
+                        Expect.isFalse (movie.Want_to_watch_with |> Set.contains "sarah") "Sarah should be removed from want-to-watch-with"
+                        Expect.isTrue (movie.Want_to_watch_with |> Set.contains "marco") "Marco should still be in want-to-watch-with"
+                    | _ -> failtest "Expected Active state"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "recording watch session with duplicate sessionId fails" <| fun _ ->
+                let sessionId = System.Guid.NewGuid().ToString("N")
+                let sessionData: WatchSessionRecordedData = {
+                    SessionId = sessionId
+                    Date = "2025-01-15"
+                    Duration = None
+                    FriendSlugs = []
+                }
+                let given = [
+                    Movie_added_to_library sampleMovieData
+                    Watch_session_recorded sessionData
+                ]
+                let result = givenWhenThen given (Record_watch_session sessionData)
+                match result with
+                | Error msg -> Expect.stringContains msg "already exists" "Should say already exists"
+                | Ok _ -> failtest "Expected error"
+
+            testCase "changing watch session date produces event" <| fun _ ->
+                let sessionId = System.Guid.NewGuid().ToString("N")
+                let sessionData: WatchSessionRecordedData = {
+                    SessionId = sessionId
+                    Date = "2025-01-15"
+                    Duration = None
+                    FriendSlugs = []
+                }
+                let given = [
+                    Movie_added_to_library sampleMovieData
+                    Watch_session_recorded sessionData
+                ]
+                let result = givenWhenThen given (Change_watch_session_date (sessionId, "2025-02-20"))
+                match result with
+                | Ok events ->
+                    Expect.equal (List.length events) 1 "Should produce one event"
+                    match events.[0] with
+                    | Watch_session_date_changed (sid, date) ->
+                        Expect.equal sid sessionId "SessionId should match"
+                        Expect.equal date "2025-02-20" "Date should match"
+                    | _ -> failtest "Expected Watch_session_date_changed"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "adding friend to watch session is idempotent" <| fun _ ->
+                let sessionId = System.Guid.NewGuid().ToString("N")
+                let sessionData: WatchSessionRecordedData = {
+                    SessionId = sessionId
+                    Date = "2025-01-15"
+                    Duration = None
+                    FriendSlugs = [ "marco" ]
+                }
+                let given = [
+                    Movie_added_to_library sampleMovieData
+                    Watch_session_recorded sessionData
+                ]
+                // First add produces event
+                let result1 = givenWhenThen given (Add_friend_to_watch_session (sessionId, "sarah"))
+                match result1 with
+                | Ok events -> Expect.equal (List.length events) 1 "Should produce one event"
+                | Error e -> failtest $"Expected success but got: {e}"
+                // Adding same friend again is idempotent
+                let givenWithSarah = given @ [ Friend_added_to_watch_session (sessionId, "sarah") ]
+                let result2 = givenWhenThen givenWithSarah (Add_friend_to_watch_session (sessionId, "sarah"))
+                match result2 with
+                | Ok events -> Expect.equal (List.length events) 0 "Should produce no events (idempotent)"
+                | Error e -> failtest $"Expected success but got: {e}"
+                // Adding marco who was already in original session is idempotent
+                let result3 = givenWhenThen given (Add_friend_to_watch_session (sessionId, "marco"))
+                match result3 with
+                | Ok events -> Expect.equal (List.length events) 0 "Should produce no events for existing friend"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "removing friend from watch session produces event" <| fun _ ->
+                let sessionId = System.Guid.NewGuid().ToString("N")
+                let sessionData: WatchSessionRecordedData = {
+                    SessionId = sessionId
+                    Date = "2025-01-15"
+                    Duration = None
+                    FriendSlugs = [ "marco" ]
+                }
+                let given = [
+                    Movie_added_to_library sampleMovieData
+                    Watch_session_recorded sessionData
+                ]
+                let result = givenWhenThen given (Remove_friend_from_watch_session (sessionId, "marco"))
+                match result with
+                | Ok events ->
+                    Expect.equal (List.length events) 1 "Should produce one event"
+                    match events.[0] with
+                    | Friend_removed_from_watch_session (sid, slug) ->
+                        Expect.equal sid sessionId "SessionId should match"
+                        Expect.equal slug "marco" "Friend slug should match"
+                    | _ -> failtest "Expected Friend_removed_from_watch_session"
+                | Error e -> failtest $"Expected success but got: {e}"
+                // Removing non-existing friend produces no events
+                let result2 = givenWhenThen given (Remove_friend_from_watch_session (sessionId, "nobody"))
+                match result2 with
+                | Ok events -> Expect.equal (List.length events) 0 "Should produce no events for non-existing friend"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "watch session commands on non-existent movie fail" <| fun _ ->
+                let sessionId = System.Guid.NewGuid().ToString("N")
+                let sessionData: WatchSessionRecordedData = {
+                    SessionId = sessionId
+                    Date = "2025-01-15"
+                    Duration = None
+                    FriendSlugs = []
+                }
+                let commands: MovieCommand list = [
+                    Record_watch_session sessionData
+                    Change_watch_session_date (sessionId, "2025-02-20")
+                    Add_friend_to_watch_session (sessionId, "marco")
+                    Remove_friend_from_watch_session (sessionId, "marco")
+                ]
+                for cmd in commands do
+                    let result = givenWhenThen [] cmd
+                    match result with
+                    | Error msg -> Expect.stringContains msg "does not exist" "Should say does not exist"
+                    | Ok _ -> failtest $"Expected error for command on non-existent movie: {cmd}"
+        ]
+
         testList "Removed movie" [
             testCase "commands on removed movie fail" <| fun _ ->
                 let removedEvents = [ Movie_added_to_library sampleMovieData; Movie_removed_from_library ]
+                let sessionData: WatchSessionRecordedData = {
+                    SessionId = "test-session"
+                    Date = "2025-01-15"
+                    Duration = None
+                    FriendSlugs = []
+                }
                 let commands = [
                     Add_movie_to_library sampleMovieData
                     Remove_movie_from_library
@@ -192,6 +363,10 @@ let catalogTests =
                     Remove_recommendation "marco"
                     Add_want_to_watch_with "sarah"
                     Remove_from_want_to_watch_with "sarah"
+                    Record_watch_session sessionData
+                    Change_watch_session_date ("test-session", "2025-02-20")
+                    Add_friend_to_watch_session ("test-session", "marco")
+                    Remove_friend_from_watch_session ("test-session", "marco")
                 ]
                 for cmd in commands do
                     let result = givenWhenThen removedEvents cmd
@@ -227,6 +402,46 @@ let catalogTests =
 
             testCase "Want_to_watch_with round-trip" <| fun _ ->
                 let event = Want_to_watch_with "sarah"
+                let eventType, data = Serialization.serialize event
+                let deserialized = Serialization.deserialize eventType data
+                Expect.equal deserialized (Some event) "Should round-trip"
+
+            testCase "Watch_session_recorded round-trip" <| fun _ ->
+                let event = Watch_session_recorded {
+                    SessionId = "abc123"
+                    Date = "2025-01-15"
+                    Duration = Some 136
+                    FriendSlugs = [ "marco"; "sarah" ]
+                }
+                let eventType, data = Serialization.serialize event
+                let deserialized = Serialization.deserialize eventType data
+                Expect.equal deserialized (Some event) "Should round-trip"
+
+            testCase "Watch_session_recorded with no duration round-trip" <| fun _ ->
+                let event = Watch_session_recorded {
+                    SessionId = "abc123"
+                    Date = "2025-01-15"
+                    Duration = None
+                    FriendSlugs = []
+                }
+                let eventType, data = Serialization.serialize event
+                let deserialized = Serialization.deserialize eventType data
+                Expect.equal deserialized (Some event) "Should round-trip"
+
+            testCase "Watch_session_date_changed round-trip" <| fun _ ->
+                let event = Watch_session_date_changed ("session1", "2025-02-20")
+                let eventType, data = Serialization.serialize event
+                let deserialized = Serialization.deserialize eventType data
+                Expect.equal deserialized (Some event) "Should round-trip"
+
+            testCase "Friend_added_to_watch_session round-trip" <| fun _ ->
+                let event = Friend_added_to_watch_session ("session1", "marco")
+                let eventType, data = Serialization.serialize event
+                let deserialized = Serialization.deserialize eventType data
+                Expect.equal deserialized (Some event) "Should round-trip"
+
+            testCase "Friend_removed_from_watch_session round-trip" <| fun _ ->
+                let event = Friend_removed_from_watch_session ("session1", "marco")
                 let eventType, data = Serialization.serialize event
                 let deserialized = Serialization.deserialize eventType data
                 Expect.equal deserialized (Some event) "Should round-trip"

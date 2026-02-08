@@ -38,6 +38,67 @@ type FriendRef = {
     Name: string
 }
 
+type FriendListItem = {
+    Slug: string
+    Name: string
+    ImageRef: string option
+}
+
+type FriendDetail = {
+    Slug: string
+    Name: string
+    ImageRef: string option
+}
+
+// Watch Sessions
+
+type WatchSessionDto = {
+    SessionId: string
+    Date: string
+    Duration: int option
+    Friends: FriendRef list
+}
+
+type RecordWatchSessionRequest = {
+    Date: string
+    Duration: int option
+    FriendSlugs: string list
+}
+
+// Content Blocks
+
+type ContentBlockType =
+    | TextBlock
+    | ImageBlock
+    | LinkBlock
+
+type ContentBlockDto = {
+    BlockId: string
+    BlockType: string
+    Content: string
+    ImageRef: string option
+    Url: string option
+    Caption: string option
+    Position: int
+}
+
+type AddContentBlockRequest = {
+    BlockType: string
+    Content: string
+    ImageRef: string option
+    Url: string option
+    Caption: string option
+}
+
+type UpdateContentBlockRequest = {
+    Content: string
+    ImageRef: string option
+    Url: string option
+    Caption: string option
+}
+
+// Movie DTOs (after WatchSession and ContentBlock since they reference those types)
+
 type MovieListItem = {
     Slug: string
     Name: string
@@ -61,18 +122,8 @@ type MovieDetail = {
     Cast: CastMemberDto list
     RecommendedBy: FriendRef list
     WantToWatchWith: FriendRef list
-}
-
-type FriendListItem = {
-    Slug: string
-    Name: string
-    ImageRef: string option
-}
-
-type FriendDetail = {
-    Slug: string
-    Name: string
-    ImageRef: string option
+    WatchSessions: WatchSessionDto list
+    ContentBlocks: ContentBlockDto list
 }
 
 module Route =
@@ -98,6 +149,20 @@ type IMediathecaApi = {
     removeFriend: string -> Async<Result<unit, string>>
     getFriend: string -> Async<FriendDetail option>
     getFriends: unit -> Async<FriendListItem list>
+    // Watch Sessions
+    recordWatchSession: string -> RecordWatchSessionRequest -> Async<Result<string, string>>
+    updateWatchSessionDate: string -> string -> string -> Async<Result<unit, string>>
+    addFriendToWatchSession: string -> string -> string -> Async<Result<unit, string>>
+    removeFriendFromWatchSession: string -> string -> string -> Async<Result<unit, string>>
+    getWatchSessions: string -> Async<WatchSessionDto list>
+    // Content Blocks
+    addContentBlock: string -> string option -> AddContentBlockRequest -> Async<Result<string, string>>
+    updateContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
+    removeContentBlock: string -> string -> Async<Result<unit, string>>
+    reorderContentBlocks: string -> string option -> string list -> Async<Result<unit, string>>
+    getContentBlocks: string -> string option -> Async<ContentBlockDto list>
+    uploadContentImage: byte array -> string -> Async<Result<string, string>>
+    // Settings
     getTmdbApiKey: unit -> Async<string>
     setTmdbApiKey: string -> Async<Result<unit, string>>
     testTmdbApiKey: string -> Async<Result<unit, string>>

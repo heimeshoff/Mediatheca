@@ -10,6 +10,8 @@ let init (slug: string) : Model * Cmd<Msg> =
       AllFriends = []
       IsLoading = true
       ShowFriendPicker = None
+      ShowRecordSession = false
+      SessionForm = { Date = ""; Duration = ""; SelectedFriends = Set.empty }
       Error = None },
     Cmd.batch [
         Cmd.ofMsg (Load_movie slug)
@@ -68,3 +70,73 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Close_friend_picker ->
         { model with ShowFriendPicker = None }, Cmd.none
+
+    | Open_record_session ->
+        let today = System.DateTime.Now.ToString("yyyy-MM-dd")
+        { model with
+            ShowRecordSession = true
+            SessionForm = { Date = today; Duration = ""; SelectedFriends = Set.empty } }, Cmd.none
+
+    | Close_record_session ->
+        { model with ShowRecordSession = false }, Cmd.none
+
+    | Session_date_changed d ->
+        { model with SessionForm = { model.SessionForm with Date = d } }, Cmd.none
+
+    | Session_duration_changed d ->
+        { model with SessionForm = { model.SessionForm with Duration = d } }, Cmd.none
+
+    | Toggle_session_friend slug ->
+        let friends =
+            if model.SessionForm.SelectedFriends.Contains slug then
+                model.SessionForm.SelectedFriends.Remove slug
+            else
+                model.SessionForm.SelectedFriends.Add slug
+        { model with SessionForm = { model.SessionForm with SelectedFriends = friends } }, Cmd.none
+
+    | Submit_record_session ->
+        let duration =
+            match System.Int32.TryParse model.SessionForm.Duration with
+            | true, v when v > 0 -> Some v
+            | _ -> None
+        let request: RecordWatchSessionRequest = {
+            Date = model.SessionForm.Date
+            Duration = duration
+            FriendSlugs = model.SessionForm.SelectedFriends |> Set.toList
+        }
+        model,
+        Cmd.OfAsync.perform (fun () -> api.recordWatchSession model.Slug request) () Session_recorded
+
+    | Session_recorded (Ok _) ->
+        { model with ShowRecordSession = false },
+        Cmd.OfAsync.perform api.getMovie model.Slug Movie_loaded
+
+    | Session_recorded (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Add_content_block request ->
+        model,
+        Cmd.OfAsync.perform
+            (fun () -> api.addContentBlock model.Slug None request)
+            ()
+            (fun result -> Content_block_result (result |> Result.map ignore))
+
+    | Update_content_block (blockId, request) ->
+        model,
+        Cmd.OfAsync.perform
+            (fun () -> api.updateContentBlock model.Slug blockId request)
+            ()
+            Content_block_result
+
+    | Remove_content_block blockId ->
+        model,
+        Cmd.OfAsync.perform
+            (fun () -> api.removeContentBlock model.Slug blockId)
+            ()
+            Content_block_result
+
+    | Content_block_result (Ok _) ->
+        model, Cmd.OfAsync.perform api.getMovie model.Slug Movie_loaded
+
+    | Content_block_result (Error err) ->
+        { model with Error = Some err }, Cmd.none

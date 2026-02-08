@@ -33,6 +33,15 @@ module MovieProjection =
                 recommended_by     TEXT NOT NULL DEFAULT '[]',
                 want_to_watch_with TEXT NOT NULL DEFAULT '[]'
             );
+
+            CREATE TABLE IF NOT EXISTS watch_sessions (
+                session_id    TEXT NOT NULL,
+                movie_slug    TEXT NOT NULL,
+                date          TEXT NOT NULL,
+                duration      INTEGER,
+                friends       TEXT NOT NULL DEFAULT '[]',
+                PRIMARY KEY (session_id, movie_slug)
+            );
         """
         |> Db.exec
 
@@ -41,6 +50,7 @@ module MovieProjection =
         |> Db.newCommand """
             DROP TABLE IF EXISTS movie_list;
             DROP TABLE IF EXISTS movie_detail;
+            DROP TABLE IF EXISTS watch_sessions;
         """
         |> Db.exec
 
@@ -193,6 +203,74 @@ module MovieProjection =
                     |> Db.setParams [ "slug", SqlType.String slug; "want_to_watch_with", SqlType.String updatedJson ]
                     |> Db.exec
 
+                | Movies.Watch_session_recorded data ->
+                    let friendsJson = data.FriendSlugs |> List.map Encode.string |> Encode.list |> Encode.toString 0
+                    conn
+                    |> Db.newCommand """
+                        INSERT OR REPLACE INTO watch_sessions (session_id, movie_slug, date, duration, friends)
+                        VALUES (@session_id, @movie_slug, @date, @duration, @friends)
+                    """
+                    |> Db.setParams [
+                        "session_id", SqlType.String data.SessionId
+                        "movie_slug", SqlType.String slug
+                        "date", SqlType.String data.Date
+                        "duration", match data.Duration with Some d -> SqlType.Int32 d | None -> SqlType.Null
+                        "friends", SqlType.String friendsJson
+                    ]
+                    |> Db.exec
+
+                | Movies.Watch_session_date_changed (sessionId, date) ->
+                    conn
+                    |> Db.newCommand "UPDATE watch_sessions SET date = @date WHERE session_id = @session_id AND movie_slug = @movie_slug"
+                    |> Db.setParams [
+                        "session_id", SqlType.String sessionId
+                        "movie_slug", SqlType.String slug
+                        "date", SqlType.String date
+                    ]
+                    |> Db.exec
+
+                | Movies.Friend_added_to_watch_session (sessionId, friendSlug) ->
+                    let currentJson =
+                        conn
+                        |> Db.newCommand "SELECT friends FROM watch_sessions WHERE session_id = @session_id AND movie_slug = @movie_slug"
+                        |> Db.setParams [ "session_id", SqlType.String sessionId; "movie_slug", SqlType.String slug ]
+                        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "friends")
+                        |> Option.defaultValue "[]"
+                    let current =
+                        Decode.fromString (Decode.list Decode.string) currentJson
+                        |> Result.defaultValue []
+                    let updated = current @ [ friendSlug ] |> List.distinct
+                    let updatedJson = updated |> List.map Encode.string |> Encode.list |> Encode.toString 0
+                    conn
+                    |> Db.newCommand "UPDATE watch_sessions SET friends = @friends WHERE session_id = @session_id AND movie_slug = @movie_slug"
+                    |> Db.setParams [
+                        "session_id", SqlType.String sessionId
+                        "movie_slug", SqlType.String slug
+                        "friends", SqlType.String updatedJson
+                    ]
+                    |> Db.exec
+
+                | Movies.Friend_removed_from_watch_session (sessionId, friendSlug) ->
+                    let currentJson =
+                        conn
+                        |> Db.newCommand "SELECT friends FROM watch_sessions WHERE session_id = @session_id AND movie_slug = @movie_slug"
+                        |> Db.setParams [ "session_id", SqlType.String sessionId; "movie_slug", SqlType.String slug ]
+                        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "friends")
+                        |> Option.defaultValue "[]"
+                    let current =
+                        Decode.fromString (Decode.list Decode.string) currentJson
+                        |> Result.defaultValue []
+                    let updated = current |> List.filter (fun s -> s <> friendSlug)
+                    let updatedJson = updated |> List.map Encode.string |> Encode.list |> Encode.toString 0
+                    conn
+                    |> Db.newCommand "UPDATE watch_sessions SET friends = @friends WHERE session_id = @session_id AND movie_slug = @movie_slug"
+                    |> Db.setParams [
+                        "session_id", SqlType.String sessionId
+                        "movie_slug", SqlType.String slug
+                        "friends", SqlType.String updatedJson
+                    ]
+                    |> Db.exec
+
     let handler: Projection.ProjectionHandler = {
         Name = "MovieProjection"
         Handle = handleEvent
@@ -220,6 +298,23 @@ module MovieProjection =
               TmdbRating =
                 if rd.IsDBNull(rd.GetOrdinal("tmdb_rating")) then None
                 else Some (rd.ReadDouble "tmdb_rating") }
+        )
+
+    let getWatchSessions (conn: SqliteConnection) (movieSlug: string) : Mediatheca.Shared.WatchSessionDto list =
+        conn
+        |> Db.newCommand "SELECT session_id, date, duration, friends FROM watch_sessions WHERE movie_slug = @slug ORDER BY date DESC"
+        |> Db.setParams [ "slug", SqlType.String movieSlug ]
+        |> Db.query (fun (rd: IDataReader) ->
+            let friendsJson = rd.ReadString "friends"
+            let friendSlugs =
+                Decode.fromString (Decode.list Decode.string) friendsJson
+                |> Result.defaultValue []
+            { Mediatheca.Shared.WatchSessionDto.SessionId = rd.ReadString "session_id"
+              Date = rd.ReadString "date"
+              Duration =
+                if rd.IsDBNull(rd.GetOrdinal("duration")) then None
+                else Some (rd.ReadInt32 "duration")
+              Friends = friendSlugs |> List.map (fun s -> { Mediatheca.Shared.FriendRef.Slug = s; Name = s }) }
         )
 
     let getBySlug (conn: SqliteConnection) (slug: string) : Mediatheca.Shared.MovieDetail option =
@@ -261,5 +356,7 @@ module MovieProjection =
                 else Some (rd.ReadDouble "tmdb_rating")
               Cast = cast
               RecommendedBy = recommendedBySlugs |> List.map (fun s -> { Mediatheca.Shared.FriendRef.Slug = s; Name = s })
-              WantToWatchWith = wantToWatchWithSlugs |> List.map (fun s -> { Mediatheca.Shared.FriendRef.Slug = s; Name = s }) }
+              WantToWatchWith = wantToWatchWithSlugs |> List.map (fun s -> { Mediatheca.Shared.FriendRef.Slug = s; Name = s })
+              WatchSessions = getWatchSessions conn slug
+              ContentBlocks = ContentBlockProjection.getForMovieDetail conn slug }
         )

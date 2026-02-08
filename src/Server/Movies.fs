@@ -18,6 +18,13 @@ module Movies =
         TmdbRating: float option
     }
 
+    type WatchSessionRecordedData = {
+        SessionId: string
+        Date: string
+        Duration: int option
+        FriendSlugs: string list
+    }
+
     // Events
 
     type MovieEvent =
@@ -30,8 +37,18 @@ module Movies =
         | Recommendation_removed of friendSlug: string
         | Want_to_watch_with of friendSlug: string
         | Removed_want_to_watch_with of friendSlug: string
+        | Watch_session_recorded of WatchSessionRecordedData
+        | Watch_session_date_changed of sessionId: string * date: string
+        | Friend_added_to_watch_session of sessionId: string * friendSlug: string
+        | Friend_removed_from_watch_session of sessionId: string * friendSlug: string
 
     // State
+
+    type WatchSessionState = {
+        Date: string
+        Duration: int option
+        Friends: Set<string>
+    }
 
     type ActiveMovie = {
         Name: string
@@ -45,6 +62,7 @@ module Movies =
         TmdbRating: float option
         RecommendedBy: Set<string>
         Want_to_watch_with: Set<string>
+        WatchSessions: Map<string, WatchSessionState>
     }
 
     type MovieState =
@@ -64,6 +82,10 @@ module Movies =
         | Remove_recommendation of friendSlug: string
         | Add_want_to_watch_with of friendSlug: string
         | Remove_from_want_to_watch_with of friendSlug: string
+        | Record_watch_session of WatchSessionRecordedData
+        | Change_watch_session_date of sessionId: string * date: string
+        | Add_friend_to_watch_session of sessionId: string * friendSlug: string
+        | Remove_friend_from_watch_session of sessionId: string * friendSlug: string
 
     // Evolve
 
@@ -82,6 +104,7 @@ module Movies =
                 TmdbRating = data.TmdbRating
                 RecommendedBy = Set.empty
                 Want_to_watch_with = Set.empty
+                WatchSessions = Map.empty
             }
         | Active _, Movie_removed_from_library -> Removed
         | Active movie, Movie_categorized genres ->
@@ -98,6 +121,38 @@ module Movies =
             Active { movie with Want_to_watch_with = movie.Want_to_watch_with |> Set.add friendSlug }
         | Active movie, Removed_want_to_watch_with friendSlug ->
             Active { movie with Want_to_watch_with = movie.Want_to_watch_with |> Set.remove friendSlug }
+        | Active movie, Watch_session_recorded data ->
+            let session = {
+                Date = data.Date
+                Duration = data.Duration
+                Friends = data.FriendSlugs |> Set.ofList
+            }
+            let updatedWantToWatch =
+                data.FriendSlugs |> List.fold (fun acc slug -> acc |> Set.remove slug) movie.Want_to_watch_with
+            Active {
+                movie with
+                    WatchSessions = movie.WatchSessions |> Map.add data.SessionId session
+                    Want_to_watch_with = updatedWantToWatch
+            }
+        | Active movie, Watch_session_date_changed (sessionId, date) ->
+            match movie.WatchSessions |> Map.tryFind sessionId with
+            | Some session ->
+                Active { movie with WatchSessions = movie.WatchSessions |> Map.add sessionId { session with Date = date } }
+            | None -> state
+        | Active movie, Friend_added_to_watch_session (sessionId, friendSlug) ->
+            match movie.WatchSessions |> Map.tryFind sessionId with
+            | Some session ->
+                Active {
+                    movie with
+                        WatchSessions = movie.WatchSessions |> Map.add sessionId { session with Friends = session.Friends |> Set.add friendSlug }
+                        Want_to_watch_with = movie.Want_to_watch_with |> Set.remove friendSlug
+                }
+            | None -> state
+        | Active movie, Friend_removed_from_watch_session (sessionId, friendSlug) ->
+            match movie.WatchSessions |> Map.tryFind sessionId with
+            | Some session ->
+                Active { movie with WatchSessions = movie.WatchSessions |> Map.add sessionId { session with Friends = session.Friends |> Set.remove friendSlug } }
+            | None -> state
         | _ -> state
 
     let reconstitute (events: MovieEvent list) : MovieState =
@@ -136,6 +191,28 @@ module Movies =
             if movie.Want_to_watch_with |> Set.contains friendSlug then
                 Ok [ Removed_want_to_watch_with friendSlug ]
             else Ok []
+        | Active movie, Record_watch_session data ->
+            if movie.WatchSessions |> Map.containsKey data.SessionId then
+                Error "Watch session already exists"
+            else
+                Ok [ Watch_session_recorded data ]
+        | Active movie, Change_watch_session_date (sessionId, date) ->
+            match movie.WatchSessions |> Map.tryFind sessionId with
+            | Some _ -> Ok [ Watch_session_date_changed (sessionId, date) ]
+            | None -> Error "Watch session does not exist"
+        | Active movie, Add_friend_to_watch_session (sessionId, friendSlug) ->
+            match movie.WatchSessions |> Map.tryFind sessionId with
+            | Some session ->
+                if session.Friends |> Set.contains friendSlug then Ok []
+                else Ok [ Friend_added_to_watch_session (sessionId, friendSlug) ]
+            | None -> Error "Watch session does not exist"
+        | Active movie, Remove_friend_from_watch_session (sessionId, friendSlug) ->
+            match movie.WatchSessions |> Map.tryFind sessionId with
+            | Some session ->
+                if session.Friends |> Set.contains friendSlug then
+                    Ok [ Friend_removed_from_watch_session (sessionId, friendSlug) ]
+                else Ok []
+            | None -> Error "Watch session does not exist"
         | Removed, _ ->
             Error "Movie has been removed"
         | Not_created, _ ->
@@ -175,6 +252,22 @@ module Movies =
                 TmdbRating = get.Optional.Field "tmdbRating" Decode.float
             })
 
+        let private encodeWatchSessionRecordedData (data: WatchSessionRecordedData) =
+            Encode.object [
+                "sessionId", Encode.string data.SessionId
+                "date", Encode.string data.Date
+                "duration", Encode.option Encode.int data.Duration
+                "friendSlugs", data.FriendSlugs |> List.map Encode.string |> Encode.list
+            ]
+
+        let private decodeWatchSessionRecordedData: Decoder<WatchSessionRecordedData> =
+            Decode.object (fun get -> {
+                SessionId = get.Required.Field "sessionId" Decode.string
+                Date = get.Required.Field "date" Decode.string
+                Duration = get.Optional.Field "duration" Decode.int
+                FriendSlugs = get.Required.Field "friendSlugs" (Decode.list Decode.string)
+            })
+
         let serialize (event: MovieEvent) : string * string =
             match event with
             | Movie_added_to_library data ->
@@ -195,6 +288,14 @@ module Movies =
                 "Want_to_watch_with", Encode.toString 0 (Encode.object [ "friendSlug", Encode.string friendSlug ])
             | Removed_want_to_watch_with friendSlug ->
                 "Removed_want_to_watch_with", Encode.toString 0 (Encode.object [ "friendSlug", Encode.string friendSlug ])
+            | Watch_session_recorded data ->
+                "Watch_session_recorded", Encode.toString 0 (encodeWatchSessionRecordedData data)
+            | Watch_session_date_changed (sessionId, date) ->
+                "Watch_session_date_changed", Encode.toString 0 (Encode.object [ "sessionId", Encode.string sessionId; "date", Encode.string date ])
+            | Friend_added_to_watch_session (sessionId, friendSlug) ->
+                "Friend_added_to_watch_session", Encode.toString 0 (Encode.object [ "sessionId", Encode.string sessionId; "friendSlug", Encode.string friendSlug ])
+            | Friend_removed_from_watch_session (sessionId, friendSlug) ->
+                "Friend_removed_from_watch_session", Encode.toString 0 (Encode.object [ "sessionId", Encode.string sessionId; "friendSlug", Encode.string friendSlug ])
 
         let deserialize (eventType: string) (data: string) : MovieEvent option =
             match eventType with
@@ -232,6 +333,28 @@ module Movies =
                 Decode.fromString (Decode.field "friendSlug" Decode.string) data
                 |> Result.toOption
                 |> Option.map Removed_want_to_watch_with
+            | "Watch_session_recorded" ->
+                Decode.fromString decodeWatchSessionRecordedData data
+                |> Result.toOption
+                |> Option.map Watch_session_recorded
+            | "Watch_session_date_changed" ->
+                Decode.fromString (Decode.object (fun get ->
+                    get.Required.Field "sessionId" Decode.string,
+                    get.Required.Field "date" Decode.string)) data
+                |> Result.toOption
+                |> Option.map Watch_session_date_changed
+            | "Friend_added_to_watch_session" ->
+                Decode.fromString (Decode.object (fun get ->
+                    get.Required.Field "sessionId" Decode.string,
+                    get.Required.Field "friendSlug" Decode.string)) data
+                |> Result.toOption
+                |> Option.map Friend_added_to_watch_session
+            | "Friend_removed_from_watch_session" ->
+                Decode.fromString (Decode.object (fun get ->
+                    get.Required.Field "sessionId" Decode.string,
+                    get.Required.Field "friendSlug" Decode.string)) data
+                |> Result.toOption
+                |> Option.map Friend_removed_from_watch_session
             | _ -> None
 
         let toEventData (event: MovieEvent) : EventStore.EventData =

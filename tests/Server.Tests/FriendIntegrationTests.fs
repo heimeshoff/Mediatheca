@@ -9,6 +9,7 @@ let private createInMemoryConnection () =
     conn.Open()
     EventStore.initialize conn
     CastStore.initialize conn
+    ContentBlockProjection.handler.Init conn
     conn
 
 [<Tests>]

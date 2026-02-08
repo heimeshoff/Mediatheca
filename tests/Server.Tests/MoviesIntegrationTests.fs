@@ -9,6 +9,7 @@ let private createInMemoryConnection () =
     conn.Open()
     EventStore.initialize conn
     CastStore.initialize conn
+    ContentBlockProjection.handler.Init conn
     conn
 
 let private sampleMovieData: Movies.MovieAddedData = {
@@ -133,4 +134,39 @@ let catalogIntegrationTests =
             Expect.isSome detail "Should find movie detail"
             Expect.equal (detail.Value.RecommendedBy |> List.length) 1 "Should have 1 recommendation"
             Expect.equal detail.Value.RecommendedBy.[0].Slug "marco" "Should be recommended by marco"
+
+        testCase "watch session recorded updates read model" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let streamId = Movies.streamId "the-matrix-1999"
+
+            MovieProjection.handler.Init conn
+
+            let addEvent = Movies.Serialization.toEventData (Movies.Movie_added_to_library sampleMovieData)
+            EventStore.appendToStream conn streamId -1L [ addEvent ] |> ignore
+
+            let sessionId = System.Guid.NewGuid().ToString("N")
+            let sessionData: Movies.WatchSessionRecordedData = {
+                SessionId = sessionId
+                Date = "2025-01-15"
+                Duration = Some 136
+                FriendSlugs = [ "marco"; "sarah" ]
+            }
+            let sessionEvent = Movies.Serialization.toEventData (Movies.Watch_session_recorded sessionData)
+            EventStore.appendToStream conn streamId 0L [ sessionEvent ] |> ignore
+
+            Projection.runProjection conn MovieProjection.handler
+
+            let sessions = MovieProjection.getWatchSessions conn "the-matrix-1999"
+            Expect.equal (List.length sessions) 1 "Should have 1 watch session"
+            Expect.equal sessions.[0].SessionId sessionId "SessionId should match"
+            Expect.equal sessions.[0].Date "2025-01-15" "Date should match"
+            Expect.equal sessions.[0].Duration (Some 136) "Duration should match"
+            Expect.equal (sessions.[0].Friends |> List.length) 2 "Should have 2 friends"
+            Expect.equal sessions.[0].Friends.[0].Slug "marco" "First friend should be marco"
+            Expect.equal sessions.[0].Friends.[1].Slug "sarah" "Second friend should be sarah"
+
+            // Also verify getBySlug includes watch sessions
+            let detail = MovieProjection.getBySlug conn "the-matrix-1999"
+            Expect.isSome detail "Should find movie detail"
+            Expect.equal (detail.Value.WatchSessions |> List.length) 1 "Detail should include 1 watch session"
     ]

@@ -1,13 +1,20 @@
 # Current State
 
 **Last Updated:** 2026-02-08
-**Current Phase:** 2 (Movies + Friends) — Complete
-**Current Task:** Phase 2 fully implemented, ready for Phase 3
+**Current Phase:** 3 (Journal + Content Blocks) — Complete
+**Current Task:** Phase 3 fully implemented, ready for Phase 4
 
 ## Recent Progress
 
-- **2026-02-08**: Frontend visual refresh — sidebar with active indicator bar + gradient logo, movie cards with hover-lift animation + rating badge overlay + poster hover overlay, friend cards with ring-on-hover avatars, dashboard redesigned with hero gradient section + stat cards (movie/friend counts) + recent movies list, staggered fade-in animations on grids, gradient text on page headings, search icon in movies search bar, improved empty states with large icons.
-- **2026-02-08**: Renamed "Catalog" bounded context to "Movies". Renamed all DU cases (events, commands, messages, page routes) from PascalCase to Snake_case convention (e.g., `MovieRemovedFromLibrary` → `Movie_removed_from_library`). Updated serialization strings, test files, projections, and all client references. Note: existing `mediatheca.db` must be recreated due to serialization string changes.
+- **2026-02-08**: Phase 3 (Journal + Content Blocks) fully implemented — REQ-016 through REQ-021
+  - WatchSession events on Movie aggregate: Watch_session_recorded, Watch_session_date_changed, Friend_added_to_watch_session, Friend_removed_from_watch_session — with auto-removal of friends from "want to watch with" when session recorded
+  - ContentBlock system as separate aggregate (ContentBlocks-{movieSlug} stream): Content_block_added, Content_block_updated, Content_block_removed, Content_blocks_reordered — with session scoping via optional sessionId
+  - ContentBlockProjection with content_blocks table, movie/session indexes
+  - Watch history UI on movie detail page with session cards and "Record Session" modal (date picker, duration, friend multi-select)
+  - Content block editor component (Notes section) with inline add/edit/delete for text, image, and link blocks
+  - Image upload API for content block images stored at images/content/
+  - IMediathecaApi expanded to 32 endpoints (11 new: 5 watch session + 6 content block)
+  - 90 tests passing (33 new: 12 watch session domain, 5 watch session serialization, 1 watch session integration, 15 content block domain + serialization)
 
 ## Active Decisions
 
@@ -23,76 +30,73 @@
 - Movies are added exclusively via TMDB import; manual edits are fine-grained events (decided: 2026-02-01)
 - Cast is NOT event-sourced — stored in a relational table, shared across movies, garbage-collected on movie removal (decided: 2026-02-01)
 - Watch sessions are part of the Movie aggregate, not a separate aggregate (decided: 2026-02-01)
-- Watch sessions deferred to Phase 3; content blocks / commenting also Phase 3 (decided: 2026-02-01)
 - Rotten Tomatoes ratings deferred (no free API); TMDB rating only for now (decided: 2026-02-01)
-- "Want to watch with" is an additive list on Movie aggregate; friends auto-removed when watch session recorded in Phase 3 (decided: 2026-02-01)
+- "Want to watch with" is an additive list on Movie aggregate; friends auto-removed when watch session recorded (decided: 2026-02-01, implemented: 2026-02-08)
 - Decider pattern: pure `decide: State -> Command -> Result<Event list, string>`, `evolve`, `reconstitute` — no IO in domain (decided: 2026-02-01)
 - Slug strategy: `slugify(name)-year` for movies, `slugify(name)` for friends; numeric suffix for duplicates (decided: 2026-02-01)
 - API is a factory: `Api.create conn httpClient tmdbConfig imageBasePath projectionHandlers` returns `IMediathecaApi` (decided: 2026-02-01)
 - Feliz.DaisyUI 5.x API: `Daisy.button.button`, `Daisy.modal.dialog`, `Daisy.modalBox.div`, `modal.open'`, no `input.bordered` or `card.compact` (decided: 2026-02-01)
+- Content blocks are a separate aggregate per movie (stream: ContentBlocks-{slug}), not part of Movie aggregate — allows independent evolution (decided: 2026-02-08)
+- Content blocks support optional sessionId for session-scoped blocks vs movie-level notes (decided: 2026-02-08)
+- ContentBlockEditor uses React.useState hooks for local editing state, not Elmish — keeps main model clean (decided: 2026-02-08)
 
-## Domain Model — Phase 2 (Implemented)
+## Domain Model — Phase 3 (Implemented)
 
-### Movie Aggregate (Catalog context) — `src/Server/Catalog.fs`
+### Movie Aggregate (Movies context) — `src/Server/Movies.fs`
 
 Events:
-- `MovieAddedToLibrary` — fat event: name, year, runtime, overview, genres, posterRef, backdropRef, tmdbId, tmdbRating
-- `MovieRemovedFromLibrary` — triggers cast cleanup (delete orphaned cast members + their images)
-- `MovieCategorized` — genre override (idempotent: no event if genres unchanged)
-- `MoviePosterReplaced` — new posterRef
-- `MovieBackdropReplaced` — new backdropRef
-- `MovieRecommendedBy` — friendSlug (additive, idempotent)
-- `RecommendationRemoved` — friendSlug (no-op if not present)
-- `WantToWatchWith` — friendSlug (additive, idempotent)
-- `RemovedWantToWatchWith` — friendSlug (no-op if not present)
+- `Movie_added_to_library` — fat event: name, year, runtime, overview, genres, posterRef, backdropRef, tmdbId, tmdbRating
+- `Movie_removed_from_library` — triggers cast cleanup
+- `Movie_categorized` — genre override (idempotent)
+- `Movie_poster_replaced` — new posterRef
+- `Movie_backdrop_replaced` — new backdropRef
+- `Movie_recommended_by` — friendSlug (additive, idempotent)
+- `Recommendation_removed` — friendSlug
+- `Want_to_watch_with` — friendSlug (additive, idempotent)
+- `Removed_want_to_watch_with` — friendSlug
+- `Watch_session_recorded` — sessionId, date, duration?, friendSlugs (auto-removes friends from want_to_watch_with)
+- `Watch_session_date_changed` — sessionId, date
+- `Friend_added_to_watch_session` — sessionId, friendSlug (also removes from want_to_watch_with)
+- `Friend_removed_from_watch_session` — sessionId, friendSlug
 
-State: `NotCreated | Active of ActiveMovie | Removed`
+State: `Not_created | Active of ActiveMovie | Removed`
+ActiveMovie includes: WatchSessions: Map<string, WatchSessionState>
 
-Non-event-sourced:
-- Cast tables (`cast_members`, `movie_cast`) in `src/Server/CastStore.fs`
-- Orphaned cast members deleted along with their image files
+### ContentBlocks Aggregate — `src/Server/ContentBlocks.fs`
+
+Events:
+- `Content_block_added` — blockData, position, sessionId?
+- `Content_block_updated` — blockId, content, imageRef?, url?, caption?
+- `Content_block_removed` — blockId
+- `Content_blocks_reordered` — blockIds, sessionId?
+
+State: `ContentBlocksState` with `Blocks: Map<string, BlockState>`
+Stream: `ContentBlocks-{movieSlug}` (separate from Movie stream)
 
 ### Friend Aggregate (Friends context) — `src/Server/Friends.fs`
 
-Events:
-- `FriendAdded` — name, imageRef
-- `FriendUpdated` — name, imageRef
-- `FriendRemoved`
-
-State: `NotCreated | Active of ActiveFriend | Removed`
-
-### Phase 3 additions (planned, not implemented yet)
-- `WatchSessionRecorded` — date, list of FriendIds (part of Movie aggregate)
-- `WatchSessionDateChanged`
-- `FriendAddedToWatchSession`
-- `FriendRemovedFromWatchSession`
-- Auto-remove friends from "want to watch with" list when watch session recorded
+Events: Friend_added, Friend_updated, Friend_removed
+State: `Not_created | Active of ActiveFriend | Removed`
 
 ## Blockers
 
 - (none)
 
-## Recent Progress
+## Full Progress History
 
 - 2026-01-30 Brainstorm completed — PROJECT.md created with full vision
 - 2026-01-30 Requirements categorized (v1/v2), 4-phase roadmap approved
-- 2026-01-30 Added Audible as book integration source alongside Goodreads (REQ-121)
-- 2026-01-31 Updated REQUIREMENTS.md — marked Phase 1 completions (REQ-001..005, 007, 008 done)
-- 2026-01-31 REQ-006 completed — app shell with sidebar/bottom nav, routing, 5 pages + NotFound, dim theme
 - 2026-01-31 Phase 1 (Skeleton) complete — all 8 requirements done
-- 2026-02-01 Phase 2 domain modeling session — Movie aggregate, Friend aggregate, TMDB import, cast table, image storage, want-to-watch-with, recommended-by
 - 2026-02-01 Phase 2 implementation complete — all 8 requirements done (REQ-009 through REQ-015)
-  - Shared types: Slug module, DTOs, expanded IMediathecaApi (18 endpoints)
-  - Server: Catalog.fs, Friends.fs (pure decider pattern), Tmdb.fs, ImageStore.fs, CastStore.fs, MovieProjection.fs, FriendProjection.fs, Api.fs (factory), Program.fs (wiring)
-  - Client: Router with MovieList/MovieDetail/FriendList/FriendDetail, TmdbSearchModal, movie/friend list+detail pages, Sidebar/BottomNav active-page matching
-  - Tests: 57 passing (9 slug, 22 catalog domain, 9 friends domain, 8 serialization, 5 catalog integration, 4 friend integration)
-  - Config: Vite /images proxy, Dockerfile image volume + TMDB_API_KEY
+- 2026-02-08 Frontend visual refresh, Movies rename, snake_case convention
+- 2026-02-08 Phase 3 implementation complete — all 6 requirements done (REQ-016 through REQ-021)
 
 ## Next Actions
 
-1. REQ-016: WatchSession events on Movie aggregate — define event types, command handlers
-2. REQ-017: Watch history view on movie detail page
-3. REQ-018: Content block system (TextBlock, ImageBlock, LinkBlock) — domain model
-4. REQ-019: Content blocks attachable to watch sessions
-5. REQ-020: Image upload for content blocks
-6. REQ-021: Inline content block editor UI
+1. REQ-022: Collection aggregate with events — create, update, remove collections
+2. REQ-023: Add entries (movies) to collections with position and per-item notes
+3. REQ-024: Collection detail view showing entries in order with notes
+4. REQ-025: Collection list view
+5. REQ-026: Main Dashboard — recent activity, recently added movies, quick stats
+6. REQ-027: Movies Dashboard — movie-specific stats
+7. REQ-028: Event Store Browser — view and search events
