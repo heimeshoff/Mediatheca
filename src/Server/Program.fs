@@ -39,16 +39,28 @@ let main args =
     // Initialize CastStore tables
     CastStore.initialize conn
 
-    // TMDB config
-    let tmdbApiKey =
+    // Initialize SettingsStore
+    SettingsStore.initialize conn
+
+    // Seed TMDB API key from env var if DB has no value yet
+    let envTmdbKey =
         Environment.GetEnvironmentVariable("TMDB_API_KEY")
         |> Option.ofObj
-        |> Option.defaultValue ""
+    match envTmdbKey with
+    | Some key when key <> "" ->
+        match SettingsStore.getSetting conn "tmdb_api_key" with
+        | None -> SettingsStore.setSetting conn "tmdb_api_key" key
+        | Some _ -> ()
+    | _ -> ()
 
-    let tmdbConfig: Tmdb.TmdbConfig = {
-        ApiKey = tmdbApiKey
-        ImageBaseUrl = "https://image.tmdb.org/t/p/"
-    }
+    // Dynamic TMDB config provider (reads from DB, falls back to env var)
+    let getTmdbConfig () : Tmdb.TmdbConfig =
+        let apiKey =
+            SettingsStore.getSetting conn "tmdb_api_key"
+            |> Option.orElse envTmdbKey
+            |> Option.defaultValue ""
+        { ApiKey = apiKey
+          ImageBaseUrl = "https://image.tmdb.org/t/p/" }
 
     let httpClient = new HttpClient()
 
@@ -67,7 +79,7 @@ let main args =
     Projection.startAllProjections conn projectionHandlers
 
     // Create API
-    let api = Api.create conn httpClient tmdbConfig imageBasePath projectionHandlers
+    let api = Api.create conn httpClient getTmdbConfig imageBasePath projectionHandlers
 
     let webApp =
         Remoting.createApi ()

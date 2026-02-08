@@ -98,4 +98,7 @@ type IMediathecaApi = {
     removeFriend: string -> Async<Result<unit, string>>
     getFriend: string -> Async<FriendDetail option>
     getFriends: unit -> Async<FriendListItem list>
+    getTmdbApiKey: unit -> Async<string>
+    setTmdbApiKey: string -> Async<Result<unit, string>>
+    testTmdbApiKey: string -> Async<Result<unit, string>>
 }

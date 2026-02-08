@@ -53,6 +53,10 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             let childModel, childCmd = Pages.FriendDetail.State.init slug
             { model with FriendDetailModel = childModel },
             Cmd.map Friend_detail_msg childCmd
+        | Settings ->
+            let childModel, childCmd = Pages.Settings.State.init ()
+            { model with SettingsModel = childModel },
+            Cmd.map Settings_msg childCmd
         | _ -> model, Cmd.none
 
     | Dashboard_msg childMsg ->
@@ -76,5 +80,5 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with FriendDetailModel = childModel }, Cmd.map Friend_detail_msg childCmd
 
     | Settings_msg childMsg ->
-        let childModel, childCmd = Pages.Settings.State.update childMsg model.SettingsModel
+        let childModel, childCmd = Pages.Settings.State.update api childMsg model.SettingsModel
         { model with SettingsModel = childModel }, Cmd.map Settings_msg childCmd

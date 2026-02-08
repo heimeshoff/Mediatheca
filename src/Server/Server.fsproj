@@ -12,6 +12,7 @@
     <Compile Include="Tmdb.fs" />
     <Compile Include="ImageStore.fs" />
     <Compile Include="CastStore.fs" />
+    <Compile Include="SettingsStore.fs" />
     <Compile Include="MovieProjection.fs" />
     <Compile Include="FriendProjection.fs" />
     <Compile Include="Api.fs" />

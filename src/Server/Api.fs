@@ -52,7 +52,7 @@ module Api =
     let create
         (conn: SqliteConnection)
         (httpClient: HttpClient)
-        (tmdbConfig: Tmdb.TmdbConfig)
+        (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
         : IMediathecaApi =
@@ -64,12 +64,13 @@ module Api =
             healthCheck = fun () -> async { return "Mediatheca is running" }
 
             searchTmdb = fun query -> async {
-                return! Tmdb.searchMovies httpClient tmdbConfig query
+                return! Tmdb.searchMovies httpClient (getTmdbConfig()) query
             }
 
             addMovie = fun tmdbId -> async {
                 try
                     // 1. Fetch TMDB details + credits
+                    let tmdbConfig = getTmdbConfig()
                     let! details = Tmdb.getMovieDetails httpClient tmdbConfig tmdbId
                     let! credits = Tmdb.getMovieCredits httpClient tmdbConfig tmdbId
 
@@ -329,5 +330,37 @@ module Api =
 
             getFriends = fun () -> async {
                 return FriendProjection.getAll conn
+            }
+
+            getTmdbApiKey = fun () -> async {
+                let key =
+                    SettingsStore.getSetting conn "tmdb_api_key"
+                    |> Option.defaultValue ""
+                if key.Length > 4 then
+                    return sprintf "****%s" (key.Substring(key.Length - 4))
+                elif key.Length > 0 then
+                    return "****"
+                else
+                    return ""
+            }
+
+            setTmdbApiKey = fun key -> async {
+                try
+                    SettingsStore.setSetting conn "tmdb_api_key" key
+                    return Ok ()
+                with ex ->
+                    return Error $"Failed to save API key: {ex.Message}"
+            }
+
+            testTmdbApiKey = fun key -> async {
+                try
+                    let testConfig: Tmdb.TmdbConfig = {
+                        ApiKey = key
+                        ImageBaseUrl = "https://image.tmdb.org/t/p/"
+                    }
+                    let! results = Tmdb.searchMovies httpClient testConfig "test"
+                    return Ok ()
+                with ex ->
+                    return Error $"TMDB API key validation failed: {ex.Message}"
             }
         }
