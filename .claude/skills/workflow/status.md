@@ -102,11 +102,39 @@ If all next actions are tightly coupled (modifying the same aggregate, same file
 
 ## Step 4: Verify in Parallel
 
-After implementation work completes (whether parallel or sequential), run verification agents concurrently:
+After implementation work completes (whether parallel or sequential), run verification agents concurrently.
 
-1. Launch in parallel using Task agents (`subagent_type: "Bash"`):
-   - **Build agent**: `npm run build` — catches Fable compilation and type errors
-   - **Test agent**: `npm test` — runs Expecto test suite
-2. If either fails, fix the issues before proceeding
-3. Once both pass, update `.planning/STATE.md` to reflect completed work
-4. Commit the changes
+**CRITICAL GUARD: NEVER update `.planning/STATE.md`, mark requirements as complete in `REQUIREMENTS.md`, or commit changes until ALL verification steps pass. A failing build or test means the work is not done — regardless of how correct the code looks. If verification fails, fix the issue and re-run verification. Repeat until green.**
+
+### 4a: Build + Test (required)
+
+Launch in parallel using Task agents (`subagent_type: "Bash"`):
+- **Build agent**: `npm run build` — catches Fable compilation and type errors
+- **Test agent**: `npm test` — runs Expecto test suite
+
+If either fails, fix the issues and re-run both. Do not proceed to 4b or 4c until both pass.
+
+### 4b: Browser Smoke Test (optional, when Chrome DevTools MCP is available)
+
+If the Chrome DevTools MCP server is connected and the work involved UI changes, launch a browser smoke test agent:
+
+1. Ensure the dev server is running (`npm start` or `npm run dev:server` + `npm run dev:client`)
+2. Navigate to each page affected by the implementation
+3. Verify:
+   - The page renders without console errors
+   - Key UI elements are present and visible (use `read_page` or `find` to check for expected elements)
+   - New interactive elements respond to clicks (buttons open modals, forms accept input, etc.)
+   - No JavaScript exceptions in the browser console (`read_console_messages` filtered for errors)
+4. Report any visual or runtime issues found
+
+Skip this step if:
+- The Chrome DevTools MCP is not connected
+- The changes are server-only (domain model, projections, API) with no UI impact
+- The dev server is not running and starting it would be disruptive
+
+### 4c: Finalize
+
+Once all verification passes:
+1. Update `.planning/STATE.md` to reflect completed work
+2. Mark completed requirements in `.planning/REQUIREMENTS.md`
+3. Commit the changes with a descriptive message

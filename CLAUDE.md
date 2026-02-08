@@ -52,6 +52,10 @@ Personal media library app (movies, series, games, books) built with full-stack 
 - Single-user app — no authentication
 - Docker deployment on Linux; development on Windows
 
+## MCP Servers
+
+- **Chrome DevTools** (`chrome-devtools-mcp`): Browser automation for end-to-end smoke testing after UI changes. Configured in `.mcp.json`. Use during `/status` Step 4b to verify pages render correctly, check for console errors, and validate interactive elements. Requires Chrome to be running.
+
 ## Gotchas
 
 - F# `open Module.Foo` opens Foo's *contents* — use `open Module` to access `Foo.bar`. Sibling modules in the same namespace are accessible by name without `open`.
