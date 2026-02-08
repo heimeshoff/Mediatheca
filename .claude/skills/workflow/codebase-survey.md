@@ -79,4 +79,4 @@ After all 4 agents complete, synthesize their results into a single **Codebase S
 - [API methods without UI, or UI without API backing]
 ```
 
-Present this snapshot to the user. Do not write it to a file — it is ephemeral context for the current conversation.
+Write this snapshot to `.planning/ARCHITECTURE.md`, overwriting any previous version. Then present a brief summary to the user confirming the file was written and highlighting any notable changes from the previous snapshot (if one existed).
