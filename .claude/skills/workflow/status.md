@@ -116,21 +116,28 @@ If either fails, fix the issues and re-run both. Do not proceed to 4b or 4c unti
 
 ### 4b: Browser Smoke Test (optional, when Chrome DevTools MCP is available)
 
-If the Chrome DevTools MCP server is connected and the work involved UI changes, launch a browser smoke test agent:
+If the Chrome DevTools MCP server is connected and the work involved UI changes, run an automated browser smoke test. The dev server lifecycle is fully managed — no manual interaction required.
 
-1. Ensure the dev server is running (`npm start` or `npm run dev:server` + `npm run dev:client`)
-2. Navigate to each page affected by the implementation
-3. Verify:
+**Dev server lifecycle:**
+
+1. **Start**: Launch `npm start` as a background task using `Bash` with `run_in_background: true`. This starts both the server (port 5000) and client (port 5173) via concurrently.
+2. **Wait for ready**: Poll `http://localhost:5173` with `curl -s -o /dev/null -w "%{http_code}" http://localhost:5173` in a retry loop (up to 30 seconds, 2s intervals) until it returns 200.
+3. **Run smoke test** (see below).
+4. **Shutdown**: After the smoke test completes (pass or fail), stop the background task using `TaskStop` with the task ID from step 1. Then verify both ports are free: `lsof -ti:5000,5173` (Unix) or `netstat -ano | findstr ":5000 :5173"` (Windows) — kill any remaining processes if needed.
+
+**Smoke test checks:**
+
+1. Navigate to each page affected by the implementation
+2. Verify:
    - The page renders without console errors
    - Key UI elements are present and visible (use `read_page` or `find` to check for expected elements)
    - New interactive elements respond to clicks (buttons open modals, forms accept input, etc.)
    - No JavaScript exceptions in the browser console (`read_console_messages` filtered for errors)
-4. Report any visual or runtime issues found
+3. Report any visual or runtime issues found
 
-Skip this step if:
+**Skip this step if:**
 - The Chrome DevTools MCP is not connected
 - The changes are server-only (domain model, projections, API) with no UI impact
-- The dev server is not running and starting it would be disruptive
 
 ### 4c: Finalize
 
