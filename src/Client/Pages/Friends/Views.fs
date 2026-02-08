@@ -19,7 +19,7 @@ let private friendCard (friend: Mediatheca.Shared.FriendListItem) =
                 prop.className "card-hover bg-base-100 shadow-md cursor-pointer"
                 prop.children [
                     Daisy.cardBody [
-                        prop.className "items-center text-center"
+                        prop.className "items-center text-center p-5"
                         prop.children [
                             Daisy.avatar [
                                 prop.children [
@@ -42,7 +42,7 @@ let private friendCard (friend: Mediatheca.Shared.FriendListItem) =
                                 ]
                             ]
                             Html.h3 [
-                                prop.className "card-title text-sm font-semibold mt-2"
+                                prop.className "card-title text-sm font-semibold mt-3"
                                 prop.text friend.Name
                             ]
                         ]

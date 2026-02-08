@@ -33,7 +33,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
         ]
     | false, Some friend ->
         Html.div [
-            prop.className "p-4 lg:p-6"
+            prop.className "p-4 lg:p-6 animate-fade-in"
             prop.children [
                 // Back button
                 Html.div [
@@ -51,15 +51,16 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     prop.className "bg-base-100 shadow-xl"
                     prop.children [
                         Daisy.cardBody [
+                            prop.className "p-8"
                             prop.children [
                                 if model.IsEditing then
                                     // Edit form
                                     Html.h2 [
-                                        prop.className "card-title font-display mb-4"
+                                        prop.className "card-title font-display mb-6"
                                         prop.text "Edit Friend"
                                     ]
                                     Html.div [
-                                        prop.className "form-control mb-4"
+                                        prop.className "form-control mb-6"
                                         prop.children [
                                             Html.label [
                                                 prop.className "label"
@@ -85,7 +86,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                         ]
                                     | None -> ()
                                     Html.div [
-                                        prop.className "flex gap-2"
+                                        prop.className "flex gap-3 pt-2"
                                         prop.children [
                                             Daisy.button.button [
                                                 button.primary
@@ -107,7 +108,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             Daisy.avatar [
                                                 prop.children [
                                                     Html.div [
-                                                        prop.className "w-24 h-24 rounded-full bg-base-300"
+                                                        prop.className "w-24 h-24 rounded-full bg-base-300 ring-2 ring-base-300"
                                                         prop.children [
                                                             match friend.ImageRef with
                                                             | Some ref ->
@@ -142,8 +143,12 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             prop.text err
                                         ]
                                     | None -> ()
+                                    // Divider + action buttons
+                                    Html.hr [
+                                        prop.className "border-base-300/50 my-6"
+                                    ]
                                     Html.div [
-                                        prop.className "flex gap-2 mt-6"
+                                        prop.className "flex gap-3"
                                         prop.children [
                                             Daisy.button.button [
                                                 button.primary
