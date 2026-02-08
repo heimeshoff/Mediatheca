@@ -61,6 +61,46 @@ module FriendProjection =
                     |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.exec
 
+                    // Scrub removed friend from movie_detail if the table exists
+                    let movieDetailExists =
+                        conn
+                        |> Db.newCommand "SELECT COUNT(*) as cnt FROM sqlite_master WHERE type='table' AND name='movie_detail'"
+                        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "cnt")
+                        |> Option.defaultValue 0
+
+                    if movieDetailExists > 0 then
+                        conn
+                        |> Db.newCommand """
+                            UPDATE movie_detail
+                            SET recommended_by = (
+                                SELECT json_group_array(j.value)
+                                FROM json_each(movie_detail.recommended_by) AS j
+                                WHERE j.value <> @slug
+                            )
+                            WHERE EXISTS (
+                                SELECT 1 FROM json_each(movie_detail.recommended_by) AS j
+                                WHERE j.value = @slug
+                            )
+                        """
+                        |> Db.setParams [ "slug", SqlType.String slug ]
+                        |> Db.exec
+
+                        conn
+                        |> Db.newCommand """
+                            UPDATE movie_detail
+                            SET want_to_watch_with = (
+                                SELECT json_group_array(j.value)
+                                FROM json_each(movie_detail.want_to_watch_with) AS j
+                                WHERE j.value <> @slug
+                            )
+                            WHERE EXISTS (
+                                SELECT 1 FROM json_each(movie_detail.want_to_watch_with) AS j
+                                WHERE j.value = @slug
+                            )
+                        """
+                        |> Db.setParams [ "slug", SqlType.String slug ]
+                        |> Db.exec
+
     let handler: Projection.ProjectionHandler = {
         Name = "FriendProjection"
         Handle = handleEvent

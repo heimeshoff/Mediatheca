@@ -8,6 +8,7 @@ let private createInMemoryConnection () =
     let conn = new SqliteConnection("Data Source=:memory:")
     conn.Open()
     EventStore.initialize conn
+    CastStore.initialize conn
     conn
 
 [<Tests>]
@@ -90,4 +91,44 @@ let friendIntegrationTests =
 
             let detail = FriendProjection.getBySlug conn "marco"
             Expect.isNone detail "Should not find removed friend"
+
+        testCase "friend removal cascades to movie projections" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let movieStreamId = Movies.streamId "the-matrix-1999"
+            let friendStreamId = Friends.streamId "marco"
+
+            MovieProjection.handler.Init conn
+            FriendProjection.handler.Init conn
+
+            // Add a movie
+            let movieData: Movies.MovieAddedData = {
+                Name = "The Matrix"; Year = 1999; Runtime = Some 136
+                Overview = "A computer hacker learns about the true nature of reality"
+                Genres = [ "Action"; "Sci-Fi" ]; PosterRef = None; BackdropRef = None
+                TmdbId = 603; TmdbRating = None
+            }
+            let addMovie = Movies.Serialization.toEventData (Movies.Movie_added_to_library movieData)
+            EventStore.appendToStream conn movieStreamId -1L [ addMovie ] |> ignore
+
+            // Recommend and want-to-watch-with "marco"
+            let recEvent = Movies.Serialization.toEventData (Movies.Movie_recommended_by "marco")
+            EventStore.appendToStream conn movieStreamId 0L [ recEvent ] |> ignore
+            let wtwEvent = Movies.Serialization.toEventData (Movies.Want_to_watch_with "marco")
+            EventStore.appendToStream conn movieStreamId 1L [ wtwEvent ] |> ignore
+
+            // Add then remove friend "marco"
+            let addFriend = Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None })
+            EventStore.appendToStream conn friendStreamId -1L [ addFriend ] |> ignore
+            let removeFriend = Friends.Serialization.toEventData Friends.Friend_removed
+            EventStore.appendToStream conn friendStreamId 0L [ removeFriend ] |> ignore
+
+            // Run both projections
+            Projection.runProjection conn MovieProjection.handler
+            Projection.runProjection conn FriendProjection.handler
+
+            // Movie detail should have empty friend lists
+            let detail = MovieProjection.getBySlug conn "the-matrix-1999"
+            Expect.isSome detail "Should find movie detail"
+            Expect.equal detail.Value.RecommendedBy [] "recommended_by should be empty after friend removal"
+            Expect.equal detail.Value.WantToWatchWith [] "want_to_watch_with should be empty after friend removal"
     ]
