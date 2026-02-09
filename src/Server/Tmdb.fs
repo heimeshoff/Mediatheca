@@ -102,6 +102,33 @@ module Tmdb =
             Cast = get.Required.Field "cast" (Decode.list decodeCastMember)
         })
 
+    // Search cache
+
+    module private SearchCache =
+        open System
+        open System.Collections.Concurrent
+
+        type CacheEntry = {
+            Results: Mediatheca.Shared.TmdbSearchResult list
+            ExpiresAt: DateTime
+        }
+
+        let private cache = ConcurrentDictionary<string, CacheEntry>()
+
+        let tryGet (query: string) : Mediatheca.Shared.TmdbSearchResult list option =
+            let key = query.ToLowerInvariant().Trim()
+            match cache.TryGetValue(key) with
+            | true, entry ->
+                if entry.ExpiresAt > DateTime.UtcNow then Some entry.Results
+                else
+                    cache.TryRemove(key) |> ignore
+                    None
+            | _ -> None
+
+        let set (query: string) (results: Mediatheca.Shared.TmdbSearchResult list) =
+            let key = query.ToLowerInvariant().Trim()
+            cache.[key] <- { Results = results; ExpiresAt = DateTime.UtcNow.AddHours(1.0) }
+
     // API functions
 
     let private fetchJson (httpClient: HttpClient) (url: string) : Async<string> =
@@ -124,19 +151,25 @@ module Tmdb =
 
     let searchMovies (httpClient: HttpClient) (config: TmdbConfig) (query: string) : Async<Mediatheca.Shared.TmdbSearchResult list> =
         async {
-            let url = $"https://api.themoviedb.org/3/search/movie?api_key={config.ApiKey}&query={System.Uri.EscapeDataString(query)}"
-            let! json = fetchJson httpClient url
-            match Decode.fromString decodeSearchResponse json with
-            | Ok response ->
-                return response.Results
-                |> List.map (fun r ->
-                    { Mediatheca.Shared.TmdbSearchResult.TmdbId = r.Id
-                      Title = r.Title
-                      Year = parseYear r.ReleaseDate
-                      Overview = r.Overview
-                      PosterPath = r.PosterPath }
-                )
-            | Error _ -> return []
+            match SearchCache.tryGet query with
+            | Some cached -> return cached
+            | None ->
+                let url = $"https://api.themoviedb.org/3/search/movie?api_key={config.ApiKey}&query={System.Uri.EscapeDataString(query)}"
+                let! json = fetchJson httpClient url
+                match Decode.fromString decodeSearchResponse json with
+                | Ok response ->
+                    let results : Mediatheca.Shared.TmdbSearchResult list =
+                        response.Results
+                        |> List.map (fun r ->
+                            { TmdbId = r.Id
+                              Title = r.Title
+                              Year = parseYear r.ReleaseDate
+                              Overview = r.Overview
+                              PosterPath = r.PosterPath }
+                        )
+                    SearchCache.set query results
+                    return results
+                | Error _ -> return []
         }
 
     let getMovieDetails (httpClient: HttpClient) (config: TmdbConfig) (tmdbId: int) : Async<TmdbMovieDetailsResponse> =

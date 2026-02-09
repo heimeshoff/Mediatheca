@@ -61,30 +61,14 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                 searchModel with
                     Query = q
                     SearchVersion = newVersion
-                    IsSearchingLocal = q <> ""
                     IsSearchingTmdb = q <> ""
-                    LocalResults = if q = "" then [] else searchModel.LocalResults
                     TmdbResults = if q = "" then [] else searchModel.TmdbResults
                     Error = None
             }
             let cmds =
                 if q = "" then Cmd.none
-                else
-                    Cmd.batch [
-                        debounceCmd 150 (Search_modal_msg (SearchModal.Debounce_local_expired newVersion))
-                        debounceCmd 500 (Search_modal_msg (SearchModal.Debounce_tmdb_expired newVersion))
-                    ]
+                else debounceCmd 300 (Search_modal_msg (SearchModal.Debounce_tmdb_expired newVersion))
             { model with SearchModal = Some updatedSearch }, cmds
-
-        | SearchModal.Debounce_local_expired version ->
-            if version <> searchModel.SearchVersion || searchModel.Query = "" then
-                model, Cmd.none
-            else
-                model,
-                Cmd.OfAsync.either
-                    api.searchLibrary searchModel.Query
-                    (fun results -> Search_modal_msg (SearchModal.Local_search_completed results))
-                    (fun ex -> Search_modal_msg (SearchModal.Local_search_failed ex.Message))
 
         | SearchModal.Debounce_tmdb_expired version ->
             if version <> searchModel.SearchVersion || searchModel.Query = "" then
@@ -95,12 +79,6 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                     api.searchTmdb searchModel.Query
                     (fun results -> Search_modal_msg (SearchModal.Tmdb_search_completed results))
                     (fun ex -> Search_modal_msg (SearchModal.Tmdb_search_failed ex.Message))
-
-        | SearchModal.Local_search_completed results ->
-            { model with SearchModal = Some { searchModel with LocalResults = results; IsSearchingLocal = false } }, Cmd.none
-
-        | SearchModal.Local_search_failed err ->
-            { model with SearchModal = Some { searchModel with IsSearchingLocal = false; Error = Some err } }, Cmd.none
 
         | SearchModal.Tmdb_search_completed results ->
             { model with SearchModal = Some { searchModel with TmdbResults = results; IsSearchingTmdb = false } }, Cmd.none
@@ -180,7 +158,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         | _ -> model, Cmd.none
 
     | Open_search_modal ->
-        { model with SearchModal = Some (SearchModal.init ()) }, Cmd.none
+        { model with SearchModal = Some (SearchModal.init model.MovieListModel.Movies) }, Cmd.none
 
     | Search_modal_msg childMsg ->
         updateSearchModal api childMsg model
@@ -192,7 +170,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Movie_list_msg childMsg ->
         match childMsg with
         | Pages.Movies.Types.Open_tmdb_search ->
-            { model with SearchModal = Some (SearchModal.init ()) }, Cmd.none
+            { model with SearchModal = Some (SearchModal.init model.MovieListModel.Movies) }, Cmd.none
         | _ ->
             let childModel, childCmd = Pages.Movies.State.update api childMsg model.MovieListModel
             { model with MovieListModel = childModel }, Cmd.map Movie_list_msg childCmd

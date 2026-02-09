@@ -7,9 +7,8 @@ open Mediatheca.Shared
 
 type Model = {
     Query: string
-    LocalResults: LibrarySearchResult list
+    LibraryMovies: MovieListItem list
     TmdbResults: TmdbSearchResult list
-    IsSearchingLocal: bool
     IsSearchingTmdb: bool
     IsImporting: bool
     Error: string option
@@ -18,10 +17,7 @@ type Model = {
 
 type Msg =
     | Query_changed of string
-    | Debounce_local_expired of version: int
     | Debounce_tmdb_expired of version: int
-    | Local_search_completed of LibrarySearchResult list
-    | Local_search_failed of string
     | Tmdb_search_completed of TmdbSearchResult list
     | Tmdb_search_failed of string
     | Import of tmdbId: int
@@ -29,18 +25,33 @@ type Msg =
     | Navigate_to of slug: string
     | Close
 
-let init () : Model = {
+let init (movies: MovieListItem list) : Model = {
     Query = ""
-    LocalResults = []
+    LibraryMovies = movies
     TmdbResults = []
-    IsSearchingLocal = false
     IsSearchingTmdb = false
     IsImporting = false
     Error = None
     SearchVersion = 0
 }
 
+let filterLibrary (query: string) (movies: MovieListItem list) : LibrarySearchResult list =
+    if query = "" then []
+    else
+        let q = query.ToLowerInvariant()
+        movies
+        |> List.filter (fun m -> m.Name.ToLowerInvariant().Contains(q))
+        |> List.truncate 10
+        |> List.map (fun m ->
+            { Slug = m.Slug
+              Name = m.Name
+              Year = m.Year
+              PosterRef = m.PosterRef
+              MediaType = MediaType.Movie })
+
 let view (model: Model) (dispatch: Msg -> unit) =
+    let localResults = filterLibrary model.Query model.LibraryMovies
+
     // Full-screen backdrop with blur
     Html.div [
         prop.className "fixed inset-0 z-50 flex justify-center items-start pt-[10vh]"
@@ -126,15 +137,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     prop.className "text-sm font-semibold text-base-content/60 uppercase tracking-wide mb-2"
                                                     prop.text "In Your Library"
                                                 ]
-                                                if model.IsSearchingLocal then
-                                                    Html.div [
-                                                        prop.className "flex items-center gap-2 py-3 text-base-content/40"
-                                                        prop.children [
-                                                            Daisy.loading [ loading.dots; loading.sm ]
-                                                            Html.span [ prop.text "Searching..." ]
-                                                        ]
-                                                    ]
-                                                elif List.isEmpty model.LocalResults then
+                                                if List.isEmpty localResults then
                                                     Html.p [
                                                         prop.className "text-sm text-base-content/40 py-2"
                                                         prop.text "No matches in your library."
@@ -143,7 +146,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     Html.div [
                                                         prop.className "space-y-1"
                                                         prop.children [
-                                                            for result in model.LocalResults do
+                                                            for result in localResults do
                                                                 Html.div [
                                                                     prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 cursor-pointer transition-colors"
                                                                     prop.onClick (fun _ -> dispatch (Navigate_to result.Slug))
