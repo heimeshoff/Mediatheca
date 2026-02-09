@@ -65,6 +65,10 @@ module Api =
         {
             healthCheck = fun () -> async { return "Mediatheca is running" }
 
+            searchLibrary = fun query -> async {
+                return MovieProjection.search conn query
+            }
+
             searchTmdb = fun query -> async {
                 return! Tmdb.searchMovies httpClient (getTmdbConfig()) query
             }

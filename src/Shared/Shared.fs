@@ -19,6 +19,18 @@ module Slug =
     let catalogSlug (name: string) =
         slugify name
 
+// Search
+
+type MediaType = Movie
+
+type LibrarySearchResult = {
+    Slug: string
+    Name: string
+    Year: int
+    PosterRef: string option
+    MediaType: MediaType
+}
+
 // DTOs
 
 type TmdbSearchResult = {
@@ -218,6 +230,7 @@ module Route =
 
 type IMediathecaApi = {
     healthCheck: unit -> Async<string>
+    searchLibrary: string -> Async<LibrarySearchResult list>
     searchTmdb: string -> Async<TmdbSearchResult list>
     addMovie: int -> Async<Result<string, string>>
     removeMovie: string -> Async<Result<unit, string>>

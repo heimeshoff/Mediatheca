@@ -4,6 +4,12 @@ open Elmish
 open Mediatheca.Shared
 open Mediatheca.Client.Router
 open Mediatheca.Client.Types
+open Mediatheca.Client.Components
+
+let private debounceCmd (ms: int) (msg: Msg) : Cmd<Msg> =
+    Cmd.ofEffect (fun dispatch ->
+        Fable.Core.JS.setTimeout (fun () -> dispatch msg) ms |> ignore
+    )
 
 let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
     let dashboardModel, dashboardCmd = Pages.Dashboard.State.init ()
@@ -27,6 +33,7 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
         CatalogDetailModel = catalogDetailModel
         EventBrowserModel = eventBrowserModel
         SettingsModel = settingsModel
+        SearchModal = None
     }
 
     let cmd = Cmd.batch [
@@ -39,6 +46,89 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
     ]
 
     model, cmd
+
+let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) (model: Model) : Model * Cmd<Msg> =
+    match model.SearchModal with
+    | None -> model, Cmd.none
+    | Some searchModel ->
+        match childMsg with
+        | SearchModal.Close ->
+            { model with SearchModal = None }, Cmd.none
+
+        | SearchModal.Query_changed q ->
+            let newVersion = searchModel.SearchVersion + 1
+            let updatedSearch = {
+                searchModel with
+                    Query = q
+                    SearchVersion = newVersion
+                    IsSearchingLocal = q <> ""
+                    IsSearchingTmdb = q <> ""
+                    LocalResults = if q = "" then [] else searchModel.LocalResults
+                    TmdbResults = if q = "" then [] else searchModel.TmdbResults
+                    Error = None
+            }
+            let cmds =
+                if q = "" then Cmd.none
+                else
+                    Cmd.batch [
+                        debounceCmd 150 (Search_modal_msg (SearchModal.Debounce_local_expired newVersion))
+                        debounceCmd 500 (Search_modal_msg (SearchModal.Debounce_tmdb_expired newVersion))
+                    ]
+            { model with SearchModal = Some updatedSearch }, cmds
+
+        | SearchModal.Debounce_local_expired version ->
+            if version <> searchModel.SearchVersion || searchModel.Query = "" then
+                model, Cmd.none
+            else
+                model,
+                Cmd.OfAsync.either
+                    api.searchLibrary searchModel.Query
+                    (fun results -> Search_modal_msg (SearchModal.Local_search_completed results))
+                    (fun ex -> Search_modal_msg (SearchModal.Local_search_failed ex.Message))
+
+        | SearchModal.Debounce_tmdb_expired version ->
+            if version <> searchModel.SearchVersion || searchModel.Query = "" then
+                model, Cmd.none
+            else
+                model,
+                Cmd.OfAsync.either
+                    api.searchTmdb searchModel.Query
+                    (fun results -> Search_modal_msg (SearchModal.Tmdb_search_completed results))
+                    (fun ex -> Search_modal_msg (SearchModal.Tmdb_search_failed ex.Message))
+
+        | SearchModal.Local_search_completed results ->
+            { model with SearchModal = Some { searchModel with LocalResults = results; IsSearchingLocal = false } }, Cmd.none
+
+        | SearchModal.Local_search_failed err ->
+            { model with SearchModal = Some { searchModel with IsSearchingLocal = false; Error = Some err } }, Cmd.none
+
+        | SearchModal.Tmdb_search_completed results ->
+            { model with SearchModal = Some { searchModel with TmdbResults = results; IsSearchingTmdb = false } }, Cmd.none
+
+        | SearchModal.Tmdb_search_failed err ->
+            { model with SearchModal = Some { searchModel with IsSearchingTmdb = false; Error = Some err } }, Cmd.none
+
+        | SearchModal.Import tmdbId ->
+            { model with SearchModal = Some { searchModel with IsImporting = true; Error = None } },
+            Cmd.OfAsync.either
+                api.addMovie tmdbId
+                (fun result -> Search_modal_msg (SearchModal.Import_completed result))
+                (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
+
+        | SearchModal.Import_completed result ->
+            match result with
+            | Ok slug ->
+                { model with SearchModal = None },
+                Cmd.batch [
+                    Cmd.ofMsg (Movie_list_msg Pages.Movies.Types.Load_movies)
+                    Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate ("movies", slug))
+                ]
+            | Error err ->
+                { model with SearchModal = Some { searchModel with Error = Some err; IsImporting = false } }, Cmd.none
+
+        | SearchModal.Navigate_to slug ->
+            { model with SearchModal = None },
+            Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate ("movies", slug))
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
@@ -89,13 +179,23 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             ]
         | _ -> model, Cmd.none
 
+    | Open_search_modal ->
+        { model with SearchModal = Some (SearchModal.init ()) }, Cmd.none
+
+    | Search_modal_msg childMsg ->
+        updateSearchModal api childMsg model
+
     | Dashboard_msg childMsg ->
         let childModel, childCmd = Pages.Dashboard.State.update api childMsg model.DashboardModel
         { model with DashboardModel = childModel }, Cmd.map Dashboard_msg childCmd
 
     | Movie_list_msg childMsg ->
-        let childModel, childCmd = Pages.Movies.State.update api childMsg model.MovieListModel
-        { model with MovieListModel = childModel }, Cmd.map Movie_list_msg childCmd
+        match childMsg with
+        | Pages.Movies.Types.Open_tmdb_search ->
+            { model with SearchModal = Some (SearchModal.init ()) }, Cmd.none
+        | _ ->
+            let childModel, childCmd = Pages.Movies.State.update api childMsg model.MovieListModel
+            { model with MovieListModel = childModel }, Cmd.map Movie_list_msg childCmd
 
     | Movie_detail_msg childMsg ->
         let childModel, childCmd = Pages.MovieDetail.State.update api childMsg model.MovieDetailModel

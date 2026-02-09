@@ -280,6 +280,20 @@ module MovieProjection =
 
     // Query functions
 
+    let search (conn: SqliteConnection) (query: string) : Mediatheca.Shared.LibrarySearchResult list =
+        conn
+        |> Db.newCommand "SELECT slug, name, year, poster_ref FROM movie_list WHERE name LIKE @q ORDER BY name LIMIT 10"
+        |> Db.setParams [ "q", SqlType.String ("%" + query + "%") ]
+        |> Db.query (fun (rd: IDataReader) ->
+            { Mediatheca.Shared.LibrarySearchResult.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              Year = rd.ReadInt32 "year"
+              PosterRef =
+                if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
+                else Some (rd.ReadString "poster_ref")
+              MediaType = Mediatheca.Shared.Movie }
+        )
+
     let getAll (conn: SqliteConnection) : Mediatheca.Shared.MovieListItem list =
         conn
         |> Db.newCommand "SELECT slug, name, year, poster_ref, genres, tmdb_rating FROM movie_list ORDER BY name"

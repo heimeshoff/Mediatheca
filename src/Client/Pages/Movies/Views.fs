@@ -231,10 +231,5 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 movieCard movie
                         ]
                     ]
-            // TMDB Search Modal
-            match model.TmdbSearch with
-            | Some searchModel ->
-                TmdbSearchModal.view searchModel (Tmdb_search_msg >> dispatch)
-            | None -> ()
         ]
     ]

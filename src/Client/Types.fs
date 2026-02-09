@@ -1,6 +1,7 @@
 module Mediatheca.Client.Types
 
 open Mediatheca.Client.Router
+open Mediatheca.Client.Components
 
 type Model = {
     CurrentPage: Page
@@ -13,10 +14,13 @@ type Model = {
     CatalogDetailModel: Pages.CatalogDetail.Types.Model
     EventBrowserModel: Pages.EventBrowser.Types.Model
     SettingsModel: Pages.Settings.Types.Model
+    SearchModal: SearchModal.Model option
 }
 
 type Msg =
     | Url_changed of string list
+    | Open_search_modal
+    | Search_modal_msg of SearchModal.Msg
     | Dashboard_msg of Pages.Dashboard.Types.Msg
     | Movie_list_msg of Pages.Movies.Types.Msg
     | Movie_detail_msg of Pages.MovieDetail.Types.Msg
