@@ -249,16 +249,20 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     ]
                                             ]
                                         ]
-                                        Html.div [
-                                            prop.className "flex flex-wrap gap-2 mt-3 items-center"
+                                        Daisy.badge [
+                                            badge.lg
+                                            prop.className "gap-1"
                                             prop.children [
-                                                for fr in movie.RecommendedBy do
-                                                    friendChip fr (fun slug -> dispatch (Remove_recommendation slug))
-                                                Daisy.badge [
-                                                    badge.lg
-                                                    prop.className "cursor-pointer select-none hover:badge-primary"
+                                                Html.span [ prop.text "Recommended by" ]
+                                                if not (List.isEmpty movie.RecommendedBy) then
+                                                    Html.span [
+                                                        prop.className "font-semibold"
+                                                        prop.text (movie.RecommendedBy |> List.map (fun fr -> fr.Name) |> String.concat ", ")
+                                                    ]
+                                                Html.button [
+                                                    prop.className "btn btn-ghost btn-xs btn-circle"
                                                     prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
-                                                    prop.text "Recommended by"
+                                                    prop.text "+"
                                                 ]
                                             ]
                                         ]
