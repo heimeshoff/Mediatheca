@@ -117,14 +117,21 @@ let private RecommendationManager
     (recommendedBy: FriendRef list)
     (onAdd: string -> unit)
     (onRemove: string -> unit)
+    (onAddNew: string -> unit)
     (onClose: unit -> unit) =
     let searchText, setSearchText = React.useState("")
+    let highlightedIndex, setHighlightedIndex = React.useState(0)
     let recommendedSlugs = recommendedBy |> List.map (fun f -> f.Slug) |> Set.ofList
     let available =
         allFriends
         |> List.filter (fun f ->
             not (Set.contains f.Slug recommendedSlugs) &&
             (searchText = "" || f.Name.ToLowerInvariant().Contains(searchText.ToLowerInvariant())))
+    let availableArr = available |> List.toArray
+    let trimmedSearch = searchText.Trim()
+    let hasExactMatch = allFriends |> List.exists (fun f -> f.Name.ToLowerInvariant() = trimmedSearch.ToLowerInvariant())
+    let showAddContact = trimmedSearch <> "" && not hasExactMatch
+    let totalItems = availableArr.Length + (if showAddContact then 1 else 0)
 
     let headerExtra = [
         if not (List.isEmpty recommendedBy) then
@@ -153,26 +160,100 @@ let private RecommendationManager
             prop.placeholder "Search friends..."
             prop.autoFocus true
             prop.value searchText
-            prop.onChange (fun (v: string) -> setSearchText v)
+            prop.onChange (fun (v: string) ->
+                setSearchText v
+                setHighlightedIndex 0)
+            prop.onKeyDown (fun e ->
+                match e.key with
+                | "ArrowDown" ->
+                    e.preventDefault()
+                    if totalItems > 0 then
+                        setHighlightedIndex (min (highlightedIndex + 1) (totalItems - 1))
+                | "ArrowUp" ->
+                    e.preventDefault()
+                    setHighlightedIndex (max (highlightedIndex - 1) 0)
+                | "Enter" ->
+                    e.preventDefault()
+                    if highlightedIndex >= 0 && highlightedIndex < availableArr.Length then
+                        onAdd availableArr.[highlightedIndex].Slug
+                        setSearchText ""
+                        setHighlightedIndex 0
+                    elif showAddContact && highlightedIndex = availableArr.Length then
+                        onAddNew trimmedSearch
+                        setSearchText ""
+                        setHighlightedIndex 0
+                | "Escape" -> onClose ()
+                | _ -> ())
         ]
     ]
 
     let content = [
-        if List.isEmpty available then
+        if totalItems = 0 && not showAddContact then
             Html.p [
                 prop.className "text-base-content/60 py-2 text-sm"
                 prop.text (
-                    if List.isEmpty allFriends then "No friends available. Add friends first."
-                    elif searchText <> "" then "No matches found."
-                    else "All friends already added."
+                    if List.isEmpty allFriends && trimmedSearch = "" then "No friends available. Add friends first."
+                    elif trimmedSearch = "" then "All friends already added."
+                    else "No matches found."
                 )
             ]
         else
             Html.div [
-                prop.className "space-y-2"
+                prop.className "space-y-1"
                 prop.children [
-                    for friend in available do
-                        friendListRow friend (fun () -> onAdd friend.Slug)
+                    for i in 0 .. availableArr.Length - 1 do
+                        let friend = availableArr.[i]
+                        let isHighlighted = (i = highlightedIndex)
+                        Html.div [
+                            prop.className (
+                                "flex items-center gap-3 p-2 rounded-lg cursor-pointer " +
+                                (if isHighlighted then "bg-primary/20" else "hover:bg-base-200"))
+                            prop.onClick (fun _ -> onAdd friend.Slug)
+                            prop.children [
+                                Daisy.avatar [
+                                    prop.children [
+                                        Html.div [
+                                            prop.className "w-10 rounded-full bg-base-300"
+                                            prop.children [
+                                                match friend.ImageRef with
+                                                | Some ref ->
+                                                    Html.img [
+                                                        prop.src $"/images/{ref}"
+                                                        prop.alt friend.Name
+                                                    ]
+                                                | None ->
+                                                    Html.div [
+                                                        prop.className "flex items-center justify-center w-full h-full text-base-content/30"
+                                                        prop.children [ Icons.friends () ]
+                                                    ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                                Html.span [ prop.className "font-semibold"; prop.text friend.Name ]
+                            ]
+                        ]
+                    if showAddContact then
+                        let isHighlighted = (highlightedIndex = availableArr.Length)
+                        Html.div [
+                            prop.className (
+                                "flex items-center gap-3 p-2 rounded-lg cursor-pointer " +
+                                (if isHighlighted then "bg-primary/20" else "hover:bg-base-200"))
+                            prop.onClick (fun _ ->
+                                onAddNew trimmedSearch
+                                setSearchText ""
+                                setHighlightedIndex 0)
+                            prop.children [
+                                Html.div [
+                                    prop.className "w-10 h-10 rounded-full bg-base-300 flex items-center justify-center text-base-content/40 text-lg"
+                                    prop.text "+"
+                                ]
+                                Html.span [
+                                    prop.className "font-semibold"
+                                    prop.text $"Add contact \"{trimmedSearch}\""
+                                ]
+                            ]
+                        ]
                 ]
             ]
     ]
@@ -486,6 +567,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         movie.RecommendedBy
                         (fun slug -> dispatch (Recommend_friend slug))
                         (fun slug -> dispatch (Remove_recommendation slug))
+                        (fun name -> dispatch (Add_friend_and_recommend name))
                         (fun () -> dispatch Close_friend_picker)
                 | Some Watch_with_picker ->
                     let excludeSlugs = movie.WantToWatchWith |> List.map (fun f -> f.Slug)

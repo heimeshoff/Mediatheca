@@ -45,3 +45,5 @@ type Msg =
     | Update_content_block of blockId: string * UpdateContentBlockRequest
     | Remove_content_block of blockId: string
     | Content_block_result of Result<unit, string>
+    | Add_friend_and_recommend of name: string
+    | Friend_and_recommend_result of Result<unit, string>

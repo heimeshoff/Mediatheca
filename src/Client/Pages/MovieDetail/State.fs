@@ -132,3 +132,25 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Content_block_result (Error err) ->
         { model with Error = Some err }, Cmd.none
+
+    | Add_friend_and_recommend name ->
+        model,
+        Cmd.OfAsync.perform (fun () ->
+            async {
+                match! api.addFriend name with
+                | Ok slug ->
+                    match! api.recommendMovie model.Slug slug with
+                    | Ok () -> return Ok ()
+                    | Error e -> return Error e
+                | Error e -> return Error e
+            }) () Friend_and_recommend_result
+
+    | Friend_and_recommend_result (Ok ()) ->
+        model,
+        Cmd.batch [
+            Cmd.OfAsync.perform api.getMovie model.Slug Movie_loaded
+            Cmd.OfAsync.perform api.getFriends () Friends_loaded
+        ]
+
+    | Friend_and_recommend_result (Error err) ->
+        { model with Error = Some err }, Cmd.none
