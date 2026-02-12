@@ -247,6 +247,7 @@ type IMediathecaApi = {
     removeFriend: string -> Async<Result<unit, string>>
     getFriend: string -> Async<FriendDetail option>
     getFriends: unit -> Async<FriendListItem list>
+    uploadFriendImage: string -> byte array -> string -> Async<Result<string, string>>
     // Watch Sessions
     recordWatchSession: string -> RecordWatchSessionRequest -> Async<Result<string, string>>
     updateWatchSessionDate: string -> string -> string -> Async<Result<unit, string>>

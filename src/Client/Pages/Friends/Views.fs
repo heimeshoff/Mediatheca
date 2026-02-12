@@ -1,48 +1,75 @@
 module Mediatheca.Client.Pages.Friends.Views
 
+open Fable.Core.JsInterop
 open Feliz
 open Feliz.DaisyUI
 open Feliz.Router
 open Mediatheca.Client.Pages.Friends.Types
 open Mediatheca.Client.Components
 
-let private friendCard (friend: Mediatheca.Shared.FriendListItem) =
-    Html.a [
-        prop.href (Router.format ("friends", friend.Slug))
-        prop.onClick (fun e ->
-            e.preventDefault()
-            Router.navigate ("friends", friend.Slug)
-        )
+let private readFileAsBytes (file: Browser.Types.File) (onDone: byte array * string -> unit) =
+    let reader = Browser.Dom.FileReader.Create()
+    reader.onload <- fun _ ->
+        let result: obj = unbox reader.result
+        let uint8Array: byte array = emitJsExpr result "new Uint8Array($0)"
+        onDone (uint8Array, file.name)
+    reader.readAsArrayBuffer(file)
+
+let private friendCard (friend: Mediatheca.Shared.FriendListItem) (dispatch: Msg -> unit) =
+    let fileInputId = $"friend-image-{friend.Slug}"
+    Daisy.card [
+        card.sm
+        prop.className "card-hover bg-base-100 shadow-md cursor-pointer"
         prop.children [
-            Daisy.card [
-                card.sm
-                prop.className "card-hover bg-base-100 shadow-md cursor-pointer"
+            Daisy.cardBody [
+                prop.className "items-center text-center p-5"
                 prop.children [
-                    Daisy.cardBody [
-                        prop.className "items-center text-center p-5"
+                    Daisy.avatar [
                         prop.children [
-                            Daisy.avatar [
+                            Html.div [
+                                prop.className "w-16 h-16 rounded-full bg-base-300 ring-2 ring-base-300 transition-all duration-300 hover:ring-primary/50 relative"
+                                prop.onClick (fun e ->
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    let input = Browser.Dom.document.getElementById(fileInputId)
+                                    if not (isNull input) then input.click())
                                 prop.children [
-                                    Html.div [
-                                        prop.className "w-16 h-16 rounded-full bg-base-300 ring-2 ring-base-300 transition-all duration-300 hover:ring-primary/50"
-                                        prop.children [
-                                            match friend.ImageRef with
-                                            | Some ref ->
-                                                Html.img [
-                                                    prop.src $"/images/{ref}"
-                                                    prop.alt friend.Name
-                                                ]
-                                            | None ->
-                                                Html.div [
-                                                    prop.className "flex items-center justify-center w-full h-full text-base-content/30"
-                                                    prop.children [ Icons.friends () ]
-                                                ]
+                                    match friend.ImageRef with
+                                    | Some ref ->
+                                        Html.img [
+                                            prop.src $"/images/{ref}"
+                                            prop.alt friend.Name
                                         ]
-                                    ]
+                                    | None ->
+                                        Html.div [
+                                            prop.className "flex items-center justify-center w-full h-full text-base-content/30"
+                                            prop.children [ Icons.friends () ]
+                                        ]
                                 ]
                             ]
+                        ]
+                    ]
+                    Html.input [
+                        prop.id fileInputId
+                        prop.type' "file"
+                        prop.accept "image/*"
+                        prop.className "hidden"
+                        prop.onChange (fun (e: Browser.Types.Event) ->
+                            let input: Browser.Types.HTMLInputElement = unbox e.target
+                            let files = input.files
+                            if files.length > 0 then
+                                let file = files.[0]
+                                readFileAsBytes file (fun (bytes, filename) ->
+                                    dispatch (Upload_friend_image (friend.Slug, bytes, filename))))
+                    ]
+                    Html.a [
+                        prop.href (Router.format ("friends", friend.Slug))
+                        prop.onClick (fun e ->
+                            e.preventDefault()
+                            Router.navigate ("friends", friend.Slug))
+                        prop.children [
                             Html.h3 [
-                                prop.className "card-title text-sm font-semibold mt-3"
+                                prop.className "card-title text-sm font-semibold mt-3 hover:text-primary"
                                 prop.text friend.Name
                             ]
                         ]
@@ -160,7 +187,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     prop.className "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 stagger-grid"
                     prop.children [
                         for friend in model.Friends do
-                            friendCard friend
+                            friendCard friend dispatch
                     ]
                 ]
         ]

@@ -60,3 +60,16 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Friend_removed (Error err) ->
         { model with Error = Some err }, Cmd.none
+
+    | Upload_friend_image (slug, data, filename) ->
+        model,
+        Cmd.OfAsync.either
+            (fun () -> api.uploadFriendImage slug data filename) ()
+            Image_uploaded
+            (fun ex -> Image_uploaded (Error ex.Message))
+
+    | Image_uploaded (Ok _) ->
+        model, Cmd.ofMsg Load_friends
+
+    | Image_uploaded (Error err) ->
+        { model with Error = Some err }, Cmd.none

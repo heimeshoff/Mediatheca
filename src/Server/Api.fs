@@ -705,6 +705,29 @@ module Api =
                 return FriendProjection.getAll conn
             }
 
+            uploadFriendImage = fun slug data filename -> async {
+                let ext = System.IO.Path.GetExtension(filename).ToLowerInvariant()
+                let ref = sprintf "friends/%s%s" slug ext
+                ImageStore.saveImage imageBasePath ref data
+                let sid = Friends.streamId slug
+                let friend = FriendProjection.getBySlug conn slug
+                match friend with
+                | Some f ->
+                    let result =
+                        executeCommand
+                            conn sid
+                            Friends.Serialization.fromStoredEvent
+                            Friends.reconstitute
+                            Friends.decide
+                            Friends.Serialization.toEventData
+                            (Friends.Update_friend (f.Name, Some ref))
+                            friendProjections
+                    match result with
+                    | Ok () -> return Ok ref
+                    | Error e -> return Error e
+                | None -> return Error "Friend not found"
+            }
+
             getTmdbApiKey = fun () -> async {
                 let key =
                     SettingsStore.getSetting conn "tmdb_api_key"
