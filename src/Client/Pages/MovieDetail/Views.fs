@@ -448,7 +448,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             prop.children [
                                                 sectionHeader "Details"
                                                 Html.div [
-                                                    prop.className "grid grid-cols-2 sm:grid-cols-4 gap-4"
+                                                    prop.className "grid grid-cols-2 sm:grid-cols-3 gap-4"
                                                     prop.children [
                                                         detailCard "Year" (string movie.Year)
                                                         match movie.Runtime with
@@ -457,8 +457,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         match movie.TmdbRating with
                                                         | Some r -> detailCard "Rating" $"%.1f{r} / 10"
                                                         | None -> ()
-                                                        if not (List.isEmpty movie.Genres) then
-                                                            detailCard "Genre" (movie.Genres |> String.concat ", ")
                                                     ]
                                                 ]
                                             ]
