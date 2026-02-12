@@ -49,8 +49,17 @@ module Tmdb =
         Order: int
     }
 
+    type TmdbCrewMember = {
+        Id: int
+        Name: string
+        Job: string
+        Department: string
+        ProfilePath: string option
+    }
+
     type TmdbCreditsResponse = {
         Cast: TmdbCastMember list
+        Crew: TmdbCrewMember list
     }
 
     // Decoders
@@ -97,9 +106,19 @@ module Tmdb =
             Order = get.Required.Field "order" Decode.int
         })
 
+    let private decodeCrewMember: Decoder<TmdbCrewMember> =
+        Decode.object (fun get -> {
+            Id = get.Required.Field "id" Decode.int
+            Name = get.Required.Field "name" Decode.string
+            Job = get.Required.Field "job" Decode.string
+            Department = get.Required.Field "department" Decode.string
+            ProfilePath = get.Optional.Field "profile_path" Decode.string
+        })
+
     let private decodeCredits: Decoder<TmdbCreditsResponse> =
         Decode.object (fun get -> {
             Cast = get.Required.Field "cast" (Decode.list decodeCastMember)
+            Crew = get.Required.Field "crew" (Decode.list decodeCrewMember)
         })
 
     // Search cache

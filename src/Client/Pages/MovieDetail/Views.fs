@@ -60,8 +60,9 @@ let private castCard (cast: CastMemberDto) =
                 prop.children [
                     match cast.ImageRef with
                     | Some ref ->
+                        let src = if ref.StartsWith("http") then ref else $"/images/{ref}"
                         Html.img [
-                            prop.src $"/images/{ref}"
+                            prop.src src
                             prop.alt cast.Name
                             prop.className "w-full h-full object-cover"
                         ]
@@ -79,6 +80,39 @@ let private castCard (cast: CastMemberDto) =
             Html.p [
                 prop.className "text-base-content/50 text-xs line-clamp-1"
                 prop.text cast.Role
+            ]
+        ]
+    ]
+
+let private crewCard (crew: CrewMemberDto) =
+    Html.div [
+        prop.className "flex-shrink-0 text-center w-24"
+        prop.children [
+            Html.div [
+                prop.className "w-24 h-24 rounded-full overflow-hidden mb-3 border-2 border-secondary/20 bg-base-300 mx-auto"
+                prop.children [
+                    match crew.ImageRef with
+                    | Some ref ->
+                        let src = if ref.StartsWith("http") then ref else $"/images/{ref}"
+                        Html.img [
+                            prop.src src
+                            prop.alt crew.Name
+                            prop.className "w-full h-full object-cover"
+                        ]
+                    | None ->
+                        Html.div [
+                            prop.className "flex items-center justify-center w-full h-full text-base-content/30 text-xs"
+                            prop.text "?"
+                        ]
+                ]
+            ]
+            Html.p [
+                prop.className "font-medium text-sm line-clamp-1"
+                prop.text crew.Name
+            ]
+            Html.p [
+                prop.className "text-base-content/50 text-xs line-clamp-1"
+                prop.text crew.Job
             ]
         ]
     ]
@@ -463,18 +497,45 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                         ]
                                         // Cast
                                         if not (List.isEmpty movie.Cast) then
+                                            let castToShow = model.FullCredits |> Option.map (fun c -> c.Cast) |> Option.defaultValue movie.Cast
                                             Html.section [
                                                 prop.children [
                                                     sectionHeader "Cast"
                                                     Html.div [
-                                                        prop.className "flex gap-6 overflow-x-auto pb-4"
+                                                        prop.className "flex gap-6 overflow-x-auto pb-4 lg:flex-wrap lg:overflow-x-visible"
                                                         prop.children [
-                                                            for c in movie.Cast do
+                                                            for c in castToShow do
                                                                 castCard c
+                                                        ]
+                                                    ]
+                                                    match model.FullCredits with
+                                                    | None ->
+                                                        Daisy.button.button [
+                                                            button.ghost
+                                                            button.sm
+                                                            prop.className "mt-2"
+                                                            prop.onClick (fun _ -> dispatch Load_full_credits)
+                                                            prop.text "Load full cast & crew"
+                                                        ]
+                                                    | Some _ -> ()
+                                                ]
+                                            ]
+                                        // Crew (only shown after loading full credits)
+                                        match model.FullCredits with
+                                        | Some credits when not (List.isEmpty credits.Crew) ->
+                                            Html.section [
+                                                prop.children [
+                                                    sectionHeader "Crew"
+                                                    Html.div [
+                                                        prop.className "flex gap-6 overflow-x-auto pb-4 lg:flex-wrap lg:overflow-x-visible"
+                                                        prop.children [
+                                                            for c in credits.Crew do
+                                                                crewCard c
                                                         ]
                                                     ]
                                                 ]
                                             ]
+                                        | _ -> ()
                                     ]
                                 ]
                                 // ── Right Column: Social & Activity ──
@@ -719,18 +780,47 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                 prop.text err
                                             ]
                                         | None -> ()
-                                        // Remove movie (subtle)
+                                        // Remove movie
                                         Html.div [
                                             prop.className "pt-4"
                                             prop.children [
-                                                Daisy.button.button [
-                                                    button.error
-                                                    button.outline
-                                                    button.sm
-                                                    prop.className "w-full opacity-60 hover:opacity-100"
-                                                    prop.onClick (fun _ -> dispatch Remove_movie)
-                                                    prop.text "Remove Movie"
-                                                ]
+                                                if model.ConfirmingRemove then
+                                                    Html.div [
+                                                        prop.className "bg-error/10 border border-error/30 rounded-xl p-4 space-y-3"
+                                                        prop.children [
+                                                            Html.p [
+                                                                prop.className "text-sm font-semibold text-error"
+                                                                prop.text "Are you sure you want to remove this movie?"
+                                                            ]
+                                                            Html.div [
+                                                                prop.className "flex gap-2"
+                                                                prop.children [
+                                                                    Daisy.button.button [
+                                                                        button.error
+                                                                        button.sm
+                                                                        prop.className "flex-1"
+                                                                        prop.onClick (fun _ -> dispatch Remove_movie)
+                                                                        prop.text "Yes, remove"
+                                                                    ]
+                                                                    Daisy.button.button [
+                                                                        button.ghost
+                                                                        button.sm
+                                                                        prop.className "flex-1"
+                                                                        prop.onClick (fun _ -> dispatch Cancel_remove_movie)
+                                                                        prop.text "Cancel"
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                        ]
+                                                    ]
+                                                else
+                                                    Daisy.button.button [
+                                                        button.error
+                                                        button.sm
+                                                        prop.className "w-full"
+                                                        prop.onClick (fun _ -> dispatch Confirm_remove_movie)
+                                                        prop.text "Remove Movie"
+                                                    ]
                                             ]
                                         ]
                                     ]

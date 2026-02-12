@@ -9,6 +9,8 @@ type Model = {
     IsLoading: bool
     ShowFriendPicker: FriendPickerKind option
     EditingSessionDate: string option
+    FullCredits: FullCreditsDto option
+    ConfirmingRemove: bool
     Error: string option
 }
 
@@ -26,6 +28,8 @@ type Msg =
     | Want_to_watch_with of friendSlug: string
     | Remove_want_to_watch_with of friendSlug: string
     | Command_result of Result<unit, string>
+    | Confirm_remove_movie
+    | Cancel_remove_movie
     | Remove_movie
     | Movie_removed of Result<unit, string>
     | Open_friend_picker of FriendPickerKind
@@ -47,3 +51,5 @@ type Msg =
     | Friend_and_recommend_result of Result<unit, string>
     | Add_friend_and_watch_with of name: string
     | Friend_and_watch_with_result of Result<unit, string>
+    | Load_full_credits
+    | Full_credits_loaded of Result<FullCreditsDto, string>

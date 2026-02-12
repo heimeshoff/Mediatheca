@@ -128,6 +128,13 @@ module CatalogProjection =
 
     // Query functions
 
+    let getEntriesByMovieSlug (conn: SqliteConnection) (movieSlug: string) : (string * string) list =
+        conn
+        |> Db.newCommand "SELECT catalog_slug, entry_id FROM catalog_entries WHERE movie_slug = @movie_slug"
+        |> Db.setParams [ "movie_slug", SqlType.String movieSlug ]
+        |> Db.query (fun (rd: IDataReader) ->
+            (rd.ReadString "catalog_slug", rd.ReadString "entry_id"))
+
     let getAll (conn: SqliteConnection) : Mediatheca.Shared.CatalogListItem list =
         conn
         |> Db.newCommand """

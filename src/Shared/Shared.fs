@@ -48,6 +48,19 @@ type CastMemberDto = {
     TmdbId: int
 }
 
+type CrewMemberDto = {
+    Name: string
+    Job: string
+    Department: string
+    ImageRef: string option
+    TmdbId: int
+}
+
+type FullCreditsDto = {
+    Cast: CastMemberDto list
+    Crew: CrewMemberDto list
+}
+
 type FriendRef = {
     Slug: string
     Name: string
@@ -306,4 +319,5 @@ type IMediathecaApi = {
     getTmdbApiKey: unit -> Async<string>
     setTmdbApiKey: string -> Async<Result<unit, string>>
     testTmdbApiKey: string -> Async<Result<unit, string>>
+    getFullCredits: int -> Async<Result<FullCreditsDto, string>>
 }

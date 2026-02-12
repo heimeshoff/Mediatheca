@@ -180,6 +180,19 @@ module Api =
                         movieProjections
                 match result with
                 | Ok () ->
+                    // Remove catalog entries referencing this movie
+                    let catalogEntries = CatalogProjection.getEntriesByMovieSlug conn slug
+                    for (catalogSlug, entryId) in catalogEntries do
+                        let catalogSid = Catalogs.streamId catalogSlug
+                        executeCommand
+                            conn catalogSid
+                            Catalogs.Serialization.fromStoredEvent
+                            Catalogs.reconstitute
+                            Catalogs.decide
+                            Catalogs.Serialization.toEventData
+                            (Catalogs.Remove_entry entryId)
+                            projectionHandlers
+                        |> ignore
                     // Clean up cast and images
                     CastStore.removeMovieCastAndCleanup conn imageBasePath sid
                     ImageStore.deleteImage imageBasePath (sprintf "posters/%s.jpg" slug)
@@ -786,5 +799,34 @@ module Api =
                     return Ok ()
                 with ex ->
                     return Error $"TMDB API key validation failed: {ex.Message}"
+            }
+
+            getFullCredits = fun tmdbId -> async {
+                try
+                    let tmdbConfig = getTmdbConfig()
+                    let! credits = Tmdb.getMovieCredits httpClient tmdbConfig tmdbId
+                    let imageUrl (profilePath: string option) =
+                        match profilePath with
+                        | Some p -> Some $"{tmdbConfig.ImageBaseUrl}w185{p}"
+                        | None -> None
+                    let cast =
+                        credits.Cast
+                        |> List.sortBy (fun c -> c.Order)
+                        |> List.map (fun c ->
+                            { CastMemberDto.Name = c.Name
+                              Role = c.Character
+                              TmdbId = c.Id
+                              ImageRef = imageUrl c.ProfilePath })
+                    let crew =
+                        credits.Crew
+                        |> List.map (fun c ->
+                            { CrewMemberDto.Name = c.Name
+                              Job = c.Job
+                              Department = c.Department
+                              TmdbId = c.Id
+                              ImageRef = imageUrl c.ProfilePath })
+                    return Ok { FullCreditsDto.Cast = cast; Crew = crew }
+                with ex ->
+                    return Error $"Failed to load full credits: {ex.Message}"
             }
         }
