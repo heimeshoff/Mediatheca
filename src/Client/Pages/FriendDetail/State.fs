@@ -7,6 +7,7 @@ open Mediatheca.Client.Pages.FriendDetail.Types
 let init (slug: string) : Model * Cmd<Msg> =
     { Slug = slug
       Friend = None
+      FriendMovies = None
       IsLoading = true
       IsEditing = false
       EditForm = { Name = ""; ImageRef = None }
@@ -17,10 +18,16 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
     | Load_friend slug ->
         { model with IsLoading = true; Slug = slug },
-        Cmd.OfAsync.perform api.getFriend slug Friend_loaded
+        Cmd.batch [
+            Cmd.OfAsync.perform api.getFriend slug Friend_loaded
+            Cmd.OfAsync.perform api.getFriendMovies slug Friend_movies_loaded
+        ]
 
     | Friend_loaded friend ->
         { model with Friend = friend; IsLoading = false }, Cmd.none
+
+    | Friend_movies_loaded movies ->
+        { model with FriendMovies = Some movies }, Cmd.none
 
     | Start_editing ->
         match model.Friend with
@@ -68,4 +75,17 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate "friends")
 
     | Remove_result (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Upload_friend_image (data, filename) ->
+        model,
+        Cmd.OfAsync.either
+            (fun () -> api.uploadFriendImage model.Slug data filename) ()
+            Image_uploaded
+            (fun ex -> Image_uploaded (Error ex.Message))
+
+    | Image_uploaded (Ok _) ->
+        model, Cmd.OfAsync.perform api.getFriend model.Slug Friend_loaded
+
+    | Image_uploaded (Error err) ->
         { model with Error = Some err }, Cmd.none

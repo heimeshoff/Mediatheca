@@ -10,6 +10,7 @@ type EditForm = {
 type Model = {
     Slug: string
     Friend: FriendDetail option
+    FriendMovies: FriendMovies option
     IsLoading: bool
     IsEditing: bool
     EditForm: EditForm
@@ -19,6 +20,7 @@ type Model = {
 type Msg =
     | Load_friend of string
     | Friend_loaded of FriendDetail option
+    | Friend_movies_loaded of FriendMovies
     | Start_editing
     | Cancel_editing
     | Edit_name_changed of string
@@ -26,3 +28,5 @@ type Msg =
     | Update_result of Result<unit, string>
     | Remove_friend
     | Remove_result of Result<unit, string>
+    | Upload_friend_image of data: byte array * filename: string
+    | Image_uploaded of Result<string, string>

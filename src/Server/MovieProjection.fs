@@ -218,6 +218,24 @@ module MovieProjection =
                         "friends", SqlType.String friendsJson
                     ]
                     |> Db.exec
+                    // Remove session friends from want_to_watch_with (mirrors aggregate evolve)
+                    if not (List.isEmpty data.FriendSlugs) then
+                        let currentJson =
+                            conn
+                            |> Db.newCommand "SELECT want_to_watch_with FROM movie_detail WHERE slug = @slug"
+                            |> Db.setParams [ "slug", SqlType.String slug ]
+                            |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "want_to_watch_with")
+                            |> Option.defaultValue "[]"
+                        let current =
+                            Decode.fromString (Decode.list Decode.string) currentJson
+                            |> Result.defaultValue []
+                        let sessionFriends = Set.ofList data.FriendSlugs
+                        let updated = current |> List.filter (fun s -> not (Set.contains s sessionFriends))
+                        let updatedJson = updated |> List.map Encode.string |> Encode.list |> Encode.toString 0
+                        conn
+                        |> Db.newCommand "UPDATE movie_detail SET want_to_watch_with = @want_to_watch_with WHERE slug = @slug"
+                        |> Db.setParams [ "slug", SqlType.String slug; "want_to_watch_with", SqlType.String updatedJson ]
+                        |> Db.exec
 
                 | Movies.Watch_session_date_changed (sessionId, date) ->
                     conn
@@ -314,6 +332,18 @@ module MovieProjection =
                 else Some (rd.ReadDouble "tmdb_rating") }
         )
 
+    let private resolveFriendRefs (conn: SqliteConnection) (slugs: string list) : Mediatheca.Shared.FriendRef list =
+        if List.isEmpty slugs then []
+        else
+            let nameMap =
+                conn
+                |> Db.newCommand "SELECT slug, name FROM friend_list"
+                |> Db.query (fun (rd: IDataReader) -> rd.ReadString "slug", rd.ReadString "name")
+                |> Map.ofList
+            slugs |> List.map (fun s ->
+                { Mediatheca.Shared.FriendRef.Slug = s
+                  Name = nameMap |> Map.tryFind s |> Option.defaultValue s })
+
     let getWatchSessions (conn: SqliteConnection) (movieSlug: string) : Mediatheca.Shared.WatchSessionDto list =
         conn
         |> Db.newCommand "SELECT session_id, date, duration, friends FROM watch_sessions WHERE movie_slug = @slug ORDER BY date DESC"
@@ -328,8 +358,43 @@ module MovieProjection =
               Duration =
                 if rd.IsDBNull(rd.GetOrdinal("duration")) then None
                 else Some (rd.ReadInt32 "duration")
-              Friends = friendSlugs |> List.map (fun s -> { Mediatheca.Shared.FriendRef.Slug = s; Name = s }) }
+              Friends = resolveFriendRefs conn friendSlugs }
         )
+
+    let private readFriendMovieItem (rd: IDataReader) : Mediatheca.Shared.FriendMovieItem =
+        { Mediatheca.Shared.FriendMovieItem.Slug = rd.ReadString "slug"
+          Name = rd.ReadString "name"
+          Year = rd.ReadInt32 "year"
+          PosterRef =
+            if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
+            else Some (rd.ReadString "poster_ref") }
+
+    let getMoviesRecommendedByFriend (conn: SqliteConnection) (friendSlug: string) : Mediatheca.Shared.FriendMovieItem list =
+        let pattern = sprintf "%%\"%s\"%%" friendSlug
+        conn
+        |> Db.newCommand "SELECT slug, name, year, poster_ref FROM movie_detail WHERE recommended_by LIKE @pattern ORDER BY name"
+        |> Db.setParams [ "pattern", SqlType.String pattern ]
+        |> Db.query readFriendMovieItem
+
+    let getMoviesWantToWatchWithFriend (conn: SqliteConnection) (friendSlug: string) : Mediatheca.Shared.FriendMovieItem list =
+        let pattern = sprintf "%%\"%s\"%%" friendSlug
+        conn
+        |> Db.newCommand "SELECT slug, name, year, poster_ref FROM movie_detail WHERE want_to_watch_with LIKE @pattern ORDER BY name"
+        |> Db.setParams [ "pattern", SqlType.String pattern ]
+        |> Db.query readFriendMovieItem
+
+    let getMoviesWatchedWithFriend (conn: SqliteConnection) (friendSlug: string) : Mediatheca.Shared.FriendMovieItem list =
+        let pattern = sprintf "%%\"%s\"%%" friendSlug
+        conn
+        |> Db.newCommand """
+            SELECT DISTINCT d.slug, d.name, d.year, d.poster_ref
+            FROM watch_sessions ws
+            JOIN movie_detail d ON d.slug = ws.movie_slug
+            WHERE ws.friends LIKE @pattern
+            ORDER BY d.name
+        """
+        |> Db.setParams [ "pattern", SqlType.String pattern ]
+        |> Db.query readFriendMovieItem
 
     let getBySlug (conn: SqliteConnection) (slug: string) : Mediatheca.Shared.MovieDetail option =
         conn
@@ -369,8 +434,8 @@ module MovieProjection =
                 if rd.IsDBNull(rd.GetOrdinal("tmdb_rating")) then None
                 else Some (rd.ReadDouble "tmdb_rating")
               Cast = cast
-              RecommendedBy = recommendedBySlugs |> List.map (fun s -> { Mediatheca.Shared.FriendRef.Slug = s; Name = s })
-              WantToWatchWith = wantToWatchWithSlugs |> List.map (fun s -> { Mediatheca.Shared.FriendRef.Slug = s; Name = s })
+              RecommendedBy = resolveFriendRefs conn recommendedBySlugs
+              WantToWatchWith = resolveFriendRefs conn wantToWatchWithSlugs
               WatchSessions = getWatchSessions conn slug
               ContentBlocks = ContentBlockProjection.getForMovieDetail conn slug }
         )

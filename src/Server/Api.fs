@@ -290,11 +290,19 @@ module Api =
             // Watch Sessions
             recordWatchSession = fun slug request -> async {
                 let sid = Movies.streamId slug
+                let runtime =
+                    conn
+                    |> Db.newCommand "SELECT runtime FROM movie_detail WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.querySingle (fun (rd: IDataReader) ->
+                        if rd.IsDBNull(rd.GetOrdinal("runtime")) then None
+                        else Some (rd.ReadInt32 "runtime"))
+                    |> Option.flatten
                 let sessionId = System.Guid.NewGuid().ToString("N")
                 let sessionData: Movies.WatchSessionRecordedData = {
                     SessionId = sessionId
                     Date = request.Date
-                    Duration = request.Duration
+                    Duration = runtime
                     FriendSlugs = request.FriendSlugs
                 }
                 let result =
@@ -591,7 +599,7 @@ module Api =
                     |> Option.defaultValue 0
                 let totalWatchTime =
                     conn
-                    |> Db.newCommand "SELECT COALESCE(SUM(duration), 0) as total FROM watch_sessions"
+                    |> Db.newCommand "SELECT COALESCE(SUM(md.runtime), 0) as total FROM watch_sessions ws JOIN movie_detail md ON ws.movie_slug = md.slug"
                     |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
                     |> Option.defaultValue 0
                 return {
@@ -693,8 +701,39 @@ module Api =
                 return FriendProjection.getBySlug conn slug
             }
 
+            getFriendMovies = fun friendSlug -> async {
+                return {
+                    Mediatheca.Shared.FriendMovies.RecommendedMovies = MovieProjection.getMoviesRecommendedByFriend conn friendSlug
+                    WantToWatchMovies = MovieProjection.getMoviesWantToWatchWithFriend conn friendSlug
+                    WatchedMovies = MovieProjection.getMoviesWatchedWithFriend conn friendSlug
+                }
+            }
+
             getFriends = fun () -> async {
                 return FriendProjection.getAll conn
+            }
+
+            uploadFriendImage = fun slug data filename -> async {
+                let ext = System.IO.Path.GetExtension(filename).ToLowerInvariant()
+                let ref = sprintf "friends/%s%s" slug ext
+                ImageStore.saveImage imageBasePath ref data
+                let sid = Friends.streamId slug
+                let friend = FriendProjection.getBySlug conn slug
+                match friend with
+                | Some f ->
+                    let result =
+                        executeCommand
+                            conn sid
+                            Friends.Serialization.fromStoredEvent
+                            Friends.reconstitute
+                            Friends.decide
+                            Friends.Serialization.toEventData
+                            (Friends.Update_friend (f.Name, Some ref))
+                            friendProjections
+                    match result with
+                    | Ok () -> return Ok ref
+                    | Error e -> return Error e
+                | None -> return Error "Friend not found"
             }
 
             getTmdbApiKey = fun () -> async {

@@ -6,13 +6,12 @@ open Feliz.Router
 open Mediatheca.Client.Pages.Friends.Types
 open Mediatheca.Client.Components
 
-let private friendCard (friend: Mediatheca.Shared.FriendListItem) =
+let private friendCard (friend: Mediatheca.Shared.FriendListItem) (_dispatch: Msg -> unit) =
     Html.a [
         prop.href (Router.format ("friends", friend.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
-            Router.navigate ("friends", friend.Slug)
-        )
+            Router.navigate ("friends", friend.Slug))
         prop.children [
             Daisy.card [
                 card.sm
@@ -24,7 +23,7 @@ let private friendCard (friend: Mediatheca.Shared.FriendListItem) =
                             Daisy.avatar [
                                 prop.children [
                                     Html.div [
-                                        prop.className "w-16 h-16 rounded-full bg-base-300 ring-2 ring-base-300 transition-all duration-300 hover:ring-primary/50"
+                                        prop.className "w-16 h-16 rounded-full bg-base-300 ring-2 ring-base-300"
                                         prop.children [
                                             match friend.ImageRef with
                                             | Some ref ->
@@ -160,7 +159,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     prop.className "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 stagger-grid"
                     prop.children [
                         for friend in model.Friends do
-                            friendCard friend
+                            friendCard friend dispatch
                     ]
                 ]
         ]

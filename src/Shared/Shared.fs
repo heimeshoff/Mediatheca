@@ -65,6 +65,19 @@ type FriendDetail = {
     ImageRef: string option
 }
 
+type FriendMovieItem = {
+    Slug: string
+    Name: string
+    Year: int
+    PosterRef: string option
+}
+
+type FriendMovies = {
+    RecommendedMovies: FriendMovieItem list
+    WantToWatchMovies: FriendMovieItem list
+    WatchedMovies: FriendMovieItem list
+}
+
 // Watch Sessions
 
 type WatchSessionDto = {
@@ -76,7 +89,6 @@ type WatchSessionDto = {
 
 type RecordWatchSessionRequest = {
     Date: string
-    Duration: int option
     FriendSlugs: string list
 }
 
@@ -247,7 +259,9 @@ type IMediathecaApi = {
     updateFriend: string -> string -> string option -> Async<Result<unit, string>>
     removeFriend: string -> Async<Result<unit, string>>
     getFriend: string -> Async<FriendDetail option>
+    getFriendMovies: string -> Async<FriendMovies>
     getFriends: unit -> Async<FriendListItem list>
+    uploadFriendImage: string -> byte array -> string -> Async<Result<string, string>>
     // Watch Sessions
     recordWatchSession: string -> RecordWatchSessionRequest -> Async<Result<string, string>>
     updateWatchSessionDate: string -> string -> string -> Async<Result<unit, string>>

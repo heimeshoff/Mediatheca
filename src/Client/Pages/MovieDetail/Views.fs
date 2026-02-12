@@ -39,95 +39,144 @@ let private castCard (cast: CastMemberDto) =
         ]
     ]
 
-let private friendPicker
+
+[<ReactComponent>]
+let private FriendManager
+    (title: string)
     (allFriends: FriendListItem list)
-    (excludeSlugs: string list)
-    (onSelect: string -> unit)
+    (selectedFriends: FriendRef list)
+    (onAdd: string -> unit)
+    (onRemove: string -> unit)
+    (onAddNew: string -> unit)
     (onClose: unit -> unit) =
-    let available = allFriends |> List.filter (fun f -> not (List.contains f.Slug excludeSlugs))
-    Daisy.modal.dialog [
-        modal.open'
-        prop.children [
-            Daisy.modalBackdrop [ prop.onClick (fun _ -> onClose ()) ]
-            Daisy.modalBox.div [
+    let searchText, setSearchText = React.useState("")
+    let highlightedIndex, setHighlightedIndex = React.useState(0)
+    let selectedSlugs = selectedFriends |> List.map (fun f -> f.Slug) |> Set.ofList
+    let available =
+        allFriends
+        |> List.filter (fun f ->
+            not (Set.contains f.Slug selectedSlugs) &&
+            (searchText = "" || f.Name.ToLowerInvariant().Contains(searchText.ToLowerInvariant())))
+    let availableArr = available |> List.toArray
+    let trimmedSearch = searchText.Trim()
+    let hasExactMatch = allFriends |> List.exists (fun f -> f.Name.ToLowerInvariant() = trimmedSearch.ToLowerInvariant())
+    let showAddContact = trimmedSearch <> "" && not hasExactMatch
+    let totalItems = availableArr.Length + (if showAddContact then 1 else 0)
+
+    let headerExtra = [
+        if not (List.isEmpty selectedFriends) then
+            Html.div [
+                prop.className "flex flex-wrap gap-2 mb-4"
                 prop.children [
-                    Html.h3 [
-                        prop.className "font-bold text-lg font-display mb-4"
-                        prop.text "Select a Friend"
-                    ]
-                    if List.isEmpty available then
-                        Html.p [
-                            prop.className "text-base-content/60 py-4"
-                            prop.text "No friends available. Add friends first."
-                        ]
-                    else
-                        Html.div [
-                            prop.className "space-y-2"
-                            prop.children [
-                                for friend in available do
-                                    Html.div [
-                                        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 cursor-pointer"
-                                        prop.onClick (fun _ -> onSelect friend.Slug)
-                                        prop.children [
-                                            Daisy.avatar [
-                                                prop.children [
-                                                    Html.div [
-                                                        prop.className "w-10 rounded-full bg-base-300"
-                                                        prop.children [
-                                                            match friend.ImageRef with
-                                                            | Some ref ->
-                                                                Html.img [
-                                                                    prop.src $"/images/{ref}"
-                                                                    prop.alt friend.Name
-                                                                ]
-                                                            | None ->
-                                                                Html.div [
-                                                                    prop.className "flex items-center justify-center w-full h-full text-base-content/30"
-                                                                    prop.children [ Icons.friends () ]
-                                                                ]
-                                                        ]
-                                                    ]
-                                                ]
-                                            ]
-                                            Html.span [ prop.className "font-semibold"; prop.text friend.Name ]
-                                        ]
-                                    ]
-                            ]
-                        ]
-                    Html.div [
-                        prop.className "modal-action"
-                        prop.children [
-                            Daisy.button.button [
-                                prop.onClick (fun _ -> onClose ())
-                                prop.text "Cancel"
-                            ]
-                        ]
-                    ]
+                    for fr in selectedFriends do
+                        FriendPill.viewWithRemove fr onRemove
                 ]
             ]
+        Daisy.input [
+            prop.className "w-full mb-4"
+            prop.type' "text"
+            prop.placeholder "Search friends..."
+            prop.autoFocus true
+            prop.value searchText
+            prop.onChange (fun (v: string) ->
+                setSearchText v
+                setHighlightedIndex 0)
+            prop.onKeyDown (fun e ->
+                match e.key with
+                | "ArrowDown" ->
+                    e.preventDefault()
+                    if totalItems > 0 then
+                        setHighlightedIndex (min (highlightedIndex + 1) (totalItems - 1))
+                | "ArrowUp" ->
+                    e.preventDefault()
+                    setHighlightedIndex (max (highlightedIndex - 1) 0)
+                | "Enter" ->
+                    e.preventDefault()
+                    if highlightedIndex >= 0 && highlightedIndex < availableArr.Length then
+                        onAdd availableArr.[highlightedIndex].Slug
+                        setSearchText ""
+                        setHighlightedIndex 0
+                    elif showAddContact && highlightedIndex = availableArr.Length then
+                        onAddNew trimmedSearch
+                        setSearchText ""
+                        setHighlightedIndex 0
+                | "Escape" -> onClose ()
+                | _ -> ())
         ]
     ]
 
-let private friendChip (friendRef: FriendRef) (onRemove: string -> unit) =
-    Daisy.badge [
-        badge.lg
-        prop.className "gap-1"
-        prop.children [
-            Html.a [
-                prop.href (Router.format ("friends", friendRef.Slug))
-                prop.onClick (fun e ->
-                    e.preventDefault()
-                    Router.navigate ("friends", friendRef.Slug)
+    let content = [
+        if totalItems = 0 && not showAddContact then
+            Html.p [
+                prop.className "text-base-content/60 py-2 text-sm"
+                prop.text (
+                    if List.isEmpty allFriends && trimmedSearch = "" then "No friends available. Add friends first."
+                    elif trimmedSearch = "" then "All friends already added."
+                    else "No matches found."
                 )
-                prop.text friendRef.Name
             ]
-            Html.button [
-                prop.className "btn btn-ghost btn-xs"
-                prop.onClick (fun _ -> onRemove friendRef.Slug)
-                prop.text "x"
+        else
+            Html.div [
+                prop.className "space-y-1"
+                prop.children [
+                    for i in 0 .. availableArr.Length - 1 do
+                        let friend = availableArr.[i]
+                        let isHighlighted = (i = highlightedIndex)
+                        Html.div [
+                            prop.className (
+                                "flex items-center gap-3 p-2 rounded-lg cursor-pointer " +
+                                (if isHighlighted then "bg-primary/20" else "hover:bg-base-200"))
+                            prop.onClick (fun _ -> onAdd friend.Slug)
+                            prop.children [
+                                Daisy.avatar [
+                                    prop.children [
+                                        Html.div [
+                                            prop.className "w-10 rounded-full bg-base-300"
+                                            prop.children [
+                                                match friend.ImageRef with
+                                                | Some ref ->
+                                                    Html.img [
+                                                        prop.src $"/images/{ref}"
+                                                        prop.alt friend.Name
+                                                    ]
+                                                | None ->
+                                                    Html.div [
+                                                        prop.className "flex items-center justify-center w-full h-full text-base-content/30"
+                                                        prop.children [ Icons.friends () ]
+                                                    ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                                Html.span [ prop.className "font-semibold"; prop.text friend.Name ]
+                            ]
+                        ]
+                    if showAddContact then
+                        let isHighlighted = (highlightedIndex = availableArr.Length)
+                        Html.div [
+                            prop.className (
+                                "flex items-center gap-3 p-2 rounded-lg cursor-pointer " +
+                                (if isHighlighted then "bg-primary/20" else "hover:bg-base-200"))
+                            prop.onClick (fun _ ->
+                                onAddNew trimmedSearch
+                                setSearchText ""
+                                setHighlightedIndex 0)
+                            prop.children [
+                                Html.div [
+                                    prop.className "w-10 h-10 rounded-full bg-base-300 flex items-center justify-center text-base-content/40 text-lg"
+                                    prop.text "+"
+                                ]
+                                Html.span [
+                                    prop.className "font-semibold"
+                                    prop.text $"Add contact \"{trimmedSearch}\""
+                                ]
+                            ]
+                        ]
+                ]
             ]
-        ]
     ]
+
+    ModalPanel.viewCustom title onClose headerExtra content []
 
 let view (model: Model) (dispatch: Msg -> unit) =
     match model.IsLoading, model.Movie with
@@ -249,6 +298,26 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     ]
                                             ]
                                         ]
+                                        Daisy.badge [
+                                            badge.lg
+                                            prop.className "gap-2 select-none mt-2"
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className "cursor-pointer hover:text-primary"
+                                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
+                                                    prop.children [ Icons.recommendedBy () ]
+                                                ]
+                                                for i in 0 .. movie.RecommendedBy.Length - 1 do
+                                                    let fr = movie.RecommendedBy.[i]
+                                                    Html.span [
+                                                        prop.children [
+                                                            FriendPill.viewInline fr
+                                                            if i < movie.RecommendedBy.Length - 1 then
+                                                                Html.text ", "
+                                                        ]
+                                                    ]
+                                            ]
+                                        ]
                                         Html.p [
                                             prop.className "mt-4 text-base-content/80 leading-relaxed"
                                             prop.text movie.Overview
@@ -277,142 +346,120 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             ]
                         ]
                     ]
-                // Recommendations section
-                Html.div [
-                    prop.className "px-4 lg:px-6 mt-8"
-                    prop.children [
-                        Html.div [
-                            prop.className "flex items-center justify-between mb-3"
-                            prop.children [
-                                Html.h2 [
-                                    prop.className "text-lg font-bold font-display"
-                                    prop.text "Recommended By"
-                                ]
-                                Daisy.button.button [
-                                    button.sm
-                                    button.ghost
-                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
-                                    prop.text "+ Add"
-                                ]
-                            ]
-                        ]
-                        if List.isEmpty movie.RecommendedBy then
-                            Html.p [
-                                prop.className "text-base-content/50 text-sm"
-                                prop.text "No recommendations yet."
-                            ]
-                        else
-                            Html.div [
-                                prop.className "flex flex-wrap gap-2"
-                                prop.children [
-                                    for fr in movie.RecommendedBy do
-                                        friendChip fr (fun slug -> dispatch (Remove_recommendation slug))
-                                ]
-                            ]
-                    ]
-                ]
-                // Want to watch with section
-                Html.div [
-                    prop.className "px-4 lg:px-6 mt-8"
-                    prop.children [
-                        Html.div [
-                            prop.className "flex items-center justify-between mb-3"
-                            prop.children [
-                                Html.h2 [
-                                    prop.className "text-lg font-bold font-display"
-                                    prop.text "Want to Watch With"
-                                ]
-                                Daisy.button.button [
-                                    button.sm
-                                    button.ghost
-                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Watch_with_picker))
-                                    prop.text "+ Add"
-                                ]
-                            ]
-                        ]
-                        if List.isEmpty movie.WantToWatchWith then
-                            Html.p [
-                                prop.className "text-base-content/50 text-sm"
-                                prop.text "No watch partners yet."
-                            ]
-                        else
-                            Html.div [
-                                prop.className "flex flex-wrap gap-2"
-                                prop.children [
-                                    for fr in movie.WantToWatchWith do
-                                        friendChip fr (fun slug -> dispatch (Remove_want_to_watch_with slug))
-                                ]
-                            ]
-                    ]
-                ]
                 // Watch History section
                 Html.div [
                     prop.className "px-4 lg:px-6 mt-8"
                     prop.children [
-                        Html.div [
-                            prop.className "flex items-center justify-between mb-3"
-                            prop.children [
-                                Html.h2 [
-                                    prop.className "text-lg font-bold font-display"
-                                    prop.text "Watch History"
-                                ]
-                                Daisy.button.button [
-                                    button.sm
-                                    button.ghost
-                                    prop.onClick (fun _ -> dispatch Open_record_session)
-                                    prop.text "+ Record Session"
-                                ]
-                            ]
+                        Html.h2 [
+                            prop.className "text-lg font-bold font-display mb-3"
+                            prop.text "Watch History"
                         ]
-                        if List.isEmpty movie.WatchSessions then
-                            Html.p [
-                                prop.className "text-base-content/50 text-sm"
-                                prop.text "No watch sessions yet."
-                            ]
-                        else
-                            Html.div [
-                                prop.className "space-y-3"
-                                prop.children [
-                                    for session in movie.WatchSessions do
-                                        Daisy.card [
-                                            prop.className "bg-base-200 shadow-sm"
+                        Daisy.card [
+                            prop.className "bg-base-200 shadow-sm w-auto border border-dashed border-base-content/20"
+                            prop.children [
+                                Daisy.cardBody [
+                                    prop.className "p-3 gap-2"
+                                    prop.children [
+                                        Html.div [
+                                            prop.className "flex items-center gap-2"
                                             prop.children [
-                                                Daisy.cardBody [
-                                                    prop.className "p-4"
-                                                    prop.children [
-                                                        Html.div [
-                                                            prop.className "flex items-center justify-between"
-                                                            prop.children [
-                                                                Html.span [
-                                                                    prop.className "font-semibold"
-                                                                    prop.text session.Date
-                                                                ]
-                                                                match session.Duration with
-                                                                | Some d ->
-                                                                    Html.span [
-                                                                        prop.className "text-base-content/60 text-sm"
-                                                                        prop.text $"{d} min"
-                                                                    ]
-                                                                | None -> ()
-                                                            ]
-                                                        ]
-                                                        if not (List.isEmpty session.Friends) then
-                                                            Html.div [
-                                                                prop.className "flex flex-wrap gap-1 mt-2"
-                                                                prop.children [
-                                                                    for friend in session.Friends do
-                                                                        Daisy.badge [
-                                                                            badge.sm
-                                                                            prop.text friend.Name
-                                                                        ]
-                                                                ]
-                                                            ]
-                                                    ]
+                                                Html.span [
+                                                    prop.className "text-sm text-base-content/60 whitespace-nowrap"
+                                                    prop.text "Want to watch with"
+                                                ]
+                                                Daisy.badge [
+                                                    badge.sm
+                                                    prop.className "cursor-pointer select-none hover:badge-primary"
+                                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Watch_with_picker))
+                                                    prop.text "+"
                                                 ]
                                             ]
                                         ]
+                                        if not (List.isEmpty movie.WantToWatchWith) then
+                                            Html.div [
+                                                prop.className "flex flex-wrap gap-1 mt-1"
+                                                prop.children [
+                                                    for fr in movie.WantToWatchWith do
+                                                        FriendPill.viewWithRemove fr (fun slug -> dispatch (Remove_want_to_watch_with slug))
+                                                ]
+                                            ]
+                                    ]
                                 ]
                             ]
+                        ]
+                        Html.div [
+                            prop.className "flex flex-wrap gap-2 mt-3"
+                            prop.children [
+                                // Add session card
+                                Daisy.card [
+                                    prop.className "bg-base-200 shadow-sm w-auto border border-dashed border-base-content/20 cursor-pointer hover:bg-base-300 transition-colors duration-200"
+                                    prop.onClick (fun _ -> dispatch Record_quick_session)
+                                    prop.children [
+                                        Daisy.cardBody [
+                                            prop.className "p-3 flex-row items-center justify-center"
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className "text-base-content/40 text-lg select-none"
+                                                    prop.text "+"
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                                for session in movie.WatchSessions do
+                                    Daisy.card [
+                                        prop.className "bg-base-200 shadow-sm w-auto"
+                                        prop.key session.SessionId
+                                        prop.children [
+                                            Daisy.cardBody [
+                                                prop.className "p-3 gap-2"
+                                                prop.children [
+                                                    Html.div [
+                                                        prop.className "flex items-center gap-2"
+                                                        prop.children [
+                                                            if model.EditingSessionDate = Some session.SessionId then
+                                                                Daisy.input [
+                                                                    prop.className "w-36"
+                                                                    input.sm
+                                                                    prop.type' "date"
+                                                                    prop.autoFocus true
+                                                                    prop.value session.Date
+                                                                    prop.onChange (fun (v: string) ->
+                                                                        dispatch (Update_session_date (session.SessionId, v)))
+                                                                    prop.onBlur (fun _ ->
+                                                                        dispatch (Update_session_date (session.SessionId, session.Date)))
+                                                                    prop.onKeyDown (fun e ->
+                                                                        if e.key = "Escape" then
+                                                                            dispatch (Update_session_date (session.SessionId, session.Date)))
+                                                                ]
+                                                            else
+                                                                Html.span [
+                                                                    prop.className "font-semibold text-sm whitespace-nowrap cursor-pointer hover:text-primary transition-colors duration-150"
+                                                                    prop.onClick (fun _ -> dispatch (Edit_session_date session.SessionId))
+                                                                    prop.text session.Date
+                                                                ]
+                                                            Daisy.badge [
+                                                                badge.sm
+                                                                prop.className "cursor-pointer select-none hover:badge-primary transition-colors duration-150"
+                                                                prop.onClick (fun _ -> dispatch (Open_friend_picker (Session_friend_picker session.SessionId)))
+                                                                prop.text "+"
+                                                            ]
+                                                        ]
+                                                    ]
+                                                    if not (List.isEmpty session.Friends) then
+                                                        Html.div [
+                                                            prop.className "flex flex-wrap gap-1"
+                                                            prop.children [
+                                                                for friend in session.Friends do
+                                                                    FriendPill.viewWithRemove friend (fun slug -> dispatch (Remove_friend_from_session (session.SessionId, slug)))
+                                                            ]
+                                                        ]
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                            ]
+                        ]
                     ]
                 ]
                 // Notes section
@@ -458,111 +505,37 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 // Friend picker modal
                 match model.ShowFriendPicker with
                 | Some Recommend_picker ->
-                    let excludeSlugs = movie.RecommendedBy |> List.map (fun f -> f.Slug)
-                    friendPicker model.AllFriends excludeSlugs
+                    FriendManager
+                        "Recommended By"
+                        model.AllFriends
+                        movie.RecommendedBy
                         (fun slug -> dispatch (Recommend_friend slug))
+                        (fun slug -> dispatch (Remove_recommendation slug))
+                        (fun name -> dispatch (Add_friend_and_recommend name))
                         (fun () -> dispatch Close_friend_picker)
                 | Some Watch_with_picker ->
-                    let excludeSlugs = movie.WantToWatchWith |> List.map (fun f -> f.Slug)
-                    friendPicker model.AllFriends excludeSlugs
+                    FriendManager
+                        "Want to Watch With"
+                        model.AllFriends
+                        movie.WantToWatchWith
                         (fun slug -> dispatch (Want_to_watch_with slug))
+                        (fun slug -> dispatch (Remove_want_to_watch_with slug))
+                        (fun name -> dispatch (Add_friend_and_watch_with name))
+                        (fun () -> dispatch Close_friend_picker)
+                | Some (Session_friend_picker sessionId) ->
+                    let sessionFriends =
+                        movie.WatchSessions
+                        |> List.tryFind (fun s -> s.SessionId = sessionId)
+                        |> Option.map (fun s -> s.Friends)
+                        |> Option.defaultValue []
+                    FriendManager
+                        "Watched With"
+                        model.AllFriends
+                        sessionFriends
+                        (fun slug -> dispatch (Add_friend_to_session (sessionId, slug)))
+                        (fun slug -> dispatch (Remove_friend_from_session (sessionId, slug)))
+                        (fun name -> dispatch (Add_new_friend_to_session (sessionId, name)))
                         (fun () -> dispatch Close_friend_picker)
                 | None -> ()
-                // Record session modal
-                if model.ShowRecordSession then
-                    Daisy.modal.dialog [
-                        modal.open'
-                        prop.children [
-                            Daisy.modalBackdrop [ prop.onClick (fun _ -> dispatch Close_record_session) ]
-                            Daisy.modalBox.div [
-                                prop.children [
-                                    Html.h3 [
-                                        prop.className "font-bold text-lg font-display mb-4"
-                                        prop.text "Record Watch Session"
-                                    ]
-                                    Html.div [
-                                        prop.className "space-y-4"
-                                        prop.children [
-                                            // Date input
-                                            Html.div [
-                                                prop.children [
-                                                    Html.label [
-                                                        prop.className "label"
-                                                        prop.children [
-                                                            Html.span [ prop.className "label-text"; prop.text "Date" ]
-                                                        ]
-                                                    ]
-                                                    Daisy.input [
-                                                        prop.className "w-full"
-                                                        prop.type' "date"
-                                                        prop.value model.SessionForm.Date
-                                                        prop.onChange (fun (v: string) -> dispatch (Session_date_changed v))
-                                                    ]
-                                                ]
-                                            ]
-                                            // Duration input
-                                            Html.div [
-                                                prop.children [
-                                                    Html.label [
-                                                        prop.className "label"
-                                                        prop.children [
-                                                            Html.span [ prop.className "label-text"; prop.text "Duration" ]
-                                                        ]
-                                                    ]
-                                                    Daisy.input [
-                                                        prop.className "w-full"
-                                                        prop.type' "number"
-                                                        prop.placeholder "Minutes (optional)"
-                                                        prop.value model.SessionForm.Duration
-                                                        prop.onChange (fun (v: string) -> dispatch (Session_duration_changed v))
-                                                    ]
-                                                ]
-                                            ]
-                                            // Friend multi-select
-                                            if not (List.isEmpty model.AllFriends) then
-                                                Html.div [
-                                                    prop.children [
-                                                        Html.label [
-                                                            prop.className "label"
-                                                            prop.children [
-                                                                Html.span [ prop.className "label-text"; prop.text "Watched with" ]
-                                                            ]
-                                                        ]
-                                                        Html.div [
-                                                            prop.className "flex flex-wrap gap-2"
-                                                            prop.children [
-                                                                for friend in model.AllFriends do
-                                                                    let isSelected = model.SessionForm.SelectedFriends.Contains friend.Slug
-                                                                    Daisy.badge [
-                                                                        if isSelected then badge.primary
-                                                                        badge.lg
-                                                                        prop.className "cursor-pointer select-none"
-                                                                        prop.onClick (fun _ -> dispatch (Toggle_session_friend friend.Slug))
-                                                                        prop.text friend.Name
-                                                                    ]
-                                                            ]
-                                                        ]
-                                                    ]
-                                                ]
-                                        ]
-                                    ]
-                                    Html.div [
-                                        prop.className "modal-action"
-                                        prop.children [
-                                            Daisy.button.button [
-                                                prop.onClick (fun _ -> dispatch Close_record_session)
-                                                prop.text "Cancel"
-                                            ]
-                                            Daisy.button.button [
-                                                button.primary
-                                                prop.onClick (fun _ -> dispatch Submit_record_session)
-                                                prop.text "Record Session"
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
             ]
         ]

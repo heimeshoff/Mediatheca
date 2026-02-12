@@ -23,3 +23,5 @@ type Msg =
     | Friend_added of Result<string, string>
     | Remove_friend of string
     | Friend_removed of Result<unit, string>
+    | Upload_friend_image of slug: string * data: byte array * filename: string
+    | Image_uploaded of Result<string, string>

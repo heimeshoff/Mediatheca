@@ -77,7 +77,8 @@ let main args =
         CatalogProjection.handler
     ]
 
-    // Start projections
+    // Rebuild movie projection once to fix want_to_watch_with data, then catch up all projections
+    Projection.rebuildProjection conn MovieProjection.handler
     Projection.startAllProjections conn projectionHandlers
 
     // Create API
