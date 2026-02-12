@@ -42,9 +42,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         Daisy.button.button [
                             button.ghost
                             button.sm
-                            prop.onClick (fun e ->
-                                e.preventDefault()
-                                Fable.Core.JS.Constructors.Window.Create().history.back())
+                            prop.onClick (fun _ ->
+                                Fable.Core.JsInterop.emitJsStatement () "window.history.back()")
                             prop.text "< Back"
                         ]
                     ]
