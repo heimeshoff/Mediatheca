@@ -121,6 +121,30 @@ module Tmdb =
             Crew = get.Required.Field "crew" (Decode.list decodeCrewMember)
         })
 
+    type TmdbVideo = {
+        Key: string
+        Site: string
+        Type: string
+        Official: bool
+    }
+
+    type TmdbVideosResponse = {
+        Results: TmdbVideo list
+    }
+
+    let private decodeVideo: Decoder<TmdbVideo> =
+        Decode.object (fun get -> {
+            Key = get.Required.Field "key" Decode.string
+            Site = get.Required.Field "site" Decode.string
+            Type = get.Required.Field "type" Decode.string
+            Official = get.Optional.Field "official" Decode.bool |> Option.defaultValue false
+        })
+
+    let private decodeVideosResponse: Decoder<TmdbVideosResponse> =
+        Decode.object (fun get -> {
+            Results = get.Required.Field "results" (Decode.list decodeVideo)
+        })
+
     // Search cache
 
     module private SearchCache =
@@ -207,6 +231,23 @@ module Tmdb =
             match Decode.fromString decodeCredits json with
             | Ok credits -> return credits
             | Error e -> return failwith $"Failed to parse TMDB credits: {e}"
+        }
+
+    let getMovieTrailer (httpClient: HttpClient) (config: TmdbConfig) (tmdbId: int) : Async<string option> =
+        async {
+            let url = $"https://api.themoviedb.org/3/movie/{tmdbId}/videos?api_key={config.ApiKey}"
+            let! json = fetchJson httpClient url
+            match Decode.fromString decodeVideosResponse json with
+            | Ok response ->
+                let youtubeTrailers =
+                    response.Results
+                    |> List.filter (fun v -> v.Site = "YouTube" && v.Type = "Trailer")
+                // Prefer official trailers, then fall back to any trailer
+                let best =
+                    youtubeTrailers |> List.tryFind (fun v -> v.Official)
+                    |> Option.orElseWith (fun () -> youtubeTrailers |> List.tryHead)
+                return best |> Option.map (fun v -> v.Key)
+            | Error _ -> return None
         }
 
     let downloadImage (httpClient: HttpClient) (config: TmdbConfig) (tmdbPath: string) (size: string) (destPath: string) : Async<unit> =

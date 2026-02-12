@@ -12,6 +12,8 @@ let init (slug: string) : Model * Cmd<Msg> =
       ShowFriendPicker = None
       EditingSessionDate = None
       FullCredits = None
+      TrailerKey = None
+      ShowTrailer = false
       ConfirmingRemove = false
       Error = None },
     Cmd.batch [
@@ -28,7 +30,11 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         ]
 
     | Movie_loaded movie ->
-        { model with Movie = movie; IsLoading = false }, Cmd.none
+        let trailerCmd =
+            match movie with
+            | Some m -> Cmd.OfAsync.perform api.getMovieTrailer m.TmdbId Trailer_loaded
+            | None -> Cmd.none
+        { model with Movie = movie; IsLoading = false }, trailerCmd
 
     | Friends_loaded friends ->
         { model with AllFriends = friends }, Cmd.none
@@ -218,3 +224,12 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Full_credits_loaded (Error err) ->
         { model with Error = Some err }, Cmd.none
+
+    | Trailer_loaded key ->
+        { model with TrailerKey = key }, Cmd.none
+
+    | Open_trailer ->
+        { model with ShowTrailer = true }, Cmd.none
+
+    | Close_trailer ->
+        { model with ShowTrailer = false }, Cmd.none

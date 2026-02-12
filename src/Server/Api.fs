@@ -801,6 +801,14 @@ module Api =
                     return Error $"TMDB API key validation failed: {ex.Message}"
             }
 
+            getMovieTrailer = fun tmdbId -> async {
+                try
+                    let tmdbConfig = getTmdbConfig()
+                    return! Tmdb.getMovieTrailer httpClient tmdbConfig tmdbId
+                with _ ->
+                    return None
+            }
+
             getFullCredits = fun tmdbId -> async {
                 try
                     let tmdbConfig = getTmdbConfig()

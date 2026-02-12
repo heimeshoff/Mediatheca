@@ -422,29 +422,46 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         | None -> ()
                                                     ]
                                                 ]
-                                                // Recommended by friends inline
-                                                if not (List.isEmpty movie.RecommendedBy) then
+                                                // Trailer + Recommended by row
+                                                let hasTrailer = model.TrailerKey.IsSome
+                                                let hasRecs = not (List.isEmpty movie.RecommendedBy)
+                                                if hasTrailer || hasRecs then
                                                     Html.div [
-                                                        prop.className "flex items-center gap-3 bg-base-100/20 backdrop-blur-sm p-2 rounded-full border border-base-content/10 pr-5 w-fit cursor-pointer"
-                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
+                                                        prop.className "flex flex-wrap items-center gap-3"
                                                         prop.children [
-                                                            Html.div [
-                                                                prop.className "flex -space-x-2"
-                                                                prop.children [
-                                                                    for fr in movie.RecommendedBy |> List.truncate 3 do
-                                                                        friendAvatar "w-8 h-8" fr "bg-primary/40 text-xs font-bold border-2 border-base-300"
-                                                                    if movie.RecommendedBy.Length > 3 then
-                                                                        Html.div [
-                                                                            prop.className "w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center text-xs font-bold border-2 border-base-300 backdrop-blur-sm"
-                                                                            prop.text $"+{movie.RecommendedBy.Length - 3}"
-                                                                        ]
+                                                            if hasTrailer then
+                                                                Html.button [
+                                                                    prop.className "inline-flex items-center gap-2 bg-red-600/90 hover:bg-red-600 text-white px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
+                                                                    prop.onClick (fun _ -> dispatch Open_trailer)
+                                                                    prop.children [
+                                                                        Icons.play ()
+                                                                        Html.span [ prop.text "Play Trailer" ]
+                                                                    ]
                                                                 ]
-                                                            ]
-                                                            Html.span [
-                                                                prop.className "text-sm font-medium text-base-content/70"
-                                                                let suffix = if movie.RecommendedBy.Length > 1 then "s" else ""
-                                                                prop.text $"Recommended by {movie.RecommendedBy.Length} friend{suffix}"
-                                                            ]
+                                                            if hasRecs then
+                                                                Html.div [
+                                                                    prop.className "flex items-center gap-3 bg-base-100/20 backdrop-blur-sm p-2 rounded-full border border-base-content/10 pr-5 cursor-pointer"
+                                                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
+                                                                    prop.children [
+                                                                        Html.div [
+                                                                            prop.className "flex -space-x-2"
+                                                                            prop.children [
+                                                                                for fr in movie.RecommendedBy |> List.truncate 3 do
+                                                                                    friendAvatar "w-8 h-8" fr "bg-primary/40 text-xs font-bold border-2 border-base-300"
+                                                                                if movie.RecommendedBy.Length > 3 then
+                                                                                    Html.div [
+                                                                                        prop.className "w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center text-xs font-bold border-2 border-base-300 backdrop-blur-sm"
+                                                                                        prop.text $"+{movie.RecommendedBy.Length - 3}"
+                                                                                    ]
+                                                                            ]
+                                                                        ]
+                                                                        Html.span [
+                                                                            prop.className "text-sm font-medium text-base-content/70"
+                                                                            let suffix = if movie.RecommendedBy.Length > 1 then "s" else ""
+                                                                            prop.text $"Recommended by {movie.RecommendedBy.Length} friend{suffix}"
+                                                                        ]
+                                                                    ]
+                                                                ]
                                                         ]
                                                     ]
                                             ]
@@ -864,5 +881,38 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         (fun name -> dispatch (Add_new_friend_to_session (sessionId, name)))
                         (fun () -> dispatch Close_friend_picker)
                 | None -> ()
+                // Trailer modal
+                if model.ShowTrailer then
+                    match model.TrailerKey with
+                    | Some key ->
+                        Html.div [
+                            prop.className "fixed inset-0 z-50 flex items-center justify-center"
+                            prop.children [
+                                // Backdrop
+                                Html.div [
+                                    prop.className "absolute inset-0 bg-black/80"
+                                    prop.onClick (fun _ -> dispatch Close_trailer)
+                                ]
+                                // Player container
+                                Html.div [
+                                    prop.className "relative w-full max-w-4xl mx-4 aspect-video"
+                                    prop.children [
+                                        Html.iframe [
+                                            prop.className "w-full h-full rounded-xl"
+                                            prop.src $"https://www.youtube.com/embed/{key}?autoplay=1&rel=0"
+                                            prop.custom ("allow", "autoplay; encrypted-media")
+                                            prop.custom ("allowFullScreen", true)
+                                        ]
+                                        // Close button
+                                        Html.button [
+                                            prop.className "absolute -top-10 right-0 text-white/70 hover:text-white text-2xl font-bold cursor-pointer"
+                                            prop.onClick (fun _ -> dispatch Close_trailer)
+                                            prop.text "\u00D7"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    | None -> ()
             ]
         ]

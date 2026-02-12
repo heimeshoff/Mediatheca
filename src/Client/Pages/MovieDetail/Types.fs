@@ -10,6 +10,8 @@ type Model = {
     ShowFriendPicker: FriendPickerKind option
     EditingSessionDate: string option
     FullCredits: FullCreditsDto option
+    TrailerKey: string option
+    ShowTrailer: bool
     ConfirmingRemove: bool
     Error: string option
 }
@@ -53,3 +55,6 @@ type Msg =
     | Friend_and_watch_with_result of Result<unit, string>
     | Load_full_credits
     | Full_credits_loaded of Result<FullCreditsDto, string>
+    | Trailer_loaded of string option
+    | Open_trailer
+    | Close_trailer
