@@ -382,10 +382,10 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                         ]
                                         Daisy.badge [
                                             badge.lg
-                                            prop.className "gap-1 cursor-pointer select-none hover:badge-primary"
+                                            prop.className "gap-1 cursor-pointer select-none hover:badge-primary mt-2"
                                             prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
                                             prop.children [
-                                                Html.span [ prop.text "Recommended by" ]
+                                                Icons.recommendedBy ()
                                                 if not (List.isEmpty movie.RecommendedBy) then
                                                     Html.span [
                                                         prop.className "font-semibold"
