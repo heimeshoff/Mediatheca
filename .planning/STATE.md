@@ -6,6 +6,11 @@
 
 ## Recent Progress
 
+- **2026-02-12**: Movie detail layout refinements
+  - "Recommended by" pill button in top pills area (below genres); only shows recommendation friends + button
+  - Watch sessions as compact inline cards (flex-wrap, auto-width) showing date + friend badges
+  - "Want to watch with" shown as a dashed-border card in the watch history area with friend badges + add button
+  - When no want-to-watch-with friends, shows a "Want to watch with" pill button instead
 - **2026-02-12**: Watch time & movie detail UI refinements
   - Dashboard watch time now calculated from movie runtime (TMDB) × sessions per movie (joins watch_sessions with movie_detail)
   - Watch session duration is always the movie's runtime — removed editable duration field from record session form

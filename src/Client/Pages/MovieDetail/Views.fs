@@ -254,13 +254,11 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             prop.children [
                                                 for fr in movie.RecommendedBy do
                                                     friendChip fr (fun slug -> dispatch (Remove_recommendation slug))
-                                                for fr in movie.WantToWatchWith do
-                                                    friendChip fr (fun slug -> dispatch (Remove_want_to_watch_with slug))
                                                 Daisy.badge [
                                                     badge.lg
                                                     prop.className "cursor-pointer select-none hover:badge-primary"
                                                     prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
-                                                    prop.text "+ Add"
+                                                    prop.text "Recommended by"
                                                 ]
                                             ]
                                         ]
@@ -311,55 +309,83 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 ]
                             ]
                         ]
-                        if List.isEmpty movie.WatchSessions then
-                            Html.p [
-                                prop.className "text-base-content/50 text-sm"
-                                prop.text "No watch sessions yet."
-                            ]
-                        else
-                            Html.div [
-                                prop.className "space-y-3"
-                                prop.children [
-                                    for session in movie.WatchSessions do
-                                        Daisy.card [
-                                            prop.className "bg-base-200 shadow-sm"
-                                            prop.children [
-                                                Daisy.cardBody [
-                                                    prop.className "p-4"
-                                                    prop.children [
+                        Html.div [
+                            prop.className "flex flex-wrap gap-2"
+                            prop.children [
+                                for session in movie.WatchSessions do
+                                    Daisy.card [
+                                        prop.className "bg-base-200 shadow-sm w-auto"
+                                        prop.children [
+                                            Daisy.cardBody [
+                                                prop.className "p-3 flex-row items-center gap-2"
+                                                prop.children [
+                                                    Html.span [
+                                                        prop.className "font-semibold text-sm whitespace-nowrap"
+                                                        prop.text session.Date
+                                                    ]
+                                                    if not (List.isEmpty session.Friends) then
                                                         Html.div [
-                                                            prop.className "flex items-center justify-between"
+                                                            prop.className "flex flex-wrap gap-1"
                                                             prop.children [
-                                                                Html.span [
-                                                                    prop.className "font-semibold"
-                                                                    prop.text session.Date
-                                                                ]
-                                                                match session.Duration with
-                                                                | Some d ->
-                                                                    Html.span [
-                                                                        prop.className "text-base-content/60 text-sm"
-                                                                        prop.text $"{d} min"
+                                                                for friend in session.Friends do
+                                                                    Daisy.badge [
+                                                                        badge.sm
+                                                                        prop.text friend.Name
                                                                     ]
-                                                                | None -> ()
                                                             ]
                                                         ]
-                                                        if not (List.isEmpty session.Friends) then
-                                                            Html.div [
-                                                                prop.className "flex flex-wrap gap-1 mt-2"
-                                                                prop.children [
-                                                                    for friend in session.Friends do
-                                                                        Daisy.badge [
-                                                                            badge.sm
-                                                                            prop.text friend.Name
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                                if not (List.isEmpty movie.WantToWatchWith) then
+                                    Daisy.card [
+                                        prop.className "bg-base-200 shadow-sm w-auto border border-dashed border-base-content/20"
+                                        prop.children [
+                                            Daisy.cardBody [
+                                                prop.className "p-3 flex-row items-center gap-2"
+                                                prop.children [
+                                                    Html.span [
+                                                        prop.className "text-sm text-base-content/60 whitespace-nowrap"
+                                                        prop.text "Watch with"
+                                                    ]
+                                                    Html.div [
+                                                        prop.className "flex flex-wrap gap-1"
+                                                        prop.children [
+                                                            for fr in movie.WantToWatchWith do
+                                                                Daisy.badge [
+                                                                    badge.sm
+                                                                    prop.className "gap-1"
+                                                                    prop.children [
+                                                                        Html.span [ prop.text fr.Name ]
+                                                                        Html.button [
+                                                                            prop.className "text-xs opacity-60 hover:opacity-100"
+                                                                            prop.onClick (fun _ -> dispatch (Remove_want_to_watch_with fr.Slug))
+                                                                            prop.text "x"
                                                                         ]
+                                                                    ]
                                                                 ]
-                                                            ]
+                                                        ]
+                                                    ]
+                                                    Daisy.badge [
+                                                        badge.sm
+                                                        prop.className "cursor-pointer select-none hover:badge-primary"
+                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Watch_with_picker))
+                                                        prop.text "+"
                                                     ]
                                                 ]
                                             ]
                                         ]
-                                ]
+                                    ]
+                                else
+                                    Daisy.badge [
+                                        badge.lg
+                                        prop.className "cursor-pointer select-none hover:badge-primary"
+                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Watch_with_picker))
+                                        prop.text "Want to watch with"
+                                    ]
                             ]
+                        ]
                     ]
                 ]
                 // Notes section
