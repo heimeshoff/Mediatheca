@@ -441,17 +441,28 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             ]
                                         ]
                                     ]
-                                if not (List.isEmpty movie.WantToWatchWith) then
-                                    Daisy.card [
-                                        prop.className "bg-base-200 shadow-sm w-auto border border-dashed border-base-content/20"
-                                        prop.children [
-                                            Daisy.cardBody [
-                                                prop.className "p-3 flex-row items-center gap-2"
-                                                prop.children [
-                                                    Html.span [
-                                                        prop.className "text-sm text-base-content/60 whitespace-nowrap"
-                                                        prop.text "Watch with"
+                                Daisy.card [
+                                    prop.className "bg-base-200 shadow-sm w-auto border border-dashed border-base-content/20"
+                                    prop.children [
+                                        Daisy.cardBody [
+                                            prop.className "p-3 gap-2"
+                                            prop.children [
+                                                Html.div [
+                                                    prop.className "flex items-center gap-2"
+                                                    prop.children [
+                                                        Html.span [
+                                                            prop.className "text-sm text-base-content/60 whitespace-nowrap"
+                                                            prop.text "Want to watch with"
+                                                        ]
+                                                        Daisy.badge [
+                                                            badge.sm
+                                                            prop.className "cursor-pointer select-none hover:badge-primary"
+                                                            prop.onClick (fun _ -> dispatch (Open_friend_picker Watch_with_picker))
+                                                            prop.text "+"
+                                                        ]
                                                     ]
+                                                ]
+                                                if not (List.isEmpty movie.WantToWatchWith) then
                                                     Html.div [
                                                         prop.className "flex flex-wrap gap-1"
                                                         prop.children [
@@ -459,23 +470,10 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                 FriendPill.viewWithRemove fr (fun slug -> dispatch (Remove_want_to_watch_with slug))
                                                         ]
                                                     ]
-                                                    Daisy.badge [
-                                                        badge.sm
-                                                        prop.className "cursor-pointer select-none hover:badge-primary"
-                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Watch_with_picker))
-                                                        prop.text "+"
-                                                    ]
-                                                ]
                                             ]
                                         ]
                                     ]
-                                else
-                                    Daisy.badge [
-                                        badge.lg
-                                        prop.className "cursor-pointer select-none hover:badge-primary"
-                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Watch_with_picker))
-                                        prop.text "Want to watch with"
-                                    ]
+                                ]
                             ]
                         ]
                     ]
