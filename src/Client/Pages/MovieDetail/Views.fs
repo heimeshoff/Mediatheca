@@ -129,6 +129,119 @@ let private friendChip (friendRef: FriendRef) (onRemove: string -> unit) =
         ]
     ]
 
+[<ReactComponent>]
+let private RecommendationManager
+    (allFriends: FriendListItem list)
+    (recommendedBy: FriendRef list)
+    (onAdd: string -> unit)
+    (onRemove: string -> unit)
+    (onClose: unit -> unit) =
+    let searchText, setSearchText = React.useState("")
+    let recommendedSlugs = recommendedBy |> List.map (fun f -> f.Slug) |> Set.ofList
+    let available =
+        allFriends
+        |> List.filter (fun f ->
+            not (Set.contains f.Slug recommendedSlugs) &&
+            (searchText = "" || f.Name.ToLowerInvariant().Contains(searchText.ToLowerInvariant())))
+    Daisy.modal.dialog [
+        modal.open'
+        prop.children [
+            Daisy.modalBackdrop [ prop.onClick (fun _ -> onClose ()) ]
+            Daisy.modalBox.div [
+                prop.children [
+                    Html.h3 [
+                        prop.className "font-bold text-lg font-display mb-4"
+                        prop.text "Recommended By"
+                    ]
+                    if not (List.isEmpty recommendedBy) then
+                        Html.div [
+                            prop.className "mb-4"
+                            prop.children [
+                                Html.div [
+                                    prop.className "flex flex-wrap gap-2"
+                                    prop.children [
+                                        for fr in recommendedBy do
+                                            Daisy.badge [
+                                                badge.lg
+                                                badge.primary
+                                                prop.className "gap-1"
+                                                prop.children [
+                                                    Html.span [ prop.text fr.Name ]
+                                                    Html.button [
+                                                        prop.className "btn btn-ghost btn-xs"
+                                                        prop.onClick (fun _ -> onRemove fr.Slug)
+                                                        prop.text "x"
+                                                    ]
+                                                ]
+                                            ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    Daisy.input [
+                        prop.className "w-full mb-4"
+                        prop.type' "text"
+                        prop.placeholder "Search friends..."
+                        prop.value searchText
+                        prop.onChange (fun (v: string) -> setSearchText v)
+                    ]
+                    if List.isEmpty available then
+                        Html.p [
+                            prop.className "text-base-content/60 py-2 text-sm"
+                            prop.text (
+                                if List.isEmpty allFriends then "No friends available. Add friends first."
+                                elif searchText <> "" then "No matches found."
+                                else "All friends already added."
+                            )
+                        ]
+                    else
+                        Html.div [
+                            prop.className "space-y-2 max-h-64 overflow-y-auto"
+                            prop.children [
+                                for friend in available do
+                                    Html.div [
+                                        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 cursor-pointer"
+                                        prop.onClick (fun _ -> onAdd friend.Slug)
+                                        prop.children [
+                                            Daisy.avatar [
+                                                prop.children [
+                                                    Html.div [
+                                                        prop.className "w-10 rounded-full bg-base-300"
+                                                        prop.children [
+                                                            match friend.ImageRef with
+                                                            | Some ref ->
+                                                                Html.img [
+                                                                    prop.src $"/images/{ref}"
+                                                                    prop.alt friend.Name
+                                                                ]
+                                                            | None ->
+                                                                Html.div [
+                                                                    prop.className "flex items-center justify-center w-full h-full text-base-content/30"
+                                                                    prop.children [ Icons.friends () ]
+                                                                ]
+                                                        ]
+                                                    ]
+                                                ]
+                                            ]
+                                            Html.span [ prop.className "font-semibold"; prop.text friend.Name ]
+                                        ]
+                                    ]
+                            ]
+                        ]
+                    Html.div [
+                        prop.className "modal-action"
+                        prop.children [
+                            Daisy.button.button [
+                                prop.onClick (fun _ -> onClose ())
+                                prop.text "Done"
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+
 let view (model: Model) (dispatch: Msg -> unit) =
     match model.IsLoading, model.Movie with
     | true, _ ->
@@ -251,7 +364,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                         ]
                                         Daisy.badge [
                                             badge.lg
-                                            prop.className "gap-1"
+                                            prop.className "gap-1 cursor-pointer select-none hover:badge-primary"
+                                            prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
                                             prop.children [
                                                 Html.span [ prop.text "Recommended by" ]
                                                 if not (List.isEmpty movie.RecommendedBy) then
@@ -259,11 +373,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         prop.className "font-semibold"
                                                         prop.text (movie.RecommendedBy |> List.map (fun fr -> fr.Name) |> String.concat ", ")
                                                     ]
-                                                Html.button [
-                                                    prop.className "btn btn-ghost btn-xs btn-circle"
-                                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
-                                                    prop.text "+"
-                                                ]
                                             ]
                                         ]
                                         Html.p [
@@ -435,9 +544,11 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 // Friend picker modal
                 match model.ShowFriendPicker with
                 | Some Recommend_picker ->
-                    let excludeSlugs = movie.RecommendedBy |> List.map (fun f -> f.Slug)
-                    friendPicker model.AllFriends excludeSlugs
+                    RecommendationManager
+                        model.AllFriends
+                        movie.RecommendedBy
                         (fun slug -> dispatch (Recommend_friend slug))
+                        (fun slug -> dispatch (Remove_recommendation slug))
                         (fun () -> dispatch Close_friend_picker)
                 | Some Watch_with_picker ->
                     let excludeSlugs = movie.WantToWatchWith |> List.map (fun f -> f.Slug)

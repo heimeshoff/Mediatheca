@@ -33,7 +33,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with AllFriends = friends }, Cmd.none
 
     | Recommend_friend friendSlug ->
-        { model with ShowFriendPicker = None },
+        model,
         Cmd.OfAsync.perform (fun () -> api.recommendMovie model.Slug friendSlug) () Command_result
 
     | Remove_recommendation friendSlug ->
