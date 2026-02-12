@@ -10,8 +10,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       AllFriends = []
       IsLoading = true
       ShowFriendPicker = None
-      ShowRecordSession = false
-      SessionForm = { Date = ""; SelectedFriends = Set.empty }
+      EditingSessionDate = None
       Error = None },
     Cmd.batch [
         Cmd.ofMsg (Load_movie slug)
@@ -71,39 +70,56 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Close_friend_picker ->
         { model with ShowFriendPicker = None }, Cmd.none
 
-    | Open_record_session ->
+    | Record_quick_session ->
         let today = System.DateTime.Now.ToString("yyyy-MM-dd")
-        { model with
-            ShowRecordSession = true
-            SessionForm = { Date = today; SelectedFriends = Set.empty } }, Cmd.none
-
-    | Close_record_session ->
-        { model with ShowRecordSession = false }, Cmd.none
-
-    | Session_date_changed d ->
-        { model with SessionForm = { model.SessionForm with Date = d } }, Cmd.none
-
-    | Toggle_session_friend slug ->
-        let friends =
-            if model.SessionForm.SelectedFriends.Contains slug then
-                model.SessionForm.SelectedFriends.Remove slug
-            else
-                model.SessionForm.SelectedFriends.Add slug
-        { model with SessionForm = { model.SessionForm with SelectedFriends = friends } }, Cmd.none
-
-    | Submit_record_session ->
         let request: RecordWatchSessionRequest = {
-            Date = model.SessionForm.Date
-            FriendSlugs = model.SessionForm.SelectedFriends |> Set.toList
+            Date = today
+            FriendSlugs = []
         }
         model,
-        Cmd.OfAsync.perform (fun () -> api.recordWatchSession model.Slug request) () Session_recorded
+        Cmd.OfAsync.perform (fun () -> api.recordWatchSession model.Slug request) () Quick_session_recorded
 
-    | Session_recorded (Ok _) ->
-        { model with ShowRecordSession = false },
-        Cmd.OfAsync.perform api.getMovie model.Slug Movie_loaded
+    | Quick_session_recorded (Ok _) ->
+        model, Cmd.OfAsync.perform api.getMovie model.Slug Movie_loaded
 
-    | Session_recorded (Error err) ->
+    | Quick_session_recorded (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Edit_session_date sessionId ->
+        { model with EditingSessionDate = Some sessionId }, Cmd.none
+
+    | Update_session_date (sessionId, date) ->
+        { model with EditingSessionDate = None },
+        Cmd.OfAsync.perform (fun () -> api.updateWatchSessionDate model.Slug sessionId date) () Command_result
+
+    | Add_friend_to_session (sessionId, friendSlug) ->
+        model,
+        Cmd.OfAsync.perform (fun () -> api.addFriendToWatchSession model.Slug sessionId friendSlug) () Command_result
+
+    | Remove_friend_from_session (sessionId, friendSlug) ->
+        model,
+        Cmd.OfAsync.perform (fun () -> api.removeFriendFromWatchSession model.Slug sessionId friendSlug) () Command_result
+
+    | Add_new_friend_to_session (sessionId, name) ->
+        model,
+        Cmd.OfAsync.perform (fun () ->
+            async {
+                match! api.addFriend name with
+                | Ok slug ->
+                    match! api.addFriendToWatchSession model.Slug sessionId slug with
+                    | Ok () -> return Ok ()
+                    | Error e -> return Error e
+                | Error e -> return Error e
+            }) () New_friend_for_session_result
+
+    | New_friend_for_session_result (Ok ()) ->
+        model,
+        Cmd.batch [
+            Cmd.OfAsync.perform api.getMovie model.Slug Movie_loaded
+            Cmd.OfAsync.perform api.getFriends () Friends_loaded
+        ]
+
+    | New_friend_for_session_result (Error err) ->
         { model with Error = Some err }, Cmd.none
 
     | Add_content_block request ->
@@ -175,24 +191,4 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         ]
 
     | Friend_and_watch_with_result (Error err) ->
-        { model with Error = Some err }, Cmd.none
-
-    | Add_session_friend slug ->
-        let friends = model.SessionForm.SelectedFriends.Add slug
-        { model with SessionForm = { model.SessionForm with SelectedFriends = friends } }, Cmd.none
-
-    | Remove_session_friend slug ->
-        let friends = model.SessionForm.SelectedFriends.Remove slug
-        { model with SessionForm = { model.SessionForm with SelectedFriends = friends } }, Cmd.none
-
-    | Add_new_friend_to_session name ->
-        model,
-        Cmd.OfAsync.perform (fun () -> api.addFriend name) () New_friend_for_session_result
-
-    | New_friend_for_session_result (Ok slug) ->
-        let friends = model.SessionForm.SelectedFriends.Add slug
-        { model with SessionForm = { model.SessionForm with SelectedFriends = friends } },
-        Cmd.OfAsync.perform api.getFriends () Friends_loaded
-
-    | New_friend_for_session_result (Error err) ->
         { model with Error = Some err }, Cmd.none

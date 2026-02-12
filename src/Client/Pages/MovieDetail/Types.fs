@@ -2,26 +2,20 @@ module Mediatheca.Client.Pages.MovieDetail.Types
 
 open Mediatheca.Shared
 
-type SessionFormState = {
-    Date: string
-    SelectedFriends: Set<string>
-}
-
 type Model = {
     Slug: string
     Movie: MovieDetail option
     AllFriends: FriendListItem list
     IsLoading: bool
     ShowFriendPicker: FriendPickerKind option
-    ShowRecordSession: bool
-    SessionForm: SessionFormState
+    EditingSessionDate: string option
     Error: string option
 }
 
 and FriendPickerKind =
     | Recommend_picker
     | Watch_with_picker
-    | Session_friend_picker
+    | Session_friend_picker of sessionId: string
 
 type Msg =
     | Load_movie of string
@@ -36,12 +30,14 @@ type Msg =
     | Movie_removed of Result<unit, string>
     | Open_friend_picker of FriendPickerKind
     | Close_friend_picker
-    | Open_record_session
-    | Close_record_session
-    | Session_date_changed of string
-    | Toggle_session_friend of string
-    | Submit_record_session
-    | Session_recorded of Result<string, string>
+    | Record_quick_session
+    | Quick_session_recorded of Result<string, string>
+    | Edit_session_date of sessionId: string
+    | Update_session_date of sessionId: string * date: string
+    | Add_friend_to_session of sessionId: string * friendSlug: string
+    | Remove_friend_from_session of sessionId: string * friendSlug: string
+    | Add_new_friend_to_session of sessionId: string * name: string
+    | New_friend_for_session_result of Result<unit, string>
     | Add_content_block of AddContentBlockRequest
     | Update_content_block of blockId: string * UpdateContentBlockRequest
     | Remove_content_block of blockId: string
@@ -50,7 +46,3 @@ type Msg =
     | Friend_and_recommend_result of Result<unit, string>
     | Add_friend_and_watch_with of name: string
     | Friend_and_watch_with_result of Result<unit, string>
-    | Add_session_friend of friendSlug: string
-    | Remove_session_friend of friendSlug: string
-    | Add_new_friend_to_session of name: string
-    | New_friend_for_session_result of Result<string, string>

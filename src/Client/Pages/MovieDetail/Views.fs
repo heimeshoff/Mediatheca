@@ -350,20 +350,9 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 Html.div [
                     prop.className "px-4 lg:px-6 mt-8"
                     prop.children [
-                        Html.div [
-                            prop.className "flex items-center justify-between mb-3"
-                            prop.children [
-                                Html.h2 [
-                                    prop.className "text-lg font-bold font-display"
-                                    prop.text "Watch History"
-                                ]
-                                Daisy.button.button [
-                                    button.sm
-                                    button.ghost
-                                    prop.onClick (fun _ -> dispatch Open_record_session)
-                                    prop.text "+ Record Session"
-                                ]
-                            ]
+                        Html.h2 [
+                            prop.className "text-lg font-bold font-display mb-3"
+                            prop.text "Watch History"
                         ]
                         Daisy.card [
                             prop.className "bg-base-200 shadow-sm w-auto border border-dashed border-base-content/20"
@@ -406,11 +395,39 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                         prop.className "bg-base-200 shadow-sm w-auto"
                                         prop.children [
                                             Daisy.cardBody [
-                                                prop.className "p-3 flex-row items-center gap-2"
+                                                prop.className "p-3 gap-2"
                                                 prop.children [
-                                                    Html.span [
-                                                        prop.className "font-semibold text-sm whitespace-nowrap"
-                                                        prop.text session.Date
+                                                    Html.div [
+                                                        prop.className "flex items-center gap-2"
+                                                        prop.children [
+                                                            if model.EditingSessionDate = Some session.SessionId then
+                                                                Daisy.input [
+                                                                    prop.className "w-36"
+                                                                    input.sm
+                                                                    prop.type' "date"
+                                                                    prop.autoFocus true
+                                                                    prop.value session.Date
+                                                                    prop.onChange (fun (v: string) ->
+                                                                        dispatch (Update_session_date (session.SessionId, v)))
+                                                                    prop.onBlur (fun _ ->
+                                                                        dispatch (Update_session_date (session.SessionId, session.Date)))
+                                                                    prop.onKeyDown (fun e ->
+                                                                        if e.key = "Escape" then
+                                                                            dispatch (Update_session_date (session.SessionId, session.Date)))
+                                                                ]
+                                                            else
+                                                                Html.span [
+                                                                    prop.className "font-semibold text-sm whitespace-nowrap cursor-pointer hover:text-primary"
+                                                                    prop.onClick (fun _ -> dispatch (Edit_session_date session.SessionId))
+                                                                    prop.text session.Date
+                                                                ]
+                                                            Daisy.badge [
+                                                                badge.sm
+                                                                prop.className "cursor-pointer select-none hover:badge-primary"
+                                                                prop.onClick (fun _ -> dispatch (Open_friend_picker (Session_friend_picker session.SessionId)))
+                                                                prop.text "+"
+                                                            ]
+                                                        ]
                                                     ]
                                                     if not (List.isEmpty session.Friends) then
                                                         Html.div [
@@ -424,6 +441,22 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             ]
                                         ]
                                     ]
+                                // Add session card
+                                Daisy.card [
+                                    prop.className "bg-base-200 shadow-sm w-auto border border-dashed border-base-content/20 cursor-pointer hover:bg-base-300"
+                                    prop.onClick (fun _ -> dispatch Record_quick_session)
+                                    prop.children [
+                                        Daisy.cardBody [
+                                            prop.className "p-3 flex-row items-center justify-center"
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className "text-base-content/40 text-lg select-none"
+                                                    prop.text "+"
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
                             ]
                         ]
                     ]
@@ -488,93 +521,20 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         (fun slug -> dispatch (Remove_want_to_watch_with slug))
                         (fun name -> dispatch (Add_friend_and_watch_with name))
                         (fun () -> dispatch Close_friend_picker)
-                | Some Session_friend_picker ->
-                    let selectedRefs =
-                        model.AllFriends
-                        |> List.filter (fun f -> model.SessionForm.SelectedFriends.Contains f.Slug)
-                        |> List.map (fun f -> { Slug = f.Slug; Name = f.Name })
+                | Some (Session_friend_picker sessionId) ->
+                    let sessionFriends =
+                        movie.WatchSessions
+                        |> List.tryFind (fun s -> s.SessionId = sessionId)
+                        |> Option.map (fun s -> s.Friends)
+                        |> Option.defaultValue []
                     FriendManager
                         "Watched With"
                         model.AllFriends
-                        selectedRefs
-                        (fun slug -> dispatch (Add_session_friend slug))
-                        (fun slug -> dispatch (Remove_session_friend slug))
-                        (fun name -> dispatch (Add_new_friend_to_session name))
+                        sessionFriends
+                        (fun slug -> dispatch (Add_friend_to_session (sessionId, slug)))
+                        (fun slug -> dispatch (Remove_friend_from_session (sessionId, slug)))
+                        (fun name -> dispatch (Add_new_friend_to_session (sessionId, name)))
                         (fun () -> dispatch Close_friend_picker)
                 | None -> ()
-                // Record session modal
-                if model.ShowRecordSession then
-                    ModalPanel.viewWithFooter
-                        "Record Watch Session"
-                        (fun () -> dispatch Close_record_session)
-                        [
-                            Html.div [
-                                prop.className "space-y-4"
-                                prop.children [
-                                    // Date input
-                                    Html.div [
-                                        prop.children [
-                                            Html.label [
-                                                prop.className "label"
-                                                prop.children [
-                                                    Html.span [ prop.className "label-text"; prop.text "Date" ]
-                                                ]
-                                            ]
-                                            Daisy.input [
-                                                prop.className "w-full"
-                                                prop.type' "date"
-                                                prop.value model.SessionForm.Date
-                                                prop.onChange (fun (v: string) -> dispatch (Session_date_changed v))
-                                            ]
-                                        ]
-                                    ]
-                                    // Watched with
-                                    Html.div [
-                                        prop.children [
-                                            Html.div [
-                                                prop.className "flex items-center gap-2"
-                                                prop.children [
-                                                    Html.label [
-                                                        prop.className "label"
-                                                        prop.children [
-                                                            Html.span [ prop.className "label-text"; prop.text "Watched with" ]
-                                                        ]
-                                                    ]
-                                                    Daisy.badge [
-                                                        badge.sm
-                                                        prop.className "cursor-pointer select-none hover:badge-primary"
-                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Session_friend_picker))
-                                                        prop.text "+"
-                                                    ]
-                                                ]
-                                            ]
-                                            if not model.SessionForm.SelectedFriends.IsEmpty then
-                                                let selectedRefs =
-                                                    model.AllFriends
-                                                    |> List.filter (fun f -> model.SessionForm.SelectedFriends.Contains f.Slug)
-                                                    |> List.map (fun f -> { Slug = f.Slug; Name = f.Name })
-                                                Html.div [
-                                                    prop.className "flex flex-wrap gap-2 mt-1"
-                                                    prop.children [
-                                                        for fr in selectedRefs do
-                                                            FriendPill.viewWithRemove fr (fun slug -> dispatch (Remove_session_friend slug))
-                                                    ]
-                                                ]
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                        [
-                            Daisy.button.button [
-                                prop.onClick (fun _ -> dispatch Close_record_session)
-                                prop.text "Cancel"
-                            ]
-                            Daisy.button.button [
-                                button.primary
-                                prop.onClick (fun _ -> dispatch Submit_record_session)
-                                prop.text "Record Session"
-                            ]
-                        ]
             ]
         ]
