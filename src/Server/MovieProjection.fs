@@ -218,6 +218,24 @@ module MovieProjection =
                         "friends", SqlType.String friendsJson
                     ]
                     |> Db.exec
+                    // Remove session friends from want_to_watch_with (mirrors aggregate evolve)
+                    if not (List.isEmpty data.FriendSlugs) then
+                        let currentJson =
+                            conn
+                            |> Db.newCommand "SELECT want_to_watch_with FROM movie_detail WHERE slug = @slug"
+                            |> Db.setParams [ "slug", SqlType.String slug ]
+                            |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "want_to_watch_with")
+                            |> Option.defaultValue "[]"
+                        let current =
+                            Decode.fromString (Decode.list Decode.string) currentJson
+                            |> Result.defaultValue []
+                        let sessionFriends = Set.ofList data.FriendSlugs
+                        let updated = current |> List.filter (fun s -> not (Set.contains s sessionFriends))
+                        let updatedJson = updated |> List.map Encode.string |> Encode.list |> Encode.toString 0
+                        conn
+                        |> Db.newCommand "UPDATE movie_detail SET want_to_watch_with = @want_to_watch_with WHERE slug = @slug"
+                        |> Db.setParams [ "slug", SqlType.String slug; "want_to_watch_with", SqlType.String updatedJson ]
+                        |> Db.exec
 
                 | Movies.Watch_session_date_changed (sessionId, date) ->
                     conn
