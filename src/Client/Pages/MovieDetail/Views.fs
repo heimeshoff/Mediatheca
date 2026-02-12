@@ -119,7 +119,7 @@ let private RecommendationManager
                 prop.className "flex flex-wrap gap-2 mb-4"
                 prop.children [
                     for fr in recommendedBy do
-                        FriendPill.viewLargeWithRemove fr onRemove
+                        FriendPill.viewWithRemove fr onRemove
                 ]
             ]
         Daisy.input [
@@ -434,7 +434,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                             prop.className "flex flex-wrap gap-1"
                                                             prop.children [
                                                                 for friend in session.Friends do
-                                                                    FriendPill.viewSmall friend
+                                                                    FriendPill.view friend
                                                             ]
                                                         ]
                                                 ]
@@ -456,7 +456,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         prop.className "flex flex-wrap gap-1"
                                                         prop.children [
                                                             for fr in movie.WantToWatchWith do
-                                                                FriendPill.viewSmallWithRemove fr (fun slug -> dispatch (Remove_want_to_watch_with slug))
+                                                                FriendPill.viewWithRemove fr (fun slug -> dispatch (Remove_want_to_watch_with slug))
                                                         ]
                                                     ]
                                                     Daisy.badge [

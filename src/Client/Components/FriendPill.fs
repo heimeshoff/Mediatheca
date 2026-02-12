@@ -5,9 +5,9 @@ open Feliz.DaisyUI
 open Feliz.Router
 open Mediatheca.Shared
 
-let viewSmall (friend: FriendRef) =
+let view (friend: FriendRef) =
     Daisy.badge [
-        badge.sm
+        badge.lg
         prop.className "cursor-pointer hover:badge-primary"
         prop.onClick (fun e ->
             e.preventDefault()
@@ -22,38 +22,13 @@ let viewSmall (friend: FriendRef) =
         ]
     ]
 
-let viewSmallWithRemove (friend: FriendRef) (onRemove: string -> unit) =
+let viewWithRemove (friend: FriendRef) (onRemove: string -> unit) =
     Daisy.badge [
-        badge.sm
+        badge.lg
         prop.className "gap-1"
         prop.children [
             Html.a [
                 prop.className "cursor-pointer hover:text-primary"
-                prop.href (Router.format ("friends", friend.Slug))
-                prop.onClick (fun e ->
-                    e.preventDefault()
-                    e.stopPropagation()
-                    Router.navigate ("friends", friend.Slug))
-                prop.text friend.Name
-            ]
-            Html.button [
-                prop.className "text-xs opacity-60 hover:opacity-100"
-                prop.onClick (fun e ->
-                    e.stopPropagation()
-                    onRemove friend.Slug)
-                prop.text "x"
-            ]
-        ]
-    ]
-
-let viewLargeWithRemove (friend: FriendRef) (onRemove: string -> unit) =
-    Daisy.badge [
-        badge.lg
-        badge.primary
-        prop.className "gap-1"
-        prop.children [
-            Html.a [
-                prop.className "cursor-pointer hover:text-primary-content/70"
                 prop.href (Router.format ("friends", friend.Slug))
                 prop.onClick (fun e ->
                     e.preventDefault()
