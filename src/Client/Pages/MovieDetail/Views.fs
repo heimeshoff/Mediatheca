@@ -408,7 +408,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 ]
                                 for session in movie.WatchSessions do
                                     Daisy.card [
-                                        prop.className "bg-base-200 shadow-sm w-auto animate-pop-in"
+                                        prop.className "bg-base-200 shadow-sm w-auto"
                                         prop.key session.SessionId
                                         prop.children [
                                             Daisy.cardBody [
