@@ -382,14 +382,29 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                         ]
                                         Daisy.badge [
                                             badge.lg
-                                            prop.className "gap-2 cursor-pointer select-none hover:badge-primary mt-2"
-                                            prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
+                                            prop.className "gap-2 select-none mt-2"
                                             prop.children [
-                                                Icons.recommendedBy ()
-                                                if not (List.isEmpty movie.RecommendedBy) then
+                                                Html.span [
+                                                    prop.className "cursor-pointer hover:text-primary"
+                                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
+                                                    prop.children [ Icons.recommendedBy () ]
+                                                ]
+                                                for i in 0 .. movie.RecommendedBy.Length - 1 do
+                                                    let fr = movie.RecommendedBy.[i]
                                                     Html.span [
-                                                        prop.className "font-semibold"
-                                                        prop.text (movie.RecommendedBy |> List.map (fun fr -> fr.Name) |> String.concat ", ")
+                                                        prop.children [
+                                                            Html.a [
+                                                                prop.className "font-semibold cursor-pointer hover:text-primary"
+                                                                prop.href (Router.format ("friends", fr.Slug))
+                                                                prop.onClick (fun e ->
+                                                                    e.preventDefault()
+                                                                    e.stopPropagation()
+                                                                    Router.navigate ("friends", fr.Slug))
+                                                                prop.text fr.Name
+                                                            ]
+                                                            if i < movie.RecommendedBy.Length - 1 then
+                                                                Html.text ", "
+                                                        ]
                                                     ]
                                             ]
                                         ]
