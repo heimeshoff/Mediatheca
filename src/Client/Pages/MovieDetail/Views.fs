@@ -390,9 +390,26 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         Html.div [
                             prop.className "flex flex-wrap gap-2 mt-3"
                             prop.children [
+                                // Add session card
+                                Daisy.card [
+                                    prop.className "bg-base-200 shadow-sm w-auto border border-dashed border-base-content/20 cursor-pointer hover:bg-base-300 transition-colors duration-200"
+                                    prop.onClick (fun _ -> dispatch Record_quick_session)
+                                    prop.children [
+                                        Daisy.cardBody [
+                                            prop.className "p-3 flex-row items-center justify-center"
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className "text-base-content/40 text-lg select-none"
+                                                    prop.text "+"
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
                                 for session in movie.WatchSessions do
                                     Daisy.card [
-                                        prop.className "bg-base-200 shadow-sm w-auto"
+                                        prop.className "bg-base-200 shadow-sm w-auto animate-pop-in"
+                                        prop.key session.SessionId
                                         prop.children [
                                             Daisy.cardBody [
                                                 prop.className "p-3 gap-2"
@@ -417,13 +434,13 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                 ]
                                                             else
                                                                 Html.span [
-                                                                    prop.className "font-semibold text-sm whitespace-nowrap cursor-pointer hover:text-primary"
+                                                                    prop.className "font-semibold text-sm whitespace-nowrap cursor-pointer hover:text-primary transition-colors duration-150"
                                                                     prop.onClick (fun _ -> dispatch (Edit_session_date session.SessionId))
                                                                     prop.text session.Date
                                                                 ]
                                                             Daisy.badge [
                                                                 badge.sm
-                                                                prop.className "cursor-pointer select-none hover:badge-primary"
+                                                                prop.className "cursor-pointer select-none hover:badge-primary transition-colors duration-150"
                                                                 prop.onClick (fun _ -> dispatch (Open_friend_picker (Session_friend_picker session.SessionId)))
                                                                 prop.text "+"
                                                             ]
@@ -441,22 +458,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             ]
                                         ]
                                     ]
-                                // Add session card
-                                Daisy.card [
-                                    prop.className "bg-base-200 shadow-sm w-auto border border-dashed border-base-content/20 cursor-pointer hover:bg-base-300"
-                                    prop.onClick (fun _ -> dispatch Record_quick_session)
-                                    prop.children [
-                                        Daisy.cardBody [
-                                            prop.className "p-3 flex-row items-center justify-center"
-                                            prop.children [
-                                                Html.span [
-                                                    prop.className "text-base-content/40 text-lg select-none"
-                                                    prop.text "+"
-                                                ]
-                                            ]
-                                        ]
-                                    ]
-                                ]
                             ]
                         ]
                     ]
