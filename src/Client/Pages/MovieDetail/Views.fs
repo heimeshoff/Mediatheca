@@ -365,8 +365,41 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 ]
                             ]
                         ]
+                        Daisy.card [
+                            prop.className "bg-base-200 shadow-sm w-auto border border-dashed border-base-content/20"
+                            prop.children [
+                                Daisy.cardBody [
+                                    prop.className "p-3 gap-2"
+                                    prop.children [
+                                        Html.div [
+                                            prop.className "flex items-center gap-2"
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className "text-sm text-base-content/60 whitespace-nowrap"
+                                                    prop.text "Want to watch with"
+                                                ]
+                                                Daisy.badge [
+                                                    badge.sm
+                                                    prop.className "cursor-pointer select-none hover:badge-primary"
+                                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Watch_with_picker))
+                                                    prop.text "+"
+                                                ]
+                                            ]
+                                        ]
+                                        if not (List.isEmpty movie.WantToWatchWith) then
+                                            Html.div [
+                                                prop.className "flex flex-wrap gap-1 mt-1"
+                                                prop.children [
+                                                    for fr in movie.WantToWatchWith do
+                                                        FriendPill.viewWithRemove fr (fun slug -> dispatch (Remove_want_to_watch_with slug))
+                                                ]
+                                            ]
+                                    ]
+                                ]
+                            ]
+                        ]
                         Html.div [
-                            prop.className "flex flex-wrap gap-2"
+                            prop.className "flex flex-wrap gap-2 mt-3"
                             prop.children [
                                 for session in movie.WatchSessions do
                                     Daisy.card [
@@ -391,39 +424,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             ]
                                         ]
                                     ]
-                                Daisy.card [
-                                    prop.className "bg-base-200 shadow-sm w-auto border border-dashed border-base-content/20"
-                                    prop.children [
-                                        Daisy.cardBody [
-                                            prop.className "p-3 gap-2"
-                                            prop.children [
-                                                Html.div [
-                                                    prop.className "flex items-center gap-2"
-                                                    prop.children [
-                                                        Html.span [
-                                                            prop.className "text-sm text-base-content/60 whitespace-nowrap"
-                                                            prop.text "Want to watch with"
-                                                        ]
-                                                        Daisy.badge [
-                                                            badge.sm
-                                                            prop.className "cursor-pointer select-none hover:badge-primary"
-                                                            prop.onClick (fun _ -> dispatch (Open_friend_picker Watch_with_picker))
-                                                            prop.text "+"
-                                                        ]
-                                                    ]
-                                                ]
-                                                if not (List.isEmpty movie.WantToWatchWith) then
-                                                    Html.div [
-                                                        prop.className "flex flex-wrap gap-1 mt-1"
-                                                        prop.children [
-                                                            for fr in movie.WantToWatchWith do
-                                                                FriendPill.viewWithRemove fr (fun slug -> dispatch (Remove_want_to_watch_with slug))
-                                                        ]
-                                                    ]
-                                            ]
-                                        ]
-                                    ]
-                                ]
                             ]
                         ]
                     ]
@@ -488,6 +488,19 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         (fun slug -> dispatch (Remove_want_to_watch_with slug))
                         (fun name -> dispatch (Add_friend_and_watch_with name))
                         (fun () -> dispatch Close_friend_picker)
+                | Some Session_friend_picker ->
+                    let selectedRefs =
+                        model.AllFriends
+                        |> List.filter (fun f -> model.SessionForm.SelectedFriends.Contains f.Slug)
+                        |> List.map (fun f -> { Slug = f.Slug; Name = f.Name })
+                    FriendManager
+                        "Watched With"
+                        model.AllFriends
+                        selectedRefs
+                        (fun slug -> dispatch (Add_session_friend slug))
+                        (fun slug -> dispatch (Remove_session_friend slug))
+                        (fun name -> dispatch (Add_new_friend_to_session name))
+                        (fun () -> dispatch Close_friend_picker)
                 | None -> ()
                 // Record session modal
                 if model.ShowRecordSession then
@@ -515,32 +528,40 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             ]
                                         ]
                                     ]
-                                    // Friend multi-select
-                                    if not (List.isEmpty model.AllFriends) then
-                                        Html.div [
-                                            prop.children [
-                                                Html.label [
-                                                    prop.className "label"
-                                                    prop.children [
-                                                        Html.span [ prop.className "label-text"; prop.text "Watched with" ]
+                                    // Watched with
+                                    Html.div [
+                                        prop.children [
+                                            Html.div [
+                                                prop.className "flex items-center gap-2"
+                                                prop.children [
+                                                    Html.label [
+                                                        prop.className "label"
+                                                        prop.children [
+                                                            Html.span [ prop.className "label-text"; prop.text "Watched with" ]
+                                                        ]
                                                     ]
-                                                ]
-                                                Html.div [
-                                                    prop.className "flex flex-wrap gap-2"
-                                                    prop.children [
-                                                        for friend in model.AllFriends do
-                                                            let isSelected = model.SessionForm.SelectedFriends.Contains friend.Slug
-                                                            Daisy.badge [
-                                                                if isSelected then badge.primary
-                                                                badge.lg
-                                                                prop.className "cursor-pointer select-none"
-                                                                prop.onClick (fun _ -> dispatch (Toggle_session_friend friend.Slug))
-                                                                prop.text friend.Name
-                                                            ]
+                                                    Daisy.badge [
+                                                        badge.sm
+                                                        prop.className "cursor-pointer select-none hover:badge-primary"
+                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Session_friend_picker))
+                                                        prop.text "+"
                                                     ]
                                                 ]
                                             ]
+                                            if not model.SessionForm.SelectedFriends.IsEmpty then
+                                                let selectedRefs =
+                                                    model.AllFriends
+                                                    |> List.filter (fun f -> model.SessionForm.SelectedFriends.Contains f.Slug)
+                                                    |> List.map (fun f -> { Slug = f.Slug; Name = f.Name })
+                                                Html.div [
+                                                    prop.className "flex flex-wrap gap-2 mt-1"
+                                                    prop.children [
+                                                        for fr in selectedRefs do
+                                                            FriendPill.viewWithRemove fr (fun slug -> dispatch (Remove_session_friend slug))
+                                                    ]
+                                                ]
                                         ]
+                                    ]
                                 ]
                             ]
                         ]

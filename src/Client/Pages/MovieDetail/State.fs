@@ -176,3 +176,23 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Friend_and_watch_with_result (Error err) ->
         { model with Error = Some err }, Cmd.none
+
+    | Add_session_friend slug ->
+        let friends = model.SessionForm.SelectedFriends.Add slug
+        { model with SessionForm = { model.SessionForm with SelectedFriends = friends } }, Cmd.none
+
+    | Remove_session_friend slug ->
+        let friends = model.SessionForm.SelectedFriends.Remove slug
+        { model with SessionForm = { model.SessionForm with SelectedFriends = friends } }, Cmd.none
+
+    | Add_new_friend_to_session name ->
+        model,
+        Cmd.OfAsync.perform (fun () -> api.addFriend name) () New_friend_for_session_result
+
+    | New_friend_for_session_result (Ok slug) ->
+        let friends = model.SessionForm.SelectedFriends.Add slug
+        { model with SessionForm = { model.SessionForm with SelectedFriends = friends } },
+        Cmd.OfAsync.perform api.getFriends () Friends_loaded
+
+    | New_friend_for_session_result (Error err) ->
+        { model with Error = Some err }, Cmd.none

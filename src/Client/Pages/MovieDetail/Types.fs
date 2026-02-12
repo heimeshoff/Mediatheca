@@ -21,6 +21,7 @@ type Model = {
 and FriendPickerKind =
     | Recommend_picker
     | Watch_with_picker
+    | Session_friend_picker
 
 type Msg =
     | Load_movie of string
@@ -49,3 +50,7 @@ type Msg =
     | Friend_and_recommend_result of Result<unit, string>
     | Add_friend_and_watch_with of name: string
     | Friend_and_watch_with_result of Result<unit, string>
+    | Add_session_friend of friendSlug: string
+    | Remove_session_friend of friendSlug: string
+    | Add_new_friend_to_session of name: string
+    | New_friend_for_session_result of Result<string, string>
