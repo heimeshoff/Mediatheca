@@ -76,7 +76,6 @@ type WatchSessionDto = {
 
 type RecordWatchSessionRequest = {
     Date: string
-    Duration: int option
     FriendSlugs: string list
 }
 

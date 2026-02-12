@@ -11,7 +11,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       IsLoading = true
       ShowFriendPicker = None
       ShowRecordSession = false
-      SessionForm = { Date = ""; Duration = ""; SelectedFriends = Set.empty }
+      SessionForm = { Date = ""; SelectedFriends = Set.empty }
       Error = None },
     Cmd.batch [
         Cmd.ofMsg (Load_movie slug)
@@ -75,16 +75,13 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         let today = System.DateTime.Now.ToString("yyyy-MM-dd")
         { model with
             ShowRecordSession = true
-            SessionForm = { Date = today; Duration = ""; SelectedFriends = Set.empty } }, Cmd.none
+            SessionForm = { Date = today; SelectedFriends = Set.empty } }, Cmd.none
 
     | Close_record_session ->
         { model with ShowRecordSession = false }, Cmd.none
 
     | Session_date_changed d ->
         { model with SessionForm = { model.SessionForm with Date = d } }, Cmd.none
-
-    | Session_duration_changed d ->
-        { model with SessionForm = { model.SessionForm with Duration = d } }, Cmd.none
 
     | Toggle_session_friend slug ->
         let friends =
@@ -95,13 +92,8 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with SessionForm = { model.SessionForm with SelectedFriends = friends } }, Cmd.none
 
     | Submit_record_session ->
-        let duration =
-            match System.Int32.TryParse model.SessionForm.Duration with
-            | true, v when v > 0 -> Some v
-            | _ -> None
         let request: RecordWatchSessionRequest = {
             Date = model.SessionForm.Date
-            Duration = duration
             FriendSlugs = model.SessionForm.SelectedFriends |> Set.toList
         }
         model,

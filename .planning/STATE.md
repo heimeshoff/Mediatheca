@@ -6,6 +6,12 @@
 
 ## Recent Progress
 
+- **2026-02-12**: Watch time & movie detail UI refinements
+  - Dashboard watch time now calculated from movie runtime (TMDB) × sessions per movie (joins watch_sessions with movie_detail)
+  - Watch session duration is always the movie's runtime — removed editable duration field from record session form
+  - Removed Duration from RecordWatchSessionRequest; server looks up runtime from movie_detail table
+  - "Recommended By" and "Want to Watch With" moved to pill collection below genres, above description, with "+ Add" pill
+  - Removed old standalone "Recommended By" and "Want to Watch With" sections from below cast
 - **2026-02-08**: Phase 4 (Curation + Dashboards + Admin) fully implemented — REQ-022 through REQ-028
   - Catalog aggregate with events: Catalog_created, Catalog_updated, Catalog_removed, Entry_added, Entry_updated, Entry_removed, Entries_reordered — with duplicate movie prevention per catalog
   - CatalogProjection with catalog_list and catalog_entries tables, JOIN to movie_list for movie metadata

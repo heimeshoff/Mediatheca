@@ -249,6 +249,21 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     ]
                                             ]
                                         ]
+                                        Html.div [
+                                            prop.className "flex flex-wrap gap-2 mt-3 items-center"
+                                            prop.children [
+                                                for fr in movie.RecommendedBy do
+                                                    friendChip fr (fun slug -> dispatch (Remove_recommendation slug))
+                                                for fr in movie.WantToWatchWith do
+                                                    friendChip fr (fun slug -> dispatch (Remove_want_to_watch_with slug))
+                                                Daisy.badge [
+                                                    badge.lg
+                                                    prop.className "cursor-pointer select-none hover:badge-primary"
+                                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
+                                                    prop.text "+ Add"
+                                                ]
+                                            ]
+                                        ]
                                         Html.p [
                                             prop.className "mt-4 text-base-content/80 leading-relaxed"
                                             prop.text movie.Overview
@@ -277,74 +292,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             ]
                         ]
                     ]
-                // Recommendations section
-                Html.div [
-                    prop.className "px-4 lg:px-6 mt-8"
-                    prop.children [
-                        Html.div [
-                            prop.className "flex items-center justify-between mb-3"
-                            prop.children [
-                                Html.h2 [
-                                    prop.className "text-lg font-bold font-display"
-                                    prop.text "Recommended By"
-                                ]
-                                Daisy.button.button [
-                                    button.sm
-                                    button.ghost
-                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
-                                    prop.text "+ Add"
-                                ]
-                            ]
-                        ]
-                        if List.isEmpty movie.RecommendedBy then
-                            Html.p [
-                                prop.className "text-base-content/50 text-sm"
-                                prop.text "No recommendations yet."
-                            ]
-                        else
-                            Html.div [
-                                prop.className "flex flex-wrap gap-2"
-                                prop.children [
-                                    for fr in movie.RecommendedBy do
-                                        friendChip fr (fun slug -> dispatch (Remove_recommendation slug))
-                                ]
-                            ]
-                    ]
-                ]
-                // Want to watch with section
-                Html.div [
-                    prop.className "px-4 lg:px-6 mt-8"
-                    prop.children [
-                        Html.div [
-                            prop.className "flex items-center justify-between mb-3"
-                            prop.children [
-                                Html.h2 [
-                                    prop.className "text-lg font-bold font-display"
-                                    prop.text "Want to Watch With"
-                                ]
-                                Daisy.button.button [
-                                    button.sm
-                                    button.ghost
-                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Watch_with_picker))
-                                    prop.text "+ Add"
-                                ]
-                            ]
-                        ]
-                        if List.isEmpty movie.WantToWatchWith then
-                            Html.p [
-                                prop.className "text-base-content/50 text-sm"
-                                prop.text "No watch partners yet."
-                            ]
-                        else
-                            Html.div [
-                                prop.className "flex flex-wrap gap-2"
-                                prop.children [
-                                    for fr in movie.WantToWatchWith do
-                                        friendChip fr (fun slug -> dispatch (Remove_want_to_watch_with slug))
-                                ]
-                            ]
-                    ]
-                ]
                 // Watch History section
                 Html.div [
                     prop.className "px-4 lg:px-6 mt-8"
@@ -497,24 +444,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         prop.type' "date"
                                                         prop.value model.SessionForm.Date
                                                         prop.onChange (fun (v: string) -> dispatch (Session_date_changed v))
-                                                    ]
-                                                ]
-                                            ]
-                                            // Duration input
-                                            Html.div [
-                                                prop.children [
-                                                    Html.label [
-                                                        prop.className "label"
-                                                        prop.children [
-                                                            Html.span [ prop.className "label-text"; prop.text "Duration" ]
-                                                        ]
-                                                    ]
-                                                    Daisy.input [
-                                                        prop.className "w-full"
-                                                        prop.type' "number"
-                                                        prop.placeholder "Minutes (optional)"
-                                                        prop.value model.SessionForm.Duration
-                                                        prop.onChange (fun (v: string) -> dispatch (Session_duration_changed v))
                                                     ]
                                                 ]
                                             ]

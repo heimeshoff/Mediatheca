@@ -290,11 +290,19 @@ module Api =
             // Watch Sessions
             recordWatchSession = fun slug request -> async {
                 let sid = Movies.streamId slug
+                let runtime =
+                    conn
+                    |> Db.newCommand "SELECT runtime FROM movie_detail WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.querySingle (fun (rd: IDataReader) ->
+                        if rd.IsDBNull(rd.GetOrdinal("runtime")) then None
+                        else Some (rd.ReadInt32 "runtime"))
+                    |> Option.flatten
                 let sessionId = System.Guid.NewGuid().ToString("N")
                 let sessionData: Movies.WatchSessionRecordedData = {
                     SessionId = sessionId
                     Date = request.Date
-                    Duration = request.Duration
+                    Duration = runtime
                     FriendSlugs = request.FriendSlugs
                 }
                 let result =
@@ -591,7 +599,7 @@ module Api =
                     |> Option.defaultValue 0
                 let totalWatchTime =
                     conn
-                    |> Db.newCommand "SELECT COALESCE(SUM(duration), 0) as total FROM watch_sessions"
+                    |> Db.newCommand "SELECT COALESCE(SUM(md.runtime), 0) as total FROM watch_sessions ws JOIN movie_detail md ON ws.movie_slug = md.slug"
                     |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
                     |> Option.defaultValue 0
                 return {

@@ -4,7 +4,6 @@ open Mediatheca.Shared
 
 type SessionFormState = {
     Date: string
-    Duration: string
     SelectedFriends: Set<string>
 }
 
@@ -39,7 +38,6 @@ type Msg =
     | Open_record_session
     | Close_record_session
     | Session_date_changed of string
-    | Session_duration_changed of string
     | Toggle_session_friend of string
     | Submit_record_session
     | Session_recorded of Result<string, string>
