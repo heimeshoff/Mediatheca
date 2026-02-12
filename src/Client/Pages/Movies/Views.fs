@@ -12,79 +12,14 @@ let private ratingColor (rating: float) =
     else "badge-error"
 
 let private movieCard (movie: Mediatheca.Shared.MovieListItem) =
-    Html.a [
-        prop.href (Router.format ("movies", movie.Slug))
-        prop.onClick (fun e ->
-            e.preventDefault()
-            Router.navigate ("movies", movie.Slug)
-        )
-        prop.children [
-            Daisy.card [
-                card.sm
-                prop.className "poster-card card-hover bg-base-100 shadow-md cursor-pointer overflow-hidden"
-                prop.children [
-                    Html.figure [
-                        prop.className "relative aspect-[2/3] bg-base-300 overflow-hidden"
-                        prop.children [
-                            match movie.PosterRef with
-                            | Some ref ->
-                                Html.img [
-                                    prop.src $"/images/{ref}"
-                                    prop.alt movie.Name
-                                    prop.className "w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                ]
-                            | None ->
-                                Html.div [
-                                    prop.className "flex items-center justify-center w-full h-full text-base-content/30"
-                                    prop.children [
-                                        Icons.movie ()
-                                    ]
-                                ]
-                            // Rating badge overlay
-                            match movie.TmdbRating with
-                            | Some rating ->
-                                Html.div [
-                                    prop.className $"absolute top-2 right-2 badge badge-sm {ratingColor rating} font-bold shadow-lg"
-                                    prop.text $"%.1f{rating}"
-                                ]
-                            | None -> ()
-                            // Bottom gradient overlay
-                            Html.div [
-                                prop.className "poster-overlay absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/70 to-transparent"
-                            ]
-                            Html.div [
-                                prop.className "poster-overlay absolute inset-x-0 bottom-0 p-3"
-                                prop.children [
-                                    Html.p [
-                                        prop.className "text-white text-xs font-medium line-clamp-2 drop-shadow-md"
-                                        prop.text movie.Name
-                                    ]
-                                    Html.p [
-                                        prop.className "text-white/70 text-xs mt-0.5"
-                                        prop.text (string movie.Year)
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                    Daisy.cardBody [
-                        prop.children [
-                            Html.h3 [
-                                prop.className "card-title text-sm font-semibold line-clamp-1"
-                                prop.text movie.Name
-                            ]
-                            Html.div [
-                                prop.className "flex items-center gap-2 text-xs text-base-content/50"
-                                prop.children [
-                                    Html.span [ prop.text (string movie.Year) ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
-        ]
-    ]
+    let ratingBadge =
+        movie.TmdbRating
+        |> Option.map (fun rating ->
+            Html.div [
+                prop.className $"absolute top-2 right-2 badge badge-sm {ratingColor rating} font-bold shadow-lg"
+                prop.text $"%.1f{rating}"
+            ])
+    PosterCard.view movie.Slug movie.Name movie.Year movie.PosterRef ratingBadge
 
 let private allGenres (movies: Mediatheca.Shared.MovieListItem list) =
     movies

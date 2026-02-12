@@ -100,6 +100,10 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         model,
         Cmd.OfAsync.perform (fun () -> api.removeFriendFromWatchSession model.Slug sessionId friendSlug) () Command_result
 
+    | Remove_watch_session sessionId ->
+        model,
+        Cmd.OfAsync.perform (fun () -> api.removeWatchSession model.Slug sessionId) () Command_result
+
     | Add_new_friend_to_session (sessionId, name) ->
         model,
         Cmd.OfAsync.perform (fun () ->

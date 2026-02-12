@@ -36,6 +36,7 @@ type Msg =
     | Update_session_date of sessionId: string * date: string
     | Add_friend_to_session of sessionId: string * friendSlug: string
     | Remove_friend_from_session of sessionId: string * friendSlug: string
+    | Remove_watch_session of sessionId: string
     | Add_new_friend_to_session of sessionId: string * name: string
     | New_friend_for_session_result of Result<unit, string>
     | Add_content_block of AddContentBlockRequest

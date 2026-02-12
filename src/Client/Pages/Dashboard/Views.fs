@@ -53,23 +53,7 @@ let private recentMovieCard (movie: Mediatheca.Shared.MovieListItem) =
         )
         prop.className "flex items-center gap-3 p-3 rounded-xl hover:bg-base-300/50 transition-colors cursor-pointer group"
         prop.children [
-            Html.div [
-                prop.className "w-10 h-14 rounded-lg overflow-hidden bg-base-300 flex-none"
-                prop.children [
-                    match movie.PosterRef with
-                    | Some ref ->
-                        Html.img [
-                            prop.src $"/images/{ref}"
-                            prop.alt movie.Name
-                            prop.className "w-full h-full object-cover"
-                        ]
-                    | None ->
-                        Html.div [
-                            prop.className "flex items-center justify-center w-full h-full text-base-content/20"
-                            prop.children [ Icons.movie () ]
-                        ]
-                ]
-            ]
+            PosterCard.thumbnail movie.PosterRef movie.Name
             Html.div [
                 prop.className "flex-1 min-w-0"
                 prop.children [

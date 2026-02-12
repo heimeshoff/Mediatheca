@@ -11,7 +11,8 @@ let init (slug: string) : Model * Cmd<Msg> =
       IsLoading = true
       IsEditing = false
       EditForm = { Name = ""; ImageRef = None }
-      Error = None },
+      Error = None
+      ShowRemoveConfirm = false },
     Cmd.ofMsg (Load_friend slug)
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
@@ -64,7 +65,13 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with Error = Some err }, Cmd.none
 
     | Remove_friend ->
-        model,
+        { model with ShowRemoveConfirm = true }, Cmd.none
+
+    | Cancel_remove_friend ->
+        { model with ShowRemoveConfirm = false }, Cmd.none
+
+    | Confirm_remove_friend ->
+        { model with ShowRemoveConfirm = false },
         Cmd.OfAsync.either
             api.removeFriend model.Slug
             Remove_result

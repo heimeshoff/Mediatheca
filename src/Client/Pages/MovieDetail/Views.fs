@@ -603,7 +603,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                             let session = movie.WatchSessions.[i]
                                                             Html.div [
                                                                 prop.key session.SessionId
-                                                                prop.className "relative pl-8"
+                                                                prop.className "group/session relative pl-8"
                                                                 prop.children [
                                                                     // Timeline dot
                                                                     Html.div [
@@ -644,6 +644,12 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                                             prop.onClick (fun _ -> dispatch (Edit_session_date session.SessionId))
                                                                                             prop.text session.Date
                                                                                         ]
+                                                                                    Html.button [
+                                                                                        prop.className "opacity-0 group-hover/session:opacity-100 transition-opacity text-base-content/30 hover:text-error text-xs"
+                                                                                        prop.title "Remove session"
+                                                                                        prop.onClick (fun _ -> dispatch (Remove_watch_session session.SessionId))
+                                                                                        prop.children [ Icons.trash () ]
+                                                                                    ]
                                                                                 ]
                                                                             ]
                                                                             // Session friends

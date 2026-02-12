@@ -358,6 +358,19 @@ module Api =
                         movieProjections
             }
 
+            removeWatchSession = fun slug sessionId -> async {
+                let sid = Movies.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        (Movies.Remove_watch_session sessionId)
+                        movieProjections
+            }
+
             getWatchSessions = fun slug -> async {
                 return MovieProjection.getWatchSessions conn slug
             }
@@ -619,6 +632,7 @@ module Api =
                         | "Movie_added_to_library" -> "Movie added to library"
                         | "Movie_removed_from_library" -> "Movie removed from library"
                         | "Watch_session_recorded" -> "Watch session recorded"
+                        | "Watch_session_removed" -> "Watch session removed"
                         | "Friend_added" -> "Friend added"
                         | "Friend_removed" -> "Friend removed"
                         | "Catalog_created" -> "Catalog created"
@@ -686,7 +700,8 @@ module Api =
 
             removeFriend = fun slug -> async {
                 let sid = Friends.streamId slug
-                return
+                let imageRef = FriendProjection.getBySlug conn slug |> Option.bind (fun f -> f.ImageRef)
+                let result =
                     executeCommand
                         conn sid
                         Friends.Serialization.fromStoredEvent
@@ -695,6 +710,11 @@ module Api =
                         Friends.Serialization.toEventData
                         Friends.Remove_friend
                         friendProjections
+                match result with
+                | Ok () ->
+                    imageRef |> Option.iter (fun ref -> ImageStore.deleteImage imageBasePath ref)
+                    return Ok ()
+                | Error e -> return Error e
             }
 
             getFriend = fun slug -> async {

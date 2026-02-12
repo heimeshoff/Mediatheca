@@ -72,10 +72,18 @@ type FriendMovieItem = {
     PosterRef: string option
 }
 
+type FriendWatchedItem = {
+    Slug: string
+    Name: string
+    Year: int
+    PosterRef: string option
+    Dates: string list
+}
+
 type FriendMovies = {
     RecommendedMovies: FriendMovieItem list
     WantToWatchMovies: FriendMovieItem list
-    WatchedMovies: FriendMovieItem list
+    WatchedMovies: FriendWatchedItem list
 }
 
 // Watch Sessions
@@ -267,6 +275,7 @@ type IMediathecaApi = {
     updateWatchSessionDate: string -> string -> string -> Async<Result<unit, string>>
     addFriendToWatchSession: string -> string -> string -> Async<Result<unit, string>>
     removeFriendFromWatchSession: string -> string -> string -> Async<Result<unit, string>>
+    removeWatchSession: string -> string -> Async<Result<unit, string>>
     getWatchSessions: string -> Async<WatchSessionDto list>
     // Content Blocks
     addContentBlock: string -> string option -> AddContentBlockRequest -> Async<Result<string, string>>

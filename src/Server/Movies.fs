@@ -41,6 +41,7 @@ module Movies =
         | Watch_session_date_changed of sessionId: string * date: string
         | Friend_added_to_watch_session of sessionId: string * friendSlug: string
         | Friend_removed_from_watch_session of sessionId: string * friendSlug: string
+        | Watch_session_removed of sessionId: string
 
     // State
 
@@ -86,6 +87,7 @@ module Movies =
         | Change_watch_session_date of sessionId: string * date: string
         | Add_friend_to_watch_session of sessionId: string * friendSlug: string
         | Remove_friend_from_watch_session of sessionId: string * friendSlug: string
+        | Remove_watch_session of sessionId: string
 
     // Evolve
 
@@ -153,6 +155,8 @@ module Movies =
             | Some session ->
                 Active { movie with WatchSessions = movie.WatchSessions |> Map.add sessionId { session with Friends = session.Friends |> Set.remove friendSlug } }
             | None -> state
+        | Active movie, Watch_session_removed sessionId ->
+            Active { movie with WatchSessions = movie.WatchSessions |> Map.remove sessionId }
         | _ -> state
 
     let reconstitute (events: MovieEvent list) : MovieState =
@@ -213,6 +217,10 @@ module Movies =
                     Ok [ Friend_removed_from_watch_session (sessionId, friendSlug) ]
                 else Ok []
             | None -> Error "Watch session does not exist"
+        | Active movie, Remove_watch_session sessionId ->
+            if movie.WatchSessions |> Map.containsKey sessionId then
+                Ok [ Watch_session_removed sessionId ]
+            else Error "Watch session does not exist"
         | Removed, _ ->
             Error "Movie has been removed"
         | Not_created, _ ->
@@ -296,6 +304,8 @@ module Movies =
                 "Friend_added_to_watch_session", Encode.toString 0 (Encode.object [ "sessionId", Encode.string sessionId; "friendSlug", Encode.string friendSlug ])
             | Friend_removed_from_watch_session (sessionId, friendSlug) ->
                 "Friend_removed_from_watch_session", Encode.toString 0 (Encode.object [ "sessionId", Encode.string sessionId; "friendSlug", Encode.string friendSlug ])
+            | Watch_session_removed sessionId ->
+                "Watch_session_removed", Encode.toString 0 (Encode.object [ "sessionId", Encode.string sessionId ])
 
         let deserialize (eventType: string) (data: string) : MovieEvent option =
             match eventType with
@@ -355,6 +365,10 @@ module Movies =
                     get.Required.Field "friendSlug" Decode.string)) data
                 |> Result.toOption
                 |> Option.map Friend_removed_from_watch_session
+            | "Watch_session_removed" ->
+                Decode.fromString (Decode.field "sessionId" Decode.string) data
+                |> Result.toOption
+                |> Option.map Watch_session_removed
             | _ -> None
 
         let toEventData (event: MovieEvent) : EventStore.EventData =
