@@ -314,6 +314,18 @@ module MovieProjection =
                 else Some (rd.ReadDouble "tmdb_rating") }
         )
 
+    let private resolveFriendRefs (conn: SqliteConnection) (slugs: string list) : Mediatheca.Shared.FriendRef list =
+        if List.isEmpty slugs then []
+        else
+            let nameMap =
+                conn
+                |> Db.newCommand "SELECT slug, name FROM friend_list"
+                |> Db.query (fun (rd: IDataReader) -> rd.ReadString "slug", rd.ReadString "name")
+                |> Map.ofList
+            slugs |> List.map (fun s ->
+                { Mediatheca.Shared.FriendRef.Slug = s
+                  Name = nameMap |> Map.tryFind s |> Option.defaultValue s })
+
     let getWatchSessions (conn: SqliteConnection) (movieSlug: string) : Mediatheca.Shared.WatchSessionDto list =
         conn
         |> Db.newCommand "SELECT session_id, date, duration, friends FROM watch_sessions WHERE movie_slug = @slug ORDER BY date DESC"
@@ -328,7 +340,7 @@ module MovieProjection =
               Duration =
                 if rd.IsDBNull(rd.GetOrdinal("duration")) then None
                 else Some (rd.ReadInt32 "duration")
-              Friends = friendSlugs |> List.map (fun s -> { Mediatheca.Shared.FriendRef.Slug = s; Name = s }) }
+              Friends = resolveFriendRefs conn friendSlugs }
         )
 
     let getBySlug (conn: SqliteConnection) (slug: string) : Mediatheca.Shared.MovieDetail option =
@@ -369,8 +381,8 @@ module MovieProjection =
                 if rd.IsDBNull(rd.GetOrdinal("tmdb_rating")) then None
                 else Some (rd.ReadDouble "tmdb_rating")
               Cast = cast
-              RecommendedBy = recommendedBySlugs |> List.map (fun s -> { Mediatheca.Shared.FriendRef.Slug = s; Name = s })
-              WantToWatchWith = wantToWatchWithSlugs |> List.map (fun s -> { Mediatheca.Shared.FriendRef.Slug = s; Name = s })
+              RecommendedBy = resolveFriendRefs conn recommendedBySlugs
+              WantToWatchWith = resolveFriendRefs conn wantToWatchWithSlugs
               WatchSessions = getWatchSessions conn slug
               ContentBlocks = ContentBlockProjection.getForMovieDetail conn slug }
         )

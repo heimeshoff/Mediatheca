@@ -382,7 +382,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                         ]
                                         Daisy.badge [
                                             badge.lg
-                                            prop.className "gap-1 cursor-pointer select-none hover:badge-primary mt-2"
+                                            prop.className "gap-2 cursor-pointer select-none hover:badge-primary mt-2"
                                             prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
                                             prop.children [
                                                 Icons.recommendedBy ()
