@@ -451,7 +451,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                             prop.className "flex flex-wrap gap-1"
                                                             prop.children [
                                                                 for friend in session.Friends do
-                                                                    FriendPill.view friend
+                                                                    FriendPill.viewWithRemove friend (fun slug -> dispatch (Remove_friend_from_session (session.SessionId, slug)))
                                                             ]
                                                         ]
                                                 ]
