@@ -344,14 +344,21 @@ module MovieProjection =
     let private resolveFriendRefs (conn: SqliteConnection) (slugs: string list) : Mediatheca.Shared.FriendRef list =
         if List.isEmpty slugs then []
         else
-            let nameMap =
+            let friendMap =
                 conn
-                |> Db.newCommand "SELECT slug, name FROM friend_list"
-                |> Db.query (fun (rd: IDataReader) -> rd.ReadString "slug", rd.ReadString "name")
+                |> Db.newCommand "SELECT slug, name, image_ref FROM friend_list"
+                |> Db.query (fun (rd: IDataReader) ->
+                    rd.ReadString "slug",
+                    (rd.ReadString "name",
+                     if rd.IsDBNull(rd.GetOrdinal("image_ref")) then None
+                     else Some (rd.ReadString "image_ref")))
                 |> Map.ofList
             slugs |> List.map (fun s ->
+                let name, imageRef =
+                    friendMap |> Map.tryFind s |> Option.defaultValue (s, None)
                 { Mediatheca.Shared.FriendRef.Slug = s
-                  Name = nameMap |> Map.tryFind s |> Option.defaultValue s })
+                  Name = name
+                  ImageRef = imageRef })
 
     let getWatchSessions (conn: SqliteConnection) (movieSlug: string) : Mediatheca.Shared.WatchSessionDto list =
         conn

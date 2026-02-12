@@ -83,6 +83,25 @@ let private castCard (cast: CastMemberDto) =
         ]
     ]
 
+let private friendAvatar (size: string) (fr: FriendRef) (extraClass: string) =
+    Html.div [
+        prop.className $"{size} rounded-full overflow-hidden flex items-center justify-center {extraClass}"
+        prop.children [
+            match fr.ImageRef with
+            | Some ref ->
+                Html.img [
+                    prop.src $"/images/{ref}"
+                    prop.alt fr.Name
+                    prop.className "w-full h-full object-cover"
+                ]
+            | None ->
+                Html.span [
+                    prop.className "w-full h-full flex items-center justify-center"
+                    prop.text (fr.Name.[0..0].ToUpper())
+                ]
+        ]
+    ]
+
 let private glassCard (children: ReactElement list) =
     Html.div [
         prop.className "bg-base-100/50 backdrop-blur-xl border border-base-content/8 p-6 rounded-xl"
@@ -379,10 +398,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                 prop.className "flex -space-x-2"
                                                                 prop.children [
                                                                     for fr in movie.RecommendedBy |> List.truncate 3 do
-                                                                        Html.div [
-                                                                            prop.className "w-8 h-8 rounded-full bg-primary/40 flex items-center justify-center text-xs font-bold border-2 border-base-300"
-                                                                            prop.text (fr.Name.[0..0].ToUpper())
-                                                                        ]
+                                                                        friendAvatar "w-8 h-8" fr "bg-primary/40 text-xs font-bold border-2 border-base-300"
                                                                     if movie.RecommendedBy.Length > 3 then
                                                                         Html.div [
                                                                             prop.className "w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center text-xs font-bold border-2 border-base-300 backdrop-blur-sm"
@@ -496,10 +512,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                     Html.div [
                                                                         prop.className "flex items-center gap-3"
                                                                         prop.children [
-                                                                            Html.div [
-                                                                                prop.className "w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary"
-                                                                                prop.text (fr.Name.[0..0].ToUpper())
-                                                                            ]
+                                                                            friendAvatar "w-9 h-9" fr "bg-primary/20 text-sm font-bold text-primary"
                                                                             Html.a [
                                                                                 prop.className "font-medium text-sm cursor-pointer hover:text-primary transition-colors"
                                                                                 prop.href (Router.format ("friends", fr.Slug))
@@ -553,10 +566,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                     Html.div [
                                                                         prop.className "flex items-center gap-3"
                                                                         prop.children [
-                                                                            Html.div [
-                                                                                prop.className "w-9 h-9 rounded-full bg-secondary/20 flex items-center justify-center text-sm font-bold text-secondary"
-                                                                                prop.text (fr.Name.[0..0].ToUpper())
-                                                                            ]
+                                                                            friendAvatar "w-9 h-9" fr "bg-secondary/20 text-sm font-bold text-secondary"
                                                                             Html.a [
                                                                                 prop.className "font-medium text-sm cursor-pointer hover:text-primary transition-colors"
                                                                                 prop.href (Router.format ("friends", fr.Slug))
@@ -662,10 +672,12 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                                             prop.children [
                                                                                                 for fr in session.Friends do
                                                                                                     Html.div [
-                                                                                                        prop.className "w-6 h-6 rounded-full bg-accent/30 flex items-center justify-center text-[8px] font-bold border border-base-300 cursor-pointer hover:z-10 hover:scale-110 transition-transform"
+                                                                                                        prop.className "cursor-pointer hover:z-10 hover:scale-110 transition-transform"
                                                                                                         prop.title fr.Name
                                                                                                         prop.onClick (fun _ -> dispatch (Remove_friend_from_session (session.SessionId, fr.Slug)))
-                                                                                                        prop.text (fr.Name.[0..0].ToUpper())
+                                                                                                        prop.children [
+                                                                                                            friendAvatar "w-6 h-6" fr "bg-accent/30 text-[8px] font-bold border border-base-300"
+                                                                                                        ]
                                                                                                     ]
                                                                                             ]
                                                                                         ]

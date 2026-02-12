@@ -51,6 +51,7 @@ type CastMemberDto = {
 type FriendRef = {
     Slug: string
     Name: string
+    ImageRef: string option
 }
 
 type FriendListItem = {
