@@ -6,6 +6,10 @@
 
 ## Recent Progress
 
+- **2026-02-12**: Extract FriendPill component for consistent clickable friend name pills
+  - Created `Components/FriendPill.fs` with viewSmall, viewSmallWithRemove, viewLargeWithRemove, viewInline variants
+  - All friend name pills now navigate to friend page on click (recommendation modal, watch history, want-to-watch-with)
+  - Replaced inline badge code in MovieDetail/Views.fs with shared FriendPill component
 - **2026-02-12**: Movie detail layout refinements
   - "Recommended by" pill button in top pills area (below genres); only shows recommendation friends + button
   - Watch sessions as compact inline cards (flex-wrap, auto-width) showing date + friend badges

@@ -90,26 +90,6 @@ let private friendPicker
             ]
     ]
 
-let private friendChip (friendRef: FriendRef) (onRemove: string -> unit) =
-    Daisy.badge [
-        badge.lg
-        prop.className "gap-1"
-        prop.children [
-            Html.a [
-                prop.href (Router.format ("friends", friendRef.Slug))
-                prop.onClick (fun e ->
-                    e.preventDefault()
-                    Router.navigate ("friends", friendRef.Slug)
-                )
-                prop.text friendRef.Name
-            ]
-            Html.button [
-                prop.className "btn btn-ghost btn-xs"
-                prop.onClick (fun _ -> onRemove friendRef.Slug)
-                prop.text "x"
-            ]
-        ]
-    ]
 
 [<ReactComponent>]
 let private RecommendationManager
@@ -139,19 +119,7 @@ let private RecommendationManager
                 prop.className "flex flex-wrap gap-2 mb-4"
                 prop.children [
                     for fr in recommendedBy do
-                        Daisy.badge [
-                            badge.lg
-                            badge.primary
-                            prop.className "gap-1"
-                            prop.children [
-                                Html.span [ prop.text fr.Name ]
-                                Html.button [
-                                    prop.className "btn btn-ghost btn-xs"
-                                    prop.onClick (fun _ -> onRemove fr.Slug)
-                                    prop.text "x"
-                                ]
-                            ]
-                        ]
+                        FriendPill.viewLargeWithRemove fr onRemove
                 ]
             ]
         Daisy.input [
@@ -393,15 +361,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     let fr = movie.RecommendedBy.[i]
                                                     Html.span [
                                                         prop.children [
-                                                            Html.a [
-                                                                prop.className "font-semibold cursor-pointer hover:text-primary"
-                                                                prop.href (Router.format ("friends", fr.Slug))
-                                                                prop.onClick (fun e ->
-                                                                    e.preventDefault()
-                                                                    e.stopPropagation()
-                                                                    Router.navigate ("friends", fr.Slug))
-                                                                prop.text fr.Name
-                                                            ]
+                                                            FriendPill.viewInline fr
                                                             if i < movie.RecommendedBy.Length - 1 then
                                                                 Html.text ", "
                                                         ]
@@ -474,10 +434,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                             prop.className "flex flex-wrap gap-1"
                                                             prop.children [
                                                                 for friend in session.Friends do
-                                                                    Daisy.badge [
-                                                                        badge.sm
-                                                                        prop.text friend.Name
-                                                                    ]
+                                                                    FriendPill.viewSmall friend
                                                             ]
                                                         ]
                                                 ]
@@ -499,18 +456,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         prop.className "flex flex-wrap gap-1"
                                                         prop.children [
                                                             for fr in movie.WantToWatchWith do
-                                                                Daisy.badge [
-                                                                    badge.sm
-                                                                    prop.className "gap-1"
-                                                                    prop.children [
-                                                                        Html.span [ prop.text fr.Name ]
-                                                                        Html.button [
-                                                                            prop.className "text-xs opacity-60 hover:opacity-100"
-                                                                            prop.onClick (fun _ -> dispatch (Remove_want_to_watch_with fr.Slug))
-                                                                            prop.text "x"
-                                                                        ]
-                                                                    ]
-                                                                ]
+                                                                FriendPill.viewSmallWithRemove fr (fun slug -> dispatch (Remove_want_to_watch_with slug))
                                                         ]
                                                     ]
                                                     Daisy.badge [

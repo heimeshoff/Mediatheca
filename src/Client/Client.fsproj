@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="Router.fs" />
     <Compile Include="Components\Icons.fs" />
+    <Compile Include="Components\FriendPill.fs" />
     <Compile Include="Components\PageContainer.fs" />
     <Compile Include="Components\ContentBlockEditor.fs" />
     <Compile Include="Components\ModalPanel.fs" />
