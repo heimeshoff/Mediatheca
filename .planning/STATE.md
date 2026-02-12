@@ -6,6 +6,11 @@
 
 ## Recent Progress
 
+- **2026-02-12**: Redesign Friends UX for direct interaction
+  - Friends Overview: entire card is now a single link (no image upload on overview)
+  - Friend Detail: click name for inline editing (Enter to confirm, Escape to cancel)
+  - Friend Detail: click avatar to upload/replace image
+  - Removed Edit/Remove buttons; trash icon in top-right corner instead
 - **2026-02-12**: Extract FriendPill component for consistent clickable friend name pills
   - Created `Components/FriendPill.fs` with viewSmall, viewSmallWithRemove, viewLargeWithRemove, viewInline variants
   - All friend name pills now navigate to friend page on click (recommendation modal, watch history, want-to-watch-with)

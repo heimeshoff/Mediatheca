@@ -26,3 +26,5 @@ type Msg =
     | Update_result of Result<unit, string>
     | Remove_friend
     | Remove_result of Result<unit, string>
+    | Upload_friend_image of data: byte array * filename: string
+    | Image_uploaded of Result<string, string>
