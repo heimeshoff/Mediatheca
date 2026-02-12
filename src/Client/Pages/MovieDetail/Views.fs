@@ -422,48 +422,18 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         | None -> ()
                                                     ]
                                                 ]
-                                                // Trailer + Recommended by row
-                                                let hasTrailer = model.TrailerKey.IsSome
-                                                let hasRecs = not (List.isEmpty movie.RecommendedBy)
-                                                if hasTrailer || hasRecs then
-                                                    Html.div [
-                                                        prop.className "flex flex-wrap items-center gap-3"
+                                                // Trailer button
+                                                match model.TrailerKey with
+                                                | Some _ ->
+                                                    Html.button [
+                                                        prop.className "inline-flex items-center gap-2 bg-red-600/90 hover:bg-red-600 text-white px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
+                                                        prop.onClick (fun _ -> dispatch Open_trailer)
                                                         prop.children [
-                                                            if hasTrailer then
-                                                                Html.button [
-                                                                    prop.className "inline-flex items-center gap-2 bg-red-600/90 hover:bg-red-600 text-white px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
-                                                                    prop.onClick (fun _ -> dispatch Open_trailer)
-                                                                    prop.children [
-                                                                        Icons.play ()
-                                                                        Html.span [ prop.text "Play Trailer" ]
-                                                                    ]
-                                                                ]
-                                                            if hasRecs then
-                                                                Html.div [
-                                                                    prop.className "flex items-center gap-3 bg-base-100/20 backdrop-blur-sm p-2 rounded-full border border-base-content/10 pr-5 cursor-pointer"
-                                                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
-                                                                    prop.children [
-                                                                        Html.div [
-                                                                            prop.className "flex -space-x-2"
-                                                                            prop.children [
-                                                                                for fr in movie.RecommendedBy |> List.truncate 3 do
-                                                                                    friendAvatar "w-8 h-8" fr "bg-primary/40 text-xs font-bold border-2 border-base-300"
-                                                                                if movie.RecommendedBy.Length > 3 then
-                                                                                    Html.div [
-                                                                                        prop.className "w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center text-xs font-bold border-2 border-base-300 backdrop-blur-sm"
-                                                                                        prop.text $"+{movie.RecommendedBy.Length - 3}"
-                                                                                    ]
-                                                                            ]
-                                                                        ]
-                                                                        Html.span [
-                                                                            prop.className "text-sm font-medium text-base-content/70"
-                                                                            let suffix = if movie.RecommendedBy.Length > 1 then "s" else ""
-                                                                            prop.text $"Recommended by {movie.RecommendedBy.Length} friend{suffix}"
-                                                                        ]
-                                                                    ]
-                                                                ]
+                                                            Icons.play ()
+                                                            Html.span [ prop.text "Play Trailer" ]
                                                         ]
                                                     ]
+                                                | None -> ()
                                             ]
                                         ]
                                     ]
