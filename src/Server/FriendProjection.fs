@@ -101,6 +101,22 @@ module FriendProjection =
                         |> Db.setParams [ "slug", SqlType.String slug ]
                         |> Db.exec
 
+                        conn
+                        |> Db.newCommand """
+                            UPDATE watch_sessions
+                            SET friends = (
+                                SELECT json_group_array(j.value)
+                                FROM json_each(watch_sessions.friends) AS j
+                                WHERE j.value <> @slug
+                            )
+                            WHERE EXISTS (
+                                SELECT 1 FROM json_each(watch_sessions.friends) AS j
+                                WHERE j.value = @slug
+                            )
+                        """
+                        |> Db.setParams [ "slug", SqlType.String slug ]
+                        |> Db.exec
+
     let handler: Projection.ProjectionHandler = {
         Name = "FriendProjection"
         Handle = handleEvent

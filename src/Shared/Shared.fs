@@ -48,9 +48,23 @@ type CastMemberDto = {
     TmdbId: int
 }
 
+type CrewMemberDto = {
+    Name: string
+    Job: string
+    Department: string
+    ImageRef: string option
+    TmdbId: int
+}
+
+type FullCreditsDto = {
+    Cast: CastMemberDto list
+    Crew: CrewMemberDto list
+}
+
 type FriendRef = {
     Slug: string
     Name: string
+    ImageRef: string option
 }
 
 type FriendListItem = {
@@ -72,10 +86,18 @@ type FriendMovieItem = {
     PosterRef: string option
 }
 
+type FriendWatchedItem = {
+    Slug: string
+    Name: string
+    Year: int
+    PosterRef: string option
+    Dates: string list
+}
+
 type FriendMovies = {
     RecommendedMovies: FriendMovieItem list
     WantToWatchMovies: FriendMovieItem list
-    WatchedMovies: FriendMovieItem list
+    WatchedMovies: FriendWatchedItem list
 }
 
 // Watch Sessions
@@ -267,6 +289,7 @@ type IMediathecaApi = {
     updateWatchSessionDate: string -> string -> string -> Async<Result<unit, string>>
     addFriendToWatchSession: string -> string -> string -> Async<Result<unit, string>>
     removeFriendFromWatchSession: string -> string -> string -> Async<Result<unit, string>>
+    removeWatchSession: string -> string -> Async<Result<unit, string>>
     getWatchSessions: string -> Async<WatchSessionDto list>
     // Content Blocks
     addContentBlock: string -> string option -> AddContentBlockRequest -> Async<Result<string, string>>
@@ -296,4 +319,6 @@ type IMediathecaApi = {
     getTmdbApiKey: unit -> Async<string>
     setTmdbApiKey: string -> Async<Result<unit, string>>
     testTmdbApiKey: string -> Async<Result<unit, string>>
+    getFullCredits: int -> Async<Result<FullCreditsDto, string>>
+    getMovieTrailer: int -> Async<string option>
 }

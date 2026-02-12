@@ -16,20 +16,9 @@ let private entryCard (entry: Mediatheca.Shared.CatalogEntryDto) (editingNote: E
                     e.preventDefault()
                     Router.navigate ("movies", entry.MovieSlug)
                 )
-                prop.className "w-10 h-14 rounded-lg overflow-hidden bg-base-300 flex-none cursor-pointer"
+                prop.className "flex-none cursor-pointer"
                 prop.children [
-                    match entry.MoviePosterRef with
-                    | Some ref ->
-                        Html.img [
-                            prop.src $"/images/{ref}"
-                            prop.alt entry.MovieName
-                            prop.className "w-full h-full object-cover"
-                        ]
-                    | None ->
-                        Html.div [
-                            prop.className "flex items-center justify-center w-full h-full text-base-content/20"
-                            prop.children [ Icons.movie () ]
-                        ]
+                    PosterCard.thumbnail entry.MoviePosterRef entry.MovieName
                 ]
             ]
             Html.div [

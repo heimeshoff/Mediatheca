@@ -6,6 +6,13 @@
 
 ## Recent Progress
 
+- **2026-02-12**: Movie detail page design overhaul following CineSocial inspiration
+  - Tall hero section (500px lg) with backdrop image, gradient overlay, poster + title overlaid at bottom
+  - Two-column content grid (8/4): left = Synopsis, Details cards, Cast; right = social sidebar
+  - Glass-effect sidebar cards: Recommended By, Watch With, Watch History (timeline), Notes
+  - Section headers with primary accent bar, circular cast images, star rating display
+  - Friend avatar initials in recommendation/watch-with cards, timeline dots for watch sessions
+  - Mobile-responsive: smaller poster, stacked columns on mobile
 - **2026-02-12**: Show friend-related movies on Friend Detail page
   - Three sections: "Recommended", "Want to Watch Together", "Watched Together"
   - New shared type `FriendMovies` with `FriendMovieItem` lists

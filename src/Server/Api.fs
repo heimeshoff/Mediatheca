@@ -180,6 +180,19 @@ module Api =
                         movieProjections
                 match result with
                 | Ok () ->
+                    // Remove catalog entries referencing this movie
+                    let catalogEntries = CatalogProjection.getEntriesByMovieSlug conn slug
+                    for (catalogSlug, entryId) in catalogEntries do
+                        let catalogSid = Catalogs.streamId catalogSlug
+                        executeCommand
+                            conn catalogSid
+                            Catalogs.Serialization.fromStoredEvent
+                            Catalogs.reconstitute
+                            Catalogs.decide
+                            Catalogs.Serialization.toEventData
+                            (Catalogs.Remove_entry entryId)
+                            projectionHandlers
+                        |> ignore
                     // Clean up cast and images
                     CastStore.removeMovieCastAndCleanup conn imageBasePath sid
                     ImageStore.deleteImage imageBasePath (sprintf "posters/%s.jpg" slug)
@@ -355,6 +368,19 @@ module Api =
                         Movies.decide
                         Movies.Serialization.toEventData
                         (Movies.Remove_friend_from_watch_session (sessionId, friendSlug))
+                        movieProjections
+            }
+
+            removeWatchSession = fun slug sessionId -> async {
+                let sid = Movies.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        (Movies.Remove_watch_session sessionId)
                         movieProjections
             }
 
@@ -619,6 +645,7 @@ module Api =
                         | "Movie_added_to_library" -> "Movie added to library"
                         | "Movie_removed_from_library" -> "Movie removed from library"
                         | "Watch_session_recorded" -> "Watch session recorded"
+                        | "Watch_session_removed" -> "Watch session removed"
                         | "Friend_added" -> "Friend added"
                         | "Friend_removed" -> "Friend removed"
                         | "Catalog_created" -> "Catalog created"
@@ -686,7 +713,8 @@ module Api =
 
             removeFriend = fun slug -> async {
                 let sid = Friends.streamId slug
-                return
+                let imageRef = FriendProjection.getBySlug conn slug |> Option.bind (fun f -> f.ImageRef)
+                let result =
                     executeCommand
                         conn sid
                         Friends.Serialization.fromStoredEvent
@@ -695,6 +723,11 @@ module Api =
                         Friends.Serialization.toEventData
                         Friends.Remove_friend
                         friendProjections
+                match result with
+                | Ok () ->
+                    imageRef |> Option.iter (fun ref -> ImageStore.deleteImage imageBasePath ref)
+                    return Ok ()
+                | Error e -> return Error e
             }
 
             getFriend = fun slug -> async {
@@ -766,5 +799,42 @@ module Api =
                     return Ok ()
                 with ex ->
                     return Error $"TMDB API key validation failed: {ex.Message}"
+            }
+
+            getMovieTrailer = fun tmdbId -> async {
+                try
+                    let tmdbConfig = getTmdbConfig()
+                    return! Tmdb.getMovieTrailer httpClient tmdbConfig tmdbId
+                with _ ->
+                    return None
+            }
+
+            getFullCredits = fun tmdbId -> async {
+                try
+                    let tmdbConfig = getTmdbConfig()
+                    let! credits = Tmdb.getMovieCredits httpClient tmdbConfig tmdbId
+                    let imageUrl (profilePath: string option) =
+                        match profilePath with
+                        | Some p -> Some $"{tmdbConfig.ImageBaseUrl}w185{p}"
+                        | None -> None
+                    let cast =
+                        credits.Cast
+                        |> List.sortBy (fun c -> c.Order)
+                        |> List.map (fun c ->
+                            { CastMemberDto.Name = c.Name
+                              Role = c.Character
+                              TmdbId = c.Id
+                              ImageRef = imageUrl c.ProfilePath })
+                    let crew =
+                        credits.Crew
+                        |> List.map (fun c ->
+                            { CrewMemberDto.Name = c.Name
+                              Job = c.Job
+                              Department = c.Department
+                              TmdbId = c.Id
+                              ImageRef = imageUrl c.ProfilePath })
+                    return Ok { FullCreditsDto.Cast = cast; Crew = crew }
+                with ex ->
+                    return Error $"Failed to load full credits: {ex.Message}"
             }
         }

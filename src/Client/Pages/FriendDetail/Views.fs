@@ -26,23 +26,7 @@ let private movieCard (movie: FriendMovieItem) =
             Html.div [
                 prop.className "flex items-center gap-3 p-3 rounded-lg bg-base-200/50 hover:bg-base-200 transition-colors cursor-pointer"
                 prop.children [
-                    Html.div [
-                        prop.className "w-10 h-14 rounded bg-base-300 overflow-hidden flex-shrink-0"
-                        prop.children [
-                            match movie.PosterRef with
-                            | Some ref ->
-                                Html.img [
-                                    prop.src $"/images/{ref}"
-                                    prop.alt movie.Name
-                                    prop.className "w-full h-full object-cover"
-                                ]
-                            | None ->
-                                Html.div [
-                                    prop.className "flex items-center justify-center w-full h-full text-base-content/20"
-                                    prop.children [ Icons.movie () ]
-                                ]
-                        ]
-                    ]
+                    PosterCard.thumbnail movie.PosterRef movie.Name
                     Html.div [
                         prop.children [
                             Html.p [
@@ -59,6 +43,56 @@ let private movieCard (movie: FriendMovieItem) =
             ]
         ]
     ]
+
+let private watchedMovieCard (movie: FriendWatchedItem) =
+    Html.a [
+        prop.href (Router.format ("movies", movie.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("movies", movie.Slug))
+        prop.children [
+            Html.div [
+                prop.className "flex items-center gap-3 p-3 rounded-lg bg-base-200/50 hover:bg-base-200 transition-colors cursor-pointer"
+                prop.children [
+                    PosterCard.thumbnail movie.PosterRef movie.Name
+                    Html.div [
+                        prop.className "flex-1 min-w-0"
+                        prop.children [
+                            Html.p [
+                                prop.className "font-medium text-sm leading-tight"
+                                prop.text movie.Name
+                            ]
+                            Html.p [
+                                prop.className "text-xs text-base-content/50"
+                                prop.text (movie.Dates |> String.concat ", ")
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+let private watchedMovieSection (movies: FriendWatchedItem list) =
+    if List.isEmpty movies then
+        Html.none
+    else
+        Html.div [
+            prop.className "mt-6"
+            prop.children [
+                Html.h3 [
+                    prop.className "text-lg font-bold font-display mb-3"
+                    prop.text "Watched Together"
+                ]
+                Html.div [
+                    prop.className "flex flex-col gap-2"
+                    prop.children [
+                        for movie in movies do
+                            watchedMovieCard movie
+                    ]
+                ]
+            ]
+        ]
 
 let private movieSection (title: string) (movies: FriendMovieItem list) =
     if List.isEmpty movies then
@@ -216,11 +250,32 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 | Some movies ->
                                     movieSection "Recommended" movies.RecommendedMovies
                                     movieSection "Want to Watch Together" movies.WantToWatchMovies
-                                    movieSection "Watched Together" movies.WatchedMovies
+                                    watchedMovieSection movies.WatchedMovies
                                 | None -> ()
                             ]
                         ]
                     ]
                 ]
+                if model.ShowRemoveConfirm then
+                    ModalPanel.viewWithFooter
+                        "Remove Friend"
+                        (fun () -> dispatch Cancel_remove_friend)
+                        [
+                            Html.p [
+                                prop.text $"Do you really want to remove {friend.Name}? All recommendations and watch history references will be removed."
+                            ]
+                        ]
+                        [
+                            Daisy.button.button [
+                                button.ghost
+                                prop.onClick (fun _ -> dispatch Cancel_remove_friend)
+                                prop.text "Cancel"
+                            ]
+                            Daisy.button.button [
+                                button.error
+                                prop.onClick (fun _ -> dispatch Confirm_remove_friend)
+                                prop.text "Remove"
+                            ]
+                        ]
             ]
         ]

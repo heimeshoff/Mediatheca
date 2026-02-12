@@ -12,6 +12,7 @@
     <Compile Include="Components\PageContainer.fs" />
     <Compile Include="Components\ContentBlockEditor.fs" />
     <Compile Include="Components\ModalPanel.fs" />
+    <Compile Include="Components\PosterCard.fs" />
     <Compile Include="Components\SearchModal.fs" />
     <Compile Include="Components\Sidebar.fs" />
     <Compile Include="Components\BottomNav.fs" />

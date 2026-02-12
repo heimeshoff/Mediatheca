@@ -7,17 +7,62 @@ open Mediatheca.Shared
 open Mediatheca.Client.Pages.MovieDetail.Types
 open Mediatheca.Client.Components
 
+let private sectionHeader (title: string) =
+    Html.h2 [
+        prop.className "text-2xl font-bold font-display mb-6 flex items-center gap-2"
+        prop.children [
+            Html.span [ prop.className "w-1 h-6 bg-primary rounded-full inline-block" ]
+            Html.text title
+        ]
+    ]
+
+let private starRating (rating: float) =
+    let stars = rating / 2.0
+    let fullStars = int stars
+    let hasHalf = stars - float fullStars >= 0.5
+    Html.div [
+        prop.className "flex items-center gap-1 text-warning"
+        prop.children [
+            for _ in 1 .. fullStars do
+                Html.span [ prop.className "text-sm"; prop.text "\u2605" ]
+            if hasHalf then
+                Html.span [ prop.className "text-sm opacity-50"; prop.text "\u2605" ]
+            for _ in 1 .. (5 - fullStars - (if hasHalf then 1 else 0)) do
+                Html.span [ prop.className "text-sm text-base-content/20"; prop.text "\u2605" ]
+            Html.span [
+                prop.className "ml-1 text-base-content font-semibold text-sm"
+                prop.text $"%.1f{rating}"
+            ]
+        ]
+    ]
+
+let private detailCard (label: string) (value: string) =
+    Html.div [
+        prop.className "bg-base-100/50 backdrop-blur-sm p-4 rounded-xl border border-base-content/5"
+        prop.children [
+            Html.span [
+                prop.className "block text-base-content/40 text-xs uppercase font-bold tracking-widest mb-1"
+                prop.text label
+            ]
+            Html.span [
+                prop.className "font-medium"
+                prop.text value
+            ]
+        ]
+    ]
+
 let private castCard (cast: CastMemberDto) =
     Html.div [
-        prop.className "flex-none w-24"
+        prop.className "flex-shrink-0 text-center w-24"
         prop.children [
             Html.div [
-                prop.className "aspect-[2/3] rounded-lg bg-base-300 overflow-hidden mb-1"
+                prop.className "w-24 h-24 rounded-full overflow-hidden mb-3 border-2 border-primary/20 bg-base-300 mx-auto"
                 prop.children [
                     match cast.ImageRef with
                     | Some ref ->
+                        let src = if ref.StartsWith("http") then ref else $"/images/{ref}"
                         Html.img [
-                            prop.src $"/images/{ref}"
+                            prop.src src
                             prop.alt cast.Name
                             prop.className "w-full h-full object-cover"
                         ]
@@ -29,14 +74,72 @@ let private castCard (cast: CastMemberDto) =
                 ]
             ]
             Html.p [
-                prop.className "text-xs font-semibold line-clamp-1"
+                prop.className "font-medium text-sm line-clamp-1"
                 prop.text cast.Name
             ]
             Html.p [
-                prop.className "text-xs text-base-content/60 line-clamp-1"
+                prop.className "text-base-content/50 text-xs line-clamp-1"
                 prop.text cast.Role
             ]
         ]
+    ]
+
+let private crewCard (crew: CrewMemberDto) =
+    Html.div [
+        prop.className "flex-shrink-0 text-center w-24"
+        prop.children [
+            Html.div [
+                prop.className "w-24 h-24 rounded-full overflow-hidden mb-3 border-2 border-secondary/20 bg-base-300 mx-auto"
+                prop.children [
+                    match crew.ImageRef with
+                    | Some ref ->
+                        let src = if ref.StartsWith("http") then ref else $"/images/{ref}"
+                        Html.img [
+                            prop.src src
+                            prop.alt crew.Name
+                            prop.className "w-full h-full object-cover"
+                        ]
+                    | None ->
+                        Html.div [
+                            prop.className "flex items-center justify-center w-full h-full text-base-content/30 text-xs"
+                            prop.text "?"
+                        ]
+                ]
+            ]
+            Html.p [
+                prop.className "font-medium text-sm line-clamp-1"
+                prop.text crew.Name
+            ]
+            Html.p [
+                prop.className "text-base-content/50 text-xs line-clamp-1"
+                prop.text crew.Job
+            ]
+        ]
+    ]
+
+let private friendAvatar (size: string) (fr: FriendRef) (extraClass: string) =
+    Html.div [
+        prop.className $"{size} rounded-full overflow-hidden flex items-center justify-center {extraClass}"
+        prop.children [
+            match fr.ImageRef with
+            | Some ref ->
+                Html.img [
+                    prop.src $"/images/{ref}"
+                    prop.alt fr.Name
+                    prop.className "w-full h-full object-cover"
+                ]
+            | None ->
+                Html.span [
+                    prop.className "w-full h-full flex items-center justify-center"
+                    prop.text (fr.Name.[0..0].ToUpper())
+                ]
+        ]
+    ]
+
+let private glassCard (children: ReactElement list) =
+    Html.div [
+        prop.className "bg-base-100/50 backdrop-blur-xl border border-base-content/8 p-6 rounded-xl"
+        prop.children children
     ]
 
 
@@ -206,49 +309,51 @@ let view (model: Model) (dispatch: Msg -> unit) =
     | false, Some movie ->
         Html.div [
             prop.children [
-                // Backdrop hero
+                // ── Hero Section ──
                 Html.div [
-                    prop.className "relative h-64 lg:h-80 bg-base-300 overflow-hidden"
+                    prop.className "relative h-72 lg:h-[500px] w-full overflow-hidden"
                     prop.children [
-                        match movie.BackdropRef with
-                        | Some ref ->
-                            Html.img [
-                                prop.src $"/images/{ref}"
-                                prop.alt movie.Name
-                                prop.className "w-full h-full object-cover opacity-50"
-                            ]
-                        | None -> ()
+                        // Backdrop image
                         Html.div [
-                            prop.className "absolute inset-0 bg-gradient-to-t from-base-300 to-transparent"
+                            prop.className "absolute inset-0"
+                            prop.children [
+                                match movie.BackdropRef with
+                                | Some ref ->
+                                    Html.img [
+                                        prop.src $"/images/{ref}"
+                                        prop.alt movie.Name
+                                        prop.className "w-full h-full object-cover"
+                                    ]
+                                | None -> ()
+                                // Gradient overlay
+                                Html.div [
+                                    prop.className "absolute inset-0 bg-gradient-to-t from-base-300 via-base-300/40 to-base-300/80"
+                                ]
+                            ]
                         ]
                         // Back button
                         Html.div [
-                            prop.className "absolute top-4 left-4"
+                            prop.className "absolute top-4 left-4 z-10"
                             prop.children [
                                 Daisy.button.button [
                                     button.ghost
                                     button.sm
-                                    prop.className "text-base-content"
+                                    prop.className "text-base-content backdrop-blur-sm bg-base-300/30"
                                     prop.onClick (fun _ -> Router.navigate "movies")
-                                    prop.text "< Back"
+                                    prop.text "\u2190 Back"
                                 ]
                             ]
                         ]
-                    ]
-                ]
-                // Movie info card
-                Html.div [
-                    prop.className "px-4 lg:px-6 -mt-32 relative z-10"
-                    prop.children [
+                        // Hero content at bottom
                         Html.div [
-                            prop.className "flex flex-col md:flex-row gap-6"
+                            prop.className "relative h-full flex items-end pb-8 lg:pb-12 px-4 lg:px-8"
                             prop.children [
-                                // Poster
                                 Html.div [
-                                    prop.className "w-40 flex-none"
+                                    prop.className "flex gap-6 lg:gap-10 items-end w-full max-w-6xl mx-auto"
                                     prop.children [
+                                        // Movie Poster
                                         Html.div [
-                                            prop.className "aspect-[2/3] rounded-lg overflow-hidden shadow-xl bg-base-200"
+                                            prop.className "hidden lg:block w-52 h-80 flex-shrink-0 rounded-xl overflow-hidden shadow-2xl border border-base-content/10"
                                             prop.children [
                                                 match movie.PosterRef with
                                                 | Some ref ->
@@ -259,250 +364,459 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     ]
                                                 | None ->
                                                     Html.div [
-                                                        prop.className "flex items-center justify-center w-full h-full text-base-content/30"
+                                                        prop.className "flex items-center justify-center w-full h-full bg-base-200 text-base-content/30"
                                                         prop.children [ Icons.movie () ]
                                                     ]
                                             ]
                                         ]
-                                    ]
-                                ]
-                                // Info
-                                Html.div [
-                                    prop.className "flex-1"
-                                    prop.children [
-                                        Html.h1 [
-                                            prop.className "text-3xl font-bold font-display"
-                                            prop.text movie.Name
-                                        ]
+                                        // Mobile poster (smaller)
                                         Html.div [
-                                            prop.className "flex items-center gap-3 mt-2 text-base-content/60"
+                                            prop.className "lg:hidden w-28 h-44 flex-shrink-0 rounded-lg overflow-hidden shadow-xl border border-base-content/10"
                                             prop.children [
-                                                Html.span [ prop.text (string movie.Year) ]
-                                                match movie.Runtime with
-                                                | Some r ->
-                                                    Html.span [ prop.text $"{r} min" ]
-                                                | None -> ()
-                                                match movie.TmdbRating with
-                                                | Some r ->
-                                                    Html.span [ prop.text $"%.1f{r} / 10" ]
-                                                | None -> ()
-                                            ]
-                                        ]
-                                        Html.div [
-                                            prop.className "flex flex-wrap gap-2 mt-3"
-                                            prop.children [
-                                                for genre in movie.Genres do
-                                                    Daisy.badge [
-                                                        badge.outline
-                                                        prop.text genre
+                                                match movie.PosterRef with
+                                                | Some ref ->
+                                                    Html.img [
+                                                        prop.src $"/images/{ref}"
+                                                        prop.alt movie.Name
+                                                        prop.className "w-full h-full object-cover"
                                                     ]
-                                            ]
-                                        ]
-                                        Daisy.badge [
-                                            badge.lg
-                                            prop.className "gap-2 select-none mt-2"
-                                            prop.children [
-                                                Html.span [
-                                                    prop.className "cursor-pointer hover:text-primary"
-                                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
-                                                    prop.children [ Icons.recommendedBy () ]
-                                                ]
-                                                for i in 0 .. movie.RecommendedBy.Length - 1 do
-                                                    let fr = movie.RecommendedBy.[i]
-                                                    Html.span [
-                                                        prop.children [
-                                                            FriendPill.viewInline fr
-                                                            if i < movie.RecommendedBy.Length - 1 then
-                                                                Html.text ", "
-                                                        ]
-                                                    ]
-                                            ]
-                                        ]
-                                        Html.p [
-                                            prop.className "mt-4 text-base-content/80 leading-relaxed"
-                                            prop.text movie.Overview
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-                // Cast horizontal scroll
-                if not (List.isEmpty movie.Cast) then
-                    Html.div [
-                        prop.className "px-4 lg:px-6 mt-8"
-                        prop.children [
-                            Html.h2 [
-                                prop.className "text-lg font-bold font-display mb-3"
-                                prop.text "Cast"
-                            ]
-                            Html.div [
-                                prop.className "flex gap-3 overflow-x-auto pb-2"
-                                prop.children [
-                                    for c in movie.Cast do
-                                        castCard c
-                                ]
-                            ]
-                        ]
-                    ]
-                // Watch History section
-                Html.div [
-                    prop.className "px-4 lg:px-6 mt-8"
-                    prop.children [
-                        Html.h2 [
-                            prop.className "text-lg font-bold font-display mb-3"
-                            prop.text "Watch History"
-                        ]
-                        Daisy.card [
-                            prop.className "bg-base-200 shadow-sm w-auto border border-dashed border-base-content/20"
-                            prop.children [
-                                Daisy.cardBody [
-                                    prop.className "p-3 gap-2"
-                                    prop.children [
-                                        Html.div [
-                                            prop.className "flex items-center gap-2"
-                                            prop.children [
-                                                Html.span [
-                                                    prop.className "text-sm text-base-content/60 whitespace-nowrap"
-                                                    prop.text "Want to watch with"
-                                                ]
-                                                Daisy.badge [
-                                                    badge.sm
-                                                    prop.className "cursor-pointer select-none hover:badge-primary"
-                                                    prop.onClick (fun _ -> dispatch (Open_friend_picker Watch_with_picker))
-                                                    prop.text "+"
-                                                ]
-                                            ]
-                                        ]
-                                        if not (List.isEmpty movie.WantToWatchWith) then
-                                            Html.div [
-                                                prop.className "flex flex-wrap gap-1 mt-1"
-                                                prop.children [
-                                                    for fr in movie.WantToWatchWith do
-                                                        FriendPill.viewWithRemove fr (fun slug -> dispatch (Remove_want_to_watch_with slug))
-                                                ]
-                                            ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                        Html.div [
-                            prop.className "flex flex-wrap gap-2 mt-3"
-                            prop.children [
-                                // Add session card
-                                Daisy.card [
-                                    prop.className "bg-base-200 shadow-sm w-auto border border-dashed border-base-content/20 cursor-pointer hover:bg-base-300 transition-colors duration-200"
-                                    prop.onClick (fun _ -> dispatch Record_quick_session)
-                                    prop.children [
-                                        Daisy.cardBody [
-                                            prop.className "p-3 flex-row items-center justify-center"
-                                            prop.children [
-                                                Html.span [
-                                                    prop.className "text-base-content/40 text-lg select-none"
-                                                    prop.text "+"
-                                                ]
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                                for session in movie.WatchSessions do
-                                    Daisy.card [
-                                        prop.className "bg-base-200 shadow-sm w-auto"
-                                        prop.key session.SessionId
-                                        prop.children [
-                                            Daisy.cardBody [
-                                                prop.className "p-3 gap-2"
-                                                prop.children [
+                                                | None ->
                                                     Html.div [
-                                                        prop.className "flex items-center gap-2"
-                                                        prop.children [
-                                                            if model.EditingSessionDate = Some session.SessionId then
-                                                                Daisy.input [
-                                                                    prop.className "w-36"
-                                                                    input.sm
-                                                                    prop.type' "date"
-                                                                    prop.autoFocus true
-                                                                    prop.value session.Date
-                                                                    prop.onChange (fun (v: string) ->
-                                                                        dispatch (Update_session_date (session.SessionId, v)))
-                                                                    prop.onBlur (fun _ ->
-                                                                        dispatch (Update_session_date (session.SessionId, session.Date)))
-                                                                    prop.onKeyDown (fun e ->
-                                                                        if e.key = "Escape" then
-                                                                            dispatch (Update_session_date (session.SessionId, session.Date)))
-                                                                ]
-                                                            else
-                                                                Html.span [
-                                                                    prop.className "font-semibold text-sm whitespace-nowrap cursor-pointer hover:text-primary transition-colors duration-150"
-                                                                    prop.onClick (fun _ -> dispatch (Edit_session_date session.SessionId))
-                                                                    prop.text session.Date
-                                                                ]
-                                                            Daisy.badge [
-                                                                badge.sm
-                                                                prop.className "cursor-pointer select-none hover:badge-primary transition-colors duration-150"
-                                                                prop.onClick (fun _ -> dispatch (Open_friend_picker (Session_friend_picker session.SessionId)))
-                                                                prop.text "+"
+                                                        prop.className "flex items-center justify-center w-full h-full bg-base-200 text-base-content/30"
+                                                        prop.children [ Icons.movie () ]
+                                                    ]
+                                            ]
+                                        ]
+                                        // Title & Meta
+                                        Html.div [
+                                            prop.className "flex-grow pb-2"
+                                            prop.children [
+                                                // Genre badges + Rating
+                                                Html.div [
+                                                    prop.className "flex flex-wrap items-center gap-3 mb-3"
+                                                    prop.children [
+                                                        for genre in movie.Genres |> List.truncate 3 do
+                                                            Html.span [
+                                                                prop.className "bg-primary/80 px-3 py-1 rounded text-xs font-bold tracking-wider uppercase text-primary-content"
+                                                                prop.text genre
                                                             ]
+                                                        match movie.TmdbRating with
+                                                        | Some r -> starRating r
+                                                        | None -> ()
+                                                    ]
+                                                ]
+                                                // Title
+                                                Html.h1 [
+                                                    prop.className "text-3xl lg:text-5xl font-bold font-display tracking-tight mb-2"
+                                                    prop.text movie.Name
+                                                ]
+                                                // Year & Runtime
+                                                Html.div [
+                                                    prop.className "flex items-center gap-3 text-base-content/60 mb-4"
+                                                    prop.children [
+                                                        Html.span [ prop.text (string movie.Year) ]
+                                                        match movie.Runtime with
+                                                        | Some r ->
+                                                            Html.span [ prop.className "text-base-content/30"; prop.text "\u00B7" ]
+                                                            Html.span [ prop.text $"{r} min" ]
+                                                        | None -> ()
+                                                    ]
+                                                ]
+                                                // Trailer button
+                                                match model.TrailerKey with
+                                                | Some _ ->
+                                                    Html.button [
+                                                        prop.className "inline-flex items-center gap-2 bg-red-600/90 hover:bg-red-600 text-white px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
+                                                        prop.onClick (fun _ -> dispatch Open_trailer)
+                                                        prop.children [
+                                                            Icons.play ()
+                                                            Html.span [ prop.text "Play Trailer" ]
                                                         ]
                                                     ]
-                                                    if not (List.isEmpty session.Friends) then
-                                                        Html.div [
-                                                            prop.className "flex flex-wrap gap-1"
-                                                            prop.children [
-                                                                for friend in session.Friends do
-                                                                    FriendPill.viewWithRemove friend (fun slug -> dispatch (Remove_friend_from_session (session.SessionId, slug)))
-                                                            ]
-                                                        ]
-                                                ]
+                                                | None -> ()
                                             ]
                                         ]
                                     ]
+                                ]
                             ]
                         ]
                     ]
                 ]
-                // Notes section
+                // ── Content Grid ──
                 Html.div [
-                    prop.className "px-4 lg:px-6 mt-8"
+                    prop.className "max-w-6xl mx-auto px-4 lg:px-8 py-8 lg:py-12"
                     prop.children [
-                        Html.h2 [
-                            prop.className "text-lg font-bold font-display mb-3"
-                            prop.text "Notes"
-                        ]
-                        ContentBlockEditor.view
-                            movie.ContentBlocks
-                            (fun req -> dispatch (Add_content_block req))
-                            (fun bid req -> dispatch (Update_content_block (bid, req)))
-                            (fun bid -> dispatch (Remove_content_block bid))
-                    ]
-                ]
-                // Error display
-                match model.Error with
-                | Some err ->
-                    Html.div [
-                        prop.className "px-4 lg:px-6 mt-4"
-                        prop.children [
-                            Daisy.alert [
-                                alert.error
-                                prop.text err
+                        Html.div [
+                            prop.className "grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10"
+                            prop.children [
+                                // ── Left Column: Details ──
+                                Html.div [
+                                    prop.className "lg:col-span-8 space-y-10"
+                                    prop.children [
+                                        // Synopsis
+                                        if not (System.String.IsNullOrWhiteSpace movie.Overview) then
+                                            Html.section [
+                                                prop.children [
+                                                    sectionHeader "Synopsis"
+                                                    Html.p [
+                                                        prop.className "text-base-content/70 leading-relaxed text-lg"
+                                                        prop.text movie.Overview
+                                                    ]
+                                                ]
+                                            ]
+                                        // Technical Details
+                                        Html.section [
+                                            prop.children [
+                                                sectionHeader "Details"
+                                                Html.div [
+                                                    prop.className "grid grid-cols-2 sm:grid-cols-3 gap-4"
+                                                    prop.children [
+                                                        detailCard "Year" (string movie.Year)
+                                                        match movie.Runtime with
+                                                        | Some r -> detailCard "Runtime" $"{r} min"
+                                                        | None -> ()
+                                                        match movie.TmdbRating with
+                                                        | Some r -> detailCard "Rating" $"%.1f{r} / 10"
+                                                        | None -> ()
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                        // Cast
+                                        if not (List.isEmpty movie.Cast) then
+                                            let castToShow = model.FullCredits |> Option.map (fun c -> c.Cast) |> Option.defaultValue movie.Cast
+                                            Html.section [
+                                                prop.children [
+                                                    sectionHeader "Cast"
+                                                    Html.div [
+                                                        prop.className "flex gap-6 overflow-x-auto pb-4 lg:flex-wrap lg:overflow-x-visible"
+                                                        prop.children [
+                                                            for c in castToShow do
+                                                                castCard c
+                                                        ]
+                                                    ]
+                                                    match model.FullCredits with
+                                                    | None ->
+                                                        Daisy.button.button [
+                                                            button.ghost
+                                                            button.sm
+                                                            prop.className "mt-2"
+                                                            prop.onClick (fun _ -> dispatch Load_full_credits)
+                                                            prop.text "Load full cast & crew"
+                                                        ]
+                                                    | Some _ -> ()
+                                                ]
+                                            ]
+                                        // Crew (only shown after loading full credits)
+                                        match model.FullCredits with
+                                        | Some credits when not (List.isEmpty credits.Crew) ->
+                                            Html.section [
+                                                prop.children [
+                                                    sectionHeader "Crew"
+                                                    Html.div [
+                                                        prop.className "flex gap-6 overflow-x-auto pb-4 lg:flex-wrap lg:overflow-x-visible"
+                                                        prop.children [
+                                                            for c in credits.Crew do
+                                                                crewCard c
+                                                        ]
+                                                    ]
+                                                ]
+                                            ]
+                                        | _ -> ()
+                                    ]
+                                ]
+                                // ── Right Column: Social & Activity ──
+                                Html.div [
+                                    prop.className "lg:col-span-4 space-y-6"
+                                    prop.children [
+                                        // Recommended By card
+                                        glassCard [
+                                            Html.div [
+                                                prop.className "flex items-center justify-between mb-4"
+                                                prop.children [
+                                                    Html.h3 [ prop.className "text-lg font-bold"; prop.text "Recommended By" ]
+                                                    Html.button [
+                                                        prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold"
+                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
+                                                        prop.text "+"
+                                                    ]
+                                                ]
+                                            ]
+                                            if List.isEmpty movie.RecommendedBy then
+                                                Html.p [
+                                                    prop.className "text-base-content/40 text-sm"
+                                                    prop.text "No recommendations yet"
+                                                ]
+                                            else
+                                                Html.div [
+                                                    prop.className "space-y-3"
+                                                    prop.children [
+                                                        for fr in movie.RecommendedBy do
+                                                            Html.div [
+                                                                prop.className "flex items-center justify-between group p-2 rounded-lg hover:bg-base-content/5 transition-colors"
+                                                                prop.children [
+                                                                    Html.div [
+                                                                        prop.className "flex items-center gap-3"
+                                                                        prop.children [
+                                                                            friendAvatar "w-9 h-9" fr "bg-primary/20 text-sm font-bold text-primary"
+                                                                            Html.a [
+                                                                                prop.className "font-medium text-sm cursor-pointer hover:text-primary transition-colors"
+                                                                                prop.href (Router.format ("friends", fr.Slug))
+                                                                                prop.onClick (fun e ->
+                                                                                    e.preventDefault()
+                                                                                    Router.navigate ("friends", fr.Slug))
+                                                                                prop.text fr.Name
+                                                                            ]
+                                                                        ]
+                                                                    ]
+                                                                    Html.button [
+                                                                        prop.className "text-base-content/30 opacity-0 group-hover:opacity-100 transition-opacity text-xs hover:text-error"
+                                                                        prop.onClick (fun _ -> dispatch (Remove_recommendation fr.Slug))
+                                                                        prop.text "\u00D7"
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                    ]
+                                                ]
+                                        ]
+                                        // Want to Watch With card
+                                        glassCard [
+                                            Html.div [
+                                                prop.className "flex items-center justify-between mb-4"
+                                                prop.children [
+                                                    Html.h3 [ prop.className "text-lg font-bold"; prop.text "Watch With" ]
+                                                    Html.button [
+                                                        prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold"
+                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Watch_with_picker))
+                                                        prop.text "+"
+                                                    ]
+                                                ]
+                                            ]
+                                            Html.p [
+                                                prop.className "text-base-content/40 text-sm mb-4"
+                                                prop.text "Friends who want to watch this with you"
+                                            ]
+                                            if List.isEmpty movie.WantToWatchWith then
+                                                Html.p [
+                                                    prop.className "text-base-content/30 text-sm italic"
+                                                    prop.text "No one yet"
+                                                ]
+                                            else
+                                                Html.div [
+                                                    prop.className "space-y-3"
+                                                    prop.children [
+                                                        for fr in movie.WantToWatchWith do
+                                                            Html.div [
+                                                                prop.className "flex items-center justify-between group p-2 rounded-lg hover:bg-base-content/5 transition-colors"
+                                                                prop.children [
+                                                                    Html.div [
+                                                                        prop.className "flex items-center gap-3"
+                                                                        prop.children [
+                                                                            friendAvatar "w-9 h-9" fr "bg-secondary/20 text-sm font-bold text-secondary"
+                                                                            Html.a [
+                                                                                prop.className "font-medium text-sm cursor-pointer hover:text-primary transition-colors"
+                                                                                prop.href (Router.format ("friends", fr.Slug))
+                                                                                prop.onClick (fun e ->
+                                                                                    e.preventDefault()
+                                                                                    Router.navigate ("friends", fr.Slug))
+                                                                                prop.text fr.Name
+                                                                            ]
+                                                                        ]
+                                                                    ]
+                                                                    Html.button [
+                                                                        prop.className "text-base-content/30 opacity-0 group-hover:opacity-100 transition-opacity text-xs hover:text-error"
+                                                                        prop.onClick (fun _ -> dispatch (Remove_want_to_watch_with fr.Slug))
+                                                                        prop.text "\u00D7"
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                    ]
+                                                ]
+                                        ]
+                                        // Watch History card
+                                        glassCard [
+                                            Html.div [
+                                                prop.className "flex items-center justify-between mb-4"
+                                                prop.children [
+                                                    Html.h3 [ prop.className "text-lg font-bold"; prop.text "Watch History" ]
+                                                    Html.span [
+                                                        prop.className "text-primary text-xs font-bold uppercase tracking-widest"
+                                                        prop.text (
+                                                            let n = movie.WatchSessions.Length
+                                                            if n = 0 then "No sessions"
+                                                            elif n = 1 then "1 Session"
+                                                            else $"{n} Sessions"
+                                                        )
+                                                    ]
+                                                ]
+                                            ]
+                                            // Timeline
+                                            if not (List.isEmpty movie.WatchSessions) then
+                                                Html.div [
+                                                    prop.className "space-y-5 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-base-content/10"
+                                                    prop.children [
+                                                        for i in 0 .. movie.WatchSessions.Length - 1 do
+                                                            let session = movie.WatchSessions.[i]
+                                                            Html.div [
+                                                                prop.key session.SessionId
+                                                                prop.className "group/session relative pl-8"
+                                                                prop.children [
+                                                                    // Timeline dot
+                                                                    Html.div [
+                                                                        prop.className "absolute left-0 top-1 w-6 h-6 flex items-center justify-center"
+                                                                        prop.children [
+                                                                            Html.div [
+                                                                                prop.className (
+                                                                                    "w-3 h-3 rounded-full border-4 border-base-300 z-10 " +
+                                                                                    (if i = 0 then "bg-primary" else "bg-base-content/30"))
+                                                                            ]
+                                                                        ]
+                                                                    ]
+                                                                    // Session content
+                                                                    Html.div [
+                                                                        prop.children [
+                                                                            // Date (editable)
+                                                                            Html.div [
+                                                                                prop.className "flex items-center gap-2 mb-1"
+                                                                                prop.children [
+                                                                                    if model.EditingSessionDate = Some session.SessionId then
+                                                                                        Daisy.input [
+                                                                                            prop.className "w-36"
+                                                                                            input.sm
+                                                                                            prop.type' "date"
+                                                                                            prop.autoFocus true
+                                                                                            prop.value session.Date
+                                                                                            prop.onChange (fun (v: string) ->
+                                                                                                dispatch (Update_session_date (session.SessionId, v)))
+                                                                                            prop.onBlur (fun _ ->
+                                                                                                dispatch (Update_session_date (session.SessionId, session.Date)))
+                                                                                            prop.onKeyDown (fun e ->
+                                                                                                if e.key = "Escape" then
+                                                                                                    dispatch (Update_session_date (session.SessionId, session.Date)))
+                                                                                        ]
+                                                                                    else
+                                                                                        Html.span [
+                                                                                            prop.className "text-xs font-bold text-base-content/40 uppercase tracking-tight cursor-pointer hover:text-primary transition-colors"
+                                                                                            prop.onClick (fun _ -> dispatch (Edit_session_date session.SessionId))
+                                                                                            prop.text session.Date
+                                                                                        ]
+                                                                                    Html.button [
+                                                                                        prop.className "opacity-0 group-hover/session:opacity-100 transition-opacity text-base-content/30 hover:text-error text-xs"
+                                                                                        prop.title "Remove session"
+                                                                                        prop.onClick (fun _ -> dispatch (Remove_watch_session session.SessionId))
+                                                                                        prop.children [ Icons.trash () ]
+                                                                                    ]
+                                                                                ]
+                                                                            ]
+                                                                            // Session friends
+                                                                            Html.div [
+                                                                                prop.className "flex items-center gap-2"
+                                                                                prop.children [
+                                                                                    if not (List.isEmpty session.Friends) then
+                                                                                        Html.div [
+                                                                                            prop.className "flex -space-x-2"
+                                                                                            prop.children [
+                                                                                                for fr in session.Friends do
+                                                                                                    Html.div [
+                                                                                                        prop.className "cursor-pointer hover:z-10 hover:scale-110 transition-transform"
+                                                                                                        prop.title fr.Name
+                                                                                                        prop.onClick (fun _ -> dispatch (Remove_friend_from_session (session.SessionId, fr.Slug)))
+                                                                                                        prop.children [
+                                                                                                            friendAvatar "w-6 h-6" fr "bg-accent/30 text-[8px] font-bold border border-base-300"
+                                                                                                        ]
+                                                                                                    ]
+                                                                                            ]
+                                                                                        ]
+                                                                                    Html.button [
+                                                                                        prop.className "w-6 h-6 rounded-full bg-base-content/10 flex items-center justify-center text-[10px] text-base-content/40 hover:bg-primary/30 hover:text-primary transition-colors"
+                                                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker (Session_friend_picker session.SessionId)))
+                                                                                        prop.text "+"
+                                                                                    ]
+                                                                                ]
+                                                                            ]
+                                                                        ]
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                    ]
+                                                ]
+                                            // Add session button
+                                            Html.button [
+                                                prop.className "w-full mt-6 py-3 rounded-lg bg-base-content/5 border border-base-content/10 text-sm font-semibold hover:bg-base-content/10 transition-colors"
+                                                prop.onClick (fun _ -> dispatch Record_quick_session)
+                                                prop.text "+ Record Watch Session"
+                                            ]
+                                        ]
+                                        // Notes card
+                                        glassCard [
+                                            Html.h3 [
+                                                prop.className "text-lg font-bold mb-4"
+                                                prop.text "Notes"
+                                            ]
+                                            ContentBlockEditor.view
+                                                movie.ContentBlocks
+                                                (fun req -> dispatch (Add_content_block req))
+                                                (fun bid req -> dispatch (Update_content_block (bid, req)))
+                                                (fun bid -> dispatch (Remove_content_block bid))
+                                        ]
+                                        // Error display
+                                        match model.Error with
+                                        | Some err ->
+                                            Daisy.alert [
+                                                alert.error
+                                                prop.text err
+                                            ]
+                                        | None -> ()
+                                        // Remove movie
+                                        Html.div [
+                                            prop.className "pt-4"
+                                            prop.children [
+                                                if model.ConfirmingRemove then
+                                                    Html.div [
+                                                        prop.className "bg-error/10 border border-error/30 rounded-xl p-4 space-y-3"
+                                                        prop.children [
+                                                            Html.p [
+                                                                prop.className "text-sm font-semibold text-error"
+                                                                prop.text "Are you sure you want to remove this movie?"
+                                                            ]
+                                                            Html.div [
+                                                                prop.className "flex gap-2"
+                                                                prop.children [
+                                                                    Daisy.button.button [
+                                                                        button.error
+                                                                        button.sm
+                                                                        prop.className "flex-1"
+                                                                        prop.onClick (fun _ -> dispatch Remove_movie)
+                                                                        prop.text "Yes, remove"
+                                                                    ]
+                                                                    Daisy.button.button [
+                                                                        button.ghost
+                                                                        button.sm
+                                                                        prop.className "flex-1"
+                                                                        prop.onClick (fun _ -> dispatch Cancel_remove_movie)
+                                                                        prop.text "Cancel"
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                        ]
+                                                    ]
+                                                else
+                                                    Daisy.button.button [
+                                                        button.error
+                                                        button.sm
+                                                        prop.className "w-full"
+                                                        prop.onClick (fun _ -> dispatch Confirm_remove_movie)
+                                                        prop.text "Remove Movie"
+                                                    ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
                             ]
                         ]
                     ]
-                | None -> ()
-                // Actions
-                Html.div [
-                    prop.className "px-4 lg:px-6 mt-8 mb-8"
-                    prop.children [
-                        Daisy.button.button [
-                            button.error
-                            button.outline
-                            prop.onClick (fun _ -> dispatch Remove_movie)
-                            prop.text "Remove Movie"
-                        ]
-                    ]
                 ]
-                // Friend picker modal
+                // Friend picker modals
                 match model.ShowFriendPicker with
                 | Some Recommend_picker ->
                     FriendManager
@@ -537,5 +851,38 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         (fun name -> dispatch (Add_new_friend_to_session (sessionId, name)))
                         (fun () -> dispatch Close_friend_picker)
                 | None -> ()
+                // Trailer modal
+                if model.ShowTrailer then
+                    match model.TrailerKey with
+                    | Some key ->
+                        Html.div [
+                            prop.className "fixed inset-0 z-50 flex items-center justify-center"
+                            prop.children [
+                                // Backdrop
+                                Html.div [
+                                    prop.className "absolute inset-0 bg-black/80"
+                                    prop.onClick (fun _ -> dispatch Close_trailer)
+                                ]
+                                // Player container
+                                Html.div [
+                                    prop.className "relative w-full max-w-4xl mx-4 aspect-video"
+                                    prop.children [
+                                        Html.iframe [
+                                            prop.className "w-full h-full rounded-xl"
+                                            prop.src $"https://www.youtube.com/embed/{key}?autoplay=1&rel=0"
+                                            prop.custom ("allow", "autoplay; encrypted-media")
+                                            prop.custom ("allowFullScreen", true)
+                                        ]
+                                        // Close button
+                                        Html.button [
+                                            prop.className "absolute -top-10 right-0 text-white/70 hover:text-white text-2xl font-bold cursor-pointer"
+                                            prop.onClick (fun _ -> dispatch Close_trailer)
+                                            prop.text "\u00D7"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    | None -> ()
             ]
         ]

@@ -11,6 +11,10 @@ let init (slug: string) : Model * Cmd<Msg> =
       IsLoading = true
       ShowFriendPicker = None
       EditingSessionDate = None
+      FullCredits = None
+      TrailerKey = None
+      ShowTrailer = false
+      ConfirmingRemove = false
       Error = None },
     Cmd.batch [
         Cmd.ofMsg (Load_movie slug)
@@ -19,14 +23,18 @@ let init (slug: string) : Model * Cmd<Msg> =
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
     | Load_movie slug ->
-        { model with IsLoading = true; Slug = slug },
+        { model with IsLoading = true; Slug = slug; FullCredits = None },
         Cmd.batch [
             Cmd.OfAsync.perform api.getMovie slug Movie_loaded
             Cmd.OfAsync.perform api.getFriends () Friends_loaded
         ]
 
     | Movie_loaded movie ->
-        { model with Movie = movie; IsLoading = false }, Cmd.none
+        let trailerCmd =
+            match movie with
+            | Some m -> Cmd.OfAsync.perform api.getMovieTrailer m.TmdbId Trailer_loaded
+            | None -> Cmd.none
+        { model with Movie = movie; IsLoading = false }, trailerCmd
 
     | Friends_loaded friends ->
         { model with AllFriends = friends }, Cmd.none
@@ -53,8 +61,14 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Command_result (Error err) ->
         { model with Error = Some err }, Cmd.none
 
+    | Confirm_remove_movie ->
+        { model with ConfirmingRemove = true }, Cmd.none
+
+    | Cancel_remove_movie ->
+        { model with ConfirmingRemove = false }, Cmd.none
+
     | Remove_movie ->
-        model,
+        { model with ConfirmingRemove = false },
         Cmd.OfAsync.perform (fun () -> api.removeMovie model.Slug) () Movie_removed
 
     | Movie_removed (Ok ()) ->
@@ -99,6 +113,10 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Remove_friend_from_session (sessionId, friendSlug) ->
         model,
         Cmd.OfAsync.perform (fun () -> api.removeFriendFromWatchSession model.Slug sessionId friendSlug) () Command_result
+
+    | Remove_watch_session sessionId ->
+        model,
+        Cmd.OfAsync.perform (fun () -> api.removeWatchSession model.Slug sessionId) () Command_result
 
     | Add_new_friend_to_session (sessionId, name) ->
         model,
@@ -192,3 +210,26 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Friend_and_watch_with_result (Error err) ->
         { model with Error = Some err }, Cmd.none
+
+    | Load_full_credits ->
+        match model.Movie with
+        | Some movie ->
+            model,
+            Cmd.OfAsync.either (fun () -> api.getFullCredits movie.TmdbId) () Full_credits_loaded (fun ex -> Full_credits_loaded (Error ex.Message))
+        | None ->
+            model, Cmd.none
+
+    | Full_credits_loaded (Ok credits) ->
+        { model with FullCredits = Some credits }, Cmd.none
+
+    | Full_credits_loaded (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Trailer_loaded key ->
+        { model with TrailerKey = key }, Cmd.none
+
+    | Open_trailer ->
+        { model with ShowTrailer = true }, Cmd.none
+
+    | Close_trailer ->
+        { model with ShowTrailer = false }, Cmd.none
