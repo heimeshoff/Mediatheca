@@ -6,6 +6,11 @@
 
 ## Recent Progress
 
+- **2026-02-12**: Show friend-related movies on Friend Detail page
+  - Three sections: "Recommended", "Want to Watch Together", "Watched Together"
+  - New shared type `FriendMovies` with `FriendMovieItem` lists
+  - New `getFriendMovies` API endpoint with reverse lookups via JSON LIKE queries
+  - Each movie links to its detail page with poster thumbnail
 - **2026-02-12**: Redesign Friends UX for direct interaction
   - Friends Overview: entire card is now a single link (no image upload on overview)
   - Friend Detail: click name for inline editing (Enter to confirm, Escape to cancel)

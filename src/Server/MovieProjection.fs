@@ -361,6 +361,41 @@ module MovieProjection =
               Friends = resolveFriendRefs conn friendSlugs }
         )
 
+    let private readFriendMovieItem (rd: IDataReader) : Mediatheca.Shared.FriendMovieItem =
+        { Mediatheca.Shared.FriendMovieItem.Slug = rd.ReadString "slug"
+          Name = rd.ReadString "name"
+          Year = rd.ReadInt32 "year"
+          PosterRef =
+            if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
+            else Some (rd.ReadString "poster_ref") }
+
+    let getMoviesRecommendedByFriend (conn: SqliteConnection) (friendSlug: string) : Mediatheca.Shared.FriendMovieItem list =
+        let pattern = sprintf "%%\"%s\"%%" friendSlug
+        conn
+        |> Db.newCommand "SELECT slug, name, year, poster_ref FROM movie_detail WHERE recommended_by LIKE @pattern ORDER BY name"
+        |> Db.setParams [ "pattern", SqlType.String pattern ]
+        |> Db.query readFriendMovieItem
+
+    let getMoviesWantToWatchWithFriend (conn: SqliteConnection) (friendSlug: string) : Mediatheca.Shared.FriendMovieItem list =
+        let pattern = sprintf "%%\"%s\"%%" friendSlug
+        conn
+        |> Db.newCommand "SELECT slug, name, year, poster_ref FROM movie_detail WHERE want_to_watch_with LIKE @pattern ORDER BY name"
+        |> Db.setParams [ "pattern", SqlType.String pattern ]
+        |> Db.query readFriendMovieItem
+
+    let getMoviesWatchedWithFriend (conn: SqliteConnection) (friendSlug: string) : Mediatheca.Shared.FriendMovieItem list =
+        let pattern = sprintf "%%\"%s\"%%" friendSlug
+        conn
+        |> Db.newCommand """
+            SELECT DISTINCT d.slug, d.name, d.year, d.poster_ref
+            FROM watch_sessions ws
+            JOIN movie_detail d ON d.slug = ws.movie_slug
+            WHERE ws.friends LIKE @pattern
+            ORDER BY d.name
+        """
+        |> Db.setParams [ "pattern", SqlType.String pattern ]
+        |> Db.query readFriendMovieItem
+
     let getBySlug (conn: SqliteConnection) (slug: string) : Mediatheca.Shared.MovieDetail option =
         conn
         |> Db.newCommand "SELECT slug, name, year, runtime, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, recommended_by, want_to_watch_with FROM movie_detail WHERE slug = @slug"

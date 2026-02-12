@@ -701,6 +701,14 @@ module Api =
                 return FriendProjection.getBySlug conn slug
             }
 
+            getFriendMovies = fun friendSlug -> async {
+                return {
+                    Mediatheca.Shared.FriendMovies.RecommendedMovies = MovieProjection.getMoviesRecommendedByFriend conn friendSlug
+                    WantToWatchMovies = MovieProjection.getMoviesWantToWatchWithFriend conn friendSlug
+                    WatchedMovies = MovieProjection.getMoviesWatchedWithFriend conn friendSlug
+                }
+            }
+
             getFriends = fun () -> async {
                 return FriendProjection.getAll conn
             }
