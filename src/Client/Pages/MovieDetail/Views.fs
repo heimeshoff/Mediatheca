@@ -464,7 +464,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                 ]
                                                 if not (List.isEmpty movie.WantToWatchWith) then
                                                     Html.div [
-                                                        prop.className "flex flex-wrap gap-1"
+                                                        prop.className "flex flex-wrap gap-1 mt-1"
                                                         prop.children [
                                                             for fr in movie.WantToWatchWith do
                                                                 FriendPill.viewWithRemove fr (fun slug -> dispatch (Remove_want_to_watch_with slug))
