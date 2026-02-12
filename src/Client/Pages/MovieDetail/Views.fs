@@ -39,73 +39,23 @@ let private castCard (cast: CastMemberDto) =
         ]
     ]
 
-let private friendListRow (friend: FriendListItem) (onClick: unit -> unit) =
-    Html.div [
-        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 cursor-pointer"
-        prop.onClick (fun _ -> onClick ())
-        prop.children [
-            Daisy.avatar [
-                prop.children [
-                    Html.div [
-                        prop.className "w-10 rounded-full bg-base-300"
-                        prop.children [
-                            match friend.ImageRef with
-                            | Some ref ->
-                                Html.img [
-                                    prop.src $"/images/{ref}"
-                                    prop.alt friend.Name
-                                ]
-                            | None ->
-                                Html.div [
-                                    prop.className "flex items-center justify-center w-full h-full text-base-content/30"
-                                    prop.children [ Icons.friends () ]
-                                ]
-                        ]
-                    ]
-                ]
-            ]
-            Html.span [ prop.className "font-semibold"; prop.text friend.Name ]
-        ]
-    ]
-
-let private friendPicker
-    (allFriends: FriendListItem list)
-    (excludeSlugs: string list)
-    (onSelect: string -> unit)
-    (onClose: unit -> unit) =
-    let available = allFriends |> List.filter (fun f -> not (List.contains f.Slug excludeSlugs))
-    ModalPanel.view "Select a Friend" onClose [
-        if List.isEmpty available then
-            Html.p [
-                prop.className "text-base-content/60 py-4"
-                prop.text "No friends available. Add friends first."
-            ]
-        else
-            Html.div [
-                prop.className "space-y-2"
-                prop.children [
-                    for friend in available do
-                        friendListRow friend (fun () -> onSelect friend.Slug)
-                ]
-            ]
-    ]
-
 
 [<ReactComponent>]
-let private RecommendationManager
+let private FriendManager
+    (title: string)
     (allFriends: FriendListItem list)
-    (recommendedBy: FriendRef list)
+    (selectedFriends: FriendRef list)
     (onAdd: string -> unit)
     (onRemove: string -> unit)
     (onAddNew: string -> unit)
     (onClose: unit -> unit) =
     let searchText, setSearchText = React.useState("")
     let highlightedIndex, setHighlightedIndex = React.useState(0)
-    let recommendedSlugs = recommendedBy |> List.map (fun f -> f.Slug) |> Set.ofList
+    let selectedSlugs = selectedFriends |> List.map (fun f -> f.Slug) |> Set.ofList
     let available =
         allFriends
         |> List.filter (fun f ->
-            not (Set.contains f.Slug recommendedSlugs) &&
+            not (Set.contains f.Slug selectedSlugs) &&
             (searchText = "" || f.Name.ToLowerInvariant().Contains(searchText.ToLowerInvariant())))
     let availableArr = available |> List.toArray
     let trimmedSearch = searchText.Trim()
@@ -114,11 +64,11 @@ let private RecommendationManager
     let totalItems = availableArr.Length + (if showAddContact then 1 else 0)
 
     let headerExtra = [
-        if not (List.isEmpty recommendedBy) then
+        if not (List.isEmpty selectedFriends) then
             Html.div [
                 prop.className "flex flex-wrap gap-2 mb-4"
                 prop.children [
-                    for fr in recommendedBy do
+                    for fr in selectedFriends do
                         FriendPill.viewWithRemove fr onRemove
                 ]
             ]
@@ -226,7 +176,7 @@ let private RecommendationManager
             ]
     ]
 
-    ModalPanel.viewCustom "Recommended By" onClose headerExtra content []
+    ModalPanel.viewCustom title onClose headerExtra content []
 
 let view (model: Model) (dispatch: Msg -> unit) =
     match model.IsLoading, model.Movie with
@@ -521,7 +471,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 // Friend picker modal
                 match model.ShowFriendPicker with
                 | Some Recommend_picker ->
-                    RecommendationManager
+                    FriendManager
+                        "Recommended By"
                         model.AllFriends
                         movie.RecommendedBy
                         (fun slug -> dispatch (Recommend_friend slug))
@@ -529,9 +480,13 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         (fun name -> dispatch (Add_friend_and_recommend name))
                         (fun () -> dispatch Close_friend_picker)
                 | Some Watch_with_picker ->
-                    let excludeSlugs = movie.WantToWatchWith |> List.map (fun f -> f.Slug)
-                    friendPicker model.AllFriends excludeSlugs
+                    FriendManager
+                        "Want to Watch With"
+                        model.AllFriends
+                        movie.WantToWatchWith
                         (fun slug -> dispatch (Want_to_watch_with slug))
+                        (fun slug -> dispatch (Remove_want_to_watch_with slug))
+                        (fun name -> dispatch (Add_friend_and_watch_with name))
                         (fun () -> dispatch Close_friend_picker)
                 | None -> ()
                 // Record session modal

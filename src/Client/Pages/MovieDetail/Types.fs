@@ -47,3 +47,5 @@ type Msg =
     | Content_block_result of Result<unit, string>
     | Add_friend_and_recommend of name: string
     | Friend_and_recommend_result of Result<unit, string>
+    | Add_friend_and_watch_with of name: string
+    | Friend_and_watch_with_result of Result<unit, string>

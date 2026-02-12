@@ -41,7 +41,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         Cmd.OfAsync.perform (fun () -> api.removeRecommendation model.Slug friendSlug) () Command_result
 
     | Want_to_watch_with friendSlug ->
-        { model with ShowFriendPicker = None },
+        model,
         Cmd.OfAsync.perform (fun () -> api.wantToWatchWith model.Slug friendSlug) () Command_result
 
     | Remove_want_to_watch_with friendSlug ->
@@ -153,4 +153,26 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         ]
 
     | Friend_and_recommend_result (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Add_friend_and_watch_with name ->
+        model,
+        Cmd.OfAsync.perform (fun () ->
+            async {
+                match! api.addFriend name with
+                | Ok slug ->
+                    match! api.wantToWatchWith model.Slug slug with
+                    | Ok () -> return Ok ()
+                    | Error e -> return Error e
+                | Error e -> return Error e
+            }) () Friend_and_watch_with_result
+
+    | Friend_and_watch_with_result (Ok ()) ->
+        model,
+        Cmd.batch [
+            Cmd.OfAsync.perform api.getMovie model.Slug Movie_loaded
+            Cmd.OfAsync.perform api.getFriends () Friends_loaded
+        ]
+
+    | Friend_and_watch_with_result (Error err) ->
         { model with Error = Some err }, Cmd.none
