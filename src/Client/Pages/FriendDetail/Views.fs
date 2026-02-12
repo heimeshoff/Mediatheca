@@ -42,8 +42,10 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         Daisy.button.button [
                             button.ghost
                             button.sm
-                            prop.onClick (fun _ -> Router.navigate "friends")
-                            prop.text "< Back to Friends"
+                            prop.onClick (fun e ->
+                                e.preventDefault()
+                                Fable.Core.JS.Constructors.Window.Create().history.back())
+                            prop.text "< Back"
                         ]
                     ]
                 ]
