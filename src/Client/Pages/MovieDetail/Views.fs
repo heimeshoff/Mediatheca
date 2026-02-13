@@ -75,21 +75,26 @@ let private getRatingOption (rating: int option) =
 let private personalRatingCard (rating: int option) (isOpen: bool) (dispatch: Msg -> unit) =
     let currentOption = getRatingOption rating
     Html.div [
-        prop.className "relative bg-base-100/50 backdrop-blur-sm p-4 rounded-xl border border-base-content/5"
+        prop.className "relative"
         prop.children [
-            Html.span [
-                prop.className "block text-base-content/40 text-xs uppercase font-bold tracking-widest mb-1"
-                prop.text "My Rating"
-            ]
-            Html.button [
-                prop.className $"flex items-center gap-2 font-medium cursor-pointer {currentOption.ColorClass} hover:opacity-80 transition-opacity"
-                prop.onClick (fun _ -> dispatch Toggle_rating_dropdown)
+            Html.div [
+                prop.className "bg-base-100/50 backdrop-blur-sm p-4 rounded-xl border border-base-content/5"
                 prop.children [
                     Html.span [
-                        prop.className "w-5 h-5"
-                        prop.children [ currentOption.Icon () ]
+                        prop.className "block text-base-content/40 text-xs uppercase font-bold tracking-widest mb-1"
+                        prop.text "My Rating"
                     ]
-                    Html.span [ prop.text currentOption.Name ]
+                    Html.button [
+                        prop.className $"flex items-center gap-2 font-medium cursor-pointer {currentOption.ColorClass} hover:opacity-80 transition-opacity"
+                        prop.onClick (fun _ -> dispatch Toggle_rating_dropdown)
+                        prop.children [
+                            Html.span [
+                                prop.className "w-5 h-5"
+                                prop.children [ currentOption.Icon () ]
+                            ]
+                            Html.span [ prop.text currentOption.Name ]
+                        ]
+                    ]
                 ]
             ]
             if isOpen then

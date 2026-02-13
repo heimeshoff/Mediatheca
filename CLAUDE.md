@@ -59,6 +59,7 @@ Personal media library app (movies, series, games, books) built with full-stack 
 
 ## Gotchas
 
+- **`backdrop-filter` breaks on nested elements**: If a parent has `backdrop-filter` (e.g. `backdrop-blur-sm`), any child's `backdrop-filter` will only blur the parent's content, not the page behind it. Fix: render glassmorphic dropdowns/popovers as **siblings** to the blurred parent, not children. Wrap both in a plain `position: relative` container without `backdrop-filter`.
 - F# `open Module.Foo` opens Foo's *contents* — use `open Module` to access `Foo.bar`. Sibling modules in the same namespace are accessible by name without `open`.
 - `vite-plugin-fable@0.1.x` requires Vite 6; `0.2.x` requires Vite 7 — don't upgrade one without the other
 - `ts-lsp-client@1.1.0` breaks vite-plugin-fable ESM imports — pinned to `1.0.4` via npm overrides
