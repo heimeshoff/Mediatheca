@@ -51,6 +51,91 @@ let private detailCard (label: string) (value: string) =
         ]
     ]
 
+type private RatingOption = {
+    Value: int
+    Name: string
+    Description: string
+    Icon: unit -> ReactElement
+    ColorClass: string
+}
+
+let private ratingOptions : RatingOption list = [
+    { Value = 0; Name = "Unrated"; Description = "No rating yet"; Icon = Icons.questionCircle; ColorClass = "text-base-content/50" }
+    { Value = 1; Name = "Waste"; Description = "Waste of time"; Icon = Icons.thumbsDown; ColorClass = "text-red-400" }
+    { Value = 2; Name = "Meh"; Description = "Didn't click, uninspiring"; Icon = Icons.minusCircle; ColorClass = "text-orange-400" }
+    { Value = 3; Name = "Decent"; Description = "Watchable, even if not life-changing"; Icon = Icons.handOkay; ColorClass = "text-yellow-400" }
+    { Value = 4; Name = "Entertaining"; Description = "Strong craft, enjoyable"; Icon = Icons.thumbsUp; ColorClass = "text-lime-400" }
+    { Value = 5; Name = "Outstanding"; Description = "Absolutely brilliant, stays with you"; Icon = Icons.trophy; ColorClass = "text-amber-400" }
+]
+
+let private getRatingOption (rating: int option) =
+    let r = rating |> Option.defaultValue 0
+    ratingOptions |> List.find (fun opt -> opt.Value = r)
+
+let private personalRatingCard (rating: int option) (isOpen: bool) (dispatch: Msg -> unit) =
+    let currentOption = getRatingOption rating
+    Html.div [
+        prop.className "relative bg-base-100/50 backdrop-blur-sm p-4 rounded-xl border border-base-content/5"
+        prop.children [
+            Html.span [
+                prop.className "block text-base-content/40 text-xs uppercase font-bold tracking-widest mb-1"
+                prop.text "My Rating"
+            ]
+            Html.button [
+                prop.className $"flex items-center gap-2 font-medium cursor-pointer {currentOption.ColorClass} hover:opacity-80 transition-opacity"
+                prop.onClick (fun _ -> dispatch Toggle_rating_dropdown)
+                prop.children [
+                    Html.span [
+                        prop.className "w-5 h-5"
+                        prop.children [ currentOption.Icon () ]
+                    ]
+                    Html.span [ prop.text currentOption.Name ]
+                ]
+            ]
+            if isOpen then
+                Html.div [
+                    prop.className "absolute top-full left-0 mt-2 z-50 rating-dropdown"
+                    prop.children [
+                        for opt in ratingOptions do
+                            if opt.Value > 0 then
+                                let isActive = rating = Some opt.Value
+                                let itemClass =
+                                    if isActive then "rating-dropdown-item rating-dropdown-item-active"
+                                    else "rating-dropdown-item"
+                                Html.button [
+                                    prop.className itemClass
+                                    prop.onClick (fun _ -> dispatch (Set_personal_rating opt.Value))
+                                    prop.children [
+                                        Html.span [
+                                            prop.className $"w-5 h-5 {opt.ColorClass}"
+                                            prop.children [ opt.Icon () ]
+                                        ]
+                                        Html.div [
+                                            prop.className "flex flex-col items-start"
+                                            prop.children [
+                                                Html.span [ prop.className "font-medium"; prop.text opt.Name ]
+                                                Html.span [ prop.className "text-xs text-base-content/50"; prop.text opt.Description ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                        if rating.IsSome && rating.Value > 0 then
+                            Html.button [
+                                prop.className "rating-dropdown-item rating-dropdown-item-clear"
+                                prop.onClick (fun _ -> dispatch (Set_personal_rating 0))
+                                prop.children [
+                                    Html.span [
+                                        prop.className "w-5 h-5 text-base-content/40"
+                                        prop.children [ Icons.questionCircle () ]
+                                    ]
+                                    Html.span [ prop.className "font-medium text-base-content/60"; prop.text "Clear rating" ]
+                                ]
+                            ]
+                    ]
+                ]
+        ]
+    ]
+
 let private castCard (cast: CastMemberDto) =
     Html.div [
         prop.className "flex-shrink-0 text-center w-24"
@@ -475,9 +560,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         match movie.Runtime with
                                                         | Some r -> detailCard "Runtime" $"{r} min"
                                                         | None -> ()
-                                                        match movie.TmdbRating with
-                                                        | Some r -> detailCard "Rating" $"%.1f{r} / 10"
-                                                        | None -> ()
+                                                        personalRatingCard movie.PersonalRating model.IsRatingOpen dispatch
                                                     ]
                                                 ]
                                             ]

@@ -12,6 +12,7 @@ type Model = {
     FullCredits: FullCreditsDto option
     TrailerKey: string option
     ShowTrailer: bool
+    IsRatingOpen: bool
     ConfirmingRemove: bool
     Error: string option
 }
@@ -58,3 +59,6 @@ type Msg =
     | Trailer_loaded of string option
     | Open_trailer
     | Close_trailer
+    | Toggle_rating_dropdown
+    | Set_personal_rating of int
+    | Personal_rating_result of Result<unit, string>

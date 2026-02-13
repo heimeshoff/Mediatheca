@@ -6,20 +6,8 @@ open Feliz.Router
 open Mediatheca.Client.Pages.Movies.Types
 open Mediatheca.Client.Components
 
-let private ratingColor (rating: float) =
-    if rating >= 7.5 then "badge-success"
-    elif rating >= 5.0 then "badge-warning"
-    else "badge-error"
-
 let private movieCard (movie: Mediatheca.Shared.MovieListItem) =
-    let ratingBadge =
-        movie.TmdbRating
-        |> Option.map (fun rating ->
-            Html.div [
-                prop.className $"absolute top-2 right-2 badge badge-sm {ratingColor rating} font-bold shadow-lg"
-                prop.text $"%.1f{rating}"
-            ])
-    PosterCard.view movie.Slug movie.Name movie.Year movie.PosterRef ratingBadge
+    PosterCard.view movie.Slug movie.Name movie.Year movie.PosterRef None
 
 let private allGenres (movies: Mediatheca.Shared.MovieListItem list) =
     movies

@@ -300,6 +300,19 @@ module Api =
                         movieProjections
             }
 
+            setPersonalRating = fun slug rating -> async {
+                let sid = Movies.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        (Movies.Set_personal_rating rating)
+                        movieProjections
+            }
+
             // Watch Sessions
             recordWatchSession = fun slug request -> async {
                 let sid = Movies.streamId slug
