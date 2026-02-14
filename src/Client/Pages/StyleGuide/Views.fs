@@ -1195,11 +1195,13 @@ let private componentsSection () =
 [<ReactComponent>]
 let private contentBlocksDemo () =
     let blocks, setBlocks = React.useState<ContentBlockDto list>([
-        { BlockId = "demo-1"; BlockType = "text"; Content = "This is a text note. Click the pencil icon to edit, or the X to remove."; ImageRef = None; Url = None; Caption = None; Position = 0 }
-        { BlockId = "demo-2"; BlockType = "text"; Content = "Check out [Fable Documentation](https://fable.io/docs/) for more info on the compiler."; ImageRef = None; Url = None; Caption = None; Position = 1 }
-        { BlockId = "demo-3"; BlockType = "text"; Content = "Select text in the input and paste a URL to create an inline link."; ImageRef = None; Url = None; Caption = None; Position = 2 }
+        { BlockId = "demo-1"; BlockType = "text"; Content = "This is a text note. Hover to see the drag handle on the left."; ImageRef = None; Url = None; Caption = None; Position = 0 }
+        { BlockId = "demo-2"; BlockType = "quote"; Content = "The only way to do great work is to love what you do."; ImageRef = None; Url = None; Caption = None; Position = 1 }
+        { BlockId = "demo-3"; BlockType = "callout"; Content = "Click the drag handle to open the context menu. Use \"Turn into\" to change block types."; ImageRef = None; Url = None; Caption = None; Position = 2 }
+        { BlockId = "demo-4"; BlockType = "code"; Content = "let hello = printfn \"Hello from Fable!\""; ImageRef = None; Url = None; Caption = None; Position = 3 }
+        { BlockId = "demo-5"; BlockType = "text"; Content = "Check out [Fable Documentation](https://fable.io/docs/) for more info on the compiler."; ImageRef = None; Url = None; Caption = None; Position = 4 }
     ])
-    let nextId, setNextId = React.useState(4)
+    let nextId, setNextId = React.useState(6)
 
     let onAdd (req: AddContentBlockRequest) =
         let newBlock : ContentBlockDto = {
@@ -1223,7 +1225,20 @@ let private contentBlocksDemo () =
     let onRemove (blockId: string) =
         setBlocks (blocks |> List.filter (fun b -> b.BlockId <> blockId))
 
-    ContentBlockEditor.view blocks onAdd onUpdate onRemove
+    let onChangeType (blockId: string) (newType: string) =
+        setBlocks (blocks |> List.map (fun b ->
+            if b.BlockId = blockId then { b with BlockType = newType }
+            else b))
+
+    let onReorder (blockIds: string list) =
+        setBlocks (
+            blockIds
+            |> List.mapi (fun i bid ->
+                blocks |> List.tryFind (fun b -> b.BlockId = bid)
+                |> Option.map (fun b -> { b with Position = i }))
+            |> List.choose id)
+
+    ContentBlockEditor.view blocks onAdd onUpdate onRemove onChangeType onReorder
 
 let private contentBlocksSection () =
     Html.div [
@@ -1237,7 +1252,7 @@ let private contentBlocksSection () =
 
             Html.p [
                 prop.className DesignSystem.secondaryText
-                prop.text "Try adding, editing, and removing blocks below. Type in the \"new block\" placeholder and press Enter to save. Select text in the input and paste a URL to create an inline link. Hover over a block to see edit/remove controls."
+                prop.text "Try adding, editing, and removing blocks below. Hover over a block to see the drag handle on the left. Click the handle to open the context menu (edit, delete, change type). Drag to reorder."
             ]
 
             Html.div [
@@ -1250,42 +1265,32 @@ let private contentBlocksSection () =
             subheading "Block Types"
 
             Html.div [
-                prop.className "grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl"
+                prop.className "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl"
                 prop.children [
-                    Html.div [
-                        prop.className (DesignSystem.glassSubtle + " p-5 rounded-xl border border-base-content/5")
-                        prop.children [
-                            Html.h4 [
-                                prop.className (DesignSystem.subtitle + " text-primary mb-2")
-                                prop.text "Text Block"
-                            ]
-                            Html.p [
-                                prop.className DesignSystem.secondaryText
-                                prop.text "Free-form text notes with optional inline links. Links are created via smart paste using [text](url) markdown syntax. Rendered as plain text on the background."
-                            ]
-                            Html.code [
-                                prop.className "block mt-3 text-xs font-mono text-base-content/50 bg-base-300/30 p-2 rounded"
-                                prop.text "BlockType = \"text\""
-                            ]
-                        ]
-                    ]
-                    Html.div [
-                        prop.className (DesignSystem.glassSubtle + " p-5 rounded-xl border border-base-content/5")
-                        prop.children [
-                            Html.h4 [
-                                prop.className (DesignSystem.subtitle + " text-primary mb-2")
-                                prop.text "Image Block"
-                            ]
-                            Html.p [
-                                prop.className DesignSystem.secondaryText
-                                prop.text "Image attachments with optional caption. Uses ImageRef for storage reference. (Planned -- not yet implemented in editor.)"
-                            ]
-                            Html.code [
-                                prop.className "block mt-3 text-xs font-mono text-base-content/50 bg-base-300/30 p-2 rounded"
-                                prop.text "BlockType = \"image\""
+                    for (typeName, label, desc) in [
+                        "text", "Text Block", "Free-form text notes with optional inline links via [text](url) markdown syntax. Default block type."
+                        "quote", "Quote Block", "Styled with a left border and italic text. Use for citations, memorable quotes, or highlighted passages."
+                        "callout", "Callout Block", "Info-styled block with an icon and tinted background. Use for tips, warnings, or important notes."
+                        "code", "Code Block", "Monospace font with a subtle background. Use for code snippets, technical references, or formatted data."
+                        "image", "Image Block", "Image attachments with optional caption. Uses ImageRef for storage reference. (Planned -- not yet in editor.)"
+                    ] do
+                        Html.div [
+                            prop.className (DesignSystem.glassSubtle + " p-5 rounded-xl border border-base-content/5")
+                            prop.children [
+                                Html.h4 [
+                                    prop.className (DesignSystem.subtitle + " text-primary mb-2")
+                                    prop.text label
+                                ]
+                                Html.p [
+                                    prop.className DesignSystem.secondaryText
+                                    prop.text desc
+                                ]
+                                Html.code [
+                                    prop.className "block mt-3 text-xs font-mono text-base-content/50 bg-base-300/30 p-2 rounded"
+                                    prop.text $"BlockType = \"{typeName}\""
+                                ]
                             ]
                         ]
-                    ]
                 ]
             ]
 
@@ -1296,7 +1301,7 @@ let private contentBlocksSection () =
                 prop.children [
                     Html.code [
                         prop.className "text-xs font-mono text-base-content/60 bg-base-300/30 p-3 rounded block"
-                        prop.text "ContentBlockEditor.view blocks onAdd onUpdate onRemove"
+                        prop.text "ContentBlockEditor.view blocks onAdd onUpdate onRemove onChangeType onReorder"
                     ]
                     Html.div [
                         prop.className "p-4 rounded-lg bg-base-200/30 border border-base-content/5"
@@ -1305,34 +1310,21 @@ let private contentBlocksSection () =
                             Html.ul [
                                 prop.className "mt-2 space-y-1"
                                 prop.children [
-                                    Html.li [
-                                        prop.className "text-sm text-base-content/70"
-                                        prop.children [
-                                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "blocks" ]
-                                            Html.span [ prop.text " -- ContentBlockDto list, sorted by Position" ]
+                                    for (name, desc) in [
+                                        "blocks", "ContentBlockDto list, sorted by Position"
+                                        "onAdd", "AddContentBlockRequest -> unit"
+                                        "onUpdate", "string -> UpdateContentBlockRequest -> unit"
+                                        "onRemove", "string -> unit"
+                                        "onChangeType", "string -> string -> unit (blockId, newType)"
+                                        "onReorder", "string list -> unit (ordered blockIds)"
+                                    ] do
+                                        Html.li [
+                                            prop.className "text-sm text-base-content/70"
+                                            prop.children [
+                                                Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text name ]
+                                                Html.span [ prop.text $" -- {desc}" ]
+                                            ]
                                         ]
-                                    ]
-                                    Html.li [
-                                        prop.className "text-sm text-base-content/70"
-                                        prop.children [
-                                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "onAdd" ]
-                                            Html.span [ prop.text " -- AddContentBlockRequest -> unit" ]
-                                        ]
-                                    ]
-                                    Html.li [
-                                        prop.className "text-sm text-base-content/70"
-                                        prop.children [
-                                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "onUpdate" ]
-                                            Html.span [ prop.text " -- string -> UpdateContentBlockRequest -> unit" ]
-                                        ]
-                                    ]
-                                    Html.li [
-                                        prop.className "text-sm text-base-content/70"
-                                        prop.children [
-                                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "onRemove" ]
-                                            Html.span [ prop.text " -- string -> unit" ]
-                                        ]
-                                    ]
                                 ]
                             ]
                         ]
@@ -1352,7 +1344,9 @@ let private contentBlocksSection () =
                                 "Enter", "Save the current block"
                                 "Escape", "Cancel editing"
                                 "Select text + Paste URL", "Create an inline [text](url) link in the content"
-                                "Hover block", "Reveal edit (pencil) and delete (X) controls"
+                                "Hover block", "Reveal drag handle on the left"
+                                "Click drag handle", "Open context menu (Edit, Delete, Turn into...)"
+                                "Drag handle", "Drag to reorder blocks"
                             ] do
                                 Html.div [
                                     prop.className "flex items-center gap-3 py-1"

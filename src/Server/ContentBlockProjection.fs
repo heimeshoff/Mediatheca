@@ -81,6 +81,15 @@ module ContentBlockProjection =
                     |> Db.setParams [ "block_id", SqlType.String blockId ]
                     |> Db.exec
 
+                | ContentBlocks.Content_block_type_changed (blockId, blockType) ->
+                    conn
+                    |> Db.newCommand "UPDATE content_blocks SET block_type = @block_type WHERE block_id = @block_id"
+                    |> Db.setParams [
+                        "block_id", SqlType.String blockId
+                        "block_type", SqlType.String blockType
+                    ]
+                    |> Db.exec
+
                 | ContentBlocks.Content_blocks_reordered (blockIds, _sessionId) ->
                     blockIds
                     |> List.iteri (fun i bid ->

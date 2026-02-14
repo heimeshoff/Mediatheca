@@ -6,6 +6,13 @@
 
 ## Recent Progress
 
+- **2026-02-14**: Added catalog picker to movie detail page
+  - Glass "Add to Catalog" button next to Play Trailer in hero section
+  - Modal with search/filter for catalogs (same pattern as friend picker)
+  - Create new catalogs inline from the picker modal
+  - Removable ghost pills showing current catalog memberships
+  - New `CatalogRef` type and `getCatalogsForMovie` API endpoint
+  - Server-side query joins catalog_entries with catalog_list
 - **2026-02-14**: Changed card hover animation from lift (translateY) to subtle scale (towards viewer)
 - **2026-02-14**: Redesigned content blocks — removed card styling, removed link subtype, inline markdown links
   - Blocks render as plain text on background (no cards, no glass effects)
