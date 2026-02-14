@@ -135,6 +135,21 @@ module CatalogProjection =
         |> Db.query (fun (rd: IDataReader) ->
             (rd.ReadString "catalog_slug", rd.ReadString "entry_id"))
 
+    let getCatalogsForMovie (conn: SqliteConnection) (movieSlug: string) : Mediatheca.Shared.CatalogRef list =
+        conn
+        |> Db.newCommand """
+            SELECT ce.catalog_slug, ce.entry_id, cl.name
+            FROM catalog_entries ce
+            INNER JOIN catalog_list cl ON cl.slug = ce.catalog_slug
+            WHERE ce.movie_slug = @movie_slug
+            ORDER BY cl.name
+        """
+        |> Db.setParams [ "movie_slug", SqlType.String movieSlug ]
+        |> Db.query (fun (rd: IDataReader) ->
+            { Mediatheca.Shared.CatalogRef.Slug = rd.ReadString "catalog_slug"
+              Name = rd.ReadString "name"
+              EntryId = rd.ReadString "entry_id" })
+
     let getAll (conn: SqliteConnection) : Mediatheca.Shared.CatalogListItem list =
         conn
         |> Db.newCommand """
