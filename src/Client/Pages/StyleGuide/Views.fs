@@ -1385,6 +1385,265 @@ let private contentBlocksSection () =
         ]
     ]
 
+// ── Section: Entry List ──
+
+type private EntryListLayout = Gallery | List
+
+type private MockEntry = {
+    Slug: string
+    Name: string
+    Year: int
+    PosterRef: string option
+    Genres: string list
+    Rating: float option
+}
+
+let private mockEntries = [
+    { Slug = "blade-runner-2049-2017"; Name = "Blade Runner 2049"; Year = 2017; PosterRef = None; Genres = ["Sci-Fi"; "Drama"]; Rating = Some 8.0 }
+    { Slug = "the-matrix-1999"; Name = "The Matrix"; Year = 1999; PosterRef = None; Genres = ["Sci-Fi"; "Action"]; Rating = Some 8.7 }
+    { Slug = "alien-1979"; Name = "Alien"; Year = 1979; PosterRef = None; Genres = ["Horror"; "Sci-Fi"]; Rating = Some 8.5 }
+    { Slug = "dune-part-two-2024"; Name = "Dune: Part Two"; Year = 2024; PosterRef = None; Genres = ["Sci-Fi"; "Adventure"]; Rating = Some 8.3 }
+    { Slug = "parasite-2019"; Name = "Parasite"; Year = 2019; PosterRef = None; Genres = ["Thriller"; "Drama"]; Rating = Some 8.5 }
+    { Slug = "interstellar-2014"; Name = "Interstellar"; Year = 2014; PosterRef = None; Genres = ["Sci-Fi"; "Drama"]; Rating = Some 8.7 }
+    { Slug = "the-godfather-1972"; Name = "The Godfather"; Year = 1972; PosterRef = None; Genres = ["Crime"; "Drama"]; Rating = Some 9.2 }
+    { Slug = "spirited-away-2001"; Name = "Spirited Away"; Year = 2001; PosterRef = None; Genres = ["Animation"; "Fantasy"]; Rating = Some 8.6 }
+]
+
+let private layoutToggle (active: EntryListLayout) (onSwitch: EntryListLayout -> unit) =
+    Html.div [
+        prop.className "flex items-center gap-1 bg-base-200/50 rounded-lg p-1"
+        prop.children [
+            Html.button [
+                prop.className (
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 "
+                    + (if active = Gallery then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
+                )
+                prop.onClick (fun _ -> onSwitch Gallery)
+                prop.children [
+                    Html.span [ prop.className "w-4 h-4"; prop.children [ Icons.viewGrid () ] ]
+                    Html.span [ prop.text "Gallery" ]
+                ]
+            ]
+            Html.button [
+                prop.className (
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 "
+                    + (if active = List then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
+                )
+                prop.onClick (fun _ -> onSwitch List)
+                prop.children [
+                    Html.span [ prop.className "w-4 h-4"; prop.children [ Icons.viewList () ] ]
+                    Html.span [ prop.text "List" ]
+                ]
+            ]
+        ]
+    ]
+
+let private galleryView (entries: MockEntry list) =
+    Html.div [
+        prop.className (DesignSystem.movieGrid + " " + DesignSystem.staggerGrid)
+        prop.children [
+            for entry in entries do
+                PosterCard.view entry.Slug entry.Name entry.Year entry.PosterRef None
+        ]
+    ]
+
+let private listRow (entry: MockEntry) =
+    Html.div [
+        prop.className "flex items-center gap-3 p-3 rounded-xl bg-base-100 hover:bg-base-200/80 transition-colors group"
+        prop.children [
+            Html.div [
+                prop.className "flex-none"
+                prop.children [ PosterCard.thumbnail entry.PosterRef entry.Name ]
+            ]
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.p [
+                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                        prop.text entry.Name
+                    ]
+                    Html.div [
+                        prop.className "flex items-center gap-2 mt-0.5"
+                        prop.children [
+                            Html.span [
+                                prop.className "text-xs text-base-content/50"
+                                prop.text (string entry.Year)
+                            ]
+                            Html.span [
+                                prop.className "text-base-content/20"
+                                prop.text "·"
+                            ]
+                            Html.span [
+                                prop.className "text-xs text-base-content/40"
+                                prop.text (entry.Genres |> String.concat ", ")
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+            match entry.Rating with
+            | Some r ->
+                Html.div [
+                    prop.className "flex-none text-xs font-medium text-warning/80 bg-warning/10 px-2 py-0.5 rounded"
+                    prop.text (sprintf "%.1f" r)
+                ]
+            | None -> ()
+        ]
+    ]
+
+let private listView (entries: MockEntry list) =
+    Html.div [
+        prop.className ("bg-base-200/50 rounded-xl p-2 flex flex-col gap-1 " + DesignSystem.animateFadeIn)
+        prop.children [
+            for entry in entries do
+                listRow entry
+        ]
+    ]
+
+[<ReactComponent>]
+let private entryListDemo () =
+    let layout, setLayout = React.useState Gallery
+
+    Html.div [
+        prop.className "flex flex-col gap-4"
+        prop.children [
+            Html.div [
+                prop.className "flex items-center justify-between"
+                prop.children [
+                    Html.p [
+                        prop.className DesignSystem.secondaryText
+                        prop.text $"{mockEntries.Length} entries"
+                    ]
+                    layoutToggle layout setLayout
+                ]
+            ]
+            match layout with
+            | Gallery -> galleryView mockEntries
+            | List -> listView mockEntries
+        ]
+    ]
+
+let private entryListSection () =
+    Html.div [
+        prop.className "flex flex-col gap-6"
+        prop.children [
+            sectionTitle "Entry List"
+
+            decision "A Notion-style database view for media entries. Supports switchable layouts: Gallery shows poster cards in a responsive grid, List shows detailed rows with thumbnail, metadata, and ratings. The layout toggle persists per-component instance."
+
+            subheading "Live Demo"
+
+            Html.div [
+                prop.className "mt-2"
+                prop.children [ entryListDemo () ]
+            ]
+
+            subheading "Layout Toggle"
+
+            Html.p [
+                prop.className DesignSystem.secondaryText
+                prop.text "Segmented control with icon + label. Active state uses primary tint with subtle shadow. Wraps in a base-200 container to group the options."
+            ]
+
+            Html.div [
+                prop.className "flex flex-col gap-3 mt-4"
+                prop.children [
+                    Html.div [
+                        prop.className "flex gap-4 items-center"
+                        prop.children [
+                            layoutToggle Gallery (fun _ -> ())
+                            Html.code [
+                                prop.className "text-xs font-mono text-primary/70"
+                                prop.text "Gallery active"
+                            ]
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "flex gap-4 items-center"
+                        prop.children [
+                            layoutToggle List (fun _ -> ())
+                            Html.code [
+                                prop.className "text-xs font-mono text-primary/70"
+                                prop.text "List active"
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+
+            subheading "Gallery Layout"
+
+            Html.p [
+                prop.className DesignSystem.secondaryText
+                prop.text "Responsive poster grid using PosterCard.view. Same layout as the Movies page -- 2 columns on mobile scaling to 6 on desktop. Includes stagger animation on load."
+            ]
+
+            codeBlock """Html.div [
+    prop.className (DesignSystem.movieGrid + " " + DesignSystem.staggerGrid)
+    prop.children [
+        for entry in entries do
+            PosterCard.view entry.Slug entry.Name entry.Year entry.PosterRef None
+    ]
+]"""
+
+            subheading "List Layout"
+
+            Html.p [
+                prop.className DesignSystem.secondaryText
+                prop.text "Detailed row layout with thumbnail, title, year, genres, and optional rating badge. Same pattern as CatalogDetail and FriendDetail pages. Rows have hover highlight and group-hover effects."
+            ]
+
+            codeBlock """Html.div [
+    prop.className "bg-base-200/50 rounded-xl p-2 flex flex-col gap-1"
+    prop.children [
+        for entry in entries do
+            Html.div [
+                prop.className "flex items-center gap-3 p-3 rounded-xl bg-base-100 group"
+                prop.children [
+                    PosterCard.thumbnail entry.PosterRef entry.Name
+                    // title + year + genres (flex-1 min-w-0)
+                    // optional rating badge (flex-none)
+                ]
+            ]
+    ]
+]"""
+
+            subheading "Icons"
+
+            Html.div [
+                prop.className "flex gap-6 mt-2"
+                prop.children [
+                    Html.div [
+                        prop.className "flex flex-col items-center gap-2 p-3 rounded-lg bg-base-200/20 border border-base-content/5"
+                        prop.children [
+                            Html.div [ prop.className "text-base-content/70"; prop.children [ Icons.viewGrid () ] ]
+                            Html.span [ prop.className "text-xs font-mono text-base-content/40"; prop.text "viewGrid" ]
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "flex flex-col items-center gap-2 p-3 rounded-lg bg-base-200/20 border border-base-content/5"
+                        prop.children [
+                            Html.div [ prop.className "text-base-content/70"; prop.children [ Icons.viewList () ] ]
+                            Html.span [ prop.className "text-xs font-mono text-base-content/40"; prop.text "viewList" ]
+                        ]
+                    ]
+                ]
+            ]
+
+            subheading "Decisions"
+
+            decisionBox
+                "Layout Toggle Pattern"
+                "Segmented control (icon + label) in a contained pill group. Visually distinct from filter pills which are standalone. The toggle is local React state, not part of the Elmish model, since it's a view preference not application state."
+                "Dropdown select (hidden options, extra click). Tab bar (conflicts with page-level navigation). Icon-only toggle (poor discoverability)."
+
+            decisionBox
+                "Gallery as Default"
+                "Gallery (poster grid) is the default layout because posters are the strongest visual identifier for movies. The dark theme makes posters pop, and the grid gives a quick visual scan of the collection."
+                "List as default (too text-heavy for a media app). Table layout (too dense, better for data apps than media libraries)."
+        ]
+    ]
+
 // ── Section Nav ──
 
 let private sectionNav (activeSection: Section) (dispatch: Msg -> unit) =
@@ -1397,6 +1656,7 @@ let private sectionNav (activeSection: Section) (dispatch: Msg -> unit) =
         Animations, "Animations"
         Components, "Components"
         ContentBlocks, "Content Blocks"
+        EntryList, "Entry List"
     ]
     Html.nav [
         prop.className "flex flex-wrap gap-2 mb-8"
@@ -1422,6 +1682,7 @@ let private sectionContent (section: Section) =
     | Animations -> animationsSection ()
     | Components -> componentsSection ()
     | ContentBlocks -> contentBlocksSection ()
+    | EntryList -> entryListSection ()
 
 // ── Page View ──
 

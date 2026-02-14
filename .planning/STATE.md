@@ -6,6 +6,14 @@
 
 ## Recent Progress
 
+- **2026-02-14**: Added Entry List component to Style Guide
+  - Notion-style database view with switchable Gallery/List layouts
+  - Gallery: responsive poster grid using PosterCard.view with stagger animation
+  - List: detailed rows with thumbnail, title, year, genres, and rating badge
+  - Segmented layout toggle control (icon + label) with local React state
+  - New viewGrid and viewList icons added to Icons module
+  - Live interactive demo with 8 mock movie entries
+  - Code examples and design decision callouts
 - **2026-02-14**: Added catalog picker to movie detail page
   - Glass "Add to Catalog" button next to Play Trailer in hero section
   - Modal with search/filter for catalogs (same pattern as friend picker)
