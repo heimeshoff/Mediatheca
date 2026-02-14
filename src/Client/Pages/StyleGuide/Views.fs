@@ -1415,25 +1415,19 @@ let private layoutToggle (active: EntryListLayout) (onSwitch: EntryListLayout ->
         prop.children [
             Html.button [
                 prop.className (
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 "
+                    "flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 "
                     + (if active = Gallery then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
                 )
                 prop.onClick (fun _ -> onSwitch Gallery)
-                prop.children [
-                    Html.span [ prop.className "w-4 h-4"; prop.children [ Icons.viewGrid () ] ]
-                    Html.span [ prop.text "Gallery" ]
-                ]
+                prop.children [ Icons.viewGrid () ]
             ]
             Html.button [
                 prop.className (
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 "
+                    "flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 "
                     + (if active = List then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
                 )
                 prop.onClick (fun _ -> onSwitch List)
-                prop.children [
-                    Html.span [ prop.className "w-4 h-4"; prop.children [ Icons.viewList () ] ]
-                    Html.span [ prop.text "List" ]
-                ]
+                prop.children [ Icons.viewList () ]
             ]
         ]
     ]
