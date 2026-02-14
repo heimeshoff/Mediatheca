@@ -58,7 +58,11 @@ let private glassCard (children: ReactElement list) =
 
 let private friendAvatar (size: string) (fr: FriendRef) (extraClass: string) =
     Html.div [
-        prop.className $"{size} rounded-full overflow-hidden flex items-center justify-center {extraClass}"
+        prop.className $"{size} rounded-full overflow-hidden flex items-center justify-center cursor-pointer {extraClass}"
+        prop.title fr.Name
+        prop.onClick (fun e ->
+            e.stopPropagation()
+            Router.navigate ("friends", fr.Slug))
         prop.children [
             match fr.ImageRef with
             | Some ref ->
