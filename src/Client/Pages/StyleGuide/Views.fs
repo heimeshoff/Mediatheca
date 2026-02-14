@@ -1389,6 +1389,36 @@ let private contentBlocksSection () =
 
 type private EntryListLayout = Gallery | List
 
+type private SortField = ByReleaseDate | ByName | ByRating
+type private SortDirection = Ascending | Descending
+
+type private SortState = {
+    Field: SortField
+    Direction: SortDirection
+}
+
+let private defaultDirectionFor field =
+    match field with
+    | ByName -> Ascending
+    | ByReleaseDate -> Descending
+    | ByRating -> Descending
+
+let private sortFieldLabel field =
+    match field with
+    | ByReleaseDate -> "Release Date"
+    | ByName -> "Name"
+    | ByRating -> "Rating"
+
+let private sortEntries (sort: SortState) (entries: MockEntry list) =
+    let sorted =
+        match sort.Field with
+        | ByReleaseDate -> entries |> List.sortBy (fun e -> e.Year)
+        | ByName -> entries |> List.sortBy (fun e -> e.Name.ToLowerInvariant())
+        | ByRating -> entries |> List.sortBy (fun e -> e.Rating |> Option.defaultValue 0.0)
+    match sort.Direction with
+    | Ascending -> sorted
+    | Descending -> sorted |> List.rev
+
 type private MockEntry = {
     Slug: string
     Name: string
@@ -1429,6 +1459,93 @@ let private layoutToggle (active: EntryListLayout) (onSwitch: EntryListLayout ->
                 prop.onClick (fun _ -> onSwitch List)
                 prop.children [ Icons.viewList () ]
             ]
+        ]
+    ]
+
+[<ReactComponent>]
+let private sortButton (sort: SortState) (onSort: SortState -> unit) =
+    let isOpen, setIsOpen = React.useState false
+
+    let selectField field =
+        if sort.Field = field then
+            // Same field: toggle direction
+            let newDir = if sort.Direction = Ascending then Descending else Ascending
+            onSort { sort with Direction = newDir }
+        else
+            // New field: use its default direction
+            onSort { Field = field; Direction = defaultDirectionFor field }
+        setIsOpen false
+
+    let toggleDirection () =
+        let newDir = if sort.Direction = Ascending then Descending else Ascending
+        onSort { sort with Direction = newDir }
+        setIsOpen false
+
+    // Relative container: button + dropdown as siblings (glassmorphism gotcha)
+    Html.div [
+        prop.className "relative"
+        prop.children [
+            Html.button [
+                prop.className (
+                    "flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 "
+                    + (if isOpen then "bg-primary/15 text-primary" else "text-base-content/50 hover:text-base-content bg-base-200/50")
+                )
+                prop.onClick (fun _ -> setIsOpen (not isOpen))
+                prop.children [ Icons.arrowsUpDown () ]
+            ]
+            if isOpen then
+                // Click-away backdrop
+                Html.div [
+                    prop.className "fixed inset-0 z-40"
+                    prop.onClick (fun _ -> setIsOpen false)
+                ]
+                // Dropdown menu
+                Html.div [
+                    prop.className (DesignSystem.glassDropdown + " absolute right-0 top-full mt-2 z-50 w-48 p-1.5")
+                    prop.children [
+                        for field in [ ByReleaseDate; ByName; ByRating ] do
+                            let isActive = sort.Field = field
+                            Html.button [
+                                prop.className (
+                                    "rating-dropdown-item w-full "
+                                    + (if isActive then "rating-dropdown-item-active" else "")
+                                )
+                                prop.onClick (fun _ -> selectField field)
+                                prop.children [
+                                    Html.span [
+                                        prop.className "flex-1 text-sm"
+                                        prop.text (sortFieldLabel field)
+                                    ]
+                                    if isActive then
+                                        Html.span [
+                                            prop.className "text-primary"
+                                            prop.children [
+                                                if sort.Direction = Ascending then Icons.chevronUp ()
+                                                else Icons.chevronDown ()
+                                            ]
+                                        ]
+                                ]
+                            ]
+                        // Separator + direction toggle
+                        Html.button [
+                            prop.className "rating-dropdown-item rating-dropdown-item-clear w-full"
+                            prop.onClick (fun _ -> toggleDirection ())
+                            prop.children [
+                                Html.span [
+                                    prop.className "flex-1 text-sm"
+                                    prop.text (if sort.Direction = Ascending then "Ascending" else "Descending")
+                                ]
+                                Html.span [
+                                    prop.className "text-base-content/40"
+                                    prop.children [
+                                        if sort.Direction = Ascending then Icons.chevronUp ()
+                                        else Icons.chevronDown ()
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
         ]
     ]
 
@@ -1497,6 +1614,9 @@ let private listView (entries: MockEntry list) =
 [<ReactComponent>]
 let private entryListDemo () =
     let layout, setLayout = React.useState Gallery
+    let sort, setSort = React.useState { Field = ByReleaseDate; Direction = Descending }
+
+    let sorted = sortEntries sort mockEntries
 
     Html.div [
         prop.className "flex flex-col gap-4"
@@ -1508,12 +1628,18 @@ let private entryListDemo () =
                         prop.className DesignSystem.secondaryText
                         prop.text $"{mockEntries.Length} entries"
                     ]
-                    layoutToggle layout setLayout
+                    Html.div [
+                        prop.className "flex items-center gap-2"
+                        prop.children [
+                            sortButton sort setSort
+                            layoutToggle layout setLayout
+                        ]
+                    ]
                 ]
             ]
             match layout with
-            | Gallery -> galleryView mockEntries
-            | List -> listView mockEntries
+            | Gallery -> galleryView sorted
+            | List -> listView sorted
         ]
     ]
 
