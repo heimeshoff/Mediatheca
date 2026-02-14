@@ -114,8 +114,24 @@ let view (model: Model) (dispatch: Msg -> unit) =
     let selCol, setSelCol = React.useState(Movie : MediaType)
 
     let localResults = filterLibrary model.Query model.LibraryMovies model.LibrarySeries
-    let movieResults = model.TmdbResults |> List.filter (fun r -> r.MediaType = Movie)
-    let seriesResults = model.TmdbResults |> List.filter (fun r -> r.MediaType = Series)
+
+    // Build lookup of library items by (lowercased name, year) to exclude from TMDB results
+    let libraryMovieKeys =
+        model.LibraryMovies
+        |> List.map (fun m -> m.Name.ToLowerInvariant(), m.Year)
+        |> Set.ofList
+    let librarySeriesKeys =
+        model.LibrarySeries
+        |> List.map (fun s -> s.Name.ToLowerInvariant(), s.Year)
+        |> Set.ofList
+    let isInLibrary (r: TmdbSearchResult) =
+        let key = r.Title.ToLowerInvariant(), r.Year |> Option.defaultValue 0
+        match r.MediaType with
+        | Movie -> libraryMovieKeys |> Set.contains key
+        | Series -> librarySeriesKeys |> Set.contains key
+
+    let movieResults = model.TmdbResults |> List.filter (fun r -> r.MediaType = Movie && not (isInLibrary r))
+    let seriesResults = model.TmdbResults |> List.filter (fun r -> r.MediaType = Series && not (isInLibrary r))
 
     // Reset selection when search query changes
     React.useEffect((fun () ->
