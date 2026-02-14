@@ -72,28 +72,35 @@ let private getRatingOption (rating: int option) =
     let r = rating |> Option.defaultValue 0
     ratingOptions |> List.find (fun opt -> opt.Value = r)
 
+let private glassCard (children: ReactElement list) =
+    Html.div [
+        prop.className "bg-base-100/50 backdrop-blur-xl border border-base-content/8 p-6 rounded-xl"
+        prop.children children
+    ]
+
 let private personalRatingCard (rating: int option) (isOpen: bool) (dispatch: Msg -> unit) =
     let currentOption = getRatingOption rating
+    // Outer container has position:relative but NO backdrop-filter,
+    // so the dropdown's z-50 escapes the glassCard stacking context.
     Html.div [
         prop.className "relative"
         prop.children [
-            Html.div [
-                prop.className "bg-base-100/50 backdrop-blur-sm p-4 rounded-xl border border-base-content/5"
-                prop.children [
-                    Html.span [
-                        prop.className "block text-base-content/40 text-xs uppercase font-bold tracking-widest mb-1"
-                        prop.text "My Rating"
+            glassCard [
+                Html.div [
+                    prop.className "flex items-center justify-between mb-4"
+                    prop.children [
+                        Html.h3 [ prop.className "text-lg font-bold"; prop.text "My Rating" ]
                     ]
-                    Html.button [
-                        prop.className $"flex items-center gap-2 font-medium cursor-pointer {currentOption.ColorClass} hover:opacity-80 transition-opacity"
-                        prop.onClick (fun _ -> dispatch Toggle_rating_dropdown)
-                        prop.children [
-                            Html.span [
-                                prop.className "w-5 h-5"
-                                prop.children [ currentOption.Icon () ]
-                            ]
-                            Html.span [ prop.text currentOption.Name ]
+                ]
+                Html.button [
+                    prop.className $"flex items-center gap-3 font-semibold text-lg cursor-pointer {currentOption.ColorClass} hover:opacity-80 transition-opacity"
+                    prop.onClick (fun _ -> dispatch Toggle_rating_dropdown)
+                    prop.children [
+                        Html.span [
+                            prop.className "w-6 h-6"
+                            prop.children [ currentOption.Icon () ]
                         ]
+                        Html.span [ prop.text currentOption.Name ]
                     ]
                 ]
             ]
@@ -225,13 +232,6 @@ let private friendAvatar (size: string) (fr: FriendRef) (extraClass: string) =
                 ]
         ]
     ]
-
-let private glassCard (children: ReactElement list) =
-    Html.div [
-        prop.className "bg-base-100/50 backdrop-blur-xl border border-base-content/8 p-6 rounded-xl"
-        prop.children children
-    ]
-
 
 [<ReactComponent>]
 let private FriendManager
@@ -554,20 +554,14 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     ]
                                                 ]
                                             ]
-                                        // Technical Details
+                                        // Notes
                                         Html.section [
                                             prop.children [
-                                                sectionHeader "Details"
-                                                Html.div [
-                                                    prop.className "grid grid-cols-2 sm:grid-cols-3 gap-4"
-                                                    prop.children [
-                                                        detailCard "Year" (string movie.Year)
-                                                        match movie.Runtime with
-                                                        | Some r -> detailCard "Runtime" $"{r} min"
-                                                        | None -> ()
-                                                        personalRatingCard movie.PersonalRating model.IsRatingOpen dispatch
-                                                    ]
-                                                ]
+                                                ContentBlockEditor.view
+                                                    movie.ContentBlocks
+                                                    (fun req -> dispatch (Add_content_block req))
+                                                    (fun bid req -> dispatch (Update_content_block (bid, req)))
+                                                    (fun bid -> dispatch (Remove_content_block bid))
                                             ]
                                         ]
                                         // Cast
@@ -617,6 +611,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 Html.div [
                                     prop.className "lg:col-span-4 space-y-6"
                                     prop.children [
+                                        // Personal Rating
+                                        personalRatingCard movie.PersonalRating model.IsRatingOpen dispatch
                                         // Recommended By card
                                         glassCard [
                                             Html.div [
@@ -834,18 +830,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                 prop.onClick (fun _ -> dispatch Record_quick_session)
                                                 prop.text "+ Record Watch Session"
                                             ]
-                                        ]
-                                        // Notes card
-                                        glassCard [
-                                            Html.h3 [
-                                                prop.className "text-lg font-bold mb-4"
-                                                prop.text "Notes"
-                                            ]
-                                            ContentBlockEditor.view
-                                                movie.ContentBlocks
-                                                (fun req -> dispatch (Add_content_block req))
-                                                (fun bid req -> dispatch (Update_content_block (bid, req)))
-                                                (fun bid -> dispatch (Remove_content_block bid))
                                         ]
                                         // Error display
                                         match model.Error with

@@ -6,6 +6,9 @@
 
 ## Recent Progress
 
+- **2026-02-14**: Fix rating dropdown z-index — rendered below Recommended By card
+  - Root cause: `backdrop-filter` on `glassCard` creates stacking context, trapping dropdown's `z-50`
+  - Fix: render dropdown as sibling to glassCard, wrapped in plain `relative` container (no backdrop-filter)
 - **2026-02-13**: Personal rating system (adapted from Cinemarco)
   - Removed TMDB rating badge from movie poster cards on the Movies list page
   - Kept TMDB star rating next to genre badges in movie detail hero section
