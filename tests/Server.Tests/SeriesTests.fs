@@ -257,6 +257,49 @@ let seriesTests =
                     Expect.isTrue (session.WatchedEpisodes |> Set.contains (1, 3)) "S1E3 should be in WatchedEpisodes"
                 | _ -> failtest "Expected Active state"
             | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Unmarking a season removes all watched episodes for that season" <| fun _ ->
+            let given = [
+                Series_added_to_library sampleSeriesData
+                Season_marked_watched { RewatchId = "default"; SeasonNumber = 1; Date = "2025-03-15" }
+                Episode_watched { RewatchId = "default"; SeasonNumber = 2; EpisodeNumber = 1; Date = "2025-03-15" }
+            ]
+            let result = givenWhenThen given (Mark_season_unwatched { RewatchId = "default"; SeasonNumber = 1 })
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 1 "Should produce one event"
+                let state = applyEvents (given @ events)
+                match state with
+                | Active series ->
+                    let session = series.RewatchSessions |> Map.find "default"
+                    Expect.isFalse (session.WatchedEpisodes |> Set.contains (1, 1)) "S1E1 should be removed"
+                    Expect.isFalse (session.WatchedEpisodes |> Set.contains (1, 2)) "S1E2 should be removed"
+                    Expect.isFalse (session.WatchedEpisodes |> Set.contains (1, 3)) "S1E3 should be removed"
+                    Expect.isTrue (session.WatchedEpisodes |> Set.contains (2, 1)) "S2E1 should still be watched"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Changing episode watched date on a watched episode succeeds" <| fun _ ->
+            let given = [
+                Series_added_to_library sampleSeriesData
+                Episode_watched { RewatchId = "default"; SeasonNumber = 1; EpisodeNumber = 2; Date = "2025-03-15" }
+            ]
+            let result = givenWhenThen given (Change_episode_watched_date { RewatchId = "default"; SeasonNumber = 1; EpisodeNumber = 2; Date = "2025-04-01" })
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 1 "Should produce one event"
+                match events.[0] with
+                | Episode_watched_date_changed data ->
+                    Expect.equal data.Date "2025-04-01" "Date should be updated"
+                | _ -> failtest "Expected Episode_watched_date_changed event"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Changing date on an unwatched episode fails" <| fun _ ->
+            let given = [ Series_added_to_library sampleSeriesData ]
+            let result = givenWhenThen given (Change_episode_watched_date { RewatchId = "default"; SeasonNumber = 1; EpisodeNumber = 2; Date = "2025-04-01" })
+            match result with
+            | Error msg -> Expect.stringContains msg "not watched" "Should say not watched"
+            | Ok _ -> failtest "Expected error"
     ]
 
 [<Tests>]
@@ -306,6 +349,26 @@ let seriesSerializationTests =
             let deserialized = Serialization.deserialize eventType data
             Expect.equal deserialized (Some event) "Should round-trip"
 
+        testCase "Season_marked_unwatched round-trips" <| fun _ ->
+            let event = Season_marked_unwatched {
+                RewatchId = "default"
+                SeasonNumber = 2
+            }
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Episode_watched_date_changed round-trips" <| fun _ ->
+            let event = Episode_watched_date_changed {
+                RewatchId = "default"
+                SeasonNumber = 1
+                EpisodeNumber = 3
+                Date = "2025-04-01"
+            }
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
         testCase "All event types serialize and deserialize" <| fun _ ->
             let events: SeriesEvent list = [
                 Series_added_to_library sampleSeriesData
@@ -326,6 +389,8 @@ let seriesSerializationTests =
                 Episode_unwatched { RewatchId = "default"; SeasonNumber = 1; EpisodeNumber = 1 }
                 Season_marked_watched { RewatchId = "default"; SeasonNumber = 1; Date = "2025-01-01" }
                 Episodes_watched_up_to { RewatchId = "default"; SeasonNumber = 1; EpisodeNumber = 3; Date = "2025-01-01" }
+                Season_marked_unwatched { RewatchId = "default"; SeasonNumber = 1 }
+                Episode_watched_date_changed { RewatchId = "default"; SeasonNumber = 1; EpisodeNumber = 1; Date = "2025-04-01" }
             ]
             for event in events do
                 let eventType, data = Serialization.serialize event

@@ -14,6 +14,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       IsRatingOpen = false
       ShowFriendPicker = None
       Friends = []
+      EditingEpisodeDate = None
       ConfirmingRemove = false
       Error = None },
     Cmd.batch [
@@ -23,9 +24,12 @@ let init (slug: string) : Model * Cmd<Msg> =
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
     | Load_detail ->
+        let rewatchId =
+            if model.SelectedRewatchId = "default" then None
+            else Some model.SelectedRewatchId
         { model with IsLoading = true },
         Cmd.batch [
-            Cmd.OfAsync.perform api.getSeriesDetail model.Slug Detail_loaded
+            Cmd.OfAsync.perform (fun () -> api.getSeriesDetail model.Slug rewatchId) () Detail_loaded
             Cmd.OfAsync.perform api.getFriends () Friends_loaded
         ]
 
@@ -87,6 +91,108 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         model, Cmd.ofMsg Load_detail
 
     | Season_marked (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Mark_season_unwatched seasonNumber ->
+        let request: MarkSeasonUnwatchedRequest = {
+            RewatchId = model.SelectedRewatchId
+            SeasonNumber = seasonNumber
+        }
+        model,
+        Cmd.OfAsync.either
+            (fun () -> api.markSeasonUnwatched model.Slug request)
+            () Season_unmarked (fun ex -> Season_unmarked (Error ex.Message))
+
+    | Season_unmarked (Ok ()) ->
+        model, Cmd.ofMsg Load_detail
+
+    | Season_unmarked (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Edit_episode_date (seasonNumber, episodeNumber) ->
+        { model with EditingEpisodeDate = Some (seasonNumber, episodeNumber) }, Cmd.none
+
+    | Cancel_edit_episode_date ->
+        { model with EditingEpisodeDate = None }, Cmd.none
+
+    | Update_episode_date (seasonNumber, episodeNumber, date) ->
+        let request: UpdateEpisodeWatchedDateRequest = {
+            RewatchId = model.SelectedRewatchId
+            SeasonNumber = seasonNumber
+            EpisodeNumber = episodeNumber
+            Date = date
+        }
+        { model with EditingEpisodeDate = None },
+        Cmd.OfAsync.either
+            (fun () -> api.updateEpisodeWatchedDate model.Slug request)
+            () Episode_date_updated (fun ex -> Episode_date_updated (Error ex.Message))
+
+    | Episode_date_updated (Ok ()) ->
+        model, Cmd.ofMsg Load_detail
+
+    | Episode_date_updated (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Create_rewatch_session ->
+        let request: CreateRewatchSessionRequest = {
+            Name = None
+            FriendSlugs = []
+        }
+        model,
+        Cmd.OfAsync.either
+            (fun () -> api.createRewatchSession model.Slug request)
+            () Rewatch_session_created (fun ex -> Rewatch_session_created (Error ex.Message))
+
+    | Rewatch_session_created (Ok rewatchId) ->
+        { model with SelectedRewatchId = rewatchId }, Cmd.ofMsg Load_detail
+
+    | Rewatch_session_created (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Remove_rewatch_session rewatchId ->
+        model,
+        Cmd.OfAsync.either
+            (fun () -> api.removeRewatchSession model.Slug rewatchId)
+            () Rewatch_session_removed (fun ex -> Rewatch_session_removed (Error ex.Message))
+
+    | Rewatch_session_removed (Ok ()) ->
+        { model with SelectedRewatchId = "default" }, Cmd.ofMsg Load_detail
+
+    | Rewatch_session_removed (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Add_rewatch_friend (rewatchId, friendSlug) ->
+        model,
+        Cmd.OfAsync.either
+            (fun () -> api.addFriendToRewatchSession model.Slug rewatchId friendSlug)
+            () Rewatch_friend_result (fun ex -> Rewatch_friend_result (Error ex.Message))
+
+    | Remove_rewatch_friend (rewatchId, friendSlug) ->
+        model,
+        Cmd.OfAsync.either
+            (fun () -> api.removeFriendFromRewatchSession model.Slug rewatchId friendSlug)
+            () Rewatch_friend_result (fun ex -> Rewatch_friend_result (Error ex.Message))
+
+    | Add_friend_and_add_to_session (rewatchId, name) ->
+        model,
+        Cmd.OfAsync.either (fun () ->
+            async {
+                match! api.addFriend name with
+                | Ok slug ->
+                    match! api.addFriendToRewatchSession model.Slug rewatchId slug with
+                    | Ok () -> return Ok ()
+                    | Error e -> return Error e
+                | Error e -> return Error e
+            }) () Rewatch_friend_result (fun ex -> Rewatch_friend_result (Error ex.Message))
+
+    | Rewatch_friend_result (Ok ()) ->
+        model,
+        Cmd.batch [
+            Cmd.ofMsg Load_detail
+            Cmd.OfAsync.perform api.getFriends () Friends_loaded
+        ]
+
+    | Rewatch_friend_result (Error err) ->
         { model with Error = Some err }, Cmd.none
 
     | Toggle_rating_dropdown ->

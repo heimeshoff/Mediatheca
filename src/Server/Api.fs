@@ -690,6 +690,8 @@ module Api =
                         | "Episode_unwatched" -> "Episode marked unwatched"
                         | "Season_marked_watched" -> "Season marked as watched"
                         | "Episodes_watched_up_to" -> "Episodes watched up to"
+                        | "Season_marked_unwatched" -> "Season marked unwatched"
+                        | "Episode_watched_date_changed" -> "Episode watched date changed"
                         | "Rewatch_session_created" -> "Rewatch session created"
                         | "Rewatch_session_removed" -> "Rewatch session removed"
                         | "Series_personal_rating_set" -> "Series personal rating updated"
@@ -1064,8 +1066,8 @@ module Api =
                 return SeriesProjection.getAll conn
             }
 
-            getSeriesDetail = fun slug -> async {
-                return SeriesProjection.getBySlug conn slug
+            getSeriesDetail = fun slug rewatchId -> async {
+                return SeriesProjection.getBySlug conn slug rewatchId
             }
 
             setSeriesPersonalRating = fun slug rating -> async {
@@ -1258,6 +1260,40 @@ module Api =
                         Series.decide
                         Series.Serialization.toEventData
                         (Series.Mark_episodes_watched_up_to {
+                            RewatchId = request.RewatchId
+                            SeasonNumber = request.SeasonNumber
+                            EpisodeNumber = request.EpisodeNumber
+                            Date = request.Date
+                        })
+                        projectionHandlers
+            }
+
+            markSeasonUnwatched = fun slug request -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Mark_season_unwatched {
+                            RewatchId = request.RewatchId
+                            SeasonNumber = request.SeasonNumber
+                        })
+                        projectionHandlers
+            }
+
+            updateEpisodeWatchedDate = fun slug request -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Change_episode_watched_date {
                             RewatchId = request.RewatchId
                             SeasonNumber = request.SeasonNumber
                             EpisodeNumber = request.EpisodeNumber

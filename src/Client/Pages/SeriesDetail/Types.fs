@@ -7,6 +7,7 @@ type SeriesTab = Overview | Episodes
 type FriendPickerKind =
     | Recommend_picker
     | Watch_with_picker
+    | Session_friend_picker of rewatchId: string
 
 type Model = {
     Slug: string
@@ -20,6 +21,8 @@ type Model = {
     // Social modals
     ShowFriendPicker: FriendPickerKind option
     Friends: FriendListItem list
+    // Episode date editing
+    EditingEpisodeDate: (int * int) option
     // Remove
     ConfirmingRemove: bool
     Error: string option
@@ -36,6 +39,23 @@ type Msg =
     | Episode_toggled of Result<unit, string>
     | Mark_season_watched of seasonNumber: int
     | Season_marked of Result<unit, string>
+    | Mark_season_unwatched of seasonNumber: int
+    | Season_unmarked of Result<unit, string>
+    // Episode date
+    | Edit_episode_date of int * int
+    | Update_episode_date of int * int * string
+    | Cancel_edit_episode_date
+    | Episode_date_updated of Result<unit, string>
+    // Rewatch session management
+    | Create_rewatch_session
+    | Rewatch_session_created of Result<string, string>
+    | Remove_rewatch_session of rewatchId: string
+    | Rewatch_session_removed of Result<unit, string>
+    // Session friends
+    | Add_rewatch_friend of rewatchId: string * friendSlug: string
+    | Remove_rewatch_friend of rewatchId: string * friendSlug: string
+    | Add_friend_and_add_to_session of rewatchId: string * name: string
+    | Rewatch_friend_result of Result<unit, string>
     // Rating
     | Toggle_rating_dropdown
     | Set_rating of int

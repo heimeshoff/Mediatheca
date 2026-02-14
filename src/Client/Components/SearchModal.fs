@@ -99,7 +99,7 @@ let private renderTmdbItem (result: TmdbSearchResult) (isSelected: bool) (onImpo
                     match result.Year with
                     | Some y ->
                         Html.p [
-                            prop.className "text-xs text-base-content/60"
+                            prop.className "text-xs text-base-content/50"
                             prop.text (string y)
                         ]
                     | None -> ()
@@ -187,9 +187,9 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 Html.div [
                     prop.className "flex items-center gap-2 mb-2"
                     prop.children [
-                        Html.span [ prop.className "w-5 h-5 text-base-content/60"; prop.children [ icon ] ]
+                        Html.span [ prop.className "w-5 h-5 text-base-content/50"; prop.children [ icon ] ]
                         Html.h5 [
-                            prop.className "text-sm font-semibold text-base-content/60 uppercase tracking-wide"
+                            prop.className (Mediatheca.Client.DesignSystem.subtitle + " text-base-content/50")
                             prop.text title
                         ]
                         if not (List.isEmpty results) then
@@ -202,7 +202,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 ]
                 if List.isEmpty results then
                     Html.p [
-                        prop.className "text-xs text-base-content/30 py-4 text-center"
+                        prop.className "text-xs text-base-content/40 py-4 text-center"
                         prop.text "No results"
                     ]
                 else
@@ -285,7 +285,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             Html.div [
                                                 prop.children [
                                                     Html.h4 [
-                                                        prop.className "text-sm font-semibold text-base-content/60 uppercase tracking-wide mb-2"
+                                                        prop.className (Mediatheca.Client.DesignSystem.subtitle + " text-base-content/50 mb-2")
                                                         prop.text "In Your Library"
                                                     ]
                                                     Html.div [
@@ -320,7 +320,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                                     prop.text result.Name
                                                                                 ]
                                                                                 Html.p [
-                                                                                    prop.className "text-xs text-base-content/60"
+                                                                                    prop.className "text-xs text-base-content/50"
                                                                                     prop.text (string result.Year)
                                                                                 ]
                                                                             ]
@@ -344,7 +344,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                         Html.div [
                                             prop.children [
                                                 Html.h4 [
-                                                    prop.className "text-sm font-semibold text-base-content/60 uppercase tracking-wide mb-3"
+                                                    prop.className (Mediatheca.Client.DesignSystem.subtitle + " text-base-content/50 mb-3")
                                                     prop.text "TMDB Results"
                                                 ]
                                                 if model.IsSearchingTmdb then

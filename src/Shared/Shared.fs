@@ -388,6 +388,18 @@ type MarkEpisodesUpToRequest = {
     Date: string
 }
 
+type MarkSeasonUnwatchedRequest = {
+    RewatchId: string
+    SeasonNumber: int
+}
+
+type UpdateEpisodeWatchedDateRequest = {
+    RewatchId: string
+    SeasonNumber: int
+    EpisodeNumber: int
+    Date: string
+}
+
 module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
@@ -459,7 +471,7 @@ type IMediathecaApi = {
     addSeries: int -> Async<Result<string, string>>
     removeSeries: string -> Async<Result<unit, string>>
     getSeries: unit -> Async<SeriesListItem list>
-    getSeriesDetail: string -> Async<SeriesDetail option>
+    getSeriesDetail: string -> string option -> Async<SeriesDetail option>
     setSeriesPersonalRating: string -> int option -> Async<Result<unit, string>>
     addSeriesRecommendation: string -> string -> Async<Result<unit, string>>
     removeSeriesRecommendation: string -> string -> Async<Result<unit, string>>
@@ -475,6 +487,8 @@ type IMediathecaApi = {
     markEpisodeUnwatched: string -> MarkEpisodeUnwatchedRequest -> Async<Result<unit, string>>
     markSeasonWatched: string -> MarkSeasonWatchedRequest -> Async<Result<unit, string>>
     markEpisodesWatchedUpTo: string -> MarkEpisodesUpToRequest -> Async<Result<unit, string>>
+    markSeasonUnwatched: string -> MarkSeasonUnwatchedRequest -> Async<Result<unit, string>>
+    updateEpisodeWatchedDate: string -> UpdateEpisodeWatchedDateRequest -> Async<Result<unit, string>>
     // Series Content Blocks + Catalogs
     getSeriesContentBlocks: string -> Async<ContentBlockDto list>
     addSeriesContentBlock: string -> AddContentBlockRequest -> Async<Result<string, string>>

@@ -535,6 +535,36 @@ module SeriesProjection =
                         |> Db.exec
                     recalculateProgress conn slug
 
+                | Series.Season_marked_unwatched data ->
+                    conn
+                    |> Db.newCommand """
+                        DELETE FROM series_episode_progress
+                        WHERE series_slug = @slug AND rewatch_id = @rewatch_id AND season_number = @season_number
+                    """
+                    |> Db.setParams [
+                        "slug", SqlType.String slug
+                        "rewatch_id", SqlType.String data.RewatchId
+                        "season_number", SqlType.Int32 data.SeasonNumber
+                    ]
+                    |> Db.exec
+                    recalculateProgress conn slug
+
+                | Series.Episode_watched_date_changed data ->
+                    conn
+                    |> Db.newCommand """
+                        UPDATE series_episode_progress SET watched_date = @watched_date
+                        WHERE series_slug = @slug AND rewatch_id = @rewatch_id
+                          AND season_number = @season_number AND episode_number = @episode_number
+                    """
+                    |> Db.setParams [
+                        "slug", SqlType.String slug
+                        "rewatch_id", SqlType.String data.RewatchId
+                        "season_number", SqlType.Int32 data.SeasonNumber
+                        "episode_number", SqlType.Int32 data.EpisodeNumber
+                        "watched_date", SqlType.String data.Date
+                    ]
+                    |> Db.exec
+
     let handler: Projection.ProjectionHandler = {
         Name = "SeriesProjection"
         Handle = handleEvent
@@ -619,7 +649,7 @@ module SeriesProjection =
               MediaType = Mediatheca.Shared.Series }
         )
 
-    let getBySlug (conn: SqliteConnection) (slug: string) : Mediatheca.Shared.SeriesDetail option =
+    let getBySlug (conn: SqliteConnection) (slug: string) (rewatchId: string option) : Mediatheca.Shared.SeriesDetail option =
         conn
         |> Db.newCommand "SELECT slug, name, year, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, episode_runtime, status, personal_rating, recommended_by, want_to_watch_with FROM series_detail WHERE slug = @slug"
         |> Db.setParams [ "slug", SqlType.String slug ]
@@ -637,19 +667,22 @@ module SeriesProjection =
                 Decode.fromString (Decode.list Decode.string) wantToWatchWithJson
                 |> Result.defaultValue []
 
-            // Get default rewatch session id
-            let defaultRewatchId =
-                conn
-                |> Db.newCommand "SELECT rewatch_id FROM series_rewatch_sessions WHERE series_slug = @slug AND is_default = 1"
-                |> Db.setParams [ "slug", SqlType.String slug ]
-                |> Db.querySingle (fun (rd2: IDataReader) -> rd2.ReadString "rewatch_id")
-                |> Option.defaultValue "default"
+            // Determine which rewatch session to show progress for
+            let activeRewatchId =
+                match rewatchId with
+                | Some id -> id
+                | None ->
+                    conn
+                    |> Db.newCommand "SELECT rewatch_id FROM series_rewatch_sessions WHERE series_slug = @slug AND is_default = 1"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.querySingle (fun (rd2: IDataReader) -> rd2.ReadString "rewatch_id")
+                    |> Option.defaultValue "default"
 
-            // Get watched episodes for default session
-            let defaultWatched =
+            // Get watched episodes for active session
+            let activeWatched =
                 conn
                 |> Db.newCommand "SELECT season_number, episode_number, watched_date FROM series_episode_progress WHERE series_slug = @slug AND rewatch_id = @rewatch_id"
-                |> Db.setParams [ "slug", SqlType.String slug; "rewatch_id", SqlType.String defaultRewatchId ]
+                |> Db.setParams [ "slug", SqlType.String slug; "rewatch_id", SqlType.String activeRewatchId ]
                 |> Db.query (fun (rd2: IDataReader) ->
                     (rd2.ReadInt32 "season_number", rd2.ReadInt32 "episode_number"),
                     if rd2.IsDBNull(rd2.GetOrdinal("watched_date")) then None
@@ -685,7 +718,7 @@ module SeriesProjection =
                         |> Db.setParams [ "slug", SqlType.String slug; "season_number", SqlType.Int32 seasonNumber ]
                         |> Db.query (fun (rd3: IDataReader) ->
                             let epNum = rd3.ReadInt32 "episode_number"
-                            let watchInfo = defaultWatched |> Map.tryFind (seasonNumber, epNum)
+                            let watchInfo = activeWatched |> Map.tryFind (seasonNumber, epNum)
                             { Mediatheca.Shared.EpisodeDto.EpisodeNumber = epNum
                               Mediatheca.Shared.EpisodeDto.Name = rd3.ReadString "name"
                               Mediatheca.Shared.EpisodeDto.Overview = rd3.ReadString "overview"
@@ -723,6 +756,22 @@ module SeriesProjection =
                 )
 
             let totalEpisodes = seasons |> List.sumBy (fun s -> s.Episodes.Length)
+
+            // Ensure default rewatch session exists (repairs legacy data)
+            let hasDefault =
+                conn
+                |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_rewatch_sessions WHERE series_slug = @slug AND is_default = 1"
+                |> Db.setParams [ "slug", SqlType.String slug ]
+                |> Db.querySingle (fun (rd2: IDataReader) -> rd2.ReadInt32 "cnt")
+                |> Option.defaultValue 0
+            if hasDefault = 0 then
+                conn
+                |> Db.newCommand """
+                    INSERT OR REPLACE INTO series_rewatch_sessions (rewatch_id, series_slug, name, is_default, friends)
+                    VALUES ('default', @series_slug, NULL, 1, '[]')
+                """
+                |> Db.setParams [ "series_slug", SqlType.String slug ]
+                |> Db.exec
 
             // Get rewatch sessions
             let rewatchSessions =

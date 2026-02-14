@@ -12,7 +12,7 @@ open Mediatheca.Client.Components
 
 let private sectionHeader (title: string) =
     Html.h2 [
-        prop.className "text-2xl font-bold font-display mb-6 flex items-center gap-2"
+        prop.className (DesignSystem.sectionHeader + " font-bold mb-6 flex items-center gap-2")
         prop.children [
             Html.span [ prop.className "w-1 h-6 bg-primary rounded-full inline-block" ]
             Html.text title
@@ -42,17 +42,17 @@ let private starRating (rating: float) =
 let private statusBadge (status: SeriesStatus) =
     let (color, label) =
         match status with
-        | Returning -> ("badge-success", "Returning")
-        | Ended -> ("badge-ghost", "Ended")
-        | Canceled -> ("badge-error", "Canceled")
-        | InProduction -> ("badge-warning", "In Production")
-        | Planned -> ("badge-info", "Planned")
-        | UnknownStatus -> ("badge-ghost", "Unknown")
-    Html.span [ prop.className $"badge badge-sm {color}"; prop.text label ]
+        | Returning -> (badge.success, "Returning")
+        | Ended -> (badge.ghost, "Ended")
+        | Canceled -> (badge.error, "Canceled")
+        | InProduction -> (badge.warning, "In Production")
+        | Planned -> (badge.info, "Planned")
+        | UnknownStatus -> (badge.ghost, "Unknown")
+    Daisy.badge [ badge.sm; color; prop.text label ]
 
 let private glassCard (children: ReactElement list) =
     Html.div [
-        prop.className "bg-base-100/50 backdrop-blur-xl border border-base-content/8 p-6 rounded-xl"
+        prop.className (DesignSystem.glassCard + " p-6")
         prop.children children
     ]
 
@@ -87,11 +87,11 @@ type private RatingOption = {
 
 let private ratingOptions : RatingOption list = [
     { Value = 0; Name = "Unrated"; Description = "No rating yet"; Icon = Icons.questionCircle; ColorClass = "text-base-content/50" }
-    { Value = 1; Name = "Waste"; Description = "Waste of time"; Icon = Icons.thumbsDown; ColorClass = "text-red-400" }
-    { Value = 2; Name = "Meh"; Description = "Didn't click, uninspiring"; Icon = Icons.minusCircle; ColorClass = "text-orange-400" }
-    { Value = 3; Name = "Decent"; Description = "Watchable, even if not life-changing"; Icon = Icons.handOkay; ColorClass = "text-yellow-400" }
-    { Value = 4; Name = "Entertaining"; Description = "Strong craft, enjoyable"; Icon = Icons.thumbsUp; ColorClass = "text-lime-400" }
-    { Value = 5; Name = "Outstanding"; Description = "Absolutely brilliant, stays with you"; Icon = Icons.trophy; ColorClass = "text-amber-400" }
+    { Value = 1; Name = "Waste"; Description = "Waste of time"; Icon = Icons.thumbsDown; ColorClass = "text-error" }
+    { Value = 2; Name = "Meh"; Description = "Didn't click, uninspiring"; Icon = Icons.minusCircle; ColorClass = "text-secondary" }
+    { Value = 3; Name = "Decent"; Description = "Watchable, even if not life-changing"; Icon = Icons.handOkay; ColorClass = "text-warning" }
+    { Value = 4; Name = "Entertaining"; Description = "Strong craft, enjoyable"; Icon = Icons.thumbsUp; ColorClass = "text-success" }
+    { Value = 5; Name = "Outstanding"; Description = "Absolutely brilliant, stays with you"; Icon = Icons.trophy; ColorClass = "text-primary" }
 ]
 
 let private getRatingOption (rating: int option) =
@@ -158,7 +158,7 @@ let private personalRatingCard (rating: int option) (isOpen: bool) (dispatch: Ms
                                         prop.className "w-5 h-5 text-base-content/40"
                                         prop.children [ Icons.questionCircle () ]
                                     ]
-                                    Html.span [ prop.className "font-medium text-base-content/60"; prop.text "Clear rating" ]
+                                    Html.span [ prop.className "font-medium text-base-content/50"; prop.text "Clear rating" ]
                                 ]
                             ]
                     ]
@@ -271,7 +271,7 @@ let private FriendManager
     let content = [
         if totalItems = 0 && not showAddContact then
             Html.p [
-                prop.className "text-base-content/60 py-2 text-sm"
+                prop.className "text-base-content/50 py-2 text-sm"
                 prop.text (
                     if List.isEmpty allFriends && trimmedSearch = "" then "No friends available. Add friends first."
                     elif trimmedSearch = "" then "All friends already added."
@@ -347,12 +347,14 @@ let private episodeCard
     (seasonNumber: int)
     (episode: EpisodeDto)
     (isNextEpisode: bool)
+    (model: Model)
     (dispatch: Msg -> unit) =
     let borderClass =
         if isNextEpisode then "border-primary/50 ring-1 ring-primary/30"
         else "border-base-content/8"
     let opacityClass =
         if episode.IsWatched then "" else "opacity-80"
+    let isEditingDate = model.EditingEpisodeDate = Some (seasonNumber, episode.EpisodeNumber)
     Html.div [
         prop.className $"bg-base-100/50 backdrop-blur-sm border {borderClass} rounded-xl overflow-hidden transition-all {opacityClass}"
         prop.children [
@@ -385,8 +387,9 @@ let private episodeCard
                                 prop.className "flex items-center gap-2 mb-1"
                                 prop.children [
                                     if isNextEpisode then
-                                        Html.span [
-                                            prop.className "badge badge-sm badge-primary"
+                                        Daisy.badge [
+                                            badge.sm
+                                            badge.primary
                                             prop.text "NEXT"
                                         ]
                                     Html.span [
@@ -410,6 +413,34 @@ let private episodeCard
                                 Html.p [
                                     prop.className "text-xs text-base-content/50 line-clamp-2"
                                     prop.text episode.Overview
+                                ]
+                            // Watched date display
+                            if episode.IsWatched then
+                                Html.div [
+                                    prop.className "mt-1"
+                                    prop.children [
+                                        if isEditingDate then
+                                            Daisy.input [
+                                                prop.className "w-36"
+                                                input.sm
+                                                prop.type' "date"
+                                                prop.autoFocus true
+                                                prop.value (episode.WatchedDate |> Option.defaultValue "")
+                                                prop.onChange (fun (v: string) ->
+                                                    dispatch (Update_episode_date (seasonNumber, episode.EpisodeNumber, v)))
+                                                prop.onBlur (fun _ ->
+                                                    dispatch Cancel_edit_episode_date)
+                                                prop.onKeyDown (fun e ->
+                                                    if e.key = "Escape" then
+                                                        dispatch Cancel_edit_episode_date)
+                                            ]
+                                        else
+                                            Html.span [
+                                                prop.className "text-xs text-base-content/40 cursor-pointer hover:text-primary transition-colors"
+                                                prop.onClick (fun _ -> dispatch (Edit_episode_date (seasonNumber, episode.EpisodeNumber)))
+                                                prop.text (episode.WatchedDate |> Option.defaultValue "No date")
+                                            ]
+                                    ]
                                 ]
                         ]
                     ]
@@ -510,24 +541,112 @@ let private seasonSidebar (seasons: SeasonDto list) (selectedSeason: int) (dispa
         ]
     ]
 
-let private rewatchSelector (sessions: RewatchSessionDto list) (selectedId: string) (dispatch: Msg -> unit) =
+let private rewatchSessionPanel (series: SeriesDetail) (model: Model) (dispatch: Msg -> unit) =
+    let totalEpisodes = series.Seasons |> List.sumBy (fun s -> s.Episodes.Length)
     Html.div [
-        prop.className "flex items-center gap-2 flex-wrap"
+        prop.className "mb-6"
         prop.children [
-            for session in sessions do
-                let isSelected = session.RewatchId = selectedId || (session.IsDefault && selectedId = "default")
-                let label =
-                    match session.Name with
-                    | Some n -> n
-                    | None -> "Personal"
-                Html.button [
-                    prop.className (
-                        "px-3 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer " +
-                        (if isSelected then "bg-primary/15 text-primary border border-primary/30"
-                         else "bg-base-content/5 text-base-content/60 hover:bg-base-content/10"))
-                    prop.onClick (fun _ -> dispatch (Select_rewatch session.RewatchId))
-                    prop.text label
+            // Header
+            Html.div [
+                prop.className "flex items-center justify-between mb-3"
+                prop.children [
+                    Html.h4 [
+                        prop.className "text-sm font-bold uppercase tracking-wider text-base-content/60"
+                        prop.text "Watch Sessions"
+                    ]
+                    Html.button [
+                        prop.className "w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold cursor-pointer"
+                        prop.onClick (fun _ -> dispatch Create_rewatch_session)
+                        prop.text "+"
+                    ]
                 ]
+            ]
+            // Session list
+            Html.div [
+                prop.className "space-y-2"
+                prop.children [
+                    for session in series.RewatchSessions do
+                        let isSelected = session.RewatchId = model.SelectedRewatchId || (session.IsDefault && model.SelectedRewatchId = "default")
+                        let label =
+                            match session.Name with
+                            | Some n -> n
+                            | None -> if session.IsDefault then "First Watch" else "Rewatch"
+                        let pct =
+                            if totalEpisodes = 0 then 0.0
+                            else float session.WatchedCount / float totalEpisodes * 100.0
+                        Html.div [
+                            prop.className (
+                                "group relative p-3 rounded-lg transition-all cursor-pointer border " +
+                                (if isSelected then "bg-primary/15 border-primary/30"
+                                 else "border-transparent hover:bg-base-content/5"))
+                            prop.onClick (fun _ -> dispatch (Select_rewatch session.RewatchId))
+                            prop.children [
+                                Html.div [
+                                    prop.className "flex items-center justify-between mb-1"
+                                    prop.children [
+                                        Html.div [
+                                            prop.className "flex items-center gap-2"
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className "font-semibold text-sm"
+                                                    prop.text label
+                                                ]
+                                                // Friend avatars
+                                                if not (List.isEmpty session.Friends) then
+                                                    Html.div [
+                                                        prop.className "flex -space-x-1"
+                                                        prop.children [
+                                                            for fr in session.Friends |> List.truncate 3 do
+                                                                friendAvatar "w-5 h-5" fr "bg-primary/20 text-[10px] font-bold text-primary border border-base-300"
+                                                        ]
+                                                    ]
+                                            ]
+                                        ]
+                                        Html.div [
+                                            prop.className "flex items-center gap-2"
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className "text-xs text-base-content/40"
+                                                    prop.text $"{session.WatchedCount}/{totalEpisodes}"
+                                                ]
+                                                // Friends button on selected session
+                                                if isSelected then
+                                                    Html.button [
+                                                        prop.className "w-6 h-6 flex items-center justify-center text-base-content/40 hover:text-primary transition-colors cursor-pointer"
+                                                        prop.title "Manage friends"
+                                                        prop.onClick (fun e ->
+                                                            e.stopPropagation()
+                                                            dispatch (Open_friend_picker (Session_friend_picker session.RewatchId)))
+                                                        prop.children [ Icons.friends () ]
+                                                    ]
+                                                // Remove button on non-default sessions
+                                                if not session.IsDefault then
+                                                    Html.button [
+                                                        prop.className "w-6 h-6 flex items-center justify-center text-base-content/30 opacity-0 group-hover:opacity-100 transition-opacity hover:text-error cursor-pointer"
+                                                        prop.title "Remove session"
+                                                        prop.onClick (fun e ->
+                                                            e.stopPropagation()
+                                                            dispatch (Remove_rewatch_session session.RewatchId))
+                                                        prop.children [ Icons.trash () ]
+                                                    ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                                // Progress bar
+                                Html.div [
+                                    prop.className "h-1 bg-base-content/10 rounded-full overflow-hidden"
+                                    prop.children [
+                                        Html.div [
+                                            prop.className "h-full bg-primary rounded-full transition-all"
+                                            prop.style [ style.width (length.percent pct) ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                ]
+            ]
         ]
     ]
 
@@ -538,10 +657,12 @@ let private episodesTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
     Html.div [
         prop.className "grid grid-cols-1 lg:grid-cols-12 gap-6"
         prop.children [
-            // Season sidebar
+            // Season sidebar with rewatch panel above
             Html.div [
                 prop.className "lg:col-span-3"
                 prop.children [
+                    if series.RewatchSessions.Length > 0 then
+                        rewatchSessionPanel series model dispatch
                     seasonSidebar series.Seasons model.SelectedSeason dispatch
                 ]
             ]
@@ -575,14 +696,20 @@ let private episodesTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                                                 ]
                                             ]
                                         ]
-                                        // Rewatch selector + Mark all
+                                        // Mark all / Unmark all
                                         Html.div [
                                             prop.className "flex items-center gap-3"
                                             prop.children [
-                                                if not (List.isEmpty series.RewatchSessions) then
-                                                    rewatchSelector series.RewatchSessions model.SelectedRewatchId dispatch
                                                 let allWatched = season.Episodes |> List.forall (fun e -> e.IsWatched)
-                                                if not allWatched then
+                                                if allWatched then
+                                                    Daisy.button.button [
+                                                        button.sm
+                                                        button.ghost
+                                                        prop.className "text-error/70 hover:text-error"
+                                                        prop.onClick (fun _ -> dispatch (Mark_season_unwatched season.SeasonNumber))
+                                                        prop.text "Unmark All"
+                                                    ]
+                                                else
                                                     Daisy.button.button [
                                                         button.sm
                                                         button.primary
@@ -618,7 +745,7 @@ let private episodesTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                                                 Html.div [ prop.className "flex-grow h-px bg-primary/30" ]
                                             ]
                                         ]
-                                    episodeCard season.SeasonNumber ep isNext dispatch
+                                    episodeCard season.SeasonNumber ep isNext model dispatch
                             ]
                         ]
                 ]
@@ -999,7 +1126,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                 ]
                                                 // Year, runtime, seasons
                                                 Html.div [
-                                                    prop.className "flex items-center gap-3 text-base-content/60 mb-4"
+                                                    prop.className "flex items-center gap-3 text-base-content/50 mb-4"
                                                     prop.children [
                                                         Html.span [ prop.text (string series.Year) ]
                                                         match series.EpisodeRuntime with
@@ -1026,7 +1153,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                 prop.className "hidden lg:block flex-shrink-0"
                                                 prop.children [
                                                     Html.div [
-                                                        prop.className "bg-base-100/55 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 rounded-xl p-4 min-w-[180px]"
+                                                        prop.className (DesignSystem.glassCard + " p-4 min-w-[180px]")
                                                         prop.children [
                                                             Html.p [
                                                                 prop.className "text-xs font-bold text-primary uppercase tracking-wider mb-1"
@@ -1080,6 +1207,20 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         (fun slug -> dispatch (Add_watch_with slug))
                         (fun slug -> dispatch (Remove_watch_with slug))
                         (fun name -> dispatch (Add_friend_and_watch_with name))
+                        (fun () -> dispatch Close_friend_picker)
+                | Some (Session_friend_picker rewatchId) ->
+                    let sessionFriends =
+                        series.RewatchSessions
+                        |> List.tryFind (fun s -> s.RewatchId = rewatchId)
+                        |> Option.map (fun s -> s.Friends)
+                        |> Option.defaultValue []
+                    FriendManager
+                        "Session Friends"
+                        model.Friends
+                        sessionFriends
+                        (fun slug -> dispatch (Add_rewatch_friend (rewatchId, slug)))
+                        (fun slug -> dispatch (Remove_rewatch_friend (rewatchId, slug)))
+                        (fun name -> dispatch (Add_friend_and_add_to_session (rewatchId, name)))
                         (fun () -> dispatch Close_friend_picker)
                 | None -> ()
             ]

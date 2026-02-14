@@ -76,6 +76,18 @@ module Series =
         Date: string
     }
 
+    type SeasonMarkedUnwatchedData = {
+        RewatchId: string
+        SeasonNumber: int
+    }
+
+    type EpisodeWatchedDateChangedData = {
+        RewatchId: string
+        SeasonNumber: int
+        EpisodeNumber: int
+        Date: string
+    }
+
     // Events
 
     type SeriesEvent =
@@ -97,6 +109,8 @@ module Series =
         | Episode_unwatched of EpisodeUnwatchedData
         | Season_marked_watched of SeasonMarkedWatchedData
         | Episodes_watched_up_to of EpisodesWatchedUpToData
+        | Season_marked_unwatched of SeasonMarkedUnwatchedData
+        | Episode_watched_date_changed of EpisodeWatchedDateChangedData
 
     // State
 
@@ -171,6 +185,8 @@ module Series =
         | Mark_episode_unwatched of EpisodeUnwatchedData
         | Mark_season_watched of SeasonMarkedWatchedData
         | Mark_episodes_watched_up_to of EpisodesWatchedUpToData
+        | Mark_season_unwatched of SeasonMarkedUnwatchedData
+        | Change_episode_watched_date of EpisodeWatchedDateChangedData
 
     // Evolve
 
@@ -301,6 +317,17 @@ module Series =
                 let watched = Set.union session.WatchedEpisodes episodePairs
                 Active { series with RewatchSessions = series.RewatchSessions |> Map.add data.RewatchId { session with WatchedEpisodes = watched } }
             | None -> state
+        | Active series, Season_marked_unwatched data ->
+            match series.RewatchSessions |> Map.tryFind data.RewatchId with
+            | Some session ->
+                let seasonEpisodes =
+                    session.WatchedEpisodes
+                    |> Set.filter (fun (sn, _) -> sn = data.SeasonNumber)
+                let watched = Set.difference session.WatchedEpisodes seasonEpisodes
+                Active { series with RewatchSessions = series.RewatchSessions |> Map.add data.RewatchId { session with WatchedEpisodes = watched } }
+            | None -> state
+        | Active _, Episode_watched_date_changed _ ->
+            state // Dates are projection-only; aggregate only tracks watched/unwatched
         | _ -> state
 
     let reconstitute (events: SeriesEvent list) : SeriesState =
@@ -393,6 +420,20 @@ module Series =
                 match series.Seasons |> Map.tryFind data.SeasonNumber with
                 | Some _ -> Ok [ Episodes_watched_up_to data ]
                 | None -> Error "Season does not exist"
+            | None -> Error "Rewatch session does not exist"
+        | Active series, Mark_season_unwatched data ->
+            match series.RewatchSessions |> Map.tryFind data.RewatchId with
+            | Some _ ->
+                match series.Seasons |> Map.tryFind data.SeasonNumber with
+                | Some _ -> Ok [ Season_marked_unwatched data ]
+                | None -> Error "Season does not exist"
+            | None -> Error "Rewatch session does not exist"
+        | Active series, Change_episode_watched_date data ->
+            match series.RewatchSessions |> Map.tryFind data.RewatchId with
+            | Some session ->
+                if session.WatchedEpisodes |> Set.contains (data.SeasonNumber, data.EpisodeNumber) then
+                    Ok [ Episode_watched_date_changed data ]
+                else Error "Episode is not watched"
             | None -> Error "Rewatch session does not exist"
         | Removed, _ ->
             Error "Series has been removed"
@@ -565,6 +606,34 @@ module Series =
                 Date = get.Required.Field "date" Decode.string
             })
 
+        let private encodeSeasonMarkedUnwatchedData (data: SeasonMarkedUnwatchedData) =
+            Encode.object [
+                "rewatchId", Encode.string data.RewatchId
+                "seasonNumber", Encode.int data.SeasonNumber
+            ]
+
+        let private decodeSeasonMarkedUnwatchedData: Decoder<SeasonMarkedUnwatchedData> =
+            Decode.object (fun get -> {
+                RewatchId = get.Required.Field "rewatchId" Decode.string
+                SeasonNumber = get.Required.Field "seasonNumber" Decode.int
+            })
+
+        let private encodeEpisodeWatchedDateChangedData (data: EpisodeWatchedDateChangedData) =
+            Encode.object [
+                "rewatchId", Encode.string data.RewatchId
+                "seasonNumber", Encode.int data.SeasonNumber
+                "episodeNumber", Encode.int data.EpisodeNumber
+                "date", Encode.string data.Date
+            ]
+
+        let private decodeEpisodeWatchedDateChangedData: Decoder<EpisodeWatchedDateChangedData> =
+            Decode.object (fun get -> {
+                RewatchId = get.Required.Field "rewatchId" Decode.string
+                SeasonNumber = get.Required.Field "seasonNumber" Decode.int
+                EpisodeNumber = get.Required.Field "episodeNumber" Decode.int
+                Date = get.Required.Field "date" Decode.string
+            })
+
         let serialize (event: SeriesEvent) : string * string =
             match event with
             | Series_added_to_library data ->
@@ -603,6 +672,10 @@ module Series =
                 "Season_marked_watched", Encode.toString 0 (encodeSeasonMarkedWatchedData data)
             | Episodes_watched_up_to data ->
                 "Episodes_watched_up_to", Encode.toString 0 (encodeEpisodesWatchedUpToData data)
+            | Season_marked_unwatched data ->
+                "Season_marked_unwatched", Encode.toString 0 (encodeSeasonMarkedUnwatchedData data)
+            | Episode_watched_date_changed data ->
+                "Episode_watched_date_changed", Encode.toString 0 (encodeEpisodeWatchedDateChangedData data)
 
         let deserialize (eventType: string) (data: string) : SeriesEvent option =
             match eventType with
@@ -676,6 +749,14 @@ module Series =
                 Decode.fromString decodeEpisodesWatchedUpToData data
                 |> Result.toOption
                 |> Option.map Episodes_watched_up_to
+            | "Season_marked_unwatched" ->
+                Decode.fromString decodeSeasonMarkedUnwatchedData data
+                |> Result.toOption
+                |> Option.map Season_marked_unwatched
+            | "Episode_watched_date_changed" ->
+                Decode.fromString decodeEpisodeWatchedDateChangedData data
+                |> Result.toOption
+                |> Option.map Episode_watched_date_changed
             | _ -> None
 
         let toEventData (event: SeriesEvent) : EventStore.EventData =
