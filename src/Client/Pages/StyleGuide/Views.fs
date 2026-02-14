@@ -1471,10 +1471,10 @@ let private sortButton (sort: SortState) (onSort: SortState -> unit) (isOpen: bo
             onSort { Field = field; Direction = defaultDirectionFor field }
         setIsOpen false
 
-    let toggleDirection () =
-        let newDir = if sort.Direction = Ascending then Descending else Ascending
-        onSort { sort with Direction = newDir }
-        setIsOpen false
+    let directionIcon dir =
+        match dir with
+        | Ascending -> Icons.chevronDown ()
+        | Descending -> Icons.chevronUp ()
 
     // Relative container: button + dropdown as siblings (glassmorphism gotcha)
     Html.div [
@@ -1500,6 +1500,7 @@ let private sortButton (sort: SortState) (onSort: SortState -> unit) (isOpen: bo
                     prop.children [
                         for field in [ ByReleaseDate; ByName; ByRating ] do
                             let isActive = sort.Field = field
+                            let dir = if isActive then sort.Direction else defaultDirectionFor field
                             Html.button [
                                 prop.className (
                                     "rating-dropdown-item w-full "
@@ -1511,34 +1512,12 @@ let private sortButton (sort: SortState) (onSort: SortState -> unit) (isOpen: bo
                                         prop.className "flex-1 text-sm"
                                         prop.text (sortFieldLabel field)
                                     ]
-                                    if isActive then
-                                        Html.span [
-                                            prop.className "text-primary"
-                                            prop.children [
-                                                if sort.Direction = Ascending then Icons.chevronUp ()
-                                                else Icons.chevronDown ()
-                                            ]
-                                        ]
-                                ]
-                            ]
-                        // Separator + direction toggle
-                        Html.button [
-                            prop.className "rating-dropdown-item rating-dropdown-item-clear w-full"
-                            prop.onClick (fun _ -> toggleDirection ())
-                            prop.children [
-                                Html.span [
-                                    prop.className "flex-1 text-sm"
-                                    prop.text (if sort.Direction = Ascending then "Ascending" else "Descending")
-                                ]
-                                Html.span [
-                                    prop.className "text-base-content/40"
-                                    prop.children [
-                                        if sort.Direction = Ascending then Icons.chevronUp ()
-                                        else Icons.chevronDown ()
+                                    Html.span [
+                                        prop.className (if isActive then "text-primary" else "text-base-content/30")
+                                        prop.children [ directionIcon dir ]
                                     ]
                                 ]
                             ]
-                        ]
                     ]
                 ]
         ]
