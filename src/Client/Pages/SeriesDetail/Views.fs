@@ -541,6 +541,38 @@ let private seasonSidebar (seasons: SeasonDto list) (selectedSeason: int) (dispa
         ]
     ]
 
+let private sessionAvatar (friends: FriendRef list) =
+    if List.isEmpty friends then
+        // Personal — single user silhouette
+        Html.div [
+            prop.className "w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center text-primary flex-shrink-0"
+            prop.children [
+                Svg.svg [
+                    svg.className "w-5 h-5"
+                    svg.fill "none"
+                    svg.viewBox (0, 0, 24, 24)
+                    svg.stroke "currentColor"
+                    svg.custom ("strokeWidth", 1.5)
+                    svg.children [
+                        Svg.path [
+                            svg.custom ("strokeLinecap", "round")
+                            svg.custom ("strokeLinejoin", "round")
+                            svg.d "M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    else
+        // Friends — overlapping avatars
+        Html.div [
+            prop.className "flex -space-x-2 flex-shrink-0"
+            prop.children [
+                for fr in friends |> List.truncate 3 do
+                    friendAvatar "w-10 h-10" fr "bg-secondary/20 text-sm font-bold text-secondary border-2 border-base-100"
+            ]
+        ]
+
 let private rewatchSessionPanel (series: SeriesDetail) (model: Model) (dispatch: Msg -> unit) =
     let totalEpisodes = series.Seasons |> List.sumBy (fun s -> s.Episodes.Length)
     Html.div [
@@ -548,7 +580,7 @@ let private rewatchSessionPanel (series: SeriesDetail) (model: Model) (dispatch:
         prop.children [
             // Header
             Html.div [
-                prop.className "flex items-center justify-between mb-3"
+                prop.className "flex items-center justify-between mb-4"
                 prop.children [
                     Html.h4 [
                         prop.className "text-sm font-bold uppercase tracking-wider text-base-content/60"
@@ -561,77 +593,94 @@ let private rewatchSessionPanel (series: SeriesDetail) (model: Model) (dispatch:
                     ]
                 ]
             ]
-            // Session list
+            // Horizontal session cards
             Html.div [
-                prop.className "space-y-2"
+                prop.className "flex gap-3 overflow-x-auto pb-2"
                 prop.children [
                     for session in series.RewatchSessions do
                         let isSelected = session.RewatchId = model.SelectedRewatchId || (session.IsDefault && model.SelectedRewatchId = "default")
                         let pct =
                             if totalEpisodes = 0 then 0.0
                             else float session.WatchedCount / float totalEpisodes * 100.0
+                        let sessionName =
+                            if List.isEmpty session.Friends then "Personal"
+                            else session.Friends |> List.map (fun f -> f.Name) |> String.concat ", "
                         Html.div [
                             prop.className (
-                                "group relative p-3 rounded-lg transition-all cursor-pointer border " +
-                                (if isSelected then "bg-primary/15 border-primary/30"
-                                 else "border-transparent hover:bg-base-content/5"))
+                                "group relative flex-shrink-0 w-52 p-4 rounded-xl transition-all cursor-pointer border " +
+                                DesignSystem.glassSubtle + " " +
+                                (if isSelected then "border-primary/30 bg-primary/10"
+                                 else "border-base-content/8 hover:border-base-content/15"))
                             prop.onClick (fun _ -> dispatch (Select_rewatch session.RewatchId))
                             prop.children [
+                                // Avatar + Name row
                                 Html.div [
-                                    prop.className "flex items-center justify-between mb-1"
+                                    prop.className "flex items-center gap-3 mb-3"
                                     prop.children [
+                                        sessionAvatar session.Friends
                                         Html.div [
-                                            prop.className "flex items-center gap-2 flex-wrap"
+                                            prop.className "flex-grow min-w-0"
                                             prop.children [
-                                                if List.isEmpty session.Friends then
-                                                    Html.span [
-                                                        prop.className "font-semibold text-sm"
-                                                        prop.text "Personal"
+                                                Html.div [
+                                                    prop.className "flex items-center justify-between gap-1"
+                                                    prop.children [
+                                                        Html.span [
+                                                            prop.className "font-semibold text-sm truncate"
+                                                            prop.text sessionName
+                                                        ]
+                                                        Html.div [
+                                                            prop.className "flex items-center gap-1 flex-shrink-0"
+                                                            prop.children [
+                                                                if isSelected then
+                                                                    Html.button [
+                                                                        prop.className "w-6 h-6 flex items-center justify-center text-base-content/40 hover:text-primary transition-colors cursor-pointer"
+                                                                        prop.title "Manage friends"
+                                                                        prop.onClick (fun e ->
+                                                                            e.stopPropagation()
+                                                                            dispatch (Open_friend_picker (Session_friend_picker session.RewatchId)))
+                                                                        prop.children [ Icons.friends () ]
+                                                                    ]
+                                                                if not session.IsDefault then
+                                                                    Html.button [
+                                                                        prop.className "w-6 h-6 flex items-center justify-center text-base-content/30 opacity-0 group-hover:opacity-100 transition-opacity hover:text-error cursor-pointer"
+                                                                        prop.title "Remove session"
+                                                                        prop.onClick (fun e ->
+                                                                            e.stopPropagation()
+                                                                            dispatch (Remove_rewatch_session session.RewatchId))
+                                                                        prop.children [ Icons.trash () ]
+                                                                    ]
+                                                            ]
+                                                        ]
                                                     ]
-                                                else
-                                                    for fr in session.Friends do
-                                                        FriendPill.viewWithRemove fr (fun slug ->
-                                                            dispatch (Remove_rewatch_friend (session.RewatchId, slug)))
-                                            ]
-                                        ]
-                                        Html.div [
-                                            prop.className "flex items-center gap-2"
-                                            prop.children [
-                                                Html.span [
-                                                    prop.className "text-xs text-base-content/40"
-                                                    prop.text $"{session.WatchedCount}/{totalEpisodes}"
                                                 ]
-                                                // Friends button on selected session
-                                                if isSelected then
-                                                    Html.button [
-                                                        prop.className "w-6 h-6 flex items-center justify-center text-base-content/40 hover:text-primary transition-colors cursor-pointer"
-                                                        prop.title "Manage friends"
-                                                        prop.onClick (fun e ->
-                                                            e.stopPropagation()
-                                                            dispatch (Open_friend_picker (Session_friend_picker session.RewatchId)))
-                                                        prop.children [ Icons.friends () ]
-                                                    ]
-                                                // Remove button on non-default sessions
-                                                if not session.IsDefault then
-                                                    Html.button [
-                                                        prop.className "w-6 h-6 flex items-center justify-center text-base-content/30 opacity-0 group-hover:opacity-100 transition-opacity hover:text-error cursor-pointer"
-                                                        prop.title "Remove session"
-                                                        prop.onClick (fun e ->
-                                                            e.stopPropagation()
-                                                            dispatch (Remove_rewatch_session session.RewatchId))
-                                                        prop.children [ Icons.trash () ]
-                                                    ]
                                             ]
                                         ]
                                     ]
                                 ]
-                                // Progress bar
+                                // Progress
                                 Html.div [
-                                    prop.className "h-1 bg-base-content/10 rounded-full overflow-hidden"
                                     prop.children [
                                         Html.div [
-                                            prop.className "h-full bg-primary rounded-full transition-all"
-                                            prop.style [ style.width (length.percent pct) ]
+                                            prop.className "flex items-center justify-between mb-1.5"
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className "text-xs text-base-content/50"
+                                                    prop.text "Progress"
+                                                ]
+                                                Html.span [
+                                                    prop.className "text-xs font-semibold text-base-content/70"
+                                                    prop.text (sprintf "%.0f%%" pct)
+                                                ]
+                                            ]
+                                        ]
+                                        Html.div [
+                                            prop.className "h-1.5 bg-base-content/10 rounded-full overflow-hidden"
+                                            prop.children [
+                                                Html.div [
+                                                    prop.className "h-full bg-primary rounded-full transition-all"
+                                                    prop.style [ style.width (length.percent pct) ]
+                                                ]
+                                            ]
                                         ]
                                     ]
                                 ]
