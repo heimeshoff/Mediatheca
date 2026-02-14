@@ -652,47 +652,18 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         | None -> ()
                                                     ]
                                                 ]
-                                                // Action buttons row
-                                                Html.div [
-                                                    prop.className "flex flex-wrap items-center gap-3"
-                                                    prop.children [
-                                                        // Trailer button
-                                                        match model.TrailerKey with
-                                                        | Some _ ->
-                                                            Html.button [
-                                                                prop.className "inline-flex items-center gap-2 bg-red-600/90 hover:bg-red-600 text-white px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
-                                                                prop.onClick (fun _ -> dispatch Open_trailer)
-                                                                prop.children [
-                                                                    Icons.play ()
-                                                                    Html.span [ prop.text "Play Trailer" ]
-                                                                ]
-                                                            ]
-                                                        | None -> ()
-                                                        // Selected catalog pills
-                                                        for cat in model.MovieCatalogs do
-                                                            Html.span [
-                                                                prop.className "inline-flex items-center gap-1.5 bg-transparent border border-base-content/20 text-base-content/70 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors hover:border-base-content/40 group/pill"
-                                                                prop.children [
-                                                                    Html.span [ prop.text cat.Name ]
-                                                                    Html.button [
-                                                                        prop.className "text-base-content/30 hover:text-error transition-colors cursor-pointer opacity-0 group-hover/pill:opacity-100"
-                                                                        prop.onClick (fun e ->
-                                                                            e.stopPropagation()
-                                                                            dispatch (Remove_from_catalog (cat.Slug, cat.EntryId)))
-                                                                        prop.text "\u00D7"
-                                                                    ]
-                                                                ]
-                                                            ]
-                                                        // Add to catalog button
-                                                        Html.button [
-                                                            prop.className "w-7 h-7 rounded-full bg-base-100/50 backdrop-blur-sm border border-base-content/15 hover:bg-base-100/70 text-base-content/50 hover:text-base-content flex items-center justify-center transition-colors cursor-pointer"
-                                                            prop.onClick (fun _ -> dispatch Open_catalog_picker)
-                                                            prop.children [
-                                                                Html.span [ prop.className "[&>svg]:w-4 [&>svg]:h-4"; prop.children [ Icons.catalog () ] ]
-                                                            ]
+                                                // Trailer button
+                                                match model.TrailerKey with
+                                                | Some _ ->
+                                                    Html.button [
+                                                        prop.className "inline-flex items-center gap-2 bg-red-600/90 hover:bg-red-600 text-white px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
+                                                        prop.onClick (fun _ -> dispatch Open_trailer)
+                                                        prop.children [
+                                                            Icons.play ()
+                                                            Html.span [ prop.text "Play Trailer" ]
                                                         ]
                                                     ]
-                                                ]
+                                                | None -> ()
                                             ]
                                         ]
                                     ]
@@ -712,6 +683,35 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 Html.div [
                                     prop.className "lg:col-span-8 space-y-10"
                                     prop.children [
+                                        // Catalogs
+                                        Html.div [
+                                            prop.className "flex flex-wrap items-center gap-2"
+                                            prop.children [
+                                                // Add to catalog button
+                                                Html.button [
+                                                    prop.className "w-9 h-9 rounded-full bg-base-100/50 backdrop-blur-sm border border-base-content/15 hover:bg-base-100/70 text-base-content/50 hover:text-base-content flex items-center justify-center transition-colors cursor-pointer"
+                                                    prop.onClick (fun _ -> dispatch Open_catalog_picker)
+                                                    prop.children [
+                                                        Html.span [ prop.className "[&>svg]:w-5 [&>svg]:h-5"; prop.children [ Icons.catalog () ] ]
+                                                    ]
+                                                ]
+                                                // Selected catalog pills
+                                                for cat in model.MovieCatalogs do
+                                                    Html.span [
+                                                        prop.className "inline-flex items-center gap-1.5 bg-transparent border border-base-content/20 text-base-content/70 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors hover:border-base-content/40 group/pill"
+                                                        prop.children [
+                                                            Html.span [ prop.text cat.Name ]
+                                                            Html.button [
+                                                                prop.className "text-base-content/30 hover:text-error transition-colors cursor-pointer opacity-0 group-hover/pill:opacity-100"
+                                                                prop.onClick (fun e ->
+                                                                    e.stopPropagation()
+                                                                    dispatch (Remove_from_catalog (cat.Slug, cat.EntryId)))
+                                                                prop.text "\u00D7"
+                                                            ]
+                                                        ]
+                                                    ]
+                                            ]
+                                        ]
                                         // Synopsis
                                         if not (System.String.IsNullOrWhiteSpace movie.Overview) then
                                             Html.section [
