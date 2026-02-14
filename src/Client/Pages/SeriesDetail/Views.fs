@@ -659,6 +659,20 @@ let private overviewTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                                 (fun blockIds -> dispatch (Reorder_content_blocks blockIds))
                         ]
                     ]
+                    // Cast
+                    if not (List.isEmpty series.Cast) then
+                        Html.section [
+                            prop.children [
+                                sectionHeader "Cast"
+                                Html.div [
+                                    prop.className "flex gap-6 overflow-x-auto pb-4 lg:flex-wrap lg:overflow-x-visible"
+                                    prop.children [
+                                        for c in series.Cast do
+                                            castCard c
+                                    ]
+                                ]
+                            ]
+                        ]
                 ]
             ]
             // Right column: Social
@@ -827,39 +841,11 @@ let private overviewTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
         ]
     ]
 
-// ── Cast & Crew Tab ──
-
-let private castCrewTab (series: SeriesDetail) =
-    Html.div [
-        prop.className "space-y-10"
-        prop.children [
-            if not (List.isEmpty series.Cast) then
-                Html.section [
-                    prop.children [
-                        sectionHeader "Cast"
-                        Html.div [
-                            prop.className "flex gap-6 overflow-x-auto pb-4 lg:flex-wrap lg:overflow-x-visible"
-                            prop.children [
-                                for c in series.Cast do
-                                    castCard c
-                            ]
-                        ]
-                    ]
-                ]
-            else
-                Html.p [
-                    prop.className "text-base-content/50 py-8 text-center"
-                    prop.text "No cast information available."
-                ]
-        ]
-    ]
-
 // ── Tab Bar ──
 
 let private tabBar (activeTab: SeriesTab) (dispatch: Msg -> unit) =
     let tabs = [
         (Overview, "Overview")
-        (CastCrew, "Cast & Crew")
         (Episodes, "Episodes")
     ]
     Html.div [
@@ -1072,7 +1058,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         tabBar model.ActiveTab dispatch
                         match model.ActiveTab with
                         | Overview -> overviewTab series model dispatch
-                        | CastCrew -> castCrewTab series
                         | Episodes -> episodesTab series model dispatch
                     ]
                 ]

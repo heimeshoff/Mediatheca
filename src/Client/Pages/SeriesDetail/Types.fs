@@ -2,7 +2,7 @@ module Mediatheca.Client.Pages.SeriesDetail.Types
 
 open Mediatheca.Shared
 
-type SeriesTab = Overview | CastCrew | Episodes
+type SeriesTab = Overview | Episodes
 
 type FriendPickerKind =
     | Recommend_picker
