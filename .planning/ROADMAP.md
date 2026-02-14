@@ -8,6 +8,7 @@
 | 2 | Catalog + Friends | :white_check_mark: Done | REQ-009, REQ-010, REQ-010a, REQ-011, REQ-012, REQ-013, REQ-014, REQ-015 |
 | 3 | Journal + Content Blocks | :white_check_mark: Done | REQ-016, REQ-017, REQ-018, REQ-019, REQ-020, REQ-021 |
 | 4 | Curation + Dashboards + Admin | :white_check_mark: Done | REQ-022, REQ-023, REQ-024, REQ-025, REQ-026, REQ-027, REQ-028 |
+| 5 | Design System (Style Guide) | :white_check_mark: Done | REQ-029, REQ-030, REQ-031, REQ-032, REQ-033 |
 
 ### Phase 1: Skeleton
 
@@ -58,6 +59,16 @@ Deliverable: Users can organize movies into catalogs, view dashboards with stats
 - Catalog list and detail pages
 - Main dashboard (recent activity, quick stats: movies, friends, catalogs, watch time)
 - Administration: Event store browser (view/search/filter events by stream and type)
+
+### Phase 5: Design System (Style Guide)
+
+Deliverable: A living style guide page that serves as the single source of truth for all design decisions, component definitions, and design tokens. Changes to the design system are made in the Style Guide first and then propagated to application pages via dedicated skills/agents.
+
+- Style Guide page at `/styleguide` (hidden route, no nav entry)
+- Component catalog: every reusable component with all parametrizations and design decision explanations
+- Design token documentation: typography, colors, spacing, shapes, glassmorphism, with rationale
+- Extract components and tokens so Style Guide is the canonical definition, app pages consume from it
+- Skills/agents for propagating Style Guide changes to all application pages
 
 ## Completed Milestones
 

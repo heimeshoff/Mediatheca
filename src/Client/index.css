@@ -6,6 +6,53 @@
     --font-display: "Oswald", sans-serif;
 }
 
+/* ── Design Tokens ── */
+:root {
+    /* Glass effect tokens */
+    --glass-bg-opacity-light: 0.55;
+    --glass-bg-opacity-medium: 0.60;
+    --glass-bg-opacity-heavy: 0.70;
+    --glass-blur-subtle: 12px;
+    --glass-blur-standard: 24px;
+    --glass-blur-heavy: 40px;
+    --glass-saturate: 1.2;
+    --glass-border-opacity: 0.15;
+    --glass-highlight-opacity: 0.08;
+    --glass-shadow-opacity: 0.6;
+
+    /* Spacing scale */
+    --space-page-mobile: 1rem;
+    --space-page-desktop: 1.5rem;
+    --space-gap-compact: 0.5rem;
+    --space-gap-standard: 0.75rem;
+    --space-gap-loose: 1rem;
+
+    /* Border radius */
+    --radius-card: 1rem;
+    --radius-button: 0.5rem;
+    --radius-avatar: 9999px;
+    --radius-poster: 0.375rem;
+
+    /* Animation durations */
+    --duration-fast: 0.15s;
+    --duration-normal: 0.25s;
+    --duration-slow: 0.4s;
+
+    /* Shadows */
+    --shadow-card: 0 4px 12px -2px oklch(0% 0 0 / 0.3);
+    --shadow-card-hover: 0 12px 24px -8px oklch(0% 0 0 / 0.3), 0 0 0 1px oklch(100% 0 0 / 0.05);
+    --shadow-dropdown: inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 12px 40px -8px oklch(0% 0 0 / 0.6);
+    --shadow-poster: 0 4px 12px -2px oklch(0% 0 0 / 0.5), 0 0 0 1px oklch(100% 0 0 / 0.05);
+    --shadow-poster-hover: 0 20px 40px -8px oklch(0% 0 0 / 0.6), 0 0 0 1px oklch(100% 0 0 / 0.08);
+
+    /* Typography */
+    --tracking-heading: 0.05em;
+    --text-hierarchy-primary: 1;
+    --text-hierarchy-secondary: 0.7;
+    --text-hierarchy-muted: 0.5;
+    --text-hierarchy-faint: 0.4;
+}
+
 h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
     text-transform: uppercase;

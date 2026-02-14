@@ -4,11 +4,12 @@ open Feliz
 open Feliz.DaisyUI
 open Feliz.Router
 open Mediatheca.Client.Pages.Dashboard.Types
+open Mediatheca.Client
 open Mediatheca.Client.Components
 
 let private statCard (icon: unit -> ReactElement) (label: string) (value: string) (color: string) (delay: int) =
     Html.div [
-        prop.className $"stat-glow bg-base-100 rounded-2xl p-6 shadow-md card-hover"
+        prop.className $"{DesignSystem.statGlow} bg-base-100 rounded-2xl p-6 shadow-md card-hover"
         prop.style [ style.custom ("animationDelay", $"{delay}ms") ]
         prop.children [
             Html.div [
@@ -107,7 +108,7 @@ let private activityItem (item: Mediatheca.Shared.RecentActivityItem) =
 let view (model: Model) (_dispatch: Msg -> unit) =
     let stats = model.Stats |> Option.defaultValue { MovieCount = 0; FriendCount = 0; CatalogCount = 0; WatchSessionCount = 0; TotalWatchTimeMinutes = 0 }
     Html.div [
-        prop.className "animate-fade-in"
+        prop.className DesignSystem.animateFadeIn
         prop.children [
             // Hero section
             Html.div [
@@ -137,11 +138,11 @@ let view (model: Model) (_dispatch: Msg -> unit) =
             ]
 
             Html.div [
-                prop.className "p-4 lg:p-6 -mt-6 relative z-10"
+                prop.className (DesignSystem.pagePadding + " -mt-6 relative z-10")
                 prop.children [
                     // Stats grid
                     Html.div [
-                        prop.className "grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-grid"
+                        prop.className ("grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 " + DesignSystem.staggerGrid)
                         prop.children [
                             statCard Icons.movie "Movies" (string stats.MovieCount) "text-primary" 0
                             statCard Icons.friends "Friends" (string stats.FriendCount) "text-secondary" 100
@@ -155,7 +156,7 @@ let view (model: Model) (_dispatch: Msg -> unit) =
                         prop.children [
                             // Recent movies section
                             Html.div [
-                                prop.className "animate-fade-in-up"
+                                prop.className DesignSystem.animateFadeInUp
                                 prop.children [
                                     if not (List.isEmpty model.RecentMovies) then
                                         Html.div [
@@ -194,7 +195,7 @@ let view (model: Model) (_dispatch: Msg -> unit) =
                                         ]
                                     else if not model.IsLoading then
                                         Html.div [
-                                            prop.className "text-center py-12 animate-fade-in"
+                                            prop.className ("text-center py-12 " + DesignSystem.animateFadeIn)
                                             prop.children [
                                                 Html.div [
                                                     prop.className "text-base-content/15 mb-4"
@@ -216,7 +217,7 @@ let view (model: Model) (_dispatch: Msg -> unit) =
                             // Recent activity section
                             if not (List.isEmpty model.RecentActivity) then
                                 Html.div [
-                                    prop.className "animate-fade-in-up"
+                                    prop.className DesignSystem.animateFadeInUp
                                     prop.children [
                                         Html.div [
                                             prop.className "flex items-center justify-between mb-4"

@@ -43,6 +43,14 @@
 - [x] REQ-027: Dashboard — stats (total watched, watch time, catalog count) [Phase 4]
 - [x] REQ-028: Event Store Browser — view and search events by stream, type, and date [Phase 4]
 
+### Phase 5: Design System (Style Guide)
+
+- [x] REQ-029: Style Guide page at `/styleguide` route — hidden from navigation, not discoverable, accessible only by direct URL [Phase 5]
+- [x] REQ-030: Component catalog — every reusable frontend component displayed with all used parametrizations, each with explanation of design decisions (what was chosen, what was rejected, and why) [Phase 5]
+- [x] REQ-031: Design token documentation — typography (Oswald/Inter usage), colors (theme palette), spacing, shapes, glassmorphism conventions, and all other design decisions with rationale for each choice [Phase 5]
+- [x] REQ-032: Design system as single source of truth — extract component definitions and design tokens so the Style Guide IS the canonical definition and application pages consume from it [Phase 5]
+- [x] REQ-033: Skills and/or agents for Style Guide workflow — when a component or design token is changed in the Style Guide, provide guided propagation to update all usages across application pages [Phase 5]
+
 ## v2 (Future)
 
 - [ ] REQ-100: TV Series support (Series > Season > Episode hierarchy) with TMDB import

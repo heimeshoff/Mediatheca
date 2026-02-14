@@ -21,6 +21,7 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
     let catalogDetailModel, catalogDetailCmd = Pages.CatalogDetail.State.init ""
     let eventBrowserModel, eventBrowserCmd = Pages.EventBrowser.State.init ()
     let settingsModel, settingsCmd = Pages.Settings.State.init ()
+    let styleGuideModel, styleGuideCmd = Pages.StyleGuide.State.init ()
 
     let model = {
         CurrentPage = Dashboard
@@ -33,6 +34,7 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
         CatalogDetailModel = catalogDetailModel
         EventBrowserModel = eventBrowserModel
         SettingsModel = settingsModel
+        StyleGuideModel = styleGuideModel
         SearchModal = None
     }
 
@@ -146,6 +148,10 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             let childModel, childCmd = Pages.Settings.State.init ()
             { model with SettingsModel = childModel },
             Cmd.map Settings_msg childCmd
+        | Styleguide ->
+            let childModel, childCmd = Pages.StyleGuide.State.init ()
+            { model with StyleGuideModel = childModel },
+            Cmd.map Styleguide_msg childCmd
         | Dashboard ->
             let childModel, childCmd = Pages.Dashboard.State.init ()
             { model with DashboardModel = childModel },
@@ -202,3 +208,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Settings_msg childMsg ->
         let childModel, childCmd = Pages.Settings.State.update api childMsg model.SettingsModel
         { model with SettingsModel = childModel }, Cmd.map Settings_msg childCmd
+
+    | Styleguide_msg childMsg ->
+        let childModel, childCmd = Pages.StyleGuide.State.update childMsg model.StyleGuideModel
+        { model with StyleGuideModel = childModel }, Cmd.map Styleguide_msg childCmd

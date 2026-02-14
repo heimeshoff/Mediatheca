@@ -4,6 +4,7 @@ open Feliz
 open Feliz.DaisyUI
 open Feliz.Router
 open Mediatheca.Client.Pages.Movies.Types
+open Mediatheca.Client
 open Mediatheca.Client.Components
 
 let private movieCard (movie: Mediatheca.Shared.MovieListItem) =
@@ -17,7 +18,7 @@ let private allGenres (movies: Mediatheca.Shared.MovieListItem list) =
 
 let view (model: Model) (dispatch: Msg -> unit) =
     Html.div [
-        prop.className "p-4 lg:p-6 animate-fade-in"
+        prop.className (DesignSystem.pagePadding + " " + DesignSystem.animateFadeIn)
         prop.children [
             Html.div [
                 prop.className "flex items-center justify-between mb-6"
@@ -115,7 +116,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     )
                 if List.isEmpty filtered then
                     Html.div [
-                        prop.className "text-center py-20 animate-fade-in"
+                        prop.className ("text-center py-20 " + DesignSystem.animateFadeIn)
                         prop.children [
                             Html.div [
                                 prop.className "text-base-content/20 mb-4"
@@ -148,7 +149,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     ]
                 else
                     Html.div [
-                        prop.className "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 stagger-grid"
+                        prop.className ("grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 " + DesignSystem.staggerGrid)
                         prop.children [
                             for movie in filtered do
                                 movieCard movie

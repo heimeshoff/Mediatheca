@@ -1,84 +1,86 @@
-# Codebase Snapshot (as of 2026-02-08)
+# Codebase Snapshot (as of 2026-02-14)
 
 ## Domain Model
 
-### Movies Aggregate (`src/Server/Movies.fs`)
-- **Stream ID:** `Movie-{slug}`
-- **State:** `Not_created | Active of ActiveMovie | Removed`
-- **ActiveMovie fields:** Name, Year, Runtime?, Overview, Genres[], PosterRef?, BackdropRef?, TmdbId, TmdbRating?, RecommendedBy (Set<string>), Want_to_watch_with (Set<string>)
-- **9 Events:** Movie_added_to_library (fat), Movie_removed_from_library, Movie_categorized, Movie_poster_replaced, Movie_backdrop_replaced, Movie_recommended_by, Recommendation_removed, Want_to_watch_with, Removed_want_to_watch_with
-- **9 Commands:** Add_movie_to_library, Remove_movie_from_library, Categorize_movie, Replace_poster, Replace_backdrop, Recommend_by, Remove_recommendation, Add_want_to_watch_with, Remove_from_want_to_watch_with
-- **Invariants:** Idempotent set operations (recommend/watch-with), state guards (Removed is terminal)
+4 aggregates, all using Event Sourcing + CQRS with `NotCreated → Active → Removed` state machines (except ContentBlocks which is always-active).
 
-### Friends Aggregate (`src/Server/Friends.fs`)
-- **Stream ID:** `Friend-{slug}`
-- **State:** `Not_created | Active of ActiveFriend | Removed`
-- **ActiveFriend fields:** Name, ImageRef?
-- **3 Events:** Friend_added, Friend_updated, Friend_removed
-- **3 Commands:** Add_friend, Update_friend, Remove_friend
-- **Cascade:** Friend removal scrubs slugs from all movie_detail recommended_by/want_to_watch_with via FriendProjection
+| Aggregate | Stream | Events | Key Validation | Cross-Agg Deps |
+|-----------|--------|--------|----------------|----------------|
+| **Movies** | `Movie-{slug}` | 14 events | Idempotency, session existence, dupes | References Friend slugs |
+| **Friends** | `Friend-{slug}` | 3 events | Simple state guards | Referenced by Movies |
+| **Catalogs** | `Catalog-{slug}` | 7 events | Unique entries per catalog, auto-position | References Movie slugs |
+| **ContentBlocks** | `ContentBlocks-{movieSlug}` | 4 events | Session-scoped positioning | Keyed by Movie slug |
 
-### Cross-Aggregate: Movies reference friends by slug in RecommendedBy and Want_to_watch_with sets
+Key behaviors:
+- Watch session recording auto-removes friends from `Want_to_watch_with`
+- Friend removal cascades cleanup across movie JSON arrays
+- Decider pattern: pure `decide: State -> Command -> Result<Event list, string>`
 
 ## API Surface
 
-### IMediathecaApi (21 methods)
-- **Movies:** addMovie(tmdbId), removeMovie(slug), getMovie(slug), getMovies(), categorizeMovie, replacePoster, replaceBackdrop, recommendMovie, removeRecommendation, wantToWatchWith, removeWantToWatchWith
-- **Friends:** addFriend(name), updateFriend, removeFriend, getFriend, getFriends
-- **TMDB:** searchTmdb(query)
-- **Settings:** getTmdbApiKey, setTmdbApiKey, testTmdbApiKey
-- **Health:** healthCheck
+47 methods on `IMediathecaApi` via Fable.Remoting:
+- Movies: 11 methods (CRUD + metadata + rating)
+- Movie-Friend relations: 4 methods
+- Watch Sessions: 5 methods
+- Content Blocks: 6 methods
+- Friends: 7 methods
+- Catalogs: 9 methods
+- Dashboard/Admin: 5 methods
 
-### DTOs
-- MovieListItem (slug, name, year, posterRef?, genres[], tmdbRating?)
-- MovieDetail (all above + runtime?, overview, backdropRef?, tmdbId, cast[], recommendedBy[], wantToWatchWith[])
-- FriendListItem / FriendDetail (slug, name, imageRef?)
-- FriendRef (slug, name), CastMemberDto (name, role, imageRef?, tmdbId), TmdbSearchResult
-
-### Slug Module: slugify(), movieSlug(name, year), friendSlug(name)
+All DTOs defined in `src/Shared/Shared.fs`. Slug module provides URL-safe identifiers.
 
 ## Storage & Projections
 
-### Event Store (`EventStore.fs`)
-- **Table:** `events` (global_position PK, stream_id, stream_position, event_type, data JSON, metadata JSON, timestamp)
-- **Checkpoints:** `projection_checkpoints` (projection_name PK, last_position, updated_at)
-- **Concurrency:** Optimistic locking via UNIQUE(stream_id, stream_position)
-- **Pragmas:** WAL, NORMAL sync, FK enabled, 5s busy timeout
+15 tables total across EventStore (2), MovieProjection (3), FriendProjection (1), CatalogProjection (2), ContentBlockProjection (1), CastStore (2), SettingsStore (1) + filesystem (ImageStore).
 
-### Projections
-- **MovieProjection:** `movie_list` (slug PK, name, year, poster_ref, genres JSON, tmdb_rating), `movie_detail` (+ runtime, overview, backdrop_ref, tmdb_id, recommended_by JSON, want_to_watch_with JSON)
-- **FriendProjection:** `friend_list` (slug PK, name, image_ref) + cascade cleanup on removal
-
-### Non-Event-Sourced
-- **CastStore:** `cast_members` (id, name, tmdb_id UNIQUE, image_ref), `movie_cast` (movie_stream_id, cast_member_id, role, billing_order, is_top_billed)
-- **ImageStore:** File-based (saveImage, deleteImage, imageExists) at `{BaseDir}/images`
-- **SettingsStore:** `settings` KV table (key PK, value, updated_at)
-
-### Wiring: `projectionHandlers = [MovieProjection.handler; FriendProjection.handler]` in Program.fs; 100-event batch processing with checkpoint resume
+Key patterns:
+- JSON columns for collections (friend lists as JSON arrays)
+- Dual movie tables (movie_list for search, movie_detail for full info)
+- Projection checkpoint tracking for catch-up
+- MovieProjection rebuilt on startup for consistency
 
 ## Client Architecture
 
-### Pages (7)
+### Pages & Routes
 | Page | Route | Pattern |
 |------|-------|---------|
-| Dashboard | `/` | Stats + recent movies |
-| Movie_list | `/movies` | Search/filter grid + TMDB modal |
-| Movie_detail | `/movies/:slug` | Backdrop hero + cast + friend pickers |
-| Friend_list | `/friends` | Grid + inline add form |
-| Friend_detail | `/friends/:slug` | Profile + inline edit |
-| Settings | `/settings` | TMDB key config |
+| Dashboard | `/` | Stats cards, recent movies, activity timeline |
+| Movie_list | `/movies` | Grid with search/genre filter |
+| Movie_detail | `/movies/:slug` | Hero + two-column (content left, social right) |
+| Friend_list | `/friends` | Card grid with add form |
+| Friend_detail | `/friends/:slug` | Profile with recommended/watched movies |
+| Catalog_list | `/catalogs` | Catalog cards with create form |
+| Catalog_detail | `/catalogs/:slug` | Entries with management |
+| Event_browser | `/events` | Event store explorer with filters |
+| Settings | `/settings` | Configuration page |
 | Not_found | `/not-found` | 404 |
 
-### Root MVU: All child models initialized upfront, message routing via `Cmd.map`, page switch reinitializes target page
+### Reusable Components
+| Component | File | Public Functions |
+|-----------|------|-----------------|
+| **Icons** | `Icons.fs` | `svgIcon`, `svgIconSm` + named icons (Dashboard, Movie, Friends, etc.) |
+| **Layout** | `Layout.fs` | `view currentPage content` |
+| **Sidebar** | `Sidebar.fs` | `view currentPage` (desktop nav, glassmorphic) |
+| **BottomNav** | `BottomNav.fs` | `view currentPage` (mobile dock) |
+| **PageContainer** | `PageContainer.fs` | `view title children` |
+| **PosterCard** | `PosterCard.fs` | `view slug name year posterRef ratingBadge`, `thumbnail posterRef alt` |
+| **ModalPanel** | `ModalPanel.fs` | `view`, `viewCustom`, `viewWithFooter` (glassmorphic overlay) |
+| **SearchModal** | `SearchModal.fs` | Debounced TMDB search + library filter |
+| **FriendPill** | `FriendPill.fs` | `view`, `viewWithRemove`, `viewInline` |
+| **ContentBlockEditor** | `ContentBlockEditor.fs` | Block CRUD with inline editing |
 
-### Components: Layout (Sidebar + BottomNav responsive shell), Icons (6 SVGs), PageContainer, TmdbSearchModal (nested MVU in Movies page)
-
-### Styling: TailwindCSS 4 + DaisyUI 5, custom "dim" theme, Oswald/Inter fonts, hero gradients, card hover animations, stagger grid animations
+### Design Tokens (Current — Implicit)
+- **Typography:** Oswald (`font-display`, headings, uppercase, tracking 0.05em) / Inter (`font-sans`, body)
+- **Theme:** DaisyUI "dim" dark theme — primary (cyan-green oklch 86.1%), secondary (orange oklch 73.4%), accent (magenta oklch 74.2%)
+- **Glassmorphism:** `oklch(…/0.55–0.70)` bg, `backdrop-blur-[24px] saturate-[1.2]`, subtle border + inset highlight
+- **Spacing:** p-4 mobile, lg:p-6 desktop; gap-2 compact, gap-3 standard; rounded-xl cards, rounded-full avatars
+- **Animations:** fade-in (0.3s), fade-in-up (0.4s), scale-in (0.3s), stagger-grid (40ms cascading)
+- **Shadows:** Subtle (0 4px 12px -2px), deeper on hover; oklch-based
+- **Z-index:** auto (content), relative (cards), z-50 (modals/dropdowns)
 
 ## Cross-Cutting Observations
-
-- Watch sessions (Phase 3) will extend Movie aggregate — needs new events, state fields, projection columns
-- Content blocks are a new concept — may need new projection tables or extend movie_detail
-- No WatchSession or ContentBlock types exist yet in Shared.fs
-- Movie detail page will need a new "Watch History" section and content block editor
-- Image upload for content blocks needs new ImageStore paths and API endpoints
+- All design tokens are currently implicit — scattered across Tailwind classes in view functions and index.css
+- No centralized component library — components are reusable but design decisions are baked into each file
+- Glassmorphism convention documented in CLAUDE.md but not enforced programmatically
+- Typography rules (Oswald headings, Inter body) applied ad-hoc per component
+- Color usage follows DaisyUI semantic classes but specific opacity/oklch values vary per usage site

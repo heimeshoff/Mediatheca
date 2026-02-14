@@ -6,6 +6,7 @@ open Feliz.DaisyUI
 open Feliz.Router
 open Mediatheca.Shared
 open Mediatheca.Client.Pages.FriendDetail.Types
+open Mediatheca.Client
 open Mediatheca.Client.Components
 
 let private readFileAsBytes (file: Browser.Types.File) (onDone: byte array * string -> unit) =
@@ -143,7 +144,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
     | false, Some friend ->
         let fileInputId = "friend-detail-image-upload"
         Html.div [
-            prop.className "p-4 lg:p-6 animate-fade-in"
+            prop.className (DesignSystem.pagePadding + " " + DesignSystem.animateFadeIn)
             prop.children [
                 // Back button
                 Html.div [

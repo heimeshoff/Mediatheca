@@ -2,6 +2,7 @@ module Mediatheca.Client.Components.PosterCard
 
 open Feliz
 open Feliz.Router
+open Mediatheca.Client
 
 /// Poster card for grid display (Movies page).
 /// Renders a 2/3 aspect-ratio poster with hover effects (shine, shadow lift, info overlay).
@@ -19,17 +20,17 @@ let view
             Router.navigate ("movies", slug))
         prop.children [
             Html.div [
-                prop.className "poster-card group relative cursor-pointer w-full"
+                prop.className (DesignSystem.posterCard + " group relative cursor-pointer w-full")
                 prop.children [
                     Html.div [
-                        prop.className "poster-image-container poster-shadow"
+                        prop.className DesignSystem.posterImageContainer
                         prop.children [
                             match posterRef with
                             | Some ref ->
                                 Html.img [
                                     prop.src $"/images/{ref}"
                                     prop.alt name
-                                    prop.className "poster-image"
+                                    prop.className DesignSystem.posterImage
                                 ]
                             | None ->
                                 Html.div [
@@ -61,7 +62,7 @@ let view
                             ]
 
                             // Shine effect
-                            Html.div [ prop.className "poster-shine" ]
+                            Html.div [ prop.className DesignSystem.posterShine ]
                         ]
                     ]
                 ]

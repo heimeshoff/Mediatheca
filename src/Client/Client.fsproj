@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <Compile Include="Router.fs" />
+    <Compile Include="DesignSystem.fs" />
     <Compile Include="Components\Icons.fs" />
     <Compile Include="Components\FriendPill.fs" />
     <Compile Include="Components\PageContainer.fs" />
@@ -44,6 +45,9 @@
     <Compile Include="Pages\Settings\Types.fs" />
     <Compile Include="Pages\Settings\State.fs" />
     <Compile Include="Pages\Settings\Views.fs" />
+    <Compile Include="Pages\StyleGuide\Types.fs" />
+    <Compile Include="Pages\StyleGuide\State.fs" />
+    <Compile Include="Pages\StyleGuide\Views.fs" />
     <Compile Include="Pages\NotFound\Views.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="State.fs" />

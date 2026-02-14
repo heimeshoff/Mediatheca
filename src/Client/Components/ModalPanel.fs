@@ -1,6 +1,7 @@
 module Mediatheca.Client.Components.ModalPanel
 
 open Feliz
+open Mediatheca.Client
 
 let viewCustom
     (title: string)
@@ -9,14 +10,14 @@ let viewCustom
     (content: ReactElement list)
     (footer: ReactElement list) =
     Html.div [
-        prop.className "fixed inset-0 z-50 flex justify-center items-start pt-[10vh]"
+        prop.className DesignSystem.modalContainer
         prop.children [
             Html.div [
-                prop.className "absolute inset-0 bg-black/30"
+                prop.className DesignSystem.modalBackdrop
                 prop.onClick (fun _ -> onClose ())
             ]
             Html.div [
-                prop.className "relative w-full max-w-2xl mx-4 max-h-[70vh] flex flex-col bg-base-100/70 backdrop-blur-xl rounded-2xl shadow-2xl border border-base-content/10 overflow-hidden animate-fade-in"
+                prop.className ("relative w-full max-w-2xl mx-4 max-h-[70vh] flex flex-col " + DesignSystem.modalPanel)
                 prop.children [
                     Html.div [
                         prop.className "p-5 pb-0"

@@ -4,6 +4,7 @@ open Feliz
 open Feliz.DaisyUI
 open Feliz.Router
 open Mediatheca.Client.Pages.CatalogDetail.Types
+open Mediatheca.Client
 open Mediatheca.Client.Components
 
 let private entryCard (entry: Mediatheca.Shared.CatalogEntryDto) (editingNote: EditNoteState option) (dispatch: Msg -> unit) =
@@ -108,7 +109,7 @@ let private addEntryForm (model: Model) (dispatch: Msg -> unit) =
         |> List.filter (fun m -> not (existingMovieSlugs.Contains m.Slug))
 
     Daisy.card [
-        prop.className "bg-base-100 shadow-md mb-4 animate-scale-in"
+        prop.className ("bg-base-100 shadow-md mb-4 " + DesignSystem.animateScaleIn)
         prop.children [
             Daisy.cardBody [
                 prop.children [
@@ -173,7 +174,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
         ]
     | false, None ->
         Html.div [
-            prop.className "text-center py-20 animate-fade-in"
+            prop.className ("text-center py-20 " + DesignSystem.animateFadeIn)
             prop.children [
                 Html.p [
                     prop.className "text-base-content/50 font-medium"
@@ -192,7 +193,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
         ]
     | false, Some catalog ->
         Html.div [
-            prop.className "animate-fade-in"
+            prop.className DesignSystem.animateFadeIn
             prop.children [
                 // Header
                 Html.div [
@@ -312,7 +313,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
 
                 // Entries
                 Html.div [
-                    prop.className "p-4 lg:p-6"
+                    prop.className DesignSystem.pagePadding
                     prop.children [
                         Html.div [
                             prop.className "flex items-center justify-between mb-4"
