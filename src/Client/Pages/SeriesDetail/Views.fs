@@ -422,7 +422,7 @@ let private episodeCard
                     ]
                     // Watch toggle button + date
                     Html.div [
-                        prop.className "flex flex-col items-center justify-center flex-shrink-0 gap-1"
+                        prop.className "relative flex items-center flex-shrink-0"
                         prop.children [
                             Html.button [
                                 prop.className (
@@ -466,29 +466,34 @@ let private episodeCard
                                         ]
                                 ]
                             ]
-                            // Watched date display
+                            // Watched date — positioned absolutely so it doesn't shift the button
                             if episode.IsWatched then
-                                if isEditingDate then
-                                    Daisy.input [
-                                        prop.className "w-28"
-                                        input.xs
-                                        prop.type' "date"
-                                        prop.autoFocus true
-                                        prop.value (episode.WatchedDate |> Option.defaultValue "")
-                                        prop.onChange (fun (v: string) ->
-                                            dispatch (Update_episode_date (seasonNumber, episode.EpisodeNumber, v)))
-                                        prop.onBlur (fun _ ->
-                                            dispatch Cancel_edit_episode_date)
-                                        prop.onKeyDown (fun e ->
-                                            if e.key = "Escape" then
-                                                dispatch Cancel_edit_episode_date)
+                                Html.div [
+                                    prop.className "absolute top-full left-1/2 -translate-x-1/2 mt-1 whitespace-nowrap"
+                                    prop.children [
+                                        if isEditingDate then
+                                            Daisy.input [
+                                                prop.className "w-28"
+                                                input.xs
+                                                prop.type' "date"
+                                                prop.autoFocus true
+                                                prop.value (episode.WatchedDate |> Option.defaultValue "")
+                                                prop.onChange (fun (v: string) ->
+                                                    dispatch (Update_episode_date (seasonNumber, episode.EpisodeNumber, v)))
+                                                prop.onBlur (fun _ ->
+                                                    dispatch Cancel_edit_episode_date)
+                                                prop.onKeyDown (fun e ->
+                                                    if e.key = "Escape" then
+                                                        dispatch Cancel_edit_episode_date)
+                                            ]
+                                        else
+                                            Html.span [
+                                                prop.className "text-[10px] text-base-content/40 cursor-pointer hover:text-primary transition-colors"
+                                                prop.onClick (fun _ -> dispatch (Edit_episode_date (seasonNumber, episode.EpisodeNumber)))
+                                                prop.text (episode.WatchedDate |> Option.defaultValue "No date")
+                                            ]
                                     ]
-                                else
-                                    Html.span [
-                                        prop.className "text-[10px] text-base-content/40 cursor-pointer hover:text-primary transition-colors"
-                                        prop.onClick (fun _ -> dispatch (Edit_episode_date (seasonNumber, episode.EpisodeNumber)))
-                                        prop.text (episode.WatchedDate |> Option.defaultValue "No date")
-                                    ]
+                                ]
                         ]
                     ]
                 ]
@@ -606,7 +611,7 @@ let private rewatchSessionPanel (series: SeriesDetail) (model: Model) (dispatch:
                             else session.Friends |> List.map (fun f -> f.Name) |> String.concat ", "
                         // Plain wrapper — no backdrop-filter — so dropdown sibling gets proper blur
                         Html.div [
-                            prop.className "relative flex-shrink-0 w-52"
+                            prop.className "group relative flex-shrink-0 w-52"
                             prop.children [
                                 // Card (has glass effect)
                                 Html.div [
@@ -634,7 +639,7 @@ let private rewatchSessionPanel (series: SeriesDetail) (model: Model) (dispatch:
                                                                 ]
                                                                 // Three-dots button
                                                                 Html.button [
-                                                                    prop.className "w-6 h-6 flex-shrink-0 flex items-center justify-center text-base-content/40 hover:text-base-content transition-colors cursor-pointer rounded-full hover:bg-base-content/10"
+                                                                    prop.className "w-6 h-6 flex-shrink-0 flex items-center justify-center text-base-content/40 hover:text-base-content transition-all cursor-pointer rounded-full hover:bg-base-content/10 opacity-0 group-hover:opacity-100"
                                                                     prop.onClick (fun e ->
                                                                         e.stopPropagation()
                                                                         dispatch (Toggle_session_menu session.RewatchId))
