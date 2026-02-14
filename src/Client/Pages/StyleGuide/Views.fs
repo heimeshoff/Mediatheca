@@ -1397,6 +1397,26 @@ type private SortState = {
     Direction: SortDirection
 }
 
+type private MockEntry = {
+    Slug: string
+    Name: string
+    Year: int
+    PosterRef: string option
+    Genres: string list
+    Rating: float option
+}
+
+let private mockEntries = [
+    { Slug = "blade-runner-2049-2017"; Name = "Blade Runner 2049"; Year = 2017; PosterRef = None; Genres = ["Sci-Fi"; "Drama"]; Rating = Some 8.0 }
+    { Slug = "the-matrix-1999"; Name = "The Matrix"; Year = 1999; PosterRef = None; Genres = ["Sci-Fi"; "Action"]; Rating = Some 8.7 }
+    { Slug = "alien-1979"; Name = "Alien"; Year = 1979; PosterRef = None; Genres = ["Horror"; "Sci-Fi"]; Rating = Some 8.5 }
+    { Slug = "dune-part-two-2024"; Name = "Dune: Part Two"; Year = 2024; PosterRef = None; Genres = ["Sci-Fi"; "Adventure"]; Rating = Some 8.3 }
+    { Slug = "parasite-2019"; Name = "Parasite"; Year = 2019; PosterRef = None; Genres = ["Thriller"; "Drama"]; Rating = Some 8.5 }
+    { Slug = "interstellar-2014"; Name = "Interstellar"; Year = 2014; PosterRef = None; Genres = ["Sci-Fi"; "Drama"]; Rating = Some 8.7 }
+    { Slug = "the-godfather-1972"; Name = "The Godfather"; Year = 1972; PosterRef = None; Genres = ["Crime"; "Drama"]; Rating = Some 9.2 }
+    { Slug = "spirited-away-2001"; Name = "Spirited Away"; Year = 2001; PosterRef = None; Genres = ["Animation"; "Fantasy"]; Rating = Some 8.6 }
+]
+
 let private defaultDirectionFor field =
     match field with
     | ByName -> Ascending
@@ -1418,26 +1438,6 @@ let private sortEntries (sort: SortState) (entries: MockEntry list) =
     match sort.Direction with
     | Ascending -> sorted
     | Descending -> sorted |> List.rev
-
-type private MockEntry = {
-    Slug: string
-    Name: string
-    Year: int
-    PosterRef: string option
-    Genres: string list
-    Rating: float option
-}
-
-let private mockEntries = [
-    { Slug = "blade-runner-2049-2017"; Name = "Blade Runner 2049"; Year = 2017; PosterRef = None; Genres = ["Sci-Fi"; "Drama"]; Rating = Some 8.0 }
-    { Slug = "the-matrix-1999"; Name = "The Matrix"; Year = 1999; PosterRef = None; Genres = ["Sci-Fi"; "Action"]; Rating = Some 8.7 }
-    { Slug = "alien-1979"; Name = "Alien"; Year = 1979; PosterRef = None; Genres = ["Horror"; "Sci-Fi"]; Rating = Some 8.5 }
-    { Slug = "dune-part-two-2024"; Name = "Dune: Part Two"; Year = 2024; PosterRef = None; Genres = ["Sci-Fi"; "Adventure"]; Rating = Some 8.3 }
-    { Slug = "parasite-2019"; Name = "Parasite"; Year = 2019; PosterRef = None; Genres = ["Thriller"; "Drama"]; Rating = Some 8.5 }
-    { Slug = "interstellar-2014"; Name = "Interstellar"; Year = 2014; PosterRef = None; Genres = ["Sci-Fi"; "Drama"]; Rating = Some 8.7 }
-    { Slug = "the-godfather-1972"; Name = "The Godfather"; Year = 1972; PosterRef = None; Genres = ["Crime"; "Drama"]; Rating = Some 9.2 }
-    { Slug = "spirited-away-2001"; Name = "Spirited Away"; Year = 2001; PosterRef = None; Genres = ["Animation"; "Fantasy"]; Rating = Some 8.6 }
-]
 
 let private layoutToggle (active: EntryListLayout) (onSwitch: EntryListLayout -> unit) =
     Html.div [
