@@ -14,6 +14,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       FullCredits = None
       TrailerKey = None
       ShowTrailer = false
+      IsRatingOpen = false
       ConfirmingRemove = false
       Error = None },
     Cmd.batch [
@@ -233,3 +234,21 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Close_trailer ->
         { model with ShowTrailer = false }, Cmd.none
+
+    | Toggle_rating_dropdown ->
+        { model with IsRatingOpen = not model.IsRatingOpen }, Cmd.none
+
+    | Set_personal_rating rating ->
+        let ratingValue = if rating = 0 then None else Some rating
+        { model with IsRatingOpen = false },
+        Cmd.OfAsync.either
+            (fun () -> api.setPersonalRating model.Slug ratingValue)
+            ()
+            Personal_rating_result
+            (fun ex -> Personal_rating_result (Error ex.Message))
+
+    | Personal_rating_result (Ok ()) ->
+        model, Cmd.OfAsync.perform api.getMovie model.Slug Movie_loaded
+
+    | Personal_rating_result (Error err) ->
+        { model with Error = Some err }, Cmd.none

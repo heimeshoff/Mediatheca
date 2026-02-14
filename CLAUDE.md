@@ -45,6 +45,7 @@ Personal media library app (movies, series, games, books) built with full-stack 
 
 - Fonts: Oswald (`font-display`, headings) and Inter (`font-sans`, body) via Google Fonts
 - Theme: custom "dim" dark theme in `index.css` via `@plugin "daisyui/theme"`, selected by `data-theme="dim"` on `<html>`
+- **Glassmorphism for all overlays**: Every dropdown, popover, modal, and floating panel MUST use glassmorphism — semi-transparent background (`/0.55`–`/0.70` opacity), `backdrop-filter: blur(24px) saturate(1.2)`, subtle border (`oklch(… / 0.15)`), and `inset 0 1px 0 0 oklch(100% 0 0 / 0.08)` highlight. Never use fully opaque backgrounds on overlays. See `.rating-dropdown` and `.glass-card` in `index.css` for reference.
 - F# modules for code organization (not classes)
 - Async workflows for I/O operations
 - Event types as discriminated unions per bounded context
@@ -58,6 +59,7 @@ Personal media library app (movies, series, games, books) built with full-stack 
 
 ## Gotchas
 
+- **`backdrop-filter` breaks on nested elements**: If a parent has `backdrop-filter` (e.g. `backdrop-blur-sm`), any child's `backdrop-filter` will only blur the parent's content, not the page behind it. Fix: render glassmorphic dropdowns/popovers as **siblings** to the blurred parent, not children. Wrap both in a plain `position: relative` container without `backdrop-filter`.
 - F# `open Module.Foo` opens Foo's *contents* — use `open Module` to access `Foo.bar`. Sibling modules in the same namespace are accessible by name without `open`.
 - `vite-plugin-fable@0.1.x` requires Vite 6; `0.2.x` requires Vite 7 — don't upgrade one without the other
 - `ts-lsp-client@1.1.0` breaks vite-plugin-fable ESM imports — pinned to `1.0.4` via npm overrides

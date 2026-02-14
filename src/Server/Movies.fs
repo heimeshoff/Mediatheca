@@ -42,6 +42,7 @@ module Movies =
         | Friend_added_to_watch_session of sessionId: string * friendSlug: string
         | Friend_removed_from_watch_session of sessionId: string * friendSlug: string
         | Watch_session_removed of sessionId: string
+        | Personal_rating_set of rating: int option
 
     // State
 
@@ -61,6 +62,7 @@ module Movies =
         BackdropRef: string option
         TmdbId: int
         TmdbRating: float option
+        PersonalRating: int option
         RecommendedBy: Set<string>
         Want_to_watch_with: Set<string>
         WatchSessions: Map<string, WatchSessionState>
@@ -88,6 +90,7 @@ module Movies =
         | Add_friend_to_watch_session of sessionId: string * friendSlug: string
         | Remove_friend_from_watch_session of sessionId: string * friendSlug: string
         | Remove_watch_session of sessionId: string
+        | Set_personal_rating of rating: int option
 
     // Evolve
 
@@ -104,6 +107,7 @@ module Movies =
                 BackdropRef = data.BackdropRef
                 TmdbId = data.TmdbId
                 TmdbRating = data.TmdbRating
+                PersonalRating = None
                 RecommendedBy = Set.empty
                 Want_to_watch_with = Set.empty
                 WatchSessions = Map.empty
@@ -157,6 +161,8 @@ module Movies =
             | None -> state
         | Active movie, Watch_session_removed sessionId ->
             Active { movie with WatchSessions = movie.WatchSessions |> Map.remove sessionId }
+        | Active movie, Personal_rating_set rating ->
+            Active { movie with PersonalRating = rating }
         | _ -> state
 
     let reconstitute (events: MovieEvent list) : MovieState =
@@ -221,6 +227,9 @@ module Movies =
             if movie.WatchSessions |> Map.containsKey sessionId then
                 Ok [ Watch_session_removed sessionId ]
             else Error "Watch session does not exist"
+        | Active movie, Set_personal_rating rating ->
+            if movie.PersonalRating = rating then Ok []
+            else Ok [ Personal_rating_set rating ]
         | Removed, _ ->
             Error "Movie has been removed"
         | Not_created, _ ->
@@ -306,6 +315,8 @@ module Movies =
                 "Friend_removed_from_watch_session", Encode.toString 0 (Encode.object [ "sessionId", Encode.string sessionId; "friendSlug", Encode.string friendSlug ])
             | Watch_session_removed sessionId ->
                 "Watch_session_removed", Encode.toString 0 (Encode.object [ "sessionId", Encode.string sessionId ])
+            | Personal_rating_set rating ->
+                "Personal_rating_set", Encode.toString 0 (Encode.object [ "rating", Encode.option Encode.int rating ])
 
         let deserialize (eventType: string) (data: string) : MovieEvent option =
             match eventType with
@@ -369,6 +380,10 @@ module Movies =
                 Decode.fromString (Decode.field "sessionId" Decode.string) data
                 |> Result.toOption
                 |> Option.map Watch_session_removed
+            | "Personal_rating_set" ->
+                Decode.fromString (Decode.object (fun get -> get.Optional.Field "rating" Decode.int)) data
+                |> Result.toOption
+                |> Option.map Personal_rating_set
             | _ -> None
 
         let toEventData (event: MovieEvent) : EventStore.EventData =

@@ -6,6 +6,17 @@
 
 ## Recent Progress
 
+- **2026-02-14**: Fix rating dropdown z-index — rendered below Recommended By card
+  - Root cause: `backdrop-filter` on `glassCard` creates stacking context, trapping dropdown's `z-50`
+  - Fix: render dropdown as sibling to glassCard, wrapped in plain `relative` container (no backdrop-filter)
+- **2026-02-13**: Personal rating system (adapted from Cinemarco)
+  - Removed TMDB rating badge from movie poster cards on the Movies list page
+  - Kept TMDB star rating next to genre badges in movie detail hero section
+  - Replaced TMDB "Rating" detail card with interactive personal rating dropdown
+  - 5-level personal rating: Waste, Meh, Decent, Entertaining, Outstanding — each with icon and color
+  - Full event-sourcing: `Personal_rating_set` event, `Set_personal_rating` command, projection column
+  - New API endpoint `setPersonalRating` for persisting ratings
+  - Glassmorphism dropdown UI with fadeInDown animation
 - **2026-02-12**: Movie detail page design overhaul following CineSocial inspiration
   - Tall hero section (500px lg) with backdrop image, gradient overlay, poster + title overlaid at bottom
   - Two-column content grid (8/4): left = Synopsis, Details cards, Cast; right = social sidebar
@@ -95,7 +106,7 @@ Stream: `Catalog-{slug}`
 
 ### Movie Aggregate (Movies context) — `src/Server/Movies.fs`
 
-Events: Movie_added_to_library, Movie_removed_from_library, Movie_categorized, Movie_poster_replaced, Movie_backdrop_replaced, Movie_recommended_by, Recommendation_removed, Want_to_watch_with, Removed_want_to_watch_with, Watch_session_recorded, Watch_session_date_changed, Friend_added_to_watch_session, Friend_removed_from_watch_session
+Events: Movie_added_to_library, Movie_removed_from_library, Movie_categorized, Movie_poster_replaced, Movie_backdrop_replaced, Movie_recommended_by, Recommendation_removed, Want_to_watch_with, Removed_want_to_watch_with, Watch_session_recorded, Watch_session_date_changed, Friend_added_to_watch_session, Friend_removed_from_watch_session, Personal_rating_set
 
 ### ContentBlocks Aggregate — `src/Server/ContentBlocks.fs`
 

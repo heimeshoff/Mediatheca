@@ -30,6 +30,7 @@ module MovieProjection =
                 backdrop_ref  TEXT,
                 tmdb_id       INTEGER NOT NULL,
                 tmdb_rating   REAL,
+                personal_rating INTEGER,
                 recommended_by     TEXT NOT NULL DEFAULT '[]',
                 want_to_watch_with TEXT NOT NULL DEFAULT '[]'
             );
@@ -44,6 +45,13 @@ module MovieProjection =
             );
         """
         |> Db.exec
+
+        // Migration: add personal_rating column if not present (existing databases)
+        try
+            conn
+            |> Db.newCommand "ALTER TABLE movie_detail ADD COLUMN personal_rating INTEGER"
+            |> Db.exec
+        with _ -> () // Column already exists
 
     let private dropTables (conn: SqliteConnection) : unit =
         conn
@@ -298,6 +306,15 @@ module MovieProjection =
                     ]
                     |> Db.exec
 
+                | Movies.Personal_rating_set rating ->
+                    conn
+                    |> Db.newCommand "UPDATE movie_detail SET personal_rating = @personal_rating WHERE slug = @slug"
+                    |> Db.setParams [
+                        "slug", SqlType.String slug
+                        "personal_rating", match rating with Some r -> SqlType.Int32 r | None -> SqlType.Null
+                    ]
+                    |> Db.exec
+
     let handler: Projection.ProjectionHandler = {
         Name = "MovieProjection"
         Handle = handleEvent
@@ -429,7 +446,7 @@ module MovieProjection =
 
     let getBySlug (conn: SqliteConnection) (slug: string) : Mediatheca.Shared.MovieDetail option =
         conn
-        |> Db.newCommand "SELECT slug, name, year, runtime, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, recommended_by, want_to_watch_with FROM movie_detail WHERE slug = @slug"
+        |> Db.newCommand "SELECT slug, name, year, runtime, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, personal_rating, recommended_by, want_to_watch_with FROM movie_detail WHERE slug = @slug"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
@@ -464,6 +481,9 @@ module MovieProjection =
               TmdbRating =
                 if rd.IsDBNull(rd.GetOrdinal("tmdb_rating")) then None
                 else Some (rd.ReadDouble "tmdb_rating")
+              PersonalRating =
+                if rd.IsDBNull(rd.GetOrdinal("personal_rating")) then None
+                else Some (rd.ReadInt32 "personal_rating")
               Cast = cast
               RecommendedBy = resolveFriendRefs conn recommendedBySlugs
               WantToWatchWith = resolveFriendRefs conn wantToWatchWithSlugs

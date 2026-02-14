@@ -251,6 +251,7 @@ type MovieDetail = {
     BackdropRef: string option
     TmdbId: int
     TmdbRating: float option
+    PersonalRating: int option
     Cast: CastMemberDto list
     RecommendedBy: FriendRef list
     WantToWatchWith: FriendRef list
@@ -277,6 +278,7 @@ type IMediathecaApi = {
     removeRecommendation: string -> string -> Async<Result<unit, string>>
     wantToWatchWith: string -> string -> Async<Result<unit, string>>
     removeWantToWatchWith: string -> string -> Async<Result<unit, string>>
+    setPersonalRating: string -> int option -> Async<Result<unit, string>>
     addFriend: string -> Async<Result<string, string>>
     updateFriend: string -> string -> string option -> Async<Result<unit, string>>
     removeFriend: string -> Async<Result<unit, string>>
