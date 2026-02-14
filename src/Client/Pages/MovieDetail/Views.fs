@@ -688,7 +688,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                             prop.className "w-7 h-7 rounded-full bg-base-100/50 backdrop-blur-sm border border-base-content/15 hover:bg-base-100/70 text-base-content/50 hover:text-base-content flex items-center justify-center transition-colors cursor-pointer"
                                                             prop.onClick (fun _ -> dispatch Open_catalog_picker)
                                                             prop.children [
-                                                                Html.span [ prop.className "text-sm font-bold"; prop.text "+" ]
+                                                                Html.span [ prop.className "w-4 h-4"; prop.children [ Icons.catalog () ] ]
                                                             ]
                                                         ]
                                                     ]
