@@ -856,6 +856,22 @@ module Api =
                     return None
             }
 
+            getSeriesTrailer = fun tmdbId -> async {
+                try
+                    let tmdbConfig = getTmdbConfig()
+                    return! Tmdb.getSeriesTrailer httpClient tmdbConfig tmdbId
+                with _ ->
+                    return None
+            }
+
+            getSeasonTrailer = fun tmdbId seasonNumber -> async {
+                try
+                    let tmdbConfig = getTmdbConfig()
+                    return! Tmdb.getSeasonTrailer httpClient tmdbConfig tmdbId seasonNumber
+                with _ ->
+                    return None
+            }
+
             getFullCredits = fun tmdbId -> async {
                 try
                     let tmdbConfig = getTmdbConfig()

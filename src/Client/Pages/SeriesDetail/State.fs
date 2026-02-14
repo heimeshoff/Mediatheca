@@ -15,6 +15,9 @@ let init (slug: string) : Model * Cmd<Msg> =
       ShowFriendPicker = None
       Friends = []
       EditingEpisodeDate = None
+      TrailerKey = None
+      SeasonTrailerKeys = Map.empty
+      ShowTrailer = None
       ConfirmingRemove = false
       Error = None },
     Cmd.batch [
@@ -34,7 +37,19 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         ]
 
     | Detail_loaded detail ->
-        { model with Detail = detail; IsLoading = false }, Cmd.none
+        let trailerCmd =
+            match detail with
+            | Some series ->
+                Cmd.batch [
+                    Cmd.OfAsync.perform api.getSeriesTrailer series.TmdbId Trailer_loaded
+                    for season in series.Seasons do
+                        Cmd.OfAsync.perform
+                            (fun () -> api.getSeasonTrailer series.TmdbId season.SeasonNumber)
+                            ()
+                            (fun key -> Season_trailer_loaded (season.SeasonNumber, key))
+                ]
+            | None -> Cmd.none
+        { model with Detail = detail; IsLoading = false }, trailerCmd
 
     | Set_tab tab ->
         { model with ActiveTab = tab }, Cmd.none
@@ -186,9 +201,12 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             }) () Rewatch_friend_result (fun ex -> Rewatch_friend_result (Error ex.Message))
 
     | Rewatch_friend_result (Ok ()) ->
+        let rewatchId =
+            if model.SelectedRewatchId = "default" then None
+            else Some model.SelectedRewatchId
         model,
         Cmd.batch [
-            Cmd.ofMsg Load_detail
+            Cmd.OfAsync.perform (fun () -> api.getSeriesDetail model.Slug rewatchId) () Detail_loaded
             Cmd.OfAsync.perform api.getFriends () Friends_loaded
         ]
 
@@ -318,6 +336,21 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Content_block_result (Error err) ->
         { model with Error = Some err }, Cmd.none
+
+    | Trailer_loaded key ->
+        { model with TrailerKey = key }, Cmd.none
+
+    | Season_trailer_loaded (seasonNumber, key) ->
+        match key with
+        | Some k ->
+            { model with SeasonTrailerKeys = model.SeasonTrailerKeys |> Map.add seasonNumber k }, Cmd.none
+        | None -> model, Cmd.none
+
+    | Open_trailer key ->
+        { model with ShowTrailer = Some key }, Cmd.none
+
+    | Close_trailer ->
+        { model with ShowTrailer = None }, Cmd.none
 
     | Confirm_remove_series ->
         { model with ConfirmingRemove = true }, Cmd.none

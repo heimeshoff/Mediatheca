@@ -251,6 +251,38 @@ module Tmdb =
             | Error _ -> return None
         }
 
+    let getSeriesTrailer (httpClient: HttpClient) (config: TmdbConfig) (tmdbId: int) : Async<string option> =
+        async {
+            let url = $"https://api.themoviedb.org/3/tv/{tmdbId}/videos?api_key={config.ApiKey}"
+            let! json = fetchJson httpClient url
+            match Decode.fromString decodeVideosResponse json with
+            | Ok response ->
+                let youtubeTrailers =
+                    response.Results
+                    |> List.filter (fun v -> v.Site = "YouTube" && v.Type = "Trailer")
+                let best =
+                    youtubeTrailers |> List.tryFind (fun v -> v.Official)
+                    |> Option.orElseWith (fun () -> youtubeTrailers |> List.tryHead)
+                return best |> Option.map (fun v -> v.Key)
+            | Error _ -> return None
+        }
+
+    let getSeasonTrailer (httpClient: HttpClient) (config: TmdbConfig) (tmdbId: int) (seasonNumber: int) : Async<string option> =
+        async {
+            let url = $"https://api.themoviedb.org/3/tv/{tmdbId}/season/{seasonNumber}/videos?api_key={config.ApiKey}"
+            let! json = fetchJson httpClient url
+            match Decode.fromString decodeVideosResponse json with
+            | Ok response ->
+                let youtubeTrailers =
+                    response.Results
+                    |> List.filter (fun v -> v.Site = "YouTube" && v.Type = "Trailer")
+                let best =
+                    youtubeTrailers |> List.tryFind (fun v -> v.Official)
+                    |> Option.orElseWith (fun () -> youtubeTrailers |> List.tryHead)
+                return best |> Option.map (fun v -> v.Key)
+            | Error _ -> return None
+        }
+
     let downloadImage (httpClient: HttpClient) (config: TmdbConfig) (tmdbPath: string) (size: string) (destPath: string) : Async<unit> =
         async {
             let url = $"{config.ImageBaseUrl}{size}{tmdbPath}"

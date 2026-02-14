@@ -23,6 +23,10 @@ type Model = {
     Friends: FriendListItem list
     // Episode date editing
     EditingEpisodeDate: (int * int) option
+    // Trailer
+    TrailerKey: string option
+    SeasonTrailerKeys: Map<int, string>
+    ShowTrailer: string option
     // Remove
     ConfirmingRemove: bool
     Error: string option
@@ -78,6 +82,11 @@ type Msg =
     | Change_content_block_type of blockId: string * blockType: string
     | Reorder_content_blocks of blockIds: string list
     | Content_block_result of Result<unit, string>
+    // Trailer
+    | Trailer_loaded of string option
+    | Season_trailer_loaded of seasonNumber: int * key: string option
+    | Open_trailer of key: string
+    | Close_trailer
     // Remove
     | Confirm_remove_series
     | Cancel_remove_series

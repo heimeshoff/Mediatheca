@@ -503,7 +503,7 @@ let private seasonSidebar (seasons: SeasonDto list) (selectedSeason: int) (dispa
         prop.children [
             for season in seasons do
                 let isSelected = season.SeasonNumber = selectedSeason
-                let watchedCount = season.OverallWatchedCount
+                let watchedCount = season.WatchedCount
                 let totalCount = season.Episodes.Length
                 Html.button [
                     prop.className (
@@ -567,10 +567,6 @@ let private rewatchSessionPanel (series: SeriesDetail) (model: Model) (dispatch:
                 prop.children [
                     for session in series.RewatchSessions do
                         let isSelected = session.RewatchId = model.SelectedRewatchId || (session.IsDefault && model.SelectedRewatchId = "default")
-                        let label =
-                            match session.Name with
-                            | Some n -> n
-                            | None -> if session.IsDefault then "First Watch" else "Rewatch"
                         let pct =
                             if totalEpisodes = 0 then 0.0
                             else float session.WatchedCount / float totalEpisodes * 100.0
@@ -585,21 +581,17 @@ let private rewatchSessionPanel (series: SeriesDetail) (model: Model) (dispatch:
                                     prop.className "flex items-center justify-between mb-1"
                                     prop.children [
                                         Html.div [
-                                            prop.className "flex items-center gap-2"
+                                            prop.className "flex items-center gap-2 flex-wrap"
                                             prop.children [
-                                                Html.span [
-                                                    prop.className "font-semibold text-sm"
-                                                    prop.text label
-                                                ]
-                                                // Friend avatars
-                                                if not (List.isEmpty session.Friends) then
-                                                    Html.div [
-                                                        prop.className "flex -space-x-1"
-                                                        prop.children [
-                                                            for fr in session.Friends |> List.truncate 3 do
-                                                                friendAvatar "w-5 h-5" fr "bg-primary/20 text-[10px] font-bold text-primary border border-base-300"
-                                                        ]
+                                                if List.isEmpty session.Friends then
+                                                    Html.span [
+                                                        prop.className "font-semibold text-sm"
+                                                        prop.text "Personal"
                                                     ]
+                                                else
+                                                    for fr in session.Friends do
+                                                        FriendPill.viewWithRemove fr (fun slug ->
+                                                            dispatch (Remove_rewatch_friend (session.RewatchId, slug)))
                                             ]
                                         ]
                                         Html.div [
@@ -655,99 +647,116 @@ let private episodesTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
         series.Seasons
         |> List.tryFind (fun s -> s.SeasonNumber = model.SelectedSeason)
     Html.div [
-        prop.className "grid grid-cols-1 lg:grid-cols-12 gap-6"
+        prop.className "space-y-6"
         prop.children [
-            // Season sidebar with rewatch panel above
+            // Watch sessions at the top, full width
+            if series.RewatchSessions.Length > 0 then
+                rewatchSessionPanel series model dispatch
             Html.div [
-                prop.className "lg:col-span-3"
+                prop.className "grid grid-cols-1 lg:grid-cols-12 gap-6"
                 prop.children [
-                    if series.RewatchSessions.Length > 0 then
-                        rewatchSessionPanel series model dispatch
-                    seasonSidebar series.Seasons model.SelectedSeason dispatch
-                ]
-            ]
-            // Episode list
-            Html.div [
-                prop.className "lg:col-span-9"
-                prop.children [
-                    match selectedSeason with
-                    | None ->
-                        Html.p [
-                            prop.className "text-base-content/50"
-                            prop.text "Select a season to view episodes."
+                    // Season sidebar
+                    Html.div [
+                        prop.className "lg:col-span-3"
+                        prop.children [
+                            seasonSidebar series.Seasons model.SelectedSeason dispatch
                         ]
-                    | Some season ->
-                        Html.div [
-                            prop.className "space-y-4"
-                            prop.children [
-                                // Season header
+                    ]
+                    // Episode list
+                    Html.div [
+                        prop.className "lg:col-span-9"
+                        prop.children [
+                            match selectedSeason with
+                            | None ->
+                                Html.p [
+                                    prop.className "text-base-content/50"
+                                    prop.text "Select a season to view episodes."
+                                ]
+                            | Some season ->
                                 Html.div [
-                                    prop.className "flex items-center justify-between mb-2"
+                                    prop.className "space-y-4"
                                     prop.children [
+                                        // Season header
                                         Html.div [
+                                            prop.className "flex items-center justify-between mb-2"
                                             prop.children [
-                                                Html.h3 [
-                                                    prop.className "text-xl font-bold font-display"
-                                                    prop.text season.Name
+                                                Html.div [
+                                                    prop.children [
+                                                        Html.h3 [
+                                                            prop.className "text-xl font-bold font-display"
+                                                            prop.text season.Name
+                                                        ]
+                                                        Html.p [
+                                                            prop.className "text-sm text-base-content/50"
+                                                            prop.text $"{season.Episodes.Length} Episodes Total"
+                                                        ]
+                                                    ]
                                                 ]
-                                                Html.p [
-                                                    prop.className "text-sm text-base-content/50"
-                                                    prop.text $"{season.Episodes.Length} Episodes Total"
+                                                // Season trailer + Mark all / Unmark all
+                                                Html.div [
+                                                    prop.className "flex items-center gap-3"
+                                                    prop.children [
+                                                        match model.SeasonTrailerKeys |> Map.tryFind season.SeasonNumber with
+                                                        | Some key ->
+                                                            Html.button [
+                                                                prop.className "inline-flex items-center gap-1.5 bg-red-600/90 hover:bg-red-600 text-white px-3 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer"
+                                                                prop.onClick (fun _ -> dispatch (Open_trailer key))
+                                                                prop.children [
+                                                                    Icons.play ()
+                                                                    Html.span [ prop.text "Trailer" ]
+                                                                ]
+                                                            ]
+                                                        | None -> ()
+                                                        let allWatched = season.Episodes |> List.forall (fun e -> e.IsWatched)
+                                                        if allWatched then
+                                                            Daisy.button.button [
+                                                                button.sm
+                                                                button.ghost
+                                                                prop.className "text-error/70 hover:text-error"
+                                                                prop.onClick (fun _ -> dispatch (Mark_season_unwatched season.SeasonNumber))
+                                                                prop.text "Unmark All"
+                                                            ]
+                                                        else
+                                                            Daisy.button.button [
+                                                                button.sm
+                                                                button.primary
+                                                                button.outline
+                                                                prop.onClick (fun _ -> dispatch (Mark_season_watched season.SeasonNumber))
+                                                                prop.text "Mark All Watched"
+                                                            ]
+                                                    ]
                                                 ]
                                             ]
                                         ]
-                                        // Mark all / Unmark all
-                                        Html.div [
-                                            prop.className "flex items-center gap-3"
-                                            prop.children [
-                                                let allWatched = season.Episodes |> List.forall (fun e -> e.IsWatched)
-                                                if allWatched then
-                                                    Daisy.button.button [
-                                                        button.sm
-                                                        button.ghost
-                                                        prop.className "text-error/70 hover:text-error"
-                                                        prop.onClick (fun _ -> dispatch (Mark_season_unwatched season.SeasonNumber))
-                                                        prop.text "Unmark All"
+                                        // Find next episode for highlighting
+                                        let nextEp =
+                                            season.Episodes
+                                            |> List.tryFind (fun e -> not e.IsWatched)
+                                        // Episode cards with "Coming Next" divider
+                                        let mutable shownDivider = false
+                                        for ep in season.Episodes do
+                                            let isNext =
+                                                match nextEp with
+                                                | Some n -> n.EpisodeNumber = ep.EpisodeNumber
+                                                | None -> false
+                                            if isNext && not shownDivider && ep.EpisodeNumber > 1 then
+                                                shownDivider <- true
+                                                Html.div [
+                                                    prop.className "flex items-center gap-3 py-2"
+                                                    prop.children [
+                                                        Html.div [ prop.className "flex-grow h-px bg-primary/30" ]
+                                                        Html.span [
+                                                            prop.className "text-xs font-bold text-primary uppercase tracking-wider"
+                                                            prop.text "Coming Next"
+                                                        ]
+                                                        Html.div [ prop.className "flex-grow h-px bg-primary/30" ]
                                                     ]
-                                                else
-                                                    Daisy.button.button [
-                                                        button.sm
-                                                        button.primary
-                                                        button.outline
-                                                        prop.onClick (fun _ -> dispatch (Mark_season_watched season.SeasonNumber))
-                                                        prop.text "Mark All Watched"
-                                                    ]
-                                            ]
-                                        ]
+                                                ]
+                                            episodeCard season.SeasonNumber ep isNext model dispatch
                                     ]
                                 ]
-                                // Find next episode for highlighting
-                                let nextEp =
-                                    season.Episodes
-                                    |> List.tryFind (fun e -> not e.IsWatched)
-                                // Episode cards with "Coming Next" divider
-                                let mutable shownDivider = false
-                                for ep in season.Episodes do
-                                    let isNext =
-                                        match nextEp with
-                                        | Some n -> n.EpisodeNumber = ep.EpisodeNumber
-                                        | None -> false
-                                    if isNext && not shownDivider && ep.EpisodeNumber > 1 then
-                                        shownDivider <- true
-                                        Html.div [
-                                            prop.className "flex items-center gap-3 py-2"
-                                            prop.children [
-                                                Html.div [ prop.className "flex-grow h-px bg-primary/30" ]
-                                                Html.span [
-                                                    prop.className "text-xs font-bold text-primary uppercase tracking-wider"
-                                                    prop.text "Coming Next"
-                                                ]
-                                                Html.div [ prop.className "flex-grow h-px bg-primary/30" ]
-                                            ]
-                                        ]
-                                    episodeCard season.SeasonNumber ep isNext model dispatch
-                            ]
                         ]
+                    ]
                 ]
             ]
         ]
@@ -1138,6 +1147,18 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         Html.span [ prop.text $"{series.Seasons.Length} Seasons" ]
                                                     ]
                                                 ]
+                                                // Trailer button
+                                                match model.TrailerKey with
+                                                | Some key ->
+                                                    Html.button [
+                                                        prop.className "inline-flex items-center gap-2 bg-red-600/90 hover:bg-red-600 text-white px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
+                                                        prop.onClick (fun _ -> dispatch (Open_trailer key))
+                                                        prop.children [
+                                                            Icons.play ()
+                                                            Html.span [ prop.text "Play Trailer" ]
+                                                        ]
+                                                    ]
+                                                | None -> ()
                                             ]
                                         ]
                                         // Next Up card (bottom-right of hero, desktop only)
@@ -1222,6 +1243,35 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         (fun slug -> dispatch (Remove_rewatch_friend (rewatchId, slug)))
                         (fun name -> dispatch (Add_friend_and_add_to_session (rewatchId, name)))
                         (fun () -> dispatch Close_friend_picker)
+                | None -> ()
+                // Trailer modal
+                match model.ShowTrailer with
+                | Some key ->
+                    Html.div [
+                        prop.className "fixed inset-0 z-50 flex items-center justify-center"
+                        prop.children [
+                            Html.div [
+                                prop.className "absolute inset-0 bg-black/80"
+                                prop.onClick (fun _ -> dispatch Close_trailer)
+                            ]
+                            Html.div [
+                                prop.className "relative w-full max-w-4xl mx-4 aspect-video"
+                                prop.children [
+                                    Html.iframe [
+                                        prop.className "w-full h-full rounded-xl"
+                                        prop.src $"https://www.youtube.com/embed/{key}?autoplay=1&rel=0"
+                                        prop.custom ("allow", "autoplay; encrypted-media")
+                                        prop.custom ("allowFullScreen", true)
+                                    ]
+                                    Html.button [
+                                        prop.className "absolute -top-10 right-0 text-white/70 hover:text-white text-2xl font-bold cursor-pointer"
+                                        prop.onClick (fun _ -> dispatch Close_trailer)
+                                        prop.text "\u00D7"
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
                 | None -> ()
             ]
         ]

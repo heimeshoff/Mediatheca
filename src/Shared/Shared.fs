@@ -466,6 +466,8 @@ type IMediathecaApi = {
     testTmdbApiKey: string -> Async<Result<unit, string>>
     getFullCredits: int -> Async<Result<FullCreditsDto, string>>
     getMovieTrailer: int -> Async<string option>
+    getSeriesTrailer: int -> Async<string option>
+    getSeasonTrailer: int -> int -> Async<string option>
     // TV Series
     searchTvSeries: string -> Async<TmdbSearchResult list>
     addSeries: int -> Async<Result<string, string>>
