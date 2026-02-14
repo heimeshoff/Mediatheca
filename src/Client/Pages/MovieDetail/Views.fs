@@ -576,7 +576,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         ]
                         // Hero content at bottom
                         Html.div [
-                            prop.className "relative h-full flex items-end pb-8 lg:pb-12 px-4 lg:px-8"
+                            prop.className "relative h-full flex items-end pb-6 lg:pb-8 px-4 lg:px-8"
                             prop.children [
                                 Html.div [
                                     prop.className "flex gap-6 lg:gap-10 items-end w-full max-w-6xl mx-auto"
@@ -674,7 +674,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 ]
                 // ── Content Grid ──
                 Html.div [
-                    prop.className "max-w-6xl mx-auto px-4 lg:px-8 py-8 lg:py-12"
+                    prop.className "max-w-6xl mx-auto px-4 lg:px-8 pt-4 lg:pt-6 pb-8 lg:pb-12"
                     prop.children [
                         Html.div [
                             prop.className "grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10"
@@ -685,7 +685,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                     prop.children [
                                         // Catalogs
                                         Html.div [
-                                            prop.className "flex flex-wrap items-center gap-2 -mt-4"
+                                            prop.className "flex flex-wrap items-center gap-2"
                                             prop.children [
                                                 // Add to catalog button
                                                 Html.button [
