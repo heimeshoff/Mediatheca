@@ -27,6 +27,8 @@ type Model = {
     TrailerKey: string option
     SeasonTrailerKeys: Map<int, string>
     ShowTrailer: string option
+    // Session context menu
+    SessionMenuOpen: string option
     // Remove
     ConfirmingRemove: bool
     Error: string option
@@ -50,6 +52,9 @@ type Msg =
     | Update_episode_date of int * int * string
     | Cancel_edit_episode_date
     | Episode_date_updated of Result<unit, string>
+    // Session context menu
+    | Toggle_session_menu of rewatchId: string
+    | Close_session_menu
     // Rewatch session management
     | Create_rewatch_session
     | Rewatch_session_created of Result<string, string>

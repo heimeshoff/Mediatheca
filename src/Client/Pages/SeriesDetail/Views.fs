@@ -418,39 +418,11 @@ let private episodeCard
                                     prop.className "text-xs text-base-content/50 line-clamp-2"
                                     prop.text episode.Overview
                                 ]
-                            // Watched date display
-                            if episode.IsWatched then
-                                Html.div [
-                                    prop.className "mt-1"
-                                    prop.children [
-                                        if isEditingDate then
-                                            Daisy.input [
-                                                prop.className "w-36"
-                                                input.sm
-                                                prop.type' "date"
-                                                prop.autoFocus true
-                                                prop.value (episode.WatchedDate |> Option.defaultValue "")
-                                                prop.onChange (fun (v: string) ->
-                                                    dispatch (Update_episode_date (seasonNumber, episode.EpisodeNumber, v)))
-                                                prop.onBlur (fun _ ->
-                                                    dispatch Cancel_edit_episode_date)
-                                                prop.onKeyDown (fun e ->
-                                                    if e.key = "Escape" then
-                                                        dispatch Cancel_edit_episode_date)
-                                            ]
-                                        else
-                                            Html.span [
-                                                prop.className "text-xs text-base-content/40 cursor-pointer hover:text-primary transition-colors"
-                                                prop.onClick (fun _ -> dispatch (Edit_episode_date (seasonNumber, episode.EpisodeNumber)))
-                                                prop.text (episode.WatchedDate |> Option.defaultValue "No date")
-                                            ]
-                                    ]
-                                ]
                         ]
                     ]
-                    // Watch toggle button
+                    // Watch toggle button + date
                     Html.div [
-                        prop.className "flex items-center flex-shrink-0"
+                        prop.className "flex flex-col items-center justify-center flex-shrink-0 gap-1"
                         prop.children [
                             Html.button [
                                 prop.className (
@@ -494,6 +466,29 @@ let private episodeCard
                                         ]
                                 ]
                             ]
+                            // Watched date display
+                            if episode.IsWatched then
+                                if isEditingDate then
+                                    Daisy.input [
+                                        prop.className "w-28"
+                                        input.xs
+                                        prop.type' "date"
+                                        prop.autoFocus true
+                                        prop.value (episode.WatchedDate |> Option.defaultValue "")
+                                        prop.onChange (fun (v: string) ->
+                                            dispatch (Update_episode_date (seasonNumber, episode.EpisodeNumber, v)))
+                                        prop.onBlur (fun _ ->
+                                            dispatch Cancel_edit_episode_date)
+                                        prop.onKeyDown (fun e ->
+                                            if e.key = "Escape" then
+                                                dispatch Cancel_edit_episode_date)
+                                    ]
+                                else
+                                    Html.span [
+                                        prop.className "text-[10px] text-base-content/40 cursor-pointer hover:text-primary transition-colors"
+                                        prop.onClick (fun _ -> dispatch (Edit_episode_date (seasonNumber, episode.EpisodeNumber)))
+                                        prop.text (episode.WatchedDate |> Option.defaultValue "No date")
+                                    ]
                         ]
                     ]
                 ]
@@ -632,26 +627,63 @@ let private rewatchSessionPanel (series: SeriesDetail) (model: Model) (dispatch:
                                                             prop.className "font-semibold text-sm truncate"
                                                             prop.text sessionName
                                                         ]
+                                                        // Three-dots context menu
                                                         Html.div [
-                                                            prop.className "flex items-center gap-1 flex-shrink-0"
+                                                            prop.className "relative flex-shrink-0"
                                                             prop.children [
-                                                                if isSelected then
-                                                                    Html.button [
-                                                                        prop.className "w-6 h-6 flex items-center justify-center text-base-content/40 hover:text-primary transition-colors cursor-pointer"
-                                                                        prop.title "Manage friends"
-                                                                        prop.onClick (fun e ->
-                                                                            e.stopPropagation()
-                                                                            dispatch (Open_friend_picker (Session_friend_picker session.RewatchId)))
-                                                                        prop.children [ Icons.friends () ]
+                                                                Html.button [
+                                                                    prop.className "w-6 h-6 flex items-center justify-center text-base-content/40 hover:text-base-content transition-colors cursor-pointer rounded-full hover:bg-base-content/10"
+                                                                    prop.onClick (fun e ->
+                                                                        e.stopPropagation()
+                                                                        dispatch (Toggle_session_menu session.RewatchId))
+                                                                    prop.children [
+                                                                        Svg.svg [
+                                                                            svg.className "w-4 h-4"
+                                                                            svg.fill "currentColor"
+                                                                            svg.viewBox (0, 0, 20, 20)
+                                                                            svg.children [
+                                                                                Svg.path [
+                                                                                    svg.d "M10 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 12a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 18a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"
+                                                                                ]
+                                                                            ]
+                                                                        ]
                                                                     ]
-                                                                if not session.IsDefault then
-                                                                    Html.button [
-                                                                        prop.className "w-6 h-6 flex items-center justify-center text-base-content/30 opacity-0 group-hover:opacity-100 transition-opacity hover:text-error cursor-pointer"
-                                                                        prop.title "Remove session"
-                                                                        prop.onClick (fun e ->
-                                                                            e.stopPropagation()
-                                                                            dispatch (Remove_rewatch_session session.RewatchId))
-                                                                        prop.children [ Icons.trash () ]
+                                                                ]
+                                                                // Dropdown menu
+                                                                if model.SessionMenuOpen = Some session.RewatchId then
+                                                                    Html.div [
+                                                                        prop.className "absolute right-0 top-full mt-1 z-50 min-w-[160px] rating-dropdown py-1"
+                                                                        prop.children [
+                                                                            Html.button [
+                                                                                prop.className "w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-base-content/10 transition-colors cursor-pointer"
+                                                                                prop.onClick (fun e ->
+                                                                                    e.stopPropagation()
+                                                                                    dispatch Close_session_menu
+                                                                                    dispatch (Open_friend_picker (Session_friend_picker session.RewatchId)))
+                                                                                prop.children [
+                                                                                    Html.span [
+                                                                                        prop.className "w-4 h-4 text-base-content/60"
+                                                                                        prop.children [ Icons.friends () ]
+                                                                                    ]
+                                                                                    Html.span [ prop.text "Manage friends" ]
+                                                                                ]
+                                                                            ]
+                                                                            if not session.IsDefault then
+                                                                                Html.button [
+                                                                                    prop.className "w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-error/15 text-error/70 hover:text-error transition-colors cursor-pointer"
+                                                                                    prop.onClick (fun e ->
+                                                                                        e.stopPropagation()
+                                                                                        dispatch Close_session_menu
+                                                                                        dispatch (Remove_rewatch_session session.RewatchId))
+                                                                                    prop.children [
+                                                                                        Html.span [
+                                                                                            prop.className "w-4 h-4"
+                                                                                            prop.children [ Icons.trash () ]
+                                                                                        ]
+                                                                                        Html.span [ prop.text "Delete session" ]
+                                                                                    ]
+                                                                                ]
+                                                                        ]
                                                                     ]
                                                             ]
                                                         ]
