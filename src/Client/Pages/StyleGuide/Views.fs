@@ -1462,17 +1462,12 @@ let private layoutToggle (active: EntryListLayout) (onSwitch: EntryListLayout ->
         ]
     ]
 
-[<ReactComponent>]
-let private sortButton (sort: SortState) (onSort: SortState -> unit) =
-    let isOpen, setIsOpen = React.useState false
-
+let private sortButton (sort: SortState) (onSort: SortState -> unit) (isOpen: bool) (setIsOpen: bool -> unit) =
     let selectField field =
         if sort.Field = field then
-            // Same field: toggle direction
             let newDir = if sort.Direction = Ascending then Descending else Ascending
             onSort { sort with Direction = newDir }
         else
-            // New field: use its default direction
             onSort { Field = field; Direction = defaultDirectionFor field }
         setIsOpen false
 
@@ -1615,6 +1610,7 @@ let private listView (entries: MockEntry list) =
 let private entryListDemo () =
     let layout, setLayout = React.useState Gallery
     let sort, setSort = React.useState { Field = ByReleaseDate; Direction = Descending }
+    let sortOpen, setSortOpen = React.useState false
 
     let sorted = sortEntries sort mockEntries
 
@@ -1631,7 +1627,7 @@ let private entryListDemo () =
                     Html.div [
                         prop.className "flex items-center gap-2"
                         prop.children [
-                            sortButton sort setSort
+                            sortButton sort setSort sortOpen setSortOpen
                             layoutToggle layout setLayout
                         ]
                     ]
