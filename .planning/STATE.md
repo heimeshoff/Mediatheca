@@ -6,6 +6,7 @@
 
 ## Recent Progress
 
+- **2026-02-14**: Changed card hover animation from lift (translateY) to subtle scale (towards viewer)
 - **2026-02-14**: Redesigned content blocks — removed card styling, removed link subtype, inline markdown links
   - Blocks render as plain text on background (no cards, no glass effects)
   - Removed "link" as a separate block type; all blocks are text blocks
