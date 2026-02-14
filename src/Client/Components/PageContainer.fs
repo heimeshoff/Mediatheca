@@ -2,10 +2,11 @@ module Mediatheca.Client.Components.PageContainer
 
 open Feliz
 open Feliz.DaisyUI
+open Mediatheca.Client
 
 let view (title: string) (children: ReactElement list) =
     Html.div [
-        prop.className "p-4 lg:p-6"
+        prop.className DesignSystem.pagePadding
         prop.children [
             Html.h1 [
                 prop.className "text-2xl font-bold mb-6"

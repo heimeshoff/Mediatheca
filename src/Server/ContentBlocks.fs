@@ -21,6 +21,7 @@ module ContentBlocks =
         | Content_block_added of ContentBlockData * position: int * sessionId: string option
         | Content_block_updated of blockId: string * content: string * imageRef: string option * url: string option * caption: string option
         | Content_block_removed of blockId: string
+        | Content_block_type_changed of blockId: string * blockType: string
         | Content_blocks_reordered of blockIds: string list * sessionId: string option
 
     // State
@@ -47,6 +48,7 @@ module ContentBlocks =
         | Add_content_block of ContentBlockData * sessionId: string option
         | Update_content_block of blockId: string * content: string * imageRef: string option * url: string option * caption: string option
         | Remove_content_block of blockId: string
+        | Change_content_block_type of blockId: string * blockType: string
         | Reorder_content_blocks of blockIds: string list * sessionId: string option
 
     // Evolve
@@ -73,6 +75,12 @@ module ContentBlocks =
             | None -> state
         | Content_block_removed bid ->
             { state with Blocks = state.Blocks |> Map.remove bid }
+        | Content_block_type_changed (bid, blockType) ->
+            match state.Blocks |> Map.tryFind bid with
+            | Some block ->
+                let updated = { block with BlockType = blockType }
+                { state with Blocks = state.Blocks |> Map.add bid updated }
+            | None -> state
         | Content_blocks_reordered (bids, sid) ->
             let updatedBlocks =
                 bids
@@ -113,6 +121,11 @@ module ContentBlocks =
                 Ok [ Content_block_removed bid ]
             else
                 Ok []
+        | Change_content_block_type (bid, blockType) ->
+            if state.Blocks |> Map.containsKey bid then
+                Ok [ Content_block_type_changed (bid, blockType) ]
+            else
+                Error $"Block with id '{bid}' does not exist"
         | Reorder_content_blocks (bids, sid) ->
             let allExist = bids |> List.forall (fun bid -> state.Blocks |> Map.containsKey bid)
             if not allExist then
@@ -166,6 +179,11 @@ module ContentBlocks =
                 ])
             | Content_block_removed blockId ->
                 "Content_block_removed", Encode.toString 0 (Encode.object [ "blockId", Encode.string blockId ])
+            | Content_block_type_changed (blockId, blockType) ->
+                "Content_block_type_changed", Encode.toString 0 (Encode.object [
+                    "blockId", Encode.string blockId
+                    "blockType", Encode.string blockType
+                ])
             | Content_blocks_reordered (blockIds, sessionId) ->
                 "Content_blocks_reordered", Encode.toString 0 (Encode.object [
                     "blockIds", blockIds |> List.map Encode.string |> Encode.list
@@ -198,6 +216,14 @@ module ContentBlocks =
                 Decode.fromString (Decode.field "blockId" Decode.string) data
                 |> Result.toOption
                 |> Option.map Content_block_removed
+            | "Content_block_type_changed" ->
+                let decoder =
+                    Decode.object (fun get ->
+                        let blockId = get.Required.Field "blockId" Decode.string
+                        let blockType = get.Required.Field "blockType" Decode.string
+                        Content_block_type_changed (blockId, blockType))
+                Decode.fromString decoder data
+                |> Result.toOption
             | "Content_blocks_reordered" ->
                 let decoder =
                     Decode.object (fun get ->

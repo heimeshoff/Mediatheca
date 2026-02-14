@@ -119,7 +119,9 @@ type RecordWatchSessionRequest = {
 type ContentBlockType =
     | TextBlock
     | ImageBlock
-    | LinkBlock
+    | QuoteBlock
+    | CalloutBlock
+    | CodeBlock
 
 type ContentBlockDto = {
     BlockId: string
@@ -192,6 +194,12 @@ type AddCatalogEntryRequest = {
 
 type UpdateCatalogEntryRequest = {
     Note: string option
+}
+
+type CatalogRef = {
+    Slug: string
+    Name: string
+    EntryId: string
 }
 
 // Dashboard
@@ -297,6 +305,7 @@ type IMediathecaApi = {
     addContentBlock: string -> string option -> AddContentBlockRequest -> Async<Result<string, string>>
     updateContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
     removeContentBlock: string -> string -> Async<Result<unit, string>>
+    changeContentBlockType: string -> string -> string -> Async<Result<unit, string>>
     reorderContentBlocks: string -> string option -> string list -> Async<Result<unit, string>>
     getContentBlocks: string -> string option -> Async<ContentBlockDto list>
     uploadContentImage: byte array -> string -> Async<Result<string, string>>
@@ -310,6 +319,7 @@ type IMediathecaApi = {
     updateCatalogEntry: string -> string -> UpdateCatalogEntryRequest -> Async<Result<unit, string>>
     removeCatalogEntry: string -> string -> Async<Result<unit, string>>
     reorderCatalogEntries: string -> string list -> Async<Result<unit, string>>
+    getCatalogsForMovie: string -> Async<CatalogRef list>
     // Dashboard
     getDashboardStats: unit -> Async<DashboardStats>
     getRecentActivity: int -> Async<RecentActivityItem list>

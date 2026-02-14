@@ -3,6 +3,7 @@ module Mediatheca.Client.Pages.EventBrowser.Views
 open Feliz
 open Feliz.DaisyUI
 open Mediatheca.Client.Pages.EventBrowser.Types
+open Mediatheca.Client
 open Mediatheca.Client.Components
 
 let private eventRow (event: Mediatheca.Shared.EventDto) (isExpanded: bool) (dispatch: Msg -> unit) =
@@ -60,7 +61,7 @@ let private eventRow (event: Mediatheca.Shared.EventDto) (isExpanded: bool) (dis
             ]
             if isExpanded then
                 Html.div [
-                    prop.className "px-4 pb-3 animate-fade-in"
+                    prop.className ("px-4 pb-3 " + DesignSystem.animateFadeIn)
                     prop.children [
                         Html.pre [
                             prop.className "bg-base-300/50 rounded-lg p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-all"
@@ -80,7 +81,7 @@ let private eventRow (event: Mediatheca.Shared.EventDto) (isExpanded: bool) (dis
 
 let view (model: Model) (dispatch: Msg -> unit) =
     Html.div [
-        prop.className "p-4 lg:p-6 animate-fade-in"
+        prop.className (DesignSystem.pagePadding + " " + DesignSystem.animateFadeIn)
         prop.children [
             Html.h1 [
                 prop.className "text-2xl font-bold font-display text-gradient-primary mb-6"

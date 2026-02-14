@@ -6,6 +6,9 @@ type Model = {
     Slug: string
     Movie: MovieDetail option
     AllFriends: FriendListItem list
+    AllCatalogs: CatalogListItem list
+    MovieCatalogs: CatalogRef list
+    ShowCatalogPicker: bool
     IsLoading: bool
     ShowFriendPicker: FriendPickerKind option
     EditingSessionDate: string option
@@ -49,6 +52,8 @@ type Msg =
     | Add_content_block of AddContentBlockRequest
     | Update_content_block of blockId: string * UpdateContentBlockRequest
     | Remove_content_block of blockId: string
+    | Change_content_block_type of blockId: string * blockType: string
+    | Reorder_content_blocks of blockIds: string list
     | Content_block_result of Result<unit, string>
     | Add_friend_and_recommend of name: string
     | Friend_and_recommend_result of Result<unit, string>
@@ -62,3 +67,11 @@ type Msg =
     | Toggle_rating_dropdown
     | Set_personal_rating of int
     | Personal_rating_result of Result<unit, string>
+    | Catalogs_loaded of CatalogListItem list
+    | Movie_catalogs_loaded of CatalogRef list
+    | Open_catalog_picker
+    | Close_catalog_picker
+    | Add_to_catalog of catalogSlug: string
+    | Remove_from_catalog of catalogSlug: string * entryId: string
+    | Create_catalog_and_add of name: string
+    | Catalog_result of Result<unit, string>

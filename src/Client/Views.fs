@@ -42,6 +42,8 @@ let private pageContent (model: Model) (dispatch: Msg -> unit) =
         Pages.EventBrowser.Views.view model.EventBrowserModel (Event_browser_msg >> dispatch)
     | Settings ->
         Pages.Settings.Views.view model.SettingsModel (Settings_msg >> dispatch)
+    | Styleguide ->
+        Pages.StyleGuide.Views.view model.StyleGuideModel (Styleguide_msg >> dispatch)
     | Not_found ->
         Pages.NotFound.Views.view ()
 

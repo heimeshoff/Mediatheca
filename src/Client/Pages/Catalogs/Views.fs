@@ -4,6 +4,7 @@ open Feliz
 open Feliz.DaisyUI
 open Feliz.Router
 open Mediatheca.Client.Pages.Catalogs.Types
+open Mediatheca.Client
 open Mediatheca.Client.Components
 
 let private catalogCard (catalog: Mediatheca.Shared.CatalogListItem) =
@@ -69,7 +70,7 @@ let private catalogCard (catalog: Mediatheca.Shared.CatalogListItem) =
 
 let view (model: Model) (dispatch: Msg -> unit) =
     Html.div [
-        prop.className "p-4 lg:p-6 animate-fade-in"
+        prop.className (DesignSystem.pagePadding + " " + DesignSystem.animateFadeIn)
         prop.children [
             Html.div [
                 prop.className "flex items-center justify-between mb-6"
@@ -91,7 +92,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
             // Create catalog form
             if model.ShowCreateForm then
                 Daisy.card [
-                    prop.className "bg-base-100 shadow-md mb-6 animate-scale-in"
+                    prop.className ("bg-base-100 shadow-md mb-6 " + DesignSystem.animateScaleIn)
                     prop.children [
                         Daisy.cardBody [
                             prop.children [
@@ -159,7 +160,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 ]
             else if List.isEmpty model.Catalogs then
                 Html.div [
-                    prop.className "text-center py-20 animate-fade-in"
+                    prop.className ("text-center py-20 " + DesignSystem.animateFadeIn)
                     prop.children [
                         Html.div [
                             prop.className "text-base-content/20 mb-4"
@@ -192,7 +193,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 ]
             else
                 Html.div [
-                    prop.className "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger-grid"
+                    prop.className ("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 " + DesignSystem.staggerGrid)
                     prop.children [
                         for catalog in model.Catalogs do
                             catalogCard catalog

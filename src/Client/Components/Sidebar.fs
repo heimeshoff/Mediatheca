@@ -3,6 +3,7 @@ module Mediatheca.Client.Components.Sidebar
 open Feliz
 open Feliz.DaisyUI
 open Feliz.Router
+open Mediatheca.Client
 open Mediatheca.Client.Router
 
 type NavItem = {
@@ -51,13 +52,7 @@ let view (currentPage: Page) =
                                 let isActive = item.IsActive currentPage
                                 Html.li [
                                     Html.a [
-                                        prop.className (
-                                            "nav-glow flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 "
-                                            + if isActive then
-                                                "active bg-primary/10 text-primary"
-                                              else
-                                                "text-base-content/70 hover:text-base-content hover:bg-base-300/50"
-                                        )
+                                        prop.className (DesignSystem.navItemClass isActive)
                                         prop.href item.Href
                                         prop.onClick (fun e ->
                                             e.preventDefault()

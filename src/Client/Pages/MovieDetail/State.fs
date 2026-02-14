@@ -8,6 +8,9 @@ let init (slug: string) : Model * Cmd<Msg> =
     { Slug = slug
       Movie = None
       AllFriends = []
+      AllCatalogs = []
+      MovieCatalogs = []
+      ShowCatalogPicker = false
       IsLoading = true
       ShowFriendPicker = None
       EditingSessionDate = None
@@ -28,6 +31,8 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         Cmd.batch [
             Cmd.OfAsync.perform api.getMovie slug Movie_loaded
             Cmd.OfAsync.perform api.getFriends () Friends_loaded
+            Cmd.OfAsync.perform api.getCatalogs () Catalogs_loaded
+            Cmd.OfAsync.perform api.getCatalogsForMovie slug Movie_catalogs_loaded
         ]
 
     | Movie_loaded movie ->
@@ -162,6 +167,20 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             ()
             Content_block_result
 
+    | Change_content_block_type (blockId, blockType) ->
+        model,
+        Cmd.OfAsync.perform
+            (fun () -> api.changeContentBlockType model.Slug blockId blockType)
+            ()
+            Content_block_result
+
+    | Reorder_content_blocks blockIds ->
+        model,
+        Cmd.OfAsync.perform
+            (fun () -> api.reorderContentBlocks model.Slug None blockIds)
+            ()
+            Content_block_result
+
     | Content_block_result (Ok _) ->
         model, Cmd.OfAsync.perform api.getMovie model.Slug Movie_loaded
 
@@ -251,4 +270,66 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         model, Cmd.OfAsync.perform api.getMovie model.Slug Movie_loaded
 
     | Personal_rating_result (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Catalogs_loaded catalogs ->
+        { model with AllCatalogs = catalogs }, Cmd.none
+
+    | Movie_catalogs_loaded catalogs ->
+        { model with MovieCatalogs = catalogs }, Cmd.none
+
+    | Open_catalog_picker ->
+        { model with ShowCatalogPicker = true }, Cmd.none
+
+    | Close_catalog_picker ->
+        { model with ShowCatalogPicker = false }, Cmd.none
+
+    | Add_to_catalog catalogSlug ->
+        let request: AddCatalogEntryRequest = {
+            MovieSlug = model.Slug
+            Note = None
+        }
+        model,
+        Cmd.OfAsync.either
+            (fun () -> async {
+                match! api.addCatalogEntry catalogSlug request with
+                | Ok _ -> return Ok ()
+                | Error e -> return Error e
+            }) () Catalog_result (fun ex -> Catalog_result (Error ex.Message))
+
+    | Remove_from_catalog (catalogSlug, entryId) ->
+        model,
+        Cmd.OfAsync.either
+            (fun () -> api.removeCatalogEntry catalogSlug entryId)
+            () Catalog_result (fun ex -> Catalog_result (Error ex.Message))
+
+    | Create_catalog_and_add name ->
+        let request: CreateCatalogRequest = {
+            Name = name
+            Description = ""
+            IsSorted = false
+        }
+        model,
+        Cmd.OfAsync.either
+            (fun () -> async {
+                match! api.createCatalog request with
+                | Ok slug ->
+                    let entryReq: AddCatalogEntryRequest = {
+                        MovieSlug = model.Slug
+                        Note = None
+                    }
+                    match! api.addCatalogEntry slug entryReq with
+                    | Ok _ -> return Ok ()
+                    | Error e -> return Error e
+                | Error e -> return Error e
+            }) () Catalog_result (fun ex -> Catalog_result (Error ex.Message))
+
+    | Catalog_result (Ok ()) ->
+        model,
+        Cmd.batch [
+            Cmd.OfAsync.perform api.getCatalogs () Catalogs_loaded
+            Cmd.OfAsync.perform api.getCatalogsForMovie model.Slug Movie_catalogs_loaded
+        ]
+
+    | Catalog_result (Error err) ->
         { model with Error = Some err }, Cmd.none

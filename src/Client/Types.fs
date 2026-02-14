@@ -14,6 +14,7 @@ type Model = {
     CatalogDetailModel: Pages.CatalogDetail.Types.Model
     EventBrowserModel: Pages.EventBrowser.Types.Model
     SettingsModel: Pages.Settings.Types.Model
+    StyleGuideModel: Pages.StyleGuide.Types.Model
     SearchModal: SearchModal.Model option
 }
 
@@ -30,3 +31,4 @@ type Msg =
     | Catalog_detail_msg of Pages.CatalogDetail.Types.Msg
     | Event_browser_msg of Pages.EventBrowser.Types.Msg
     | Settings_msg of Pages.Settings.Types.Msg
+    | Styleguide_msg of Pages.StyleGuide.Types.Msg

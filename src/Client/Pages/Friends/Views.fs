@@ -4,6 +4,7 @@ open Feliz
 open Feliz.DaisyUI
 open Feliz.Router
 open Mediatheca.Client.Pages.Friends.Types
+open Mediatheca.Client
 open Mediatheca.Client.Components
 
 let private friendCard (friend: Mediatheca.Shared.FriendListItem) (_dispatch: Msg -> unit) =
@@ -53,7 +54,7 @@ let private friendCard (friend: Mediatheca.Shared.FriendListItem) (_dispatch: Ms
 
 let view (model: Model) (dispatch: Msg -> unit) =
     Html.div [
-        prop.className "p-4 lg:p-6 animate-fade-in"
+        prop.className (DesignSystem.pagePadding + " " + DesignSystem.animateFadeIn)
         prop.children [
             Html.div [
                 prop.className "flex items-center justify-between mb-6"
@@ -75,7 +76,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
             // Add friend form
             if model.ShowAddForm then
                 Daisy.card [
-                    prop.className "bg-base-100 shadow-md mb-6 animate-scale-in"
+                    prop.className ("bg-base-100 shadow-md mb-6 " + DesignSystem.animateScaleIn)
                     prop.children [
                         Daisy.cardBody [
                             prop.children [
@@ -123,7 +124,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 ]
             else if List.isEmpty model.Friends then
                 Html.div [
-                    prop.className "text-center py-20 animate-fade-in"
+                    prop.className ("text-center py-20 " + DesignSystem.animateFadeIn)
                     prop.children [
                         Html.div [
                             prop.className "text-base-content/20 mb-4"
@@ -156,7 +157,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 ]
             else
                 Html.div [
-                    prop.className "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 stagger-grid"
+                    prop.className ("grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 " + DesignSystem.staggerGrid)
                     prop.children [
                         for friend in model.Friends do
                             friendCard friend dispatch

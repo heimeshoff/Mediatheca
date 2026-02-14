@@ -1,11 +1,38 @@
 # Current State
 
-**Last Updated:** 2026-02-08
-**Current Phase:** 4 (Curation + Dashboards + Admin) — Complete
-**Current Task:** All v1 MVP phases complete
+**Last Updated:** 2026-02-14
+**Current Phase:** 5 (Design System / Style Guide) — Complete
+**Current Task:** All v1 phases + Phase 5 complete
 
 ## Recent Progress
 
+- **2026-02-14**: Added catalog picker to movie detail page
+  - Glass "Add to Catalog" button next to Play Trailer in hero section
+  - Modal with search/filter for catalogs (same pattern as friend picker)
+  - Create new catalogs inline from the picker modal
+  - Removable ghost pills showing current catalog memberships
+  - New `CatalogRef` type and `getCatalogsForMovie` API endpoint
+  - Server-side query joins catalog_entries with catalog_list
+- **2026-02-14**: Changed card hover animation from lift (translateY) to subtle scale (towards viewer)
+- **2026-02-14**: Redesigned content blocks — removed card styling, removed link subtype, inline markdown links
+  - Blocks render as plain text on background (no cards, no glass effects)
+  - Removed "link" as a separate block type; all blocks are text blocks
+  - Inline links via markdown `[text](url)` syntax, rendered as clickable `<a>` tags
+  - Smart paste preserved: select text + paste URL creates inline `[text](url)` link
+  - Replaced "+" button with always-visible "new block" watermark placeholder
+  - Legacy link blocks auto-converted to inline markdown format on display
+  - Updated Style Guide section to reflect new design
+- **2026-02-14**: Added Content Blocks section to Style Guide
+  - Live interactive demo with mock data (add, edit, remove text/link blocks)
+  - Block type documentation (text, link, image)
+  - API reference and interaction patterns (Enter, Escape, smart paste)
+  - Design decision callouts (inline editing, smart paste, glass subtle styling)
+- **2026-02-14**: New Phase 5 — Design System (Style Guide) added to plan (REQ-029 through REQ-033)
+  - Style Guide page at `/styleguide` as single source of truth for components and design tokens
+  - Component catalog with parametrizations and design decision explanations
+  - Design token documentation (typography, colors, spacing, shapes, glassmorphism)
+  - Extract canonical definitions so app pages consume from Style Guide
+  - Skills/agents for propagating Style Guide changes to application pages
 - **2026-02-14**: Fix rating dropdown z-index — rendered below Recommended By card
   - Root cause: `backdrop-filter` on `glassCard` creates stacking context, trapping dropdown's `z-50`
   - Fix: render dropdown as sibling to glassCard, wrapped in plain `relative` container (no backdrop-filter)
@@ -86,6 +113,8 @@
 - "Collection" renamed to "Catalog" throughout the codebase (decided: 2026-02-08)
 - Catalogs are a separate aggregate (stream: Catalog-{slug}), entries reference movies by slug (decided: 2026-02-08)
 - Catalog entries prevent duplicate movies per catalog (decided: 2026-02-08)
+- Design system uses two layers: CSS custom properties for raw tokens (opacities, blur, spacing, radii) in index.css, F# module (DesignSystem.fs) for typed compositions (class combinations like glassCard, sectionHeader) — Option C (decided: 2026-02-14)
+- REQ-033 skill is an enforcement/audit tool (`/design-check`): scans client files for hardcoded classes that should use DesignSystem.fs or CSS tokens, verifies new components follow design system rules — not a migration tool (decided: 2026-02-14)
 
 ## Domain Model — Phase 4 (Implemented)
 
@@ -129,10 +158,12 @@ Events: Friend_added, Friend_updated, Friend_removed
 - 2026-02-08 Frontend visual refresh, Movies rename, snake_case convention
 - 2026-02-08 Phase 3 implementation complete — all 6 requirements done (REQ-016 through REQ-021)
 - 2026-02-08 Phase 4 implementation complete — all 7 requirements done (REQ-022 through REQ-028)
+- 2026-02-14 Phase 5 (Design System / Style Guide) complete — all 5 requirements done (REQ-029 through REQ-033)
 
 ## Next Actions
 
-v1 MVP is complete! All 4 phases implemented. Consider:
-1. v2 features (TV Series, Games, Books, Integrations)
-2. Polish and bug fixes
-3. Production deployment testing
+Phase 5 complete! Consider:
+1. Use `/design-check` to audit design system compliance
+2. Visit `/styleguide` to review and refine the design system
+3. v2 features (TV Series, Games, Books, Integrations)
+4. Polish and bug fixes

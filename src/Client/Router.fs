@@ -12,6 +12,7 @@ type Page =
     | Catalog_detail of slug: string
     | Event_browser
     | Settings
+    | Styleguide
     | Not_found
 
 module Route =
@@ -26,6 +27,7 @@ module Route =
         | [ "catalogs"; slug ] -> Catalog_detail slug
         | [ "events" ] -> Event_browser
         | [ "settings" ] -> Settings
+        | [ "styleguide" ] -> Styleguide
         | _ -> Not_found
 
     let toUrl (page: Page) =
@@ -39,6 +41,7 @@ module Route =
         | Catalog_detail slug -> Router.format ("catalogs", slug)
         | Event_browser -> Router.format "events"
         | Settings -> Router.format "settings"
+        | Styleguide -> Router.format "styleguide"
         | Not_found -> Router.format "not-found"
 
     let isMoviesSection (page: Page) =

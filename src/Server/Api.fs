@@ -453,6 +453,19 @@ module Api =
                         projectionHandlers
             }
 
+            changeContentBlockType = fun slug blockId blockType -> async {
+                let sid = ContentBlocks.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Change_content_block_type (blockId, blockType))
+                        projectionHandlers
+            }
+
             reorderContentBlocks = fun slug sessionId blockIds -> async {
                 let sid = ContentBlocks.streamId slug
                 return
@@ -612,6 +625,10 @@ module Api =
                         Catalogs.Serialization.toEventData
                         (Catalogs.Reorder_entries entryIds)
                         projectionHandlers
+            }
+
+            getCatalogsForMovie = fun movieSlug -> async {
+                return CatalogProjection.getCatalogsForMovie conn movieSlug
             }
 
             // Dashboard
