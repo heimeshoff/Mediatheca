@@ -914,9 +914,10 @@ module Api =
                         let! posterRef, backdropRef =
                             Tmdb.downloadSeriesImages httpClient tmdbConfig slug details.PosterPath details.BackdropPath imageBasePath
 
-                        // Fetch season details with episodes
+                        // Fetch season details with episodes (skip Specials / season 0)
                         let! seasons =
                             details.Seasons
+                            |> List.filter (fun s -> s.SeasonNumber > 0)
                             |> List.map (fun seasonSummary -> async {
                                 let! seasonResult = Tmdb.getTvSeasonDetails httpClient tmdbConfig tmdbId seasonSummary.SeasonNumber
                                 match seasonResult with
