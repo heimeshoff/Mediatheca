@@ -6,6 +6,14 @@
 
 ## Recent Progress
 
+- **2026-02-14**: Search modal two-column layout with keyboard navigation
+  - TMDB results split into Movies (left) and Series (right) columns with divider
+  - Full keyboard nav: ↑↓ navigate rows, ←→ switch columns, Enter imports, Esc closes
+  - Selection highlighting with ring + background, auto-scroll into view
+  - ReactComponent with local useState for selection (no Elmish roundtrip)
+  - Left/Right arrow only captured when selection is active (preserves cursor movement)
+  - Selection resets on new query, keyboard hints shown in modal footer
+  - Widened modal to max-w-4xl for two-column layout
 - **2026-02-14**: Unified search modal (Ctrl+K) for movies and TV series
   - Added MediaType to TmdbSearchResult shared type
   - Search modal now queries both TMDB movie and TV search APIs in parallel
