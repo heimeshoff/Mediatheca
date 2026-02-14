@@ -108,6 +108,9 @@ let calloutBlock () =
 let codeBlock () =
     svgIconSm "M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5"
 
+let tv () =
+    svgIcon "M6 20h12M9 20V17h6v3M4 4h16a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1z"
+
 let arrowsUpDown () =
     svgIcon "M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5"
 

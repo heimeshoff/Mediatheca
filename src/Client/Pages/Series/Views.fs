@@ -1,0 +1,217 @@
+module Mediatheca.Client.Pages.Series.Views
+
+open Feliz
+open Feliz.DaisyUI
+open Feliz.Router
+open Mediatheca.Shared
+open Mediatheca.Client.Pages.Series.Types
+open Mediatheca.Client
+open Mediatheca.Client.Components
+
+let private statusBadge (status: SeriesStatus) =
+    let (color, label) =
+        match status with
+        | Returning -> ("badge-success", "Returning")
+        | Ended -> ("badge-ghost", "Ended")
+        | Canceled -> ("badge-error", "Canceled")
+        | InProduction -> ("badge-warning", "In Production")
+        | Planned -> ("badge-info", "Planned")
+        | UnknownStatus -> ("badge-ghost", "Unknown")
+    Html.span [ prop.className $"badge badge-sm {color}"; prop.text label ]
+
+let private seriesCard (series: SeriesListItem) =
+    let progressText = $"{series.WatchedEpisodeCount}/{series.EpisodeCount} episodes"
+    let nextUpText =
+        match series.NextUp with
+        | Some n -> Some $"Next: S{n.SeasonNumber}E{n.EpisodeNumber}"
+        | None -> None
+    Html.a [
+        prop.href (Router.format ("series", series.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("series", series.Slug))
+        prop.children [
+            Html.div [
+                prop.className (DesignSystem.posterCard + " group relative cursor-pointer w-full")
+                prop.children [
+                    Html.div [
+                        prop.className DesignSystem.posterImageContainer
+                        prop.children [
+                            match series.PosterRef with
+                            | Some ref ->
+                                Html.img [
+                                    prop.src $"/images/{ref}"
+                                    prop.alt series.Name
+                                    prop.className DesignSystem.posterImage
+                                ]
+                            | None ->
+                                Html.div [
+                                    prop.className "flex items-center justify-center w-full h-full text-base-content/20"
+                                    prop.children [ Icons.tv () ]
+                                ]
+
+                            // Status badge (top-right)
+                            Html.div [
+                                prop.className "absolute top-2 right-2 z-10"
+                                prop.children [ statusBadge series.Status ]
+                            ]
+
+                            // Bottom gradient + title overlay (visible on hover)
+                            Html.div [
+                                prop.className "poster-overlay absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/70 to-transparent"
+                            ]
+                            Html.div [
+                                prop.className "poster-overlay absolute inset-x-0 bottom-0 p-3"
+                                prop.children [
+                                    Html.p [
+                                        prop.className "text-white text-xs font-medium line-clamp-2 drop-shadow-md"
+                                        prop.text series.Name
+                                    ]
+                                    Html.p [
+                                        prop.className "text-white/70 text-xs mt-0.5"
+                                        prop.text (string series.Year)
+                                    ]
+                                ]
+                            ]
+
+                            // Shine effect
+                            Html.div [ prop.className DesignSystem.posterShine ]
+                        ]
+                    ]
+                    // Info below the poster
+                    Html.div [
+                        prop.className "mt-2 px-1"
+                        prop.children [
+                            Html.p [
+                                prop.className "text-xs text-base-content/50"
+                                prop.text progressText
+                            ]
+                            match nextUpText with
+                            | Some text ->
+                                Html.p [
+                                    prop.className "text-xs text-primary font-medium mt-0.5"
+                                    prop.text text
+                                ]
+                            | None -> ()
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+let view (model: Model) (dispatch: Msg -> unit) =
+    Html.div [
+        prop.className (DesignSystem.pagePadding + " " + DesignSystem.animateFadeIn)
+        prop.children [
+            Html.div [
+                prop.className "flex items-center justify-between mb-6"
+                prop.children [
+                    Html.h1 [
+                        prop.className "text-2xl font-bold font-display text-gradient-primary"
+                        prop.text "TV Series"
+                    ]
+                    Daisy.button.button [
+                        button.primary
+                        prop.className "gap-2"
+                        prop.onClick (fun _ -> dispatch Open_tmdb_search)
+                        prop.children [
+                            Html.span [ prop.text "+" ]
+                            Html.span [ prop.text "Add Series" ]
+                        ]
+                    ]
+                ]
+            ]
+            // Search bar
+            Html.div [
+                prop.className "flex flex-col sm:flex-row gap-3 mb-6"
+                prop.children [
+                    Html.div [
+                        prop.className "relative flex-1"
+                        prop.children [
+                            Html.div [
+                                prop.className "absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-base-content/40"
+                                prop.children [
+                                    Svg.svg [
+                                        svg.className "w-5 h-5"
+                                        svg.fill "none"
+                                        svg.viewBox (0, 0, 24, 24)
+                                        svg.stroke "currentColor"
+                                        svg.custom ("strokeWidth", 1.5)
+                                        svg.children [
+                                            Svg.path [
+                                                svg.custom ("strokeLinecap", "round")
+                                                svg.custom ("strokeLinejoin", "round")
+                                                svg.d "m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                            Daisy.input [
+                                prop.className "w-full pl-10"
+                                prop.placeholder "Search series..."
+                                prop.value model.SearchQuery
+                                prop.onChange (Search_changed >> dispatch)
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+            if model.IsLoading then
+                Html.div [
+                    prop.className "flex justify-center py-12"
+                    prop.children [
+                        Daisy.loading [ loading.spinner; loading.lg ]
+                    ]
+                ]
+            else
+                let filtered =
+                    model.Series
+                    |> List.filter (fun s ->
+                        model.SearchQuery = "" ||
+                        s.Name.ToLowerInvariant().Contains(model.SearchQuery.ToLowerInvariant())
+                    )
+                if List.isEmpty filtered then
+                    Html.div [
+                        prop.className ("text-center py-20 " + DesignSystem.animateFadeIn)
+                        prop.children [
+                            Html.div [
+                                prop.className "text-base-content/20 mb-4"
+                                prop.children [
+                                    Svg.svg [
+                                        svg.className "w-16 h-16 mx-auto"
+                                        svg.fill "none"
+                                        svg.viewBox (0, 0, 24, 24)
+                                        svg.stroke "currentColor"
+                                        svg.custom ("strokeWidth", 1)
+                                        svg.children [
+                                            Svg.path [
+                                                svg.custom ("strokeLinecap", "round")
+                                                svg.custom ("strokeLinejoin", "round")
+                                                svg.d "M6 20.25h12m-7.5-3v3m3-3v3m-10.125-3h17.25c.621 0 1.125-.504 1.125-1.125V4.875c0-.621-.504-1.125-1.125-1.125H2.625c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125Z"
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                            Html.p [
+                                prop.className "text-base-content/50 font-medium"
+                                prop.text "No series found."
+                            ]
+                            Html.p [
+                                prop.className "mt-2 text-base-content/30 text-sm"
+                                prop.text "Add a TV series from TMDB to get started."
+                            ]
+                        ]
+                    ]
+                else
+                    Html.div [
+                        prop.className ("grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 " + DesignSystem.staggerGrid)
+                        prop.children [
+                            for series in filtered do
+                                seriesCard series
+                        ]
+                    ]
+        ]
+    ]

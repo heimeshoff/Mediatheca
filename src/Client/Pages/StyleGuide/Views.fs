@@ -1387,16 +1387,6 @@ let private contentBlocksSection () =
 
 // ── Section: Entry List ──
 
-type private EntryListLayout = Gallery | List
-
-type private SortField = ByReleaseDate | ByName | ByRating
-type private SortDirection = Ascending | Descending
-
-type private SortState = {
-    Field: SortField
-    Direction: SortDirection
-}
-
 type private MockEntry = {
     Slug: string
     Name: string
@@ -1417,156 +1407,56 @@ let private mockEntries = [
     { Slug = "spirited-away-2001"; Name = "Spirited Away"; Year = 2001; PosterRef = None; Genres = ["Animation"; "Fantasy"]; Rating = Some 8.6 }
 ]
 
-let private defaultDirectionFor field =
-    match field with
-    | ByName -> Ascending
-    | ByReleaseDate -> Descending
-    | ByRating -> Descending
+let private mockEntryItems : EntryList.EntryItem list =
+    mockEntries |> List.map (fun e ->
+        { Slug = e.Slug
+          Name = e.Name
+          Year = e.Year
+          PosterRef = e.PosterRef
+          Rating = e.Rating })
 
-let private sortFieldLabel field =
-    match field with
-    | ByReleaseDate -> "Release Date"
-    | ByName -> "Name"
-    | ByRating -> "Rating"
+let private mockBySlug =
+    mockEntries |> List.map (fun e -> e.Slug, e) |> Map.ofList
 
-let private sortEntries (sort: SortState) (entries: MockEntry list) =
-    let sorted =
-        match sort.Field with
-        | ByReleaseDate -> entries |> List.sortBy (fun e -> e.Year)
-        | ByName -> entries |> List.sortBy (fun e -> e.Name.ToLowerInvariant())
-        | ByRating -> entries |> List.sortBy (fun e -> e.Rating |> Option.defaultValue 0.0)
-    match sort.Direction with
-    | Ascending -> sorted
-    | Descending -> sorted |> List.rev
-
-let private layoutToggle (active: EntryListLayout) (onSwitch: EntryListLayout -> unit) =
-    Html.div [
-        prop.className "flex items-center gap-1 bg-base-200/50 rounded-lg p-1"
-        prop.children [
-            Html.button [
-                prop.className (
-                    "flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 "
-                    + (if active = Gallery then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
-                )
-                prop.onClick (fun _ -> onSwitch Gallery)
-                prop.children [ Icons.viewGrid () ]
-            ]
-            Html.button [
-                prop.className (
-                    "flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 "
-                    + (if active = List then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
-                )
-                prop.onClick (fun _ -> onSwitch List)
-                prop.children [ Icons.viewList () ]
-            ]
-        ]
-    ]
-
-let private sortButton (sort: SortState) (onSort: SortState -> unit) (isOpen: bool) (setIsOpen: bool -> unit) =
-    let selectField field =
-        if sort.Field = field then
-            let newDir = if sort.Direction = Ascending then Descending else Ascending
-            onSort { sort with Direction = newDir }
-        else
-            onSort { Field = field; Direction = defaultDirectionFor field }
-        setIsOpen false
-
-    let directionIcon dir =
-        match dir with
-        | Ascending -> Icons.chevronDown ()
-        | Descending -> Icons.chevronUp ()
-
-    // Relative container: button + dropdown as siblings (glassmorphism gotcha)
-    Html.div [
-        prop.className "relative"
-        prop.children [
-            Html.button [
-                prop.className (
-                    "flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 "
-                    + (if isOpen then "bg-primary/15 text-primary" else "text-base-content/50 hover:text-base-content bg-base-200/50")
-                )
-                prop.onClick (fun _ -> setIsOpen (not isOpen))
-                prop.children [ Icons.arrowsUpDown () ]
-            ]
-            if isOpen then
-                // Click-away backdrop
-                Html.div [
-                    prop.className "fixed inset-0 z-40"
-                    prop.onClick (fun _ -> setIsOpen false)
-                ]
-                // Dropdown menu
-                Html.div [
-                    prop.className (DesignSystem.glassDropdown + " absolute right-0 top-full mt-2 z-50 w-48 p-1.5")
-                    prop.children [
-                        for field in [ ByReleaseDate; ByName; ByRating ] do
-                            let isActive = sort.Field = field
-                            let dir = if isActive then sort.Direction else defaultDirectionFor field
-                            Html.button [
-                                prop.className (
-                                    "rating-dropdown-item w-full "
-                                    + (if isActive then "rating-dropdown-item-active" else "")
-                                )
-                                prop.onClick (fun _ -> selectField field)
-                                prop.children [
-                                    Html.span [
-                                        prop.className "flex-1 text-sm"
-                                        prop.text (sortFieldLabel field)
-                                    ]
-                                    Html.span [
-                                        prop.className (if isActive then "text-primary" else "text-base-content/30")
-                                        prop.children [ directionIcon dir ]
-                                    ]
-                                ]
-                            ]
-                    ]
-                ]
-        ]
-    ]
-
-let private galleryView (entries: MockEntry list) =
-    Html.div [
-        prop.className (DesignSystem.movieGrid + " " + DesignSystem.staggerGrid)
-        prop.children [
-            for entry in entries do
-                PosterCard.view entry.Slug entry.Name entry.Year entry.PosterRef None
-        ]
-    ]
-
-let private listRow (entry: MockEntry) =
+let private mockListRow (item: EntryList.EntryItem) =
+    let entry = mockBySlug |> Map.tryFind item.Slug
     Html.div [
         prop.className "flex items-center gap-3 p-3 rounded-xl bg-base-100 hover:bg-base-200/80 transition-colors group"
         prop.children [
             Html.div [
                 prop.className "flex-none"
-                prop.children [ PosterCard.thumbnail entry.PosterRef entry.Name ]
+                prop.children [ PosterCard.thumbnail item.PosterRef item.Name ]
             ]
             Html.div [
                 prop.className "flex-1 min-w-0"
                 prop.children [
                     Html.p [
                         prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
-                        prop.text entry.Name
+                        prop.text item.Name
                     ]
                     Html.div [
                         prop.className "flex items-center gap-2 mt-0.5"
                         prop.children [
                             Html.span [
                                 prop.className "text-xs text-base-content/50"
-                                prop.text (string entry.Year)
+                                prop.text (string item.Year)
                             ]
-                            Html.span [
-                                prop.className "text-base-content/20"
-                                prop.text "·"
-                            ]
-                            Html.span [
-                                prop.className "text-xs text-base-content/40"
-                                prop.text (entry.Genres |> String.concat ", ")
-                            ]
+                            match entry with
+                            | Some e when not (List.isEmpty e.Genres) ->
+                                Html.span [
+                                    prop.className "text-base-content/20"
+                                    prop.text "·"
+                                ]
+                                Html.span [
+                                    prop.className "text-xs text-base-content/40"
+                                    prop.text (e.Genres |> String.concat ", ")
+                                ]
+                            | _ -> ()
                         ]
                     ]
                 ]
             ]
-            match entry.Rating with
+            match item.Rating with
             | Some r ->
                 Html.div [
                     prop.className "flex-none text-xs font-medium text-warning/80 bg-warning/10 px-2 py-0.5 rounded"
@@ -1576,132 +1466,62 @@ let private listRow (entry: MockEntry) =
         ]
     ]
 
-let private listView (entries: MockEntry list) =
-    Html.div [
-        prop.className ("bg-base-200/50 rounded-xl p-2 flex flex-col gap-1 " + DesignSystem.animateFadeIn)
-        prop.children [
-            for entry in entries do
-                listRow entry
-        ]
-    ]
-
-[<ReactComponent>]
-let private entryListDemo () =
-    let layout, setLayout = React.useState Gallery
-    let sort, setSort = React.useState { Field = ByReleaseDate; Direction = Descending }
-    let sortOpen, setSortOpen = React.useState false
-
-    let sorted = sortEntries sort mockEntries
-
-    Html.div [
-        prop.className "flex flex-col gap-4"
-        prop.children [
-            Html.div [
-                prop.className "flex items-center justify-between"
-                prop.children [
-                    Html.p [
-                        prop.className DesignSystem.secondaryText
-                        prop.text $"{mockEntries.Length} entries"
-                    ]
-                    Html.div [
-                        prop.className "flex items-center gap-2"
-                        prop.children [
-                            sortButton sort setSort sortOpen setSortOpen
-                            layoutToggle layout setLayout
-                        ]
-                    ]
-                ]
-            ]
-            match layout with
-            | Gallery -> galleryView sorted
-            | List -> listView sorted
-        ]
-    ]
-
 let private entryListSection () =
     Html.div [
         prop.className "flex flex-col gap-6"
         prop.children [
             sectionTitle "Entry List"
 
-            decision "A Notion-style database view for media entries. Supports switchable layouts: Gallery shows poster cards in a responsive grid, List shows detailed rows with thumbnail, metadata, and ratings. The layout toggle persists per-component instance."
+            decision "A Notion-style database view for media entries. Supports switchable layouts: Gallery shows poster cards in a responsive grid, List shows detailed rows with thumbnail, metadata, and ratings. The layout toggle persists per-component instance. Reusable via Components/EntryList.fs."
 
             subheading "Live Demo"
 
             Html.div [
                 prop.className "mt-2"
-                prop.children [ entryListDemo () ]
+                prop.children [
+                    EntryList.view {
+                        Items = mockEntryItems
+                        RenderListRow = mockListRow
+                    }
+                ]
             ]
 
-            subheading "Layout Toggle"
+            subheading "Usage"
 
-            Html.p [
-                prop.className DesignSystem.secondaryText
-                prop.text "Segmented control with icon + label. Active state uses primary tint with subtle shadow. Wraps in a base-200 container to group the options."
-            ]
+            codeBlock """EntryList.view {
+    Items = items         // EntryItem list
+    RenderListRow = fun item ->
+        // custom list-mode row per page
+        Html.div [ ... ]
+}"""
+
+            subheading "EntryItem"
 
             Html.div [
-                prop.className "flex flex-col gap-3 mt-4"
+                prop.className "p-4 rounded-lg bg-base-200/30 border border-base-content/5 max-w-2xl"
                 prop.children [
-                    Html.div [
-                        prop.className "flex gap-4 items-center"
+                    Html.p [ prop.className DesignSystem.mutedText; prop.text "Fields:" ]
+                    Html.ul [
+                        prop.className "mt-2 space-y-1"
                         prop.children [
-                            layoutToggle Gallery (fun _ -> ())
-                            Html.code [
-                                prop.className "text-xs font-mono text-primary/70"
-                                prop.text "Gallery active"
-                            ]
-                        ]
-                    ]
-                    Html.div [
-                        prop.className "flex gap-4 items-center"
-                        prop.children [
-                            layoutToggle List (fun _ -> ())
-                            Html.code [
-                                prop.className "text-xs font-mono text-primary/70"
-                                prop.text "List active"
-                            ]
+                            for (name, desc) in [
+                                "Slug", "string -- unique identifier, used for PosterCard link"
+                                "Name", "string -- display title"
+                                "Year", "int -- release year"
+                                "PosterRef", "string option -- image reference"
+                                "Rating", "float option -- used by sort-by-rating"
+                            ] do
+                                Html.li [
+                                    prop.className "text-sm text-base-content/70"
+                                    prop.children [
+                                        Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text name ]
+                                        Html.span [ prop.text $" -- {desc}" ]
+                                    ]
+                                ]
                         ]
                     ]
                 ]
             ]
-
-            subheading "Gallery Layout"
-
-            Html.p [
-                prop.className DesignSystem.secondaryText
-                prop.text "Responsive poster grid using PosterCard.view. Same layout as the Movies page -- 2 columns on mobile scaling to 6 on desktop. Includes stagger animation on load."
-            ]
-
-            codeBlock """Html.div [
-    prop.className (DesignSystem.movieGrid + " " + DesignSystem.staggerGrid)
-    prop.children [
-        for entry in entries do
-            PosterCard.view entry.Slug entry.Name entry.Year entry.PosterRef None
-    ]
-]"""
-
-            subheading "List Layout"
-
-            Html.p [
-                prop.className DesignSystem.secondaryText
-                prop.text "Detailed row layout with thumbnail, title, year, genres, and optional rating badge. Same pattern as CatalogDetail and FriendDetail pages. Rows have hover highlight and group-hover effects."
-            ]
-
-            codeBlock """Html.div [
-    prop.className "bg-base-200/50 rounded-xl p-2 flex flex-col gap-1"
-    prop.children [
-        for entry in entries do
-            Html.div [
-                prop.className "flex items-center gap-3 p-3 rounded-xl bg-base-100 group"
-                prop.children [
-                    PosterCard.thumbnail entry.PosterRef entry.Name
-                    // title + year + genres (flex-1 min-w-0)
-                    // optional rating badge (flex-none)
-                ]
-            ]
-    ]
-]"""
 
             subheading "Icons"
 
@@ -1729,13 +1549,18 @@ let private entryListSection () =
 
             decisionBox
                 "Layout Toggle Pattern"
-                "Segmented control (icon + label) in a contained pill group. Visually distinct from filter pills which are standalone. The toggle is local React state, not part of the Elmish model, since it's a view preference not application state."
+                "Segmented control (icon-only) in a contained pill group. Visually distinct from filter pills which are standalone. The toggle is local React state, not part of the Elmish model, since it's a view preference not application state."
                 "Dropdown select (hidden options, extra click). Tab bar (conflicts with page-level navigation). Icon-only toggle (poor discoverability)."
 
             decisionBox
                 "Gallery as Default"
                 "Gallery (poster grid) is the default layout because posters are the strongest visual identifier for movies. The dark theme makes posters pop, and the grid gives a quick visual scan of the collection."
                 "List as default (too text-heavy for a media app). Table layout (too dense, better for data apps than media libraries)."
+
+            decisionBox
+                "Caller-provided List Row"
+                "Gallery mode is uniform (PosterCard.view), but list mode delegates row rendering to the caller via RenderListRow. Each page can show its own metadata: notes in catalogs, dates in watched-together, genres+ratings in the style guide."
+                "Fixed list row format (can't show page-specific data). Fully configurable via options record (over-engineering for 3 use cases)."
         ]
     ]
 

@@ -8,6 +8,8 @@ type Model = {
     DashboardModel: Pages.Dashboard.Types.Model
     MovieListModel: Pages.Movies.Types.Model
     MovieDetailModel: Pages.MovieDetail.Types.Model
+    SeriesListModel: Pages.Series.Types.Model
+    SeriesDetailModel: Pages.SeriesDetail.Types.Model
     FriendListModel: Pages.Friends.Types.Model
     FriendDetailModel: Pages.FriendDetail.Types.Model
     CatalogListModel: Pages.Catalogs.Types.Model
@@ -25,6 +27,8 @@ type Msg =
     | Dashboard_msg of Pages.Dashboard.Types.Msg
     | Movie_list_msg of Pages.Movies.Types.Msg
     | Movie_detail_msg of Pages.MovieDetail.Types.Msg
+    | Series_list_msg of Pages.Series.Types.Msg
+    | Series_detail_msg of Pages.SeriesDetail.Types.Msg
     | Friend_list_msg of Pages.Friends.Types.Msg
     | Friend_detail_msg of Pages.FriendDetail.Types.Msg
     | Catalog_list_msg of Pages.Catalogs.Types.Msg

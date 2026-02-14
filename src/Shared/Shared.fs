@@ -19,9 +19,12 @@ module Slug =
     let catalogSlug (name: string) =
         slugify name
 
+    let seriesSlug (name: string) (year: int) =
+        sprintf "%s-%d" (slugify name) year
+
 // Search
 
-type MediaType = Movie
+type MediaType = Movie | Series
 
 type LibrarySearchResult = {
     Slug: string
@@ -39,6 +42,7 @@ type TmdbSearchResult = {
     Year: int option
     Overview: string
     PosterPath: string option
+    MediaType: MediaType
 }
 
 type CastMemberDto = {
@@ -267,6 +271,123 @@ type MovieDetail = {
     ContentBlocks: ContentBlockDto list
 }
 
+// TV Series
+
+type SeriesStatus =
+    | Returning
+    | Ended
+    | Canceled
+    | InProduction
+    | Planned
+    | UnknownStatus
+
+type EpisodeDto = {
+    EpisodeNumber: int
+    Name: string
+    Overview: string
+    Runtime: int option
+    AirDate: string option
+    StillRef: string option
+    TmdbRating: float option
+    IsWatched: bool
+    WatchedDate: string option
+}
+
+type SeasonDto = {
+    SeasonNumber: int
+    Name: string
+    Overview: string
+    PosterRef: string option
+    AirDate: string option
+    Episodes: EpisodeDto list
+    WatchedCount: int
+    OverallWatchedCount: int
+}
+
+type RewatchSessionDto = {
+    RewatchId: string
+    Name: string option
+    IsDefault: bool
+    Friends: FriendRef list
+    WatchedCount: int
+    TotalEpisodes: int
+    CompletionPercentage: float
+}
+
+type NextUpDto = {
+    SeasonNumber: int
+    EpisodeNumber: int
+    EpisodeName: string
+}
+
+type SeriesListItem = {
+    Slug: string
+    Name: string
+    Year: int
+    PosterRef: string option
+    Genres: string list
+    TmdbRating: float option
+    Status: SeriesStatus
+    SeasonCount: int
+    EpisodeCount: int
+    WatchedEpisodeCount: int
+    NextUp: NextUpDto option
+}
+
+type SeriesDetail = {
+    Slug: string
+    Name: string
+    Year: int
+    Overview: string
+    Genres: string list
+    Status: SeriesStatus
+    PosterRef: string option
+    BackdropRef: string option
+    TmdbId: int
+    TmdbRating: float option
+    EpisodeRuntime: int option
+    PersonalRating: int option
+    Cast: CastMemberDto list
+    RecommendedBy: FriendRef list
+    WantToWatchWith: FriendRef list
+    Seasons: SeasonDto list
+    RewatchSessions: RewatchSessionDto list
+    ContentBlocks: ContentBlockDto list
+}
+
+// Series Request Types
+
+type CreateRewatchSessionRequest = {
+    Name: string option
+    FriendSlugs: string list
+}
+
+type MarkEpisodeWatchedRequest = {
+    RewatchId: string
+    SeasonNumber: int
+    EpisodeNumber: int
+    Date: string
+}
+
+type MarkEpisodeUnwatchedRequest = {
+    RewatchId: string
+    SeasonNumber: int
+    EpisodeNumber: int
+}
+
+type MarkSeasonWatchedRequest = {
+    RewatchId: string
+    SeasonNumber: int
+    Date: string
+}
+
+type MarkEpisodesUpToRequest = {
+    RewatchId: string
+    SeasonNumber: int
+    EpisodeNumber: int
+    Date: string
+}
+
 module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
@@ -333,4 +454,31 @@ type IMediathecaApi = {
     testTmdbApiKey: string -> Async<Result<unit, string>>
     getFullCredits: int -> Async<Result<FullCreditsDto, string>>
     getMovieTrailer: int -> Async<string option>
+    // TV Series
+    searchTvSeries: string -> Async<TmdbSearchResult list>
+    addSeries: int -> Async<Result<string, string>>
+    removeSeries: string -> Async<Result<unit, string>>
+    getSeries: unit -> Async<SeriesListItem list>
+    getSeriesDetail: string -> Async<SeriesDetail option>
+    setSeriesPersonalRating: string -> int option -> Async<Result<unit, string>>
+    addSeriesRecommendation: string -> string -> Async<Result<unit, string>>
+    removeSeriesRecommendation: string -> string -> Async<Result<unit, string>>
+    addSeriesWantToWatchWith: string -> string -> Async<Result<unit, string>>
+    removeSeriesWantToWatchWith: string -> string -> Async<Result<unit, string>>
+    // Series Rewatch Sessions
+    createRewatchSession: string -> CreateRewatchSessionRequest -> Async<Result<string, string>>
+    removeRewatchSession: string -> string -> Async<Result<unit, string>>
+    addFriendToRewatchSession: string -> string -> string -> Async<Result<unit, string>>
+    removeFriendFromRewatchSession: string -> string -> string -> Async<Result<unit, string>>
+    // Series Episode Progress
+    markEpisodeWatched: string -> MarkEpisodeWatchedRequest -> Async<Result<unit, string>>
+    markEpisodeUnwatched: string -> MarkEpisodeUnwatchedRequest -> Async<Result<unit, string>>
+    markSeasonWatched: string -> MarkSeasonWatchedRequest -> Async<Result<unit, string>>
+    markEpisodesWatchedUpTo: string -> MarkEpisodesUpToRequest -> Async<Result<unit, string>>
+    // Series Content Blocks + Catalogs
+    getSeriesContentBlocks: string -> Async<ContentBlockDto list>
+    addSeriesContentBlock: string -> AddContentBlockRequest -> Async<Result<string, string>>
+    updateSeriesContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
+    removeSeriesContentBlock: string -> string -> Async<Result<unit, string>>
+    getCatalogsForSeries: string -> Async<CatalogRef list>
 }

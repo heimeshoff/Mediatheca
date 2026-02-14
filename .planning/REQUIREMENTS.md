@@ -1,6 +1,6 @@
 # Requirements
 
-## v1 (MVP) — Movies-Only Personal Media Tracker
+## v1 — Personal Media Tracker
 
 ### Phase 1: Skeleton
 
@@ -51,11 +51,19 @@
 - [x] REQ-032: Design system as single source of truth — extract component definitions and design tokens so the Style Guide IS the canonical definition and application pages consume from it [Phase 5]
 - [x] REQ-033: Skills and/or agents for Style Guide workflow — when a component or design token is changed in the Style Guide, provide guided propagation to update all usages across application pages [Phase 5]
 
+### Phase 6: TV Series
+
+- [x] REQ-100: TV Series aggregate with Series > Season > Episode hierarchy, fat TMDB import (series + all seasons + all episodes), SeriesStatus (Returning/Ended/Canceled/InProduction/Planned), series-level cast (non-event-sourced CastStore), local image storage (posters, backdrops, episode stills) [Phase 6]
+- [x] REQ-101: Named rewatch sessions — default personal session (auto-created on import) + named rewatch sessions with friends; episode progress tracked per session; overall progress = union across all sessions [Phase 6]
+- [x] REQ-101a: Batch episode operations — mark season watched, mark episodes watched up to S##E##; essential for importing already-seen series [Phase 6]
+- [x] REQ-101b: Social features on Series — recommended_by, want_to_watch_with, personal_rating, content_blocks (full parity with Movies) [Phase 6]
+- [x] REQ-102: TV Series detail page with hero backdrop, tab bar (Overview, Cast & Crew, Episodes), season sidebar with progress counts, episode list with thumbnails/watch status/green checkmarks, "next up" highlight, rewatch session selector dropdown [Phase 6]
+- [x] REQ-102a: TV Series list page with search/filtering, poster grid/list, season count badges, "next up" preview, series status badges [Phase 6]
+- [x] REQ-102b: Polymorphic catalog entries — catalogs can hold both Movies and Series via MediaType discriminator [Phase 6]
+- [ ] REQ-102c: TV Series Dashboard with episode progress, next-to-watch across all series, watch time stats [Phase 6]
+
 ## v2 (Future)
 
-- [ ] REQ-100: TV Series support (Series > Season > Episode hierarchy) with TMDB import
-- [ ] REQ-101: Episode-level watch session tracking with per-session friend tracking
-- [ ] REQ-102: TV Series Dashboard with episode progress and next-to-watch
 - [ ] REQ-103: Game support with manual creation and metadata
 - [ ] REQ-104: Steam integration — import game library and play hours
 - [ ] REQ-105: HowLongToBeat integration — average completion time per game

@@ -1,11 +1,35 @@
 # Current State
 
 **Last Updated:** 2026-02-14
-**Current Phase:** 5 (Design System / Style Guide) — Complete
-**Current Task:** All v1 phases + Phase 5 complete
+**Current Phase:** 6 (TV Series) — Implementation complete
+**Current Task:** All Phase 6 requirements implemented
 
 ## Recent Progress
 
+- **2026-02-14**: Unified search modal (Ctrl+K) for movies and TV series
+  - Added MediaType to TmdbSearchResult shared type
+  - Search modal now queries both TMDB movie and TV search APIs in parallel
+  - Import routes to addMovie or addSeries based on result type
+  - Library search shows both movies and series with type badges
+  - Navigation after import/selection routes to correct detail page
+  - Wired up Series page Open_tmdb_search (was TODO)
+  - Fixed missing SeriesProjection.handler registration in Program.fs
+- **2026-02-14**: Phase 6 (TV Series) implementation complete
+  - Series.fs: Full aggregate with 18 event types, named rewatch sessions, batch episode operations
+  - SeriesSerialization: Complete Thoth.Json.Net serialization for all events including nested season/episode data
+  - Tmdb.fs: TV series search, details, season/episode import, credits, image downloads
+  - SeriesProjection.fs: 6 projection tables (series_list, series_detail, series_seasons, series_episodes, series_rewatch_sessions, series_episode_progress)
+  - CastStore.fs: series_cast junction table with save/get/cleanup
+  - Api.fs: 25+ new API endpoints for series CRUD, social features, rewatch sessions, episode progress
+  - Shared.fs: All Series DTOs, SeriesStatus, request types, IMediathecaApi extensions
+  - Client: Series list page with poster grid and search, Series detail page with hero, tabs, season sidebar, episode list with watch toggles
+  - Router: Series_list and Series_detail routes, navigation (sidebar + bottom nav)
+  - Tests: 21 new tests (domain + serialization), all passing
+  - 139 tests total, 137 passing, 2 errored (pre-existing integration test issue)
+- **2026-02-14**: Created Phase 6 — TV Series (REQ-100, REQ-101, REQ-102, REQ-102a, REQ-102b)
+  - Moved REQ-100–102 from v2 into v1 as new Phase 6
+  - Added REQ-102a (series list page) and REQ-102b (series dashboard) to break out UI requirements
+  - Inspiration prototype: `inspiration/tv_series/tv_series_episode_list_2/`
 - **2026-02-14**: Added Entry List component to Style Guide
   - Notion-style database view with switchable Gallery/List layouts
   - Gallery: responsive poster grid using PosterCard.view with stagger animation
@@ -97,6 +121,7 @@
 
 ## Active Decisions
 
+- **TV Series aggregate — MODELED (revised after Cinemarco analysis)**: Single aggregate per series, fat TMDB import event, named rewatch sessions (default personal + named sessions with friends, each tracking independent episode progress), batch operations (mark season watched, mark episodes up to S02E05), series status from TMDB (Returning/Ended/Canceled/InProduction/Planned), "next up" derived from progress, series-level cast (non-event-sourced), full social parity with Movies, polymorphic catalog entries (Movie | Series) (decided: 2026-02-14)
 - Movies-only for v1 MVP (decided: 2026-01-30)
 - SQLite-based event store, single file for events + read models (decided: 2026-01-30)
 - Local filesystem for image storage (decided: 2026-01-30)
@@ -123,6 +148,196 @@
 - Catalog entries prevent duplicate movies per catalog (decided: 2026-02-08)
 - Design system uses two layers: CSS custom properties for raw tokens (opacities, blur, spacing, radii) in index.css, F# module (DesignSystem.fs) for typed compositions (class combinations like glassCard, sectionHeader) — Option C (decided: 2026-02-14)
 - REQ-033 skill is an enforcement/audit tool (`/design-check`): scans client files for hardcoded classes that should use DesignSystem.fs or CSS tokens, verifies new components follow design system rules — not a migration tool (decided: 2026-02-14)
+
+## Domain Model — Phase 6 (TV Series) — Modeled (revised after Cinemarco analysis)
+
+### Series Aggregate (Movies context) — `src/Server/Series.fs`
+
+**Stream:** `Series-{slug}` where slug = `seriesSlug name year` = `slugify(name)-year`
+
+**Events:**
+
+*Import & lifecycle:*
+- `Series_added_to_library of SeriesAddedData` — fat import: name, year, overview, genres, status, poster/backdrop refs, tmdbId, tmdbRating, episodeRuntime, seasons (list of SeasonImportData with episodes)
+- `Series_removed_from_library`
+
+*Metadata updates:*
+- `Series_categorized of string list` — genre update
+- `Series_poster_replaced of string` — new poster ref
+- `Series_backdrop_replaced of string` — new backdrop ref
+- `Series_personal_rating_set of int option` — 1-5 rating
+
+*Social (same pattern as Movies):*
+- `Series_recommended_by of string` — friendSlug
+- `Series_recommendation_removed of string` — friendSlug
+- `Series_want_to_watch_with of string` — friendSlug
+- `Series_removed_want_to_watch_with of string` — friendSlug
+
+*Named rewatch sessions (series-level tracking contexts):*
+- `Rewatch_session_created of RewatchSessionCreatedData` — rewatchId, name?, friendSlugs (default session auto-created on Series_added)
+- `Rewatch_session_removed of string` — rewatchId (cannot remove default)
+- `Rewatch_session_friend_added of RewatchSessionFriendData` — rewatchId, friendSlug
+- `Rewatch_session_friend_removed of RewatchSessionFriendData` — rewatchId, friendSlug
+
+*Episode watch progress (per rewatch session):*
+- `Episode_watched of EpisodeWatchedData` — rewatchId, seasonNumber, episodeNumber, date
+- `Episode_unwatched of EpisodeUnwatchedData` — rewatchId, seasonNumber, episodeNumber
+- `Season_marked_watched of SeasonMarkedWatchedData` — rewatchId, seasonNumber, date
+- `Episodes_watched_up_to of EpisodesWatchedUpToData` — rewatchId, seasonNumber, episodeNumber, date
+
+**State:**
+```
+SeriesState = Not_created | Active of ActiveSeries | Removed
+
+SeriesStatus = Returning | Ended | Canceled | InProduction | Planned | Unknown
+
+ActiveSeries = {
+    Name: string
+    Year: int
+    Overview: string
+    Genres: string list
+    Status: SeriesStatus
+    PosterRef: string option
+    BackdropRef: string option
+    TmdbId: int
+    TmdbRating: float option
+    EpisodeRuntime: int option              // typical runtime in minutes (from TMDB)
+    PersonalRating: int option
+    Seasons: Map<int, SeasonState>          // seasonNumber → SeasonState
+    RecommendedBy: Set<string>              // friendSlugs
+    WantToWatchWith: Set<string>            // friendSlugs
+    RewatchSessions: Map<string, RewatchSessionState>  // rewatchId → session
+}
+
+SeasonState = {
+    SeasonNumber: int
+    Name: string
+    Overview: string
+    PosterRef: string option
+    AirDate: string option
+    Episodes: Map<int, EpisodeState>        // episodeNumber → EpisodeState
+}
+
+EpisodeState = {
+    EpisodeNumber: int
+    Name: string
+    Overview: string
+    Runtime: int option                      // minutes (episode-specific, falls back to series EpisodeRuntime)
+    AirDate: string option
+    StillRef: string option                  // episode screenshot/still image
+    TmdbRating: float option
+}
+
+RewatchSessionState = {
+    RewatchId: string
+    Name: string option                      // None = default personal session
+    IsDefault: bool                          // exactly one per series, auto-created
+    Friends: Set<string>                     // friendSlugs
+    WatchedEpisodes: Set<int * int>          // (seasonNumber, episodeNumber) pairs
+}
+```
+
+**Import Data (for fat event):**
+```
+SeriesAddedData = {
+    Name: string; Year: int; Overview: string; Genres: string list
+    Status: SeriesStatus
+    PosterRef: string option; BackdropRef: string option
+    TmdbId: int; TmdbRating: float option
+    EpisodeRuntime: int option
+    Seasons: SeasonImportData list
+}
+
+SeasonImportData = {
+    SeasonNumber: int; Name: string; Overview: string
+    PosterRef: string option; AirDate: string option
+    Episodes: EpisodeImportData list
+}
+
+EpisodeImportData = {
+    EpisodeNumber: int; Name: string; Overview: string
+    Runtime: int option; AirDate: string option
+    StillRef: string option; TmdbRating: float option
+}
+```
+
+**Key behaviors:**
+- `Series_added_to_library` also implicitly creates a default rewatch session (IsDefault=true, no name, no friends). The `evolve` function handles this.
+- `Episode_watched` marks a single episode as watched in a specific rewatch session.
+- `Season_marked_watched` emits a single event that marks all episodes in the season. `evolve` adds all (season, episode) pairs to the session's WatchedEpisodes set.
+- `Episodes_watched_up_to` marks episodes 1 through N in a season. `evolve` adds pairs (season, 1)..(season, N).
+- **"Next up"** is derived in the projection: first unwatched episode across all seasons in the default session, ordered by (seasonNumber, episodeNumber).
+- **Overall progress** = union of WatchedEpisodes across all rewatch sessions. A projection column `watched_episode_count` on `series_list`.
+- **Watch status** (NotStarted / InProgress / Completed) derived from overall progress vs total episode count.
+
+**Cast:** Non-event-sourced, same CastStore pattern as Movies. Series-level cast from TMDB `/tv/{id}/credits`. Shared `cast_members` table, `series_cast` junction table (mirrors `movie_cast`). Garbage-collect orphaned cast on series removal.
+
+**Content Blocks:** Separate aggregate `ContentBlocks-{seriesSlug}` (same pattern as movies). Series-level notes.
+
+**Catalog Integration:** Catalog entries become polymorphic — `MediaType` discriminator (Movie | Series). `Entry_added` event gains `mediaType` field alongside existing `movieSlug` (renamed to `mediaSlug`). Existing movie entries default to Movie type.
+
+### Projection Tables (SeriesProjection)
+
+- `series_list`: slug, name, year, poster_ref, genres (JSON), tmdb_rating, status, season_count, episode_count, watched_episode_count, next_up_season, next_up_episode, next_up_title
+- `series_detail`: slug, name, year, overview, genres (JSON), poster_ref, backdrop_ref, tmdb_id, tmdb_rating, episode_runtime, status, personal_rating, recommended_by (JSON), want_to_watch_with (JSON)
+- `series_seasons`: series_slug, season_number, name, overview, poster_ref, air_date, episode_count
+- `series_episodes`: series_slug, season_number, episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating
+- `series_rewatch_sessions`: rewatch_id, series_slug, name, is_default, friends (JSON), watched_episodes (JSON array of [season,episode] pairs), watched_count
+- `series_episode_progress`: series_slug, rewatch_id, season_number, episode_number, watched_date (one row per watched episode per session)
+
+### TMDB Integration
+
+- `searchTvSeries`: `/search/tv` endpoint → TmdbSearchResult list (reuse existing type with mediaType flag)
+- `getTvSeriesDetails`: `/tv/{id}` → series metadata + season list + status
+- `getTvSeasonDetails`: `/tv/{id}/season/{n}` → episodes for one season (called per season during import)
+- `getTvSeriesCredits`: `/tv/{id}/credits` → series-level cast
+- Image downloads: posters → `images/posters/series-{slug}.jpg`, backdrops → `images/backdrops/series-{slug}.jpg`, episode stills → `images/stills/{slug}-s{nn}e{nn}.jpg`
+
+### Shared DTOs
+
+- `SeriesListItem`: Slug, Name, Year, PosterRef, Genres, TmdbRating, Status, SeasonCount, EpisodeCount, WatchedEpisodeCount, NextUp (option of SeasonNum * EpNum * Title)
+- `SeriesDetail`: Full aggregate view + Cast + ContentBlocks + RewatchSessions + CatalogRefs
+- `SeasonDto`: SeasonNumber, Name, Overview, PosterRef, AirDate, Episodes (EpisodeDto list), WatchedCount (in default session), OverallWatchedCount
+- `EpisodeDto`: EpisodeNumber, Name, Overview, Runtime, AirDate, StillRef, TmdbRating, IsWatched (in selected session), WatchedDate option
+- `RewatchSessionDto`: RewatchId, Name option, IsDefault, Friends (FriendRef list), WatchedCount, CompletionPercentage
+- `WatchStatus` = NotStarted | InProgress | Completed (derived, not stored as event)
+
+### API Endpoints (added to IMediathecaApi)
+
+*Import & lifecycle:*
+- `searchTvSeries: string -> Async<TmdbSearchResult list>`
+- `addSeries: int -> Async<Result<string, string>>` — tmdbId, imports full series + creates default rewatch session
+- `removeSeries: string -> Async<Result<unit, string>>`
+
+*Read:*
+- `getSeries: unit -> Async<SeriesListItem list>`
+- `getSeriesDetail: string -> Async<SeriesDetail option>`
+- `getCatalogsForSeries: string -> Async<CatalogRef list>`
+
+*Metadata & social:*
+- `setSeriesPersonalRating: string -> int option -> Async<Result<unit, string>>`
+- `addSeriesRecommendation: string -> string -> Async<Result<unit, string>>`
+- `removeSeriesRecommendation: string -> string -> Async<Result<unit, string>>`
+- `addSeriesWantToWatchWith: string -> string -> Async<Result<unit, string>>`
+- `removeSeriesWantToWatchWith: string -> string -> Async<Result<unit, string>>`
+
+*Rewatch sessions:*
+- `createRewatchSession: string -> CreateRewatchSessionRequest -> Async<Result<string, string>>` — seriesSlug, name + friends
+- `removeRewatchSession: string -> string -> Async<Result<unit, string>>` — seriesSlug, rewatchId
+- `addFriendToRewatchSession: string -> string -> string -> Async<Result<unit, string>>` — seriesSlug, rewatchId, friendSlug
+- `removeFriendFromRewatchSession: string -> string -> string -> Async<Result<unit, string>>`
+
+*Episode progress (per rewatch session):*
+- `markEpisodeWatched: string -> MarkEpisodeWatchedRequest -> Async<Result<unit, string>>` — seriesSlug, rewatchId + season + episode + date
+- `markEpisodeUnwatched: string -> MarkEpisodeUnwatchedRequest -> Async<Result<unit, string>>` — seriesSlug, rewatchId + season + episode
+- `markSeasonWatched: string -> MarkSeasonWatchedRequest -> Async<Result<unit, string>>` — seriesSlug, rewatchId + season + date
+- `markEpisodesWatchedUpTo: string -> MarkEpisodesUpToRequest -> Async<Result<unit, string>>` — seriesSlug, rewatchId + season + episode + date
+
+### Client Pages
+
+- `Series_list` page at `/series` — poster grid/list with search, season count badges, "next up" on cards, series status badge (Returning/Ended/etc.)
+- `Series_detail` page at `/series/{slug}` — hero with backdrop, tab bar (Overview, Cast & Crew, Episodes), season sidebar with progress counts, episode list with thumbnails/watch status/green checkmarks, "next up" highlight, rewatch session selector dropdown, "Mark Season Watched" button
+- Navigation: add "TV Series" to sidebar and bottom nav (tv icon)
 
 ## Domain Model — Phase 4 (Implemented)
 
@@ -167,11 +382,11 @@ Events: Friend_added, Friend_updated, Friend_removed
 - 2026-02-08 Phase 3 implementation complete — all 6 requirements done (REQ-016 through REQ-021)
 - 2026-02-08 Phase 4 implementation complete — all 7 requirements done (REQ-022 through REQ-028)
 - 2026-02-14 Phase 5 (Design System / Style Guide) complete — all 5 requirements done (REQ-029 through REQ-033)
+- 2026-02-14 Phase 6 (TV Series) implementation complete — 7 of 8 requirements done (REQ-100 through REQ-102b)
 
 ## Next Actions
 
-Phase 5 complete! Consider:
-1. Use `/design-check` to audit design system compliance
-2. Visit `/styleguide` to review and refine the design system
-3. v2 features (TV Series, Games, Books, Integrations)
-4. Polish and bug fixes
+1. **REQ-102c: TV Series Dashboard** — episode progress across all series, next-to-watch, watch time stats
+2. Wire TMDB series search into the SearchModal (currently movies only)
+3. Polish Series detail page (visual refinements, mobile responsiveness)
+4. Fix pre-existing integration test failures (missing friend_list table in test setup)

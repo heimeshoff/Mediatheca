@@ -26,6 +26,17 @@ module CastStore =
             );
 
             CREATE INDEX IF NOT EXISTS idx_movie_cast_movie ON movie_cast(movie_stream_id);
+
+            CREATE TABLE IF NOT EXISTS series_cast (
+                series_stream_id TEXT    NOT NULL,
+                cast_member_id   INTEGER NOT NULL REFERENCES cast_members(id),
+                role             TEXT    NOT NULL,
+                billing_order    INTEGER NOT NULL,
+                is_top_billed    INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (series_stream_id, cast_member_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_series_cast_series ON series_cast(series_stream_id);
         """
         |> Db.exec
 
@@ -104,7 +115,101 @@ module CastStore =
                 |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt64 "cnt")
                 |> Option.defaultValue 0L
 
-            if usageCount = 0L then
+            let seriesUsageCount =
+                conn
+                |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_cast WHERE cast_member_id = @id"
+                |> Db.setParams [ "id", SqlType.Int64 cmId ]
+                |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt64 "cnt")
+                |> Option.defaultValue 0L
+
+            if usageCount = 0L && seriesUsageCount = 0L then
+                // Get image ref before deleting
+                let imageRef =
+                    conn
+                    |> Db.newCommand "SELECT image_ref FROM cast_members WHERE id = @id"
+                    |> Db.setParams [ "id", SqlType.Int64 cmId ]
+                    |> Db.querySingle (fun (rd: IDataReader) ->
+                        if rd.IsDBNull(rd.GetOrdinal("image_ref")) then None
+                        else Some (rd.ReadString "image_ref")
+                    )
+                    |> Option.flatten
+
+                // Delete cast member
+                conn
+                |> Db.newCommand "DELETE FROM cast_members WHERE id = @id"
+                |> Db.setParams [ "id", SqlType.Int64 cmId ]
+                |> Db.exec
+
+                // Delete cast member image
+                match imageRef with
+                | Some ref -> ImageStore.deleteImage imageBasePath ref
+                | None -> ()
+
+    let addSeriesCast (conn: SqliteConnection) (seriesStreamId: string) (castMemberId: int64) (role: string) (billingOrder: int) (isTopBilled: bool) : unit =
+        conn
+        |> Db.newCommand """
+            INSERT OR IGNORE INTO series_cast (series_stream_id, cast_member_id, role, billing_order, is_top_billed)
+            VALUES (@series_stream_id, @cast_member_id, @role, @billing_order, @is_top_billed)
+        """
+        |> Db.setParams [
+            "series_stream_id", SqlType.String seriesStreamId
+            "cast_member_id", SqlType.Int64 castMemberId
+            "role", SqlType.String role
+            "billing_order", SqlType.Int32 billingOrder
+            "is_top_billed", SqlType.Int32 (if isTopBilled then 1 else 0)
+        ]
+        |> Db.exec
+
+    let getSeriesCast (conn: SqliteConnection) (seriesStreamId: string) : Mediatheca.Shared.CastMemberDto list =
+        conn
+        |> Db.newCommand """
+            SELECT cm.name, sc.role, cm.image_ref, cm.tmdb_id
+            FROM series_cast sc
+            JOIN cast_members cm ON cm.id = sc.cast_member_id
+            WHERE sc.series_stream_id = @series_stream_id
+            ORDER BY sc.billing_order
+        """
+        |> Db.setParams [ "series_stream_id", SqlType.String seriesStreamId ]
+        |> Db.query (fun (rd: IDataReader) ->
+            { Mediatheca.Shared.CastMemberDto.Name = rd.ReadString "name"
+              Role = rd.ReadString "role"
+              ImageRef =
+                if rd.IsDBNull(rd.GetOrdinal("image_ref")) then None
+                else Some (rd.ReadString "image_ref")
+              TmdbId = rd.ReadInt32 "tmdb_id" }
+        )
+
+    let removeSeriesCastAndCleanup (conn: SqliteConnection) (imageBasePath: string) (seriesStreamId: string) : unit =
+        // Get orphan-candidate cast member ids before deleting
+        let castMemberIds =
+            conn
+            |> Db.newCommand "SELECT cast_member_id FROM series_cast WHERE series_stream_id = @series_stream_id"
+            |> Db.setParams [ "series_stream_id", SqlType.String seriesStreamId ]
+            |> Db.query (fun (rd: IDataReader) -> rd.ReadInt64 "cast_member_id")
+
+        // Delete series_cast rows
+        conn
+        |> Db.newCommand "DELETE FROM series_cast WHERE series_stream_id = @series_stream_id"
+        |> Db.setParams [ "series_stream_id", SqlType.String seriesStreamId ]
+        |> Db.exec
+
+        // Find and clean up orphaned cast members
+        for cmId in castMemberIds do
+            let movieUsageCount =
+                conn
+                |> Db.newCommand "SELECT COUNT(*) as cnt FROM movie_cast WHERE cast_member_id = @id"
+                |> Db.setParams [ "id", SqlType.Int64 cmId ]
+                |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt64 "cnt")
+                |> Option.defaultValue 0L
+
+            let seriesUsageCount =
+                conn
+                |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_cast WHERE cast_member_id = @id"
+                |> Db.setParams [ "id", SqlType.Int64 cmId ]
+                |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt64 "cnt")
+                |> Option.defaultValue 0L
+
+            if movieUsageCount = 0L && seriesUsageCount = 0L then
                 // Get image ref before deleting
                 let imageRef =
                     conn

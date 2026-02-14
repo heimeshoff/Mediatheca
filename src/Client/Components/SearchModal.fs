@@ -8,6 +8,7 @@ open Mediatheca.Shared
 type Model = {
     Query: string
     LibraryMovies: MovieListItem list
+    LibrarySeries: SeriesListItem list
     TmdbResults: TmdbSearchResult list
     IsSearchingTmdb: bool
     IsImporting: bool
@@ -20,14 +21,15 @@ type Msg =
     | Debounce_tmdb_expired of version: int
     | Tmdb_search_completed of TmdbSearchResult list
     | Tmdb_search_failed of string
-    | Import of tmdbId: int
-    | Import_completed of Result<string, string>
-    | Navigate_to of slug: string
+    | Import of tmdbId: int * MediaType
+    | Import_completed of Result<string * MediaType, string>
+    | Navigate_to of slug: string * MediaType
     | Close
 
-let init (movies: MovieListItem list) : Model = {
+let init (movies: MovieListItem list) (series: SeriesListItem list) : Model = {
     Query = ""
     LibraryMovies = movies
+    LibrarySeries = series
     TmdbResults = []
     IsSearchingTmdb = false
     IsImporting = false
@@ -35,27 +37,39 @@ let init (movies: MovieListItem list) : Model = {
     SearchVersion = 0
 }
 
-let filterLibrary (query: string) (movies: MovieListItem list) : LibrarySearchResult list =
+let filterLibrary (query: string) (movies: MovieListItem list) (series: SeriesListItem list) : LibrarySearchResult list =
     if query = "" then []
     else
         let q = query.ToLowerInvariant()
-        movies
-        |> List.filter (fun m -> m.Name.ToLowerInvariant().Contains(q))
+        let movieResults =
+            movies
+            |> List.filter (fun m -> m.Name.ToLowerInvariant().Contains(q))
+            |> List.map (fun m ->
+                { Slug = m.Slug
+                  Name = m.Name
+                  Year = m.Year
+                  PosterRef = m.PosterRef
+                  MediaType = MediaType.Movie })
+        let seriesResults =
+            series
+            |> List.filter (fun s -> s.Name.ToLowerInvariant().Contains(q))
+            |> List.map (fun s ->
+                { Slug = s.Slug
+                  Name = s.Name
+                  Year = s.Year
+                  PosterRef = s.PosterRef
+                  MediaType = MediaType.Series })
+        (movieResults @ seriesResults)
+        |> List.sortBy (fun r -> r.Name.ToLowerInvariant())
         |> List.truncate 10
-        |> List.map (fun m ->
-            { Slug = m.Slug
-              Name = m.Name
-              Year = m.Year
-              PosterRef = m.PosterRef
-              MediaType = MediaType.Movie })
 
 let view (model: Model) (dispatch: Msg -> unit) =
-    let localResults = filterLibrary model.Query model.LibraryMovies
+    let localResults = filterLibrary model.Query model.LibraryMovies model.LibrarySeries
 
     let headerExtra = [
         Daisy.input [
             prop.className "w-full mb-4"
-            prop.placeholder "Search movies..."
+            prop.placeholder "Search movies & series..."
             prop.value model.Query
             prop.autoFocus true
             prop.onChange (Query_changed >> dispatch)
@@ -111,7 +125,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                         for result in localResults do
                                             Html.div [
                                                 prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 cursor-pointer transition-colors"
-                                                prop.onClick (fun _ -> dispatch (Navigate_to result.Slug))
+                                                prop.onClick (fun _ -> dispatch (Navigate_to (result.Slug, result.MediaType)))
                                                 prop.children [
                                                     match result.PosterRef with
                                                     | Some ref ->
@@ -124,7 +138,9 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         Html.div [
                                                             prop.className "w-10 h-15 rounded bg-base-300 flex items-center justify-center"
                                                             prop.children [
-                                                                Icons.movie ()
+                                                                match result.MediaType with
+                                                                | Movie -> Icons.movie ()
+                                                                | Series -> Icons.tv ()
                                                             ]
                                                         ]
                                                     Html.div [
@@ -143,7 +159,11 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     Daisy.badge [
                                                         badge.success
                                                         badge.sm
-                                                        prop.text "In Library"
+                                                        prop.text (
+                                                            match result.MediaType with
+                                                            | Movie -> "Movie"
+                                                            | Series -> "Series"
+                                                        )
                                                     ]
                                                 ]
                                             ]
@@ -178,7 +198,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                         for result in model.TmdbResults do
                                             Html.div [
                                                 prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 cursor-pointer transition-colors"
-                                                prop.onClick (fun _ -> dispatch (Import result.TmdbId))
+                                                prop.onClick (fun _ -> dispatch (Import (result.TmdbId, result.MediaType)))
                                                 prop.children [
                                                     match result.PosterPath with
                                                     | Some path ->
@@ -190,7 +210,11 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     | None ->
                                                         Html.div [
                                                             prop.className "w-10 h-15 rounded bg-base-300 flex items-center justify-center text-xs"
-                                                            prop.text "?"
+                                                            prop.children [
+                                                                match result.MediaType with
+                                                                | Movie -> Icons.movie ()
+                                                                | Series -> Icons.tv ()
+                                                            ]
                                                         ]
                                                     Html.div [
                                                         prop.className "flex-1"
@@ -208,6 +232,17 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                             | None -> ()
                                                         ]
                                                     ]
+                                                    Daisy.badge [
+                                                        badge.sm
+                                                        match result.MediaType with
+                                                        | Movie -> badge.info
+                                                        | Series -> badge.secondary
+                                                        prop.text (
+                                                            match result.MediaType with
+                                                            | Movie -> "Movie"
+                                                            | Series -> "Series"
+                                                        )
+                                                    ]
                                                     Daisy.button.button [
                                                         button.sm
                                                         button.primary
@@ -215,7 +250,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         prop.text "Import"
                                                         prop.onClick (fun e ->
                                                             e.stopPropagation()
-                                                            dispatch (Import result.TmdbId)
+                                                            dispatch (Import (result.TmdbId, result.MediaType))
                                                         )
                                                     ]
                                                 ]

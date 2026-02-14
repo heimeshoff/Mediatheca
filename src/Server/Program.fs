@@ -75,6 +75,7 @@ let main args =
         FriendProjection.handler
         ContentBlockProjection.handler
         CatalogProjection.handler
+        SeriesProjection.handler
     ]
 
     // Rebuild movie projection once to fix want_to_watch_with data, then catch up all projections

@@ -1,6 +1,6 @@
 # Roadmap
 
-## Current Milestone: v1 — Movies-Only MVP
+## Current Milestone: v1 — Personal Media Tracker
 
 | Phase | Name | Status | Requirements |
 |-------|------|--------|--------------|
@@ -9,6 +9,7 @@
 | 3 | Journal + Content Blocks | :white_check_mark: Done | REQ-016, REQ-017, REQ-018, REQ-019, REQ-020, REQ-021 |
 | 4 | Curation + Dashboards + Admin | :white_check_mark: Done | REQ-022, REQ-023, REQ-024, REQ-025, REQ-026, REQ-027, REQ-028 |
 | 5 | Design System (Style Guide) | :white_check_mark: Done | REQ-029, REQ-030, REQ-031, REQ-032, REQ-033 |
+| 6 | TV Series | :white_check_mark: Done | REQ-100, REQ-101, REQ-101a, REQ-101b, REQ-102, REQ-102a, REQ-102b, REQ-102c |
 
 ### Phase 1: Skeleton
 
@@ -69,6 +70,22 @@ Deliverable: A living style guide page that serves as the single source of truth
 - Design token documentation: typography, colors, spacing, shapes, glassmorphism, with rationale
 - Extract components and tokens so Style Guide is the canonical definition, app pages consume from it
 - Skills/agents for propagating Style Guide changes to all application pages
+
+### Phase 6: TV Series
+
+Deliverable: Users can add TV series via TMDB import, browse seasons and episodes, track episode-level watch progress with friends, and view a series dashboard with progress and next-to-watch.
+
+- TV Series aggregate: Series > Season > Episode hierarchy, fat TMDB import, SeriesStatus tracking
+- TMDB API integration: search TV series, import series/season/episode metadata + images (posters, backdrops, episode stills)
+- Named rewatch sessions: default personal + named sessions with friends, independent episode progress per session
+- Batch operations: mark season watched, mark episodes watched up to S##E##
+- Social features: recommended_by, want_to_watch_with, personal_rating, content_blocks (full parity with Movies)
+- Series detail page: hero with backdrop, tab bar, season sidebar with progress, episode list with watch status, "next up", rewatch session selector
+- Series list page with search/filtering, poster grid/list, series status badges
+- Polymorphic catalog entries: catalogs can hold Movies and Series
+- TV Series dashboard: episode progress, next-to-watch across all series
+
+**Status: Domain model complete. Ready for implementation.**
 
 ## Completed Milestones
 

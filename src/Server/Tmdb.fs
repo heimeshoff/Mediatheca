@@ -208,7 +208,8 @@ module Tmdb =
                               Title = r.Title
                               Year = parseYear r.ReleaseDate
                               Overview = r.Overview
-                              PosterPath = r.PosterPath }
+                              PosterPath = r.PosterPath
+                              MediaType = Mediatheca.Shared.Movie }
                         )
                     SearchCache.set query results
                     return results
@@ -260,4 +261,222 @@ module Tmdb =
             if not (System.IO.Directory.Exists(dir)) then
                 System.IO.Directory.CreateDirectory(dir) |> ignore
             System.IO.File.WriteAllBytes(destPath, bytes)
+        }
+
+    // ─── TV Series types ────────────────────────────────────────────────
+
+    type TmdbTvEpisode = {
+        EpisodeNumber: int
+        Name: string
+        Overview: string
+        AirDate: string option
+        Runtime: int option
+        StillPath: string option
+        VoteAverage: float
+    }
+
+    type TmdbTvSeasonSummary = {
+        SeasonNumber: int
+        Name: string
+        Overview: string
+        PosterPath: string option
+        AirDate: string option
+        EpisodeCount: int
+    }
+
+    type TmdbTvSearchResult = {
+        Id: int
+        Name: string
+        FirstAirDate: string option
+        Overview: string
+        PosterPath: string option
+        VoteAverage: float
+    }
+
+    type TmdbTvDetailsResponse = {
+        Id: int
+        Name: string
+        FirstAirDate: string option
+        Overview: string
+        Genres: TmdbGenre list
+        PosterPath: string option
+        BackdropPath: string option
+        VoteAverage: float
+        Status: string
+        NumberOfSeasons: int
+        NumberOfEpisodes: int
+        EpisodeRunTime: int list
+        Seasons: TmdbTvSeasonSummary list
+    }
+
+    type TmdbTvSeasonResponse = {
+        SeasonNumber: int
+        Name: string
+        Overview: string
+        PosterPath: string option
+        AirDate: string option
+        Episodes: TmdbTvEpisode list
+    }
+
+    // ─── TV Series decoders ─────────────────────────────────────────────
+
+    let private decodeTvSearchResult: Decoder<TmdbTvSearchResult> =
+        Decode.object (fun get -> {
+            Id = get.Required.Field "id" Decode.int
+            Name = get.Required.Field "name" Decode.string
+            FirstAirDate = get.Optional.Field "first_air_date" Decode.string
+            Overview = get.Required.Field "overview" Decode.string
+            PosterPath = get.Optional.Field "poster_path" Decode.string
+            VoteAverage = get.Optional.Field "vote_average" Decode.float |> Option.defaultValue 0.0
+        })
+
+    let private decodeTvSearchResponse: Decoder<{| Results: TmdbTvSearchResult list |}> =
+        Decode.object (fun get -> {| Results = get.Required.Field "results" (Decode.list decodeTvSearchResult) |})
+
+    let private decodeTvSeasonSummary: Decoder<TmdbTvSeasonSummary> =
+        Decode.object (fun get -> {
+            SeasonNumber = get.Required.Field "season_number" Decode.int
+            Name = get.Required.Field "name" Decode.string
+            Overview = get.Required.Field "overview" Decode.string
+            PosterPath = get.Optional.Field "poster_path" Decode.string
+            AirDate = get.Optional.Field "air_date" Decode.string
+            EpisodeCount = get.Required.Field "episode_count" Decode.int
+        })
+
+    let private decodeTvDetails: Decoder<TmdbTvDetailsResponse> =
+        Decode.object (fun get -> {
+            Id = get.Required.Field "id" Decode.int
+            Name = get.Required.Field "name" Decode.string
+            FirstAirDate = get.Optional.Field "first_air_date" Decode.string
+            Overview = get.Required.Field "overview" Decode.string
+            Genres = get.Required.Field "genres" (Decode.list decodeGenre)
+            PosterPath = get.Optional.Field "poster_path" Decode.string
+            BackdropPath = get.Optional.Field "backdrop_path" Decode.string
+            VoteAverage = get.Optional.Field "vote_average" Decode.float |> Option.defaultValue 0.0
+            Status = get.Required.Field "status" Decode.string
+            NumberOfSeasons = get.Required.Field "number_of_seasons" Decode.int
+            NumberOfEpisodes = get.Required.Field "number_of_episodes" Decode.int
+            EpisodeRunTime = get.Optional.Field "episode_run_time" (Decode.list Decode.int) |> Option.defaultValue []
+            Seasons = get.Required.Field "seasons" (Decode.list decodeTvSeasonSummary)
+        })
+
+    let private decodeTvEpisode: Decoder<TmdbTvEpisode> =
+        Decode.object (fun get -> {
+            EpisodeNumber = get.Required.Field "episode_number" Decode.int
+            Name = get.Required.Field "name" Decode.string
+            Overview = get.Required.Field "overview" Decode.string
+            AirDate = get.Optional.Field "air_date" Decode.string
+            Runtime = get.Optional.Field "runtime" Decode.int
+            StillPath = get.Optional.Field "still_path" Decode.string
+            VoteAverage = get.Optional.Field "vote_average" Decode.float |> Option.defaultValue 0.0
+        })
+
+    let private decodeTvSeasonResponse: Decoder<TmdbTvSeasonResponse> =
+        Decode.object (fun get -> {
+            SeasonNumber = get.Required.Field "season_number" Decode.int
+            Name = get.Required.Field "name" Decode.string
+            Overview = get.Required.Field "overview" Decode.string
+            PosterPath = get.Optional.Field "poster_path" Decode.string
+            AirDate = get.Optional.Field "air_date" Decode.string
+            Episodes = get.Required.Field "episodes" (Decode.list decodeTvEpisode)
+        })
+
+    // ─── TV Series status mapping ───────────────────────────────────────
+
+    let mapSeriesStatus (tmdbStatus: string) : string =
+        match tmdbStatus with
+        | "Returning Series" -> "Returning"
+        | "Ended" -> "Ended"
+        | "Canceled" -> "Canceled"
+        | "In Production" -> "InProduction"
+        | "Planned" -> "Planned"
+        | _ -> "Unknown"
+
+    // ─── TV Series API functions ────────────────────────────────────────
+
+    let searchTvSeries (httpClient: HttpClient) (config: TmdbConfig) (query: string) : Async<Mediatheca.Shared.TmdbSearchResult list> =
+        async {
+            let cacheKey = $"tv:{query}"
+            match SearchCache.tryGet cacheKey with
+            | Some cached -> return cached
+            | None ->
+                let url = $"https://api.themoviedb.org/3/search/tv?api_key={config.ApiKey}&query={System.Uri.EscapeDataString(query)}&language=en-US&page=1"
+                let! json = fetchJson httpClient url
+                match Decode.fromString decodeTvSearchResponse json with
+                | Ok response ->
+                    let results : Mediatheca.Shared.TmdbSearchResult list =
+                        response.Results
+                        |> List.map (fun r ->
+                            { TmdbId = r.Id
+                              Title = r.Name
+                              Year = parseYear r.FirstAirDate
+                              Overview = r.Overview
+                              PosterPath = r.PosterPath
+                              MediaType = Mediatheca.Shared.Series }
+                        )
+                    SearchCache.set cacheKey results
+                    return results
+                | Error _ -> return []
+        }
+
+    let getTvSeriesDetails (httpClient: HttpClient) (config: TmdbConfig) (tmdbId: int) : Async<Result<TmdbTvDetailsResponse, string>> =
+        async {
+            let url = $"https://api.themoviedb.org/3/tv/{tmdbId}?api_key={config.ApiKey}&language=en-US"
+            let! json = fetchJson httpClient url
+            match Decode.fromString decodeTvDetails json with
+            | Ok details -> return Ok details
+            | Error e -> return Error $"Failed to parse TMDB TV series details: {e}"
+        }
+
+    let getTvSeasonDetails (httpClient: HttpClient) (config: TmdbConfig) (tmdbId: int) (seasonNumber: int) : Async<Result<TmdbTvSeasonResponse, string>> =
+        async {
+            let url = $"https://api.themoviedb.org/3/tv/{tmdbId}/season/{seasonNumber}?api_key={config.ApiKey}&language=en-US"
+            let! json = fetchJson httpClient url
+            match Decode.fromString decodeTvSeasonResponse json with
+            | Ok season -> return Ok season
+            | Error e -> return Error $"Failed to parse TMDB TV season details: {e}"
+        }
+
+    let getTvSeriesCredits (httpClient: HttpClient) (config: TmdbConfig) (tmdbId: int) : Async<Result<TmdbCreditsResponse, string>> =
+        async {
+            let url = $"https://api.themoviedb.org/3/tv/{tmdbId}/credits?api_key={config.ApiKey}&language=en-US"
+            let! json = fetchJson httpClient url
+            match Decode.fromString decodeCredits json with
+            | Ok credits -> return Ok credits
+            | Error e -> return Error $"Failed to parse TMDB TV series credits: {e}"
+        }
+
+    let downloadSeriesImages (httpClient: HttpClient) (config: TmdbConfig) (slug: string) (posterPath: string option) (backdropPath: string option) (imageBasePath: string) : Async<string option * string option> =
+        async {
+            let posterRef =
+                match posterPath with
+                | Some p ->
+                    let ref = $"posters/series-{slug}.jpg"
+                    try
+                        downloadImage httpClient config p "w500" (System.IO.Path.Combine(imageBasePath, ref))
+                        |> Async.RunSynchronously
+                        Some ref
+                    with _ -> None
+                | None -> None
+            let backdropRef =
+                match backdropPath with
+                | Some p ->
+                    let ref = $"backdrops/series-{slug}.jpg"
+                    try
+                        downloadImage httpClient config p "w1280" (System.IO.Path.Combine(imageBasePath, ref))
+                        |> Async.RunSynchronously
+                        Some ref
+                    with _ -> None
+                | None -> None
+            return (posterRef, backdropRef)
+        }
+
+    let downloadEpisodeStill (httpClient: HttpClient) (config: TmdbConfig) (slug: string) (seasonNumber: int) (episodeNumber: int) (stillPath: string) (imageBasePath: string) : Async<string option> =
+        async {
+            let ref = $"stills/{slug}-s%02d{seasonNumber}e%02d{episodeNumber}.jpg"
+            try
+                downloadImage httpClient config stillPath "w300" (System.IO.Path.Combine(imageBasePath, ref))
+                |> Async.RunSynchronously
+                return Some ref
+            with _ -> return None
         }
