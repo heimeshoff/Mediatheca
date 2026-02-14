@@ -6,6 +6,14 @@
 
 ## Recent Progress
 
+- **2026-02-14**: Redesigned content blocks — removed card styling, removed link subtype, inline markdown links
+  - Blocks render as plain text on background (no cards, no glass effects)
+  - Removed "link" as a separate block type; all blocks are text blocks
+  - Inline links via markdown `[text](url)` syntax, rendered as clickable `<a>` tags
+  - Smart paste preserved: select text + paste URL creates inline `[text](url)` link
+  - Replaced "+" button with always-visible "new block" watermark placeholder
+  - Legacy link blocks auto-converted to inline markdown format on display
+  - Updated Style Guide section to reflect new design
 - **2026-02-14**: Added Content Blocks section to Style Guide
   - Live interactive demo with mock data (add, edit, remove text/link blocks)
   - Block type documentation (text, link, image)

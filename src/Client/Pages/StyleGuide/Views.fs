@@ -1196,8 +1196,8 @@ let private componentsSection () =
 let private contentBlocksDemo () =
     let blocks, setBlocks = React.useState<ContentBlockDto list>([
         { BlockId = "demo-1"; BlockType = "text"; Content = "This is a text note. Click the pencil icon to edit, or the X to remove."; ImageRef = None; Url = None; Caption = None; Position = 0 }
-        { BlockId = "demo-2"; BlockType = "link"; Content = "Fable Documentation"; ImageRef = None; Url = Some "https://fable.io/docs/"; Caption = None; Position = 1 }
-        { BlockId = "demo-3"; BlockType = "text"; Content = "Notes support plain text, links (auto-detected from URLs), and smart paste (select text, paste a URL to create a named link)."; ImageRef = None; Url = None; Caption = None; Position = 2 }
+        { BlockId = "demo-2"; BlockType = "text"; Content = "Check out [Fable Documentation](https://fable.io/docs/) for more info on the compiler."; ImageRef = None; Url = None; Caption = None; Position = 1 }
+        { BlockId = "demo-3"; BlockType = "text"; Content = "Select text in the input and paste a URL to create an inline link."; ImageRef = None; Url = None; Caption = None; Position = 2 }
     ])
     let nextId, setNextId = React.useState(4)
 
@@ -1231,13 +1231,13 @@ let private contentBlocksSection () =
         prop.children [
             sectionTitle "Content Blocks"
 
-            decision "The content block system lets users attach rich notes to movies -- plain text, links, and (future) images. Blocks are event-sourced and ordered by position. The editor auto-detects URLs and supports smart paste (select text + paste URL = named link)."
+            decision "The content block system lets users attach rich notes to movies. All blocks are text blocks that can contain inline links via markdown-style [text](url) syntax. Blocks are event-sourced and ordered by position. Smart paste: select text and paste a URL to create an inline link."
 
             subheading "Live Demo"
 
             Html.p [
                 prop.className DesignSystem.secondaryText
-                prop.text "Try adding, editing, and removing blocks below. Click + to add, type text or paste a URL, and press Enter to save. Hover over a block to see edit/remove controls."
+                prop.text "Try adding, editing, and removing blocks below. Type in the \"new block\" placeholder and press Enter to save. Select text in the input and paste a URL to create an inline link. Hover over a block to see edit/remove controls."
             ]
 
             Html.div [
@@ -1250,7 +1250,7 @@ let private contentBlocksSection () =
             subheading "Block Types"
 
             Html.div [
-                prop.className "grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl"
+                prop.className "grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl"
                 prop.children [
                     Html.div [
                         prop.className (DesignSystem.glassSubtle + " p-5 rounded-xl border border-base-content/5")
@@ -1261,28 +1261,11 @@ let private contentBlocksSection () =
                             ]
                             Html.p [
                                 prop.className DesignSystem.secondaryText
-                                prop.text "Free-form text notes. Stored as plain text with whitespace preserved. Rendered in a subtle glass card."
+                                prop.text "Free-form text notes with optional inline links. Links are created via smart paste using [text](url) markdown syntax. Rendered as plain text on the background."
                             ]
                             Html.code [
                                 prop.className "block mt-3 text-xs font-mono text-base-content/50 bg-base-300/30 p-2 rounded"
                                 prop.text "BlockType = \"text\""
-                            ]
-                        ]
-                    ]
-                    Html.div [
-                        prop.className (DesignSystem.glassSubtle + " p-5 rounded-xl border border-base-content/5")
-                        prop.children [
-                            Html.h4 [
-                                prop.className (DesignSystem.subtitle + " text-primary mb-2")
-                                prop.text "Link Block"
-                            ]
-                            Html.p [
-                                prop.className DesignSystem.secondaryText
-                                prop.text "URL references with optional display text. Auto-detected when input starts with http(s)://. Smart paste creates named links."
-                            ]
-                            Html.code [
-                                prop.className "block mt-3 text-xs font-mono text-base-content/50 bg-base-300/30 p-2 rounded"
-                                prop.text "BlockType = \"link\""
                             ]
                         ]
                     ]
@@ -1367,9 +1350,8 @@ let private contentBlocksSection () =
                         prop.children [
                             for (keys, desc) in [
                                 "Enter", "Save the current block"
-                                "Escape", "Cancel editing / adding"
-                                "Paste URL", "Auto-detect and create a link block"
-                                "Select text + Paste URL", "Create a named link (display text = selection, href = pasted URL)"
+                                "Escape", "Cancel editing"
+                                "Select text + Paste URL", "Create an inline [text](url) link in the content"
                                 "Hover block", "Reveal edit (pencil) and delete (X) controls"
                             ] do
                                 Html.div [
@@ -1394,18 +1376,18 @@ let private contentBlocksSection () =
 
             decisionBox
                 "Inline Editing"
-                "Edit-in-place with Enter/Escape keyboard shortcuts. Cards transform into input fields on edit, keeping the user in context. No modal dialogs for simple text edits."
-                "Separate edit modal (too heavy for quick notes). Markdown editor (overkill for short text notes and links)."
+                "Edit-in-place with Enter/Escape keyboard shortcuts. Blocks transform into input fields on edit, keeping the user in context. No modal dialogs for simple text edits."
+                "Separate edit modal (too heavy for quick notes). Markdown editor (overkill for short text notes)."
 
             decisionBox
                 "Smart Paste"
-                "Pasting a URL when text is selected creates a named link automatically. This mirrors how rich text editors work and saves the user from manually filling two fields."
-                "Always creating plain text blocks from paste (loses the opportunity to create structured links)."
+                "Pasting a URL when text is selected wraps it as a markdown link [text](url) inline. This mirrors how rich text editors work and keeps links as part of the text flow rather than separate block types."
+                "Separate link block type (adds complexity, breaks text flow). Always creating plain text from paste (loses structured links)."
 
             decisionBox
-                "Glass Subtle Styling"
-                "Content block cards use glassSubtle (bg-base-100/50 backdrop-blur-sm) -- lightweight and unobtrusive. Notes are secondary content that shouldn't compete with the movie poster or primary metadata."
-                "Full glassCard (too visually heavy for inline content). Fully opaque cards (break the glassmorphism convention)."
+                "No-Card Styling"
+                "Content blocks render as plain text on the background -- no cards, no glass effects. Blocks are secondary content that should feel like natural text, not UI elements. New blocks appear via a subtle \"new block\" placeholder."
+                "Glass cards (too visually heavy, makes notes feel like separate components). Fully styled cards (compete with primary movie metadata)."
         ]
     ]
 

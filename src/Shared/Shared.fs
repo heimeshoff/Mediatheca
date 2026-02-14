@@ -119,7 +119,6 @@ type RecordWatchSessionRequest = {
 type ContentBlockType =
     | TextBlock
     | ImageBlock
-    | LinkBlock
 
 type ContentBlockDto = {
     BlockId: string
