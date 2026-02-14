@@ -685,7 +685,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                     prop.children [
                                         // Catalogs
                                         Html.div [
-                                            prop.className "flex flex-wrap items-center gap-2"
+                                            prop.className "flex flex-wrap items-center gap-2 -mt-4"
                                             prop.children [
                                                 // Add to catalog button
                                                 Html.button [
@@ -700,7 +700,14 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     Html.span [
                                                         prop.className "inline-flex items-center gap-1.5 bg-transparent border border-base-content/20 text-base-content/70 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors hover:border-base-content/40 group/pill"
                                                         prop.children [
-                                                            Html.span [ prop.text cat.Name ]
+                                                            Html.a [
+                                                                prop.className "cursor-pointer hover:text-primary transition-colors"
+                                                                prop.href (Feliz.Router.Router.format ("catalogs", cat.Slug))
+                                                                prop.onClick (fun e ->
+                                                                    e.preventDefault()
+                                                                    Feliz.Router.Router.navigate ("catalogs", cat.Slug))
+                                                                prop.text cat.Name
+                                                            ]
                                                             Html.button [
                                                                 prop.className "text-base-content/30 hover:text-error transition-colors cursor-pointer opacity-0 group-hover/pill:opacity-100"
                                                                 prop.onClick (fun e ->
