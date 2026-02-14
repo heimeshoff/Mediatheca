@@ -668,15 +668,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                 ]
                                                             ]
                                                         | None -> ()
-                                                        // Add to Catalog button
-                                                        Html.button [
-                                                            prop.className "inline-flex items-center gap-2 bg-base-100/50 backdrop-blur-sm border border-base-content/15 hover:bg-base-100/70 text-base-content px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
-                                                            prop.onClick (fun _ -> dispatch Open_catalog_picker)
-                                                            prop.children [
-                                                                Icons.catalog ()
-                                                                Html.span [ prop.text "Add to Catalog" ]
-                                                            ]
-                                                        ]
                                                         // Selected catalog pills
                                                         for cat in model.MovieCatalogs do
                                                             Html.span [
@@ -692,6 +683,14 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                     ]
                                                                 ]
                                                             ]
+                                                        // Add to catalog button
+                                                        Html.button [
+                                                            prop.className "w-7 h-7 rounded-full bg-base-100/50 backdrop-blur-sm border border-base-content/15 hover:bg-base-100/70 text-base-content/50 hover:text-base-content flex items-center justify-center transition-colors cursor-pointer"
+                                                            prop.onClick (fun _ -> dispatch Open_catalog_picker)
+                                                            prop.children [
+                                                                Html.span [ prop.className "text-sm font-bold"; prop.text "+" ]
+                                                            ]
+                                                        ]
                                                     ]
                                                 ]
                                             ]
