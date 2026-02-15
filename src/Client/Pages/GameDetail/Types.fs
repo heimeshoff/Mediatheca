@@ -8,6 +8,8 @@ type FriendPickerKind =
     | Played_with_picker
     | Family_owner_picker
 
+type ImagePickerKind = Cover_picker | Backdrop_picker
+
 type Model = {
     Slug: string
     Game: GameDetail option
@@ -23,6 +25,10 @@ type Model = {
     HltbInput: string
     IsEditingHltb: bool
     ConfirmingRemove: bool
+    ShowImagePicker: ImagePickerKind option
+    ImageCandidates: GameImageCandidate list
+    IsLoadingImages: bool
+    IsSelectingImage: bool
     Error: string option
 }
 
@@ -76,6 +82,11 @@ type Msg =
     | Remove_from_catalog of catalogSlug: string * entryId: string
     | Create_catalog_and_add of name: string
     | Catalog_result of Result<unit, string>
+    | Open_image_picker of ImagePickerKind
+    | Close_image_picker
+    | Image_candidates_loaded of GameImageCandidate list
+    | Select_image of url: string
+    | Image_selected of Result<unit, string>
     | Confirm_remove_game
     | Cancel_remove_game
     | Remove_game

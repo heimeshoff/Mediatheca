@@ -17,11 +17,36 @@ let init () : Model * Cmd<Msg> =
       IsSavingRawg = false
       RawgTestResult = None
       RawgSaveResult = None
+      SteamApiKey = ""
+      SteamKeyInput = ""
+      IsTestingSteam = false
+      IsSavingSteam = false
+      SteamTestResult = None
+      SteamSaveResult = None
+      SteamId = ""
+      SteamIdInput = ""
+      IsSavingSteamId = false
+      SteamIdSaveResult = None
+      IsResolvingVanity = false
+      VanityInput = ""
+      VanityResult = None
+      IsImportingSteam = false
+      SteamImportResult = None
+      SteamFamilyToken = ""
+      SteamFamilyTokenInput = ""
+      IsSavingFamilyToken = false
+      FamilyTokenSaveResult = None
+      SteamFamilyMembers = []
+      Friends = []
+      IsFetchingFamilyMembers = false
+      FetchFamilyMembersResult = None
+      IsImportingSteamFamily = false
+      SteamFamilyImportResult = None
       CinemarcoDbPath = ""
       CinemarcoImagesPath = ""
       IsImporting = false
       ImportResult = None },
-    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key ]
+    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends ]
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
@@ -102,6 +127,178 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             | Ok () -> Cmd.ofMsg Load_rawg_key
             | Error _ -> Cmd.none
         { model with IsSavingRawg = false; RawgSaveResult = Some saveResult }, cmd
+
+    // Steam Integration
+    | Load_steam_key ->
+        model, Cmd.OfAsync.perform api.getSteamApiKey () Steam_key_loaded
+
+    | Steam_key_loaded key ->
+        { model with SteamApiKey = key }, Cmd.none
+
+    | Steam_key_input_changed value ->
+        { model with SteamKeyInput = value; SteamTestResult = None; SteamSaveResult = None }, Cmd.none
+
+    | Test_steam_key ->
+        { model with IsTestingSteam = true; SteamTestResult = None },
+        Cmd.OfAsync.either api.testSteamApiKey model.SteamKeyInput
+            Steam_test_result
+            (fun ex -> Steam_test_result (Error ex.Message))
+
+    | Steam_test_result result ->
+        let testResult =
+            match result with
+            | Ok () -> Ok "Connection successful"
+            | Error e -> Error e
+        { model with IsTestingSteam = false; SteamTestResult = Some testResult }, Cmd.none
+
+    | Save_steam_key ->
+        { model with IsSavingSteam = true; SteamSaveResult = None },
+        Cmd.OfAsync.either api.setSteamApiKey model.SteamKeyInput
+            Steam_save_result
+            (fun ex -> Steam_save_result (Error ex.Message))
+
+    | Steam_save_result result ->
+        let saveResult =
+            match result with
+            | Ok () -> Ok "API key saved"
+            | Error e -> Error e
+        let cmd =
+            match result with
+            | Ok () -> Cmd.ofMsg Load_steam_key
+            | Error _ -> Cmd.none
+        { model with IsSavingSteam = false; SteamSaveResult = Some saveResult }, cmd
+
+    | Load_steam_id ->
+        model, Cmd.OfAsync.perform api.getSteamId () Steam_id_loaded
+
+    | Steam_id_loaded steamId ->
+        { model with SteamId = steamId; SteamIdInput = steamId }, Cmd.none
+
+    | Steam_id_input_changed value ->
+        { model with SteamIdInput = value; SteamIdSaveResult = None }, Cmd.none
+
+    | Save_steam_id ->
+        { model with IsSavingSteamId = true; SteamIdSaveResult = None },
+        Cmd.OfAsync.either api.setSteamId model.SteamIdInput
+            Steam_id_save_result
+            (fun ex -> Steam_id_save_result (Error ex.Message))
+
+    | Steam_id_save_result result ->
+        let saveResult =
+            match result with
+            | Ok () -> Ok "Steam ID saved"
+            | Error e -> Error e
+        let cmd =
+            match result with
+            | Ok () -> Cmd.ofMsg Load_steam_id
+            | Error _ -> Cmd.none
+        { model with IsSavingSteamId = false; SteamIdSaveResult = Some saveResult }, cmd
+
+    | Vanity_input_changed value ->
+        { model with VanityInput = value; VanityResult = None }, Cmd.none
+
+    | Resolve_vanity_url ->
+        { model with IsResolvingVanity = true; VanityResult = None },
+        Cmd.OfAsync.either api.resolveSteamVanityUrl model.VanityInput
+            Vanity_resolved
+            (fun ex -> Vanity_resolved (Error ex.Message))
+
+    | Vanity_resolved result ->
+        match result with
+        | Ok steamId ->
+            { model with IsResolvingVanity = false; VanityResult = Some (Ok steamId); SteamIdInput = steamId }, Cmd.none
+        | Error e ->
+            { model with IsResolvingVanity = false; VanityResult = Some (Error e) }, Cmd.none
+
+    | Import_steam_library ->
+        { model with IsImportingSteam = true; SteamImportResult = None },
+        Cmd.OfAsync.either api.importSteamLibrary ()
+            Steam_import_completed
+            (fun ex -> Steam_import_completed (Error ex.Message))
+
+    | Steam_import_completed result ->
+        { model with IsImportingSteam = false; SteamImportResult = Some result }, Cmd.none
+
+    // Steam Family
+    | Load_steam_family_token ->
+        model, Cmd.OfAsync.perform api.getSteamFamilyToken () Steam_family_token_loaded
+
+    | Steam_family_token_loaded token ->
+        { model with SteamFamilyToken = token }, Cmd.none
+
+    | Steam_family_token_input_changed value ->
+        { model with SteamFamilyTokenInput = value; FamilyTokenSaveResult = None }, Cmd.none
+
+    | Save_steam_family_token ->
+        { model with IsSavingFamilyToken = true; FamilyTokenSaveResult = None },
+        Cmd.OfAsync.either api.setSteamFamilyToken model.SteamFamilyTokenInput
+            Steam_family_token_save_result
+            (fun ex -> Steam_family_token_save_result (Error ex.Message))
+
+    | Steam_family_token_save_result result ->
+        let saveResult =
+            match result with
+            | Ok () -> Ok "Family token saved"
+            | Error e -> Error e
+        let cmd =
+            match result with
+            | Ok () -> Cmd.ofMsg Load_steam_family_token
+            | Error _ -> Cmd.none
+        { model with IsSavingFamilyToken = false; FamilyTokenSaveResult = Some saveResult }, cmd
+
+    | Load_steam_family_members ->
+        model, Cmd.OfAsync.perform api.getSteamFamilyMembers () Steam_family_members_loaded
+
+    | Steam_family_members_loaded members ->
+        { model with SteamFamilyMembers = members }, Cmd.none
+
+    | Fetch_steam_family_members ->
+        { model with IsFetchingFamilyMembers = true; FetchFamilyMembersResult = None },
+        Cmd.OfAsync.either api.fetchSteamFamilyMembers ()
+            Steam_family_members_fetched
+            (fun ex -> Steam_family_members_fetched (Error ex.Message))
+
+    | Steam_family_members_fetched result ->
+        match result with
+        | Ok members ->
+            { model with
+                IsFetchingFamilyMembers = false
+                FetchFamilyMembersResult = Some (Ok (sprintf "Found %d family members" members.Length))
+                SteamFamilyMembers = members }, Cmd.none
+        | Error e ->
+            { model with
+                IsFetchingFamilyMembers = false
+                FetchFamilyMembersResult = Some (Error e) }, Cmd.none
+
+    | Load_friends ->
+        model, Cmd.OfAsync.perform api.getFriends () Friends_loaded
+
+    | Friends_loaded friends ->
+        { model with Friends = friends }, Cmd.none
+
+    | Update_family_member_friend (steamId, friendSlug) ->
+        let updated =
+            model.SteamFamilyMembers |> List.map (fun m ->
+                if m.SteamId = steamId then { m with FriendSlug = friendSlug }
+                else m)
+        { model with SteamFamilyMembers = updated }, Cmd.none
+
+    | Save_steam_family_members ->
+        model, Cmd.OfAsync.either api.setSteamFamilyMembers model.SteamFamilyMembers
+            Steam_family_members_save_result
+            (fun ex -> Steam_family_members_save_result (Error ex.Message))
+
+    | Steam_family_members_save_result _ ->
+        model, Cmd.none
+
+    | Import_steam_family ->
+        { model with IsImportingSteamFamily = true; SteamFamilyImportResult = None },
+        Cmd.OfAsync.either api.importSteamFamily ()
+            Steam_family_import_completed
+            (fun ex -> Steam_family_import_completed (Error ex.Message))
+
+    | Steam_family_import_completed result ->
+        { model with IsImportingSteamFamily = false; SteamFamilyImportResult = Some result }, Cmd.none
 
     | Cinemarco_db_path_changed value ->
         { model with CinemarcoDbPath = value; ImportResult = None }, Cmd.none

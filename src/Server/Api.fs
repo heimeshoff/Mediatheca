@@ -56,6 +56,7 @@ module Api =
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (getRawgConfig: unit -> Rawg.RawgConfig)
+        (getSteamConfig: unit -> Steam.SteamConfig)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
         : IMediathecaApi =
@@ -747,6 +748,8 @@ module Api =
                         | "Game_store_removed" -> "Game store removed"
                         | "Game_family_owner_added" -> "Game family owner added"
                         | "Game_family_owner_removed" -> "Game family owner removed"
+                        | "Game_steam_app_id_set" -> "Game linked to Steam"
+                        | "Game_play_time_set" -> "Game play time updated"
                         | other -> other.Replace("_", " ")
                     { Mediatheca.Shared.RecentActivityItem.Timestamp = e.Timestamp.ToString("o")
                       StreamId = e.StreamId
@@ -1804,6 +1807,77 @@ module Api =
                 return CatalogProjection.getCatalogsForMovie conn slug
             }
 
+            getGameImageCandidates = fun slug -> async {
+                match GameProjection.getBySlug conn slug with
+                | None -> return []
+                | Some game ->
+                    let steamCandidates =
+                        match game.SteamAppId with
+                        | Some appId ->
+                            [ { GameImageCandidate.Url = $"https://cdn.akamai.steamstatic.com/steam/apps/{appId}/library_600x900_2x.jpg"
+                                Source = "Steam"; Label = "Steam Library Cover"; IsCover = true }
+                              { Url = $"https://cdn.akamai.steamstatic.com/steam/apps/{appId}/library_hero.jpg"
+                                Source = "Steam"; Label = "Steam Library Hero"; IsCover = false }
+                              { Url = $"https://cdn.akamai.steamstatic.com/steam/apps/{appId}/header.jpg"
+                                Source = "Steam"; Label = "Steam Header"; IsCover = false } ]
+                        | None -> []
+
+                    let! rawgCandidates = async {
+                        match game.RawgId with
+                        | Some rawgId ->
+                            let rawgConfig = getRawgConfig()
+                            let! details = async {
+                                try
+                                    let! d = Rawg.getGameDetails httpClient rawgConfig rawgId
+                                    return Some d
+                                with _ -> return None
+                            }
+                            let detailCandidates =
+                                match details with
+                                | Some (d: Rawg.RawgGameDetailsResponse) ->
+                                    [ match d.BackgroundImage with
+                                      | Some url ->
+                                          { GameImageCandidate.Url = url; Source = "RAWG"; Label = "RAWG Background"; IsCover = false }
+                                      | None -> ()
+                                      match d.BackgroundImageAdditional with
+                                      | Some url ->
+                                          { Url = url; Source = "RAWG"; Label = "RAWG Background 2"; IsCover = false }
+                                      | None -> () ]
+                                | None -> []
+                            let! screenshots = Rawg.getGameScreenshots httpClient rawgConfig rawgId
+                            return detailCandidates @ screenshots
+                        | None -> return []
+                    }
+
+                    return steamCandidates @ rawgCandidates
+            }
+
+            selectGameImage = fun slug sourceUrl imageKind -> async {
+                try
+                    let! response = httpClient.GetAsync(sourceUrl) |> Async.AwaitTask
+                    response.EnsureSuccessStatusCode() |> ignore
+                    let! bytes = response.Content.ReadAsByteArrayAsync() |> Async.AwaitTask
+                    let ref =
+                        if imageKind = "cover" then $"posters/game-{slug}.jpg"
+                        else $"backdrops/game-{slug}.jpg"
+                    ImageStore.saveImage imageBasePath ref bytes
+                    let sid = Games.streamId slug
+                    let command =
+                        if imageKind = "cover" then Games.Replace_cover ref
+                        else Games.Replace_backdrop ref
+                    return
+                        executeCommand
+                            conn sid
+                            Games.Serialization.fromStoredEvent
+                            Games.reconstitute
+                            Games.decide
+                            Games.Serialization.toEventData
+                            command
+                            projectionHandlers
+                with ex ->
+                    return Error $"Failed to download image: {ex.Message}"
+            }
+
             // Games Settings
             getRawgApiKey = fun () -> async {
                 let key =
@@ -1834,6 +1908,552 @@ module Api =
                     return Ok ()
                 with ex ->
                     return Error $"RAWG API key validation failed: {ex.Message}"
+            }
+
+            // Steam Integration
+            getSteamApiKey = fun () -> async {
+                let key =
+                    SettingsStore.getSetting conn "steam_api_key"
+                    |> Option.defaultValue ""
+                if key.Length > 4 then
+                    return sprintf "****%s" (key.Substring(key.Length - 4))
+                elif key.Length > 0 then
+                    return "****"
+                else
+                    return ""
+            }
+
+            setSteamApiKey = fun key -> async {
+                try
+                    SettingsStore.setSetting conn "steam_api_key" key
+                    return Ok ()
+                with ex ->
+                    return Error $"Failed to save Steam API key: {ex.Message}"
+            }
+
+            testSteamApiKey = fun key -> async {
+                try
+                    let testConfig: Steam.SteamConfig = {
+                        ApiKey = key
+                        SteamId = "76561197960435530" // Robin Walker (Valve employee, public profile)
+                    }
+                    let! games = Steam.getOwnedGames httpClient testConfig
+                    if List.isEmpty games then
+                        return Error "API key accepted but returned no results (may be invalid)"
+                    else
+                        return Ok ()
+                with ex ->
+                    return Error $"Steam API key validation failed: {ex.Message}"
+            }
+
+            getSteamId = fun () -> async {
+                return
+                    SettingsStore.getSetting conn "steam_id"
+                    |> Option.defaultValue ""
+            }
+
+            setSteamId = fun steamId -> async {
+                try
+                    SettingsStore.setSetting conn "steam_id" steamId
+                    return Ok ()
+                with ex ->
+                    return Error $"Failed to save Steam ID: {ex.Message}"
+            }
+
+            resolveSteamVanityUrl = fun vanityUrl -> async {
+                let steamConfig = getSteamConfig()
+                if System.String.IsNullOrWhiteSpace(steamConfig.ApiKey) then
+                    return Error "Steam API key not configured"
+                else
+                    return! Steam.resolveVanityUrl httpClient steamConfig.ApiKey vanityUrl
+            }
+
+            importSteamLibrary = fun () -> async {
+                try
+                    let steamConfig = getSteamConfig()
+                    if System.String.IsNullOrWhiteSpace(steamConfig.ApiKey) || System.String.IsNullOrWhiteSpace(steamConfig.SteamId) then
+                        return Error "Steam API key and Steam ID must be configured"
+                    else
+                        let! steamGames = Steam.getOwnedGames httpClient steamConfig
+                        let mutable gamesMatched = 0
+                        let mutable gamesCreated = 0
+                        let mutable playTimeUpdated = 0
+                        let mutable errors: string list = []
+
+                        for steamGame in steamGames do
+                            try
+                                // Try to match by steam_app_id first
+                                let existingByAppId = GameProjection.findBySteamAppId conn steamGame.AppId
+                                match existingByAppId with
+                                | Some slug ->
+                                    // Matched by steam_app_id — update play time
+                                    gamesMatched <- gamesMatched + 1
+                                    let sid = Games.streamId slug
+                                    if steamGame.PlaytimeMinutes > 0 then
+                                        let result =
+                                            executeCommand conn sid
+                                                Games.Serialization.fromStoredEvent
+                                                Games.reconstitute
+                                                Games.decide
+                                                Games.Serialization.toEventData
+                                                (Games.Set_play_time steamGame.PlaytimeMinutes)
+                                                projectionHandlers
+                                        match result with
+                                        | Ok () -> playTimeUpdated <- playTimeUpdated + 1
+                                        | Error _ -> ()
+                                | None ->
+                                    // Try to match by name
+                                    let existingByName = GameProjection.findByName conn steamGame.Name
+                                    match existingByName with
+                                    | (slug, _) :: _ ->
+                                        // Matched by name — set steam_app_id, add store, update play time
+                                        gamesMatched <- gamesMatched + 1
+                                        let sid = Games.streamId slug
+                                        executeCommand conn sid
+                                            Games.Serialization.fromStoredEvent
+                                            Games.reconstitute
+                                            Games.decide
+                                            Games.Serialization.toEventData
+                                            (Games.Set_steam_app_id steamGame.AppId)
+                                            projectionHandlers |> ignore
+                                        executeCommand conn sid
+                                            Games.Serialization.fromStoredEvent
+                                            Games.reconstitute
+                                            Games.decide
+                                            Games.Serialization.toEventData
+                                            (Games.Add_store "Steam")
+                                            projectionHandlers |> ignore
+                                        if steamGame.PlaytimeMinutes > 0 then
+                                            let result =
+                                                executeCommand conn sid
+                                                    Games.Serialization.fromStoredEvent
+                                                    Games.reconstitute
+                                                    Games.decide
+                                                    Games.Serialization.toEventData
+                                                    (Games.Set_play_time steamGame.PlaytimeMinutes)
+                                                    projectionHandlers
+                                            match result with
+                                            | Ok () -> playTimeUpdated <- playTimeUpdated + 1
+                                            | Error _ -> ()
+                                    | [] ->
+                                        // No match — create new game
+                                        // Try RAWG enrichment
+                                        let rawgConfig = getRawgConfig()
+                                        let! rawgResults =
+                                            if not (System.String.IsNullOrWhiteSpace(rawgConfig.ApiKey)) then
+                                                Rawg.searchGames httpClient rawgConfig steamGame.Name
+                                            else
+                                                async { return [] }
+
+                                        let rawgMatch = rawgResults |> List.tryHead
+
+                                        let description, genres, rawgId, rawgRating, year =
+                                            match rawgMatch with
+                                            | Some r ->
+                                                let rawgYear = r.Year |> Option.defaultValue 0
+                                                "", r.Genres, Some r.RawgId, r.Rating, rawgYear
+                                            | None ->
+                                                "", [], None, None, 0
+
+                                        // Download cover from Steam CDN
+                                        let baseSlug = Slug.gameSlug steamGame.Name (if year > 0 then year else 2000)
+                                        let slug = generateUniqueSlug conn Games.streamId baseSlug
+                                        let! coverRef = Steam.downloadSteamCover httpClient steamGame.AppId slug imageBasePath
+
+                                        let gameData: Games.GameAddedData = {
+                                            Name = steamGame.Name
+                                            Year = if year > 0 then year else 0
+                                            Genres = genres
+                                            Description = description
+                                            CoverRef = coverRef
+                                            BackdropRef = None
+                                            RawgId = rawgId
+                                            RawgRating = rawgRating
+                                        }
+
+                                        let sid = Games.streamId slug
+                                        let result =
+                                            executeCommand conn sid
+                                                Games.Serialization.fromStoredEvent
+                                                Games.reconstitute
+                                                Games.decide
+                                                Games.Serialization.toEventData
+                                                (Games.Add_game gameData)
+                                                projectionHandlers
+
+                                        match result with
+                                        | Ok () ->
+                                            gamesCreated <- gamesCreated + 1
+                                            // Set steam_app_id and store
+                                            executeCommand conn sid
+                                                Games.Serialization.fromStoredEvent
+                                                Games.reconstitute
+                                                Games.decide
+                                                Games.Serialization.toEventData
+                                                (Games.Set_steam_app_id steamGame.AppId)
+                                                projectionHandlers |> ignore
+                                            executeCommand conn sid
+                                                Games.Serialization.fromStoredEvent
+                                                Games.reconstitute
+                                                Games.decide
+                                                Games.Serialization.toEventData
+                                                (Games.Add_store "Steam")
+                                                projectionHandlers |> ignore
+                                            if steamGame.PlaytimeMinutes > 0 then
+                                                let ptResult =
+                                                    executeCommand conn sid
+                                                        Games.Serialization.fromStoredEvent
+                                                        Games.reconstitute
+                                                        Games.decide
+                                                        Games.Serialization.toEventData
+                                                        (Games.Set_play_time steamGame.PlaytimeMinutes)
+                                                        projectionHandlers
+                                                match ptResult with
+                                                | Ok () -> playTimeUpdated <- playTimeUpdated + 1
+                                                | Error _ -> ()
+                                        | Error e ->
+                                            errors <- errors @ [ sprintf "Failed to create '%s': %s" steamGame.Name e ]
+                            with ex ->
+                                errors <- errors @ [ sprintf "Error processing '%s': %s" steamGame.Name ex.Message ]
+
+                        return Ok {
+                            Mediatheca.Shared.SteamImportResult.GamesMatched = gamesMatched
+                            GamesCreated = gamesCreated
+                            PlayTimeUpdated = playTimeUpdated
+                            Errors = errors
+                        }
+                with ex ->
+                    return Error $"Steam import failed: {ex.Message}"
+            }
+
+            getSteamFamilyToken = fun () -> async {
+                let token =
+                    SettingsStore.getSetting conn "steam_family_token"
+                    |> Option.defaultValue ""
+                if token.Length > 4 then
+                    return sprintf "****%s" (token.Substring(token.Length - 4))
+                elif token.Length > 0 then
+                    return "****"
+                else
+                    return ""
+            }
+
+            setSteamFamilyToken = fun token -> async {
+                try
+                    SettingsStore.setSetting conn "steam_family_token" token
+                    return Ok ()
+                with ex ->
+                    return Error $"Failed to save family token: {ex.Message}"
+            }
+
+            getSteamFamilyMembers = fun () -> async {
+                let json =
+                    SettingsStore.getSetting conn "steam_family_members"
+                    |> Option.defaultValue "[]"
+                let decoder =
+                    Thoth.Json.Net.Decode.list (
+                        Thoth.Json.Net.Decode.object (fun get -> {
+                            Mediatheca.Shared.SteamFamilyMember.SteamId = get.Required.Field "steamId" Thoth.Json.Net.Decode.string
+                            DisplayName = get.Required.Field "displayName" Thoth.Json.Net.Decode.string
+                            FriendSlug = get.Optional.Field "friendSlug" Thoth.Json.Net.Decode.string
+                        })
+                    )
+                match Thoth.Json.Net.Decode.fromString decoder json with
+                | Ok members -> return members
+                | Error _ -> return []
+            }
+
+            setSteamFamilyMembers = fun members -> async {
+                try
+                    let json =
+                        members
+                        |> List.map (fun m ->
+                            Thoth.Json.Net.Encode.object [
+                                "steamId", Thoth.Json.Net.Encode.string m.SteamId
+                                "displayName", Thoth.Json.Net.Encode.string m.DisplayName
+                                "friendSlug", Thoth.Json.Net.Encode.option Thoth.Json.Net.Encode.string m.FriendSlug
+                            ])
+                        |> Thoth.Json.Net.Encode.list
+                        |> Thoth.Json.Net.Encode.toString 0
+                    SettingsStore.setSetting conn "steam_family_members" json
+                    return Ok ()
+                with ex ->
+                    return Error $"Failed to save family members: {ex.Message}"
+            }
+
+            fetchSteamFamilyMembers = fun () -> async {
+                try
+                    let token =
+                        SettingsStore.getSetting conn "steam_family_token"
+                        |> Option.defaultValue ""
+                    if System.String.IsNullOrWhiteSpace(token) then
+                        return Error "Steam Family access token not configured"
+                    else
+                        let steamConfig = getSteamConfig()
+                        // Get family group ID
+                        printfn "[SteamFamily] Step 1: Calling getFamilyGroupForUser..."
+                        let! familyResult = Steam.getFamilyGroupForUser httpClient token
+                        match familyResult with
+                        | Error e ->
+                            printfn "[SteamFamily] getFamilyGroupForUser FAILED: %s" e
+                            return Error e
+                        | Ok familyGroupBasic ->
+                            printfn "[SteamFamily] Got family group ID: %s, basic members: %d" familyGroupBasic.FamilyGroupid familyGroupBasic.Members.Length
+                            // Fetch actual family group details (with members)
+                            printfn "[SteamFamily] Step 2: Calling getFamilyGroup..."
+                            let! familyDetailResult = Steam.getFamilyGroup httpClient token familyGroupBasic.FamilyGroupid
+                            let familyMembers =
+                                match familyDetailResult with
+                                | Ok fg ->
+                                    printfn "[SteamFamily] getFamilyGroup OK — members: %d (steamids: %s)" fg.Members.Length (fg.Members |> List.map (fun m -> m.Steamid) |> String.concat ", ")
+                                    fg.Members
+                                | Error e ->
+                                    printfn "[SteamFamily] getFamilyGroup FAILED: %s — falling back to basic members (%d)" e familyGroupBasic.Members.Length
+                                    familyGroupBasic.Members // fallback
+
+                            let ownSteamId =
+                                SettingsStore.getSetting conn "steam_id"
+                                |> Option.defaultValue ""
+                            printfn "[SteamFamily] Own Steam ID: '%s', total family members: %d" ownSteamId familyMembers.Length
+
+                            let otherMembers =
+                                familyMembers
+                                |> List.filter (fun m -> m.Steamid <> ownSteamId)
+                            printfn "[SteamFamily] After filtering own ID: %d members" otherMembers.Length
+
+                            // Resolve display names via Steam Web API
+                            let! playerNames =
+                                if not (System.String.IsNullOrWhiteSpace(steamConfig.ApiKey)) && not (List.isEmpty otherMembers) then
+                                    Steam.getPlayerSummaries httpClient steamConfig.ApiKey (otherMembers |> List.map (fun m -> m.Steamid))
+                                else
+                                    async { return Ok [] }
+
+                            let nameMap =
+                                match playerNames with
+                                | Ok players -> players |> List.map (fun p -> p.Steamid, p.PersonaName) |> Map.ofList
+                                | Error _ -> Map.empty
+
+                            // Read existing mappings to preserve FriendSlug
+                            let existingMembersJson =
+                                SettingsStore.getSetting conn "steam_family_members"
+                                |> Option.defaultValue "[]"
+                            let memberDecoder =
+                                Thoth.Json.Net.Decode.list (
+                                    Thoth.Json.Net.Decode.object (fun get -> {
+                                        Mediatheca.Shared.SteamFamilyMember.SteamId = get.Required.Field "steamId" Thoth.Json.Net.Decode.string
+                                        DisplayName = get.Required.Field "displayName" Thoth.Json.Net.Decode.string
+                                        FriendSlug = get.Optional.Field "friendSlug" Thoth.Json.Net.Decode.string
+                                    })
+                                )
+                            let existingMappings =
+                                match Thoth.Json.Net.Decode.fromString memberDecoder existingMembersJson with
+                                | Ok m -> m |> List.map (fun m -> m.SteamId, m.FriendSlug) |> Map.ofList
+                                | Error _ -> Map.empty
+
+                            let members =
+                                otherMembers
+                                |> List.map (fun m ->
+                                    { Mediatheca.Shared.SteamFamilyMember.SteamId = m.Steamid
+                                      DisplayName = nameMap |> Map.tryFind m.Steamid |> Option.defaultValue m.Steamid
+                                      FriendSlug = existingMappings |> Map.tryFind m.Steamid |> Option.flatten })
+
+                            // Persist
+                            let json =
+                                members
+                                |> List.map (fun m ->
+                                    Thoth.Json.Net.Encode.object [
+                                        "steamId", Thoth.Json.Net.Encode.string m.SteamId
+                                        "displayName", Thoth.Json.Net.Encode.string m.DisplayName
+                                        "friendSlug", Thoth.Json.Net.Encode.option Thoth.Json.Net.Encode.string m.FriendSlug
+                                    ])
+                                |> Thoth.Json.Net.Encode.list
+                                |> Thoth.Json.Net.Encode.toString 0
+                            SettingsStore.setSetting conn "steam_family_members" json
+
+                            return Ok members
+                with ex ->
+                    return Error $"Failed to fetch family members: {ex.Message}"
+            }
+
+            importSteamFamily = fun () -> async {
+                try
+                    let token =
+                        SettingsStore.getSetting conn "steam_family_token"
+                        |> Option.defaultValue ""
+                    if System.String.IsNullOrWhiteSpace(token) then
+                        return Error "Steam Family access token not configured"
+                    else
+                        // Get family group ID
+                        let! familyResult = Steam.getFamilyGroupForUser httpClient token
+                        match familyResult with
+                        | Error e -> return Error e
+                        | Ok familyGroupBasic ->
+                            // Read saved member mappings
+                            let existingMembersJson =
+                                SettingsStore.getSetting conn "steam_family_members"
+                                |> Option.defaultValue "[]"
+                            let memberDecoder =
+                                Thoth.Json.Net.Decode.list (
+                                    Thoth.Json.Net.Decode.object (fun get -> {
+                                        Mediatheca.Shared.SteamFamilyMember.SteamId = get.Required.Field "steamId" Thoth.Json.Net.Decode.string
+                                        DisplayName = get.Required.Field "displayName" Thoth.Json.Net.Decode.string
+                                        FriendSlug = get.Optional.Field "friendSlug" Thoth.Json.Net.Decode.string
+                                    })
+                                )
+                            let memberMappings =
+                                match Thoth.Json.Net.Decode.fromString memberDecoder existingMembersJson with
+                                | Ok m -> m
+                                | Error _ -> []
+
+                            let steamIdToFriendSlug =
+                                memberMappings
+                                |> List.choose (fun m ->
+                                    match m.FriendSlug with
+                                    | Some slug -> Some (m.SteamId, slug)
+                                    | None -> None)
+                                |> Map.ofList
+
+                            // Get shared library
+                            let! sharedResult = Steam.getSharedLibraryApps httpClient token familyGroupBasic.FamilyGroupid
+                            match sharedResult with
+                            | Error e -> return Error e
+                            | Ok sharedApps ->
+                                let mutable gamesProcessed = 0
+                                let mutable gamesCreated = 0
+                                let mutable familyOwnersSet = 0
+                                let mutable errors: string list = []
+
+                                let setFamilyOwners (sid: string) (app: Steam.SteamSharedLibraryApp) =
+                                    for ownerSteamId in app.OwnerSteamids do
+                                        match steamIdToFriendSlug |> Map.tryFind ownerSteamId with
+                                        | Some friendSlug ->
+                                            let result =
+                                                executeCommand conn sid
+                                                    Games.Serialization.fromStoredEvent
+                                                    Games.reconstitute
+                                                    Games.decide
+                                                    Games.Serialization.toEventData
+                                                    (Games.Add_family_owner friendSlug)
+                                                    projectionHandlers
+                                            match result with
+                                            | Ok () -> familyOwnersSet <- familyOwnersSet + 1
+                                            | Error _ -> ()
+                                        | None -> ()
+
+                                for app in sharedApps do
+                                    try
+                                        gamesProcessed <- gamesProcessed + 1
+
+                                        // Case 1: Match by steam_app_id
+                                        let existingByAppId = GameProjection.findBySteamAppId conn app.Appid
+                                        match existingByAppId with
+                                        | Some slug ->
+                                            let sid = Games.streamId slug
+                                            setFamilyOwners sid app
+                                        | None ->
+                                            // Case 2: Match by name
+                                            let existingByName =
+                                                if app.Name <> "" then GameProjection.findByName conn app.Name
+                                                else []
+                                            match existingByName with
+                                            | (slug, _) :: _ ->
+                                                let sid = Games.streamId slug
+                                                executeCommand conn sid
+                                                    Games.Serialization.fromStoredEvent
+                                                    Games.reconstitute
+                                                    Games.decide
+                                                    Games.Serialization.toEventData
+                                                    (Games.Set_steam_app_id app.Appid)
+                                                    projectionHandlers |> ignore
+                                                executeCommand conn sid
+                                                    Games.Serialization.fromStoredEvent
+                                                    Games.reconstitute
+                                                    Games.decide
+                                                    Games.Serialization.toEventData
+                                                    (Games.Add_store "Steam")
+                                                    projectionHandlers |> ignore
+                                                setFamilyOwners sid app
+                                            | [] ->
+                                                // Case 3: No match — create new game
+                                                if app.Name = "" then
+                                                    errors <- errors @ [ sprintf "App %d has no name, skipping" app.Appid ]
+                                                else
+                                                    // RAWG enrichment
+                                                    let rawgConfig = getRawgConfig()
+                                                    let! rawgResults =
+                                                        if not (System.String.IsNullOrWhiteSpace(rawgConfig.ApiKey)) then
+                                                            Rawg.searchGames httpClient rawgConfig app.Name
+                                                        else
+                                                            async { return [] }
+
+                                                    let rawgMatch = rawgResults |> List.tryHead
+
+                                                    let description, genres, rawgId, rawgRating, year =
+                                                        match rawgMatch with
+                                                        | Some r ->
+                                                            let rawgYear = r.Year |> Option.defaultValue 0
+                                                            "", r.Genres, Some r.RawgId, r.Rating, rawgYear
+                                                        | None ->
+                                                            "", [], None, None, 0
+
+                                                    // Download cover from Steam CDN
+                                                    let baseSlug = Slug.gameSlug app.Name (if year > 0 then year else 2000)
+                                                    let slug = generateUniqueSlug conn Games.streamId baseSlug
+                                                    let! coverRef = Steam.downloadSteamCover httpClient app.Appid slug imageBasePath
+
+                                                    let gameData: Games.GameAddedData = {
+                                                        Name = app.Name
+                                                        Year = if year > 0 then year else 0
+                                                        Genres = genres
+                                                        Description = description
+                                                        CoverRef = coverRef
+                                                        BackdropRef = None
+                                                        RawgId = rawgId
+                                                        RawgRating = rawgRating
+                                                    }
+
+                                                    let sid = Games.streamId slug
+                                                    let result =
+                                                        executeCommand conn sid
+                                                            Games.Serialization.fromStoredEvent
+                                                            Games.reconstitute
+                                                            Games.decide
+                                                            Games.Serialization.toEventData
+                                                            (Games.Add_game gameData)
+                                                            projectionHandlers
+
+                                                    match result with
+                                                    | Ok () ->
+                                                        gamesCreated <- gamesCreated + 1
+                                                        executeCommand conn sid
+                                                            Games.Serialization.fromStoredEvent
+                                                            Games.reconstitute
+                                                            Games.decide
+                                                            Games.Serialization.toEventData
+                                                            (Games.Set_steam_app_id app.Appid)
+                                                            projectionHandlers |> ignore
+                                                        executeCommand conn sid
+                                                            Games.Serialization.fromStoredEvent
+                                                            Games.reconstitute
+                                                            Games.decide
+                                                            Games.Serialization.toEventData
+                                                            (Games.Add_store "Steam")
+                                                            projectionHandlers |> ignore
+                                                        setFamilyOwners sid app
+                                                    | Error e ->
+                                                        errors <- errors @ [ sprintf "Failed to create '%s': %s" app.Name e ]
+                                    with ex ->
+                                        errors <- errors @ [ sprintf "Error processing app %d: %s" app.Appid ex.Message ]
+
+                                return Ok {
+                                    Mediatheca.Shared.SteamFamilyImportResult.FamilyMembers = memberMappings.Length
+                                    GamesProcessed = gamesProcessed
+                                    GamesCreated = gamesCreated
+                                    FamilyOwnersSet = familyOwnersSet
+                                    Errors = errors
+                                }
+                with ex ->
+                    return Error $"Steam Family import failed: {ex.Message}"
             }
 
             importFromCinemarco = fun request -> async {

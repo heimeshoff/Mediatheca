@@ -19,6 +19,10 @@ let init (slug: string) : Model * Cmd<Msg> =
       HltbInput = ""
       IsEditingHltb = false
       ConfirmingRemove = false
+      ShowImagePicker = None
+      ImageCandidates = []
+      IsLoadingImages = false
+      IsSelectingImage = false
       Error = None },
     Cmd.batch [
         Cmd.ofMsg (Load_game slug)
@@ -339,6 +343,39 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Catalog_result (Error err) ->
         { model with Error = Some err }, Cmd.none
+
+    | Open_image_picker kind ->
+        { model with ShowImagePicker = Some kind; IsLoadingImages = true; ImageCandidates = [] },
+        Cmd.OfAsync.either
+            (fun () -> api.getGameImageCandidates model.Slug)
+            ()
+            Image_candidates_loaded
+            (fun _ -> Image_candidates_loaded [])
+
+    | Close_image_picker ->
+        { model with ShowImagePicker = None; ImageCandidates = []; IsLoadingImages = false; IsSelectingImage = false }, Cmd.none
+
+    | Image_candidates_loaded candidates ->
+        { model with ImageCandidates = candidates; IsLoadingImages = false }, Cmd.none
+
+    | Select_image url ->
+        let imageKind =
+            match model.ShowImagePicker with
+            | Some Cover_picker -> "cover"
+            | _ -> "backdrop"
+        { model with IsSelectingImage = true },
+        Cmd.OfAsync.either
+            (fun () -> api.selectGameImage model.Slug url imageKind)
+            ()
+            Image_selected
+            (fun ex -> Image_selected (Error ex.Message))
+
+    | Image_selected (Ok ()) ->
+        { model with ShowImagePicker = None; ImageCandidates = []; IsSelectingImage = false },
+        Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
+
+    | Image_selected (Error err) ->
+        { model with IsSelectingImage = false; Error = Some err }, Cmd.none
 
     | Confirm_remove_game ->
         { model with ConfirmingRemove = true }, Cmd.none

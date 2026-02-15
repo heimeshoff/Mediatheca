@@ -42,6 +42,8 @@ let gameTests =
                     Expect.equal game.Status Backlog "Status should default to Backlog"
                     Expect.equal game.PersonalRating None "PersonalRating should default to None"
                     Expect.equal game.HltbHours None "HltbHours should default to None"
+                    Expect.equal game.SteamAppId None "SteamAppId should default to None"
+                    Expect.equal game.TotalPlayTimeMinutes 0 "TotalPlayTimeMinutes should default to 0"
                     Expect.isTrue (Set.isEmpty game.Stores) "Stores should be empty"
                     Expect.isTrue (Set.isEmpty game.FamilyOwners) "FamilyOwners should be empty"
                     Expect.isTrue (Set.isEmpty game.RecommendedBy) "RecommendedBy should be empty"
@@ -307,6 +309,44 @@ let gameTests =
                 | _ -> failtest "Expected Active state"
             | Error e -> failtest $"Expected success but got: {e}"
 
+        testCase "Setting steam app id" <| fun _ ->
+            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Set_steam_app_id 292030)
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 1 "Should produce one event"
+                let state = applyEvents ([ Game_added_to_library sampleGameData ] @ events)
+                match state with
+                | Active game -> Expect.equal game.SteamAppId (Some 292030) "SteamAppId should be 292030"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Setting same steam app id is idempotent" <| fun _ ->
+            let result = givenWhenThen
+                            [ Game_added_to_library sampleGameData; Game_steam_app_id_set 292030 ]
+                            (Set_steam_app_id 292030)
+            match result with
+            | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Setting play time" <| fun _ ->
+            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Set_play_time 3600)
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 1 "Should produce one event"
+                let state = applyEvents ([ Game_added_to_library sampleGameData ] @ events)
+                match state with
+                | Active game -> Expect.equal game.TotalPlayTimeMinutes 3600 "TotalPlayTimeMinutes should be 3600"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Setting same play time is idempotent" <| fun _ ->
+            let result = givenWhenThen
+                            [ Game_added_to_library sampleGameData; Game_play_time_set 3600 ]
+                            (Set_play_time 3600)
+            match result with
+            | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
+            | Error e -> failtest $"Expected success but got: {e}"
+
         testCase "Commands on removed game fail" <| fun _ ->
             let removedEvents = [ Game_added_to_library sampleGameData; Game_removed_from_library ]
             let commands: GameCommand list = [
@@ -328,6 +368,8 @@ let gameTests =
                 Remove_from_want_to_play_with "sarah"
                 Add_played_with "marco"
                 Remove_played_with "marco"
+                Set_steam_app_id 292030
+                Set_play_time 3600
             ]
             for cmd in commands do
                 let result = givenWhenThen removedEvents cmd
@@ -376,6 +418,18 @@ let gameSerializationTests =
             let deserialized = Serialization.deserialize eventType data
             Expect.equal deserialized (Some event) "Should round-trip"
 
+        testCase "Game_steam_app_id_set round-trips" <| fun _ ->
+            let event = Game_steam_app_id_set 292030
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Game_play_time_set round-trips" <| fun _ ->
+            let event = Game_play_time_set 3600
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
         testCase "All event types serialize and deserialize" <| fun _ ->
             let events: GameEvent list = [
                 Game_added_to_library sampleGameData
@@ -402,6 +456,8 @@ let gameSerializationTests =
                 Removed_want_to_play_with "marco"
                 Game_played_with "marco"
                 Game_played_with_removed "marco"
+                Game_steam_app_id_set 292030
+                Game_play_time_set 3600
             ]
             for event in events do
                 let eventType, data = Serialization.serialize event

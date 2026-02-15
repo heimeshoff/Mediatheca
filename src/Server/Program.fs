@@ -71,6 +71,28 @@ let main args =
         | Some _ -> ()
     | _ -> ()
 
+    // Seed Steam API key from env var if DB has no value yet
+    let envSteamKey =
+        Environment.GetEnvironmentVariable("STEAM_API_KEY")
+        |> Option.ofObj
+    match envSteamKey with
+    | Some key when key <> "" ->
+        match SettingsStore.getSetting conn "steam_api_key" with
+        | None -> SettingsStore.setSetting conn "steam_api_key" key
+        | Some _ -> ()
+    | _ -> ()
+
+    // Seed Steam ID from env var if DB has no value yet
+    let envSteamId =
+        Environment.GetEnvironmentVariable("STEAM_ID")
+        |> Option.ofObj
+    match envSteamId with
+    | Some id when id <> "" ->
+        match SettingsStore.getSetting conn "steam_id" with
+        | None -> SettingsStore.setSetting conn "steam_id" id
+        | Some _ -> ()
+    | _ -> ()
+
     // Dynamic TMDB config provider (reads from DB, falls back to env var)
     let getTmdbConfig () : Tmdb.TmdbConfig =
         let apiKey =
@@ -87,6 +109,18 @@ let main args =
             |> Option.orElse envRawgKey
             |> Option.defaultValue ""
         { ApiKey = apiKey }
+
+    // Dynamic Steam config provider (reads from DB, falls back to env var)
+    let getSteamConfig () : Steam.SteamConfig =
+        let apiKey =
+            SettingsStore.getSetting conn "steam_api_key"
+            |> Option.orElse envSteamKey
+            |> Option.defaultValue ""
+        let steamId =
+            SettingsStore.getSetting conn "steam_id"
+            |> Option.orElse envSteamId
+            |> Option.defaultValue ""
+        { ApiKey = apiKey; SteamId = steamId }
 
     let httpClient = new HttpClient()
 
@@ -105,12 +139,13 @@ let main args =
         GameProjection.handler
     ]
 
-    // Catch up all projections, rebuilding series to fix out-of-sync rewatch session data
+    // Catch up all projections, rebuilding game projection for steam_app_id column
     Projection.rebuildProjection conn SeriesProjection.handler
+    Projection.rebuildProjection conn GameProjection.handler
     Projection.startAllProjections conn projectionHandlers
 
     // Create API
-    let api = Api.create conn httpClient getTmdbConfig getRawgConfig imageBasePath projectionHandlers
+    let api = Api.create conn httpClient getTmdbConfig getRawgConfig getSteamConfig imageBasePath projectionHandlers
 
     let webApp =
         Remoting.createApi ()

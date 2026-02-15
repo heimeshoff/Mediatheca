@@ -16,6 +16,33 @@ type Model = {
     IsSavingRawg: bool
     RawgTestResult: Result<string, string> option
     RawgSaveResult: Result<string, string> option
+    // Steam Integration
+    SteamApiKey: string
+    SteamKeyInput: string
+    IsTestingSteam: bool
+    IsSavingSteam: bool
+    SteamTestResult: Result<string, string> option
+    SteamSaveResult: Result<string, string> option
+    SteamId: string
+    SteamIdInput: string
+    IsSavingSteamId: bool
+    SteamIdSaveResult: Result<string, string> option
+    IsResolvingVanity: bool
+    VanityInput: string
+    VanityResult: Result<string, string> option
+    IsImportingSteam: bool
+    SteamImportResult: Result<SteamImportResult, string> option
+    // Steam Family
+    SteamFamilyToken: string
+    SteamFamilyTokenInput: string
+    IsSavingFamilyToken: bool
+    FamilyTokenSaveResult: Result<string, string> option
+    SteamFamilyMembers: SteamFamilyMember list
+    Friends: FriendListItem list
+    IsFetchingFamilyMembers: bool
+    FetchFamilyMembersResult: Result<string, string> option
+    IsImportingSteamFamily: bool
+    SteamFamilyImportResult: Result<SteamFamilyImportResult, string> option
     // Cinemarco Import
     CinemarcoDbPath: string
     CinemarcoImagesPath: string
@@ -39,6 +66,41 @@ type Msg =
     | Rawg_test_result of Result<unit, string>
     | Save_rawg_key
     | Rawg_save_result of Result<unit, string>
+    // Steam Integration
+    | Load_steam_key
+    | Steam_key_loaded of string
+    | Steam_key_input_changed of string
+    | Test_steam_key
+    | Steam_test_result of Result<unit, string>
+    | Save_steam_key
+    | Steam_save_result of Result<unit, string>
+    | Load_steam_id
+    | Steam_id_loaded of string
+    | Steam_id_input_changed of string
+    | Save_steam_id
+    | Steam_id_save_result of Result<unit, string>
+    | Vanity_input_changed of string
+    | Resolve_vanity_url
+    | Vanity_resolved of Result<string, string>
+    | Import_steam_library
+    | Steam_import_completed of Result<SteamImportResult, string>
+    // Steam Family
+    | Load_steam_family_token
+    | Steam_family_token_loaded of string
+    | Steam_family_token_input_changed of string
+    | Save_steam_family_token
+    | Steam_family_token_save_result of Result<unit, string>
+    | Load_steam_family_members
+    | Steam_family_members_loaded of SteamFamilyMember list
+    | Fetch_steam_family_members
+    | Steam_family_members_fetched of Result<SteamFamilyMember list, string>
+    | Load_friends
+    | Friends_loaded of FriendListItem list
+    | Update_family_member_friend of steamId: string * friendSlug: string option
+    | Save_steam_family_members
+    | Steam_family_members_save_result of Result<unit, string>
+    | Import_steam_family
+    | Steam_family_import_completed of Result<SteamFamilyImportResult, string>
     // Cinemarco Import
     | Cinemarco_db_path_changed of string
     | Cinemarco_images_path_changed of string

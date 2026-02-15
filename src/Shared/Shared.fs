@@ -467,6 +467,8 @@ type GameDetail = {
     RawgRating: float option
     HltbHours: float option
     PersonalRating: int option
+    SteamAppId: int option
+    TotalPlayTimeMinutes: int
     Stores: string list
     FamilyOwners: FriendRef list
     RecommendedBy: FriendRef list
@@ -484,6 +486,43 @@ type AddGameRequest = {
     BackdropRef: string option
     RawgId: int option
     RawgRating: float option
+}
+
+// Steam Integration
+
+type SteamOwnedGame = {
+    AppId: int
+    Name: string
+    PlaytimeMinutes: int
+    ImgIconUrl: string
+}
+
+type SteamImportResult = {
+    GamesMatched: int
+    GamesCreated: int
+    PlayTimeUpdated: int
+    Errors: string list
+}
+
+type SteamFamilyMember = {
+    SteamId: string
+    DisplayName: string
+    FriendSlug: string option
+}
+
+type SteamFamilyImportResult = {
+    FamilyMembers: int
+    GamesProcessed: int
+    GamesCreated: int
+    FamilyOwnersSet: int
+    Errors: string list
+}
+
+type GameImageCandidate = {
+    Url: string
+    Source: string
+    Label: string
+    IsCover: bool
 }
 
 // Import
@@ -628,10 +667,26 @@ type IMediathecaApi = {
     updateGameContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
     removeGameContentBlock: string -> string -> Async<Result<unit, string>>
     getCatalogsForGame: string -> Async<CatalogRef list>
+    getGameImageCandidates: string -> Async<GameImageCandidate list>
+    selectGameImage: string -> string -> string -> Async<Result<unit, string>>
     // Games Settings
     getRawgApiKey: unit -> Async<string>
     setRawgApiKey: string -> Async<Result<unit, string>>
     testRawgApiKey: string -> Async<Result<unit, string>>
+    // Steam Integration
+    getSteamApiKey: unit -> Async<string>
+    setSteamApiKey: string -> Async<Result<unit, string>>
+    testSteamApiKey: string -> Async<Result<unit, string>>
+    getSteamId: unit -> Async<string>
+    setSteamId: string -> Async<Result<unit, string>>
+    resolveSteamVanityUrl: string -> Async<Result<string, string>>
+    importSteamLibrary: unit -> Async<Result<SteamImportResult, string>>
+    getSteamFamilyToken: unit -> Async<string>
+    setSteamFamilyToken: string -> Async<Result<unit, string>>
+    getSteamFamilyMembers: unit -> Async<SteamFamilyMember list>
+    setSteamFamilyMembers: SteamFamilyMember list -> Async<Result<unit, string>>
+    fetchSteamFamilyMembers: unit -> Async<Result<SteamFamilyMember list, string>>
+    importSteamFamily: unit -> Async<Result<SteamFamilyImportResult, string>>
     // Import
     importFromCinemarco: ImportFromCinemarcoRequest -> Async<Result<ImportResult, string>>
 }
