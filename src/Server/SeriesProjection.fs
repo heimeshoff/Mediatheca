@@ -69,11 +69,12 @@ module SeriesProjection =
             );
 
             CREATE TABLE IF NOT EXISTS series_rewatch_sessions (
-                rewatch_id TEXT PRIMARY KEY,
+                rewatch_id TEXT NOT NULL,
                 series_slug TEXT NOT NULL,
                 name TEXT,
                 is_default INTEGER NOT NULL DEFAULT 0,
-                friends TEXT NOT NULL DEFAULT '[]'
+                friends TEXT NOT NULL DEFAULT '[]',
+                PRIMARY KEY (rewatch_id, series_slug)
             );
 
             CREATE TABLE IF NOT EXISTS series_episode_progress (

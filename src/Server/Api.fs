@@ -1429,4 +1429,8 @@ module Api =
             getCatalogsForSeries = fun slug -> async {
                 return CatalogProjection.getCatalogsForSeriesWithChildren conn slug
             }
+
+            importFromCinemarco = fun request -> async {
+                return CinemarcoImport.runImport conn imageBasePath projectionHandlers httpClient getTmdbConfig request
+            }
         }

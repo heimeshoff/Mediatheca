@@ -417,6 +417,24 @@ type UpdateEpisodeWatchedDateRequest = {
     Date: string
 }
 
+// Import
+
+type ImportFromCinemarcoRequest = {
+    DatabasePath: string
+    ImagesPath: string
+}
+
+type ImportResult = {
+    FriendsImported: int
+    MoviesImported: int
+    SeriesImported: int
+    EpisodesWatched: int
+    CatalogsImported: int
+    ContentBlocksImported: int
+    ImagesCopied: int
+    Errors: string list
+}
+
 module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
@@ -517,4 +535,6 @@ type IMediathecaApi = {
     updateSeriesContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
     removeSeriesContentBlock: string -> string -> Async<Result<unit, string>>
     getCatalogsForSeries: string -> Async<CatalogRef list>
+    // Import
+    importFromCinemarco: ImportFromCinemarcoRequest -> Async<Result<ImportResult, string>>
 }

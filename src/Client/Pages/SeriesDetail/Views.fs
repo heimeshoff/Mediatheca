@@ -540,7 +540,7 @@ let private episodeCard
                                         ]
                                     Html.span [
                                         prop.className "text-xs font-bold text-primary uppercase tracking-wider"
-                                        prop.text $"E{episode.EpisodeNumber:D2}"
+                                        prop.text $"E%02d{episode.EpisodeNumber}"
                                     ]
                                     match episode.Runtime with
                                     | Some r ->
