@@ -63,7 +63,7 @@ let private seriesCard (series: SeriesListItem) =
                                 | Some n ->
                                     Html.p [
                                         prop.className "text-xs text-primary font-medium"
-                                        prop.text $"S{n.SeasonNumber}E{n.EpisodeNumber}"
+                                        prop.text $"Next S{n.SeasonNumber}E{n.EpisodeNumber}"
                                     ]
                                 | None -> ()
                         ]
