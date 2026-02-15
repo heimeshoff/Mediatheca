@@ -515,7 +515,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                             let isActive = tab = activeTab
                                                             Html.button [
                                                                 prop.className (
-                                                                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors "
+                                                                    "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors "
                                                                     + if isActive then "bg-primary/15 text-primary"
                                                                       else "text-base-content/50 hover:text-base-content/70 hover:bg-base-200/50"
                                                                 )
@@ -527,7 +527,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                 )
                                                                 prop.children [
                                                                     Html.span [
-                                                                        prop.className "w-4 h-4"
+                                                                        prop.className "w-5 h-5 [&>svg]:w-5 [&>svg]:h-5"
                                                                         prop.children [ tabIcon tab ]
                                                                     ]
                                                                     Html.span [ prop.text (tabLabel tab) ]
