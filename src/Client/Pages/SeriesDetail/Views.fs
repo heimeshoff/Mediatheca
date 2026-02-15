@@ -360,7 +360,7 @@ let private episodeCard
         if episode.IsWatched then "" else "opacity-80"
     let isEditingDate = model.EditingEpisodeDate = Some (seasonNumber, episode.EpisodeNumber)
     Html.div [
-        prop.className $"bg-base-100/50 backdrop-blur-sm border {borderClass} rounded-xl overflow-hidden transition-all {opacityClass}"
+        prop.className $"bg-base-100/50 backdrop-blur-sm border {borderClass} rounded-xl transition-all {opacityClass}"
         prop.children [
             Html.div [
                 prop.className "flex gap-4 p-4"
@@ -469,11 +469,11 @@ let private episodeCard
                             // Watched date — positioned absolutely so it doesn't shift the button
                             if episode.IsWatched then
                                 Html.div [
-                                    prop.className "absolute top-full left-1/2 -translate-x-1/2 mt-1 whitespace-nowrap"
+                                    prop.className "absolute top-full left-1/2 -translate-x-1/2 -mt-4 whitespace-nowrap"
                                     prop.children [
                                         if isEditingDate then
                                             Daisy.input [
-                                                prop.className "w-28"
+                                                prop.className ("w-36 border-base-content/15 " + DesignSystem.glassCard)
                                                 input.xs
                                                 prop.type' "date"
                                                 prop.autoFocus true
