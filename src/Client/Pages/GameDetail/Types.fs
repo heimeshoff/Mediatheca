@@ -29,6 +29,7 @@ type Model = {
     ImageCandidates: GameImageCandidate list
     IsLoadingImages: bool
     IsSelectingImage: bool
+    ImageVersion: int
     Error: string option
 }
 

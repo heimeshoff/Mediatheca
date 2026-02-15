@@ -147,11 +147,18 @@ let main args =
     // Create API
     let api = Api.create conn httpClient getTmdbConfig getRawgConfig getSteamConfig imageBasePath projectionHandlers
 
-    let webApp =
+    let remotingHandler =
         Remoting.createApi ()
         |> Remoting.withRouteBuilder Route.builder
         |> Remoting.fromValue api
         |> Remoting.buildHttpHandler
+
+    let webApp =
+        choose [
+            route "/api/stream/import-steam-family"
+                >=> Api.steamFamilyImportHandler conn httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers
+            remotingHandler
+        ]
 
     // Serve static files from deploy/public in production
     let staticPath = Path.Combine(Directory.GetCurrentDirectory(), "deploy", "public")

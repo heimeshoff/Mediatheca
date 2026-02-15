@@ -518,6 +518,13 @@ type SteamFamilyImportResult = {
     Errors: string list
 }
 
+type SteamFamilyImportProgress = {
+    Current: int
+    Total: int
+    GameName: string
+    Action: string
+}
+
 type GameImageCandidate = {
     Url: string
     Source: string

@@ -1,8 +1,16 @@
 module Mediatheca.Client.Pages.Settings.State
 
 open Elmish
+open Fable.Core
+open Fable.Core.JsInterop
 open Mediatheca.Shared
 open Mediatheca.Client.Pages.Settings.Types
+
+[<Emit("fetch($0)")>]
+let private jsFetch (url: string) : JS.Promise<obj> = jsNative
+
+[<Emit("new TextDecoder().decode($0)")>]
+let private decodeBytes (value: obj) : string = jsNative
 
 let init () : Model * Cmd<Msg> =
     { TmdbApiKey = ""
@@ -42,6 +50,8 @@ let init () : Model * Cmd<Msg> =
       FetchFamilyMembersResult = None
       IsImportingSteamFamily = false
       SteamFamilyImportResult = None
+      ImportProgress = None
+      ImportLog = []
       CinemarcoDbPath = ""
       CinemarcoImagesPath = ""
       IsImporting = false
@@ -292,13 +302,71 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         model, Cmd.none
 
     | Import_steam_family ->
-        { model with IsImportingSteamFamily = true; SteamFamilyImportResult = None },
-        Cmd.OfAsync.either api.importSteamFamily ()
-            Steam_family_import_completed
-            (fun ex -> Steam_family_import_completed (Error ex.Message))
+        { model with IsImportingSteamFamily = true; SteamFamilyImportResult = None; ImportProgress = None; ImportLog = [] },
+        Cmd.ofEffect (fun dispatch ->
+            async {
+                try
+                    let! response = jsFetch "/api/stream/import-steam-family" |> Async.AwaitPromise
+                    let reader: obj = response?body?getReader()
+                    let mutable buffer = ""
+                    let mutable reading = true
+                    while reading do
+                        let! chunk = (reader?read() : JS.Promise<obj>) |> Async.AwaitPromise
+                        let isDone: bool = chunk?``done``
+                        if isDone then
+                            reading <- false
+                        else
+                            let value: obj = chunk?value
+                            let text = decodeBytes value
+                            buffer <- buffer + text
+                            let mutable idx = buffer.IndexOf("\n\n")
+                            while idx >= 0 do
+                                let message = buffer.[0..idx-1]
+                                buffer <- buffer.[idx+2..]
+                                let dataLine =
+                                    if message.StartsWith("data: ") then message.[6..]
+                                    else message
+                                if dataLine <> "" then
+                                    let parsed: obj = JS.JSON.parse dataLine
+                                    let eventType: string = parsed?``type``
+                                    match eventType with
+                                    | "progress" ->
+                                        let progress: SteamFamilyImportProgress = {
+                                            Current = parsed?current |> int
+                                            Total = parsed?total |> int
+                                            GameName = parsed?gameName |> string
+                                            Action = parsed?action |> string
+                                        }
+                                        dispatch (Steam_family_import_progress progress)
+                                    | "complete" ->
+                                        let errors: string list =
+                                            let arr: obj array = parsed?errors
+                                            arr |> Array.map string |> Array.toList
+                                        let result: SteamFamilyImportResult = {
+                                            FamilyMembers = parsed?familyMembers |> int
+                                            GamesProcessed = parsed?gamesProcessed |> int
+                                            GamesCreated = parsed?gamesCreated |> int
+                                            FamilyOwnersSet = parsed?familyOwnersSet |> int
+                                            Errors = errors
+                                        }
+                                        dispatch (Steam_family_import_completed (Ok result))
+                                    | "error" ->
+                                        let errorMsg: string = parsed?message |> string
+                                        dispatch (Steam_family_import_completed (Error errorMsg))
+                                    | _ -> ()
+                                idx <- buffer.IndexOf("\n\n")
+                with ex ->
+                    dispatch (Steam_family_import_completed (Error ex.Message))
+            } |> Async.StartImmediate
+        )
+
+    | Steam_family_import_progress progress ->
+        { model with
+            ImportProgress = Some progress
+            ImportLog = model.ImportLog @ [ (progress.GameName, progress.Action) ] }, Cmd.none
 
     | Steam_family_import_completed result ->
-        { model with IsImportingSteamFamily = false; SteamFamilyImportResult = Some result }, Cmd.none
+        { model with IsImportingSteamFamily = false; SteamFamilyImportResult = Some result; ImportProgress = None }, Cmd.none
 
     | Cinemarco_db_path_changed value ->
         { model with CinemarcoDbPath = value; ImportResult = None }, Cmd.none

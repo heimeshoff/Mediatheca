@@ -664,62 +664,155 @@ let private steamFamilyDetail (model: Model) (dispatch: Msg -> unit) =
                             prop.text "Map at least one family member to a friend to enable import."
                         ]
 
-                    Html.div [
-                        prop.className "mb-4"
-                        prop.children [
-                            Daisy.button.button [
-                                button.primary
-                                if model.IsImportingSteamFamily then button.disabled
-                                prop.onClick (fun _ -> dispatch Import_steam_family)
-                                prop.disabled (
-                                    model.SteamFamilyToken = ""
-                                    || List.isEmpty model.SteamFamilyMembers
-                                    || not hasMappedMembers
-                                    || model.IsImportingSteamFamily)
-                                prop.children [
-                                    if model.IsImportingSteamFamily then
-                                        Daisy.loading [ loading.spinner; loading.sm ]
-                                        Html.text "Importing..."
-                                    else
-                                        Html.text "Import Family Library"
+                    if not model.IsImportingSteamFamily && model.SteamFamilyImportResult.IsNone then
+                        Html.div [
+                            prop.className "mb-4"
+                            prop.children [
+                                Daisy.button.button [
+                                    button.primary
+                                    prop.onClick (fun _ -> dispatch Import_steam_family)
+                                    prop.disabled (
+                                        model.SteamFamilyToken = ""
+                                        || List.isEmpty model.SteamFamilyMembers
+                                        || not hasMappedMembers)
+                                    prop.text "Import Family Library"
                                 ]
                             ]
                         ]
-                    ]
+
+                    // Live progress during import
+                    if model.IsImportingSteamFamily then
+                        Html.div [
+                            prop.className "mb-4 space-y-3"
+                            prop.children [
+                                match model.ImportProgress with
+                                | Some progress ->
+                                    // Progress bar
+                                    Html.div [
+                                        prop.className "space-y-1"
+                                        prop.children [
+                                            Html.div [
+                                                prop.className "flex justify-between text-xs text-base-content/70"
+                                                prop.children [
+                                                    Html.span [ prop.text (sprintf "%d / %d games" progress.Current progress.Total) ]
+                                                    Html.span [ prop.text (sprintf "%d%%" (if progress.Total > 0 then progress.Current * 100 / progress.Total else 0)) ]
+                                                ]
+                                            ]
+                                            Daisy.progress [
+                                                prop.className "progress-primary w-full"
+                                                prop.value (if progress.Total > 0 then progress.Current * 100 / progress.Total else 0)
+                                                prop.max 100
+                                            ]
+                                        ]
+                                    ]
+                                    // Current game
+                                    Html.div [
+                                        prop.className "flex items-center gap-2 text-sm"
+                                        prop.children [
+                                            Daisy.loading [ loading.spinner; loading.xs ]
+                                            Html.span [
+                                                prop.className "text-base-content/70"
+                                                prop.text (sprintf "Processing: %s..." progress.GameName)
+                                            ]
+                                        ]
+                                    ]
+                                | None ->
+                                    Html.div [
+                                        prop.className "flex items-center gap-2 text-sm"
+                                        prop.children [
+                                            Daisy.loading [ loading.spinner; loading.sm ]
+                                            Html.span [ prop.text "Starting import..." ]
+                                        ]
+                                    ]
+
+                                // Scrolling log
+                                if not (List.isEmpty model.ImportLog) then
+                                    Html.div [
+                                        prop.className "bg-base-200/50 rounded-lg p-3 max-h-48 overflow-y-auto text-xs font-mono space-y-0.5"
+                                        prop.children (
+                                            model.ImportLog |> List.map (fun (name, action) ->
+                                                let actionColor =
+                                                    match action with
+                                                    | "Matched" -> "text-base-content/70"
+                                                    | "Matched by name" -> "text-info"
+                                                    | "Created" -> "text-success"
+                                                    | "Skipped" | "Error" -> "text-warning"
+                                                    | _ -> "text-base-content/50"
+                                                Html.div [
+                                                    prop.className "flex gap-2"
+                                                    prop.children [
+                                                        Html.span [ prop.className "text-base-content/50 truncate max-w-[200px]"; prop.text name ]
+                                                        Html.span [ prop.className "text-base-content/30"; prop.text "\u2192" ]
+                                                        Html.span [ prop.className actionColor; prop.text action ]
+                                                    ]
+                                                ]
+                                            )
+                                        )
+                                    ]
+                            ]
+                        ]
 
                     // Steam Family import result
                     match model.SteamFamilyImportResult with
                     | Some (Ok result) ->
-                        Daisy.alert [
-                            alert.success
-                            prop.className "mb-4"
+                        Html.div [
+                            prop.className "space-y-3 mb-4"
                             prop.children [
-                                Html.div [
-                                    Html.p [ prop.className "font-bold"; prop.text "Family import completed!" ]
-                                    Html.ul [
-                                        prop.className "mt-2 text-sm space-y-1"
-                                        prop.children [
-                                            Html.li [ prop.text (sprintf "Family members: %d" result.FamilyMembers) ]
-                                            Html.li [ prop.text (sprintf "Games processed: %d" result.GamesProcessed) ]
-                                            Html.li [ prop.text (sprintf "Games created: %d" result.GamesCreated) ]
-                                            Html.li [ prop.text (sprintf "Family owners set: %d" result.FamilyOwnersSet) ]
-                                        ]
-                                    ]
-                                    if not (List.isEmpty result.Errors) then
+                                Daisy.alert [
+                                    alert.success
+                                    prop.children [
                                         Html.div [
-                                            prop.className "mt-2"
-                                            prop.children [
-                                                Html.p [ prop.className "font-bold text-warning"; prop.text (sprintf "Warnings (%d):" result.Errors.Length) ]
-                                                Html.ul [
-                                                    prop.className "text-sm text-warning"
-                                                    prop.children (
-                                                        result.Errors |> List.truncate 10 |> List.map (fun err ->
-                                                            Html.li [ prop.text err ])
-                                                    )
+                                            Html.p [ prop.className "font-bold"; prop.text "Family import completed!" ]
+                                            Html.ul [
+                                                prop.className "mt-2 text-sm space-y-1"
+                                                prop.children [
+                                                    Html.li [ prop.text (sprintf "Family members: %d" result.FamilyMembers) ]
+                                                    Html.li [ prop.text (sprintf "Games processed: %d" result.GamesProcessed) ]
+                                                    Html.li [ prop.text (sprintf "Games created: %d" result.GamesCreated) ]
+                                                    Html.li [ prop.text (sprintf "Family owners set: %d" result.FamilyOwnersSet) ]
                                                 ]
                                             ]
+                                            if not (List.isEmpty result.Errors) then
+                                                Html.div [
+                                                    prop.className "mt-2"
+                                                    prop.children [
+                                                        Html.p [ prop.className "font-bold text-warning"; prop.text (sprintf "Warnings (%d):" result.Errors.Length) ]
+                                                        Html.ul [
+                                                            prop.className "text-sm text-warning"
+                                                            prop.children (
+                                                                result.Errors |> List.truncate 10 |> List.map (fun err ->
+                                                                    Html.li [ prop.text err ])
+                                                            )
+                                                        ]
+                                                    ]
+                                                ]
                                         ]
+                                    ]
                                 ]
+                                // Completed log
+                                if not (List.isEmpty model.ImportLog) then
+                                    Html.div [
+                                        prop.className "bg-base-200/50 rounded-lg p-3 max-h-48 overflow-y-auto text-xs font-mono space-y-0.5"
+                                        prop.children (
+                                            model.ImportLog |> List.map (fun (name, action) ->
+                                                let actionColor =
+                                                    match action with
+                                                    | "Matched" -> "text-base-content/70"
+                                                    | "Matched by name" -> "text-info"
+                                                    | "Created" -> "text-success"
+                                                    | "Skipped" | "Error" -> "text-warning"
+                                                    | _ -> "text-base-content/50"
+                                                Html.div [
+                                                    prop.className "flex gap-2"
+                                                    prop.children [
+                                                        Html.span [ prop.className "text-base-content/50 truncate max-w-[200px]"; prop.text name ]
+                                                        Html.span [ prop.className "text-base-content/30"; prop.text "\u2192" ]
+                                                        Html.span [ prop.className actionColor; prop.text action ]
+                                                    ]
+                                                ]
+                                            )
+                                        )
+                                    ]
                             ]
                         ]
                     | Some (Error msg) ->

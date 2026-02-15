@@ -576,7 +576,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 match game.BackdropRef with
                                 | Some ref ->
                                     Html.img [
-                                        prop.src $"/images/{ref}"
+                                        prop.src $"/images/{ref}?v={model.ImageVersion}"
                                         prop.alt game.Name
                                         prop.className "w-full h-full object-cover"
                                     ]
@@ -584,7 +584,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                     match game.CoverRef with
                                     | Some ref ->
                                         Html.img [
-                                            prop.src $"/images/{ref}"
+                                            prop.src $"/images/{ref}?v={model.ImageVersion}"
                                             prop.alt game.Name
                                             prop.className "w-full h-full object-cover blur-xl scale-125"
                                         ]
@@ -636,7 +636,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                 match game.CoverRef with
                                                 | Some ref ->
                                                     Html.img [
-                                                        prop.src $"/images/{ref}"
+                                                        prop.src $"/images/{ref}?v={model.ImageVersion}"
                                                         prop.alt game.Name
                                                         prop.className "w-full h-full object-cover"
                                                     ]
@@ -661,7 +661,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                 match game.CoverRef with
                                                 | Some ref ->
                                                     Html.img [
-                                                        prop.src $"/images/{ref}"
+                                                        prop.src $"/images/{ref}?v={model.ImageVersion}"
                                                         prop.alt game.Name
                                                         prop.className "w-full h-full object-cover"
                                                     ]
@@ -1200,7 +1200,11 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 | Some pickerKind ->
                     let title = match pickerKind with Cover_picker -> "Choose Cover Image" | Backdrop_picker -> "Choose Backdrop Image"
                     let isCoverPicker = match pickerKind with Cover_picker -> true | Backdrop_picker -> false
-                    let filtered = model.ImageCandidates |> List.filter (fun c -> if isCoverPicker then c.IsCover else not c.IsCover)
+                    let filtered =
+                        if isCoverPicker then
+                            model.ImageCandidates |> List.sortByDescending (fun c -> c.IsCover)
+                        else
+                            model.ImageCandidates |> List.filter (fun c -> not c.IsCover)
                     let content = [
                         if model.IsSelectingImage then
                             Html.div [
@@ -1221,42 +1225,9 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 prop.text "No image sources available. Add a Steam App ID or RAWG ID to this game first."
                             ]
                         elif List.isEmpty filtered then
-                            Html.div [
-                                prop.children [
-                                    Html.p [
-                                        prop.className "text-base-content/60 py-4 text-center text-sm"
-                                        prop.text (if isCoverPicker then "No cover-sized images found. Showing all available:" else "No backdrop-sized images found. Showing all available:")
-                                    ]
-                                    Html.div [
-                                        prop.className $"grid grid-cols-2 sm:grid-cols-3 gap-3"
-                                        prop.children [
-                                            for candidate in model.ImageCandidates do
-                                                Html.button [
-                                                    prop.className "group/thumb rounded-lg overflow-hidden border border-base-content/10 hover:border-primary/50 transition-colors cursor-pointer bg-base-200"
-                                                    prop.onClick (fun _ -> dispatch (Select_image candidate.Url))
-                                                    prop.children [
-                                                        Html.div [
-                                                            prop.className (if isCoverPicker then "aspect-[2/3]" else "aspect-video")
-                                                            prop.children [
-                                                                Html.img [
-                                                                    prop.src candidate.Url
-                                                                    prop.alt candidate.Label
-                                                                    prop.className "w-full h-full object-cover"
-                                                                ]
-                                                            ]
-                                                        ]
-                                                        Html.div [
-                                                            prop.className "p-2"
-                                                            prop.children [
-                                                                Html.p [ prop.className "text-xs font-medium truncate"; prop.text candidate.Label ]
-                                                                Html.p [ prop.className "text-xs text-base-content/50"; prop.text candidate.Source ]
-                                                            ]
-                                                        ]
-                                                    ]
-                                                ]
-                                        ]
-                                    ]
-                                ]
+                            Html.p [
+                                prop.className "text-base-content/60 py-8 text-center"
+                                prop.text "No matching images found."
                             ]
                         else
                             Html.div [

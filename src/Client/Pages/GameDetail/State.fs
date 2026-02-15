@@ -23,6 +23,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       ImageCandidates = []
       IsLoadingImages = false
       IsSelectingImage = false
+      ImageVersion = 0
       Error = None },
     Cmd.batch [
         Cmd.ofMsg (Load_game slug)
@@ -371,7 +372,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             (fun ex -> Image_selected (Error ex.Message))
 
     | Image_selected (Ok ()) ->
-        { model with ShowImagePicker = None; ImageCandidates = []; IsSelectingImage = false },
+        { model with ShowImagePicker = None; ImageCandidates = []; IsSelectingImage = false; ImageVersion = model.ImageVersion + 1 },
         Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
 
     | Image_selected (Error err) ->

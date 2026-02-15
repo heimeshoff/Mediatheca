@@ -43,6 +43,8 @@ type Model = {
     FetchFamilyMembersResult: Result<string, string> option
     IsImportingSteamFamily: bool
     SteamFamilyImportResult: Result<SteamFamilyImportResult, string> option
+    ImportProgress: SteamFamilyImportProgress option
+    ImportLog: (string * string) list
     // Cinemarco Import
     CinemarcoDbPath: string
     CinemarcoImagesPath: string
@@ -100,6 +102,7 @@ type Msg =
     | Save_steam_family_members
     | Steam_family_members_save_result of Result<unit, string>
     | Import_steam_family
+    | Steam_family_import_progress of SteamFamilyImportProgress
     | Steam_family_import_completed of Result<SteamFamilyImportResult, string>
     // Cinemarco Import
     | Cinemarco_db_path_changed of string
