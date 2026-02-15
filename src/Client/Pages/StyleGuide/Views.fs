@@ -1413,7 +1413,8 @@ let private mockEntryItems : EntryList.EntryItem list =
           Name = e.Name
           Year = e.Year
           PosterRef = e.PosterRef
-          Rating = e.Rating })
+          Rating = e.Rating
+          RoutePrefix = "movies" })
 
 let private mockBySlug =
     mockEntries |> List.map (fun e -> e.Slug, e) |> Map.ofList

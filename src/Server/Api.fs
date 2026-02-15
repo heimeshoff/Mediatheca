@@ -640,6 +640,11 @@ module Api =
                     |> Db.newCommand "SELECT COUNT(*) as cnt FROM movie_list"
                     |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
                     |> Option.defaultValue 0
+                let seriesCount =
+                    conn
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_list"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+                    |> Option.defaultValue 0
                 let friendCount =
                     conn
                     |> Db.newCommand "SELECT COUNT(*) as cnt FROM friend_list"
@@ -660,13 +665,28 @@ module Api =
                     |> Db.newCommand "SELECT COALESCE(SUM(md.runtime), 0) as total FROM watch_sessions ws JOIN movie_detail md ON ws.movie_slug = md.slug"
                     |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
                     |> Option.defaultValue 0
+                let seriesWatchTime =
+                    conn
+                    |> Db.newCommand """
+                        SELECT COALESCE(SUM(e.runtime), 0) as total
+                        FROM (SELECT DISTINCT series_slug, season_number, episode_number FROM series_episode_progress) p
+                        JOIN series_episodes e ON e.series_slug = p.series_slug AND e.season_number = p.season_number AND e.episode_number = p.episode_number
+                    """
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
+                    |> Option.defaultValue 0
                 return {
                     Mediatheca.Shared.DashboardStats.MovieCount = movieCount
+                    SeriesCount = seriesCount
                     FriendCount = friendCount
                     CatalogCount = catalogCount
                     WatchSessionCount = watchSessionCount
                     TotalWatchTimeMinutes = totalWatchTime
+                    SeriesWatchTimeMinutes = seriesWatchTime
                 }
+            }
+
+            getRecentSeries = fun count -> async {
+                return SeriesProjection.getRecentSeries conn count
             }
 
             getRecentActivity = fun count -> async {
@@ -781,11 +801,17 @@ module Api =
                 return FriendProjection.getBySlug conn slug
             }
 
-            getFriendMovies = fun friendSlug -> async {
+            getFriendMedia = fun friendSlug -> async {
+                let movieRec = MovieProjection.getMoviesRecommendedByFriend conn friendSlug
+                let seriesRec = SeriesProjection.getSeriesRecommendedByFriend conn friendSlug
+                let movieWant = MovieProjection.getMoviesWantToWatchWithFriend conn friendSlug
+                let seriesWant = SeriesProjection.getSeriesWantToWatchWithFriend conn friendSlug
+                let movieWatched = MovieProjection.getMoviesWatchedWithFriend conn friendSlug
+                let seriesWatched = SeriesProjection.getSeriesWatchedWithFriend conn friendSlug
                 return {
-                    Mediatheca.Shared.FriendMovies.RecommendedMovies = MovieProjection.getMoviesRecommendedByFriend conn friendSlug
-                    WantToWatchMovies = MovieProjection.getMoviesWantToWatchWithFriend conn friendSlug
-                    WatchedMovies = MovieProjection.getMoviesWatchedWithFriend conn friendSlug
+                    Mediatheca.Shared.FriendMedia.Recommended = (movieRec @ seriesRec) |> List.sortBy (fun i -> i.Name)
+                    WantToWatch = (movieWant @ seriesWant) |> List.sortBy (fun i -> i.Name)
+                    Watched = (movieWatched @ seriesWatched) |> List.sortBy (fun i -> i.Name)
                 }
             }
 

@@ -394,27 +394,28 @@ module MovieProjection =
               Friends = resolveFriendRefs conn friendSlugs }
         )
 
-    let private readFriendMovieItem (rd: IDataReader) : Mediatheca.Shared.FriendMovieItem =
-        { Mediatheca.Shared.FriendMovieItem.Slug = rd.ReadString "slug"
+    let private readFriendMediaItem (rd: IDataReader) : Mediatheca.Shared.FriendMediaItem =
+        { Mediatheca.Shared.FriendMediaItem.Slug = rd.ReadString "slug"
           Name = rd.ReadString "name"
           Year = rd.ReadInt32 "year"
           PosterRef =
             if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
-            else Some (rd.ReadString "poster_ref") }
+            else Some (rd.ReadString "poster_ref")
+          MediaType = Mediatheca.Shared.Movie }
 
-    let getMoviesRecommendedByFriend (conn: SqliteConnection) (friendSlug: string) : Mediatheca.Shared.FriendMovieItem list =
+    let getMoviesRecommendedByFriend (conn: SqliteConnection) (friendSlug: string) : Mediatheca.Shared.FriendMediaItem list =
         let pattern = sprintf "%%\"%s\"%%" friendSlug
         conn
         |> Db.newCommand "SELECT slug, name, year, poster_ref FROM movie_detail WHERE recommended_by LIKE @pattern ORDER BY name"
         |> Db.setParams [ "pattern", SqlType.String pattern ]
-        |> Db.query readFriendMovieItem
+        |> Db.query readFriendMediaItem
 
-    let getMoviesWantToWatchWithFriend (conn: SqliteConnection) (friendSlug: string) : Mediatheca.Shared.FriendMovieItem list =
+    let getMoviesWantToWatchWithFriend (conn: SqliteConnection) (friendSlug: string) : Mediatheca.Shared.FriendMediaItem list =
         let pattern = sprintf "%%\"%s\"%%" friendSlug
         conn
         |> Db.newCommand "SELECT slug, name, year, poster_ref FROM movie_detail WHERE want_to_watch_with LIKE @pattern ORDER BY name"
         |> Db.setParams [ "pattern", SqlType.String pattern ]
-        |> Db.query readFriendMovieItem
+        |> Db.query readFriendMediaItem
 
     let getMoviesWatchedWithFriend (conn: SqliteConnection) (friendSlug: string) : Mediatheca.Shared.FriendWatchedItem list =
         let pattern = sprintf "%%\"%s\"%%" friendSlug
@@ -441,7 +442,8 @@ module MovieProjection =
               Name = name
               Year = year
               PosterRef = posterRef
-              Dates = rows |> List.map (fun (_, _, _, _, date) -> date) }
+              Dates = rows |> List.map (fun (_, _, _, _, date) -> date)
+              MediaType = Mediatheca.Shared.Movie }
         )
 
     let getBySlug (conn: SqliteConnection) (slug: string) : Mediatheca.Shared.MovieDetail option =

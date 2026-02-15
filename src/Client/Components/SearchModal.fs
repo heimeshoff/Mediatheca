@@ -45,7 +45,7 @@ let filterLibrary (query: string) (movies: MovieListItem list) (series: SeriesLi
             movies
             |> List.filter (fun m -> m.Name.ToLowerInvariant().Contains(q))
             |> List.map (fun m ->
-                { Slug = m.Slug
+                { LibrarySearchResult.Slug = m.Slug
                   Name = m.Name
                   Year = m.Year
                   PosterRef = m.PosterRef
@@ -54,7 +54,7 @@ let filterLibrary (query: string) (movies: MovieListItem list) (series: SeriesLi
             series
             |> List.filter (fun s -> s.Name.ToLowerInvariant().Contains(q))
             |> List.map (fun s ->
-                { Slug = s.Slug
+                { LibrarySearchResult.Slug = s.Slug
                   Name = s.Name
                   Year = s.Year
                   PosterRef = s.PosterRef

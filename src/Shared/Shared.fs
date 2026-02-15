@@ -83,11 +83,12 @@ type FriendDetail = {
     ImageRef: string option
 }
 
-type FriendMovieItem = {
+type FriendMediaItem = {
     Slug: string
     Name: string
     Year: int
     PosterRef: string option
+    MediaType: MediaType
 }
 
 type FriendWatchedItem = {
@@ -96,12 +97,13 @@ type FriendWatchedItem = {
     Year: int
     PosterRef: string option
     Dates: string list
+    MediaType: MediaType
 }
 
-type FriendMovies = {
-    RecommendedMovies: FriendMovieItem list
-    WantToWatchMovies: FriendMovieItem list
-    WatchedMovies: FriendWatchedItem list
+type FriendMedia = {
+    Recommended: FriendMediaItem list
+    WantToWatch: FriendMediaItem list
+    Watched: FriendWatchedItem list
 }
 
 // Watch Sessions
@@ -210,10 +212,12 @@ type CatalogRef = {
 
 type DashboardStats = {
     MovieCount: int
+    SeriesCount: int
     FriendCount: int
     CatalogCount: int
     WatchSessionCount: int
     TotalWatchTimeMinutes: int
+    SeriesWatchTimeMinutes: int
 }
 
 type RecentActivityItem = {
@@ -320,6 +324,16 @@ type NextUpDto = {
     EpisodeName: string
 }
 
+type RecentSeriesItem = {
+    Slug: string
+    Name: string
+    Year: int
+    PosterRef: string option
+    NextUp: NextUpDto option
+    WatchedEpisodeCount: int
+    EpisodeCount: int
+}
+
 type SeriesListItem = {
     Slug: string
     Name: string
@@ -424,7 +438,7 @@ type IMediathecaApi = {
     updateFriend: string -> string -> string option -> Async<Result<unit, string>>
     removeFriend: string -> Async<Result<unit, string>>
     getFriend: string -> Async<FriendDetail option>
-    getFriendMovies: string -> Async<FriendMovies>
+    getFriendMedia: string -> Async<FriendMedia>
     getFriends: unit -> Async<FriendListItem list>
     uploadFriendImage: string -> byte array -> string -> Async<Result<string, string>>
     // Watch Sessions
@@ -455,6 +469,7 @@ type IMediathecaApi = {
     getCatalogsForMovie: string -> Async<CatalogRef list>
     // Dashboard
     getDashboardStats: unit -> Async<DashboardStats>
+    getRecentSeries: int -> Async<RecentSeriesItem list>
     getRecentActivity: int -> Async<RecentActivityItem list>
     // Event Store Browser
     getEvents: EventQuery -> Async<EventDto list>

@@ -10,7 +10,7 @@ type EditForm = {
 type Model = {
     Slug: string
     Friend: FriendDetail option
-    FriendMovies: FriendMovies option
+    FriendMedia: FriendMedia option
     IsLoading: bool
     IsEditing: bool
     EditForm: EditForm
@@ -21,7 +21,7 @@ type Model = {
 type Msg =
     | Load_friend of string
     | Friend_loaded of FriendDetail option
-    | Friend_movies_loaded of FriendMovies
+    | Friend_media_loaded of FriendMedia
     | Start_editing
     | Cancel_editing
     | Edit_name_changed of string

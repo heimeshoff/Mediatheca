@@ -353,7 +353,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                       Name = e.MovieName
                                       Year = e.MovieYear
                                       PosterRef = e.MoviePosterRef
-                                      Rating = None })
+                                      Rating = None
+                                      RoutePrefix = "movies" })
                             let entryBySlug =
                                 catalog.Entries
                                 |> List.map (fun e -> e.MovieSlug, e)

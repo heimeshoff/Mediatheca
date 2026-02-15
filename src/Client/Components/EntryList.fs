@@ -12,6 +12,7 @@ type EntryItem = {
     Year: int
     PosterRef: string option
     Rating: float option
+    RoutePrefix: string
 }
 
 type Props = {
@@ -151,7 +152,7 @@ let private galleryView (entries: EntryItem list) =
         prop.className (DesignSystem.movieGrid + " " + DesignSystem.staggerGrid)
         prop.children [
             for entry in entries do
-                PosterCard.view entry.Slug entry.Name entry.Year entry.PosterRef None
+                PosterCard.viewForRoute entry.RoutePrefix entry.Slug entry.Name entry.Year entry.PosterRef None
         ]
     ]
 
