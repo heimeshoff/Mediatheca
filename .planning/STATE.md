@@ -1,11 +1,33 @@
 # Current State
 
-**Last Updated:** 2026-02-14
+**Last Updated:** 2026-02-15
 **Current Phase:** 6 (TV Series) — Implementation complete
 **Current Task:** All Phase 6 requirements implemented
 
 ## Recent Progress
 
+- **2026-02-15**: Series overview card status line redesign
+  - Episode count and status now on one line: progress left, status right
+  - Abandoned series show "Abandoned" in red (text-error)
+  - Fully watched series show "Finished" in green (text-success)
+  - Otherwise shows next episode (S{x}E{y}) in primary color
+  - Added `abandoned` column to series_list projection table
+  - Added `IsAbandoned` to SeriesListItem shared type
+- **2026-02-15**: Search modal & movies overview UX improvements
+  - Removed genre filter buttons from Movies overview (will be replaced with proper filter system later)
+  - Search modal input: no border on focus, background color change instead
+  - Keyboard navigation now works for library entries (was TMDB-only)
+  - Enter on library entry navigates to it; Enter on TMDB result imports it
+  - Arrow keys flow: library section → TMDB columns (seamless up/down transition)
+  - Selection highlighting and scroll-into-view for library items
+  - Updated keyboard hints footer ("select" instead of "import")
+- **2026-02-15**: Add abandon/unabandon series feature
+  - New events: Series_abandoned, Series_unabandoned with full serialization
+  - New commands: Abandon_series, Unabandon_series with idempotent decide logic
+  - Abandoned bool field on ActiveSeries state, IsAbandoned on SeriesDetail DTO
+  - Projection: abandoned column on series_detail table
+  - API: abandonSeries/unabandonSeries endpoints
+  - UI: toggle button above Remove Series (warning style), text changes based on state
 - **2026-02-14**: Search modal two-column layout with keyboard navigation
   - TMDB results split into Movies (left) and Series (right) columns with divider
   - Full keyboard nav: ↑↓ navigate rows, ←→ switch columns, Enter imports, Esc closes

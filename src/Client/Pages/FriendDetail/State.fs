@@ -7,7 +7,7 @@ open Mediatheca.Client.Pages.FriendDetail.Types
 let init (slug: string) : Model * Cmd<Msg> =
     { Slug = slug
       Friend = None
-      FriendMovies = None
+      FriendMedia = None
       IsLoading = true
       IsEditing = false
       EditForm = { Name = ""; ImageRef = None }
@@ -21,14 +21,14 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with IsLoading = true; Slug = slug },
         Cmd.batch [
             Cmd.OfAsync.perform api.getFriend slug Friend_loaded
-            Cmd.OfAsync.perform api.getFriendMovies slug Friend_movies_loaded
+            Cmd.OfAsync.perform api.getFriendMedia slug Friend_media_loaded
         ]
 
     | Friend_loaded friend ->
         { model with Friend = friend; IsLoading = false }, Cmd.none
 
-    | Friend_movies_loaded movies ->
-        { model with FriendMovies = Some movies }, Cmd.none
+    | Friend_media_loaded media ->
+        { model with FriendMedia = Some media }, Cmd.none
 
     | Start_editing ->
         match model.Friend with

@@ -170,6 +170,148 @@ let private personalRatingCard (rating: int option) (isOpen: bool) (dispatch: Ms
         ]
     ]
 
+// ── Catalog Manager (modal) ──
+
+[<ReactComponent>]
+let private CatalogManager
+    (allCatalogs: CatalogListItem list)
+    (currentCatalogs: CatalogRef list)
+    (onAdd: string -> unit)
+    (onRemove: string -> string -> unit)
+    (onCreateNew: string -> unit)
+    (onClose: unit -> unit) =
+    let searchText, setSearchText = React.useState("")
+    let highlightedIndex, setHighlightedIndex = React.useState(0)
+    let selectedSlugs = currentCatalogs |> List.map (fun c -> c.Slug) |> Set.ofList
+    let available =
+        allCatalogs
+        |> List.filter (fun c ->
+            not (Set.contains c.Slug selectedSlugs) &&
+            (searchText = "" || c.Name.ToLowerInvariant().Contains(searchText.ToLowerInvariant())))
+    let availableArr = available |> List.toArray
+    let trimmedSearch = searchText.Trim()
+    let hasExactMatch = allCatalogs |> List.exists (fun c -> c.Name.ToLowerInvariant() = trimmedSearch.ToLowerInvariant())
+    let showCreateNew = trimmedSearch <> "" && not hasExactMatch
+    let totalItems = availableArr.Length + (if showCreateNew then 1 else 0)
+
+    let headerExtra = [
+        if not (List.isEmpty currentCatalogs) then
+            Html.div [
+                prop.className "flex flex-wrap gap-2 mb-4"
+                prop.children [
+                    for cat in currentCatalogs do
+                        Html.span [
+                            prop.className "inline-flex items-center gap-1.5 bg-transparent border border-base-content/20 text-base-content/70 px-3 py-1 rounded-full text-sm font-semibold transition-colors hover:border-base-content/40"
+                            prop.children [
+                                Html.span [ prop.text cat.Name ]
+                                Html.button [
+                                    prop.className "text-base-content/40 hover:text-error transition-colors cursor-pointer ml-0.5"
+                                    prop.onClick (fun e ->
+                                        e.stopPropagation()
+                                        onRemove cat.Slug cat.EntryId)
+                                    prop.text "\u00D7"
+                                ]
+                            ]
+                        ]
+                ]
+            ]
+        Daisy.input [
+            prop.className "w-full mb-4"
+            prop.type' "text"
+            prop.placeholder "Search catalogs..."
+            prop.autoFocus true
+            prop.value searchText
+            prop.onChange (fun (v: string) ->
+                setSearchText v
+                setHighlightedIndex 0)
+            prop.onKeyDown (fun e ->
+                match e.key with
+                | "ArrowDown" ->
+                    e.preventDefault()
+                    if totalItems > 0 then
+                        setHighlightedIndex (min (highlightedIndex + 1) (totalItems - 1))
+                | "ArrowUp" ->
+                    e.preventDefault()
+                    setHighlightedIndex (max (highlightedIndex - 1) 0)
+                | "Enter" ->
+                    e.preventDefault()
+                    if highlightedIndex >= 0 && highlightedIndex < availableArr.Length then
+                        onAdd availableArr.[highlightedIndex].Slug
+                        setSearchText ""
+                        setHighlightedIndex 0
+                    elif showCreateNew && highlightedIndex = availableArr.Length then
+                        onCreateNew trimmedSearch
+                        setSearchText ""
+                        setHighlightedIndex 0
+                | "Escape" -> onClose ()
+                | _ -> ())
+        ]
+    ]
+
+    let content = [
+        if totalItems = 0 && not showCreateNew then
+            Html.p [
+                prop.className "text-base-content/60 py-2 text-sm"
+                prop.text (
+                    if List.isEmpty allCatalogs && trimmedSearch = "" then "No catalogs yet. Create one below."
+                    elif trimmedSearch = "" then "Already in all catalogs."
+                    else "No matches found."
+                )
+            ]
+        else
+            Html.div [
+                prop.className "space-y-1"
+                prop.children [
+                    for i in 0 .. availableArr.Length - 1 do
+                        let catalog = availableArr.[i]
+                        let isHighlighted = (i = highlightedIndex)
+                        Html.div [
+                            prop.className (
+                                "flex items-center gap-3 p-2 rounded-lg cursor-pointer " +
+                                (if isHighlighted then "bg-primary/20" else "hover:bg-base-200"))
+                            prop.onClick (fun _ -> onAdd catalog.Slug)
+                            prop.children [
+                                Html.div [
+                                    prop.className "w-10 h-10 rounded-full bg-base-300 flex items-center justify-center text-base-content/40"
+                                    prop.children [ Icons.catalog () ]
+                                ]
+                                Html.div [
+                                    prop.className "flex flex-col"
+                                    prop.children [
+                                        Html.span [ prop.className "font-semibold"; prop.text catalog.Name ]
+                                        if catalog.Description <> "" then
+                                            Html.span [ prop.className "text-xs text-base-content/50"; prop.text catalog.Description ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    if showCreateNew then
+                        let isHighlighted = (highlightedIndex = availableArr.Length)
+                        Html.div [
+                            prop.className (
+                                "flex items-center gap-3 p-2 rounded-lg cursor-pointer " +
+                                (if isHighlighted then "bg-primary/20" else "hover:bg-base-200"))
+                            prop.onClick (fun _ ->
+                                onCreateNew trimmedSearch
+                                setSearchText ""
+                                setHighlightedIndex 0)
+                            prop.children [
+                                Html.div [
+                                    prop.className "w-10 h-10 rounded-full bg-base-300 flex items-center justify-center text-base-content/40 text-lg"
+                                    prop.text "+"
+                                ]
+                                Html.span [
+                                    prop.className "font-semibold"
+                                    prop.text $"Create catalog \"{trimmedSearch}\""
+                                ]
+                            ]
+                        ]
+                ]
+            ]
+    ]
+
+    ModalPanel.viewCustom "Add to Catalog" onClose headerExtra content []
+
 // ── Cast ──
 
 let private castCard (cast: CastMemberDto) =
@@ -398,7 +540,7 @@ let private episodeCard
                                         ]
                                     Html.span [
                                         prop.className "text-xs font-bold text-primary uppercase tracking-wider"
-                                        prop.text $"E{episode.EpisodeNumber:D2}"
+                                        prop.text $"E%02d{episode.EpisodeNumber}"
                                     ]
                                     match episode.Runtime with
                                     | Some r ->
@@ -418,12 +560,43 @@ let private episodeCard
                                     prop.className "text-xs text-base-content/50 line-clamp-2"
                                     prop.text episode.Overview
                                 ]
+                            let epSlug = $"{model.Slug}:s%02d{seasonNumber}e%02d{episode.EpisodeNumber}"
+                            let epCatalogs = model.SeriesCatalogs |> List.filter (fun c -> c.MovieSlug = epSlug)
+                            if not (List.isEmpty epCatalogs) then
+                                Html.div [
+                                    prop.className "flex flex-wrap gap-1 mt-1"
+                                    prop.children [
+                                        for cat in epCatalogs do
+                                            Html.a [
+                                                prop.className "inline-flex items-center bg-transparent border border-base-content/15 text-base-content/40 px-1.5 py-0.5 rounded-full text-[10px] font-medium transition-colors hover:border-base-content/30 hover:text-primary cursor-pointer"
+                                                prop.href (Router.format ("catalogs", cat.Slug))
+                                                prop.onClick (fun e ->
+                                                    e.preventDefault()
+                                                    Router.navigate ("catalogs", cat.Slug))
+                                                prop.text cat.Name
+                                            ]
+                                    ]
+                                ]
                         ]
                     ]
-                    // Watch toggle button + date
+                    // Catalog + Watch toggle button + date
                     Html.div [
-                        prop.className "relative flex items-center flex-shrink-0"
+                        prop.className "relative flex items-center gap-2 flex-shrink-0"
                         prop.children [
+                            let epSlugForBtn = $"{model.Slug}:s%02d{seasonNumber}e%02d{episode.EpisodeNumber}"
+                            let epInCatalog = model.SeriesCatalogs |> List.exists (fun c -> c.MovieSlug = epSlugForBtn)
+                            Html.button [
+                                prop.className (
+                                    "w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer " +
+                                    (if epInCatalog then "bg-info/20 text-info hover:bg-info/30"
+                                     else "bg-base-content/10 text-base-content/30 hover:bg-primary/20 hover:text-primary"))
+                                prop.title "Add episode to catalog"
+                                prop.onClick (fun _ ->
+                                    dispatch (Open_catalog_picker (Episode_catalog (seasonNumber, episode.EpisodeNumber))))
+                                prop.children [
+                                    Html.span [ prop.className "[&>svg]:w-4 [&>svg]:h-4"; prop.children [ Icons.catalog () ] ]
+                                ]
+                            ]
                             Html.button [
                                 prop.className (
                                     "w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer " +
@@ -808,12 +981,42 @@ let private episodesTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                                                             prop.className "text-sm text-base-content/50"
                                                             prop.text $"{season.Episodes.Length} Episodes Total"
                                                         ]
+                                                        let seasonSlug = $"{model.Slug}:s%02d{season.SeasonNumber}"
+                                                        let seasonCatalogs = model.SeriesCatalogs |> List.filter (fun c -> c.MovieSlug = seasonSlug)
+                                                        if not (List.isEmpty seasonCatalogs) then
+                                                            Html.div [
+                                                                prop.className "flex flex-wrap gap-1.5 mt-1"
+                                                                prop.children [
+                                                                    for cat in seasonCatalogs do
+                                                                        Html.a [
+                                                                            prop.className "inline-flex items-center gap-1 bg-transparent border border-base-content/15 text-base-content/50 px-2 py-0.5 rounded-full text-xs font-medium transition-colors hover:border-base-content/30 hover:text-primary cursor-pointer"
+                                                                            prop.href (Router.format ("catalogs", cat.Slug))
+                                                                            prop.onClick (fun e ->
+                                                                                e.preventDefault()
+                                                                                Router.navigate ("catalogs", cat.Slug))
+                                                                            prop.text cat.Name
+                                                                        ]
+                                                                ]
+                                                            ]
                                                     ]
                                                 ]
-                                                // Season trailer + Mark all / Unmark all
+                                                // Season catalog + trailer + Mark all / Unmark all
+                                                let seasonSlugForBtn = $"{model.Slug}:s%02d{season.SeasonNumber}"
+                                                let seasonInCatalog = model.SeriesCatalogs |> List.exists (fun c -> c.MovieSlug = seasonSlugForBtn)
                                                 Html.div [
                                                     prop.className "flex items-center gap-3"
                                                     prop.children [
+                                                        Html.button [
+                                                            prop.className (
+                                                                "w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer " +
+                                                                (if seasonInCatalog then "bg-info/20 text-info hover:bg-info/30"
+                                                                 else "bg-base-content/10 text-base-content/40 hover:bg-primary/20 hover:text-primary"))
+                                                            prop.title "Add season to catalog"
+                                                            prop.onClick (fun _ -> dispatch (Open_catalog_picker (Season_catalog season.SeasonNumber)))
+                                                            prop.children [
+                                                                Html.span [ prop.className "[&>svg]:w-4 [&>svg]:h-4"; prop.children [ Icons.catalog () ] ]
+                                                            ]
+                                                        ]
                                                         match model.SeasonTrailerKeys |> Map.tryFind season.SeasonNumber with
                                                         | Some key ->
                                                             Html.button [
@@ -890,6 +1093,40 @@ let private overviewTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
             Html.div [
                 prop.className "lg:col-span-8 space-y-10"
                 prop.children [
+                    // Catalogs
+                    Html.div [
+                        prop.className "flex flex-wrap items-center gap-2"
+                        prop.children [
+                            Html.button [
+                                prop.className "w-9 h-9 rounded-full bg-base-100/50 backdrop-blur-sm border border-base-content/15 hover:bg-base-100/70 text-base-content/50 hover:text-base-content flex items-center justify-center transition-colors cursor-pointer"
+                                prop.onClick (fun _ -> dispatch (Open_catalog_picker Series_catalog))
+                                prop.children [
+                                    Html.span [ prop.className "[&>svg]:w-5 [&>svg]:h-5"; prop.children [ Icons.catalog () ] ]
+                                ]
+                            ]
+                            for cat in model.SeriesCatalogs |> List.filter (fun c -> c.MovieSlug = model.Slug) do
+                                Html.span [
+                                    prop.className "inline-flex items-center gap-1.5 bg-transparent border border-base-content/20 text-base-content/70 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors hover:border-base-content/40 group/pill"
+                                    prop.children [
+                                        Html.a [
+                                            prop.className "cursor-pointer hover:text-primary transition-colors"
+                                            prop.href (Router.format ("catalogs", cat.Slug))
+                                            prop.onClick (fun e ->
+                                                e.preventDefault()
+                                                Router.navigate ("catalogs", cat.Slug))
+                                            prop.text cat.Name
+                                        ]
+                                        Html.button [
+                                            prop.className "text-base-content/30 hover:text-error transition-colors cursor-pointer opacity-0 group-hover/pill:opacity-100"
+                                            prop.onClick (fun e ->
+                                                e.stopPropagation()
+                                                dispatch (Remove_from_catalog (cat.Slug, cat.EntryId)))
+                                            prop.text "\u00D7"
+                                        ]
+                                    ]
+                                ]
+                        ]
+                    ]
                     // Synopsis
                     if not (System.String.IsNullOrWhiteSpace series.Overview) then
                         Html.section [
@@ -1047,9 +1284,23 @@ let private overviewTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                             prop.text err
                         ]
                     | None -> ()
-                    // Remove series
+                    // Abandon series
                     Html.div [
                         prop.className "pt-4"
+                        prop.children [
+                            let isAbandoned = series.IsAbandoned
+                            Daisy.button.button [
+                                button.warning
+                                button.sm
+                                prop.className "w-full"
+                                prop.onClick (fun _ -> dispatch Toggle_abandon_series)
+                                prop.text (if isAbandoned then "Unabandon Series" else "Abandon Series")
+                            ]
+                        ]
+                    ]
+                    // Remove series
+                    Html.div [
+                        prop.className "pt-2"
                         prop.children [
                             if model.ConfirmingRemove then
                                 Html.div [
@@ -1390,6 +1641,25 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             ]
                         ]
                     ]
+                | None -> ()
+                // Catalog picker modal
+                match model.ShowCatalogPicker with
+                | Some target ->
+                    let targetSlug =
+                        match target with
+                        | Series_catalog -> model.Slug
+                        | Season_catalog sn -> $"{model.Slug}:s%02d{sn}"
+                        | Episode_catalog (sn, en) -> $"{model.Slug}:s%02d{sn}e%02d{en}"
+                    let currentCatalogs =
+                        model.SeriesCatalogs
+                        |> List.filter (fun c -> c.MovieSlug = targetSlug)
+                    CatalogManager
+                        model.AllCatalogs
+                        currentCatalogs
+                        (fun slug -> dispatch (Add_to_catalog slug))
+                        (fun slug entryId -> dispatch (Remove_from_catalog (slug, entryId)))
+                        (fun name -> dispatch (Create_catalog_and_add name))
+                        (fun () -> dispatch Close_catalog_picker)
                 | None -> ()
             ]
         ]

@@ -10,7 +10,11 @@ let init () : Model * Cmd<Msg> =
       IsTesting = false
       IsSaving = false
       TestResult = None
-      SaveResult = None },
+      SaveResult = None
+      CinemarcoDbPath = ""
+      CinemarcoImagesPath = ""
+      IsImporting = false
+      ImportResult = None },
     Cmd.ofMsg Load_tmdb_key
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
@@ -53,3 +57,22 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             | Ok () -> Cmd.ofMsg Load_tmdb_key
             | Error _ -> Cmd.none
         { model with IsSaving = false; SaveResult = Some saveResult }, cmd
+
+    | Cinemarco_db_path_changed value ->
+        { model with CinemarcoDbPath = value; ImportResult = None }, Cmd.none
+
+    | Cinemarco_images_path_changed value ->
+        { model with CinemarcoImagesPath = value; ImportResult = None }, Cmd.none
+
+    | Start_cinemarco_import ->
+        let request: ImportFromCinemarcoRequest = {
+            DatabasePath = model.CinemarcoDbPath
+            ImagesPath = model.CinemarcoImagesPath
+        }
+        { model with IsImporting = true; ImportResult = None },
+        Cmd.OfAsync.either api.importFromCinemarco request
+            Import_completed
+            (fun ex -> Import_completed (Error ex.Message))
+
+    | Import_completed result ->
+        { model with IsImporting = false; ImportResult = Some result }, Cmd.none

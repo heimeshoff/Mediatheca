@@ -27,12 +27,19 @@ let main args =
 
     let app = builder.Build()
 
+    // Data directory — configurable via DATA_DIR env var (same pattern as Cinemarco)
+    let dataDir =
+        match Environment.GetEnvironmentVariable("DATA_DIR") |> Option.ofObj with
+        | Some dir when dir <> "" -> dir
+        | _ ->
+            let home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+            Path.Combine(home, "app", "mediatheca")
+
+    if not (Directory.Exists(dataDir)) then
+        Directory.CreateDirectory(dataDir) |> ignore
+
     // Initialize database
-    let dbPath =
-        Path.Combine(
-            AppContext.BaseDirectory,
-            "mediatheca.db"
-        )
+    let dbPath = Path.Combine(dataDir, "mediatheca.db")
 
     let conn = createConnection dbPath
 
@@ -65,7 +72,7 @@ let main args =
     let httpClient = new HttpClient()
 
     // Image storage
-    let imageBasePath = Path.Combine(AppContext.BaseDirectory, "images")
+    let imageBasePath = Path.Combine(dataDir, "images")
     if not (Directory.Exists(imageBasePath)) then
         Directory.CreateDirectory(imageBasePath) |> ignore
 

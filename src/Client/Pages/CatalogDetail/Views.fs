@@ -8,14 +8,18 @@ open Mediatheca.Client
 open Mediatheca.Client.Components
 
 let private entryCard (entry: Mediatheca.Shared.CatalogEntryDto) (editingNote: EditNoteState option) (dispatch: Msg -> unit) =
+    let navSlug =
+        if entry.MovieSlug.Contains(":") then entry.MovieSlug.Split(':').[0]
+        else entry.MovieSlug
+    let navPrefix = entry.RoutePrefix
     Html.div [
         prop.className "flex items-center gap-3 p-3 rounded-xl bg-base-100 group"
         prop.children [
             Html.a [
-                prop.href (Router.format ("movies", entry.MovieSlug))
+                prop.href (Router.format (navPrefix, navSlug))
                 prop.onClick (fun e ->
                     e.preventDefault()
-                    Router.navigate ("movies", entry.MovieSlug)
+                    Router.navigate (navPrefix, navSlug)
                 )
                 prop.className "flex-none cursor-pointer"
                 prop.children [
@@ -26,10 +30,10 @@ let private entryCard (entry: Mediatheca.Shared.CatalogEntryDto) (editingNote: E
                 prop.className "flex-1 min-w-0"
                 prop.children [
                     Html.a [
-                        prop.href (Router.format ("movies", entry.MovieSlug))
+                        prop.href (Router.format (navPrefix, navSlug))
                         prop.onClick (fun e ->
                             e.preventDefault()
-                            Router.navigate ("movies", entry.MovieSlug)
+                            Router.navigate (navPrefix, navSlug)
                         )
                         prop.className "font-semibold text-sm truncate hover:text-primary transition-colors cursor-pointer block"
                         prop.text entry.MovieName
@@ -273,7 +277,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         prop.children [
                                                             Daisy.badge [
                                                                 badge.ghost
-                                                                prop.text $"{List.length catalog.Entries} movies"
+                                                                prop.text $"{List.length catalog.Entries} entries"
                                                             ]
                                                             if catalog.IsSorted then
                                                                 Daisy.badge [
@@ -320,13 +324,13 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             prop.children [
                                 Html.h2 [
                                     prop.className "text-lg font-bold font-display"
-                                    prop.text "Movies"
+                                    prop.text "Entries"
                                 ]
                                 Daisy.button.button [
                                     button.primary
                                     button.sm
                                     prop.onClick (fun _ -> dispatch Toggle_add_entry)
-                                    prop.text (if model.ShowAddEntry then "Cancel" else "+ Add Movie")
+                                    prop.text (if model.ShowAddEntry then "Cancel" else "+ Add Entry")
                                 ]
                             ]
                         ]
@@ -338,10 +342,10 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             Html.div [
                                 prop.className "text-center py-12 text-base-content/30"
                                 prop.children [
-                                    Html.p [ prop.text "No movies in this catalog yet." ]
+                                    Html.p [ prop.text "No entries in this catalog yet." ]
                                     Html.p [
                                         prop.className "text-sm mt-1"
-                                        prop.text "Add movies to build your catalog."
+                                        prop.text "Add movies or series to build your catalog."
                                     ]
                                 ]
                             ]
@@ -349,11 +353,15 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             let entryItems : EntryList.EntryItem list =
                                 catalog.Entries
                                 |> List.map (fun e ->
+                                    let navSlug =
+                                        if e.MovieSlug.Contains(":") then e.MovieSlug.Split(':').[0]
+                                        else e.MovieSlug
                                     { Slug = e.MovieSlug
                                       Name = e.MovieName
                                       Year = e.MovieYear
                                       PosterRef = e.MoviePosterRef
-                                      Rating = None })
+                                      Rating = None
+                                      RoutePrefix = e.RoutePrefix })
                             let entryBySlug =
                                 catalog.Entries
                                 |> List.map (fun e -> e.MovieSlug, e)
@@ -364,6 +372,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                     match Map.tryFind item.Slug entryBySlug with
                                     | Some entry -> entryCard entry model.EditingNote dispatch
                                     | None -> Html.none
+                                ShowWatchOrder = true
                             }
 
                         match model.Error with

@@ -83,11 +83,12 @@ type FriendDetail = {
     ImageRef: string option
 }
 
-type FriendMovieItem = {
+type FriendMediaItem = {
     Slug: string
     Name: string
     Year: int
     PosterRef: string option
+    MediaType: MediaType
 }
 
 type FriendWatchedItem = {
@@ -96,12 +97,13 @@ type FriendWatchedItem = {
     Year: int
     PosterRef: string option
     Dates: string list
+    MediaType: MediaType
 }
 
-type FriendMovies = {
-    RecommendedMovies: FriendMovieItem list
-    WantToWatchMovies: FriendMovieItem list
-    WatchedMovies: FriendWatchedItem list
+type FriendMedia = {
+    Recommended: FriendMediaItem list
+    WantToWatch: FriendMediaItem list
+    Watched: FriendWatchedItem list
 }
 
 // Watch Sessions
@@ -162,6 +164,7 @@ type CatalogEntryDto = {
     MoviePosterRef: string option
     Note: string option
     Position: int
+    RoutePrefix: string
 }
 
 type CatalogListItem = {
@@ -204,16 +207,19 @@ type CatalogRef = {
     Slug: string
     Name: string
     EntryId: string
+    MovieSlug: string
 }
 
 // Dashboard
 
 type DashboardStats = {
     MovieCount: int
+    SeriesCount: int
     FriendCount: int
     CatalogCount: int
     WatchSessionCount: int
     TotalWatchTimeMinutes: int
+    SeriesWatchTimeMinutes: int
 }
 
 type RecentActivityItem = {
@@ -320,6 +326,16 @@ type NextUpDto = {
     EpisodeName: string
 }
 
+type RecentSeriesItem = {
+    Slug: string
+    Name: string
+    Year: int
+    PosterRef: string option
+    NextUp: NextUpDto option
+    WatchedEpisodeCount: int
+    EpisodeCount: int
+}
+
 type SeriesListItem = {
     Slug: string
     Name: string
@@ -332,6 +348,7 @@ type SeriesListItem = {
     EpisodeCount: int
     WatchedEpisodeCount: int
     NextUp: NextUpDto option
+    IsAbandoned: bool
 }
 
 type SeriesDetail = {
@@ -347,6 +364,7 @@ type SeriesDetail = {
     TmdbRating: float option
     EpisodeRuntime: int option
     PersonalRating: int option
+    IsAbandoned: bool
     Cast: CastMemberDto list
     RecommendedBy: FriendRef list
     WantToWatchWith: FriendRef list
@@ -400,6 +418,24 @@ type UpdateEpisodeWatchedDateRequest = {
     Date: string
 }
 
+// Import
+
+type ImportFromCinemarcoRequest = {
+    DatabasePath: string
+    ImagesPath: string
+}
+
+type ImportResult = {
+    FriendsImported: int
+    MoviesImported: int
+    SeriesImported: int
+    EpisodesWatched: int
+    CatalogsImported: int
+    ContentBlocksImported: int
+    ImagesCopied: int
+    Errors: string list
+}
+
 module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
@@ -424,7 +460,7 @@ type IMediathecaApi = {
     updateFriend: string -> string -> string option -> Async<Result<unit, string>>
     removeFriend: string -> Async<Result<unit, string>>
     getFriend: string -> Async<FriendDetail option>
-    getFriendMovies: string -> Async<FriendMovies>
+    getFriendMedia: string -> Async<FriendMedia>
     getFriends: unit -> Async<FriendListItem list>
     uploadFriendImage: string -> byte array -> string -> Async<Result<string, string>>
     // Watch Sessions
@@ -455,6 +491,7 @@ type IMediathecaApi = {
     getCatalogsForMovie: string -> Async<CatalogRef list>
     // Dashboard
     getDashboardStats: unit -> Async<DashboardStats>
+    getRecentSeries: int -> Async<RecentSeriesItem list>
     getRecentActivity: int -> Async<RecentActivityItem list>
     // Event Store Browser
     getEvents: EventQuery -> Async<EventDto list>
@@ -472,6 +509,8 @@ type IMediathecaApi = {
     searchTvSeries: string -> Async<TmdbSearchResult list>
     addSeries: int -> Async<Result<string, string>>
     removeSeries: string -> Async<Result<unit, string>>
+    abandonSeries: string -> Async<Result<unit, string>>
+    unabandonSeries: string -> Async<Result<unit, string>>
     getSeries: unit -> Async<SeriesListItem list>
     getSeriesDetail: string -> string option -> Async<SeriesDetail option>
     setSeriesPersonalRating: string -> int option -> Async<Result<unit, string>>
@@ -497,4 +536,6 @@ type IMediathecaApi = {
     updateSeriesContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
     removeSeriesContentBlock: string -> string -> Async<Result<unit, string>>
     getCatalogsForSeries: string -> Async<CatalogRef list>
+    // Import
+    importFromCinemarco: ImportFromCinemarcoRequest -> Async<Result<ImportResult, string>>
 }

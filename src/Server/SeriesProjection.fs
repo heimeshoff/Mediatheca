@@ -23,7 +23,8 @@ module SeriesProjection =
                 watched_episode_count INTEGER NOT NULL DEFAULT 0,
                 next_up_season INTEGER,
                 next_up_episode INTEGER,
-                next_up_title TEXT
+                next_up_title TEXT,
+                abandoned INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS series_detail (
@@ -40,7 +41,8 @@ module SeriesProjection =
                 status TEXT NOT NULL DEFAULT 'Unknown',
                 personal_rating INTEGER,
                 recommended_by TEXT NOT NULL DEFAULT '[]',
-                want_to_watch_with TEXT NOT NULL DEFAULT '[]'
+                want_to_watch_with TEXT NOT NULL DEFAULT '[]',
+                abandoned INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS series_seasons (
@@ -68,11 +70,12 @@ module SeriesProjection =
             );
 
             CREATE TABLE IF NOT EXISTS series_rewatch_sessions (
-                rewatch_id TEXT PRIMARY KEY,
+                rewatch_id TEXT NOT NULL,
                 series_slug TEXT NOT NULL,
                 name TEXT,
                 is_default INTEGER NOT NULL DEFAULT 0,
-                friends TEXT NOT NULL DEFAULT '[]'
+                friends TEXT NOT NULL DEFAULT '[]',
+                PRIMARY KEY (rewatch_id, series_slug)
             );
 
             CREATE TABLE IF NOT EXISTS series_episode_progress (
@@ -565,6 +568,26 @@ module SeriesProjection =
                     ]
                     |> Db.exec
 
+                | Series.Series_abandoned ->
+                    conn
+                    |> Db.newCommand "UPDATE series_detail SET abandoned = 1 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE series_list SET abandoned = 1 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+
+                | Series.Series_unabandoned ->
+                    conn
+                    |> Db.newCommand "UPDATE series_detail SET abandoned = 0 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE series_list SET abandoned = 0 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+
     let handler: Projection.ProjectionHandler = {
         Name = "SeriesProjection"
         Handle = handleEvent
@@ -604,7 +627,7 @@ module SeriesProjection =
 
     let getAll (conn: SqliteConnection) : Mediatheca.Shared.SeriesListItem list =
         conn
-        |> Db.newCommand "SELECT slug, name, year, poster_ref, genres, tmdb_rating, status, season_count, episode_count, watched_episode_count, next_up_season, next_up_episode, next_up_title FROM series_list ORDER BY name"
+        |> Db.newCommand "SELECT slug, name, year, poster_ref, genres, tmdb_rating, status, season_count, episode_count, watched_episode_count, next_up_season, next_up_episode, next_up_title, abandoned FROM series_list ORDER BY name"
         |> Db.query (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
             let genres =
@@ -632,7 +655,8 @@ module SeriesProjection =
               SeasonCount = rd.ReadInt32 "season_count"
               EpisodeCount = rd.ReadInt32 "episode_count"
               WatchedEpisodeCount = rd.ReadInt32 "watched_episode_count"
-              NextUp = nextUp }
+              NextUp = nextUp
+              IsAbandoned = rd.ReadInt32 "abandoned" = 1 }
         )
 
     let search (conn: SqliteConnection) (query: string) : Mediatheca.Shared.LibrarySearchResult list =
@@ -651,7 +675,7 @@ module SeriesProjection =
 
     let getBySlug (conn: SqliteConnection) (slug: string) (rewatchId: string option) : Mediatheca.Shared.SeriesDetail option =
         conn
-        |> Db.newCommand "SELECT slug, name, year, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, episode_runtime, status, personal_rating, recommended_by, want_to_watch_with FROM series_detail WHERE slug = @slug"
+        |> Db.newCommand "SELECT slug, name, year, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, episode_runtime, status, personal_rating, recommended_by, want_to_watch_with, abandoned FROM series_detail WHERE slug = @slug"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
@@ -828,12 +852,94 @@ module SeriesProjection =
               PersonalRating =
                 if rd.IsDBNull(rd.GetOrdinal("personal_rating")) then None
                 else Some (rd.ReadInt32 "personal_rating")
+              IsAbandoned = rd.ReadInt32 "abandoned" = 1
               Cast = cast
               RecommendedBy = resolveFriendRefs conn recommendedBySlugs
               WantToWatchWith = resolveFriendRefs conn wantToWatchWithSlugs
               Seasons = seasons
               RewatchSessions = rewatchSessions
               ContentBlocks = ContentBlockProjection.getByMovie conn slug }
+        )
+
+    let getRecentSeries (conn: SqliteConnection) (count: int) : Mediatheca.Shared.RecentSeriesItem list =
+        conn
+        |> Db.newCommand "SELECT slug, name, year, poster_ref, episode_count, watched_episode_count, next_up_season, next_up_episode, next_up_title FROM series_list ORDER BY rowid DESC LIMIT @count"
+        |> Db.setParams [ "count", SqlType.Int32 count ]
+        |> Db.query (fun (rd: IDataReader) ->
+            let nextUp =
+                if rd.IsDBNull(rd.GetOrdinal("next_up_season")) then None
+                else
+                    Some {
+                        Mediatheca.Shared.NextUpDto.SeasonNumber = rd.ReadInt32 "next_up_season"
+                        Mediatheca.Shared.NextUpDto.EpisodeNumber = rd.ReadInt32 "next_up_episode"
+                        Mediatheca.Shared.NextUpDto.EpisodeName = rd.ReadString "next_up_title"
+                    }
+            { Mediatheca.Shared.RecentSeriesItem.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              Year = rd.ReadInt32 "year"
+              PosterRef =
+                if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
+                else Some (rd.ReadString "poster_ref")
+              NextUp = nextUp
+              WatchedEpisodeCount = rd.ReadInt32 "watched_episode_count"
+              EpisodeCount = rd.ReadInt32 "episode_count" }
+        )
+
+    let getSeriesRecommendedByFriend (conn: SqliteConnection) (friendSlug: string) : Mediatheca.Shared.FriendMediaItem list =
+        let pattern = sprintf "%%\"%s\"%%" friendSlug
+        conn
+        |> Db.newCommand "SELECT slug, name, year, poster_ref FROM series_detail WHERE recommended_by LIKE @pattern ORDER BY name"
+        |> Db.setParams [ "pattern", SqlType.String pattern ]
+        |> Db.query (fun (rd: IDataReader) ->
+            { Mediatheca.Shared.FriendMediaItem.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              Year = rd.ReadInt32 "year"
+              PosterRef =
+                if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
+                else Some (rd.ReadString "poster_ref")
+              MediaType = Mediatheca.Shared.Series }
+        )
+
+    let getSeriesWantToWatchWithFriend (conn: SqliteConnection) (friendSlug: string) : Mediatheca.Shared.FriendMediaItem list =
+        let pattern = sprintf "%%\"%s\"%%" friendSlug
+        conn
+        |> Db.newCommand "SELECT slug, name, year, poster_ref FROM series_detail WHERE want_to_watch_with LIKE @pattern ORDER BY name"
+        |> Db.setParams [ "pattern", SqlType.String pattern ]
+        |> Db.query (fun (rd: IDataReader) ->
+            { Mediatheca.Shared.FriendMediaItem.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              Year = rd.ReadInt32 "year"
+              PosterRef =
+                if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
+                else Some (rd.ReadString "poster_ref")
+              MediaType = Mediatheca.Shared.Series }
+        )
+
+    let getSeriesWatchedWithFriend (conn: SqliteConnection) (friendSlug: string) : Mediatheca.Shared.FriendWatchedItem list =
+        let pattern = sprintf "%%\"%s\"%%" friendSlug
+        conn
+        |> Db.newCommand """
+            SELECT d.slug, d.name, d.year, d.poster_ref, MAX(p.watched_date) as last_watched
+            FROM series_rewatch_sessions rs
+            JOIN series_episode_progress p ON p.series_slug = rs.series_slug AND p.rewatch_id = rs.rewatch_id
+            JOIN series_detail d ON d.slug = rs.series_slug
+            WHERE rs.friends LIKE @pattern
+            GROUP BY d.slug
+            ORDER BY d.name
+        """
+        |> Db.setParams [ "pattern", SqlType.String pattern ]
+        |> Db.query (fun (rd: IDataReader) ->
+            let lastWatched =
+                if rd.IsDBNull(rd.GetOrdinal("last_watched")) then []
+                else [ rd.ReadString "last_watched" ]
+            { Mediatheca.Shared.FriendWatchedItem.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              Year = rd.ReadInt32 "year"
+              PosterRef =
+                if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
+                else Some (rd.ReadString "poster_ref")
+              Dates = lastWatched
+              MediaType = Mediatheca.Shared.Series }
         )
 
     let getWatchedEpisodesForSession (conn: SqliteConnection) (slug: string) (rewatchId: string) : Set<int * int> =

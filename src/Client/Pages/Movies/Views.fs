@@ -10,12 +10,6 @@ open Mediatheca.Client.Components
 let private movieCard (movie: Mediatheca.Shared.MovieListItem) =
     PosterCard.view movie.Slug movie.Name movie.Year movie.PosterRef None
 
-let private allGenres (movies: Mediatheca.Shared.MovieListItem list) =
-    movies
-    |> List.collect (fun m -> m.Genres)
-    |> List.distinct
-    |> List.sort
-
 let view (model: Model) (dispatch: Msg -> unit) =
     Html.div [
         prop.className (DesignSystem.pagePadding + " " + DesignSystem.animateFadeIn)
@@ -38,59 +32,34 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     ]
                 ]
             ]
-            // Search and filter bar
+            // Search bar
             Html.div [
-                prop.className "flex flex-col sm:flex-row gap-3 mb-6"
+                prop.className "relative mb-6"
                 prop.children [
                     Html.div [
-                        prop.className "relative flex-1"
+                        prop.className "absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-base-content/40"
                         prop.children [
-                            Html.div [
-                                prop.className "absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-base-content/40"
-                                prop.children [
-                                    Svg.svg [
-                                        svg.className "w-5 h-5"
-                                        svg.fill "none"
-                                        svg.viewBox (0, 0, 24, 24)
-                                        svg.stroke "currentColor"
-                                        svg.custom ("strokeWidth", 1.5)
-                                        svg.children [
-                                            Svg.path [
-                                                svg.custom ("strokeLinecap", "round")
-                                                svg.custom ("strokeLinejoin", "round")
-                                                svg.d "m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-                                            ]
-                                        ]
+                            Svg.svg [
+                                svg.className "w-5 h-5"
+                                svg.fill "none"
+                                svg.viewBox (0, 0, 24, 24)
+                                svg.stroke "currentColor"
+                                svg.custom ("strokeWidth", 1.5)
+                                svg.children [
+                                    Svg.path [
+                                        svg.custom ("strokeLinecap", "round")
+                                        svg.custom ("strokeLinejoin", "round")
+                                        svg.d "m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
                                     ]
                                 ]
                             ]
-                            Daisy.input [
-                                prop.className "w-full pl-10"
-                                prop.placeholder "Search movies..."
-                                prop.value model.SearchQuery
-                                prop.onChange (Search_changed >> dispatch)
-                            ]
                         ]
                     ]
-                    Html.div [
-                        prop.className "flex gap-1.5 flex-wrap"
-                        prop.children [
-                            Daisy.button.button [
-                                if model.GenreFilter.IsNone then button.primary else button.ghost
-                                button.sm
-                                prop.className (if model.GenreFilter.IsNone then "" else "hover:bg-base-300/60")
-                                prop.onClick (fun _ -> dispatch (Genre_filter_changed None))
-                                prop.text "All"
-                            ]
-                            for genre in allGenres model.Movies do
-                                Daisy.button.button [
-                                    if model.GenreFilter = Some genre then button.primary else button.ghost
-                                    button.sm
-                                    prop.className (if model.GenreFilter = Some genre then "" else "hover:bg-base-300/60")
-                                    prop.onClick (fun _ -> dispatch (Genre_filter_changed (Some genre)))
-                                    prop.text genre
-                                ]
-                        ]
+                    Daisy.input [
+                        prop.className "w-full pl-10"
+                        prop.placeholder "Search movies..."
+                        prop.value model.SearchQuery
+                        prop.onChange (Search_changed >> dispatch)
                     ]
                 ]
             ]
@@ -105,14 +74,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 let filtered =
                     model.Movies
                     |> List.filter (fun m ->
-                        let matchesSearch =
-                            model.SearchQuery = "" ||
-                            m.Name.ToLowerInvariant().Contains(model.SearchQuery.ToLowerInvariant())
-                        let matchesGenre =
-                            match model.GenreFilter with
-                            | None -> true
-                            | Some g -> m.Genres |> List.contains g
-                        matchesSearch && matchesGenre
+                        model.SearchQuery = "" ||
+                        m.Name.ToLowerInvariant().Contains(model.SearchQuery.ToLowerInvariant())
                     )
                 if List.isEmpty filtered then
                     Html.div [

@@ -21,6 +21,7 @@
     <Compile Include="MovieProjection.fs" />
     <Compile Include="FriendProjection.fs" />
     <Compile Include="SeriesProjection.fs" />
+    <Compile Include="CinemarcoImport.fs" />
     <Compile Include="Api.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

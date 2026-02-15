@@ -17,12 +17,14 @@ let private readFileAsBytes (file: Browser.Types.File) (onDone: byte array * str
         onDone (uint8Array, file.name)
     reader.readAsArrayBuffer(file)
 
-let private movieListRow (item: EntryList.EntryItem) =
+let private routeForMedia (mediaType: MediaType) = match mediaType with | Movie -> "movies" | Series -> "series"
+
+let private mediaListRow (item: EntryList.EntryItem) =
     Html.a [
-        prop.href (Router.format ("movies", item.Slug))
+        prop.href (Router.format (item.RoutePrefix, item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
-            Router.navigate ("movies", item.Slug))
+            Router.navigate (item.RoutePrefix, item.Slug))
         prop.children [
             Html.div [
                 prop.className "flex items-center gap-3 p-3 rounded-xl bg-base-100 hover:bg-base-200/80 transition-colors cursor-pointer group"
@@ -34,9 +36,19 @@ let private movieListRow (item: EntryList.EntryItem) =
                     Html.div [
                         prop.className "flex-1 min-w-0"
                         prop.children [
-                            Html.p [
-                                prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
-                                prop.text item.Name
+                            Html.div [
+                                prop.className "flex items-center gap-2"
+                                prop.children [
+                                    Html.p [
+                                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                                        prop.text item.Name
+                                    ]
+                                    if item.RoutePrefix = "series" then
+                                        Html.span [
+                                            prop.className "badge badge-xs badge-outline badge-warning flex-none"
+                                            prop.text "Series"
+                                        ]
+                                ]
                             ]
                             Html.p [
                                 prop.className "text-xs text-base-content/50"
@@ -49,12 +61,12 @@ let private movieListRow (item: EntryList.EntryItem) =
         ]
     ]
 
-let private watchedMovieListRow (watchedBySlug: Map<string, FriendWatchedItem>) (item: EntryList.EntryItem) =
+let private watchedMediaListRow (watchedBySlug: Map<string, FriendWatchedItem>) (item: EntryList.EntryItem) =
     Html.a [
-        prop.href (Router.format ("movies", item.Slug))
+        prop.href (Router.format (item.RoutePrefix, item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
-            Router.navigate ("movies", item.Slug))
+            Router.navigate (item.RoutePrefix, item.Slug))
         prop.children [
             Html.div [
                 prop.className "flex items-center gap-3 p-3 rounded-xl bg-base-100 hover:bg-base-200/80 transition-colors cursor-pointer group"
@@ -66,9 +78,19 @@ let private watchedMovieListRow (watchedBySlug: Map<string, FriendWatchedItem>) 
                     Html.div [
                         prop.className "flex-1 min-w-0"
                         prop.children [
-                            Html.p [
-                                prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
-                                prop.text item.Name
+                            Html.div [
+                                prop.className "flex items-center gap-2"
+                                prop.children [
+                                    Html.p [
+                                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                                        prop.text item.Name
+                                    ]
+                                    if item.RoutePrefix = "series" then
+                                        Html.span [
+                                            prop.className "badge badge-xs badge-outline badge-warning flex-none"
+                                            prop.text "Series"
+                                        ]
+                                ]
                             ]
                             Html.p [
                                 prop.className "text-xs text-base-content/50"
@@ -85,26 +107,28 @@ let private watchedMovieListRow (watchedBySlug: Map<string, FriendWatchedItem>) 
         ]
     ]
 
-let private friendMovieItems (movies: FriendMovieItem list) : EntryList.EntryItem list =
-    movies |> List.map (fun m -> {
+let private friendMediaItems (items: FriendMediaItem list) : EntryList.EntryItem list =
+    items |> List.map (fun m -> {
         EntryList.EntryItem.Slug = m.Slug
         Name = m.Name
         Year = m.Year
         PosterRef = m.PosterRef
         Rating = None
+        RoutePrefix = routeForMedia m.MediaType
     })
 
-let private friendWatchedItems (movies: FriendWatchedItem list) : EntryList.EntryItem list =
-    movies |> List.map (fun m -> {
+let private friendWatchedItems (items: FriendWatchedItem list) : EntryList.EntryItem list =
+    items |> List.map (fun m -> {
         EntryList.EntryItem.Slug = m.Slug
         Name = m.Name
         Year = m.Year
         PosterRef = m.PosterRef
         Rating = None
+        RoutePrefix = routeForMedia m.MediaType
     })
 
-let private movieSection (title: string) (movies: FriendMovieItem list) =
-    if List.isEmpty movies then
+let private mediaSection (title: string) (items: FriendMediaItem list) =
+    if List.isEmpty items then
         Html.none
     else
         Html.div [
@@ -115,18 +139,19 @@ let private movieSection (title: string) (movies: FriendMovieItem list) =
                     prop.text title
                 ]
                 EntryList.view {
-                    Items = friendMovieItems movies
-                    RenderListRow = movieListRow
+                    Items = friendMediaItems items
+                    RenderListRow = mediaListRow
+                    ShowWatchOrder = false
                 }
             ]
         ]
 
-let private watchedMovieSection (movies: FriendWatchedItem list) =
-    if List.isEmpty movies then
+let private watchedMediaSection (items: FriendWatchedItem list) =
+    if List.isEmpty items then
         Html.none
     else
         let watchedBySlug =
-            movies |> List.map (fun m -> m.Slug, m) |> Map.ofList
+            items |> List.map (fun m -> m.Slug, m) |> Map.ofList
         Html.div [
             prop.className "mt-6"
             prop.children [
@@ -135,8 +160,9 @@ let private watchedMovieSection (movies: FriendWatchedItem list) =
                     prop.text "Watched Together"
                 ]
                 EntryList.view {
-                    Items = friendWatchedItems movies
-                    RenderListRow = watchedMovieListRow watchedBySlug
+                    Items = friendWatchedItems items
+                    RenderListRow = watchedMediaListRow watchedBySlug
+                    ShowWatchOrder = false
                 }
             ]
         ]
@@ -271,12 +297,12 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                         prop.text err
                                     ]
                                 | None -> ()
-                                // Movie sections
-                                match model.FriendMovies with
-                                | Some movies ->
-                                    movieSection "Recommended" movies.RecommendedMovies
-                                    movieSection "Want to Watch Together" movies.WantToWatchMovies
-                                    watchedMovieSection movies.WatchedMovies
+                                // Media sections
+                                match model.FriendMedia with
+                                | Some media ->
+                                    mediaSection "Recommended" media.Recommended
+                                    mediaSection "Want to Watch Together" media.WantToWatch
+                                    watchedMediaSection media.Watched
                                 | None -> ()
                             ]
                         ]
