@@ -18,13 +18,14 @@ type EntryItem = {
 type Props = {
     Items: EntryItem list
     RenderListRow: EntryItem -> ReactElement
+    ShowWatchOrder: bool
 }
 
 // ── Internal types ──
 
 type private Layout = Gallery | List
 
-type private SortField = ByReleaseDate | ByName | ByRating
+type private SortField = ByReleaseDate | ByName | ByRating | ByWatchOrder
 type private SortDirection = Ascending | Descending
 
 type private SortState = {
@@ -39,12 +40,14 @@ let private defaultDirectionFor field =
     | ByName -> Ascending
     | ByReleaseDate -> Descending
     | ByRating -> Descending
+    | ByWatchOrder -> Ascending
 
 let private sortFieldLabel field =
     match field with
     | ByReleaseDate -> "Release Date"
     | ByName -> "Name"
     | ByRating -> "Rating"
+    | ByWatchOrder -> "Watch Order"
 
 let private sortEntries (sort: SortState) (entries: EntryItem list) =
     let sorted =
@@ -52,6 +55,7 @@ let private sortEntries (sort: SortState) (entries: EntryItem list) =
         | ByReleaseDate -> entries |> List.sortBy (fun e -> e.Year)
         | ByName -> entries |> List.sortBy (fun e -> e.Name.ToLowerInvariant())
         | ByRating -> entries |> List.sortBy (fun e -> e.Rating |> Option.defaultValue 0.0)
+        | ByWatchOrder -> entries // preserve original order from server
     match sort.Direction with
     | Ascending -> sorted
     | Descending -> sorted |> List.rev
@@ -90,7 +94,7 @@ let private directionIcon dir =
 /// Uses position:absolute so backdrop-filter isn't broken by
 /// ancestor compositing layers (e.g. animate-fade-in).
 [<ReactComponent>]
-let private SortButton (sort: SortState, onSort: SortState -> unit) =
+let private SortButton (sort: SortState, onSort: SortState -> unit, showWatchOrder: bool) =
     let isOpen, setIsOpen = React.useState false
 
     let selectField field =
@@ -100,6 +104,9 @@ let private SortButton (sort: SortState, onSort: SortState -> unit) =
         else
             onSort { Field = field; Direction = defaultDirectionFor field }
         setIsOpen false
+
+    let fields =
+        [ ByReleaseDate; ByName; ByRating ] @ (if showWatchOrder then [ ByWatchOrder ] else [])
 
     Html.div [
         prop.className "relative"
@@ -122,7 +129,7 @@ let private SortButton (sort: SortState, onSort: SortState -> unit) =
                 Html.div [
                     prop.className (DesignSystem.glassDropdown + " absolute top-full right-0 mt-2 z-50 w-48 p-1.5")
                     prop.children [
-                        for field in [ ByReleaseDate; ByName; ByRating ] do
+                        for field in fields do
                             let isActive = sort.Field = field
                             let dir = if isActive then sort.Direction else defaultDirectionFor field
                             Html.button [
@@ -152,7 +159,10 @@ let private galleryView (entries: EntryItem list) =
         prop.className (DesignSystem.movieGrid + " " + DesignSystem.staggerGrid)
         prop.children [
             for entry in entries do
-                PosterCard.viewForRoute entry.RoutePrefix entry.Slug entry.Name entry.Year entry.PosterRef None
+                let navSlug =
+                    if entry.Slug.Contains(":") then entry.Slug.Split(':').[0]
+                    else entry.Slug
+                PosterCard.viewForRoute entry.RoutePrefix navSlug entry.Name entry.Year entry.PosterRef None
         ]
     ]
 
@@ -170,7 +180,10 @@ let private listView (renderRow: EntryItem -> ReactElement) (entries: EntryItem 
 [<ReactComponent>]
 let view (props: Props) =
     let layout, setLayout = React.useState Gallery
-    let sort, setSort = React.useState { Field = ByReleaseDate; Direction = Descending }
+    let defaultSort =
+        if props.ShowWatchOrder then { Field = ByWatchOrder; Direction = Ascending }
+        else { Field = ByReleaseDate; Direction = Descending }
+    let sort, setSort = React.useState defaultSort
 
     let sorted = sortEntries sort props.Items
 
@@ -187,7 +200,7 @@ let view (props: Props) =
                     Html.div [
                         prop.className "flex items-center gap-2"
                         prop.children [
-                            SortButton (sort, setSort)
+                            SortButton (sort, setSort, props.ShowWatchOrder)
                             layoutToggle layout setLayout
                         ]
                     ]

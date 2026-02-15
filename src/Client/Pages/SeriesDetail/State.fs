@@ -14,6 +14,9 @@ let init (slug: string) : Model * Cmd<Msg> =
       IsRatingOpen = false
       ShowFriendPicker = None
       Friends = []
+      AllCatalogs = []
+      SeriesCatalogs = []
+      ShowCatalogPicker = None
       EditingEpisodeDate = None
       TrailerKey = None
       SeasonTrailerKeys = Map.empty
@@ -35,6 +38,8 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         Cmd.batch [
             Cmd.OfAsync.perform (fun () -> api.getSeriesDetail model.Slug rewatchId) () Detail_loaded
             Cmd.OfAsync.perform api.getFriends () Friends_loaded
+            Cmd.OfAsync.perform api.getCatalogs () Catalogs_loaded
+            Cmd.OfAsync.perform api.getCatalogsForSeries model.Slug Series_catalogs_loaded
         ]
 
     | Detail_loaded detail ->
@@ -361,6 +366,78 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         model, Cmd.ofMsg Load_detail
 
     | Content_block_result (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Catalogs_loaded catalogs ->
+        { model with AllCatalogs = catalogs }, Cmd.none
+
+    | Series_catalogs_loaded catalogs ->
+        { model with SeriesCatalogs = catalogs }, Cmd.none
+
+    | Open_catalog_picker target ->
+        { model with ShowCatalogPicker = Some target }, Cmd.none
+
+    | Close_catalog_picker ->
+        { model with ShowCatalogPicker = None }, Cmd.none
+
+    | Add_to_catalog catalogSlug ->
+        let entrySlug =
+            match model.ShowCatalogPicker with
+            | Some (Season_catalog sn) -> $"{model.Slug}:s%02d{sn}"
+            | Some (Episode_catalog (sn, en)) -> $"{model.Slug}:s%02d{sn}e%02d{en}"
+            | _ -> model.Slug
+        let request: AddCatalogEntryRequest = {
+            MovieSlug = entrySlug
+            Note = None
+        }
+        model,
+        Cmd.OfAsync.either
+            (fun () -> async {
+                match! api.addCatalogEntry catalogSlug request with
+                | Ok _ -> return Ok ()
+                | Error e -> return Error e
+            }) () Catalog_result (fun ex -> Catalog_result (Error ex.Message))
+
+    | Remove_from_catalog (catalogSlug, entryId) ->
+        model,
+        Cmd.OfAsync.either
+            (fun () -> api.removeCatalogEntry catalogSlug entryId)
+            () Catalog_result (fun ex -> Catalog_result (Error ex.Message))
+
+    | Create_catalog_and_add name ->
+        let entrySlug =
+            match model.ShowCatalogPicker with
+            | Some (Season_catalog sn) -> $"{model.Slug}:s%02d{sn}"
+            | Some (Episode_catalog (sn, en)) -> $"{model.Slug}:s%02d{sn}e%02d{en}"
+            | _ -> model.Slug
+        let request: CreateCatalogRequest = {
+            Name = name
+            Description = ""
+            IsSorted = false
+        }
+        model,
+        Cmd.OfAsync.either
+            (fun () -> async {
+                match! api.createCatalog request with
+                | Ok slug ->
+                    let entryReq: AddCatalogEntryRequest = {
+                        MovieSlug = entrySlug
+                        Note = None
+                    }
+                    match! api.addCatalogEntry slug entryReq with
+                    | Ok _ -> return Ok ()
+                    | Error e -> return Error e
+                | Error e -> return Error e
+            }) () Catalog_result (fun ex -> Catalog_result (Error ex.Message))
+
+    | Catalog_result (Ok ()) ->
+        model,
+        Cmd.batch [
+            Cmd.OfAsync.perform api.getCatalogs () Catalogs_loaded
+            Cmd.OfAsync.perform api.getCatalogsForSeries model.Slug Series_catalogs_loaded
+        ]
+
+    | Catalog_result (Error err) ->
         { model with Error = Some err }, Cmd.none
 
     | Trailer_loaded key ->

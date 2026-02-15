@@ -1483,6 +1483,7 @@ let private entryListSection () =
                     EntryList.view {
                         Items = mockEntryItems
                         RenderListRow = mockListRow
+                        ShowWatchOrder = false
                     }
                 ]
             ]

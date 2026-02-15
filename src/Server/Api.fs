@@ -1401,6 +1401,6 @@ module Api =
             }
 
             getCatalogsForSeries = fun slug -> async {
-                return CatalogProjection.getCatalogsForMovie conn slug
+                return CatalogProjection.getCatalogsForSeriesWithChildren conn slug
             }
         }

@@ -9,6 +9,11 @@ type FriendPickerKind =
     | Watch_with_picker
     | Session_friend_picker of rewatchId: string
 
+type CatalogTarget =
+    | Series_catalog
+    | Season_catalog of seasonNumber: int
+    | Episode_catalog of seasonNumber: int * episodeNumber: int
+
 type Model = {
     Slug: string
     Detail: SeriesDetail option
@@ -21,6 +26,10 @@ type Model = {
     // Social modals
     ShowFriendPicker: FriendPickerKind option
     Friends: FriendListItem list
+    // Catalogs
+    AllCatalogs: CatalogListItem list
+    SeriesCatalogs: CatalogRef list
+    ShowCatalogPicker: CatalogTarget option
     // Episode date editing
     EditingEpisodeDate: (int * int) option
     // Trailer
@@ -87,6 +96,15 @@ type Msg =
     | Change_content_block_type of blockId: string * blockType: string
     | Reorder_content_blocks of blockIds: string list
     | Content_block_result of Result<unit, string>
+    // Catalogs
+    | Catalogs_loaded of CatalogListItem list
+    | Series_catalogs_loaded of CatalogRef list
+    | Open_catalog_picker of CatalogTarget
+    | Close_catalog_picker
+    | Add_to_catalog of catalogSlug: string
+    | Remove_from_catalog of catalogSlug: string * entryId: string
+    | Create_catalog_and_add of name: string
+    | Catalog_result of Result<unit, string>
     // Trailer
     | Trailer_loaded of string option
     | Season_trailer_loaded of seasonNumber: int * key: string option

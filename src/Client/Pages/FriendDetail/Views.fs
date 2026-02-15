@@ -141,6 +141,7 @@ let private mediaSection (title: string) (items: FriendMediaItem list) =
                 EntryList.view {
                     Items = friendMediaItems items
                     RenderListRow = mediaListRow
+                    ShowWatchOrder = false
                 }
             ]
         ]
@@ -161,6 +162,7 @@ let private watchedMediaSection (items: FriendWatchedItem list) =
                 EntryList.view {
                     Items = friendWatchedItems items
                     RenderListRow = watchedMediaListRow watchedBySlug
+                    ShowWatchOrder = false
                 }
             ]
         ]

@@ -164,6 +164,7 @@ type CatalogEntryDto = {
     MoviePosterRef: string option
     Note: string option
     Position: int
+    RoutePrefix: string
 }
 
 type CatalogListItem = {
@@ -206,6 +207,7 @@ type CatalogRef = {
     Slug: string
     Name: string
     EntryId: string
+    MovieSlug: string
 }
 
 // Dashboard
