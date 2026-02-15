@@ -6,6 +6,15 @@
 
 ## Recent Progress
 
+- **2026-02-15**: Search modal tabbed interface with unified keyboard navigation
+  - External results (Movies, Series, Games) now displayed as tabs — only one visible at a time
+  - Tab key cycles between tabs (Shift+Tab reverses), replacing left/right arrow column switching
+  - Unified focus: library results and tab results never simultaneously selected
+  - Down arrow from end of library enters active tab; Up arrow from top of tab returns to library
+  - Games tab now fully keyboard-navigable (was mouse-only before)
+  - Extracted renderRawgItem helper for consistent game result rendering
+  - Modal narrowed to max-w-2xl (single column instead of two-column layout)
+  - Updated keyboard hints footer: "tab switch" replaces "←→ switch"
 - **2026-02-15**: Series overview card status line redesign
   - Episode count and status now on one line: progress left, status right
   - Abandoned series show "Abandoned" in red (text-error)
