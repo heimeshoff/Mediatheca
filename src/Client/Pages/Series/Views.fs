@@ -8,17 +8,6 @@ open Mediatheca.Client.Pages.Series.Types
 open Mediatheca.Client
 open Mediatheca.Client.Components
 
-let private statusBadge (status: SeriesStatus) =
-    let (color, label) =
-        match status with
-        | Returning -> ("badge-success", "Returning")
-        | Ended -> ("badge-ghost", "Ended")
-        | Canceled -> ("badge-error", "Canceled")
-        | InProduction -> ("badge-warning", "In Production")
-        | Planned -> ("badge-info", "Planned")
-        | UnknownStatus -> ("badge-ghost", "Unknown")
-    Html.span [ prop.className $"badge badge-sm {color}"; prop.text label ]
-
 let private seriesCard (series: SeriesListItem) =
     let progressText = $"{series.WatchedEpisodeCount}/{series.EpisodeCount} episodes"
     let isFinished = series.EpisodeCount > 0 && series.WatchedEpisodeCount >= series.EpisodeCount
@@ -46,30 +35,6 @@ let private seriesCard (series: SeriesListItem) =
                                     prop.className "flex items-center justify-center w-full h-full text-base-content/20"
                                     prop.children [ Icons.tv () ]
                                 ]
-
-                            // Status badge (top-right)
-                            Html.div [
-                                prop.className "absolute top-2 right-2 z-10"
-                                prop.children [ statusBadge series.Status ]
-                            ]
-
-                            // Bottom gradient + title overlay (visible on hover)
-                            Html.div [
-                                prop.className "poster-overlay absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/70 to-transparent"
-                            ]
-                            Html.div [
-                                prop.className "poster-overlay absolute inset-x-0 bottom-0 p-3"
-                                prop.children [
-                                    Html.p [
-                                        prop.className "text-white text-xs font-medium line-clamp-2 drop-shadow-md"
-                                        prop.text series.Name
-                                    ]
-                                    Html.p [
-                                        prop.className "text-white/70 text-xs mt-0.5"
-                                        prop.text (string series.Year)
-                                    ]
-                                ]
-                            ]
 
                             // Shine effect
                             Html.div [ prop.className DesignSystem.posterShine ]
