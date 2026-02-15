@@ -348,6 +348,7 @@ type SeriesListItem = {
     EpisodeCount: int
     WatchedEpisodeCount: int
     NextUp: NextUpDto option
+    IsAbandoned: bool
 }
 
 type SeriesDetail = {

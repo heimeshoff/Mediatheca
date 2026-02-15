@@ -6,6 +6,13 @@
 
 ## Recent Progress
 
+- **2026-02-15**: Series overview card status line redesign
+  - Episode count and status now on one line: progress left, status right
+  - Abandoned series show "Abandoned" in red (text-error)
+  - Fully watched series show "Finished" in green (text-success)
+  - Otherwise shows next episode (S{x}E{y}) in primary color
+  - Added `abandoned` column to series_list projection table
+  - Added `IsAbandoned` to SeriesListItem shared type
 - **2026-02-15**: Search modal & movies overview UX improvements
   - Removed genre filter buttons from Movies overview (will be replaced with proper filter system later)
   - Search modal input: no border on focus, background color change instead

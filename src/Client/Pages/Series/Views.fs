@@ -21,10 +21,7 @@ let private statusBadge (status: SeriesStatus) =
 
 let private seriesCard (series: SeriesListItem) =
     let progressText = $"{series.WatchedEpisodeCount}/{series.EpisodeCount} episodes"
-    let nextUpText =
-        match series.NextUp with
-        | Some n -> Some $"Next: S{n.SeasonNumber}E{n.EpisodeNumber}"
-        | None -> None
+    let isFinished = series.EpisodeCount > 0 && series.WatchedEpisodeCount >= series.EpisodeCount
     Html.a [
         prop.href (Router.format ("series", series.Slug))
         prop.onClick (fun e ->
@@ -80,19 +77,30 @@ let private seriesCard (series: SeriesListItem) =
                     ]
                     // Info below the poster
                     Html.div [
-                        prop.className "mt-2 px-1"
+                        prop.className "flex items-baseline justify-between mt-2 px-1"
                         prop.children [
                             Html.p [
                                 prop.className "text-xs text-base-content/50"
                                 prop.text progressText
                             ]
-                            match nextUpText with
-                            | Some text ->
+                            if series.IsAbandoned then
                                 Html.p [
-                                    prop.className "text-xs text-primary font-medium mt-0.5"
-                                    prop.text text
+                                    prop.className "text-xs text-error font-medium"
+                                    prop.text "Abandoned"
                                 ]
-                            | None -> ()
+                            elif isFinished then
+                                Html.p [
+                                    prop.className "text-xs text-success font-medium"
+                                    prop.text "Finished"
+                                ]
+                            else
+                                match series.NextUp with
+                                | Some n ->
+                                    Html.p [
+                                        prop.className "text-xs text-primary font-medium"
+                                        prop.text $"S{n.SeasonNumber}E{n.EpisodeNumber}"
+                                    ]
+                                | None -> ()
                         ]
                     ]
                 ]

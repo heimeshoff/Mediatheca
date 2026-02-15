@@ -23,7 +23,8 @@ module SeriesProjection =
                 watched_episode_count INTEGER NOT NULL DEFAULT 0,
                 next_up_season INTEGER,
                 next_up_episode INTEGER,
-                next_up_title TEXT
+                next_up_title TEXT,
+                abandoned INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS series_detail (
@@ -572,10 +573,18 @@ module SeriesProjection =
                     |> Db.newCommand "UPDATE series_detail SET abandoned = 1 WHERE slug = @slug"
                     |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE series_list SET abandoned = 1 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
 
                 | Series.Series_unabandoned ->
                     conn
                     |> Db.newCommand "UPDATE series_detail SET abandoned = 0 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE series_list SET abandoned = 0 WHERE slug = @slug"
                     |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.exec
 
@@ -618,7 +627,7 @@ module SeriesProjection =
 
     let getAll (conn: SqliteConnection) : Mediatheca.Shared.SeriesListItem list =
         conn
-        |> Db.newCommand "SELECT slug, name, year, poster_ref, genres, tmdb_rating, status, season_count, episode_count, watched_episode_count, next_up_season, next_up_episode, next_up_title FROM series_list ORDER BY name"
+        |> Db.newCommand "SELECT slug, name, year, poster_ref, genres, tmdb_rating, status, season_count, episode_count, watched_episode_count, next_up_season, next_up_episode, next_up_title, abandoned FROM series_list ORDER BY name"
         |> Db.query (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
             let genres =
@@ -646,7 +655,8 @@ module SeriesProjection =
               SeasonCount = rd.ReadInt32 "season_count"
               EpisodeCount = rd.ReadInt32 "episode_count"
               WatchedEpisodeCount = rd.ReadInt32 "watched_episode_count"
-              NextUp = nextUp }
+              NextUp = nextUp
+              IsAbandoned = rd.ReadInt32 "abandoned" = 1 }
         )
 
     let search (conn: SqliteConnection) (query: string) : Mediatheca.Shared.LibrarySearchResult list =
