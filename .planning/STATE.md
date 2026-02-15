@@ -6,6 +6,13 @@
 
 ## Recent Progress
 
+- **2026-02-15**: Search modal: only search active tab's API, preserve tab on typing
+  - Active tab persists across query changes (no reset to Movies on every keystroke)
+  - Only the active tab's API is called (TMDB for Movies/Series, RAWG for Games)
+  - Switching tabs triggers a fresh search only if the new tab has no cached results
+  - Removed result count badges from tab buttons (unnecessary with single-tab search)
+  - ActiveTab moved from local React state to Elmish model (needed for API routing in State.fs)
+  - Stale inactive-tab results cleared on query change to prevent showing old data on tab switch
 - **2026-02-15**: Search modal tabbed interface with unified keyboard navigation
   - External results (Movies, Series, Games) now displayed as tabs — only one visible at a time
   - Tab key cycles between tabs (Shift+Tab reverses), replacing left/right arrow column switching

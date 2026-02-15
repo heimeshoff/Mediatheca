@@ -17,10 +17,12 @@ type Model = {
     IsImporting: bool
     Error: string option
     SearchVersion: int
+    ActiveTab: MediaType
 }
 
 type Msg =
     | Query_changed of string
+    | Tab_changed of MediaType
     | Debounce_tmdb_expired of version: int
     | Tmdb_search_completed of TmdbSearchResult list
     | Tmdb_search_failed of string
@@ -44,6 +46,7 @@ let init (movies: MovieListItem list) (series: SeriesListItem list) : Model = {
     IsImporting = false
     Error = None
     SearchVersion = 0
+    ActiveTab = Movie
 }
 
 let initWithGames (movies: MovieListItem list) (series: SeriesListItem list) (games: GameListItem list) : Model = {
@@ -58,6 +61,7 @@ let initWithGames (movies: MovieListItem list) (series: SeriesListItem list) (ga
     IsImporting = false
     Error = None
     SearchVersion = 0
+    ActiveTab = Movie
 }
 
 let filterLibrary (query: string) (movies: MovieListItem list) (series: SeriesListItem list) (games: GameListItem list) : LibrarySearchResult list =
@@ -185,8 +189,8 @@ let private renderRawgItem (result: RawgSearchResult) (isSelected: bool) (onImpo
 [<ReactComponent>]
 let view (model: Model) (dispatch: Msg -> unit) =
     let selRow, setSelRow = React.useState(-1)
-    let activeTab, setActiveTab = React.useState(Movie : MediaType)
     let inLibrary, setInLibrary = React.useState(false)
+    let activeTab = model.ActiveTab
 
     let localResults = filterLibrary model.Query model.LibraryMovies model.LibrarySeries model.LibraryGames
 
@@ -228,10 +232,9 @@ let view (model: Model) (dispatch: Msg -> unit) =
     let firstTabWithResults () =
         tabOrder |> Array.tryFind (fun t -> tabResultCount t > 0)
 
-    // Reset selection when search query changes
+    // Reset selection when search query changes (but preserve active tab)
     React.useEffect((fun () ->
         setSelRow -1
-        setActiveTab Movie
         setInLibrary false
     ), [| box model.SearchVersion |])
 
@@ -251,7 +254,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 if e.shiftKey then (idx + tabOrder.Length - 1) % tabOrder.Length
                 else (idx + 1) % tabOrder.Length
             let nextTab = tabOrder.[nextIdx]
-            setActiveTab nextTab
+            dispatch (Tab_changed nextTab)
             if not inLibrary && selRow >= 0 then
                 let len = tabResultCount nextTab
                 setSelRow (if len > 0 then min selRow (len - 1) else -1)
@@ -263,7 +266,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 elif tabResultCount activeTab > 0 then setSelRow 0; setInLibrary false
                 else
                     match firstTabWithResults () with
-                    | Some t -> setActiveTab t; setSelRow 0; setInLibrary false
+                    | Some t -> dispatch (Tab_changed t); setSelRow 0; setInLibrary false
                     | None -> ()
             elif inLibrary then
                 if selRow < List.length localResults - 1 then setSelRow (selRow + 1)
@@ -272,7 +275,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     if tabResultCount activeTab > 0 then setSelRow 0; setInLibrary false
                     else
                         match firstTabWithResults () with
-                        | Some t -> setActiveTab t; setSelRow 0; setInLibrary false
+                        | Some t -> dispatch (Tab_changed t); setSelRow 0; setInLibrary false
                         | None -> ()
             else
                 let len = tabResultCount activeTab
@@ -510,8 +513,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     prop.children [
                                                         for tab in tabOrder do
                                                             let isActive = tab = activeTab
-                                                            let count = tabResultCount tab
-                                                            let isLoading = isTabLoading tab
                                                             Html.button [
                                                                 prop.className (
                                                                     "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors "
@@ -519,7 +520,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                       else "text-base-content/50 hover:text-base-content/70 hover:bg-base-200/50"
                                                                 )
                                                                 prop.onClick (fun _ ->
-                                                                    setActiveTab tab
+                                                                    dispatch (Tab_changed tab)
                                                                     if not inLibrary && selRow >= 0 then
                                                                         let len = tabResultCount tab
                                                                         setSelRow (if len > 0 then min selRow (len - 1) else -1)
@@ -530,14 +531,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                         prop.children [ tabIcon tab ]
                                                                     ]
                                                                     Html.span [ prop.text (tabLabel tab) ]
-                                                                    if isLoading then
-                                                                        Daisy.loading [ loading.dots; loading.sm ]
-                                                                    elif count > 0 then
-                                                                        Daisy.badge [
-                                                                            badge.sm
-                                                                            badge.ghost
-                                                                            prop.text (string count)
-                                                                        ]
                                                                 ]
                                                             ]
                                                     ]

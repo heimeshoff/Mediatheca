@@ -67,16 +67,58 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
         | SearchModal.Close ->
             { model with SearchModal = None }, Cmd.none
 
+        | SearchModal.Tab_changed tab ->
+            let updatedSearch = { searchModel with ActiveTab = tab }
+            // If there's a query and the new tab's API has no results yet, trigger a search
+            let needsSearch =
+                searchModel.Query <> "" &&
+                (match tab with
+                 | Movie | Series -> List.isEmpty searchModel.TmdbResults && not searchModel.IsSearchingTmdb
+                 | Game -> List.isEmpty searchModel.RawgResults && not searchModel.IsSearchingRawg)
+            if needsSearch then
+                let withLoading =
+                    match tab with
+                    | Movie | Series -> { updatedSearch with IsSearchingTmdb = true }
+                    | Game -> { updatedSearch with IsSearchingRawg = true }
+                let searchCmd =
+                    match tab with
+                    | Movie | Series ->
+                        let searchBoth = async {
+                            let! movieResults = api.searchTmdb searchModel.Query
+                            let! seriesResults = api.searchTvSeries searchModel.Query
+                            return movieResults @ seriesResults
+                        }
+                        Cmd.OfAsync.either
+                            (fun () -> searchBoth) ()
+                            (fun results -> Search_modal_msg (SearchModal.Tmdb_search_completed results))
+                            (fun ex -> Search_modal_msg (SearchModal.Tmdb_search_failed ex.Message))
+                    | Game ->
+                        Cmd.OfAsync.either
+                            api.searchRawgGames searchModel.Query
+                            (fun results -> Search_modal_msg (SearchModal.Rawg_search_completed results))
+                            (fun ex -> Search_modal_msg (SearchModal.Rawg_search_failed ex.Message))
+                { model with SearchModal = Some withLoading }, searchCmd
+            else
+                { model with SearchModal = Some updatedSearch }, Cmd.none
+
         | SearchModal.Query_changed q ->
             let newVersion = searchModel.SearchVersion + 1
+            let activeTab = searchModel.ActiveTab
             let updatedSearch = {
                 searchModel with
                     Query = q
                     SearchVersion = newVersion
-                    IsSearchingTmdb = q <> ""
-                    IsSearchingRawg = q <> ""
-                    TmdbResults = if q = "" then [] else searchModel.TmdbResults
-                    RawgResults = if q = "" then [] else searchModel.RawgResults
+                    IsSearchingTmdb = q <> "" && (activeTab = Movie || activeTab = Series)
+                    IsSearchingRawg = q <> "" && activeTab = Game
+                    // Keep active tab results for progressive UX; clear inactive tab results (stale query)
+                    TmdbResults =
+                        if q = "" then []
+                        elif activeTab = Movie || activeTab = Series then searchModel.TmdbResults
+                        else []
+                    RawgResults =
+                        if q = "" then []
+                        elif activeTab = Game then searchModel.RawgResults
+                        else []
                     Error = None
             }
             let cmds =
@@ -88,22 +130,24 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
             if version <> searchModel.SearchVersion || searchModel.Query = "" then
                 model, Cmd.none
             else
-                let searchBoth = async {
-                    let! movieResults = api.searchTmdb searchModel.Query
-                    let! seriesResults = api.searchTvSeries searchModel.Query
-                    return movieResults @ seriesResults
-                }
-                model,
-                Cmd.batch [
+                match searchModel.ActiveTab with
+                | Movie | Series ->
+                    let searchBoth = async {
+                        let! movieResults = api.searchTmdb searchModel.Query
+                        let! seriesResults = api.searchTvSeries searchModel.Query
+                        return movieResults @ seriesResults
+                    }
+                    model,
                     Cmd.OfAsync.either
                         (fun () -> searchBoth) ()
                         (fun results -> Search_modal_msg (SearchModal.Tmdb_search_completed results))
                         (fun ex -> Search_modal_msg (SearchModal.Tmdb_search_failed ex.Message))
+                | Game ->
+                    model,
                     Cmd.OfAsync.either
                         api.searchRawgGames searchModel.Query
                         (fun results -> Search_modal_msg (SearchModal.Rawg_search_completed results))
                         (fun ex -> Search_modal_msg (SearchModal.Rawg_search_failed ex.Message))
-                ]
 
         | SearchModal.Tmdb_search_completed results ->
             { model with SearchModal = Some { searchModel with TmdbResults = results; IsSearchingTmdb = false } }, Cmd.none
