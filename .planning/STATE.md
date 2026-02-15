@@ -6,6 +6,14 @@
 
 ## Recent Progress
 
+- **2026-02-15**: Search modal & movies overview UX improvements
+  - Removed genre filter buttons from Movies overview (will be replaced with proper filter system later)
+  - Search modal input: no border on focus, background color change instead
+  - Keyboard navigation now works for library entries (was TMDB-only)
+  - Enter on library entry navigates to it; Enter on TMDB result imports it
+  - Arrow keys flow: library section → TMDB columns (seamless up/down transition)
+  - Selection highlighting and scroll-into-view for library items
+  - Updated keyboard hints footer ("select" instead of "import")
 - **2026-02-15**: Add abandon/unabandon series feature
   - New events: Series_abandoned, Series_unabandoned with full serialization
   - New commands: Abandon_series, Unabandon_series with idempotent decide logic

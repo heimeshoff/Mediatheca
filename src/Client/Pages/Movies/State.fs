@@ -7,7 +7,6 @@ open Mediatheca.Client.Pages.Movies.Types
 let init () : Model * Cmd<Msg> =
     { Movies = []
       SearchQuery = ""
-      GenreFilter = None
       IsLoading = true },
     Cmd.ofMsg Load_movies
 
@@ -22,9 +21,6 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Search_changed query ->
         { model with SearchQuery = query }, Cmd.none
-
-    | Genre_filter_changed genre ->
-        { model with GenreFilter = genre }, Cmd.none
 
     | Open_tmdb_search ->
         model, Cmd.none

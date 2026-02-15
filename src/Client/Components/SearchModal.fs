@@ -112,6 +112,7 @@ let private renderTmdbItem (result: TmdbSearchResult) (isSelected: bool) (onImpo
 let view (model: Model) (dispatch: Msg -> unit) =
     let selRow, setSelRow = React.useState(-1)
     let selCol, setSelCol = React.useState(Movie : MediaType)
+    let inLibrary, setInLibrary = React.useState(false)
 
     let localResults = filterLibrary model.Query model.LibraryMovies model.LibrarySeries
 
@@ -137,6 +138,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
     React.useEffect((fun () ->
         setSelRow -1
         setSelCol Movie
+        setInLibrary false
     ), [| box model.SearchVersion |])
 
     // Scroll selected item into view
@@ -144,39 +146,60 @@ let view (model: Model) (dispatch: Msg -> unit) =
         let el = Browser.Dom.document.querySelector("[data-search-selected='true']")
         if not (isNull el) then
             el?scrollIntoView({| block = "nearest" |})
-    ), [| box selRow; box selCol |])
+    ), [| box selRow; box selCol; box inLibrary |])
 
     let handleKeyDown (e: Browser.Types.KeyboardEvent) =
         match e.key with
         | "ArrowDown" ->
             e.preventDefault()
             if selRow < 0 then
-                if not (List.isEmpty movieResults) then setSelRow 0; setSelCol Movie
-                elif not (List.isEmpty seriesResults) then setSelRow 0; setSelCol Series
+                // Nothing selected — enter library section first, then TMDB
+                if not (List.isEmpty localResults) then setSelRow 0; setInLibrary true
+                elif not (List.isEmpty movieResults) then setSelRow 0; setSelCol Movie; setInLibrary false
+                elif not (List.isEmpty seriesResults) then setSelRow 0; setSelCol Series; setInLibrary false
+            elif inLibrary then
+                if selRow < List.length localResults - 1 then setSelRow (selRow + 1)
+                else
+                    // Past end of library — move to TMDB
+                    if not (List.isEmpty movieResults) then setSelRow 0; setSelCol Movie; setInLibrary false
+                    elif not (List.isEmpty seriesResults) then setSelRow 0; setSelCol Series; setInLibrary false
             else
                 let colLen = (if selCol = Movie then movieResults else seriesResults) |> List.length
                 if selRow < colLen - 1 then setSelRow (selRow + 1)
         | "ArrowUp" ->
             e.preventDefault()
-            if selRow > 0 then setSelRow (selRow - 1)
-            elif selRow = 0 then setSelRow -1
+            if inLibrary then
+                if selRow > 0 then setSelRow (selRow - 1)
+                elif selRow = 0 then setSelRow -1; setInLibrary false
+            else
+                if selRow > 0 then setSelRow (selRow - 1)
+                elif selRow = 0 then
+                    // At top of TMDB — move back to library if it exists
+                    if not (List.isEmpty localResults) then
+                        setSelRow (List.length localResults - 1); setInLibrary true
+                    else setSelRow -1
         | "ArrowLeft" ->
-            if selRow >= 0 && not (List.isEmpty movieResults) then
+            if selRow >= 0 && not inLibrary && not (List.isEmpty movieResults) then
                 e.preventDefault()
                 setSelCol Movie
                 setSelRow (min selRow (List.length movieResults - 1))
         | "ArrowRight" ->
-            if selRow >= 0 && not (List.isEmpty seriesResults) then
+            if selRow >= 0 && not inLibrary && not (List.isEmpty seriesResults) then
                 e.preventDefault()
                 setSelCol Series
                 setSelRow (min selRow (List.length seriesResults - 1))
         | "Enter" ->
             if selRow >= 0 then
                 e.preventDefault()
-                let results = if selCol = Movie then movieResults else seriesResults
-                match results |> List.tryItem selRow with
-                | Some r -> dispatch (Import (r.TmdbId, r.MediaType))
-                | None -> ()
+                if inLibrary then
+                    match localResults |> List.tryItem selRow with
+                    | Some r -> dispatch (Navigate_to (r.Slug, r.MediaType))
+                    | None -> ()
+                else
+                    let results = if selCol = Movie then movieResults else seriesResults
+                    match results |> List.tryItem selRow with
+                    | Some r -> dispatch (Import (r.TmdbId, r.MediaType))
+                    | None -> ()
         | "Escape" -> dispatch Close
         | _ -> ()
 
@@ -241,7 +264,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 ]
                             ]
                             Daisy.input [
-                                prop.className "w-full mb-4"
+                                prop.className "w-full mb-4 border-transparent focus:border-transparent focus:outline-0 focus:bg-base-200/60 transition-colors"
                                 prop.placeholder "Search movies & series..."
                                 prop.value model.Query
                                 prop.autoFocus true
@@ -291,9 +314,15 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     Html.div [
                                                         prop.className "space-y-1"
                                                         prop.children [
-                                                            for result in localResults do
+                                                            for (idx, result) in localResults |> List.mapi (fun i r -> (i, r)) do
+                                                                let isSelected = inLibrary && selRow = idx
                                                                 Html.div [
-                                                                    prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 cursor-pointer transition-colors"
+                                                                    if isSelected then prop.custom ("data-search-selected", "true")
+                                                                    prop.className (
+                                                                        "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors "
+                                                                        + if isSelected then "bg-primary/15 ring-1 ring-primary/40"
+                                                                          else "hover:bg-base-200"
+                                                                    )
                                                                     prop.onClick (fun _ -> dispatch (Navigate_to (result.Slug, result.MediaType)))
                                                                     prop.children [
                                                                         match result.PosterRef with
@@ -381,7 +410,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         prop.children [
                             Html.span [ prop.text "↑↓ navigate" ]
                             Html.span [ prop.text "←→ switch" ]
-                            Html.span [ prop.text "↵ import" ]
+                            Html.span [ prop.text "↵ select" ]
                             Html.span [ prop.text "esc close" ]
                         ]
                     ]
