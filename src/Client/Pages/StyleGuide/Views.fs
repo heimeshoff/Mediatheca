@@ -1385,6 +1385,185 @@ let private contentBlocksSection () =
         ]
     ]
 
+// ── Section: Entry List ──
+
+type private MockEntry = {
+    Slug: string
+    Name: string
+    Year: int
+    PosterRef: string option
+    Genres: string list
+    Rating: float option
+}
+
+let private mockEntries = [
+    { Slug = "blade-runner-2049-2017"; Name = "Blade Runner 2049"; Year = 2017; PosterRef = None; Genres = ["Sci-Fi"; "Drama"]; Rating = Some 8.0 }
+    { Slug = "the-matrix-1999"; Name = "The Matrix"; Year = 1999; PosterRef = None; Genres = ["Sci-Fi"; "Action"]; Rating = Some 8.7 }
+    { Slug = "alien-1979"; Name = "Alien"; Year = 1979; PosterRef = None; Genres = ["Horror"; "Sci-Fi"]; Rating = Some 8.5 }
+    { Slug = "dune-part-two-2024"; Name = "Dune: Part Two"; Year = 2024; PosterRef = None; Genres = ["Sci-Fi"; "Adventure"]; Rating = Some 8.3 }
+    { Slug = "parasite-2019"; Name = "Parasite"; Year = 2019; PosterRef = None; Genres = ["Thriller"; "Drama"]; Rating = Some 8.5 }
+    { Slug = "interstellar-2014"; Name = "Interstellar"; Year = 2014; PosterRef = None; Genres = ["Sci-Fi"; "Drama"]; Rating = Some 8.7 }
+    { Slug = "the-godfather-1972"; Name = "The Godfather"; Year = 1972; PosterRef = None; Genres = ["Crime"; "Drama"]; Rating = Some 9.2 }
+    { Slug = "spirited-away-2001"; Name = "Spirited Away"; Year = 2001; PosterRef = None; Genres = ["Animation"; "Fantasy"]; Rating = Some 8.6 }
+]
+
+let private mockEntryItems : EntryList.EntryItem list =
+    mockEntries |> List.map (fun e ->
+        { Slug = e.Slug
+          Name = e.Name
+          Year = e.Year
+          PosterRef = e.PosterRef
+          Rating = e.Rating })
+
+let private mockBySlug =
+    mockEntries |> List.map (fun e -> e.Slug, e) |> Map.ofList
+
+let private mockListRow (item: EntryList.EntryItem) =
+    let entry = mockBySlug |> Map.tryFind item.Slug
+    Html.div [
+        prop.className "flex items-center gap-3 p-3 rounded-xl bg-base-100 hover:bg-base-200/80 transition-colors group"
+        prop.children [
+            Html.div [
+                prop.className "flex-none"
+                prop.children [ PosterCard.thumbnail item.PosterRef item.Name ]
+            ]
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.p [
+                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                        prop.text item.Name
+                    ]
+                    Html.div [
+                        prop.className "flex items-center gap-2 mt-0.5"
+                        prop.children [
+                            Html.span [
+                                prop.className "text-xs text-base-content/50"
+                                prop.text (string item.Year)
+                            ]
+                            match entry with
+                            | Some e when not (List.isEmpty e.Genres) ->
+                                Html.span [
+                                    prop.className "text-base-content/20"
+                                    prop.text "·"
+                                ]
+                                Html.span [
+                                    prop.className "text-xs text-base-content/40"
+                                    prop.text (e.Genres |> String.concat ", ")
+                                ]
+                            | _ -> ()
+                        ]
+                    ]
+                ]
+            ]
+            match item.Rating with
+            | Some r ->
+                Html.div [
+                    prop.className "flex-none text-xs font-medium text-warning/80 bg-warning/10 px-2 py-0.5 rounded"
+                    prop.text (sprintf "%.1f" r)
+                ]
+            | None -> ()
+        ]
+    ]
+
+let private entryListSection () =
+    Html.div [
+        prop.className "flex flex-col gap-6"
+        prop.children [
+            sectionTitle "Entry List"
+
+            decision "A Notion-style database view for media entries. Supports switchable layouts: Gallery shows poster cards in a responsive grid, List shows detailed rows with thumbnail, metadata, and ratings. The layout toggle persists per-component instance. Reusable via Components/EntryList.fs."
+
+            subheading "Live Demo"
+
+            Html.div [
+                prop.className "mt-2"
+                prop.children [
+                    EntryList.view {
+                        Items = mockEntryItems
+                        RenderListRow = mockListRow
+                    }
+                ]
+            ]
+
+            subheading "Usage"
+
+            codeBlock """EntryList.view {
+    Items = items         // EntryItem list
+    RenderListRow = fun item ->
+        // custom list-mode row per page
+        Html.div [ ... ]
+}"""
+
+            subheading "EntryItem"
+
+            Html.div [
+                prop.className "p-4 rounded-lg bg-base-200/30 border border-base-content/5 max-w-2xl"
+                prop.children [
+                    Html.p [ prop.className DesignSystem.mutedText; prop.text "Fields:" ]
+                    Html.ul [
+                        prop.className "mt-2 space-y-1"
+                        prop.children [
+                            for (name, desc) in [
+                                "Slug", "string -- unique identifier, used for PosterCard link"
+                                "Name", "string -- display title"
+                                "Year", "int -- release year"
+                                "PosterRef", "string option -- image reference"
+                                "Rating", "float option -- used by sort-by-rating"
+                            ] do
+                                Html.li [
+                                    prop.className "text-sm text-base-content/70"
+                                    prop.children [
+                                        Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text name ]
+                                        Html.span [ prop.text $" -- {desc}" ]
+                                    ]
+                                ]
+                        ]
+                    ]
+                ]
+            ]
+
+            subheading "Icons"
+
+            Html.div [
+                prop.className "flex gap-6 mt-2"
+                prop.children [
+                    Html.div [
+                        prop.className "flex flex-col items-center gap-2 p-3 rounded-lg bg-base-200/20 border border-base-content/5"
+                        prop.children [
+                            Html.div [ prop.className "text-base-content/70"; prop.children [ Icons.viewGrid () ] ]
+                            Html.span [ prop.className "text-xs font-mono text-base-content/40"; prop.text "viewGrid" ]
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "flex flex-col items-center gap-2 p-3 rounded-lg bg-base-200/20 border border-base-content/5"
+                        prop.children [
+                            Html.div [ prop.className "text-base-content/70"; prop.children [ Icons.viewList () ] ]
+                            Html.span [ prop.className "text-xs font-mono text-base-content/40"; prop.text "viewList" ]
+                        ]
+                    ]
+                ]
+            ]
+
+            subheading "Decisions"
+
+            decisionBox
+                "Layout Toggle Pattern"
+                "Segmented control (icon-only) in a contained pill group. Visually distinct from filter pills which are standalone. The toggle is local React state, not part of the Elmish model, since it's a view preference not application state."
+                "Dropdown select (hidden options, extra click). Tab bar (conflicts with page-level navigation). Icon-only toggle (poor discoverability)."
+
+            decisionBox
+                "Gallery as Default"
+                "Gallery (poster grid) is the default layout because posters are the strongest visual identifier for movies. The dark theme makes posters pop, and the grid gives a quick visual scan of the collection."
+                "List as default (too text-heavy for a media app). Table layout (too dense, better for data apps than media libraries)."
+
+            decisionBox
+                "Caller-provided List Row"
+                "Gallery mode is uniform (PosterCard.view), but list mode delegates row rendering to the caller via RenderListRow. Each page can show its own metadata: notes in catalogs, dates in watched-together, genres+ratings in the style guide."
+                "Fixed list row format (can't show page-specific data). Fully configurable via options record (over-engineering for 3 use cases)."
+        ]
+    ]
+
 // ── Section Nav ──
 
 let private sectionNav (activeSection: Section) (dispatch: Msg -> unit) =
@@ -1397,6 +1576,7 @@ let private sectionNav (activeSection: Section) (dispatch: Msg -> unit) =
         Animations, "Animations"
         Components, "Components"
         ContentBlocks, "Content Blocks"
+        EntryList, "Entry List"
     ]
     Html.nav [
         prop.className "flex flex-wrap gap-2 mb-8"
@@ -1422,6 +1602,7 @@ let private sectionContent (section: Section) =
     | Animations -> animationsSection ()
     | Components -> componentsSection ()
     | ContentBlocks -> contentBlocksSection ()
+    | EntryList -> entryListSection ()
 
 // ── Page View ──
 

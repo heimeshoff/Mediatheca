@@ -346,18 +346,25 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 ]
                             ]
                         else
-                            Daisy.card [
-                                prop.className "bg-base-200/50 shadow-md"
-                                prop.children [
-                                    Daisy.cardBody [
-                                        prop.className "p-2 gap-1"
-                                        prop.children [
-                                            for entry in catalog.Entries do
-                                                entryCard entry model.EditingNote dispatch
-                                        ]
-                                    ]
-                                ]
-                            ]
+                            let entryItems : EntryList.EntryItem list =
+                                catalog.Entries
+                                |> List.map (fun e ->
+                                    { Slug = e.MovieSlug
+                                      Name = e.MovieName
+                                      Year = e.MovieYear
+                                      PosterRef = e.MoviePosterRef
+                                      Rating = None })
+                            let entryBySlug =
+                                catalog.Entries
+                                |> List.map (fun e -> e.MovieSlug, e)
+                                |> Map.ofList
+                            EntryList.view {
+                                Items = entryItems
+                                RenderListRow = fun item ->
+                                    match Map.tryFind item.Slug entryBySlug with
+                                    | Some entry -> entryCard entry model.EditingNote dispatch
+                                    | None -> Html.none
+                            }
 
                         match model.Error with
                         | Some err ->

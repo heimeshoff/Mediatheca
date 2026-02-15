@@ -66,7 +66,9 @@ module Api =
             healthCheck = fun () -> async { return "Mediatheca is running" }
 
             searchLibrary = fun query -> async {
-                return MovieProjection.search conn query
+                let movieResults = MovieProjection.search conn query
+                let seriesResults = SeriesProjection.search conn query
+                return movieResults @ seriesResults
             }
 
             searchTmdb = fun query -> async {
@@ -682,6 +684,21 @@ module Api =
                         | "Catalog_removed" -> "Catalog removed"
                         | "Entry_added" -> "Entry added to catalog"
                         | "Content_block_added" -> "Content block added"
+                        | "Series_added_to_library" -> "Series added to library"
+                        | "Series_removed_from_library" -> "Series removed from library"
+                        | "Episode_watched" -> "Episode watched"
+                        | "Episode_unwatched" -> "Episode marked unwatched"
+                        | "Season_marked_watched" -> "Season marked as watched"
+                        | "Episodes_watched_up_to" -> "Episodes watched up to"
+                        | "Season_marked_unwatched" -> "Season marked unwatched"
+                        | "Episode_watched_date_changed" -> "Episode watched date changed"
+                        | "Rewatch_session_created" -> "Rewatch session created"
+                        | "Rewatch_session_removed" -> "Rewatch session removed"
+                        | "Series_personal_rating_set" -> "Series personal rating updated"
+                        | "Series_recommended_by" -> "Series recommendation added"
+                        | "Series_recommendation_removed" -> "Series recommendation removed"
+                        | "Series_want_to_watch_with" -> "Want to watch series with friend"
+                        | "Series_removed_want_to_watch_with" -> "Removed want to watch series with friend"
                         | other -> other.Replace("_", " ")
                     { Mediatheca.Shared.RecentActivityItem.Timestamp = e.Timestamp.ToString("o")
                       StreamId = e.StreamId
@@ -839,6 +856,22 @@ module Api =
                     return None
             }
 
+            getSeriesTrailer = fun tmdbId -> async {
+                try
+                    let tmdbConfig = getTmdbConfig()
+                    return! Tmdb.getSeriesTrailer httpClient tmdbConfig tmdbId
+                with _ ->
+                    return None
+            }
+
+            getSeasonTrailer = fun tmdbId seasonNumber -> async {
+                try
+                    let tmdbConfig = getTmdbConfig()
+                    return! Tmdb.getSeasonTrailer httpClient tmdbConfig tmdbId seasonNumber
+                with _ ->
+                    return None
+            }
+
             getFullCredits = fun tmdbId -> async {
                 try
                     let tmdbConfig = getTmdbConfig()
@@ -866,5 +899,482 @@ module Api =
                     return Ok { FullCreditsDto.Cast = cast; Crew = crew }
                 with ex ->
                     return Error $"Failed to load full credits: {ex.Message}"
+            }
+
+            // TV Series
+            searchTvSeries = fun query -> async {
+                return! Tmdb.searchTvSeries httpClient (getTmdbConfig()) query
+            }
+
+            addSeries = fun tmdbId -> async {
+                try
+                    let tmdbConfig = getTmdbConfig()
+                    let! detailsResult = Tmdb.getTvSeriesDetails httpClient tmdbConfig tmdbId
+                    match detailsResult with
+                    | Error e -> return Error e
+                    | Ok details ->
+                        let year =
+                            details.FirstAirDate
+                            |> Option.bind (fun d ->
+                                if d.Length >= 4 then
+                                    match System.Int32.TryParse(d.[0..3]) with
+                                    | true, y -> Some y
+                                    | _ -> None
+                                else None)
+                            |> Option.defaultValue 0
+
+                        // Generate unique slug
+                        let baseSlug = Slug.seriesSlug details.Name year
+                        let slug = generateUniqueSlug conn Series.streamId baseSlug
+                        let sid = Series.streamId slug
+
+                        // Download poster + backdrop
+                        let! posterRef, backdropRef =
+                            Tmdb.downloadSeriesImages httpClient tmdbConfig slug details.PosterPath details.BackdropPath imageBasePath
+
+                        // Fetch season details with episodes (skip Specials / season 0)
+                        let! seasons =
+                            details.Seasons
+                            |> List.filter (fun s -> s.SeasonNumber > 0)
+                            |> List.map (fun seasonSummary -> async {
+                                let! seasonResult = Tmdb.getTvSeasonDetails httpClient tmdbConfig tmdbId seasonSummary.SeasonNumber
+                                match seasonResult with
+                                | Ok seasonDetails ->
+                                    // Download episode stills
+                                    let! episodes =
+                                        seasonDetails.Episodes
+                                        |> List.map (fun ep -> async {
+                                            let stillRef =
+                                                match ep.StillPath with
+                                                | Some stillPath ->
+                                                    try
+                                                        Tmdb.downloadEpisodeStill httpClient tmdbConfig slug seasonSummary.SeasonNumber ep.EpisodeNumber stillPath imageBasePath
+                                                        |> Async.RunSynchronously
+                                                    with _ -> None
+                                                | None -> None
+                                            let epData: Series.EpisodeImportData = {
+                                                EpisodeNumber = ep.EpisodeNumber
+                                                Name = ep.Name
+                                                Overview = ep.Overview
+                                                Runtime = ep.Runtime
+                                                AirDate = ep.AirDate
+                                                StillRef = stillRef
+                                                TmdbRating = if ep.VoteAverage > 0.0 then Some ep.VoteAverage else None
+                                            }
+                                            return epData
+                                        })
+                                        |> Async.Sequential
+                                    let seasonData: Series.SeasonImportData = {
+                                        SeasonNumber = seasonSummary.SeasonNumber
+                                        Name = seasonSummary.Name
+                                        Overview = seasonSummary.Overview
+                                        PosterRef = None
+                                        AirDate = seasonSummary.AirDate
+                                        Episodes = episodes |> Array.toList
+                                    }
+                                    return Some seasonData
+                                | Error _ -> return None
+                            })
+                            |> Async.Sequential
+
+                        let validSeasons = seasons |> Array.toList |> List.choose id
+
+                        let episodeRuntime =
+                            match details.EpisodeRunTime with
+                            | first :: _ -> Some first
+                            | [] -> None
+
+                        let seriesData: Series.SeriesAddedData = {
+                            Name = details.Name
+                            Year = year
+                            Overview = details.Overview
+                            Genres = details.Genres |> List.map (fun g -> g.Name)
+                            Status = Tmdb.mapSeriesStatus details.Status
+                            PosterRef = posterRef
+                            BackdropRef = backdropRef
+                            TmdbId = tmdbId
+                            TmdbRating = if details.VoteAverage > 0.0 then Some details.VoteAverage else None
+                            EpisodeRuntime = episodeRuntime
+                            Seasons = validSeasons
+                        }
+
+                        let result =
+                            executeCommand
+                                conn sid
+                                Series.Serialization.fromStoredEvent
+                                Series.reconstitute
+                                Series.decide
+                                Series.Serialization.toEventData
+                                (Series.Add_series_to_library seriesData)
+                                projectionHandlers
+
+                        match result with
+                        | Error e -> return Error e
+                        | Ok () ->
+                            // Fetch and save series credits
+                            let! creditsResult = Tmdb.getTvSeriesCredits httpClient tmdbConfig tmdbId
+                            match creditsResult with
+                            | Ok credits ->
+                                let topBilled = credits.Cast |> List.sortBy (fun c -> c.Order) |> List.truncate 10
+                                for castMember in topBilled do
+                                    let castImageRef =
+                                        match castMember.ProfilePath with
+                                        | Some p ->
+                                            let ref = sprintf "cast/%d.jpg" castMember.Id
+                                            let destPath = System.IO.Path.Combine(imageBasePath, ref)
+                                            if not (ImageStore.imageExists imageBasePath ref) then
+                                                try
+                                                    Tmdb.downloadImage httpClient tmdbConfig p "w185" destPath
+                                                    |> Async.RunSynchronously
+                                                with _ -> ()
+                                            Some ref
+                                        | None -> None
+                                    let cmId = CastStore.upsertCastMember conn castMember.Name castMember.Id castImageRef
+                                    CastStore.addSeriesCast conn sid cmId castMember.Character castMember.Order (castMember.Order < 10)
+                            | Error _ -> ()
+
+                            return Ok slug
+                with ex ->
+                    return Error $"Failed to add series: {ex.Message}"
+            }
+
+            removeSeries = fun slug -> async {
+                let sid = Series.streamId slug
+                let result =
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        Series.Remove_series
+                        projectionHandlers
+                match result with
+                | Ok () ->
+                    // Remove catalog entries referencing this series
+                    let catalogEntries = CatalogProjection.getEntriesByMovieSlug conn slug
+                    for (catalogSlug, entryId) in catalogEntries do
+                        let catalogSid = Catalogs.streamId catalogSlug
+                        executeCommand
+                            conn catalogSid
+                            Catalogs.Serialization.fromStoredEvent
+                            Catalogs.reconstitute
+                            Catalogs.decide
+                            Catalogs.Serialization.toEventData
+                            (Catalogs.Remove_entry entryId)
+                            projectionHandlers
+                        |> ignore
+                    // Clean up cast and images
+                    CastStore.removeSeriesCastAndCleanup conn imageBasePath sid
+                    ImageStore.deleteImage imageBasePath (sprintf "posters/series-%s.jpg" slug)
+                    ImageStore.deleteImage imageBasePath (sprintf "backdrops/series-%s.jpg" slug)
+                    // Clean up episode stills
+                    let stillsDir = System.IO.Path.Combine(imageBasePath, "stills")
+                    if System.IO.Directory.Exists(stillsDir) then
+                        let stillFiles = System.IO.Directory.GetFiles(stillsDir, sprintf "%s-s*.jpg" slug)
+                        for f in stillFiles do
+                            try System.IO.File.Delete(f) with _ -> ()
+                    return Ok ()
+                | Error e -> return Error e
+            }
+
+            getSeries = fun () -> async {
+                return SeriesProjection.getAll conn
+            }
+
+            getSeriesDetail = fun slug rewatchId -> async {
+                return SeriesProjection.getBySlug conn slug rewatchId
+            }
+
+            setSeriesPersonalRating = fun slug rating -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Set_series_personal_rating rating)
+                        projectionHandlers
+            }
+
+            addSeriesRecommendation = fun slug friendSlug -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Recommend_series friendSlug)
+                        projectionHandlers
+            }
+
+            removeSeriesRecommendation = fun slug friendSlug -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Remove_series_recommendation friendSlug)
+                        projectionHandlers
+            }
+
+            addSeriesWantToWatchWith = fun slug friendSlug -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Want_to_watch_series_with friendSlug)
+                        projectionHandlers
+            }
+
+            removeSeriesWantToWatchWith = fun slug friendSlug -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Remove_want_to_watch_series_with friendSlug)
+                        projectionHandlers
+            }
+
+            // Series Rewatch Sessions
+            createRewatchSession = fun slug request -> async {
+                let sid = Series.streamId slug
+                let rewatchId = System.Guid.NewGuid().ToString("N")
+                let data: Series.RewatchSessionCreatedData = {
+                    RewatchId = rewatchId
+                    Name = request.Name
+                    FriendSlugs = request.FriendSlugs
+                }
+                let result =
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Create_rewatch_session data)
+                        projectionHandlers
+                match result with
+                | Ok () -> return Ok rewatchId
+                | Error e -> return Error e
+            }
+
+            removeRewatchSession = fun slug rewatchId -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Remove_rewatch_session rewatchId)
+                        projectionHandlers
+            }
+
+            addFriendToRewatchSession = fun slug rewatchId friendSlug -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Add_friend_to_rewatch_session { RewatchId = rewatchId; FriendSlug = friendSlug })
+                        projectionHandlers
+            }
+
+            removeFriendFromRewatchSession = fun slug rewatchId friendSlug -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Remove_friend_from_rewatch_session { RewatchId = rewatchId; FriendSlug = friendSlug })
+                        projectionHandlers
+            }
+
+            // Series Episode Progress
+            markEpisodeWatched = fun slug request -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Mark_episode_watched {
+                            RewatchId = request.RewatchId
+                            SeasonNumber = request.SeasonNumber
+                            EpisodeNumber = request.EpisodeNumber
+                            Date = request.Date
+                        })
+                        projectionHandlers
+            }
+
+            markEpisodeUnwatched = fun slug request -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Mark_episode_unwatched {
+                            RewatchId = request.RewatchId
+                            SeasonNumber = request.SeasonNumber
+                            EpisodeNumber = request.EpisodeNumber
+                        })
+                        projectionHandlers
+            }
+
+            markSeasonWatched = fun slug request -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Mark_season_watched {
+                            RewatchId = request.RewatchId
+                            SeasonNumber = request.SeasonNumber
+                            Date = request.Date
+                        })
+                        projectionHandlers
+            }
+
+            markEpisodesWatchedUpTo = fun slug request -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Mark_episodes_watched_up_to {
+                            RewatchId = request.RewatchId
+                            SeasonNumber = request.SeasonNumber
+                            EpisodeNumber = request.EpisodeNumber
+                            Date = request.Date
+                        })
+                        projectionHandlers
+            }
+
+            markSeasonUnwatched = fun slug request -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Mark_season_unwatched {
+                            RewatchId = request.RewatchId
+                            SeasonNumber = request.SeasonNumber
+                        })
+                        projectionHandlers
+            }
+
+            updateEpisodeWatchedDate = fun slug request -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Change_episode_watched_date {
+                            RewatchId = request.RewatchId
+                            SeasonNumber = request.SeasonNumber
+                            EpisodeNumber = request.EpisodeNumber
+                            Date = request.Date
+                        })
+                        projectionHandlers
+            }
+
+            // Series Content Blocks + Catalogs
+            getSeriesContentBlocks = fun slug -> async {
+                return ContentBlockProjection.getForMovieDetail conn slug
+            }
+
+            addSeriesContentBlock = fun slug request -> async {
+                let sid = ContentBlocks.streamId slug
+                let blockId = System.Guid.NewGuid().ToString("N")
+                let blockData: ContentBlocks.ContentBlockData = {
+                    BlockId = blockId
+                    BlockType = request.BlockType
+                    Content = request.Content
+                    ImageRef = request.ImageRef
+                    Url = request.Url
+                    Caption = request.Caption
+                }
+                let result =
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Add_content_block (blockData, None))
+                        projectionHandlers
+                match result with
+                | Ok () -> return Ok blockId
+                | Error e -> return Error e
+            }
+
+            updateSeriesContentBlock = fun slug blockId request -> async {
+                let sid = ContentBlocks.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Update_content_block (blockId, request.Content, request.ImageRef, request.Url, request.Caption))
+                        projectionHandlers
+            }
+
+            removeSeriesContentBlock = fun slug blockId -> async {
+                let sid = ContentBlocks.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Remove_content_block blockId)
+                        projectionHandlers
+            }
+
+            getCatalogsForSeries = fun slug -> async {
+                return CatalogProjection.getCatalogsForMovie conn slug
             }
         }

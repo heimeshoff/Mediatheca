@@ -9,6 +9,7 @@
     <Compile Include="Projection.fs" />
     <Compile Include="Movies.fs" />
     <Compile Include="Friends.fs" />
+    <Compile Include="Series.fs" />
     <Compile Include="Tmdb.fs" />
     <Compile Include="ImageStore.fs" />
     <Compile Include="CastStore.fs" />
@@ -19,6 +20,7 @@
     <Compile Include="CatalogProjection.fs" />
     <Compile Include="MovieProjection.fs" />
     <Compile Include="FriendProjection.fs" />
+    <Compile Include="SeriesProjection.fs" />
     <Compile Include="Api.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

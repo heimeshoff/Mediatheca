@@ -6,6 +6,8 @@ type Page =
     | Dashboard
     | Movie_list
     | Movie_detail of slug: string
+    | Series_list
+    | Series_detail of slug: string
     | Friend_list
     | Friend_detail of slug: string
     | Catalog_list
@@ -21,6 +23,8 @@ module Route =
         | [] -> Dashboard
         | [ "movies" ] -> Movie_list
         | [ "movies"; slug ] -> Movie_detail slug
+        | [ "series" ] -> Series_list
+        | [ "series"; slug ] -> Series_detail slug
         | [ "friends" ] -> Friend_list
         | [ "friends"; slug ] -> Friend_detail slug
         | [ "catalogs" ] -> Catalog_list
@@ -35,6 +39,8 @@ module Route =
         | Dashboard -> Router.format ""
         | Movie_list -> Router.format "movies"
         | Movie_detail slug -> Router.format ("movies", slug)
+        | Series_list -> Router.format "series"
+        | Series_detail slug -> Router.format ("series", slug)
         | Friend_list -> Router.format "friends"
         | Friend_detail slug -> Router.format ("friends", slug)
         | Catalog_list -> Router.format "catalogs"
@@ -52,6 +58,11 @@ module Route =
     let isFriendsSection (page: Page) =
         match page with
         | Friend_list | Friend_detail _ -> true
+        | _ -> false
+
+    let isSeriesSection (page: Page) =
+        match page with
+        | Series_list | Series_detail _ -> true
         | _ -> false
 
     let isCatalogsSection (page: Page) =

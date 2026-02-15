@@ -14,6 +14,7 @@
     <Compile Include="Components\ContentBlockEditor.fs" />
     <Compile Include="Components\ModalPanel.fs" />
     <Compile Include="Components\PosterCard.fs" />
+    <Compile Include="Components\EntryList.fs" />
     <Compile Include="Components\SearchModal.fs" />
     <Compile Include="Components\Sidebar.fs" />
     <Compile Include="Components\BottomNav.fs" />
@@ -27,6 +28,12 @@
     <Compile Include="Pages\MovieDetail\Types.fs" />
     <Compile Include="Pages\MovieDetail\State.fs" />
     <Compile Include="Pages\MovieDetail\Views.fs" />
+    <Compile Include="Pages\Series\Types.fs" />
+    <Compile Include="Pages\Series\State.fs" />
+    <Compile Include="Pages\Series\Views.fs" />
+    <Compile Include="Pages\SeriesDetail\Types.fs" />
+    <Compile Include="Pages\SeriesDetail\State.fs" />
+    <Compile Include="Pages\SeriesDetail\Views.fs" />
     <Compile Include="Pages\Friends\Types.fs" />
     <Compile Include="Pages\Friends\State.fs" />
     <Compile Include="Pages\Friends\Views.fs" />

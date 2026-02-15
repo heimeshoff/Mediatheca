@@ -75,10 +75,11 @@ let main args =
         FriendProjection.handler
         ContentBlockProjection.handler
         CatalogProjection.handler
+        SeriesProjection.handler
     ]
 
-    // Rebuild movie projection once to fix want_to_watch_with data, then catch up all projections
-    Projection.rebuildProjection conn MovieProjection.handler
+    // Catch up all projections, rebuilding series to fix out-of-sync rewatch session data
+    Projection.rebuildProjection conn SeriesProjection.handler
     Projection.startAllProjections conn projectionHandlers
 
     // Create API
