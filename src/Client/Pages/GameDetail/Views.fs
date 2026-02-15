@@ -1,0 +1,1172 @@
+module Mediatheca.Client.Pages.GameDetail.Views
+
+open Feliz
+open Feliz.DaisyUI
+open Feliz.Router
+open Mediatheca.Shared
+open Mediatheca.Client.Pages.GameDetail.Types
+open Mediatheca.Client
+open Mediatheca.Client.Components
+
+let private sectionHeader (title: string) =
+    Html.h2 [
+        prop.className "text-2xl font-bold font-display mb-6 flex items-center gap-2"
+        prop.children [
+            Html.span [ prop.className "w-1 h-6 bg-primary rounded-full inline-block" ]
+            Html.text title
+        ]
+    ]
+
+let private starRating (rating: float) =
+    let stars = rating / 2.0
+    let fullStars = int stars
+    let hasHalf = stars - float fullStars >= 0.5
+    Html.div [
+        prop.className "flex items-center gap-1 text-warning"
+        prop.children [
+            for _ in 1 .. fullStars do
+                Html.span [ prop.className "text-sm"; prop.text "\u2605" ]
+            if hasHalf then
+                Html.span [ prop.className "text-sm opacity-50"; prop.text "\u2605" ]
+            for _ in 1 .. (5 - fullStars - (if hasHalf then 1 else 0)) do
+                Html.span [ prop.className "text-sm text-base-content/20"; prop.text "\u2605" ]
+            Html.span [
+                prop.className "ml-1 text-base-content font-semibold text-sm"
+                prop.text $"%.1f{rating}"
+            ]
+        ]
+    ]
+
+let private glassCard (children: ReactElement list) =
+    Html.div [
+        prop.className "bg-base-100/50 backdrop-blur-xl border border-base-content/8 p-6 rounded-xl"
+        prop.children children
+    ]
+
+let private friendAvatar (size: string) (fr: FriendRef) (extraClass: string) =
+    Html.div [
+        prop.className $"{size} rounded-full overflow-hidden flex items-center justify-center {extraClass}"
+        prop.children [
+            match fr.ImageRef with
+            | Some ref ->
+                Html.img [
+                    prop.src $"/images/{ref}"
+                    prop.alt fr.Name
+                    prop.className "w-full h-full object-cover"
+                ]
+            | None ->
+                Html.span [
+                    prop.className "w-full h-full flex items-center justify-center"
+                    prop.text (fr.Name.[0..0].ToUpper())
+                ]
+        ]
+    ]
+
+let private statusBadgeClass (status: GameStatus) =
+    match status with
+    | Backlog -> "badge-ghost"
+    | Playing -> "badge-primary"
+    | Completed -> "badge-success"
+    | Abandoned -> "badge-error"
+    | OnHold -> "badge-warning"
+
+let private statusLabel (status: GameStatus) =
+    match status with
+    | Backlog -> "Backlog"
+    | Playing -> "Playing"
+    | Completed -> "Completed"
+    | Abandoned -> "Abandoned"
+    | OnHold -> "On Hold"
+
+let private formatPlayTime (minutes: int) =
+    if minutes = 0 then "No sessions"
+    elif minutes < 60 then $"{minutes}m"
+    else
+        let h = minutes / 60
+        let m = minutes % 60
+        if m = 0 then $"{h}h"
+        else $"{h}h {m}m"
+
+type private RatingOption = {
+    Value: int
+    Name: string
+    Description: string
+    Icon: unit -> ReactElement
+    ColorClass: string
+}
+
+let private ratingOptions : RatingOption list = [
+    { Value = 0; Name = "Unrated"; Description = "No rating yet"; Icon = Icons.questionCircle; ColorClass = "text-base-content/50" }
+    { Value = 1; Name = "Waste"; Description = "Waste of time"; Icon = Icons.thumbsDown; ColorClass = "text-red-400" }
+    { Value = 2; Name = "Meh"; Description = "Didn't click, uninspiring"; Icon = Icons.minusCircle; ColorClass = "text-orange-400" }
+    { Value = 3; Name = "Decent"; Description = "Enjoyable, even if not life-changing"; Icon = Icons.handOkay; ColorClass = "text-yellow-400" }
+    { Value = 4; Name = "Entertaining"; Description = "Strong craft, enjoyable"; Icon = Icons.thumbsUp; ColorClass = "text-lime-400" }
+    { Value = 5; Name = "Outstanding"; Description = "Absolutely brilliant, stays with you"; Icon = Icons.trophy; ColorClass = "text-amber-400" }
+]
+
+let private getRatingOption (rating: int option) =
+    let r = rating |> Option.defaultValue 0
+    ratingOptions |> List.find (fun opt -> opt.Value = r)
+
+let private personalRatingCard (rating: int option) (isOpen: bool) (dispatch: Msg -> unit) =
+    let currentOption = getRatingOption rating
+    Html.div [
+        prop.className "relative"
+        prop.children [
+            glassCard [
+                Html.div [
+                    prop.className "flex items-center justify-between mb-4"
+                    prop.children [
+                        Html.h3 [ prop.className "text-lg font-bold"; prop.text "My Rating" ]
+                    ]
+                ]
+                Html.button [
+                    prop.className $"flex items-center gap-3 font-semibold text-lg cursor-pointer {currentOption.ColorClass} hover:opacity-80 transition-opacity"
+                    prop.onClick (fun _ -> dispatch Toggle_rating_dropdown)
+                    prop.children [
+                        Html.span [
+                            prop.className "w-6 h-6"
+                            prop.children [ currentOption.Icon () ]
+                        ]
+                        Html.span [ prop.text currentOption.Name ]
+                    ]
+                ]
+            ]
+            if isOpen then
+                Html.div [
+                    prop.className "absolute top-full left-0 mt-2 z-50 rating-dropdown"
+                    prop.children [
+                        for opt in ratingOptions do
+                            if opt.Value > 0 then
+                                let isActive = rating = Some opt.Value
+                                let itemClass =
+                                    if isActive then "rating-dropdown-item rating-dropdown-item-active"
+                                    else "rating-dropdown-item"
+                                Html.button [
+                                    prop.className itemClass
+                                    prop.onClick (fun _ -> dispatch (Set_personal_rating opt.Value))
+                                    prop.children [
+                                        Html.span [
+                                            prop.className $"w-5 h-5 {opt.ColorClass}"
+                                            prop.children [ opt.Icon () ]
+                                        ]
+                                        Html.div [
+                                            prop.className "flex flex-col items-start"
+                                            prop.children [
+                                                Html.span [ prop.className "font-medium"; prop.text opt.Name ]
+                                                Html.span [ prop.className "text-xs text-base-content/50"; prop.text opt.Description ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                        if rating.IsSome && rating.Value > 0 then
+                            Html.button [
+                                prop.className "rating-dropdown-item rating-dropdown-item-clear"
+                                prop.onClick (fun _ -> dispatch (Set_personal_rating 0))
+                                prop.children [
+                                    Html.span [
+                                        prop.className "w-5 h-5 text-base-content/40"
+                                        prop.children [ Icons.questionCircle () ]
+                                    ]
+                                    Html.span [ prop.className "font-medium text-base-content/60"; prop.text "Clear rating" ]
+                                ]
+                            ]
+                    ]
+                ]
+        ]
+    ]
+
+let private statusSelector (currentStatus: GameStatus) (isOpen: bool) (dispatch: Msg -> unit) =
+    let allStatuses = [ Backlog; Playing; Completed; Abandoned; OnHold ]
+    Html.div [
+        prop.className "relative"
+        prop.children [
+            glassCard [
+                Html.div [
+                    prop.className "flex items-center justify-between mb-4"
+                    prop.children [
+                        Html.h3 [ prop.className "text-lg font-bold"; prop.text "Status" ]
+                    ]
+                ]
+                Html.button [
+                    prop.className "flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                    prop.onClick (fun _ -> dispatch Toggle_status_dropdown)
+                    prop.children [
+                        Daisy.badge [
+                            prop.className (statusBadgeClass currentStatus)
+                            prop.text (statusLabel currentStatus)
+                        ]
+                    ]
+                ]
+            ]
+            if isOpen then
+                Html.div [
+                    prop.className "absolute top-full left-0 mt-2 z-50 rating-dropdown"
+                    prop.children [
+                        for status in allStatuses do
+                            let isActive = status = currentStatus
+                            let itemClass =
+                                if isActive then "rating-dropdown-item rating-dropdown-item-active"
+                                else "rating-dropdown-item"
+                            Html.button [
+                                prop.className itemClass
+                                prop.onClick (fun _ -> dispatch (Set_game_status status))
+                                prop.children [
+                                    Daisy.badge [
+                                        badge.sm
+                                        prop.className (statusBadgeClass status)
+                                        prop.text (statusLabel status)
+                                    ]
+                                ]
+                            ]
+                    ]
+                ]
+        ]
+    ]
+
+[<ReactComponent>]
+let private StoreInput (onAdd: string -> unit) (onClose: unit -> unit) =
+    let value, setValue = React.useState("")
+    Html.div [
+        prop.className "flex items-center gap-2 mt-2"
+        prop.children [
+            Daisy.input [
+                input.sm
+                prop.className "flex-1"
+                prop.placeholder "Store name (e.g. Steam, GOG, Epic)..."
+                prop.autoFocus true
+                prop.value value
+                prop.onChange (fun (v: string) -> setValue v)
+                prop.onKeyDown (fun e ->
+                    match e.key with
+                    | "Enter" ->
+                        e.preventDefault()
+                        if value.Trim() <> "" then
+                            onAdd (value.Trim())
+                            setValue ""
+                    | "Escape" -> onClose ()
+                    | _ -> ())
+            ]
+            Daisy.button.button [
+                button.primary
+                button.sm
+                prop.onClick (fun _ ->
+                    if value.Trim() <> "" then
+                        onAdd (value.Trim())
+                        setValue "")
+                prop.text "Add"
+            ]
+        ]
+    ]
+
+[<ReactComponent>]
+let private FriendManager
+    (title: string)
+    (allFriends: FriendListItem list)
+    (selectedFriends: FriendRef list)
+    (onAdd: string -> unit)
+    (onRemove: string -> unit)
+    (onAddNew: string -> unit)
+    (onClose: unit -> unit) =
+    let searchText, setSearchText = React.useState("")
+    let highlightedIndex, setHighlightedIndex = React.useState(0)
+    let selectedSlugs = selectedFriends |> List.map (fun f -> f.Slug) |> Set.ofList
+    let available =
+        allFriends
+        |> List.filter (fun f ->
+            not (Set.contains f.Slug selectedSlugs) &&
+            (searchText = "" || f.Name.ToLowerInvariant().Contains(searchText.ToLowerInvariant())))
+    let availableArr = available |> List.toArray
+    let trimmedSearch = searchText.Trim()
+    let hasExactMatch = allFriends |> List.exists (fun f -> f.Name.ToLowerInvariant() = trimmedSearch.ToLowerInvariant())
+    let showAddContact = trimmedSearch <> "" && not hasExactMatch
+    let totalItems = availableArr.Length + (if showAddContact then 1 else 0)
+
+    let headerExtra = [
+        if not (List.isEmpty selectedFriends) then
+            Html.div [
+                prop.className "flex flex-wrap gap-2 mb-4"
+                prop.children [
+                    for fr in selectedFriends do
+                        FriendPill.viewWithRemove fr onRemove
+                ]
+            ]
+        Daisy.input [
+            prop.className "w-full mb-4"
+            prop.type' "text"
+            prop.placeholder "Search friends..."
+            prop.autoFocus true
+            prop.value searchText
+            prop.onChange (fun (v: string) ->
+                setSearchText v
+                setHighlightedIndex 0)
+            prop.onKeyDown (fun e ->
+                match e.key with
+                | "ArrowDown" ->
+                    e.preventDefault()
+                    if totalItems > 0 then
+                        setHighlightedIndex (min (highlightedIndex + 1) (totalItems - 1))
+                | "ArrowUp" ->
+                    e.preventDefault()
+                    setHighlightedIndex (max (highlightedIndex - 1) 0)
+                | "Enter" ->
+                    e.preventDefault()
+                    if highlightedIndex >= 0 && highlightedIndex < availableArr.Length then
+                        onAdd availableArr.[highlightedIndex].Slug
+                        setSearchText ""
+                        setHighlightedIndex 0
+                    elif showAddContact && highlightedIndex = availableArr.Length then
+                        onAddNew trimmedSearch
+                        setSearchText ""
+                        setHighlightedIndex 0
+                | "Escape" -> onClose ()
+                | _ -> ())
+        ]
+    ]
+
+    let content = [
+        if totalItems = 0 && not showAddContact then
+            Html.p [
+                prop.className "text-base-content/60 py-2 text-sm"
+                prop.text (
+                    if List.isEmpty allFriends && trimmedSearch = "" then "No friends available. Add friends first."
+                    elif trimmedSearch = "" then "All friends already added."
+                    else "No matches found."
+                )
+            ]
+        else
+            Html.div [
+                prop.className "space-y-1"
+                prop.children [
+                    for i in 0 .. availableArr.Length - 1 do
+                        let friend = availableArr.[i]
+                        let isHighlighted = (i = highlightedIndex)
+                        Html.div [
+                            prop.className (
+                                "flex items-center gap-3 p-2 rounded-lg cursor-pointer " +
+                                (if isHighlighted then "bg-primary/20" else "hover:bg-base-200"))
+                            prop.onClick (fun _ -> onAdd friend.Slug)
+                            prop.children [
+                                Daisy.avatar [
+                                    prop.children [
+                                        Html.div [
+                                            prop.className "w-10 rounded-full bg-base-300"
+                                            prop.children [
+                                                match friend.ImageRef with
+                                                | Some ref ->
+                                                    Html.img [
+                                                        prop.src $"/images/{ref}"
+                                                        prop.alt friend.Name
+                                                    ]
+                                                | None ->
+                                                    Html.div [
+                                                        prop.className "flex items-center justify-center w-full h-full text-base-content/30"
+                                                        prop.children [ Icons.friends () ]
+                                                    ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                                Html.span [ prop.className "font-semibold"; prop.text friend.Name ]
+                            ]
+                        ]
+                    if showAddContact then
+                        let isHighlighted = (highlightedIndex = availableArr.Length)
+                        Html.div [
+                            prop.className (
+                                "flex items-center gap-3 p-2 rounded-lg cursor-pointer " +
+                                (if isHighlighted then "bg-primary/20" else "hover:bg-base-200"))
+                            prop.onClick (fun _ ->
+                                onAddNew trimmedSearch
+                                setSearchText ""
+                                setHighlightedIndex 0)
+                            prop.children [
+                                Html.div [
+                                    prop.className "w-10 h-10 rounded-full bg-base-300 flex items-center justify-center text-base-content/40 text-lg"
+                                    prop.text "+"
+                                ]
+                                Html.span [
+                                    prop.className "font-semibold"
+                                    prop.text $"Add contact \"{trimmedSearch}\""
+                                ]
+                            ]
+                        ]
+                ]
+            ]
+    ]
+
+    ModalPanel.viewCustom title onClose headerExtra content []
+
+[<ReactComponent>]
+let private CatalogManager
+    (allCatalogs: CatalogListItem list)
+    (gameCatalogs: CatalogRef list)
+    (onAdd: string -> unit)
+    (onRemove: string -> string -> unit)
+    (onCreateNew: string -> unit)
+    (onClose: unit -> unit) =
+    let searchText, setSearchText = React.useState("")
+    let highlightedIndex, setHighlightedIndex = React.useState(0)
+    let selectedSlugs = gameCatalogs |> List.map (fun c -> c.Slug) |> Set.ofList
+    let available =
+        allCatalogs
+        |> List.filter (fun c ->
+            not (Set.contains c.Slug selectedSlugs) &&
+            (searchText = "" || c.Name.ToLowerInvariant().Contains(searchText.ToLowerInvariant())))
+    let availableArr = available |> List.toArray
+    let trimmedSearch = searchText.Trim()
+    let hasExactMatch = allCatalogs |> List.exists (fun c -> c.Name.ToLowerInvariant() = trimmedSearch.ToLowerInvariant())
+    let showCreateNew = trimmedSearch <> "" && not hasExactMatch
+    let totalItems = availableArr.Length + (if showCreateNew then 1 else 0)
+
+    let headerExtra = [
+        if not (List.isEmpty gameCatalogs) then
+            Html.div [
+                prop.className "flex flex-wrap gap-2 mb-4"
+                prop.children [
+                    for cat in gameCatalogs do
+                        Html.span [
+                            prop.className "inline-flex items-center gap-1.5 bg-transparent border border-base-content/20 text-base-content/70 px-3 py-1 rounded-full text-sm font-semibold transition-colors hover:border-base-content/40"
+                            prop.children [
+                                Html.span [ prop.text cat.Name ]
+                                Html.button [
+                                    prop.className "text-base-content/40 hover:text-error transition-colors cursor-pointer ml-0.5"
+                                    prop.onClick (fun e ->
+                                        e.stopPropagation()
+                                        onRemove cat.Slug cat.EntryId)
+                                    prop.text "\u00D7"
+                                ]
+                            ]
+                        ]
+                ]
+            ]
+        Daisy.input [
+            prop.className "w-full mb-4"
+            prop.type' "text"
+            prop.placeholder "Search catalogs..."
+            prop.autoFocus true
+            prop.value searchText
+            prop.onChange (fun (v: string) ->
+                setSearchText v
+                setHighlightedIndex 0)
+            prop.onKeyDown (fun e ->
+                match e.key with
+                | "ArrowDown" ->
+                    e.preventDefault()
+                    if totalItems > 0 then
+                        setHighlightedIndex (min (highlightedIndex + 1) (totalItems - 1))
+                | "ArrowUp" ->
+                    e.preventDefault()
+                    setHighlightedIndex (max (highlightedIndex - 1) 0)
+                | "Enter" ->
+                    e.preventDefault()
+                    if highlightedIndex >= 0 && highlightedIndex < availableArr.Length then
+                        onAdd availableArr.[highlightedIndex].Slug
+                        setSearchText ""
+                        setHighlightedIndex 0
+                    elif showCreateNew && highlightedIndex = availableArr.Length then
+                        onCreateNew trimmedSearch
+                        setSearchText ""
+                        setHighlightedIndex 0
+                | "Escape" -> onClose ()
+                | _ -> ())
+        ]
+    ]
+
+    let content = [
+        if totalItems = 0 && not showCreateNew then
+            Html.p [
+                prop.className "text-base-content/60 py-2 text-sm"
+                prop.text (
+                    if List.isEmpty allCatalogs && trimmedSearch = "" then "No catalogs yet. Create one below."
+                    elif trimmedSearch = "" then "Game already in all catalogs."
+                    else "No matches found."
+                )
+            ]
+        else
+            Html.div [
+                prop.className "space-y-1"
+                prop.children [
+                    for i in 0 .. availableArr.Length - 1 do
+                        let catalog = availableArr.[i]
+                        let isHighlighted = (i = highlightedIndex)
+                        Html.div [
+                            prop.className (
+                                "flex items-center gap-3 p-2 rounded-lg cursor-pointer " +
+                                (if isHighlighted then "bg-primary/20" else "hover:bg-base-200"))
+                            prop.onClick (fun _ -> onAdd catalog.Slug)
+                            prop.children [
+                                Html.div [
+                                    prop.className "w-10 h-10 rounded-full bg-base-300 flex items-center justify-center text-base-content/40"
+                                    prop.children [ Icons.catalog () ]
+                                ]
+                                Html.div [
+                                    prop.className "flex flex-col"
+                                    prop.children [
+                                        Html.span [ prop.className "font-semibold"; prop.text catalog.Name ]
+                                        if catalog.Description <> "" then
+                                            Html.span [ prop.className "text-xs text-base-content/50"; prop.text catalog.Description ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    if showCreateNew then
+                        let isHighlighted = (highlightedIndex = availableArr.Length)
+                        Html.div [
+                            prop.className (
+                                "flex items-center gap-3 p-2 rounded-lg cursor-pointer " +
+                                (if isHighlighted then "bg-primary/20" else "hover:bg-base-200"))
+                            prop.onClick (fun _ ->
+                                onCreateNew trimmedSearch
+                                setSearchText ""
+                                setHighlightedIndex 0)
+                            prop.children [
+                                Html.div [
+                                    prop.className "w-10 h-10 rounded-full bg-base-300 flex items-center justify-center text-base-content/40 text-lg"
+                                    prop.text "+"
+                                ]
+                                Html.span [
+                                    prop.className "font-semibold"
+                                    prop.text $"Create catalog \"{trimmedSearch}\""
+                                ]
+                            ]
+                        ]
+                ]
+            ]
+    ]
+
+    ModalPanel.viewCustom "Add to Catalog" onClose headerExtra content []
+
+let view (model: Model) (dispatch: Msg -> unit) =
+    match model.IsLoading, model.Game with
+    | true, _ ->
+        Html.div [
+            prop.className "flex justify-center py-12"
+            prop.children [
+                Daisy.loading [ loading.spinner; loading.lg ]
+            ]
+        ]
+    | false, None ->
+        PageContainer.view "Game Not Found" [
+            Html.p [
+                prop.className "text-base-content/70"
+                prop.text "The game you're looking for doesn't exist."
+            ]
+            Html.a [
+                prop.className "link link-primary mt-4 inline-block"
+                prop.href (Router.format "games")
+                prop.onClick (fun e ->
+                    e.preventDefault()
+                    Router.navigate "games"
+                )
+                prop.text "Back to Games"
+            ]
+        ]
+    | false, Some game ->
+        Html.div [
+            prop.children [
+                // Hero Section
+                Html.div [
+                    prop.className "relative h-72 lg:h-[500px] w-full overflow-hidden"
+                    prop.children [
+                        // Backdrop image
+                        Html.div [
+                            prop.className "absolute inset-0"
+                            prop.children [
+                                match game.BackdropRef with
+                                | Some ref ->
+                                    Html.img [
+                                        prop.src $"/images/{ref}"
+                                        prop.alt game.Name
+                                        prop.className "w-full h-full object-cover"
+                                    ]
+                                | None ->
+                                    match game.CoverRef with
+                                    | Some ref ->
+                                        Html.img [
+                                            prop.src $"/images/{ref}"
+                                            prop.alt game.Name
+                                            prop.className "w-full h-full object-cover blur-xl scale-125"
+                                        ]
+                                    | None -> ()
+                                // Gradient overlay
+                                Html.div [
+                                    prop.className "absolute inset-0 bg-gradient-to-t from-base-300 via-base-300/40 to-base-300/80"
+                                ]
+                            ]
+                        ]
+                        // Back button
+                        Html.div [
+                            prop.className "absolute top-4 left-4 z-10"
+                            prop.children [
+                                Daisy.button.button [
+                                    button.ghost
+                                    button.sm
+                                    prop.className "text-base-content backdrop-blur-sm bg-base-300/30"
+                                    prop.onClick (fun _ -> Router.navigate "games")
+                                    prop.text "\u2190 Back"
+                                ]
+                            ]
+                        ]
+                        // Hero content at bottom
+                        Html.div [
+                            prop.className "relative h-full flex items-end pb-6 lg:pb-8 px-4 lg:px-8"
+                            prop.children [
+                                Html.div [
+                                    prop.className "flex gap-6 lg:gap-10 items-end w-full max-w-6xl mx-auto"
+                                    prop.children [
+                                        // Cover image (desktop)
+                                        Html.div [
+                                            prop.className "hidden lg:block w-52 h-80 flex-shrink-0 rounded-xl overflow-hidden shadow-2xl border border-base-content/10"
+                                            prop.children [
+                                                match game.CoverRef with
+                                                | Some ref ->
+                                                    Html.img [
+                                                        prop.src $"/images/{ref}"
+                                                        prop.alt game.Name
+                                                        prop.className "w-full h-full object-cover"
+                                                    ]
+                                                | None ->
+                                                    Html.div [
+                                                        prop.className "flex items-center justify-center w-full h-full bg-base-200 text-base-content/30"
+                                                        prop.children [ Icons.gamepad () ]
+                                                    ]
+                                            ]
+                                        ]
+                                        // Cover image (mobile)
+                                        Html.div [
+                                            prop.className "lg:hidden w-28 h-44 flex-shrink-0 rounded-lg overflow-hidden shadow-xl border border-base-content/10"
+                                            prop.children [
+                                                match game.CoverRef with
+                                                | Some ref ->
+                                                    Html.img [
+                                                        prop.src $"/images/{ref}"
+                                                        prop.alt game.Name
+                                                        prop.className "w-full h-full object-cover"
+                                                    ]
+                                                | None ->
+                                                    Html.div [
+                                                        prop.className "flex items-center justify-center w-full h-full bg-base-200 text-base-content/30"
+                                                        prop.children [ Icons.gamepad () ]
+                                                    ]
+                                            ]
+                                        ]
+                                        // Title & Meta
+                                        Html.div [
+                                            prop.className "flex-grow pb-2"
+                                            prop.children [
+                                                // Genre badges + Rating
+                                                Html.div [
+                                                    prop.className "flex flex-wrap items-center gap-3 mb-3"
+                                                    prop.children [
+                                                        for genre in game.Genres |> List.truncate 3 do
+                                                            Html.span [
+                                                                prop.className "bg-primary/80 px-3 py-1 rounded text-xs font-bold tracking-wider uppercase text-primary-content"
+                                                                prop.text genre
+                                                            ]
+                                                        Daisy.badge [
+                                                            prop.className (statusBadgeClass game.Status)
+                                                            prop.text (statusLabel game.Status)
+                                                        ]
+                                                        match game.RawgRating with
+                                                        | Some r -> starRating r
+                                                        | None -> ()
+                                                    ]
+                                                ]
+                                                // Title
+                                                Html.h1 [
+                                                    prop.className "text-3xl lg:text-5xl font-bold font-display tracking-tight mb-2"
+                                                    prop.text game.Name
+                                                ]
+                                                // Year & Play time
+                                                Html.div [
+                                                    prop.className "flex items-center gap-3 text-base-content/60 mb-4"
+                                                    prop.children [
+                                                        Html.span [ prop.text (string game.Year) ]
+                                                        match game.HltbHours with
+                                                        | Some h ->
+                                                            Html.span [ prop.className "text-base-content/30"; prop.text "\u00B7" ]
+                                                            Html.span [
+                                                                prop.className "text-sm"
+                                                                prop.text $"HLTB: {h}h"
+                                                            ]
+                                                        | None -> ()
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+                // Content Grid
+                Html.div [
+                    prop.className "max-w-6xl mx-auto px-4 lg:px-8 pt-4 lg:pt-6 pb-8 lg:pb-12"
+                    prop.children [
+                        Html.div [
+                            prop.className "grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10"
+                            prop.children [
+                                // Left Column: Details
+                                Html.div [
+                                    prop.className "lg:col-span-8 space-y-10"
+                                    prop.children [
+                                        // Catalogs
+                                        Html.div [
+                                            prop.className "flex flex-wrap items-center gap-2"
+                                            prop.children [
+                                                Html.button [
+                                                    prop.className "w-9 h-9 rounded-full bg-base-100/50 backdrop-blur-sm border border-base-content/15 hover:bg-base-100/70 text-base-content/50 hover:text-base-content flex items-center justify-center transition-colors cursor-pointer"
+                                                    prop.onClick (fun _ -> dispatch Open_catalog_picker)
+                                                    prop.children [
+                                                        Html.span [ prop.className "[&>svg]:w-5 [&>svg]:h-5"; prop.children [ Icons.catalog () ] ]
+                                                    ]
+                                                ]
+                                                for cat in model.GameCatalogs do
+                                                    Html.span [
+                                                        prop.className "inline-flex items-center gap-1.5 bg-transparent border border-base-content/20 text-base-content/70 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors hover:border-base-content/40 group/pill"
+                                                        prop.children [
+                                                            Html.a [
+                                                                prop.className "cursor-pointer hover:text-primary transition-colors"
+                                                                prop.href (Feliz.Router.Router.format ("catalogs", cat.Slug))
+                                                                prop.onClick (fun e ->
+                                                                    e.preventDefault()
+                                                                    Feliz.Router.Router.navigate ("catalogs", cat.Slug))
+                                                                prop.text cat.Name
+                                                            ]
+                                                            Html.button [
+                                                                prop.className "text-base-content/30 hover:text-error transition-colors cursor-pointer opacity-0 group-hover/pill:opacity-100"
+                                                                prop.onClick (fun e ->
+                                                                    e.stopPropagation()
+                                                                    dispatch (Remove_from_catalog (cat.Slug, cat.EntryId)))
+                                                                prop.text "\u00D7"
+                                                            ]
+                                                        ]
+                                                    ]
+                                            ]
+                                        ]
+                                        // Description
+                                        if not (System.String.IsNullOrWhiteSpace game.Description) then
+                                            Html.section [
+                                                prop.children [
+                                                    sectionHeader "Description"
+                                                    Html.p [
+                                                        prop.className "text-base-content/70 leading-relaxed text-lg"
+                                                        prop.text game.Description
+                                                    ]
+                                                ]
+                                            ]
+                                        // Stores
+                                        if not (List.isEmpty game.Stores) || model.ShowStoreInput then
+                                            Html.section [
+                                                prop.children [
+                                                    sectionHeader "Stores"
+                                                    Html.div [
+                                                        prop.className "flex flex-wrap gap-2"
+                                                        prop.children [
+                                                            for store in game.Stores do
+                                                                Html.span [
+                                                                    prop.className "inline-flex items-center gap-1.5 bg-base-100/50 border border-base-content/15 px-3 py-1.5 rounded-lg text-sm font-medium group/store"
+                                                                    prop.children [
+                                                                        Html.span [ prop.text store ]
+                                                                        Html.button [
+                                                                            prop.className "text-base-content/30 hover:text-error transition-colors cursor-pointer opacity-0 group-hover/store:opacity-100"
+                                                                            prop.onClick (fun _ -> dispatch (Remove_store store))
+                                                                            prop.text "\u00D7"
+                                                                        ]
+                                                                    ]
+                                                                ]
+                                                            Html.button [
+                                                                prop.className "w-8 h-8 rounded-lg bg-base-content/10 flex items-center justify-center text-base-content/40 hover:bg-primary/30 hover:text-primary transition-colors text-sm cursor-pointer"
+                                                                prop.onClick (fun _ -> dispatch Toggle_store_input)
+                                                                prop.text "+"
+                                                            ]
+                                                        ]
+                                                    ]
+                                                    if model.ShowStoreInput then
+                                                        StoreInput
+                                                            (fun store -> dispatch (Add_store store))
+                                                            (fun () -> dispatch Toggle_store_input)
+                                                ]
+                                            ]
+                                        // Notes
+                                        Html.section [
+                                            prop.children [
+                                                ContentBlockEditor.view
+                                                    game.ContentBlocks
+                                                    (fun req -> dispatch (Add_content_block req))
+                                                    (fun bid req -> dispatch (Update_content_block (bid, req)))
+                                                    (fun bid -> dispatch (Remove_content_block bid))
+                                                    (fun bid blockType -> dispatch (Change_content_block_type (bid, blockType)))
+                                                    (fun blockIds -> dispatch (Reorder_content_blocks blockIds))
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                                // Right Column: Social & Activity
+                                Html.div [
+                                    prop.className "lg:col-span-4 space-y-6"
+                                    prop.children [
+                                        // Status
+                                        statusSelector game.Status model.IsStatusOpen dispatch
+                                        // Personal Rating
+                                        personalRatingCard game.PersonalRating model.IsRatingOpen dispatch
+                                        // HLTB
+                                        glassCard [
+                                            Html.div [
+                                                prop.className "flex items-center justify-between mb-2"
+                                                prop.children [
+                                                    Html.h3 [ prop.className "text-lg font-bold"; prop.text "HowLongToBeat" ]
+                                                ]
+                                            ]
+                                            if model.IsEditingHltb then
+                                                Html.div [
+                                                    prop.className "flex items-center gap-2"
+                                                    prop.children [
+                                                        Daisy.input [
+                                                            input.sm
+                                                            prop.className "w-24"
+                                                            prop.type' "number"
+                                                            prop.placeholder "Hours"
+                                                            prop.autoFocus true
+                                                            prop.value model.HltbInput
+                                                            prop.onChange (fun (v: string) -> dispatch (Set_hltb_hours v))
+                                                            prop.onKeyDown (fun e ->
+                                                                match e.key with
+                                                                | "Enter" -> dispatch Save_hltb
+                                                                | "Escape" -> dispatch Cancel_editing_hltb
+                                                                | _ -> ())
+                                                        ]
+                                                        Html.span [
+                                                            prop.className "text-base-content/50 text-sm"
+                                                            prop.text "hours"
+                                                        ]
+                                                    ]
+                                                ]
+                                            else
+                                                Html.button [
+                                                    prop.className "text-base-content/60 hover:text-primary transition-colors cursor-pointer text-sm"
+                                                    prop.onClick (fun _ -> dispatch Start_editing_hltb)
+                                                    prop.text (
+                                                        match game.HltbHours with
+                                                        | Some h -> $"{h}h"
+                                                        | None -> "Set HLTB hours"
+                                                    )
+                                                ]
+                                        ]
+                                        // Family Owners
+                                        glassCard [
+                                            Html.div [
+                                                prop.className "flex items-center justify-between mb-4"
+                                                prop.children [
+                                                    Html.h3 [ prop.className "text-lg font-bold"; prop.text "Family Sharing" ]
+                                                    Html.button [
+                                                        prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold"
+                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Family_owner_picker))
+                                                        prop.text "+"
+                                                    ]
+                                                ]
+                                            ]
+                                            if List.isEmpty game.FamilyOwners then
+                                                Html.p [
+                                                    prop.className "text-base-content/40 text-sm"
+                                                    prop.text "No family members own this game"
+                                                ]
+                                            else
+                                                Html.div [
+                                                    prop.className "space-y-3"
+                                                    prop.children [
+                                                        for fr in game.FamilyOwners do
+                                                            Html.div [
+                                                                prop.className "flex items-center justify-between group p-2 rounded-lg hover:bg-base-content/5 transition-colors"
+                                                                prop.children [
+                                                                    Html.div [
+                                                                        prop.className "flex items-center gap-3"
+                                                                        prop.children [
+                                                                            friendAvatar "w-9 h-9" fr "bg-info/20 text-sm font-bold text-info"
+                                                                            Html.a [
+                                                                                prop.className "font-medium text-sm cursor-pointer hover:text-primary transition-colors"
+                                                                                prop.href (Router.format ("friends", fr.Slug))
+                                                                                prop.onClick (fun e ->
+                                                                                    e.preventDefault()
+                                                                                    Router.navigate ("friends", fr.Slug))
+                                                                                prop.text fr.Name
+                                                                            ]
+                                                                        ]
+                                                                    ]
+                                                                    Html.button [
+                                                                        prop.className "text-base-content/30 opacity-0 group-hover:opacity-100 transition-opacity text-xs hover:text-error"
+                                                                        prop.onClick (fun _ -> dispatch (Remove_family_owner fr.Slug))
+                                                                        prop.text "\u00D7"
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                    ]
+                                                ]
+                                        ]
+                                        // Recommended By card
+                                        glassCard [
+                                            Html.div [
+                                                prop.className "flex items-center justify-between mb-4"
+                                                prop.children [
+                                                    Html.h3 [ prop.className "text-lg font-bold"; prop.text "Recommended By" ]
+                                                    Html.button [
+                                                        prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold"
+                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
+                                                        prop.text "+"
+                                                    ]
+                                                ]
+                                            ]
+                                            if List.isEmpty game.RecommendedBy then
+                                                Html.p [
+                                                    prop.className "text-base-content/40 text-sm"
+                                                    prop.text "No recommendations yet"
+                                                ]
+                                            else
+                                                Html.div [
+                                                    prop.className "space-y-3"
+                                                    prop.children [
+                                                        for fr in game.RecommendedBy do
+                                                            Html.div [
+                                                                prop.className "flex items-center justify-between group p-2 rounded-lg hover:bg-base-content/5 transition-colors"
+                                                                prop.children [
+                                                                    Html.div [
+                                                                        prop.className "flex items-center gap-3"
+                                                                        prop.children [
+                                                                            friendAvatar "w-9 h-9" fr "bg-primary/20 text-sm font-bold text-primary"
+                                                                            Html.a [
+                                                                                prop.className "font-medium text-sm cursor-pointer hover:text-primary transition-colors"
+                                                                                prop.href (Router.format ("friends", fr.Slug))
+                                                                                prop.onClick (fun e ->
+                                                                                    e.preventDefault()
+                                                                                    Router.navigate ("friends", fr.Slug))
+                                                                                prop.text fr.Name
+                                                                            ]
+                                                                        ]
+                                                                    ]
+                                                                    Html.button [
+                                                                        prop.className "text-base-content/30 opacity-0 group-hover:opacity-100 transition-opacity text-xs hover:text-error"
+                                                                        prop.onClick (fun _ -> dispatch (Remove_recommendation fr.Slug))
+                                                                        prop.text "\u00D7"
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                    ]
+                                                ]
+                                        ]
+                                        // Want to Play With card
+                                        glassCard [
+                                            Html.div [
+                                                prop.className "flex items-center justify-between mb-4"
+                                                prop.children [
+                                                    Html.h3 [ prop.className "text-lg font-bold"; prop.text "Play With" ]
+                                                    Html.button [
+                                                        prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold"
+                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Play_with_picker))
+                                                        prop.text "+"
+                                                    ]
+                                                ]
+                                            ]
+                                            Html.p [
+                                                prop.className "text-base-content/40 text-sm mb-4"
+                                                prop.text "Friends who want to play this with you"
+                                            ]
+                                            if List.isEmpty game.WantToPlayWith then
+                                                Html.p [
+                                                    prop.className "text-base-content/30 text-sm italic"
+                                                    prop.text "No one yet"
+                                                ]
+                                            else
+                                                Html.div [
+                                                    prop.className "space-y-3"
+                                                    prop.children [
+                                                        for fr in game.WantToPlayWith do
+                                                            Html.div [
+                                                                prop.className "flex items-center justify-between group p-2 rounded-lg hover:bg-base-content/5 transition-colors"
+                                                                prop.children [
+                                                                    Html.div [
+                                                                        prop.className "flex items-center gap-3"
+                                                                        prop.children [
+                                                                            friendAvatar "w-9 h-9" fr "bg-secondary/20 text-sm font-bold text-secondary"
+                                                                            Html.a [
+                                                                                prop.className "font-medium text-sm cursor-pointer hover:text-primary transition-colors"
+                                                                                prop.href (Router.format ("friends", fr.Slug))
+                                                                                prop.onClick (fun e ->
+                                                                                    e.preventDefault()
+                                                                                    Router.navigate ("friends", fr.Slug))
+                                                                                prop.text fr.Name
+                                                                            ]
+                                                                        ]
+                                                                    ]
+                                                                    Html.button [
+                                                                        prop.className "text-base-content/30 opacity-0 group-hover:opacity-100 transition-opacity text-xs hover:text-error"
+                                                                        prop.onClick (fun _ -> dispatch (Remove_want_to_play_with fr.Slug))
+                                                                        prop.text "\u00D7"
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                    ]
+                                                ]
+                                        ]
+                                        // Played With card
+                                        glassCard [
+                                            Html.div [
+                                                prop.className "flex items-center justify-between mb-4"
+                                                prop.children [
+                                                    Html.h3 [ prop.className "text-lg font-bold"; prop.text "Played With" ]
+                                                    Html.button [
+                                                        prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold"
+                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Played_with_picker))
+                                                        prop.text "+"
+                                                    ]
+                                                ]
+                                            ]
+                                            Html.p [
+                                                prop.className "text-base-content/40 text-sm mb-4"
+                                                prop.text "Friends you've played this with"
+                                            ]
+                                            if List.isEmpty game.PlayedWith then
+                                                Html.p [
+                                                    prop.className "text-base-content/30 text-sm italic"
+                                                    prop.text "No one yet"
+                                                ]
+                                            else
+                                                Html.div [
+                                                    prop.className "space-y-3"
+                                                    prop.children [
+                                                        for fr in game.PlayedWith do
+                                                            Html.div [
+                                                                prop.className "flex items-center justify-between group p-2 rounded-lg hover:bg-base-content/5 transition-colors"
+                                                                prop.children [
+                                                                    Html.div [
+                                                                        prop.className "flex items-center gap-3"
+                                                                        prop.children [
+                                                                            friendAvatar "w-9 h-9" fr "bg-accent/20 text-sm font-bold text-accent"
+                                                                            Html.a [
+                                                                                prop.className "font-medium text-sm cursor-pointer hover:text-primary transition-colors"
+                                                                                prop.href (Router.format ("friends", fr.Slug))
+                                                                                prop.onClick (fun e ->
+                                                                                    e.preventDefault()
+                                                                                    Router.navigate ("friends", fr.Slug))
+                                                                                prop.text fr.Name
+                                                                            ]
+                                                                        ]
+                                                                    ]
+                                                                    Html.button [
+                                                                        prop.className "text-base-content/30 opacity-0 group-hover:opacity-100 transition-opacity text-xs hover:text-error"
+                                                                        prop.onClick (fun _ -> dispatch (Remove_played_with fr.Slug))
+                                                                        prop.text "\u00D7"
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                    ]
+                                                ]
+                                        ]
+                                        // Error display
+                                        match model.Error with
+                                        | Some err ->
+                                            Daisy.alert [
+                                                alert.error
+                                                prop.text err
+                                            ]
+                                        | None -> ()
+                                        // Remove game
+                                        Html.div [
+                                            prop.className "pt-4"
+                                            prop.children [
+                                                if model.ConfirmingRemove then
+                                                    Html.div [
+                                                        prop.className "bg-error/10 border border-error/30 rounded-xl p-4 space-y-3"
+                                                        prop.children [
+                                                            Html.p [
+                                                                prop.className "text-sm font-semibold text-error"
+                                                                prop.text "Are you sure you want to remove this game?"
+                                                            ]
+                                                            Html.div [
+                                                                prop.className "flex gap-2"
+                                                                prop.children [
+                                                                    Daisy.button.button [
+                                                                        button.error
+                                                                        button.sm
+                                                                        prop.className "flex-1"
+                                                                        prop.onClick (fun _ -> dispatch Remove_game)
+                                                                        prop.text "Yes, remove"
+                                                                    ]
+                                                                    Daisy.button.button [
+                                                                        button.ghost
+                                                                        button.sm
+                                                                        prop.className "flex-1"
+                                                                        prop.onClick (fun _ -> dispatch Cancel_remove_game)
+                                                                        prop.text "Cancel"
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                        ]
+                                                    ]
+                                                else
+                                                    Daisy.button.button [
+                                                        button.error
+                                                        button.sm
+                                                        prop.className "w-full"
+                                                        prop.onClick (fun _ -> dispatch Confirm_remove_game)
+                                                        prop.text "Remove Game"
+                                                    ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+                // Friend picker modals
+                match model.ShowFriendPicker with
+                | Some Recommend_picker ->
+                    FriendManager
+                        "Recommended By"
+                        model.AllFriends
+                        game.RecommendedBy
+                        (fun slug -> dispatch (Recommend_friend slug))
+                        (fun slug -> dispatch (Remove_recommendation slug))
+                        (fun name -> dispatch (Add_friend_and_recommend name))
+                        (fun () -> dispatch Close_friend_picker)
+                | Some Play_with_picker ->
+                    FriendManager
+                        "Want to Play With"
+                        model.AllFriends
+                        game.WantToPlayWith
+                        (fun slug -> dispatch (Want_to_play_with slug))
+                        (fun slug -> dispatch (Remove_want_to_play_with slug))
+                        (fun name -> dispatch (Add_friend_and_play_with name))
+                        (fun () -> dispatch Close_friend_picker)
+                | Some Family_owner_picker ->
+                    FriendManager
+                        "Family Sharing"
+                        model.AllFriends
+                        game.FamilyOwners
+                        (fun slug -> dispatch (Add_family_owner slug))
+                        (fun slug -> dispatch (Remove_family_owner slug))
+                        (fun name -> dispatch (Add_friend_and_family_owner name))
+                        (fun () -> dispatch Close_friend_picker)
+                | Some Played_with_picker ->
+                    FriendManager
+                        "Played With"
+                        model.AllFriends
+                        game.PlayedWith
+                        (fun slug -> dispatch (Add_played_with slug))
+                        (fun slug -> dispatch (Remove_played_with slug))
+                        (fun name -> dispatch (Add_friend_and_played_with name))
+                        (fun () -> dispatch Close_friend_picker)
+                | None -> ()
+                // Catalog picker modal
+                if model.ShowCatalogPicker then
+                    CatalogManager
+                        model.AllCatalogs
+                        model.GameCatalogs
+                        (fun slug -> dispatch (Add_to_catalog slug))
+                        (fun slug entryId -> dispatch (Remove_from_catalog (slug, entryId)))
+                        (fun name -> dispatch (Create_catalog_and_add name))
+                        (fun () -> dispatch Close_catalog_picker)
+            ]
+        ]

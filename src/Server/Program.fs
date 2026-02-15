@@ -60,6 +60,17 @@ let main args =
         | Some _ -> ()
     | _ -> ()
 
+    // Seed RAWG API key from env var if DB has no value yet
+    let envRawgKey =
+        Environment.GetEnvironmentVariable("RAWG_API_KEY")
+        |> Option.ofObj
+    match envRawgKey with
+    | Some key when key <> "" ->
+        match SettingsStore.getSetting conn "rawg_api_key" with
+        | None -> SettingsStore.setSetting conn "rawg_api_key" key
+        | Some _ -> ()
+    | _ -> ()
+
     // Dynamic TMDB config provider (reads from DB, falls back to env var)
     let getTmdbConfig () : Tmdb.TmdbConfig =
         let apiKey =
@@ -68,6 +79,14 @@ let main args =
             |> Option.defaultValue ""
         { ApiKey = apiKey
           ImageBaseUrl = "https://image.tmdb.org/t/p/" }
+
+    // Dynamic RAWG config provider (reads from DB, falls back to env var)
+    let getRawgConfig () : Rawg.RawgConfig =
+        let apiKey =
+            SettingsStore.getSetting conn "rawg_api_key"
+            |> Option.orElse envRawgKey
+            |> Option.defaultValue ""
+        { ApiKey = apiKey }
 
     let httpClient = new HttpClient()
 
@@ -83,6 +102,7 @@ let main args =
         ContentBlockProjection.handler
         CatalogProjection.handler
         SeriesProjection.handler
+        GameProjection.handler
     ]
 
     // Catch up all projections, rebuilding series to fix out-of-sync rewatch session data
@@ -90,7 +110,7 @@ let main args =
     Projection.startAllProjections conn projectionHandlers
 
     // Create API
-    let api = Api.create conn httpClient getTmdbConfig imageBasePath projectionHandlers
+    let api = Api.create conn httpClient getTmdbConfig getRawgConfig imageBasePath projectionHandlers
 
     let webApp =
         Remoting.createApi ()

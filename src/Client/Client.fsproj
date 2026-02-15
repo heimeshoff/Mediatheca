@@ -34,6 +34,12 @@
     <Compile Include="Pages\SeriesDetail\Types.fs" />
     <Compile Include="Pages\SeriesDetail\State.fs" />
     <Compile Include="Pages\SeriesDetail\Views.fs" />
+    <Compile Include="Pages\Games\Types.fs" />
+    <Compile Include="Pages\Games\State.fs" />
+    <Compile Include="Pages\Games\Views.fs" />
+    <Compile Include="Pages\GameDetail\Types.fs" />
+    <Compile Include="Pages\GameDetail\State.fs" />
+    <Compile Include="Pages\GameDetail\Views.fs" />
     <Compile Include="Pages\Friends\Types.fs" />
     <Compile Include="Pages\Friends\State.fs" />
     <Compile Include="Pages\Friends\Views.fs" />

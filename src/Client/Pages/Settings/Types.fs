@@ -9,6 +9,13 @@ type Model = {
     IsSaving: bool
     TestResult: Result<string, string> option
     SaveResult: Result<string, string> option
+    // RAWG Integration
+    RawgApiKey: string
+    RawgKeyInput: string
+    IsTestingRawg: bool
+    IsSavingRawg: bool
+    RawgTestResult: Result<string, string> option
+    RawgSaveResult: Result<string, string> option
     // Cinemarco Import
     CinemarcoDbPath: string
     CinemarcoImagesPath: string
@@ -24,6 +31,14 @@ type Msg =
     | Test_result of Result<unit, string>
     | Save_tmdb_key
     | Save_result of Result<unit, string>
+    // RAWG Integration
+    | Load_rawg_key
+    | Rawg_key_loaded of string
+    | Rawg_key_input_changed of string
+    | Test_rawg_key
+    | Rawg_test_result of Result<unit, string>
+    | Save_rawg_key
+    | Rawg_save_result of Result<unit, string>
     // Cinemarco Import
     | Cinemarco_db_path_changed of string
     | Cinemarco_images_path_changed of string

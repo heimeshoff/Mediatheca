@@ -60,16 +60,26 @@
 - [x] REQ-102: TV Series detail page with hero backdrop, tab bar (Overview, Cast & Crew, Episodes), season sidebar with progress counts, episode list with thumbnails/watch status/green checkmarks, "next up" highlight, rewatch session selector dropdown [Phase 6]
 - [x] REQ-102a: TV Series list page with search/filtering, poster grid/list, season count badges, "next up" preview, series status badges [Phase 6]
 - [x] REQ-102b: Polymorphic catalog entries — catalogs can hold both Movies and Series via MediaType discriminator [Phase 6]
-- [ ] REQ-102c: TV Series Dashboard with episode progress, next-to-watch across all series, watch time stats [Phase 6]
+- [ ] REQ-102c: TV Series Dashboard with episode progress, next-to-watch across all series, watch time stats [Phase 6 — deferred]
+
+### Phase 7A: Game Catalog + Play Sessions
+
+- [x] REQ-200: Game aggregate with RAWG API import and manual creation. GameStatus lifecycle (Backlog/Playing/Completed/Abandoned/OnHold). Game store ownership tracking (predefined: Steam, Nintendo eShop, GOG, Epic Games Store, PlayStation Store, Xbox Store, Humble Bundle, itch.io). Steam Family ownership — mark games owned by family members (friendSlugs) vs personally owned. Social parity (recommended_by, want_to_play_with, personal_rating). Content blocks (reuse ContentBlocks aggregate pattern). [Phase 7A]
+- [x] REQ-201: RAWG API integration — search games, import metadata (name, year, genres, description, cover image, background image, RAWG rating), download images to local filesystem. API key stored in Settings (like TMDB). [Phase 7A]
+- [x] REQ-202: Play session tracking — date, duration (user-entered in minutes), friends present. Accumulated total play time on game detail and list views. [Phase 7A]
+- [x] REQ-203: Game list page (poster grid/list, search, GameStatus filter badges for Backlog/Playing/Completed/Abandoned/OnHold). Game detail page (hero backdrop, info, play sessions timeline, store badges, family owners, social sidebar — following Movie/Series layout pattern). [Phase 7A]
+- [x] REQ-204: Polymorphic catalog entries — catalogs can hold Movies, Series, and Games via MediaType discriminator. [Phase 7A]
+- [x] REQ-205: Unified search modal (Ctrl+K) — add Games column with RAWG search results alongside TMDB Movies and Series columns. [Phase 7A]
+- [x] REQ-206: Friend-game associations on Friend detail page — recommended games, want to play with, played together (same pattern as movies/series). [Phase 7A]
+
+### Phase 7B: Games Dashboard + Steam Integration
+
+- [ ] REQ-207: Games Dashboard — currently playing games, recent play sessions, total play time stats, completion progress (play time vs HowLongToBeat average), games by status breakdown. [Phase 7B]
+- [ ] REQ-208: Steam integration — import personal game library with play hours via Steam Web API. Steam Family support: configure family members in Settings (Steam ID → Friend mapping), import each family member's library, mark games with family owner (friendSlug). Match imported games with existing RAWG-imported entries or create new. Requires Steam API key + Steam IDs in Settings. [Phase 7B]
+- [ ] REQ-209: HowLongToBeat integration — fetch average completion times by game name. Display comparison on game detail page (your play time vs average) and dashboard. [Phase 7B]
 
 ## v2 (Future)
 
-- [ ] REQ-103: Game support with manual creation and metadata
-- [ ] REQ-104: Steam integration — import game library and play hours
-- [ ] REQ-105: HowLongToBeat integration — average completion time per game
-- [ ] REQ-106: PlaySession tracking for games with friends
-- [ ] REQ-107: Game journal pages — rich content blocks with screenshots, stories, and links
-- [ ] REQ-108: Games Dashboard with play sessions, completion progress vs. average
 - [ ] REQ-109: Book support with manual creation
 - [ ] REQ-110: Goodreads integration — import book library and reading status
 - [ ] REQ-121: Audible integration — import audiobook library and listening progress
@@ -83,6 +93,7 @@
 - [ ] REQ-118: Yearly intelligence reports (total watch/play/read time)
 - [ ] REQ-119: Friend-level intelligence (media consumed per friend)
 - [ ] REQ-120: Planned future sessions with friends
+- [ ] REQ-102c: TV Series Dashboard with episode progress, next-to-watch across all series, watch time stats
 
 ## Out of Scope
 

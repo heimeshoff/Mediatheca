@@ -144,7 +144,7 @@ let private activityItem (item: Mediatheca.Shared.RecentActivityItem) =
     ]
 
 let view (model: Model) (_dispatch: Msg -> unit) =
-    let stats = model.Stats |> Option.defaultValue { MovieCount = 0; SeriesCount = 0; FriendCount = 0; CatalogCount = 0; WatchSessionCount = 0; TotalWatchTimeMinutes = 0; SeriesWatchTimeMinutes = 0 }
+    let stats = model.Stats |> Option.defaultValue { MovieCount = 0; SeriesCount = 0; GameCount = 0; FriendCount = 0; CatalogCount = 0; WatchSessionCount = 0; TotalWatchTimeMinutes = 0; SeriesWatchTimeMinutes = 0; TotalPlayTimeMinutes = 0 }
     Html.div [
         prop.className DesignSystem.animateFadeIn
         prop.children [

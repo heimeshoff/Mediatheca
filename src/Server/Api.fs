@@ -55,6 +55,7 @@ module Api =
         (conn: SqliteConnection)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
+        (getRawgConfig: unit -> Rawg.RawgConfig)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
         : IMediathecaApi =
@@ -68,7 +69,8 @@ module Api =
             searchLibrary = fun query -> async {
                 let movieResults = MovieProjection.search conn query
                 let seriesResults = SeriesProjection.search conn query
-                return movieResults @ seriesResults
+                let gameResults = GameProjection.search conn query
+                return movieResults @ seriesResults @ gameResults
             }
 
             searchTmdb = fun query -> async {
@@ -645,6 +647,11 @@ module Api =
                     |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_list"
                     |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
                     |> Option.defaultValue 0
+                let gameCount =
+                    conn
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+                    |> Option.defaultValue 0
                 let friendCount =
                     conn
                     |> Db.newCommand "SELECT COUNT(*) as cnt FROM friend_list"
@@ -674,14 +681,21 @@ module Api =
                     """
                     |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
                     |> Option.defaultValue 0
+                let totalPlayTime =
+                    conn
+                    |> Db.newCommand "SELECT COALESCE(SUM(total_play_time), 0) as total FROM game_list"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
+                    |> Option.defaultValue 0
                 return {
                     Mediatheca.Shared.DashboardStats.MovieCount = movieCount
                     SeriesCount = seriesCount
+                    GameCount = gameCount
                     FriendCount = friendCount
                     CatalogCount = catalogCount
                     WatchSessionCount = watchSessionCount
                     TotalWatchTimeMinutes = totalWatchTime
                     SeriesWatchTimeMinutes = seriesWatchTime
+                    TotalPlayTimeMinutes = totalPlayTime
                 }
             }
 
@@ -719,6 +733,20 @@ module Api =
                         | "Series_recommendation_removed" -> "Series recommendation removed"
                         | "Series_want_to_watch_with" -> "Want to watch series with friend"
                         | "Series_removed_want_to_watch_with" -> "Removed want to watch series with friend"
+                        | "Game_added_to_library" -> "Game added to library"
+                        | "Game_removed_from_library" -> "Game removed from library"
+                        | "Game_status_changed" -> "Game status changed"
+                        | "Game_personal_rating_set" -> "Game personal rating updated"
+                        | "Game_played_with" -> "Played game with friend"
+                        | "Game_played_with_removed" -> "Removed played game with friend"
+                        | "Game_recommended_by" -> "Game recommendation added"
+                        | "Game_recommendation_removed" -> "Game recommendation removed"
+                        | "Want_to_play_with" -> "Want to play game with friend"
+                        | "Removed_want_to_play_with" -> "Removed want to play game with friend"
+                        | "Game_store_added" -> "Game store added"
+                        | "Game_store_removed" -> "Game store removed"
+                        | "Game_family_owner_added" -> "Game family owner added"
+                        | "Game_family_owner_removed" -> "Game family owner removed"
                         | other -> other.Replace("_", " ")
                     { Mediatheca.Shared.RecentActivityItem.Timestamp = e.Timestamp.ToString("o")
                       StreamId = e.StreamId
@@ -804,14 +832,18 @@ module Api =
             getFriendMedia = fun friendSlug -> async {
                 let movieRec = MovieProjection.getMoviesRecommendedByFriend conn friendSlug
                 let seriesRec = SeriesProjection.getSeriesRecommendedByFriend conn friendSlug
+                let gameRec = GameProjection.getGamesRecommendedByFriend conn friendSlug
                 let movieWant = MovieProjection.getMoviesWantToWatchWithFriend conn friendSlug
                 let seriesWant = SeriesProjection.getSeriesWantToWatchWithFriend conn friendSlug
+                let gameWant = GameProjection.getGamesWantToPlayWithFriend conn friendSlug
+                let gamePlayed = GameProjection.getGamesPlayedWithFriend conn friendSlug
                 let movieWatched = MovieProjection.getMoviesWatchedWithFriend conn friendSlug
                 let seriesWatched = SeriesProjection.getSeriesWatchedWithFriend conn friendSlug
+                let gamePlayedAsWatched = gamePlayed |> List.map (fun g -> { Slug = g.Slug; Name = g.Name; Year = g.Year; PosterRef = g.PosterRef; Dates = []; MediaType = g.MediaType })
                 return {
-                    Mediatheca.Shared.FriendMedia.Recommended = (movieRec @ seriesRec) |> List.sortBy (fun i -> i.Name)
-                    WantToWatch = (movieWant @ seriesWant) |> List.sortBy (fun i -> i.Name)
-                    Watched = (movieWatched @ seriesWatched) |> List.sortBy (fun i -> i.Name)
+                    Mediatheca.Shared.FriendMedia.Recommended = (movieRec @ seriesRec @ gameRec) |> List.sortBy (fun i -> i.Name)
+                    WantToWatch = (movieWant @ seriesWant @ gameWant) |> List.sortBy (fun i -> i.Name)
+                    Watched = (movieWatched @ seriesWatched @ gamePlayedAsWatched) |> List.sortBy (fun i -> i.Name)
                 }
             }
 
@@ -1428,6 +1460,380 @@ module Api =
 
             getCatalogsForSeries = fun slug -> async {
                 return CatalogProjection.getCatalogsForSeriesWithChildren conn slug
+            }
+
+            // Games
+            searchRawgGames = fun query -> async {
+                return! Rawg.searchGames httpClient (getRawgConfig()) query
+            }
+
+            addGame = fun request -> async {
+                try
+                    let year = request.Year
+                    let baseSlug = Slug.gameSlug request.Name year
+                    let slug = generateUniqueSlug conn Games.streamId baseSlug
+                    let sid = Games.streamId slug
+
+                    // If we have a RAWG ID, fetch full details for description + download images
+                    let! description, coverRef, backdropRef =
+                        match request.RawgId with
+                        | Some rawgId ->
+                            async {
+                                let rawgConfig = getRawgConfig()
+                                // Fetch full game details (includes description)
+                                let! details =
+                                    async {
+                                        try
+                                            let! d = Rawg.getGameDetails httpClient rawgConfig rawgId
+                                            return Some d
+                                        with _ -> return None
+                                    }
+
+                                let desc =
+                                    match details with
+                                    | Some d when d.DescriptionRaw <> "" -> d.DescriptionRaw
+                                    | _ -> request.Description
+
+                                // Download images locally
+                                let bgImage =
+                                    match details with
+                                    | Some d -> d.BackgroundImage |> Option.orElse request.CoverRef
+                                    | None -> request.CoverRef
+
+                                let! coverRef, backdropRef = Rawg.downloadGameImages httpClient slug bgImage imageBasePath
+                                return desc, coverRef, backdropRef
+                            }
+                        | None ->
+                            async { return request.Description, request.CoverRef, request.BackdropRef }
+
+                    let gameData: Games.GameAddedData = {
+                        Name = request.Name
+                        Year = year
+                        Genres = request.Genres
+                        Description = description
+                        CoverRef = coverRef
+                        BackdropRef = backdropRef
+                        RawgId = request.RawgId
+                        RawgRating = request.RawgRating
+                    }
+
+                    let result =
+                        executeCommand
+                            conn sid
+                            Games.Serialization.fromStoredEvent
+                            Games.reconstitute
+                            Games.decide
+                            Games.Serialization.toEventData
+                            (Games.Add_game gameData)
+                            projectionHandlers
+
+                    match result with
+                    | Error e -> return Error e
+                    | Ok () -> return Ok slug
+                with ex ->
+                    return Error $"Failed to add game: {ex.Message}"
+            }
+
+            removeGame = fun slug -> async {
+                let sid = Games.streamId slug
+                let result =
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        Games.Remove_game
+                        projectionHandlers
+                match result with
+                | Ok () ->
+                    // Remove catalog entries referencing this game
+                    let catalogEntries = CatalogProjection.getEntriesByMovieSlug conn slug
+                    for (catalogSlug, entryId) in catalogEntries do
+                        let catalogSid = Catalogs.streamId catalogSlug
+                        executeCommand
+                            conn catalogSid
+                            Catalogs.Serialization.fromStoredEvent
+                            Catalogs.reconstitute
+                            Catalogs.decide
+                            Catalogs.Serialization.toEventData
+                            (Catalogs.Remove_entry entryId)
+                            projectionHandlers
+                        |> ignore
+                    // Clean up images
+                    ImageStore.deleteImage imageBasePath (sprintf "posters/game-%s.jpg" slug)
+                    ImageStore.deleteImage imageBasePath (sprintf "backdrops/game-%s.jpg" slug)
+                    return Ok ()
+                | Error e -> return Error e
+            }
+
+            getGames = fun () -> async {
+                return GameProjection.getAll conn
+            }
+
+            getGameDetail = fun slug -> async {
+                return GameProjection.getBySlug conn slug
+            }
+
+            setGameStatus = fun slug status -> async {
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Change_status status)
+                        projectionHandlers
+            }
+
+            setGamePersonalRating = fun slug rating -> async {
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Set_personal_rating rating)
+                        projectionHandlers
+            }
+
+            setGameHltbHours = fun slug hours -> async {
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Set_hltb_hours hours)
+                        projectionHandlers
+            }
+
+            addGameRecommendation = fun slug friendSlug -> async {
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Recommend_game friendSlug)
+                        projectionHandlers
+            }
+
+            removeGameRecommendation = fun slug friendSlug -> async {
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Remove_recommendation friendSlug)
+                        projectionHandlers
+            }
+
+            addGameWantToPlayWith = fun slug friendSlug -> async {
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Add_want_to_play_with friendSlug)
+                        projectionHandlers
+            }
+
+            removeGameWantToPlayWith = fun slug friendSlug -> async {
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Remove_from_want_to_play_with friendSlug)
+                        projectionHandlers
+            }
+
+            addGameStore = fun slug store -> async {
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Add_store store)
+                        projectionHandlers
+            }
+
+            removeGameStore = fun slug store -> async {
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Remove_store store)
+                        projectionHandlers
+            }
+
+            addGameFamilyOwner = fun slug friendSlug -> async {
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Add_family_owner friendSlug)
+                        projectionHandlers
+            }
+
+            removeGameFamilyOwner = fun slug friendSlug -> async {
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Remove_family_owner friendSlug)
+                        projectionHandlers
+            }
+
+            addGamePlayedWith = fun slug friendSlug -> async {
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Add_played_with friendSlug)
+                        projectionHandlers
+            }
+
+            removeGamePlayedWith = fun slug friendSlug -> async {
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Remove_played_with friendSlug)
+                        projectionHandlers
+            }
+
+            // Game Content Blocks + Catalogs
+            getGameContentBlocks = fun slug -> async {
+                return ContentBlockProjection.getForMovieDetail conn slug
+            }
+
+            addGameContentBlock = fun slug request -> async {
+                let sid = ContentBlocks.streamId slug
+                let blockId = System.Guid.NewGuid().ToString("N")
+                let blockData: ContentBlocks.ContentBlockData = {
+                    BlockId = blockId
+                    BlockType = request.BlockType
+                    Content = request.Content
+                    ImageRef = request.ImageRef
+                    Url = request.Url
+                    Caption = request.Caption
+                }
+                let result =
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Add_content_block (blockData, None))
+                        projectionHandlers
+                match result with
+                | Ok () -> return Ok blockId
+                | Error e -> return Error e
+            }
+
+            updateGameContentBlock = fun slug blockId request -> async {
+                let sid = ContentBlocks.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Update_content_block (blockId, request.Content, request.ImageRef, request.Url, request.Caption))
+                        projectionHandlers
+            }
+
+            removeGameContentBlock = fun slug blockId -> async {
+                let sid = ContentBlocks.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Remove_content_block blockId)
+                        projectionHandlers
+            }
+
+            getCatalogsForGame = fun slug -> async {
+                return CatalogProjection.getCatalogsForMovie conn slug
+            }
+
+            // Games Settings
+            getRawgApiKey = fun () -> async {
+                let key =
+                    SettingsStore.getSetting conn "rawg_api_key"
+                    |> Option.defaultValue ""
+                if key.Length > 4 then
+                    return sprintf "****%s" (key.Substring(key.Length - 4))
+                elif key.Length > 0 then
+                    return "****"
+                else
+                    return ""
+            }
+
+            setRawgApiKey = fun key -> async {
+                try
+                    SettingsStore.setSetting conn "rawg_api_key" key
+                    return Ok ()
+                with ex ->
+                    return Error $"Failed to save API key: {ex.Message}"
+            }
+
+            testRawgApiKey = fun key -> async {
+                try
+                    let testConfig: Rawg.RawgConfig = {
+                        ApiKey = key
+                    }
+                    let! _ = Rawg.searchGames httpClient testConfig "test"
+                    return Ok ()
+                with ex ->
+                    return Error $"RAWG API key validation failed: {ex.Message}"
             }
 
             importFromCinemarco = fun request -> async {

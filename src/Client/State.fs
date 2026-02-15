@@ -17,6 +17,8 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
     let movieDetailModel, movieDetailCmd = Pages.MovieDetail.State.init ""
     let seriesListModel, seriesListCmd = Pages.Series.State.init ()
     let seriesDetailModel, seriesDetailCmd = Pages.SeriesDetail.State.init ""
+    let gameListModel, gameListCmd = Pages.Games.State.init ()
+    let gameDetailModel, gameDetailCmd = Pages.GameDetail.State.init ""
     let friendListModel, friendListCmd = Pages.Friends.State.init ()
     let friendDetailModel, friendDetailCmd = Pages.FriendDetail.State.init ""
     let catalogListModel, catalogListCmd = Pages.Catalogs.State.init ()
@@ -32,6 +34,8 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
         MovieDetailModel = movieDetailModel
         SeriesListModel = seriesListModel
         SeriesDetailModel = seriesDetailModel
+        GameListModel = gameListModel
+        GameDetailModel = gameDetailModel
         FriendListModel = friendListModel
         FriendDetailModel = friendDetailModel
         CatalogListModel = catalogListModel
@@ -70,7 +74,9 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                     Query = q
                     SearchVersion = newVersion
                     IsSearchingTmdb = q <> ""
+                    IsSearchingRawg = q <> ""
                     TmdbResults = if q = "" then [] else searchModel.TmdbResults
+                    RawgResults = if q = "" then [] else searchModel.RawgResults
                     Error = None
             }
             let cmds =
@@ -88,16 +94,28 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                     return movieResults @ seriesResults
                 }
                 model,
-                Cmd.OfAsync.either
-                    (fun () -> searchBoth) ()
-                    (fun results -> Search_modal_msg (SearchModal.Tmdb_search_completed results))
-                    (fun ex -> Search_modal_msg (SearchModal.Tmdb_search_failed ex.Message))
+                Cmd.batch [
+                    Cmd.OfAsync.either
+                        (fun () -> searchBoth) ()
+                        (fun results -> Search_modal_msg (SearchModal.Tmdb_search_completed results))
+                        (fun ex -> Search_modal_msg (SearchModal.Tmdb_search_failed ex.Message))
+                    Cmd.OfAsync.either
+                        api.searchRawgGames searchModel.Query
+                        (fun results -> Search_modal_msg (SearchModal.Rawg_search_completed results))
+                        (fun ex -> Search_modal_msg (SearchModal.Rawg_search_failed ex.Message))
+                ]
 
         | SearchModal.Tmdb_search_completed results ->
             { model with SearchModal = Some { searchModel with TmdbResults = results; IsSearchingTmdb = false } }, Cmd.none
 
         | SearchModal.Tmdb_search_failed err ->
             { model with SearchModal = Some { searchModel with IsSearchingTmdb = false; Error = Some err } }, Cmd.none
+
+        | SearchModal.Rawg_search_completed results ->
+            { model with SearchModal = Some { searchModel with RawgResults = results; IsSearchingRawg = false } }, Cmd.none
+
+        | SearchModal.Rawg_search_failed err ->
+            { model with SearchModal = Some { searchModel with IsSearchingRawg = false; Error = Some err } }, Cmd.none
 
         | SearchModal.Import (tmdbId, mediaType) ->
             let importCmd =
@@ -112,6 +130,26 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                         api.addSeries tmdbId
                         (fun result -> Search_modal_msg (SearchModal.Import_completed (result |> Result.map (fun slug -> slug, MediaType.Series))))
                         (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
+                | MediaType.Game ->
+                    Cmd.none // Games use Import_rawg instead
+            { model with SearchModal = Some { searchModel with IsImporting = true; Error = None } }, importCmd
+
+        | SearchModal.Import_rawg rawgResult ->
+            let request: AddGameRequest = {
+                Name = rawgResult.Name
+                Year = rawgResult.Year |> Option.defaultValue 0
+                Genres = rawgResult.Genres
+                Description = ""
+                CoverRef = rawgResult.BackgroundImage
+                BackdropRef = rawgResult.BackgroundImage
+                RawgId = Some rawgResult.RawgId
+                RawgRating = rawgResult.Rating
+            }
+            let importCmd =
+                Cmd.OfAsync.either
+                    api.addGame request
+                    (fun result -> Search_modal_msg (SearchModal.Import_completed (result |> Result.map (fun slug -> slug, MediaType.Game))))
+                    (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
             { model with SearchModal = Some { searchModel with IsImporting = true; Error = None } }, importCmd
 
         | SearchModal.Import_completed result ->
@@ -123,6 +161,8 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                         Cmd.ofMsg (Movie_list_msg Pages.Movies.Types.Load_movies), ("movies", slug)
                     | MediaType.Series ->
                         Cmd.ofMsg (Series_list_msg Pages.Series.Types.Load_series), ("series", slug)
+                    | MediaType.Game ->
+                        Cmd.ofMsg (Game_list_msg Pages.Games.Types.Load_games), ("games", slug)
                 { model with SearchModal = None },
                 Cmd.batch [
                     reloadCmd
@@ -136,6 +176,7 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                 match mediaType with
                 | MediaType.Movie -> ("movies", slug)
                 | MediaType.Series -> ("series", slug)
+                | MediaType.Game -> ("games", slug)
             { model with SearchModal = None },
             Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate (fst navSegments, snd navSegments))
 
@@ -161,6 +202,14 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             let childModel, childCmd = Pages.SeriesDetail.State.init slug
             { model with SeriesDetailModel = childModel },
             Cmd.map Series_detail_msg childCmd
+        | Game_list ->
+            let childModel, childCmd = Pages.Games.State.init ()
+            { model with GameListModel = childModel },
+            Cmd.map Game_list_msg childCmd
+        | Game_detail slug ->
+            let childModel, childCmd = Pages.GameDetail.State.init slug
+            { model with GameDetailModel = childModel },
+            Cmd.map Game_detail_msg childCmd
         | Friend_list ->
             let childModel, childCmd = Pages.Friends.State.init ()
             { model with FriendListModel = childModel },
@@ -202,7 +251,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         | _ -> model, Cmd.none
 
     | Open_search_modal ->
-        { model with SearchModal = Some (SearchModal.init model.MovieListModel.Movies model.SeriesListModel.Series) }, Cmd.none
+        { model with SearchModal = Some (SearchModal.initWithGames model.MovieListModel.Movies model.SeriesListModel.Series model.GameListModel.Games) }, Cmd.none
 
     | Search_modal_msg childMsg ->
         updateSearchModal api childMsg model
@@ -214,7 +263,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Movie_list_msg childMsg ->
         match childMsg with
         | Pages.Movies.Types.Open_tmdb_search ->
-            { model with SearchModal = Some (SearchModal.init model.MovieListModel.Movies model.SeriesListModel.Series) }, Cmd.none
+            { model with SearchModal = Some (SearchModal.initWithGames model.MovieListModel.Movies model.SeriesListModel.Series model.GameListModel.Games) }, Cmd.none
         | _ ->
             let childModel, childCmd = Pages.Movies.State.update api childMsg model.MovieListModel
             { model with MovieListModel = childModel }, Cmd.map Movie_list_msg childCmd
@@ -226,7 +275,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Series_list_msg childMsg ->
         match childMsg with
         | Pages.Series.Types.Open_tmdb_search ->
-            { model with SearchModal = Some (SearchModal.init model.MovieListModel.Movies model.SeriesListModel.Series) }, Cmd.none
+            { model with SearchModal = Some (SearchModal.initWithGames model.MovieListModel.Movies model.SeriesListModel.Series model.GameListModel.Games) }, Cmd.none
         | _ ->
             let childModel, childCmd = Pages.Series.State.update api childMsg model.SeriesListModel
             { model with SeriesListModel = childModel }, Cmd.map Series_list_msg childCmd
@@ -234,6 +283,18 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Series_detail_msg childMsg ->
         let childModel, childCmd = Pages.SeriesDetail.State.update api childMsg model.SeriesDetailModel
         { model with SeriesDetailModel = childModel }, Cmd.map Series_detail_msg childCmd
+
+    | Game_list_msg childMsg ->
+        match childMsg with
+        | Pages.Games.Types.Open_search_modal ->
+            { model with SearchModal = Some (SearchModal.init model.MovieListModel.Movies model.SeriesListModel.Series) }, Cmd.none
+        | _ ->
+            let childModel, childCmd = Pages.Games.State.update api childMsg model.GameListModel
+            { model with GameListModel = childModel }, Cmd.map Game_list_msg childCmd
+
+    | Game_detail_msg childMsg ->
+        let childModel, childCmd = Pages.GameDetail.State.update api childMsg model.GameDetailModel
+        { model with GameDetailModel = childModel }, Cmd.map Game_detail_msg childCmd
 
     | Friend_list_msg childMsg ->
         let childModel, childCmd = Pages.Friends.State.update api childMsg model.FriendListModel
