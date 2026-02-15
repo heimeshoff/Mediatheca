@@ -110,6 +110,9 @@ type Msg =
     | Season_trailer_loaded of seasonNumber: int * key: string option
     | Open_trailer of key: string
     | Close_trailer
+    // Abandon
+    | Toggle_abandon_series
+    | Series_abandon_toggled of Result<unit, string>
     // Remove
     | Confirm_remove_series
     | Cancel_remove_series

@@ -363,6 +363,7 @@ type SeriesDetail = {
     TmdbRating: float option
     EpisodeRuntime: int option
     PersonalRating: int option
+    IsAbandoned: bool
     Cast: CastMemberDto list
     RecommendedBy: FriendRef list
     WantToWatchWith: FriendRef list
@@ -489,6 +490,8 @@ type IMediathecaApi = {
     searchTvSeries: string -> Async<TmdbSearchResult list>
     addSeries: int -> Async<Result<string, string>>
     removeSeries: string -> Async<Result<unit, string>>
+    abandonSeries: string -> Async<Result<unit, string>>
+    unabandonSeries: string -> Async<Result<unit, string>>
     getSeries: unit -> Async<SeriesListItem list>
     getSeriesDetail: string -> string option -> Async<SeriesDetail option>
     setSeriesPersonalRating: string -> int option -> Async<Result<unit, string>>

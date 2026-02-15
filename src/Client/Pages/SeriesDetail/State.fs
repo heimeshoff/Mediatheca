@@ -455,6 +455,23 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Close_trailer ->
         { model with ShowTrailer = None }, Cmd.none
 
+    | Toggle_abandon_series ->
+        let isAbandoned =
+            model.Detail |> Option.map (fun d -> d.IsAbandoned) |> Option.defaultValue false
+        let apiCall =
+            if isAbandoned then api.unabandonSeries model.Slug
+            else api.abandonSeries model.Slug
+        model,
+        Cmd.OfAsync.either
+            (fun () -> apiCall)
+            () Series_abandon_toggled (fun ex -> Series_abandon_toggled (Error ex.Message))
+
+    | Series_abandon_toggled (Ok ()) ->
+        model, Cmd.ofMsg Load_detail
+
+    | Series_abandon_toggled (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
     | Confirm_remove_series ->
         { model with ConfirmingRemove = true }, Cmd.none
 

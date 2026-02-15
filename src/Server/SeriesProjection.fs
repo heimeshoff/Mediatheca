@@ -40,7 +40,8 @@ module SeriesProjection =
                 status TEXT NOT NULL DEFAULT 'Unknown',
                 personal_rating INTEGER,
                 recommended_by TEXT NOT NULL DEFAULT '[]',
-                want_to_watch_with TEXT NOT NULL DEFAULT '[]'
+                want_to_watch_with TEXT NOT NULL DEFAULT '[]',
+                abandoned INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS series_seasons (
@@ -565,6 +566,18 @@ module SeriesProjection =
                     ]
                     |> Db.exec
 
+                | Series.Series_abandoned ->
+                    conn
+                    |> Db.newCommand "UPDATE series_detail SET abandoned = 1 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+
+                | Series.Series_unabandoned ->
+                    conn
+                    |> Db.newCommand "UPDATE series_detail SET abandoned = 0 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+
     let handler: Projection.ProjectionHandler = {
         Name = "SeriesProjection"
         Handle = handleEvent
@@ -651,7 +664,7 @@ module SeriesProjection =
 
     let getBySlug (conn: SqliteConnection) (slug: string) (rewatchId: string option) : Mediatheca.Shared.SeriesDetail option =
         conn
-        |> Db.newCommand "SELECT slug, name, year, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, episode_runtime, status, personal_rating, recommended_by, want_to_watch_with FROM series_detail WHERE slug = @slug"
+        |> Db.newCommand "SELECT slug, name, year, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, episode_runtime, status, personal_rating, recommended_by, want_to_watch_with, abandoned FROM series_detail WHERE slug = @slug"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
@@ -828,6 +841,7 @@ module SeriesProjection =
               PersonalRating =
                 if rd.IsDBNull(rd.GetOrdinal("personal_rating")) then None
                 else Some (rd.ReadInt32 "personal_rating")
+              IsAbandoned = rd.ReadInt32 "abandoned" = 1
               Cast = cast
               RecommendedBy = resolveFriendRefs conn recommendedBySlugs
               WantToWatchWith = resolveFriendRefs conn wantToWatchWithSlugs

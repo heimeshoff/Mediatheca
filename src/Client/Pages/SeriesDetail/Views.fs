@@ -1284,9 +1284,23 @@ let private overviewTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                             prop.text err
                         ]
                     | None -> ()
-                    // Remove series
+                    // Abandon series
                     Html.div [
                         prop.className "pt-4"
+                        prop.children [
+                            let isAbandoned = series.IsAbandoned
+                            Daisy.button.button [
+                                button.warning
+                                button.sm
+                                prop.className "w-full"
+                                prop.onClick (fun _ -> dispatch Toggle_abandon_series)
+                                prop.text (if isAbandoned then "Unabandon Series" else "Abandon Series")
+                            ]
+                        ]
+                    ]
+                    // Remove series
+                    Html.div [
+                        prop.className "pt-2"
                         prop.children [
                             if model.ConfirmingRemove then
                                 Html.div [

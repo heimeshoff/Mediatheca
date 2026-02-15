@@ -1104,6 +1104,32 @@ module Api =
                 | Error e -> return Error e
             }
 
+            abandonSeries = fun slug -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        Series.Abandon_series
+                        projectionHandlers
+            }
+
+            unabandonSeries = fun slug -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        Series.Unabandon_series
+                        projectionHandlers
+            }
+
             getSeries = fun () -> async {
                 return SeriesProjection.getAll conn
             }

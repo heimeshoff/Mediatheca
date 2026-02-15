@@ -1,11 +1,18 @@
 # Current State
 
-**Last Updated:** 2026-02-14
+**Last Updated:** 2026-02-15
 **Current Phase:** 6 (TV Series) — Implementation complete
 **Current Task:** All Phase 6 requirements implemented
 
 ## Recent Progress
 
+- **2026-02-15**: Add abandon/unabandon series feature
+  - New events: Series_abandoned, Series_unabandoned with full serialization
+  - New commands: Abandon_series, Unabandon_series with idempotent decide logic
+  - Abandoned bool field on ActiveSeries state, IsAbandoned on SeriesDetail DTO
+  - Projection: abandoned column on series_detail table
+  - API: abandonSeries/unabandonSeries endpoints
+  - UI: toggle button above Remove Series (warning style), text changes based on state
 - **2026-02-14**: Search modal two-column layout with keyboard navigation
   - TMDB results split into Movies (left) and Series (right) columns with divider
   - Full keyboard nav: ↑↓ navigate rows, ←→ switch columns, Enter imports, Esc closes

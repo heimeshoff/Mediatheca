@@ -111,6 +111,8 @@ module Series =
         | Episodes_watched_up_to of EpisodesWatchedUpToData
         | Season_marked_unwatched of SeasonMarkedUnwatchedData
         | Episode_watched_date_changed of EpisodeWatchedDateChangedData
+        | Series_abandoned
+        | Series_unabandoned
 
     // State
 
@@ -157,6 +159,7 @@ module Series =
         RecommendedBy: Set<string>
         WantToWatchWith: Set<string>
         RewatchSessions: Map<string, RewatchSessionState>
+        Abandoned: bool
     }
 
     type SeriesState =
@@ -187,6 +190,8 @@ module Series =
         | Mark_episodes_watched_up_to of EpisodesWatchedUpToData
         | Mark_season_unwatched of SeasonMarkedUnwatchedData
         | Change_episode_watched_date of EpisodeWatchedDateChangedData
+        | Abandon_series
+        | Unabandon_series
 
     // Evolve
 
@@ -242,6 +247,7 @@ module Series =
                 RecommendedBy = Set.empty
                 WantToWatchWith = Set.empty
                 RewatchSessions = Map.ofList [ "default", defaultSession ]
+                Abandoned = false
             }
         | Active _, Series_removed_from_library -> Removed
         | Active series, Series_categorized genres ->
@@ -328,6 +334,10 @@ module Series =
             | None -> state
         | Active _, Episode_watched_date_changed _ ->
             state // Dates are projection-only; aggregate only tracks watched/unwatched
+        | Active series, Series_abandoned ->
+            Active { series with Abandoned = true }
+        | Active series, Series_unabandoned ->
+            Active { series with Abandoned = false }
         | _ -> state
 
     let reconstitute (events: SeriesEvent list) : SeriesState =
@@ -435,6 +445,12 @@ module Series =
                     Ok [ Episode_watched_date_changed data ]
                 else Error "Episode is not watched"
             | None -> Error "Rewatch session does not exist"
+        | Active series, Abandon_series ->
+            if series.Abandoned then Ok []
+            else Ok [ Series_abandoned ]
+        | Active series, Unabandon_series ->
+            if not series.Abandoned then Ok []
+            else Ok [ Series_unabandoned ]
         | Removed, _ ->
             Error "Series has been removed"
         | Not_created, _ ->
@@ -676,6 +692,10 @@ module Series =
                 "Season_marked_unwatched", Encode.toString 0 (encodeSeasonMarkedUnwatchedData data)
             | Episode_watched_date_changed data ->
                 "Episode_watched_date_changed", Encode.toString 0 (encodeEpisodeWatchedDateChangedData data)
+            | Series_abandoned ->
+                "Series_abandoned", "{}"
+            | Series_unabandoned ->
+                "Series_unabandoned", "{}"
 
         let deserialize (eventType: string) (data: string) : SeriesEvent option =
             match eventType with
@@ -757,6 +777,10 @@ module Series =
                 Decode.fromString decodeEpisodeWatchedDateChangedData data
                 |> Result.toOption
                 |> Option.map Episode_watched_date_changed
+            | "Series_abandoned" ->
+                Some Series_abandoned
+            | "Series_unabandoned" ->
+                Some Series_unabandoned
             | _ -> None
 
         let toEventData (event: SeriesEvent) : EventStore.EventData =
