@@ -131,6 +131,130 @@ let view (model: Model) (dispatch: Msg -> unit) =
         // Divider
         Html.div [ prop.className "divider my-8" ]
 
+        // RAWG Integration section
+        Html.h2 [
+            prop.className "text-lg font-bold font-display mb-2"
+            prop.text "RAWG Integration"
+        ]
+        Html.p [
+            prop.className "text-base-content/70 mb-4"
+            prop.children [
+                Html.text "Enter your RAWG API key to enable game search and import. Get a free API key at "
+                Html.a [
+                    prop.href "https://rawg.io/apidocs"
+                    prop.target "_blank"
+                    prop.className "link link-primary"
+                    prop.text "rawg.io/apidocs"
+                ]
+                Html.text "."
+            ]
+        ]
+
+        // Current status
+        Html.div [
+            prop.className "mb-4"
+            prop.children [
+                if model.RawgApiKey <> "" then
+                    Daisy.badge [
+                        badge.success
+                        prop.className "gap-1"
+                        prop.text ("Configured: " + model.RawgApiKey)
+                    ]
+                else
+                    Daisy.badge [
+                        badge.warning
+                        prop.className "gap-1"
+                        prop.text "Not configured"
+                    ]
+            ]
+        ]
+
+        // API key input
+        Html.div [
+            prop.className "form-control mb-4"
+            prop.children [
+                Daisy.label [
+                    prop.className "label"
+                    prop.children [
+                        Html.span [
+                            prop.className "label-text"
+                            prop.text "API Key"
+                        ]
+                    ]
+                ]
+                Daisy.input [
+                    prop.type' "password"
+                    prop.className "w-full"
+                    prop.placeholder "Enter your RAWG API key..."
+                    prop.value model.RawgKeyInput
+                    prop.onChange (Rawg_key_input_changed >> dispatch)
+                ]
+            ]
+        ]
+
+        // Action buttons
+        Html.div [
+            prop.className "flex gap-2 mb-4"
+            prop.children [
+                Daisy.button.button [
+                    button.outline
+                    if model.IsTestingRawg then button.disabled
+                    prop.onClick (fun _ -> dispatch Test_rawg_key)
+                    prop.disabled (model.RawgKeyInput = "" || model.IsTestingRawg)
+                    prop.children [
+                        if model.IsTestingRawg then
+                            Daisy.loading [ loading.spinner; loading.sm ]
+                        Html.text "Test Connection"
+                    ]
+                ]
+                Daisy.button.button [
+                    button.primary
+                    if model.IsSavingRawg then button.disabled
+                    prop.onClick (fun _ -> dispatch Save_rawg_key)
+                    prop.disabled (model.RawgKeyInput = "" || model.IsSavingRawg)
+                    prop.children [
+                        if model.IsSavingRawg then
+                            Daisy.loading [ loading.spinner; loading.sm ]
+                        Html.text "Save"
+                    ]
+                ]
+            ]
+        ]
+
+        // Feedback messages
+        match model.RawgTestResult with
+        | Some (Ok msg) ->
+            Daisy.alert [
+                alert.success
+                prop.className "mb-2"
+                prop.text msg
+            ]
+        | Some (Error msg) ->
+            Daisy.alert [
+                alert.error
+                prop.className "mb-2"
+                prop.text msg
+            ]
+        | None -> ()
+
+        match model.RawgSaveResult with
+        | Some (Ok msg) ->
+            Daisy.alert [
+                alert.success
+                prop.className "mb-2"
+                prop.text msg
+            ]
+        | Some (Error msg) ->
+            Daisy.alert [
+                alert.error
+                prop.className "mb-2"
+                prop.text msg
+            ]
+        | None -> ()
+
+        // Divider
+        Html.div [ prop.className "divider my-8" ]
+
         // Cinemarco Import section
         Html.h2 [
             prop.className "text-lg font-bold font-display mb-2"

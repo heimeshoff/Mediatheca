@@ -1,11 +1,27 @@
 # Current State
 
 **Last Updated:** 2026-02-15
-**Current Phase:** 6 (TV Series) — Implementation complete
-**Current Task:** All Phase 6 requirements implemented
+**Current Phase:** 7A (Game Catalog + Play Sessions) — Implementation complete
+**Current Task:** All Phase 7A requirements implemented
 
 ## Recent Progress
 
+- **2026-02-15**: Search modal: only search active tab's API, preserve tab on typing
+  - Active tab persists across query changes (no reset to Movies on every keystroke)
+  - Only the active tab's API is called (TMDB for Movies/Series, RAWG for Games)
+  - Switching tabs triggers a fresh search only if the new tab has no cached results
+  - Removed result count badges from tab buttons (unnecessary with single-tab search)
+  - ActiveTab moved from local React state to Elmish model (needed for API routing in State.fs)
+  - Stale inactive-tab results cleared on query change to prevent showing old data on tab switch
+- **2026-02-15**: Search modal tabbed interface with unified keyboard navigation
+  - External results (Movies, Series, Games) now displayed as tabs — only one visible at a time
+  - Tab key cycles between tabs (Shift+Tab reverses), replacing left/right arrow column switching
+  - Unified focus: library results and tab results never simultaneously selected
+  - Down arrow from end of library enters active tab; Up arrow from top of tab returns to library
+  - Games tab now fully keyboard-navigable (was mouse-only before)
+  - Extracted renderRawgItem helper for consistent game result rendering
+  - Modal narrowed to max-w-2xl (single column instead of two-column layout)
+  - Updated keyboard hints footer: "tab switch" replaces "←→ switch"
 - **2026-02-15**: Series overview card status line redesign
   - Episode count and status now on one line: progress left, status right
   - Abandoned series show "Abandoned" in red (text-error)
@@ -151,8 +167,14 @@
 
 ## Active Decisions
 
+- **Game aggregate — MODELED**: RAWG API import + manual creation, GameStatus lifecycle (Backlog/Playing/Completed/Abandoned/OnHold), game store ownership (predefined list), Steam Family ownership tracking (friendSlugs), play sessions with duration + friends, social parity with Movies/Series, content blocks, polymorphic catalog entries (Movie | Series | Game) (decided: 2026-02-15)
+- **Game stores are digital storefronts** (where you bought/own the game), not hardware platforms: Steam, Nintendo eShop, GOG, Epic Games Store, PlayStation Store, Xbox Store, Humble Bundle, itch.io — with ability to add custom stores in the future (decided: 2026-02-15)
+- **Steam Family ownership**: Games can be marked as owned by a Steam Family member (friendSlug). Configuration in Settings maps Steam IDs to Friends. A game can be both personally owned AND available via family members. Import in Phase 7B, manual tagging in Phase 7A (decided: 2026-02-15)
+- **RAWG API for game metadata** (like TMDB for movies): search, import metadata + images. Free tier. API key in Settings (decided: 2026-02-15)
+- **Play session duration is user-entered** (unlike Movies where duration = runtime). Games don't have a fixed runtime (decided: 2026-02-15)
+- **REQ-102c (TV Series Dashboard) deferred** — skipped for now, focus on Games. Moved to v2 backlog (decided: 2026-02-15)
 - **TV Series aggregate — MODELED (revised after Cinemarco analysis)**: Single aggregate per series, fat TMDB import event, named rewatch sessions (default personal + named sessions with friends, each tracking independent episode progress), batch operations (mark season watched, mark episodes up to S02E05), series status from TMDB (Returning/Ended/Canceled/InProduction/Planned), "next up" derived from progress, series-level cast (non-event-sourced), full social parity with Movies, polymorphic catalog entries (Movie | Series) (decided: 2026-02-14)
-- Movies-only for v1 MVP (decided: 2026-01-30)
+- Movies-only for v1 MVP — **superseded**: v1 now includes Movies, Series, and Games (decided: 2026-01-30, updated: 2026-02-15)
 - SQLite-based event store, single file for events + read models (decided: 2026-01-30)
 - Local filesystem for image storage (decided: 2026-01-30)
 - F# end-to-end: Fable + Giraffe + Fable.Remoting (decided: 2026-01-30)
@@ -402,6 +424,175 @@ Events: Friend_added, Friend_updated, Friend_removed
 
 - (none)
 
+## Domain Model — Phase 7A (Games) — Modeled
+
+### Game Aggregate — `src/Server/Games.fs`
+
+**Stream:** `Game-{slug}` where slug = `slugify(name)-year`
+
+**Events:**
+
+*Import & lifecycle:*
+- `Game_added_to_library of GameAddedData` — fat import (RAWG or manual): name, year, genres, description, coverRef, backdropRef, rawgId, rawgRating
+- `Game_removed_from_library`
+
+*Metadata updates:*
+- `Game_categorized of string list` — genre update
+- `Game_cover_replaced of string` — new cover ref
+- `Game_backdrop_replaced of string` — new backdrop ref
+- `Game_personal_rating_set of int option` — 1-5 rating
+- `Game_status_changed of GameStatus` — Backlog/Playing/Completed/Abandoned/OnHold
+- `Game_hltb_hours_set of float option` — manual entry (API import in Phase 7B)
+
+*Store ownership:*
+- `Game_store_added of string` — store identifier ("steam", "gog", etc.)
+- `Game_store_removed of string`
+
+*Steam Family ownership:*
+- `Game_family_owner_added of string` — friendSlug (family member owns this game)
+- `Game_family_owner_removed of string` — friendSlug
+
+*Social (same pattern as Movies/Series):*
+- `Game_recommended_by of string` — friendSlug
+- `Game_recommendation_removed of string` — friendSlug
+- `Want_to_play_with of string` — friendSlug
+- `Removed_want_to_play_with of string` — friendSlug
+
+*Play sessions:*
+- `Play_session_recorded of PlaySessionData` — sessionId, date, durationMinutes, friendSlugs
+- `Play_session_date_changed of PlaySessionDateChangedData` — sessionId, newDate
+- `Play_session_duration_changed of PlaySessionDurationChangedData` — sessionId, newDurationMinutes
+- `Friend_added_to_play_session of PlaySessionFriendData` — sessionId, friendSlug
+- `Friend_removed_from_play_session of PlaySessionFriendData` — sessionId, friendSlug
+
+**State:**
+```
+GameState = Not_created | Active of ActiveGame | Removed
+
+GameStatus = Backlog | Playing | Completed | Abandoned | OnHold
+
+ActiveGame = {
+    Name: string
+    Year: int
+    Genres: string list
+    Description: string
+    CoverRef: string option
+    BackdropRef: string option
+    RawgId: int option
+    RawgRating: float option
+    HowLongToBeatHours: float option
+    PersonalRating: int option
+    Status: GameStatus
+    Stores: Set<string>                     // store identifiers where I own it
+    FamilyOwners: Set<string>               // friendSlugs who own it (Steam Family)
+    RecommendedBy: Set<string>              // friendSlugs
+    WantToPlayWith: Set<string>             // friendSlugs
+    PlaySessions: Map<string, PlaySessionState>  // sessionId → session
+}
+
+PlaySessionState = {
+    SessionId: string
+    Date: string
+    DurationMinutes: int
+    Friends: Set<string>                    // friendSlugs
+}
+```
+
+**Import Data (for fat event):**
+```
+GameAddedData = {
+    Name: string; Year: int; Genres: string list; Description: string
+    CoverRef: string option; BackdropRef: string option
+    RawgId: int option; RawgRating: float option
+}
+```
+
+**Key behaviors:**
+- `Game_added_to_library` creates the game with default status `Backlog`
+- `Game_status_changed` is the primary lifecycle event — Backlog → Playing → Completed/Abandoned/OnHold
+- Play sessions accumulate total play time (sum of all session durations) — projected onto game_list and game_detail
+- Store ownership and family ownership are independent: a game can be personally owned on GOG AND available via a family member on Steam
+- Content blocks: separate aggregate `ContentBlocks-{gameSlug}` (same pattern as Movies/Series)
+- Catalog integration: `MediaType` gains `Game` variant alongside `Movie` and `Series`
+
+**Predefined game stores:** Steam, Nintendo eShop, GOG, Epic Games Store, PlayStation Store, Xbox Store, Humble Bundle, itch.io
+
+### Projection Tables (GameProjection)
+
+- `game_list`: slug, name, year, cover_ref, genres (JSON), status, total_play_time, hltb_hours, personal_rating, rawg_rating
+- `game_detail`: slug, name, year, description, cover_ref, backdrop_ref, genres (JSON), status, rawg_id, rawg_rating, hltb_hours, personal_rating, stores (JSON), family_owners (JSON), recommended_by (JSON), want_to_play_with (JSON), total_play_time
+- `play_sessions`: session_id (PK), game_slug, date, duration_minutes, friends (JSON)
+
+### RAWG Integration
+
+- `searchGames`: `/games?search=...` endpoint → search results
+- `getGameDetails`: `/games/{id}` → game metadata + screenshots
+- Image downloads: covers → `images/posters/game-{slug}.jpg`, backgrounds → `images/backdrops/game-{slug}.jpg`
+- API key stored in Settings table (like TMDB)
+
+### Shared DTOs
+
+- `GameListItem`: Slug, Name, Year, CoverRef, Genres, Status, TotalPlayTimeMinutes, HltbHours, PersonalRating, RawgRating
+- `GameDetail`: Full aggregate view + Stores + FamilyOwners + ContentBlocks + CatalogRefs
+- `PlaySessionDto`: SessionId, Date, DurationMinutes, Friends (FriendRef list)
+- `GameStatus` = Backlog | Playing | Completed | Abandoned | OnHold
+- `GameStoreInfo`: predefined store list for UI dropdowns
+
+### API Endpoints (added to IMediathecaApi)
+
+*Import & lifecycle:*
+- `searchRawgGames: string -> Async<RawgSearchResult list>`
+- `addGame: AddGameRequest -> Async<Result<string, string>>` — RAWG import or manual creation
+- `removeGame: string -> Async<Result<unit, string>>`
+
+*Read:*
+- `getGames: unit -> Async<GameListItem list>`
+- `getGameDetail: string -> Async<GameDetail option>`
+- `getCatalogsForGame: string -> Async<CatalogRef list>`
+
+*Metadata & social:*
+- `setGamePersonalRating: string -> int option -> Async<Result<unit, string>>`
+- `setGameStatus: string -> GameStatus -> Async<Result<unit, string>>`
+- `setGameHltbHours: string -> float option -> Async<Result<unit, string>>`
+- `addGameRecommendation: string -> string -> Async<Result<unit, string>>`
+- `removeGameRecommendation: string -> string -> Async<Result<unit, string>>`
+- `addGameWantToPlayWith: string -> string -> Async<Result<unit, string>>`
+- `removeGameWantToPlayWith: string -> string -> Async<Result<unit, string>>`
+
+*Store & family ownership:*
+- `addGameStore: string -> string -> Async<Result<unit, string>>` — gameSlug, store
+- `removeGameStore: string -> string -> Async<Result<unit, string>>`
+- `addGameFamilyOwner: string -> string -> Async<Result<unit, string>>` — gameSlug, friendSlug
+- `removeGameFamilyOwner: string -> string -> Async<Result<unit, string>>`
+
+*Play sessions:*
+- `recordPlaySession: string -> RecordPlaySessionRequest -> Async<Result<unit, string>>` — gameSlug, date + duration + friends
+- `changePlaySessionDate: string -> ChangePlaySessionDateRequest -> Async<Result<unit, string>>`
+- `changePlaySessionDuration: string -> ChangePlaySessionDurationRequest -> Async<Result<unit, string>>`
+- `addFriendToPlaySession: string -> string -> string -> Async<Result<unit, string>>` — gameSlug, sessionId, friendSlug
+- `removeFriendFromPlaySession: string -> string -> string -> Async<Result<unit, string>>`
+
+*Content blocks:*
+- Reuse existing content block endpoints with game slugs
+
+*RAWG:*
+- `getRawgApiKey: unit -> Async<string option>`
+- `setRawgApiKey: string -> Async<unit>`
+- `testRawgApiKey: string -> Async<bool>`
+
+### Client Pages
+
+- `Game_list` page at `/games` — poster grid/list with search, GameStatus filter badges (Backlog/Playing/Completed/Abandoned/OnHold)
+- `Game_detail` page at `/games/{slug}` — hero with backdrop, info section, play sessions timeline, store badges, family owners (friend pills), social sidebar (same layout pattern as Movies/Series)
+- Navigation: add "Games" to sidebar and bottom nav (gamepad icon)
+- Settings page: add RAWG API key input (same pattern as TMDB)
+
+### Steam Family Configuration (Phase 7B, but data model designed now)
+
+- Settings table entries: `steam_family_members` → JSON array of `{ steamId: string, steamName: string, friendSlug: string }`
+- Settings page UI: configure Steam Family members, link each to a Friend
+- Used during Steam import to automatically tag games with family owners
+
 ## Full Progress History
 
 - 2026-01-30 Brainstorm completed — PROJECT.md created with full vision
@@ -413,10 +604,13 @@ Events: Friend_added, Friend_updated, Friend_removed
 - 2026-02-08 Phase 4 implementation complete — all 7 requirements done (REQ-022 through REQ-028)
 - 2026-02-14 Phase 5 (Design System / Style Guide) complete — all 5 requirements done (REQ-029 through REQ-033)
 - 2026-02-14 Phase 6 (TV Series) implementation complete — 7 of 8 requirements done (REQ-100 through REQ-102b)
+- 2026-02-15 Phase 7 (Games) planning complete — 10 requirements defined (REQ-200 through REQ-209)
+- 2026-02-15 Phase 7A (Game Catalog + Play Sessions) implementation complete — all 7 requirements done (REQ-200 through REQ-206)
 
 ## Next Actions
 
-1. **REQ-102c: TV Series Dashboard** — episode progress across all series, next-to-watch, watch time stats
-2. Wire TMDB series search into the SearchModal (currently movies only)
-3. Polish Series detail page (visual refinements, mobile responsiveness)
-4. Fix pre-existing integration test failures (missing friend_list table in test setup)
+1. **REQ-207: Games Dashboard** — currently playing, recent sessions, play time stats, completion vs HowLongToBeat
+2. **REQ-208: Steam integration** — import personal + family libraries, Steam Family member configuration
+3. **REQ-209: HowLongToBeat integration** — fetch average completion times
+4. Polish Game detail page (visual refinements, mobile responsiveness)
+5. Fix pre-existing integration test failures (missing friend_list table in test setup)

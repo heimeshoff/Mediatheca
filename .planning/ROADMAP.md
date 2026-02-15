@@ -9,7 +9,9 @@
 | 3 | Journal + Content Blocks | :white_check_mark: Done | REQ-016, REQ-017, REQ-018, REQ-019, REQ-020, REQ-021 |
 | 4 | Curation + Dashboards + Admin | :white_check_mark: Done | REQ-022, REQ-023, REQ-024, REQ-025, REQ-026, REQ-027, REQ-028 |
 | 5 | Design System (Style Guide) | :white_check_mark: Done | REQ-029, REQ-030, REQ-031, REQ-032, REQ-033 |
-| 6 | TV Series | :white_check_mark: Done | REQ-100, REQ-101, REQ-101a, REQ-101b, REQ-102, REQ-102a, REQ-102b, REQ-102c |
+| 6 | TV Series | :white_check_mark: Done | REQ-100, REQ-101, REQ-101a, REQ-101b, REQ-102, REQ-102a, REQ-102b |
+| 7A | Game Catalog + Play Sessions | :white_check_mark: Done | REQ-200, REQ-201, REQ-202, REQ-203, REQ-204, REQ-205, REQ-206 |
+| 7B | Games Dashboard + Steam Integration | Planned | REQ-207, REQ-208, REQ-209 |
 
 ### Phase 1: Skeleton
 
@@ -85,7 +87,30 @@ Deliverable: Users can add TV series via TMDB import, browse seasons and episode
 - Polymorphic catalog entries: catalogs can hold Movies and Series
 - TV Series dashboard: episode progress, next-to-watch across all series
 
-**Status: Domain model complete. Ready for implementation.**
+### Phase 7A: Game Catalog + Play Sessions
+
+Deliverable: Users can add games via RAWG import or manual creation, track play sessions with friends, manage game status (Backlog/Playing/Completed/Abandoned/OnHold), and record which stores and Steam Family members own each game.
+
+- Game aggregate with RAWG API import (search, import metadata + images) and manual creation
+- GameStatus lifecycle: Backlog → Playing → Completed/Abandoned/OnHold
+- Game store ownership tracking (Steam, Nintendo eShop, GOG, Epic, PlayStation Store, Xbox Store, Humble Bundle, itch.io)
+- Steam Family ownership: mark games as owned by family members (friendSlugs) vs personally owned
+- Play session tracking: date, duration (user-entered minutes), friends present, accumulated total play time
+- Social features: recommended_by, want_to_play_with, personal_rating, content_blocks (full parity with Movies/Series)
+- Game list page with poster grid/list, search, GameStatus filter badges
+- Game detail page with hero, info, play sessions, store badges, family owners, social sidebar
+- Polymorphic catalog entries: Movie | Series | Game
+- Unified search modal (Ctrl+K): add Games column with RAWG results
+- Friend detail page: show game associations (recommended, want to play with, played together)
+
+### Phase 7B: Games Dashboard + Steam Integration
+
+Deliverable: Games dashboard with play stats and completion tracking, Steam library import with family sharing support, HowLongToBeat completion time comparison.
+
+- Games Dashboard: currently playing, recent sessions, total play time, completion progress vs HowLongToBeat, games by status
+- Steam integration: import personal library + Steam Family members' libraries via Steam Web API
+- Steam Family configuration in Settings: map Steam IDs to Friends
+- HowLongToBeat integration: fetch average completion times, display comparison on game detail and dashboard
 
 ## Completed Milestones
 
@@ -93,3 +118,5 @@ Deliverable: Users can add TV series via TMDB import, browse seasons and episode
 - Phase 2: Catalog + Friends (2026-02-01)
 - Phase 3: Journal + Content Blocks (2026-02-08)
 - Phase 4: Curation + Dashboards + Admin (2026-02-08)
+- Phase 5: Design System (2026-02-14)
+- Phase 6: TV Series (2026-02-15)

@@ -17,7 +17,7 @@ let private readFileAsBytes (file: Browser.Types.File) (onDone: byte array * str
         onDone (uint8Array, file.name)
     reader.readAsArrayBuffer(file)
 
-let private routeForMedia (mediaType: MediaType) = match mediaType with | Movie -> "movies" | Series -> "series"
+let private routeForMedia (mediaType: MediaType) = match mediaType with | Movie -> "movies" | Series -> "series" | Game -> "games"
 
 let private mediaListRow (item: EntryList.EntryItem) =
     Html.a [
@@ -47,6 +47,11 @@ let private mediaListRow (item: EntryList.EntryItem) =
                                         Html.span [
                                             prop.className "badge badge-xs badge-outline badge-warning flex-none"
                                             prop.text "Series"
+                                        ]
+                                    elif item.RoutePrefix = "games" then
+                                        Html.span [
+                                            prop.className "badge badge-xs badge-outline badge-info flex-none"
+                                            prop.text "Game"
                                         ]
                                 ]
                             ]
@@ -90,14 +95,19 @@ let private watchedMediaListRow (watchedBySlug: Map<string, FriendWatchedItem>) 
                                             prop.className "badge badge-xs badge-outline badge-warning flex-none"
                                             prop.text "Series"
                                         ]
+                                    elif item.RoutePrefix = "games" then
+                                        Html.span [
+                                            prop.className "badge badge-xs badge-outline badge-info flex-none"
+                                            prop.text "Game"
+                                        ]
                                 ]
                             ]
                             Html.p [
                                 prop.className "text-xs text-base-content/50"
                                 prop.text (
                                     match Map.tryFind item.Slug watchedBySlug with
-                                    | Some w -> w.Dates |> String.concat ", "
-                                    | None -> string item.Year
+                                    | Some w when not (List.isEmpty w.Dates) -> w.Dates |> String.concat ", "
+                                    | _ -> string item.Year
                                 )
                             ]
                         ]

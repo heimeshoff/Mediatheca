@@ -22,9 +22,12 @@ module Slug =
     let seriesSlug (name: string) (year: int) =
         sprintf "%s-%d" (slugify name) year
 
+    let gameSlug (name: string) (year: int) =
+        sprintf "%s-%d" (slugify name) year
+
 // Search
 
-type MediaType = Movie | Series
+type MediaType = Movie | Series | Game
 
 type LibrarySearchResult = {
     Slug: string
@@ -215,11 +218,13 @@ type CatalogRef = {
 type DashboardStats = {
     MovieCount: int
     SeriesCount: int
+    GameCount: int
     FriendCount: int
     CatalogCount: int
     WatchSessionCount: int
     TotalWatchTimeMinutes: int
     SeriesWatchTimeMinutes: int
+    TotalPlayTimeMinutes: int
 }
 
 type RecentActivityItem = {
@@ -418,6 +423,69 @@ type UpdateEpisodeWatchedDateRequest = {
     Date: string
 }
 
+// Games
+
+type GameStatus =
+    | Backlog
+    | Playing
+    | Completed
+    | Abandoned
+    | OnHold
+
+type RawgSearchResult = {
+    RawgId: int
+    Name: string
+    Year: int option
+    BackgroundImage: string option
+    Rating: float option
+    Genres: string list
+}
+
+type GameListItem = {
+    Slug: string
+    Name: string
+    Year: int
+    CoverRef: string option
+    Genres: string list
+    Status: GameStatus
+    TotalPlayTimeMinutes: int
+    HltbHours: float option
+    PersonalRating: int option
+    RawgRating: float option
+}
+
+type GameDetail = {
+    Slug: string
+    Name: string
+    Year: int
+    Description: string
+    CoverRef: string option
+    BackdropRef: string option
+    Genres: string list
+    Status: GameStatus
+    RawgId: int option
+    RawgRating: float option
+    HltbHours: float option
+    PersonalRating: int option
+    Stores: string list
+    FamilyOwners: FriendRef list
+    RecommendedBy: FriendRef list
+    WantToPlayWith: FriendRef list
+    PlayedWith: FriendRef list
+    ContentBlocks: ContentBlockDto list
+}
+
+type AddGameRequest = {
+    Name: string
+    Year: int
+    Genres: string list
+    Description: string
+    CoverRef: string option
+    BackdropRef: string option
+    RawgId: int option
+    RawgRating: float option
+}
+
 // Import
 
 type ImportFromCinemarcoRequest = {
@@ -536,6 +604,34 @@ type IMediathecaApi = {
     updateSeriesContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
     removeSeriesContentBlock: string -> string -> Async<Result<unit, string>>
     getCatalogsForSeries: string -> Async<CatalogRef list>
+    // Games
+    searchRawgGames: string -> Async<RawgSearchResult list>
+    addGame: AddGameRequest -> Async<Result<string, string>>
+    removeGame: string -> Async<Result<unit, string>>
+    getGames: unit -> Async<GameListItem list>
+    getGameDetail: string -> Async<GameDetail option>
+    setGameStatus: string -> GameStatus -> Async<Result<unit, string>>
+    setGamePersonalRating: string -> int option -> Async<Result<unit, string>>
+    setGameHltbHours: string -> float option -> Async<Result<unit, string>>
+    addGameRecommendation: string -> string -> Async<Result<unit, string>>
+    removeGameRecommendation: string -> string -> Async<Result<unit, string>>
+    addGameWantToPlayWith: string -> string -> Async<Result<unit, string>>
+    removeGameWantToPlayWith: string -> string -> Async<Result<unit, string>>
+    addGameStore: string -> string -> Async<Result<unit, string>>
+    removeGameStore: string -> string -> Async<Result<unit, string>>
+    addGameFamilyOwner: string -> string -> Async<Result<unit, string>>
+    removeGameFamilyOwner: string -> string -> Async<Result<unit, string>>
+    addGamePlayedWith: string -> string -> Async<Result<unit, string>>
+    removeGamePlayedWith: string -> string -> Async<Result<unit, string>>
+    getGameContentBlocks: string -> Async<ContentBlockDto list>
+    addGameContentBlock: string -> AddContentBlockRequest -> Async<Result<string, string>>
+    updateGameContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
+    removeGameContentBlock: string -> string -> Async<Result<unit, string>>
+    getCatalogsForGame: string -> Async<CatalogRef list>
+    // Games Settings
+    getRawgApiKey: unit -> Async<string>
+    setRawgApiKey: string -> Async<Result<unit, string>>
+    testRawgApiKey: string -> Async<Result<unit, string>>
     // Import
     importFromCinemarco: ImportFromCinemarcoRequest -> Async<Result<ImportResult, string>>
 }
