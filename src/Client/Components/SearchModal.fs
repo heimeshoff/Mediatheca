@@ -5,6 +5,8 @@ open Feliz.DaisyUI
 open Fable.Core.JsInterop
 open Mediatheca.Shared
 
+type SearchTab = Library | Movies | Series | Games
+
 type Model = {
     Query: string
     LibraryMovies: MovieListItem list
@@ -17,12 +19,12 @@ type Model = {
     IsImporting: bool
     Error: string option
     SearchVersion: int
-    ActiveTab: MediaType
+    ActiveTab: SearchTab
 }
 
 type Msg =
     | Query_changed of string
-    | Tab_changed of MediaType
+    | Tab_changed of SearchTab
     | Debounce_tmdb_expired of version: int
     | Tmdb_search_completed of TmdbSearchResult list
     | Tmdb_search_failed of string
@@ -46,7 +48,7 @@ let init (movies: MovieListItem list) (series: SeriesListItem list) : Model = {
     IsImporting = false
     Error = None
     SearchVersion = 0
-    ActiveTab = Movie
+    ActiveTab = Library
 }
 
 let initWithGames (movies: MovieListItem list) (series: SeriesListItem list) (games: GameListItem list) : Model = {
@@ -61,7 +63,7 @@ let initWithGames (movies: MovieListItem list) (series: SeriesListItem list) (ga
     IsImporting = false
     Error = None
     SearchVersion = 0
-    ActiveTab = Movie
+    ActiveTab = Library
 }
 
 let filterLibrary (query: string) (movies: MovieListItem list) (series: SeriesListItem list) (games: GameListItem list) : LibrarySearchResult list =
@@ -121,9 +123,9 @@ let private renderTmdbItem (result: TmdbSearchResult) (isSelected: bool) (onImpo
                     prop.className "w-10 h-15 rounded bg-base-300 flex items-center justify-center flex-shrink-0"
                     prop.children [
                         match result.MediaType with
-                        | Movie -> Icons.movie ()
-                        | Series -> Icons.tv ()
-                        | Game -> Icons.gamepad ()
+                        | MediaType.Movie -> Icons.movie ()
+                        | MediaType.Series -> Icons.tv ()
+                        | MediaType.Game -> Icons.gamepad ()
                     ]
                 ]
             Html.div [
@@ -189,7 +191,6 @@ let private renderRawgItem (result: RawgSearchResult) (isSelected: bool) (onImpo
 [<ReactComponent>]
 let view (model: Model) (dispatch: Msg -> unit) =
     let selRow, setSelRow = React.useState(-1)
-    let inLibrary, setInLibrary = React.useState(false)
     let activeTab = model.ActiveTab
 
     let localResults = filterLibrary model.Query model.LibraryMovies model.LibrarySeries model.LibraryGames
@@ -210,32 +211,29 @@ let view (model: Model) (dispatch: Msg -> unit) =
     let isInLibrary (r: TmdbSearchResult) =
         let key = r.Title.ToLowerInvariant(), r.Year |> Option.defaultValue 0
         match r.MediaType with
-        | Movie -> libraryMovieKeys |> Set.contains key
-        | Series -> librarySeriesKeys |> Set.contains key
-        | Game -> false
+        | MediaType.Movie -> libraryMovieKeys |> Set.contains key
+        | MediaType.Series -> librarySeriesKeys |> Set.contains key
+        | MediaType.Game -> false
     let isGameInLibrary (r: RawgSearchResult) =
         let key = r.Name.ToLowerInvariant(), r.Year |> Option.defaultValue 0
         libraryGameKeys |> Set.contains key
 
-    let movieResults = model.TmdbResults |> List.filter (fun r -> r.MediaType = Movie && not (isInLibrary r))
-    let seriesResults = model.TmdbResults |> List.filter (fun r -> r.MediaType = Series && not (isInLibrary r))
+    let movieResults = model.TmdbResults |> List.filter (fun r -> r.MediaType = MediaType.Movie && not (isInLibrary r))
+    let seriesResults = model.TmdbResults |> List.filter (fun r -> r.MediaType = MediaType.Series && not (isInLibrary r))
     let gameResults = model.RawgResults |> List.filter (fun r -> not (isGameInLibrary r))
 
-    let tabResultCount (tab: MediaType) =
+    let tabResultCount (tab: SearchTab) =
         match tab with
-        | Movie -> List.length movieResults
+        | Library -> List.length localResults
+        | Movies -> List.length movieResults
         | Series -> List.length seriesResults
-        | Game -> List.length gameResults
+        | Games -> List.length gameResults
 
-    let tabOrder = [| Movie; Series; Game |]
-
-    let firstTabWithResults () =
-        tabOrder |> Array.tryFind (fun t -> tabResultCount t > 0)
+    let tabOrder = [| Library; Movies; Series; Games |]
 
     // Reset selection when search query changes (but preserve active tab)
     React.useEffect((fun () ->
         setSelRow -1
-        setInLibrary false
     ), [| box model.SearchVersion |])
 
     // Scroll selected item into view
@@ -243,7 +241,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
         let el = Browser.Dom.document.querySelector("[data-search-selected='true']")
         if not (isNull el) then
             el?scrollIntoView({| block = "nearest" |})
-    ), [| box selRow; box activeTab; box inLibrary |])
+    ), [| box selRow; box activeTab |])
 
     let handleKeyDown (e: Browser.Types.KeyboardEvent) =
         match e.key with
@@ -255,73 +253,55 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 else (idx + 1) % tabOrder.Length
             let nextTab = tabOrder.[nextIdx]
             dispatch (Tab_changed nextTab)
-            if not inLibrary && selRow >= 0 then
+            if selRow >= 0 then
                 let len = tabResultCount nextTab
                 setSelRow (if len > 0 then min selRow (len - 1) else -1)
         | "ArrowDown" ->
             e.preventDefault()
+            let len = tabResultCount activeTab
             if selRow < 0 then
-                // Nothing selected — enter library first, then active tab
-                if not (List.isEmpty localResults) then setSelRow 0; setInLibrary true
-                elif tabResultCount activeTab > 0 then setSelRow 0; setInLibrary false
-                else
-                    match firstTabWithResults () with
-                    | Some t -> dispatch (Tab_changed t); setSelRow 0; setInLibrary false
-                    | None -> ()
-            elif inLibrary then
-                if selRow < List.length localResults - 1 then setSelRow (selRow + 1)
-                else
-                    // Past end of library — enter active tab
-                    if tabResultCount activeTab > 0 then setSelRow 0; setInLibrary false
-                    else
-                        match firstTabWithResults () with
-                        | Some t -> dispatch (Tab_changed t); setSelRow 0; setInLibrary false
-                        | None -> ()
-            else
-                let len = tabResultCount activeTab
-                if selRow < len - 1 then setSelRow (selRow + 1)
+                if len > 0 then setSelRow 0
+            elif selRow < len - 1 then
+                setSelRow (selRow + 1)
         | "ArrowUp" ->
             e.preventDefault()
-            if inLibrary then
-                if selRow > 0 then setSelRow (selRow - 1)
-                elif selRow = 0 then setSelRow -1; setInLibrary false
-            else
-                if selRow > 0 then setSelRow (selRow - 1)
-                elif selRow = 0 then
-                    if not (List.isEmpty localResults) then
-                        setSelRow (List.length localResults - 1); setInLibrary true
-                    else setSelRow -1
+            if selRow > 0 then setSelRow (selRow - 1)
+            elif selRow = 0 then setSelRow -1
         | "Enter" ->
             if selRow >= 0 then
                 e.preventDefault()
-                if inLibrary then
+                match activeTab with
+                | Library ->
                     match localResults |> List.tryItem selRow with
                     | Some r -> dispatch (Navigate_to (r.Slug, r.MediaType))
                     | None -> ()
-                else
-                    match activeTab with
-                    | Game ->
-                        match gameResults |> List.tryItem selRow with
-                        | Some r -> dispatch (Import_rawg r)
-                        | None -> ()
-                    | _ ->
-                        let results = if activeTab = Movie then movieResults else seriesResults
-                        match results |> List.tryItem selRow with
-                        | Some r -> dispatch (Import (r.TmdbId, r.MediaType))
-                        | None -> ()
+                | Movies | Series ->
+                    let results = if activeTab = Movies then movieResults else seriesResults
+                    match results |> List.tryItem selRow with
+                    | Some r -> dispatch (Import (r.TmdbId, r.MediaType))
+                    | None -> ()
+                | Games ->
+                    match gameResults |> List.tryItem selRow with
+                    | Some r -> dispatch (Import_rawg r)
+                    | None -> ()
         | "Escape" -> dispatch Close
         | _ -> ()
 
-    let tabLabel (t: MediaType) =
-        match t with Movie -> "Movies" | Series -> "Series" | Game -> "Games"
+    let tabLabel (t: SearchTab) =
+        match t with Library -> "Library" | Movies -> "Movies" | Series -> "Series" | Games -> "Games"
 
-    let tabIcon (t: MediaType) =
-        match t with Movie -> Icons.movie () | Series -> Icons.tv () | Game -> Icons.gamepad ()
-
-    let isTabLoading (t: MediaType) =
+    let tabIcon (t: SearchTab) =
         match t with
-        | Movie | Series -> model.IsSearchingTmdb
-        | Game -> model.IsSearchingRawg
+        | Library -> Icons.catalog ()
+        | Movies -> Icons.movie ()
+        | Series -> Icons.tv ()
+        | Games -> Icons.gamepad ()
+
+    let isTabLoading (t: SearchTab) =
+        match t with
+        | Library -> false
+        | Movies | Series -> model.IsSearchingTmdb
+        | Games -> model.IsSearchingRawg
 
     let renderTabContent () =
         if isTabLoading activeTab then
@@ -330,14 +310,79 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 prop.children [
                     Daisy.loading [ loading.dots; loading.sm ]
                     Html.span [
-                        prop.text (match activeTab with Game -> "Searching RAWG..." | _ -> "Searching TMDB...")
+                        prop.text (match activeTab with Games -> "Searching RAWG..." | _ -> "Searching TMDB...")
                     ]
                 ]
             ]
         else
             match activeTab with
-            | Movie | Series ->
-                let results = if activeTab = Movie then movieResults else seriesResults
+            | Library ->
+                if List.isEmpty localResults then
+                    Html.p [
+                        prop.className "text-sm text-base-content/40 py-4 text-center"
+                        prop.text (if model.Query = "" then "Start typing to search" else "No matches in your library")
+                    ]
+                else
+                    Html.div [
+                        prop.className "space-y-1"
+                        prop.children [
+                            for (idx, result) in localResults |> List.mapi (fun i r -> (i, r)) do
+                                let isSelected = selRow = idx
+                                Html.div [
+                                    if isSelected then prop.custom ("data-search-selected", "true")
+                                    prop.className (
+                                        "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors "
+                                        + if isSelected then "bg-primary/15 ring-1 ring-primary/40"
+                                          else "hover:bg-base-200"
+                                    )
+                                    prop.onClick (fun _ -> dispatch (Navigate_to (result.Slug, result.MediaType)))
+                                    prop.children [
+                                        match result.PosterRef with
+                                        | Some ref ->
+                                            Html.img [
+                                                prop.src $"/images/{ref}"
+                                                prop.className "w-10 h-15 rounded object-cover"
+                                                prop.alt result.Name
+                                            ]
+                                        | None ->
+                                            Html.div [
+                                                prop.className "w-10 h-15 rounded bg-base-300 flex items-center justify-center"
+                                                prop.children [
+                                                    match result.MediaType with
+                                                    | MediaType.Movie -> Icons.movie ()
+                                                    | MediaType.Series -> Icons.tv ()
+                                                    | MediaType.Game -> Icons.gamepad ()
+                                                ]
+                                            ]
+                                        Html.div [
+                                            prop.className "flex-1"
+                                            prop.children [
+                                                Html.p [
+                                                    prop.className "font-semibold text-sm"
+                                                    prop.text result.Name
+                                                ]
+                                                Html.p [
+                                                    prop.className "text-xs text-base-content/50"
+                                                    prop.text (string result.Year)
+                                                ]
+                                            ]
+                                        ]
+                                        Daisy.badge [
+                                            badge.success
+                                            badge.sm
+                                            prop.text (
+                                                match result.MediaType with
+                                                | MediaType.Movie -> "Movie"
+                                                | MediaType.Series -> "Series"
+                                                | MediaType.Game -> "Game"
+                                            )
+                                        ]
+                                    ]
+                                ]
+                        ]
+                    ]
+            | Movies | Series ->
+                let results = if activeTab = Movies then movieResults else seriesResults
                 if List.isEmpty results then
                     Html.p [
                         prop.className "text-sm text-base-content/40 py-4 text-center"
@@ -348,12 +393,12 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         prop.className "space-y-1"
                         prop.children [
                             for (idx, result) in results |> List.mapi (fun i r -> (i, r)) do
-                                let isSelected = not inLibrary && selRow = idx
+                                let isSelected = selRow = idx
                                 renderTmdbItem result isSelected (fun () ->
                                     dispatch (Import (result.TmdbId, result.MediaType)))
                         ]
                     ]
-            | Game ->
+            | Games ->
                 if List.isEmpty gameResults then
                     Html.p [
                         prop.className "text-sm text-base-content/40 py-4 text-center"
@@ -364,7 +409,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         prop.className "space-y-1"
                         prop.children [
                             for (idx, result) in gameResults |> List.mapi (fun i r -> (i, r)) do
-                                let isSelected = not inLibrary && selRow = idx
+                                let isSelected = selRow = idx
                                 renderRawgItem result isSelected (fun () -> dispatch (Import_rawg result))
                         ]
                     ]
@@ -400,6 +445,34 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 prop.onChange (Query_changed >> dispatch)
                                 prop.onKeyDown handleKeyDown
                             ]
+                            // Tab bar
+                            Html.div [
+                                prop.className "flex gap-1 mb-3"
+                                prop.children [
+                                    for tab in tabOrder do
+                                        let isActive = tab = activeTab
+                                        Html.button [
+                                            prop.className (
+                                                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors "
+                                                + if isActive then "bg-primary/15 text-primary"
+                                                  else "text-base-content/50 hover:text-base-content/70 hover:bg-base-200/50"
+                                            )
+                                            prop.onClick (fun _ ->
+                                                dispatch (Tab_changed tab)
+                                                if selRow >= 0 then
+                                                    let len = tabResultCount tab
+                                                    setSelRow (if len > 0 then min selRow (len - 1) else -1)
+                                            )
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className "w-5 h-5 [&>svg]:w-5 [&>svg]:h-5"
+                                                    prop.children [ tabIcon tab ]
+                                                ]
+                                                Html.span [ prop.text (tabLabel tab) ]
+                                            ]
+                                        ]
+                                ]
+                            ]
                         ]
                     ]
                     // Scrollable content
@@ -421,126 +494,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                         Daisy.loading [ loading.spinner; loading.lg ]
                                     ]
                                 ]
-                            elif model.Query = "" then
-                                Html.div [
-                                    prop.className "text-center py-8 text-base-content/40"
-                                    prop.children [
-                                        Html.p [ prop.text "Start typing to search your library, TMDB, and RAWG." ]
-                                    ]
-                                ]
                             else
-                                Html.div [
-                                    prop.className "space-y-4"
-                                    prop.children [
-                                        // In Your Library
-                                        if not (List.isEmpty localResults) then
-                                            Html.div [
-                                                prop.children [
-                                                    Html.h4 [
-                                                        prop.className (Mediatheca.Client.DesignSystem.subtitle + " text-base-content/50 mb-2")
-                                                        prop.text "In Your Library"
-                                                    ]
-                                                    Html.div [
-                                                        prop.className "space-y-1"
-                                                        prop.children [
-                                                            for (idx, result) in localResults |> List.mapi (fun i r -> (i, r)) do
-                                                                let isSelected = inLibrary && selRow = idx
-                                                                Html.div [
-                                                                    if isSelected then prop.custom ("data-search-selected", "true")
-                                                                    prop.className (
-                                                                        "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors "
-                                                                        + if isSelected then "bg-primary/15 ring-1 ring-primary/40"
-                                                                          else "hover:bg-base-200"
-                                                                    )
-                                                                    prop.onClick (fun _ -> dispatch (Navigate_to (result.Slug, result.MediaType)))
-                                                                    prop.children [
-                                                                        match result.PosterRef with
-                                                                        | Some ref ->
-                                                                            Html.img [
-                                                                                prop.src $"/images/{ref}"
-                                                                                prop.className "w-10 h-15 rounded object-cover"
-                                                                                prop.alt result.Name
-                                                                            ]
-                                                                        | None ->
-                                                                            Html.div [
-                                                                                prop.className "w-10 h-15 rounded bg-base-300 flex items-center justify-center"
-                                                                                prop.children [
-                                                                                    match result.MediaType with
-                                                                                    | Movie -> Icons.movie ()
-                                                                                    | Series -> Icons.tv ()
-                                                                                    | Game -> Icons.gamepad ()
-                                                                                ]
-                                                                            ]
-                                                                        Html.div [
-                                                                            prop.className "flex-1"
-                                                                            prop.children [
-                                                                                Html.p [
-                                                                                    prop.className "font-semibold text-sm"
-                                                                                    prop.text result.Name
-                                                                                ]
-                                                                                Html.p [
-                                                                                    prop.className "text-xs text-base-content/50"
-                                                                                    prop.text (string result.Year)
-                                                                                ]
-                                                                            ]
-                                                                        ]
-                                                                        Daisy.badge [
-                                                                            badge.success
-                                                                            badge.sm
-                                                                            prop.text (
-                                                                                match result.MediaType with
-                                                                                | Movie -> "Movie"
-                                                                                | Series -> "Series"
-                                                                                | Game -> "Game"
-                                                                            )
-                                                                        ]
-                                                                    ]
-                                                                ]
-                                                        ]
-                                                    ]
-                                                ]
-                                            ]
-                                        // Discover — tabbed external results
-                                        Html.div [
-                                            prop.children [
-                                                Html.h4 [
-                                                    prop.className (Mediatheca.Client.DesignSystem.subtitle + " text-base-content/50 mb-3")
-                                                    prop.text "Discover"
-                                                ]
-                                                // Tab bar
-                                                Html.div [
-                                                    prop.className "flex gap-1 mb-3"
-                                                    prop.children [
-                                                        for tab in tabOrder do
-                                                            let isActive = tab = activeTab
-                                                            Html.button [
-                                                                prop.className (
-                                                                    "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors "
-                                                                    + if isActive then "bg-primary/15 text-primary"
-                                                                      else "text-base-content/50 hover:text-base-content/70 hover:bg-base-200/50"
-                                                                )
-                                                                prop.onClick (fun _ ->
-                                                                    dispatch (Tab_changed tab)
-                                                                    if not inLibrary && selRow >= 0 then
-                                                                        let len = tabResultCount tab
-                                                                        setSelRow (if len > 0 then min selRow (len - 1) else -1)
-                                                                )
-                                                                prop.children [
-                                                                    Html.span [
-                                                                        prop.className "w-5 h-5 [&>svg]:w-5 [&>svg]:h-5"
-                                                                        prop.children [ tabIcon tab ]
-                                                                    ]
-                                                                    Html.span [ prop.text (tabLabel tab) ]
-                                                                ]
-                                                            ]
-                                                    ]
-                                                ]
-                                                // Active tab content
-                                                renderTabContent ()
-                                            ]
-                                        ]
-                                    ]
-                                ]
+                                renderTabContent ()
                         ]
                     ]
                     // Keyboard hints footer
