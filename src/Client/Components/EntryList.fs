@@ -1,6 +1,7 @@
 module Mediatheca.Client.Components.EntryList
 
 open Feliz
+open Mediatheca.Shared
 open Mediatheca.Client
 open Mediatheca.Client.Components
 
@@ -19,92 +20,88 @@ type Props = {
     Items: EntryItem list
     RenderListRow: EntryItem -> ReactElement
     ShowWatchOrder: bool
+    InitialSettings: ViewSettings option
+    OnSettingsChanged: (ViewSettings -> unit) option
 }
 
 // ── Internal types ──
 
-type private Layout = Gallery | List
-type private GallerySize = Normal | Medium
-
-type private SortField = ByReleaseDate | ByName | ByRating | ByWatchOrder
-type private SortDirection = Ascending | Descending
-
 type private SortState = {
-    Field: SortField
-    Direction: SortDirection
+    Field: ViewSortField
+    Direction: ViewSortDirection
 }
 
 // ── Sort helpers ──
 
 let private defaultDirectionFor field =
     match field with
-    | ByName -> Ascending
-    | ByReleaseDate -> Descending
-    | ByRating -> Descending
-    | ByWatchOrder -> Ascending
+    | ViewSortField.ByName -> ViewSortDirection.Ascending
+    | ViewSortField.ByReleaseDate -> ViewSortDirection.Descending
+    | ViewSortField.ByRating -> ViewSortDirection.Descending
+    | ViewSortField.ByWatchOrder -> ViewSortDirection.Ascending
 
 let private sortFieldLabel field =
     match field with
-    | ByReleaseDate -> "Release Date"
-    | ByName -> "Name"
-    | ByRating -> "Rating"
-    | ByWatchOrder -> "Watch Order"
+    | ViewSortField.ByReleaseDate -> "Release Date"
+    | ViewSortField.ByName -> "Name"
+    | ViewSortField.ByRating -> "Rating"
+    | ViewSortField.ByWatchOrder -> "Watch Order"
 
 let private sortEntries (sort: SortState) (entries: EntryItem list) =
     let sorted =
         match sort.Field with
-        | ByReleaseDate -> entries |> List.sortBy (fun e -> e.Year)
-        | ByName -> entries |> List.sortBy (fun e -> e.Name.ToLowerInvariant())
-        | ByRating -> entries |> List.sortBy (fun e -> e.Rating |> Option.defaultValue 0.0)
-        | ByWatchOrder -> entries // preserve original order from server
+        | ViewSortField.ByReleaseDate -> entries |> List.sortBy (fun e -> e.Year)
+        | ViewSortField.ByName -> entries |> List.sortBy (fun e -> e.Name.ToLowerInvariant())
+        | ViewSortField.ByRating -> entries |> List.sortBy (fun e -> e.Rating |> Option.defaultValue 0.0)
+        | ViewSortField.ByWatchOrder -> entries // preserve original order from server
     match sort.Direction with
-    | Ascending -> sorted
-    | Descending -> sorted |> List.rev
+    | ViewSortDirection.Ascending -> sorted
+    | ViewSortDirection.Descending -> sorted |> List.rev
 
 // ── Sub-components ──
 
-let private layoutToggle (active: Layout) (onSwitch: Layout -> unit) =
+let private layoutToggle (active: ViewLayout) (onSwitch: ViewLayout -> unit) =
     Html.div [
         prop.className "flex items-center gap-1 bg-base-200/50 rounded-lg p-1"
         prop.children [
             Html.button [
                 prop.className (
                     "flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 "
-                    + (if active = Gallery then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
+                    + (if active = ViewLayout.Gallery then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
                 )
-                prop.onClick (fun _ -> onSwitch Gallery)
+                prop.onClick (fun _ -> onSwitch ViewLayout.Gallery)
                 prop.children [ Icons.viewGrid () ]
             ]
             Html.button [
                 prop.className (
                     "flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 "
-                    + (if active = List then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
+                    + (if active = ViewLayout.List then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
                 )
-                prop.onClick (fun _ -> onSwitch List)
+                prop.onClick (fun _ -> onSwitch ViewLayout.List)
                 prop.children [ Icons.viewList () ]
             ]
         ]
     ]
 
-let private sizeToggle (active: GallerySize) (onSwitch: GallerySize -> unit) =
+let private sizeToggle (active: ViewGallerySize) (onSwitch: ViewGallerySize -> unit) =
     Html.div [
         prop.className "flex items-center gap-1 bg-base-200/50 rounded-lg p-1"
         prop.children [
             Html.button [
                 prop.className (
                     "flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 text-xs font-bold "
-                    + (if active = Normal then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
+                    + (if active = ViewGallerySize.Normal then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
                 )
-                prop.onClick (fun _ -> onSwitch Normal)
+                prop.onClick (fun _ -> onSwitch ViewGallerySize.Normal)
                 prop.title "Normal size"
                 prop.text "L"
             ]
             Html.button [
                 prop.className (
                     "flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 text-xs font-bold "
-                    + (if active = Medium then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
+                    + (if active = ViewGallerySize.Medium then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
                 )
-                prop.onClick (fun _ -> onSwitch Medium)
+                prop.onClick (fun _ -> onSwitch ViewGallerySize.Medium)
                 prop.title "Medium size"
                 prop.text "M"
             ]
@@ -113,8 +110,8 @@ let private sizeToggle (active: GallerySize) (onSwitch: GallerySize -> unit) =
 
 let private directionIcon dir =
     match dir with
-    | Ascending -> Icons.chevronDown ()
-    | Descending -> Icons.chevronUp ()
+    | ViewSortDirection.Ascending -> Icons.chevronDown ()
+    | ViewSortDirection.Descending -> Icons.chevronUp ()
 
 /// Sort button with absolute-position glassmorphic dropdown.
 /// Uses position:absolute so backdrop-filter isn't broken by
@@ -125,14 +122,14 @@ let private SortButton (sort: SortState, onSort: SortState -> unit, showWatchOrd
 
     let selectField field =
         if sort.Field = field then
-            let newDir = if sort.Direction = Ascending then Descending else Ascending
+            let newDir = if sort.Direction = ViewSortDirection.Ascending then ViewSortDirection.Descending else ViewSortDirection.Ascending
             onSort { sort with Direction = newDir }
         else
             onSort { Field = field; Direction = defaultDirectionFor field }
         setIsOpen false
 
     let fields =
-        [ ByReleaseDate; ByName; ByRating ] @ (if showWatchOrder then [ ByWatchOrder ] else [])
+        [ ViewSortField.ByReleaseDate; ViewSortField.ByName; ViewSortField.ByRating ] @ (if showWatchOrder then [ ViewSortField.ByWatchOrder ] else [])
 
     Html.div [
         prop.className "relative"
@@ -180,8 +177,8 @@ let private SortButton (sort: SortState, onSort: SortState -> unit, showWatchOrd
         ]
     ]
 
-let private galleryView (size: GallerySize) (entries: EntryItem list) =
-    let gridClass = match size with Normal -> DesignSystem.movieGrid | Medium -> DesignSystem.movieGridMedium
+let private galleryView (size: ViewGallerySize) (entries: EntryItem list) =
+    let gridClass = match size with ViewGallerySize.Normal -> DesignSystem.movieGrid | ViewGallerySize.Medium -> DesignSystem.movieGridMedium
     Html.div [
         prop.className (gridClass + " " + DesignSystem.animateFadeIn)
         prop.children [
@@ -206,12 +203,42 @@ let private listView (renderRow: EntryItem -> ReactElement) (entries: EntryItem 
 
 [<ReactComponent>]
 let view (props: Props) =
-    let layout, setLayout = React.useState Gallery
-    let gallerySize, setGallerySize = React.useState Normal
+    let layout, setLayout = React.useState ViewLayout.Gallery
+    let gallerySize, setGallerySize = React.useState ViewGallerySize.Normal
     let defaultSort =
-        if props.ShowWatchOrder then { Field = ByWatchOrder; Direction = Ascending }
-        else { Field = ByReleaseDate; Direction = Descending }
+        if props.ShowWatchOrder then { Field = ViewSortField.ByWatchOrder; Direction = ViewSortDirection.Ascending }
+        else { Field = ViewSortField.ByReleaseDate; Direction = ViewSortDirection.Descending }
     let sort, setSort = React.useState defaultSort
+    let appliedInitial = React.useRef false
+
+    // Apply initial settings once when they arrive
+    React.useEffect (fun () ->
+        match props.InitialSettings with
+        | Some s when not appliedInitial.current ->
+            appliedInitial.current <- true
+            setLayout s.Layout
+            setGallerySize s.GallerySize
+            setSort { Field = s.SortField; Direction = s.SortDirection }
+        | _ -> ()
+    , [| box props.InitialSettings |])
+
+    let notifyChange (l: ViewLayout) (gs: ViewGallerySize) (s: SortState) =
+        match props.OnSettingsChanged with
+        | Some cb ->
+            cb { SortField = s.Field; SortDirection = s.Direction; Layout = l; GallerySize = gs }
+        | None -> ()
+
+    let setLayoutAndNotify l =
+        setLayout l
+        notifyChange l gallerySize sort
+
+    let setGallerySizeAndNotify gs =
+        setGallerySize gs
+        notifyChange layout gs sort
+
+    let setSortAndNotify s =
+        setSort s
+        notifyChange layout gallerySize s
 
     let sorted = sortEntries sort props.Items
 
@@ -228,16 +255,16 @@ let view (props: Props) =
                     Html.div [
                         prop.className "flex items-center gap-2"
                         prop.children [
-                            SortButton (sort, setSort, props.ShowWatchOrder)
-                            if layout = Gallery then
-                                sizeToggle gallerySize setGallerySize
-                            layoutToggle layout setLayout
+                            SortButton (sort, setSortAndNotify, props.ShowWatchOrder)
+                            if layout = ViewLayout.Gallery then
+                                sizeToggle gallerySize setGallerySizeAndNotify
+                            layoutToggle layout setLayoutAndNotify
                         ]
                     ]
                 ]
             ]
             match layout with
-            | Gallery -> galleryView gallerySize sorted
-            | List -> listView props.RenderListRow sorted
+            | ViewLayout.Gallery -> galleryView gallerySize sorted
+            | ViewLayout.List -> listView props.RenderListRow sorted
         ]
     ]

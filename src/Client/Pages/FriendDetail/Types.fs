@@ -17,6 +17,7 @@ type Model = {
     Error: string option
     ShowRemoveConfirm: bool
     CollapsedSections: Set<string>
+    SectionSettings: Map<string, ViewSettings>
 }
 
 type Msg =
@@ -38,3 +39,7 @@ type Msg =
     | Remove_from_pending of mediaSlug: string * routePrefix: string
     | Media_remove_result of Result<unit, string>
     | Toggle_section of string
+    | Collapsed_loaded of string list
+    | Section_settings_loaded of section: string * settings: ViewSettings option
+    | Save_section_settings of section: string * settings: ViewSettings
+    | Settings_saved

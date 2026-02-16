@@ -171,7 +171,7 @@ let private sectionHeader (title: string) (count: int) (isCollapsed: bool) (onTo
         ]
     ]
 
-let private mediaSection (title: string) (isCollapsed: bool) (onToggle: unit -> unit) (onRemove: (string * string) -> unit) (items: FriendMediaItem list) =
+let private mediaSection (title: string) (isCollapsed: bool) (onToggle: unit -> unit) (onRemove: (string * string) -> unit) (viewSettings: ViewSettings option) (onSettingsChanged: (ViewSettings -> unit) option) (items: FriendMediaItem list) =
     if List.isEmpty items then
         Html.none
     else
@@ -183,11 +183,13 @@ let private mediaSection (title: string) (isCollapsed: bool) (onToggle: unit -> 
                         Items = friendMediaItems items
                         RenderListRow = mediaListRow onRemove
                         ShowWatchOrder = false
+                        InitialSettings = viewSettings
+                        OnSettingsChanged = onSettingsChanged
                     }
             ]
         ]
 
-let private watchedMediaSection (isCollapsed: bool) (onToggle: unit -> unit) (items: FriendWatchedItem list) =
+let private watchedMediaSection (isCollapsed: bool) (onToggle: unit -> unit) (viewSettings: ViewSettings option) (onSettingsChanged: (ViewSettings -> unit) option) (items: FriendWatchedItem list) =
     if List.isEmpty items then
         Html.none
     else
@@ -201,6 +203,8 @@ let private watchedMediaSection (isCollapsed: bool) (onToggle: unit -> unit) (it
                         Items = friendWatchedItems items
                         RenderListRow = watchedMediaListRow watchedBySlug
                         ShowWatchOrder = false
+                        InitialSettings = viewSettings
+                        OnSettingsChanged = onSettingsChanged
                     }
             ]
         ]
@@ -338,9 +342,9 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 // Media sections
                                 match model.FriendMedia with
                                 | Some media ->
-                                    mediaSection "Recommended" (Set.contains "Recommended" model.CollapsedSections) (fun () -> dispatch (Toggle_section "Recommended")) (fun (slug, rp) -> dispatch (Remove_from_recommended (slug, rp))) media.Recommended
-                                    mediaSection "Pending" (Set.contains "Pending" model.CollapsedSections) (fun () -> dispatch (Toggle_section "Pending")) (fun (slug, rp) -> dispatch (Remove_from_pending (slug, rp))) media.WantToWatch
-                                    watchedMediaSection (Set.contains "Watched" model.CollapsedSections) (fun () -> dispatch (Toggle_section "Watched")) media.Watched
+                                    mediaSection "Recommended" (Set.contains "Recommended" model.CollapsedSections) (fun () -> dispatch (Toggle_section "Recommended")) (fun (slug, rp) -> dispatch (Remove_from_recommended (slug, rp))) (Map.tryFind "Recommended" model.SectionSettings) (Some (fun s -> dispatch (Save_section_settings ("Recommended", s)))) media.Recommended
+                                    mediaSection "Pending" (Set.contains "Pending" model.CollapsedSections) (fun () -> dispatch (Toggle_section "Pending")) (fun (slug, rp) -> dispatch (Remove_from_pending (slug, rp))) (Map.tryFind "Pending" model.SectionSettings) (Some (fun s -> dispatch (Save_section_settings ("Pending", s)))) media.WantToWatch
+                                    watchedMediaSection (Set.contains "Watched" model.CollapsedSections) (fun () -> dispatch (Toggle_section "Watched")) (Map.tryFind "Watched" model.SectionSettings) (Some (fun s -> dispatch (Save_section_settings ("Watched", s)))) media.Watched
                                 | None -> ()
                             ]
                         ]

@@ -13,7 +13,8 @@ let init (slug: string) : Model * Cmd<Msg> =
       EditForm = { Name = ""; ImageRef = None }
       Error = None
       ShowRemoveConfirm = false
-      CollapsedSections = Set.empty },
+      CollapsedSections = Set.empty
+      SectionSettings = Map.empty },
     Cmd.ofMsg (Load_friend slug)
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
@@ -23,6 +24,10 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         Cmd.batch [
             Cmd.OfAsync.perform api.getFriend slug Friend_loaded
             Cmd.OfAsync.perform api.getFriendMedia slug Friend_media_loaded
+            Cmd.OfAsync.perform api.getCollapsedSections ("friend:" + slug) Collapsed_loaded
+            Cmd.OfAsync.perform api.getViewSettings ("friend:" + slug + ":recommended") (fun s -> Section_settings_loaded ("Recommended", s))
+            Cmd.OfAsync.perform api.getViewSettings ("friend:" + slug + ":pending") (fun s -> Section_settings_loaded ("Pending", s))
+            Cmd.OfAsync.perform api.getViewSettings ("friend:" + slug + ":watched") (fun s -> Section_settings_loaded ("Watched", s))
         ]
 
     | Friend_loaded friend ->
@@ -128,4 +133,27 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 Set.remove section model.CollapsedSections
             else
                 Set.add section model.CollapsedSections
-        { model with CollapsedSections = collapsed }, Cmd.none
+        { model with CollapsedSections = collapsed },
+        Cmd.OfAsync.either
+            (fun () -> api.saveCollapsedSections ("friend:" + model.Slug) (Set.toList collapsed)) ()
+            (fun () -> Settings_saved)
+            (fun _ -> Settings_saved)
+
+    | Collapsed_loaded sections ->
+        { model with CollapsedSections = Set.ofList sections }, Cmd.none
+
+    | Section_settings_loaded (section, settings) ->
+        match settings with
+        | Some s -> { model with SectionSettings = Map.add section s model.SectionSettings }, Cmd.none
+        | None -> model, Cmd.none
+
+    | Save_section_settings (section, settings) ->
+        let key = section.ToLowerInvariant()
+        { model with SectionSettings = Map.add section settings model.SectionSettings },
+        Cmd.OfAsync.either
+            (fun () -> api.saveViewSettings ("friend:" + model.Slug + ":" + key) settings) ()
+            (fun () -> Settings_saved)
+            (fun _ -> Settings_saved)
+
+    | Settings_saved ->
+        model, Cmd.none

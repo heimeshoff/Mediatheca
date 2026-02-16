@@ -1484,6 +1484,8 @@ let private entryListSection () =
                         Items = mockEntryItems
                         RenderListRow = mockListRow
                         ShowWatchOrder = false
+                        InitialSettings = None
+                        OnSettingsChanged = None
                     }
                 ]
             ]

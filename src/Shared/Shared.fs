@@ -570,6 +570,20 @@ type JellyfinImportResult = {
     Errors: string list
 }
 
+// View Settings
+
+type ViewSortField = ByReleaseDate | ByName | ByRating | ByWatchOrder
+type ViewSortDirection = Ascending | Descending
+type ViewLayout = Gallery | List
+type ViewGallerySize = Normal | Medium
+
+type ViewSettings = {
+    SortField: ViewSortField
+    SortDirection: ViewSortDirection
+    Layout: ViewLayout
+    GallerySize: ViewGallerySize
+}
+
 // Import
 
 type ImportFromCinemarcoRequest = {
@@ -742,4 +756,9 @@ type IMediathecaApi = {
     importJellyfinWatchHistory: unit -> Async<Result<JellyfinImportResult, string>>
     // Import
     importFromCinemarco: ImportFromCinemarcoRequest -> Async<Result<ImportResult, string>>
+    // View Settings
+    getViewSettings: string -> Async<ViewSettings option>
+    saveViewSettings: string -> ViewSettings -> Async<unit>
+    getCollapsedSections: string -> Async<string list>
+    saveCollapsedSections: string -> string list -> Async<unit>
 }

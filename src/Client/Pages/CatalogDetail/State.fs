@@ -15,7 +15,8 @@ let init (slug: string) : Model * Cmd<Msg> =
       ShowEditCatalog = false
       EditName = ""
       EditDescription = ""
-      Error = None },
+      Error = None
+      ViewSettings = None },
     Cmd.ofMsg (Load_catalog slug)
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
@@ -25,6 +26,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         Cmd.batch [
             Cmd.OfAsync.perform api.getCatalog slug Catalog_loaded
             Cmd.OfAsync.perform api.getMovies () Movies_loaded
+            Cmd.OfAsync.perform api.getViewSettings ("catalog:" + slug) View_settings_loaded
         ]
 
     | Catalog_loaded catalog ->
@@ -161,3 +163,16 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Command_result (Error err) ->
         { model with Error = Some err }, Cmd.none
+
+    | View_settings_loaded settings ->
+        { model with ViewSettings = settings }, Cmd.none
+
+    | Save_view_settings settings ->
+        { model with ViewSettings = Some settings },
+        Cmd.OfAsync.either
+            (fun () -> api.saveViewSettings ("catalog:" + model.Slug) settings) ()
+            (fun () -> View_settings_saved)
+            (fun _ -> View_settings_saved)
+
+    | View_settings_saved ->
+        model, Cmd.none

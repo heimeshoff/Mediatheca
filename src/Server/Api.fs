@@ -2850,4 +2850,30 @@ module Api =
             importFromCinemarco = fun request -> async {
                 return CinemarcoImport.runImport conn imageBasePath projectionHandlers httpClient getTmdbConfig request
             }
+
+            getViewSettings = fun key -> async {
+                match SettingsStore.getSetting conn ("view:" + key) with
+                | Some json ->
+                    try
+                        let settings = Newtonsoft.Json.JsonConvert.DeserializeObject<ViewSettings>(json, Fable.Remoting.Json.FableJsonConverter())
+                        return Some settings
+                    with _ -> return None
+                | None -> return None
+            }
+
+            saveViewSettings = fun key settings -> async {
+                let json = Newtonsoft.Json.JsonConvert.SerializeObject(settings, Fable.Remoting.Json.FableJsonConverter())
+                SettingsStore.setSetting conn ("view:" + key) json
+            }
+
+            getCollapsedSections = fun key -> async {
+                match SettingsStore.getSetting conn ("collapsed:" + key) with
+                | Some csv when csv <> "" -> return csv.Split(',') |> Array.toList
+                | _ -> return []
+            }
+
+            saveCollapsedSections = fun key sections -> async {
+                let csv = sections |> String.concat ","
+                SettingsStore.setSetting conn ("collapsed:" + key) csv
+            }
         }

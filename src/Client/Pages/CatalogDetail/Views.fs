@@ -373,6 +373,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                     | Some entry -> entryCard entry model.EditingNote dispatch
                                     | None -> Html.none
                                 ShowWatchOrder = true
+                                InitialSettings = model.ViewSettings
+                                OnSettingsChanged = Some (Save_view_settings >> dispatch)
                             }
 
                         match model.Error with

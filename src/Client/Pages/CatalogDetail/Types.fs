@@ -24,6 +24,7 @@ type Model = {
     EditName: string
     EditDescription: string
     Error: string option
+    ViewSettings: ViewSettings option
 }
 
 type Msg =
@@ -51,3 +52,6 @@ type Msg =
     | Remove_catalog
     | Catalog_removed of Result<unit, string>
     | Command_result of Result<unit, string>
+    | View_settings_loaded of ViewSettings option
+    | Save_view_settings of ViewSettings
+    | View_settings_saved
