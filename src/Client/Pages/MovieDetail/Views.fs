@@ -541,7 +541,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
             prop.children [
                 // ── Hero Section ──
                 Html.div [
-                    prop.className "relative h-72 lg:h-[500px] w-full overflow-hidden"
+                    prop.className "relative min-h-72 lg:h-[500px] w-full overflow-hidden"
                     prop.children [
                         // Backdrop image
                         Html.div [
@@ -576,7 +576,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         ]
                         // Hero content at bottom
                         Html.div [
-                            prop.className "relative h-full flex items-end pb-6 lg:pb-8 px-4 lg:px-8"
+                            prop.className "relative min-h-72 lg:h-full flex items-end pb-6 lg:pb-8 px-4 lg:px-8"
                             prop.children [
                                 Html.div [
                                     prop.className "flex gap-6 lg:gap-10 items-end w-full max-w-6xl mx-auto"
@@ -841,12 +841,12 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     ]
                                                 ]
                                         ]
-                                        // Want to Watch With card
+                                        // Pending card
                                         glassCard [
                                             Html.div [
                                                 prop.className "flex items-center justify-between mb-4"
                                                 prop.children [
-                                                    Html.h3 [ prop.className "text-lg font-bold"; prop.text "Watch With" ]
+                                                    Html.h3 [ prop.className "text-lg font-bold"; prop.text "Pending" ]
                                                     Html.button [
                                                         prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold"
                                                         prop.onClick (fun _ -> dispatch (Open_friend_picker Watch_with_picker))
@@ -856,7 +856,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             ]
                                             Html.p [
                                                 prop.className "text-base-content/40 text-sm mb-4"
-                                                prop.text "Friends who want to watch this with you"
+                                                prop.text "Friends who want to watch this"
                                             ]
                                             if List.isEmpty movie.WantToWatchWith then
                                                 Html.p [
@@ -947,7 +947,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                                             input.sm
                                                                                             prop.type' "date"
                                                                                             prop.autoFocus true
-                                                                                            prop.value session.Date
+                                                                                            prop.value (if session.Date.Length > 10 then session.Date.Substring(0, 10) else session.Date)
                                                                                             prop.onChange (fun (v: string) ->
                                                                                                 dispatch (Update_session_date (session.SessionId, v)))
                                                                                             prop.onBlur (fun _ ->
@@ -980,11 +980,15 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                                             prop.children [
                                                                                                 for fr in session.Friends do
                                                                                                     Html.div [
-                                                                                                        prop.className "cursor-pointer hover:z-10 hover:scale-110 transition-transform"
+                                                                                                        prop.className "relative group/friend cursor-pointer hover:z-10 transition-transform"
                                                                                                         prop.title fr.Name
                                                                                                         prop.onClick (fun _ -> dispatch (Remove_friend_from_session (session.SessionId, fr.Slug)))
                                                                                                         prop.children [
                                                                                                             friendAvatar "w-6 h-6" fr "bg-accent/30 text-[8px] font-bold border border-base-300"
+                                                                                                            Html.span [
+                                                                                                                prop.className "absolute -top-1 -right-1 w-3.5 h-3.5 bg-error text-error-content rounded-full opacity-0 group-hover/friend:opacity-100 transition-opacity text-[7px] font-bold flex items-center justify-center leading-none"
+                                                                                                                prop.text "\u00D7"
+                                                                                                            ]
                                                                                                         ]
                                                                                                     ]
                                                                                             ]
@@ -1079,7 +1083,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         (fun () -> dispatch Close_friend_picker)
                 | Some Watch_with_picker ->
                     FriendManager
-                        "Want to Watch With"
+                        "Pending"
                         model.AllFriends
                         movie.WantToWatchWith
                         (fun slug -> dispatch (Want_to_watch_with slug))

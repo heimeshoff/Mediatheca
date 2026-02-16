@@ -70,7 +70,7 @@ let private catalogCard (catalog: Mediatheca.Shared.CatalogListItem) =
 
 let view (model: Model) (dispatch: Msg -> unit) =
     Html.div [
-        prop.className (DesignSystem.pagePadding + " " + DesignSystem.animateFadeIn)
+        prop.className (DesignSystem.pageContainer + " " + DesignSystem.animateFadeIn)
         prop.children [
             Html.div [
                 prop.className "flex items-center justify-between mb-6"
@@ -193,7 +193,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 ]
             else
                 Html.div [
-                    prop.className ("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 " + DesignSystem.staggerGrid)
+                    prop.className ("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 " + DesignSystem.animateFadeIn)
                     prop.children [
                         for catalog in model.Catalogs do
                             catalogCard catalog

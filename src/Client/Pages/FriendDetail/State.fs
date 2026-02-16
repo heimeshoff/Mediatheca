@@ -96,3 +96,27 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Image_uploaded (Error err) ->
         { model with Error = Some err }, Cmd.none
+
+    | Remove_from_recommended (mediaSlug, routePrefix) ->
+        let apiCall =
+            match routePrefix with
+            | "series" -> api.removeSeriesRecommendation mediaSlug model.Slug
+            | "games" -> api.removeGameRecommendation mediaSlug model.Slug
+            | _ -> api.removeRecommendation mediaSlug model.Slug
+        model,
+        Cmd.OfAsync.either (fun () -> apiCall) () Media_remove_result (fun ex -> Media_remove_result (Error ex.Message))
+
+    | Remove_from_pending (mediaSlug, routePrefix) ->
+        let apiCall =
+            match routePrefix with
+            | "series" -> api.removeSeriesWantToWatchWith mediaSlug model.Slug
+            | "games" -> api.removeGameWantToPlayWith mediaSlug model.Slug
+            | _ -> api.removeWantToWatchWith mediaSlug model.Slug
+        model,
+        Cmd.OfAsync.either (fun () -> apiCall) () Media_remove_result (fun ex -> Media_remove_result (Error ex.Message))
+
+    | Media_remove_result (Ok ()) ->
+        model, Cmd.OfAsync.perform api.getFriendMedia model.Slug Friend_media_loaded
+
+    | Media_remove_result (Error err) ->
+        { model with Error = Some err }, Cmd.none

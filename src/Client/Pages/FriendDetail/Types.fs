@@ -33,3 +33,6 @@ type Msg =
     | Remove_result of Result<unit, string>
     | Upload_friend_image of data: byte array * filename: string
     | Image_uploaded of Result<string, string>
+    | Remove_from_recommended of mediaSlug: string * routePrefix: string
+    | Remove_from_pending of mediaSlug: string * routePrefix: string
+    | Media_remove_result of Result<unit, string>

@@ -19,15 +19,16 @@ let private readFileAsBytes (file: Browser.Types.File) (onDone: byte array * str
 
 let private routeForMedia (mediaType: MediaType) = match mediaType with | Movie -> "movies" | Series -> "series" | Game -> "games"
 
-let private mediaListRow (item: EntryList.EntryItem) =
-    Html.a [
-        prop.href (Router.format (item.RoutePrefix, item.Slug))
-        prop.onClick (fun e ->
-            e.preventDefault()
-            Router.navigate (item.RoutePrefix, item.Slug))
+let private mediaListRow (onRemove: (string * string) -> unit) (item: EntryList.EntryItem) =
+    Html.div [
+        prop.className "flex items-center gap-3 p-3 rounded-xl bg-base-100 hover:bg-base-200/80 transition-colors group"
         prop.children [
-            Html.div [
-                prop.className "flex items-center gap-3 p-3 rounded-xl bg-base-100 hover:bg-base-200/80 transition-colors cursor-pointer group"
+            Html.a [
+                prop.href (Router.format (item.RoutePrefix, item.Slug))
+                prop.onClick (fun e ->
+                    e.preventDefault()
+                    Router.navigate (item.RoutePrefix, item.Slug))
+                prop.className "flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
                 prop.children [
                     Html.div [
                         prop.className "flex-none"
@@ -62,6 +63,11 @@ let private mediaListRow (item: EntryList.EntryItem) =
                         ]
                     ]
                 ]
+            ]
+            Html.button [
+                prop.className "text-base-content/30 opacity-0 group-hover:opacity-100 transition-opacity text-xs hover:text-error flex-none"
+                prop.onClick (fun _ -> onRemove (item.Slug, item.RoutePrefix))
+                prop.text "\u00D7"
             ]
         ]
     ]
@@ -137,7 +143,7 @@ let private friendWatchedItems (items: FriendWatchedItem list) : EntryList.Entry
         RoutePrefix = routeForMedia m.MediaType
     })
 
-let private mediaSection (title: string) (items: FriendMediaItem list) =
+let private mediaSection (title: string) (onRemove: (string * string) -> unit) (items: FriendMediaItem list) =
     if List.isEmpty items then
         Html.none
     else
@@ -150,7 +156,7 @@ let private mediaSection (title: string) (items: FriendMediaItem list) =
                 ]
                 EntryList.view {
                     Items = friendMediaItems items
-                    RenderListRow = mediaListRow
+                    RenderListRow = mediaListRow onRemove
                     ShowWatchOrder = false
                 }
             ]
@@ -310,8 +316,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 // Media sections
                                 match model.FriendMedia with
                                 | Some media ->
-                                    mediaSection "Recommended" media.Recommended
-                                    mediaSection "Want to Watch Together" media.WantToWatch
+                                    mediaSection "Recommended" (fun (slug, rp) -> dispatch (Remove_from_recommended (slug, rp))) media.Recommended
+                                    mediaSection "Pending" (fun (slug, rp) -> dispatch (Remove_from_pending (slug, rp))) media.WantToWatch
                                     watchedMediaSection media.Watched
                                 | None -> ()
                             ]

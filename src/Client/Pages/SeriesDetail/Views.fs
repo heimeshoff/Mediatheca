@@ -650,7 +650,7 @@ let private episodeCard
                                                 input.xs
                                                 prop.type' "date"
                                                 prop.autoFocus true
-                                                prop.value (episode.WatchedDate |> Option.defaultValue "")
+                                                prop.value (episode.WatchedDate |> Option.defaultValue "" |> fun d -> if d.Length > 10 then d.Substring(0, 10) else d)
                                                 prop.onChange (fun (v: string) ->
                                                     dispatch (Update_episode_date (seasonNumber, episode.EpisodeNumber, v)))
                                                 prop.onBlur (fun _ ->
@@ -1222,12 +1222,12 @@ let private overviewTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                                 ]
                             ]
                     ]
-                    // Want to Watch With card
+                    // Pending card
                     glassCard [
                         Html.div [
                             prop.className "flex items-center justify-between mb-4"
                             prop.children [
-                                Html.h3 [ prop.className "text-lg font-bold"; prop.text "Watch With" ]
+                                Html.h3 [ prop.className "text-lg font-bold"; prop.text "Pending" ]
                                 Html.button [
                                     prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold"
                                     prop.onClick (fun _ -> dispatch (Open_friend_picker Watch_with_picker))
@@ -1237,7 +1237,7 @@ let private overviewTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                         ]
                         Html.p [
                             prop.className "text-base-content/40 text-sm mb-4"
-                            prop.text "Friends who want to watch this with you"
+                            prop.text "Friends who want to watch this"
                         ]
                         if List.isEmpty series.WantToWatchWith then
                             Html.p [
@@ -1402,7 +1402,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
             prop.children [
                 // ── Hero Section ──
                 Html.div [
-                    prop.className "relative h-72 lg:h-[500px] w-full overflow-hidden"
+                    prop.className "relative min-h-72 lg:h-[500px] w-full overflow-hidden"
                     prop.children [
                         // Backdrop image
                         Html.div [
@@ -1437,7 +1437,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         ]
                         // Hero content at bottom
                         Html.div [
-                            prop.className "relative h-full flex items-end pb-6 lg:pb-8 px-4 lg:px-8"
+                            prop.className "relative min-h-72 lg:h-full flex items-end pb-6 lg:pb-8 px-4 lg:px-8"
                             prop.children [
                                 Html.div [
                                     prop.className "flex gap-6 lg:gap-10 items-end w-full max-w-6xl mx-auto"
@@ -1591,7 +1591,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         (fun () -> dispatch Close_friend_picker)
                 | Some Watch_with_picker ->
                     FriendManager
-                        "Want to Watch With"
+                        "Pending"
                         model.Friends
                         series.WantToWatchWith
                         (fun slug -> dispatch (Add_watch_with slug))

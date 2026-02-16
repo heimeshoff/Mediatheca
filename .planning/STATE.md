@@ -6,6 +6,7 @@
 
 ## Recent Progress
 
+- **2026-02-16**: Frontend tweaks batch — rename Watch With/Play With to Pending, remove poster stagger animation, add max-width to Catalogs/Friends, fix date input pre-fill for watch sessions with time, fix mobile hero height overflow, add remove buttons to friend detail media lists and watch session friend avatars
 - **2026-02-16**: Remove hover title overlay from movie and game poster cards; show title only when no image is loaded (icon + name placeholder)
 - **2026-02-16**: Move game status from poster peel (top-right badge) to text below poster (bottom-right), matching TV series pattern
 - **2026-02-15**: Search modal: only search active tab's API, preserve tab on typing

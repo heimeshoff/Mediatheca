@@ -112,7 +112,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     ]
                 else
                     Html.div [
-                        prop.className ("grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 " + DesignSystem.staggerGrid)
+                        prop.className ("grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 " + DesignSystem.animateFadeIn)
                         prop.children [
                             for movie in filtered do
                                 movieCard movie

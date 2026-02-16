@@ -156,7 +156,7 @@ let private SortButton (sort: SortState, onSort: SortState -> unit, showWatchOrd
 
 let private galleryView (entries: EntryItem list) =
     Html.div [
-        prop.className (DesignSystem.movieGrid + " " + DesignSystem.staggerGrid)
+        prop.className (DesignSystem.movieGrid + " " + DesignSystem.animateFadeIn)
         prop.children [
             for entry in entries do
                 let navSlug =

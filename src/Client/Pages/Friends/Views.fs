@@ -54,7 +54,7 @@ let private friendCard (friend: Mediatheca.Shared.FriendListItem) (_dispatch: Ms
 
 let view (model: Model) (dispatch: Msg -> unit) =
     Html.div [
-        prop.className (DesignSystem.pagePadding + " " + DesignSystem.animateFadeIn)
+        prop.className (DesignSystem.pageContainer + " " + DesignSystem.animateFadeIn)
         prop.children [
             Html.div [
                 prop.className "flex items-center justify-between mb-6"
@@ -157,7 +157,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 ]
             else
                 Html.div [
-                    prop.className ("grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 " + DesignSystem.staggerGrid)
+                    prop.className ("grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 " + DesignSystem.animateFadeIn)
                     prop.children [
                         for friend in model.Friends do
                             friendCard friend dispatch
