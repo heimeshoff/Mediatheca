@@ -9,6 +9,11 @@ open Mediatheca.Client.Pages.FriendDetail.Types
 open Mediatheca.Client
 open Mediatheca.Client.Components
 
+let private formatDateOnly (date: string) =
+    match date.IndexOf('T') with
+    | -1 -> date
+    | i -> date.[..i-1]
+
 let private readFileAsBytes (file: Browser.Types.File) (onDone: byte array * string -> unit) =
     let reader = Browser.Dom.FileReader.Create()
     reader.onload <- fun _ ->
@@ -112,7 +117,7 @@ let private watchedMediaListRow (watchedBySlug: Map<string, FriendWatchedItem>) 
                                 prop.className "text-xs text-base-content/50"
                                 prop.text (
                                     match Map.tryFind item.Slug watchedBySlug with
-                                    | Some w when not (List.isEmpty w.Dates) -> w.Dates |> String.concat ", "
+                                    | Some w when not (List.isEmpty w.Dates) -> w.Dates |> List.map formatDateOnly |> String.concat ", "
                                     | _ -> string item.Year
                                 )
                             ]
@@ -211,7 +216,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
     | false, Some friend ->
         let fileInputId = "friend-detail-image-upload"
         Html.div [
-            prop.className (DesignSystem.pagePadding + " " + DesignSystem.animateFadeIn)
+            prop.className (DesignSystem.pageContainer + " " + DesignSystem.animateFadeIn)
             prop.children [
                 // Back button
                 Html.div [
