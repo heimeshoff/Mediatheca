@@ -425,6 +425,16 @@ module SeriesProjection =
                     |> Db.setParams [ "rewatch_id", SqlType.String rewatchId; "slug", SqlType.String slug ]
                     |> Db.exec
 
+                | Series.Default_rewatch_session_changed newDefaultId ->
+                    conn
+                    |> Db.newCommand "UPDATE series_rewatch_sessions SET is_default = 0 WHERE series_slug = @slug AND is_default = 1"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE series_rewatch_sessions SET is_default = 1 WHERE series_slug = @slug AND rewatch_id = @rewatch_id"
+                    |> Db.setParams [ "slug", SqlType.String slug; "rewatch_id", SqlType.String newDefaultId ]
+                    |> Db.exec
+
                 | Series.Rewatch_session_friend_added data ->
                     let currentJson =
                         conn
@@ -950,3 +960,10 @@ module SeriesProjection =
             rd.ReadInt32 "season_number", rd.ReadInt32 "episode_number"
         )
         |> Set.ofList
+
+    let getDefaultRewatchId (conn: SqliteConnection) (slug: string) : string =
+        conn
+        |> Db.newCommand "SELECT rewatch_id FROM series_rewatch_sessions WHERE series_slug = @slug AND is_default = 1"
+        |> Db.setParams [ "slug", SqlType.String slug ]
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "rewatch_id")
+        |> Option.defaultValue "default"

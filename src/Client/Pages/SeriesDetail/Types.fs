@@ -20,7 +20,7 @@ type Model = {
     IsLoading: bool
     ActiveTab: SeriesTab
     SelectedSeason: int
-    SelectedRewatchId: string
+    SelectedRewatchId: string option
     // Rating
     IsRatingOpen: bool
     IsFriendsMenuOpen: bool
@@ -70,6 +70,8 @@ type Msg =
     | Rewatch_session_created of Result<string, string>
     | Remove_rewatch_session of rewatchId: string
     | Rewatch_session_removed of Result<unit, string>
+    | Set_default_rewatch_session of rewatchId: string
+    | Default_rewatch_session_set of Result<unit, string>
     // Session friends
     | Add_rewatch_friend of rewatchId: string * friendSlug: string
     | Remove_rewatch_friend of rewatchId: string * friendSlug: string

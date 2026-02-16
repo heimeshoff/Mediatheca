@@ -103,6 +103,7 @@ module Series =
         | Series_personal_rating_set of rating: int option
         | Rewatch_session_created of RewatchSessionCreatedData
         | Rewatch_session_removed of rewatchId: string
+        | Default_rewatch_session_changed of rewatchId: string
         | Rewatch_session_friend_added of RewatchSessionFriendData
         | Rewatch_session_friend_removed of RewatchSessionFriendData
         | Episode_watched of EpisodeWatchedData
@@ -182,6 +183,7 @@ module Series =
         | Set_series_personal_rating of rating: int option
         | Create_rewatch_session of RewatchSessionCreatedData
         | Remove_rewatch_session of rewatchId: string
+        | Set_default_rewatch_session of rewatchId: string
         | Add_friend_to_rewatch_session of RewatchSessionFriendData
         | Remove_friend_from_rewatch_session of RewatchSessionFriendData
         | Mark_episode_watched of EpisodeWatchedData
@@ -277,6 +279,12 @@ module Series =
             Active { series with RewatchSessions = series.RewatchSessions |> Map.add data.RewatchId session }
         | Active series, Rewatch_session_removed rewatchId ->
             Active { series with RewatchSessions = series.RewatchSessions |> Map.remove rewatchId }
+        | Active series, Default_rewatch_session_changed newDefaultId ->
+            let updated =
+                series.RewatchSessions
+                |> Map.map (fun id session ->
+                    { session with IsDefault = (id = newDefaultId) })
+            Active { series with RewatchSessions = updated }
         | Active series, Rewatch_session_friend_added data ->
             match series.RewatchSessions |> Map.tryFind data.RewatchId with
             | Some session ->
@@ -391,6 +399,12 @@ module Series =
                     Error "Cannot remove the default rewatch session"
                 | _ -> Ok [ Rewatch_session_removed rewatchId ]
             else Error "Rewatch session does not exist"
+        | Active series, Set_default_rewatch_session rewatchId ->
+            match series.RewatchSessions |> Map.tryFind rewatchId with
+            | Some session ->
+                if session.IsDefault then Ok []
+                else Ok [ Default_rewatch_session_changed rewatchId ]
+            | None -> Error "Rewatch session does not exist"
         | Active series, Add_friend_to_rewatch_session data ->
             match series.RewatchSessions |> Map.tryFind data.RewatchId with
             | Some session ->
@@ -676,6 +690,8 @@ module Series =
                 "Rewatch_session_created", Encode.toString 0 (encodeRewatchSessionCreatedData data)
             | Rewatch_session_removed rewatchId ->
                 "Rewatch_session_removed", Encode.toString 0 (Encode.object [ "rewatchId", Encode.string rewatchId ])
+            | Default_rewatch_session_changed rewatchId ->
+                "Default_rewatch_session_changed", Encode.toString 0 (Encode.object [ "rewatchId", Encode.string rewatchId ])
             | Rewatch_session_friend_added data ->
                 "Rewatch_session_friend_added", Encode.toString 0 (encodeRewatchSessionFriendData data)
             | Rewatch_session_friend_removed data ->
@@ -745,6 +761,10 @@ module Series =
                 Decode.fromString (Decode.field "rewatchId" Decode.string) data
                 |> Result.toOption
                 |> Option.map Rewatch_session_removed
+            | "Default_rewatch_session_changed" ->
+                Decode.fromString (Decode.field "rewatchId" Decode.string) data
+                |> Result.toOption
+                |> Option.map Default_rewatch_session_changed
             | "Rewatch_session_friend_added" ->
                 Decode.fromString decodeRewatchSessionFriendData data
                 |> Result.toOption

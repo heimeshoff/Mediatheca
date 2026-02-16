@@ -689,6 +689,7 @@ type IMediathecaApi = {
     // Series Rewatch Sessions
     createRewatchSession: string -> CreateRewatchSessionRequest -> Async<Result<string, string>>
     removeRewatchSession: string -> string -> Async<Result<unit, string>>
+    setDefaultRewatchSession: string -> string -> Async<Result<unit, string>>
     addFriendToRewatchSession: string -> string -> string -> Async<Result<unit, string>>
     removeFriendFromRewatchSession: string -> string -> string -> Async<Result<unit, string>>
     // Series Episode Progress

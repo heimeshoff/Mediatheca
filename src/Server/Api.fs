@@ -1542,6 +1542,19 @@ module Api =
                         projectionHandlers
             }
 
+            setDefaultRewatchSession = fun slug rewatchId -> async {
+                let sid = Series.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        (Series.Set_default_rewatch_session rewatchId)
+                        projectionHandlers
+            }
+
             addFriendToRewatchSession = fun slug rewatchId friendSlug -> async {
                 let sid = Series.streamId slug
                 return
@@ -2834,8 +2847,9 @@ module Api =
                                         match episodesResult with
                                         | Error e -> errors <- errors @ [sprintf "Series '%s' episodes: %s" slug e]
                                         | Ok episodes ->
-                                            // Get already-watched episodes in default rewatch session
-                                            let alreadyWatched = SeriesProjection.getWatchedEpisodesForSession conn slug "default"
+                                            // Get the actual default rewatch session (may have been changed by user)
+                                            let defaultRewatchId = SeriesProjection.getDefaultRewatchId conn slug
+                                            let alreadyWatched = SeriesProjection.getWatchedEpisodesForSession conn slug defaultRewatchId
                                             for ep in episodes do
                                                 let epPlayed = ep.UserData |> Option.map (fun ud -> ud.Played) |> Option.defaultValue false
                                                 match epPlayed, ep.ParentIndexNumber, ep.IndexNumber with
@@ -2857,7 +2871,7 @@ module Api =
                                                                 Series.decide
                                                                 Series.Serialization.toEventData
                                                                 (Series.Mark_episode_watched {
-                                                                    RewatchId = "default"
+                                                                    RewatchId = defaultRewatchId
                                                                     SeasonNumber = seasonNum
                                                                     EpisodeNumber = epNum
                                                                     Date = watchDate

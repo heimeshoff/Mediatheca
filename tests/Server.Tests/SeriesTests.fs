@@ -300,6 +300,83 @@ let seriesTests =
             match result with
             | Error msg -> Expect.stringContains msg "not watched" "Should say not watched"
             | Ok _ -> failtest "Expected error"
+
+        testCase "Setting default to another session emits event and flips IsDefault flags" <| fun _ ->
+            let sessionData: RewatchSessionCreatedData = {
+                RewatchId = "rewatch-1"
+                Name = Some "Second Watch"
+                FriendSlugs = []
+            }
+            let given = [
+                Series_added_to_library sampleSeriesData
+                Rewatch_session_created sessionData
+            ]
+            let result = givenWhenThen given (Set_default_rewatch_session "rewatch-1")
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 1 "Should produce one event"
+                match events.[0] with
+                | Default_rewatch_session_changed id -> Expect.equal id "rewatch-1" "Should change to rewatch-1"
+                | _ -> failtest "Expected Default_rewatch_session_changed event"
+                let state = applyEvents (given @ events)
+                match state with
+                | Active series ->
+                    let oldDefault = series.RewatchSessions |> Map.find "default"
+                    Expect.isFalse oldDefault.IsDefault "Old default should no longer be default"
+                    let newDefault = series.RewatchSessions |> Map.find "rewatch-1"
+                    Expect.isTrue newDefault.IsDefault "New session should be default"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Setting default to already-default session is no-op" <| fun _ ->
+            let given = [ Series_added_to_library sampleSeriesData ]
+            let result = givenWhenThen given (Set_default_rewatch_session "default")
+            match result with
+            | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Setting default to non-existent session returns error" <| fun _ ->
+            let given = [ Series_added_to_library sampleSeriesData ]
+            let result = givenWhenThen given (Set_default_rewatch_session "non-existent")
+            match result with
+            | Error msg -> Expect.stringContains msg "does not exist" "Should say does not exist"
+            | Ok _ -> failtest "Expected error"
+
+        testCase "Cannot delete the new default session" <| fun _ ->
+            let sessionData: RewatchSessionCreatedData = {
+                RewatchId = "rewatch-1"
+                Name = Some "Second Watch"
+                FriendSlugs = []
+            }
+            let given = [
+                Series_added_to_library sampleSeriesData
+                Rewatch_session_created sessionData
+                Default_rewatch_session_changed "rewatch-1"
+            ]
+            let result = givenWhenThen given (Remove_rewatch_session "rewatch-1")
+            match result with
+            | Error msg -> Expect.stringContains msg "default" "Should say cannot remove default"
+            | Ok _ -> failtest "Expected error"
+
+        testCase "Can delete old default after changing default" <| fun _ ->
+            let sessionData: RewatchSessionCreatedData = {
+                RewatchId = "rewatch-1"
+                Name = Some "Second Watch"
+                FriendSlugs = []
+            }
+            let given = [
+                Series_added_to_library sampleSeriesData
+                Rewatch_session_created sessionData
+                Default_rewatch_session_changed "rewatch-1"
+            ]
+            let result = givenWhenThen given (Remove_rewatch_session "default")
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 1 "Should produce one event"
+                match events.[0] with
+                | Rewatch_session_removed id -> Expect.equal id "default" "Should remove the old default"
+                | _ -> failtest "Expected Rewatch_session_removed event"
+            | Error e -> failtest $"Expected success but got: {e}"
     ]
 
 [<Tests>]
@@ -383,6 +460,7 @@ let seriesSerializationTests =
                 Series_personal_rating_set (Some 8)
                 Rewatch_session_created { RewatchId = "r1"; Name = None; FriendSlugs = [] }
                 Rewatch_session_removed "r1"
+                Default_rewatch_session_changed "r1"
                 Rewatch_session_friend_added { RewatchId = "r1"; FriendSlug = "marco" }
                 Rewatch_session_friend_removed { RewatchId = "r1"; FriendSlug = "marco" }
                 Episode_watched { RewatchId = "default"; SeasonNumber = 1; EpisodeNumber = 1; Date = "2025-01-01" }

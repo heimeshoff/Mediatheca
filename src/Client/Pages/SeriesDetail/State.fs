@@ -4,13 +4,22 @@ open Elmish
 open Mediatheca.Shared
 open Mediatheca.Client.Pages.SeriesDetail.Types
 
+let private activeRewatchId (model: Model) : string =
+    match model.SelectedRewatchId with
+    | Some id -> id
+    | None ->
+        model.Detail
+        |> Option.bind (fun d -> d.RewatchSessions |> List.tryFind (fun s -> s.IsDefault))
+        |> Option.map (fun s -> s.RewatchId)
+        |> Option.defaultValue "default"
+
 let init (slug: string) : Model * Cmd<Msg> =
     { Slug = slug
       Detail = None
       IsLoading = true
       ActiveTab = Overview
       SelectedSeason = 1
-      SelectedRewatchId = "default"
+      SelectedRewatchId = None
       IsRatingOpen = false
       IsFriendsMenuOpen = false
       ShowFriendPicker = None
@@ -32,12 +41,9 @@ let init (slug: string) : Model * Cmd<Msg> =
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
     | Load_detail ->
-        let rewatchId =
-            if model.SelectedRewatchId = "default" then None
-            else Some model.SelectedRewatchId
         { model with IsLoading = true },
         Cmd.batch [
-            Cmd.OfAsync.perform (fun () -> api.getSeriesDetail model.Slug rewatchId) () Detail_loaded
+            Cmd.OfAsync.perform (fun () -> api.getSeriesDetail model.Slug model.SelectedRewatchId) () Detail_loaded
             Cmd.OfAsync.perform api.getFriends () Friends_loaded
             Cmd.OfAsync.perform api.getCatalogs () Catalogs_loaded
             Cmd.OfAsync.perform api.getCatalogsForSeries model.Slug Series_catalogs_loaded
@@ -74,12 +80,13 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with SessionMenuOpen = None }, Cmd.none
 
     | Select_rewatch rewatchId ->
-        { model with SelectedRewatchId = rewatchId; SessionMenuOpen = None }, Cmd.ofMsg Load_detail
+        { model with SelectedRewatchId = Some rewatchId; SessionMenuOpen = None }, Cmd.ofMsg Load_detail
 
     | Toggle_episode_watched (seasonNumber, episodeNumber, isCurrentlyWatched) ->
+        let rewatchId = activeRewatchId model
         if isCurrentlyWatched then
             let request: MarkEpisodeUnwatchedRequest = {
-                RewatchId = model.SelectedRewatchId
+                RewatchId = rewatchId
                 SeasonNumber = seasonNumber
                 EpisodeNumber = episodeNumber
             }
@@ -90,7 +97,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         else
             let today = System.DateTime.Now.ToString("yyyy-MM-dd")
             let request: MarkEpisodeWatchedRequest = {
-                RewatchId = model.SelectedRewatchId
+                RewatchId = rewatchId
                 SeasonNumber = seasonNumber
                 EpisodeNumber = episodeNumber
                 Date = today
@@ -101,11 +108,8 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 () Episode_toggled (fun ex -> Episode_toggled (Error ex.Message))
 
     | Episode_toggled (Ok ()) ->
-        let rewatchId =
-            if model.SelectedRewatchId = "default" then None
-            else Some model.SelectedRewatchId
         model,
-        Cmd.OfAsync.perform (fun () -> api.getSeriesDetail model.Slug rewatchId) () Detail_loaded
+        Cmd.OfAsync.perform (fun () -> api.getSeriesDetail model.Slug model.SelectedRewatchId) () Detail_loaded
 
     | Episode_toggled (Error err) ->
         { model with Error = Some err }, Cmd.none
@@ -113,7 +117,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Mark_season_watched seasonNumber ->
         let today = System.DateTime.Now.ToString("yyyy-MM-dd")
         let request: MarkSeasonWatchedRequest = {
-            RewatchId = model.SelectedRewatchId
+            RewatchId = activeRewatchId model
             SeasonNumber = seasonNumber
             Date = today
         }
@@ -123,18 +127,15 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             () Season_marked (fun ex -> Season_marked (Error ex.Message))
 
     | Season_marked (Ok ()) ->
-        let rewatchId =
-            if model.SelectedRewatchId = "default" then None
-            else Some model.SelectedRewatchId
         model,
-        Cmd.OfAsync.perform (fun () -> api.getSeriesDetail model.Slug rewatchId) () Detail_loaded
+        Cmd.OfAsync.perform (fun () -> api.getSeriesDetail model.Slug model.SelectedRewatchId) () Detail_loaded
 
     | Season_marked (Error err) ->
         { model with Error = Some err }, Cmd.none
 
     | Mark_season_unwatched seasonNumber ->
         let request: MarkSeasonUnwatchedRequest = {
-            RewatchId = model.SelectedRewatchId
+            RewatchId = activeRewatchId model
             SeasonNumber = seasonNumber
         }
         model,
@@ -143,11 +144,8 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             () Season_unmarked (fun ex -> Season_unmarked (Error ex.Message))
 
     | Season_unmarked (Ok ()) ->
-        let rewatchId =
-            if model.SelectedRewatchId = "default" then None
-            else Some model.SelectedRewatchId
         model,
-        Cmd.OfAsync.perform (fun () -> api.getSeriesDetail model.Slug rewatchId) () Detail_loaded
+        Cmd.OfAsync.perform (fun () -> api.getSeriesDetail model.Slug model.SelectedRewatchId) () Detail_loaded
 
     | Season_unmarked (Error err) ->
         { model with Error = Some err }, Cmd.none
@@ -160,7 +158,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Update_episode_date (seasonNumber, episodeNumber, date) ->
         let request: UpdateEpisodeWatchedDateRequest = {
-            RewatchId = model.SelectedRewatchId
+            RewatchId = activeRewatchId model
             SeasonNumber = seasonNumber
             EpisodeNumber = episodeNumber
             Date = date
@@ -171,11 +169,8 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             () Episode_date_updated (fun ex -> Episode_date_updated (Error ex.Message))
 
     | Episode_date_updated (Ok ()) ->
-        let rewatchId =
-            if model.SelectedRewatchId = "default" then None
-            else Some model.SelectedRewatchId
         model,
-        Cmd.OfAsync.perform (fun () -> api.getSeriesDetail model.Slug rewatchId) () Detail_loaded
+        Cmd.OfAsync.perform (fun () -> api.getSeriesDetail model.Slug model.SelectedRewatchId) () Detail_loaded
 
     | Episode_date_updated (Error err) ->
         { model with Error = Some err }, Cmd.none
@@ -191,7 +186,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             () Rewatch_session_created (fun ex -> Rewatch_session_created (Error ex.Message))
 
     | Rewatch_session_created (Ok rewatchId) ->
-        { model with SelectedRewatchId = rewatchId }, Cmd.ofMsg Load_detail
+        { model with SelectedRewatchId = Some rewatchId }, Cmd.ofMsg Load_detail
 
     | Rewatch_session_created (Error err) ->
         { model with Error = Some err }, Cmd.none
@@ -203,9 +198,21 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             () Rewatch_session_removed (fun ex -> Rewatch_session_removed (Error ex.Message))
 
     | Rewatch_session_removed (Ok ()) ->
-        { model with SelectedRewatchId = "default" }, Cmd.ofMsg Load_detail
+        { model with SelectedRewatchId = None }, Cmd.ofMsg Load_detail
 
     | Rewatch_session_removed (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Set_default_rewatch_session rewatchId ->
+        model,
+        Cmd.OfAsync.either
+            (fun () -> api.setDefaultRewatchSession model.Slug rewatchId)
+            () Default_rewatch_session_set (fun ex -> Default_rewatch_session_set (Error ex.Message))
+
+    | Default_rewatch_session_set (Ok ()) ->
+        model, Cmd.ofMsg Load_detail
+
+    | Default_rewatch_session_set (Error err) ->
         { model with Error = Some err }, Cmd.none
 
     | Add_rewatch_friend (rewatchId, friendSlug) ->
@@ -233,12 +240,9 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             }) () Rewatch_friend_result (fun ex -> Rewatch_friend_result (Error ex.Message))
 
     | Rewatch_friend_result (Ok ()) ->
-        let rewatchId =
-            if model.SelectedRewatchId = "default" then None
-            else Some model.SelectedRewatchId
         model,
         Cmd.batch [
-            Cmd.OfAsync.perform (fun () -> api.getSeriesDetail model.Slug rewatchId) () Detail_loaded
+            Cmd.OfAsync.perform (fun () -> api.getSeriesDetail model.Slug model.SelectedRewatchId) () Detail_loaded
             Cmd.OfAsync.perform api.getFriends () Friends_loaded
         ]
 

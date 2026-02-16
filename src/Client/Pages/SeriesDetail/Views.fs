@@ -882,7 +882,7 @@ let private rewatchSessionPanel (series: SeriesDetail) (model: Model) (dispatch:
                 prop.className "flex gap-3 flex-wrap"
                 prop.children [
                     for session in series.RewatchSessions do
-                        let isSelected = session.RewatchId = model.SelectedRewatchId || (session.IsDefault && model.SelectedRewatchId = "default")
+                        let isSelected = model.SelectedRewatchId = Some session.RewatchId || (session.IsDefault && model.SelectedRewatchId.IsNone)
                         let pct =
                             if totalEpisodes = 0 then 0.0
                             else float session.WatchedCount / float totalEpisodes * 100.0
@@ -917,6 +917,11 @@ let private rewatchSessionPanel (series: SeriesDetail) (model: Model) (dispatch:
                                                                     prop.className "font-semibold text-sm truncate"
                                                                     prop.text sessionName
                                                                 ]
+                                                                if session.IsDefault then
+                                                                    Html.span [
+                                                                        prop.className "text-xs text-primary/60 ml-1 flex-shrink-0"
+                                                                        prop.text "(default)"
+                                                                    ]
                                                                 // Three-dots button
                                                                 Html.button [
                                                                     prop.className "w-6 h-6 flex-shrink-0 flex items-center justify-center text-base-content/40 hover:text-base-content transition-all cursor-pointer rounded-full hover:bg-base-content/10 opacity-0 group-hover:opacity-100"
@@ -1000,6 +1005,31 @@ let private rewatchSessionPanel (series: SeriesDetail) (model: Model) (dispatch:
                                                     Html.span [ prop.text "Manage friends" ]
                                                 ]
                                             ]
+                                            if not session.IsDefault then
+                                                Html.button [
+                                                    prop.className "w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-base-content/10 transition-colors cursor-pointer"
+                                                    prop.onClick (fun e ->
+                                                        e.stopPropagation()
+                                                        dispatch Close_session_menu
+                                                        dispatch (Set_default_rewatch_session session.RewatchId))
+                                                    prop.children [
+                                                        Svg.svg [
+                                                            svg.className "w-4 h-4 flex-shrink-0 text-base-content/60"
+                                                            svg.fill "none"
+                                                            svg.viewBox (0, 0, 24, 24)
+                                                            svg.stroke "currentColor"
+                                                            svg.custom ("strokeWidth", 1.5)
+                                                            svg.children [
+                                                                Svg.path [
+                                                                    svg.custom ("strokeLinecap", "round")
+                                                                    svg.custom ("strokeLinejoin", "round")
+                                                                    svg.d "M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z"
+                                                                ]
+                                                            ]
+                                                        ]
+                                                        Html.span [ prop.text "Set as default" ]
+                                                    ]
+                                                ]
                                             if not session.IsDefault then
                                                 Html.button [
                                                     prop.className "w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-error/15 text-error/70 hover:text-error transition-colors cursor-pointer"
