@@ -1,0 +1,51 @@
+name: mediatheca
+
+services:
+  mediatheca:
+    image: mediatheca:latest
+    container_name: mediatheca
+    # ports removed - accessed via Tailscale only
+    # - "5000:5000"
+    volumes:
+      - ${HOME}/heimeshoff/mediatheca:/app/data
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_URLS=http://+:5000
+      - ASPNETCORE_ENVIRONMENT=Production
+      - DATA_DIR=/app/data
+      - TMDB_API_KEY=${TMDB_API_KEY}
+      - RAWG_API_KEY=${RAWG_API_KEY}
+      - STEAM_API_KEY=${STEAM_API_KEY}
+      - STEAM_ID=${STEAM_ID}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/IMediathecaApi/healthCheck"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: mediatheca-tailscale
+    network_mode: "service:mediatheca"
+    depends_on:
+      - mediatheca
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_EXTRA_ARGS=--hostname=mediatheca
+      - TS_USERSPACE=true
+    volumes:
+      - tailscale_state:/var/lib/tailscale
+    command: >
+      sh -c "
+        tailscaled --state=/var/lib/tailscale/tailscaled.state --tun=userspace-networking &
+        sleep 5 &&
+        tailscale up --authkey=$TS_AUTHKEY $TS_EXTRA_ARGS &&
+        sleep 2 &&
+        tailscale serve --https=443 http://127.0.0.1:5000 &&
+        tail -f /dev/null
+      "
+    restart: unless-stopped
+
+volumes:
+  tailscale_state:

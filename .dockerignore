@@ -1,0 +1,11 @@
+node_modules/
+deploy/
+.git/
+.planning/
+.claude/
+tests/
+*.md
+*.db
+*.db-shm
+*.db-wal
+images/

@@ -33,14 +33,15 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=server-build /app/publish ./
 COPY --from=client-build /app/deploy/public ./deploy/public
 
-# Image storage volume for posters, backdrops, cast photos, and friend images
-VOLUME /app/images
+# Data volume for SQLite database, images, and other persistent state
+VOLUME /app/data
 
-# Set TMDB_API_KEY environment variable to enable TMDB integration
-# Example: docker run -e TMDB_API_KEY=your_key_here ...
 ENV ASPNETCORE_URLS=http://+:5000
 EXPOSE 5000
 
