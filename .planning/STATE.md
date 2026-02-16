@@ -13,6 +13,12 @@ This worktree implements Jellyfin integration (originally REQ-114 in main projec
 
 ## Recent Progress
 
+- **2026-02-16**: Collapsible sections on Friend Detail page
+  - Added chevron up/down indicators to Recommended, Pending, and Watched Together section headers
+  - Clicking a section header toggles collapse/expand
+  - Entry count displayed inline next to section title (not below)
+  - State tracked via `CollapsedSections: Set<string>` in Model
+
 - **2026-02-16**: Phase 1 (Connection & Library Scan) implemented
   - `Jellyfin.fs`: Server module with config type, user auth via `/Users/AuthenticateByName`, library fetch (movies/series/episodes), Thoth.Json.Net decoders for BaseItemDto subset
   - Settings management: `jellyfin_server_url`, `jellyfin_username`, `jellyfin_password`, `jellyfin_user_id`, `jellyfin_access_token` in SettingsStore, config provider in Program.fs

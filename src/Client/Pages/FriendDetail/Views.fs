@@ -148,43 +148,60 @@ let private friendWatchedItems (items: FriendWatchedItem list) : EntryList.Entry
         RoutePrefix = routeForMedia m.MediaType
     })
 
-let private mediaSection (title: string) (onRemove: (string * string) -> unit) (items: FriendMediaItem list) =
+let private sectionHeader (title: string) (count: int) (isCollapsed: bool) (onToggle: unit -> unit) =
+    Html.div [
+        prop.className "flex items-center gap-2 cursor-pointer select-none mt-6 mb-3"
+        prop.onClick (fun _ -> onToggle ())
+        prop.children [
+            Html.h3 [
+                prop.className "text-lg font-bold font-display"
+                prop.text title
+            ]
+            Html.span [
+                prop.className "text-sm text-base-content/50"
+                prop.text $"({count})"
+            ]
+            Html.span [
+                prop.className "text-base-content/40 transition-transform duration-200"
+                prop.children [
+                    if isCollapsed then Icons.chevronDown ()
+                    else Icons.chevronUp ()
+                ]
+            ]
+        ]
+    ]
+
+let private mediaSection (title: string) (isCollapsed: bool) (onToggle: unit -> unit) (onRemove: (string * string) -> unit) (items: FriendMediaItem list) =
     if List.isEmpty items then
         Html.none
     else
         Html.div [
-            prop.className "mt-6"
             prop.children [
-                Html.h3 [
-                    prop.className "text-lg font-bold font-display mb-3"
-                    prop.text title
-                ]
-                EntryList.view {
-                    Items = friendMediaItems items
-                    RenderListRow = mediaListRow onRemove
-                    ShowWatchOrder = false
-                }
+                sectionHeader title (List.length items) isCollapsed onToggle
+                if not isCollapsed then
+                    EntryList.view {
+                        Items = friendMediaItems items
+                        RenderListRow = mediaListRow onRemove
+                        ShowWatchOrder = false
+                    }
             ]
         ]
 
-let private watchedMediaSection (items: FriendWatchedItem list) =
+let private watchedMediaSection (isCollapsed: bool) (onToggle: unit -> unit) (items: FriendWatchedItem list) =
     if List.isEmpty items then
         Html.none
     else
         let watchedBySlug =
             items |> List.map (fun m -> m.Slug, m) |> Map.ofList
         Html.div [
-            prop.className "mt-6"
             prop.children [
-                Html.h3 [
-                    prop.className "text-lg font-bold font-display mb-3"
-                    prop.text "Watched Together"
-                ]
-                EntryList.view {
-                    Items = friendWatchedItems items
-                    RenderListRow = watchedMediaListRow watchedBySlug
-                    ShowWatchOrder = false
-                }
+                sectionHeader "Watched Together" (List.length items) isCollapsed onToggle
+                if not isCollapsed then
+                    EntryList.view {
+                        Items = friendWatchedItems items
+                        RenderListRow = watchedMediaListRow watchedBySlug
+                        ShowWatchOrder = false
+                    }
             ]
         ]
 
@@ -321,9 +338,9 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 // Media sections
                                 match model.FriendMedia with
                                 | Some media ->
-                                    mediaSection "Recommended" (fun (slug, rp) -> dispatch (Remove_from_recommended (slug, rp))) media.Recommended
-                                    mediaSection "Pending" (fun (slug, rp) -> dispatch (Remove_from_pending (slug, rp))) media.WantToWatch
-                                    watchedMediaSection media.Watched
+                                    mediaSection "Recommended" (Set.contains "Recommended" model.CollapsedSections) (fun () -> dispatch (Toggle_section "Recommended")) (fun (slug, rp) -> dispatch (Remove_from_recommended (slug, rp))) media.Recommended
+                                    mediaSection "Pending" (Set.contains "Pending" model.CollapsedSections) (fun () -> dispatch (Toggle_section "Pending")) (fun (slug, rp) -> dispatch (Remove_from_pending (slug, rp))) media.WantToWatch
+                                    watchedMediaSection (Set.contains "Watched" model.CollapsedSections) (fun () -> dispatch (Toggle_section "Watched")) media.Watched
                                 | None -> ()
                             ]
                         ]

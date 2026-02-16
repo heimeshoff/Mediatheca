@@ -12,7 +12,8 @@ let init (slug: string) : Model * Cmd<Msg> =
       IsEditing = false
       EditForm = { Name = ""; ImageRef = None }
       Error = None
-      ShowRemoveConfirm = false },
+      ShowRemoveConfirm = false
+      CollapsedSections = Set.empty },
     Cmd.ofMsg (Load_friend slug)
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
@@ -120,3 +121,11 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Media_remove_result (Error err) ->
         { model with Error = Some err }, Cmd.none
+
+    | Toggle_section section ->
+        let collapsed =
+            if Set.contains section model.CollapsedSections then
+                Set.remove section model.CollapsedSections
+            else
+                Set.add section model.CollapsedSections
+        { model with CollapsedSections = collapsed }, Cmd.none

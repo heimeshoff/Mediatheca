@@ -16,6 +16,7 @@ type Model = {
     EditForm: EditForm
     Error: string option
     ShowRemoveConfirm: bool
+    CollapsedSections: Set<string>
 }
 
 type Msg =
@@ -36,3 +37,4 @@ type Msg =
     | Remove_from_recommended of mediaSlug: string * routePrefix: string
     | Remove_from_pending of mediaSlug: string * routePrefix: string
     | Media_remove_result of Result<unit, string>
+    | Toggle_section of string
