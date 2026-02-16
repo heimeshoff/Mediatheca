@@ -4,6 +4,7 @@ open Feliz
 open Feliz.DaisyUI
 open Feliz.Router
 open Mediatheca.Client.Pages.Dashboard.Types
+open Mediatheca.Shared
 open Mediatheca.Client
 open Mediatheca.Client.Components
 
@@ -166,9 +167,65 @@ let view (model: Model) (_dispatch: Msg -> unit) =
                                 prop.className "text-3xl lg:text-4xl font-bold font-display text-gradient-primary"
                                 prop.text "Dashboard"
                             ]
-                            Html.p [
-                                prop.className "mt-2 text-base-content/60 text-lg"
-                                prop.text "Your personal media collection at a glance."
+                            Html.div [
+                                prop.className "flex items-center gap-3 mt-2"
+                                prop.children [
+                                    Html.p [
+                                        prop.className "text-base-content/60 text-lg"
+                                        prop.text "Your personal media collection at a glance."
+                                    ]
+                                    match model.JellyfinSyncStatus with
+                                    | Syncing ->
+                                        Html.span [
+                                            prop.className "inline-flex items-center gap-1.5 text-xs text-info/70 animate-pulse"
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className "loading loading-spinner loading-xs"
+                                                ]
+                                                Html.span [ prop.text "Jellyfin sync" ]
+                                            ]
+                                        ]
+                                    | Synced result ->
+                                        let checkIcon =
+                                            Svg.svg [
+                                                svg.className "w-3.5 h-3.5"
+                                                svg.fill "none"
+                                                svg.viewBox (0, 0, 24, 24)
+                                                svg.stroke "currentColor"
+                                                svg.custom ("strokeWidth", 2)
+                                                svg.children [
+                                                    Svg.path [
+                                                        svg.custom ("strokeLinecap", "round")
+                                                        svg.custom ("strokeLinejoin", "round")
+                                                        svg.d "M4.5 12.75l6 6 9-13.5"
+                                                    ]
+                                                ]
+                                            ]
+                                        let total = result.MoviesAdded + result.EpisodesAdded + result.MoviesAutoAdded + result.SeriesAutoAdded
+                                        if total > 0 then
+                                            let parts = [
+                                                if result.MoviesAutoAdded > 0 then $"+{result.MoviesAutoAdded} movies"
+                                                if result.SeriesAutoAdded > 0 then $"+{result.SeriesAutoAdded} series"
+                                                if result.MoviesAdded > 0 then $"+{result.MoviesAdded} watched"
+                                                if result.EpisodesAdded > 0 then $"+{result.EpisodesAdded} episodes"
+                                            ]
+                                            Html.span [
+                                                prop.className "inline-flex items-center gap-1.5 text-xs text-success/70"
+                                                prop.children [
+                                                    checkIcon
+                                                    Html.span [ prop.text (parts |> String.concat ", ") ]
+                                                ]
+                                            ]
+                                        else
+                                            Html.span [
+                                                prop.className "inline-flex items-center gap-1.5 text-xs text-base-content/30"
+                                                prop.children [
+                                                    checkIcon
+                                                    Html.span [ prop.text "Jellyfin synced" ]
+                                                ]
+                                            ]
+                                    | SyncFailed | Idle -> ()
+                                ]
                             ]
                         ]
                     ]
