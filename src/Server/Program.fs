@@ -159,10 +159,14 @@ let main args =
         Remoting.createApi ()
         |> Remoting.withRouteBuilder Route.builder
         |> Remoting.fromValue api
+        |> Remoting.withErrorHandler (fun ex _routeInfo ->
+            eprintfn "Fable.Remoting error: %s\n%s" ex.Message ex.StackTrace
+            Propagate ex.Message)
         |> Remoting.buildHttpHandler
 
     let webApp =
         choose [
+            route "/health" >=> text "ok"
             route "/api/stream/import-steam-family"
                 >=> Api.steamFamilyImportHandler conn httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers
             remotingHandler
@@ -171,8 +175,9 @@ let main args =
     // Serve static files from deploy/public in production
     let staticPath = Path.Combine(Directory.GetCurrentDirectory(), "deploy", "public")
     if Directory.Exists(staticPath) then
-        app.UseDefaultFiles() |> ignore
-        app.UseStaticFiles() |> ignore
+        let fileProvider = new PhysicalFileProvider(staticPath)
+        app.UseDefaultFiles(DefaultFilesOptions(FileProvider = fileProvider)) |> ignore
+        app.UseStaticFiles(StaticFileOptions(FileProvider = fileProvider)) |> ignore
 
     // Serve images from /images path
     if Directory.Exists(imageBasePath) then
