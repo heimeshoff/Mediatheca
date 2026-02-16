@@ -1,105 +1,38 @@
-# Requirements
+# Requirements — Jellyfin Integration
 
-## v1 — Personal Media Tracker
+> Branch: gitwork3 | Topic: Jellyfin sync — import watch history from local media server
 
-### Phase 1: Skeleton
+## Core Principle: Additive-Only Sync
 
-- [x] REQ-001: F# solution structure with Shared, Server, and Client projects using Fable, Giraffe, and Fable.Remoting [Phase 1]
-- [x] REQ-002: Vite + concurrently dev pipeline for simultaneous frontend and backend development [Phase 1]
-- [x] REQ-003: TailwindCSS + DaisyUI integration with Fable/Feliz frontend [Phase 1]
-- [x] REQ-004: SQLite-based append-only event store with event serialization and stream support [Phase 1]
-- [x] REQ-005: Projection engine that replays events into SQLite read model tables [Phase 1]
-- [x] REQ-006: App shell with mobile-first responsive layout and navigation (sidebar/bottom nav) [Phase 1]
-- [x] REQ-007: Dockerfile for production deployment on Linux [Phase 1]
-- [x] REQ-008: Expecto test project with build integration [Phase 1]
+Jellyfin integration is **strictly additive**. Watch sessions and episode progress are only ever *added* to Mediatheca, never removed. Jellyfin does not provide a complete watch history (only last-played date and play count), so existing Mediatheca data is always treated as the richer, authoritative record. No sync operation may delete, overwrite, or downgrade existing watch data.
 
-### Phase 2: Catalog + Friends
+## v1 — Jellyfin Integration
 
-- [x] REQ-009: Movie aggregate with events: MovieAddedToLibrary (fat TMDB import event), MovieRemovedFromLibrary, MovieCategorized, MoviePosterReplaced, MovieBackdropReplaced, MovieRecommendedBy, RecommendationRemoved, WantToWatchWith, RemovedWantToWatchWith [Phase 2]
-- [x] REQ-010: TMDB API integration — search movies, import metadata (name, year, runtime, overview, genres, poster, backdrop, TMDB rating), download images to local filesystem [Phase 2]
-- [x] REQ-010a: Cast table (non-event-sourced) — store top-billed and full cast per movie, shared across movies, garbage-collect orphaned cast members and their images on movie removal [Phase 2]
-- [x] REQ-011: Movie detail page showing metadata, cast, genres, recommendations, and "want to watch with" list [Phase 2]
-- [x] REQ-012: Movie list view with search and filtering [Phase 2]
-- [x] REQ-013: Friend aggregate with events: FriendAdded, FriendUpdated, FriendRemoved — name and image reference only [Phase 2]
-- [x] REQ-014: Friend list view with add/edit [Phase 2]
-- [x] REQ-015: "Recommended by" and "Want to watch with" associations on Movie aggregate, manageable from movie detail page [Phase 2]
+### Phase 1: Connection & Library Scan
 
-### Phase 3: Journal + Content Blocks
+- [x] REQ-300: Jellyfin server module (`Jellyfin.fs`) — config type (ServerUrl, Username, Password), user authentication via `/Users/AuthenticateByName`, library fetch via `/Users/{userId}/Items`, Thoth.Json.Net decoders for BaseItemDto (Name, ProductionYear, Type, RunTimeTicks, Genres, ProviderIds with TMDB ID, UserData with Played/PlayCount/LastPlayedDate, series fields). Follow Steam.fs/Tmdb.fs module pattern. [Phase 1]
+- [x] REQ-301: Jellyfin settings management — settings keys (`jellyfin_server_url`, `jellyfin_username`, `jellyfin_password`, `jellyfin_user_id`, `jellyfin_access_token`), config provider in Program.fs, get/set/test API endpoints on IMediathecaApi. Test connection = authenticate + fetch user info. [Phase 1]
+- [x] REQ-302: Jellyfin library scan — fetch all Movies and Series from Jellyfin, match to existing Mediatheca items by TMDB ID (from Jellyfin's `ProviderIds.Tmdb`). Return matched/unmatched item lists with Jellyfin metadata preview. Shared types: `JellyfinItem`, `JellyfinScanResult`. [Phase 1]
+- [x] REQ-303: Settings UI — Jellyfin integration card in Settings page following existing `integrationCard` pattern. Server URL input, username/password inputs, Test Connection button, Save button, connection status badge. [Phase 1]
 
-- [x] REQ-016: Record a WatchSession for a Movie with date, optional duration, and friends present [Phase 3]
-- [x] REQ-017: View watch history for a Movie (list of sessions with dates and friends) [Phase 3]
-- [x] REQ-018: Content blocks (TextBlock, ImageBlock, LinkBlock) attachable to a Movie [Phase 3]
-- [x] REQ-019: Content blocks attachable to a WatchSession [Phase 3]
-- [x] REQ-020: Image upload and storage on local filesystem for ImageBlocks [Phase 3]
-- [x] REQ-021: Inline content block editor (add, edit, reorder, delete blocks) [Phase 3]
+### Phase 2: Additive Watch History Sync
 
-### Phase 4: Curation + Dashboards + Admin
-
-- [x] REQ-022: Create a Catalog with name, description, and sorted/unsorted flag [Phase 4]
-- [x] REQ-023: Add Entries (movies) to a Catalog with optional position and per-item note [Phase 4]
-- [x] REQ-024: Catalog detail view showing entries in order with notes [Phase 4]
-- [x] REQ-025: Catalog list view [Phase 4]
-- [x] REQ-026: Main Dashboard — overview of recent activity, recently added movies, and quick stats (movies, friends, catalogs, watch time) [Phase 4]
-- [x] REQ-027: Dashboard — stats (total watched, watch time, catalog count) [Phase 4]
-- [x] REQ-028: Event Store Browser — view and search events by stream, type, and date [Phase 4]
-
-### Phase 5: Design System (Style Guide)
-
-- [x] REQ-029: Style Guide page at `/styleguide` route — hidden from navigation, not discoverable, accessible only by direct URL [Phase 5]
-- [x] REQ-030: Component catalog — every reusable frontend component displayed with all used parametrizations, each with explanation of design decisions (what was chosen, what was rejected, and why) [Phase 5]
-- [x] REQ-031: Design token documentation — typography (Oswald/Inter usage), colors (theme palette), spacing, shapes, glassmorphism conventions, and all other design decisions with rationale for each choice [Phase 5]
-- [x] REQ-032: Design system as single source of truth — extract component definitions and design tokens so the Style Guide IS the canonical definition and application pages consume from it [Phase 5]
-- [x] REQ-033: Skills and/or agents for Style Guide workflow — when a component or design token is changed in the Style Guide, provide guided propagation to update all usages across application pages [Phase 5]
-
-### Phase 6: TV Series
-
-- [x] REQ-100: TV Series aggregate with Series > Season > Episode hierarchy, fat TMDB import (series + all seasons + all episodes), SeriesStatus (Returning/Ended/Canceled/InProduction/Planned), series-level cast (non-event-sourced CastStore), local image storage (posters, backdrops, episode stills) [Phase 6]
-- [x] REQ-101: Named rewatch sessions — default personal session (auto-created on import) + named rewatch sessions with friends; episode progress tracked per session; overall progress = union across all sessions [Phase 6]
-- [x] REQ-101a: Batch episode operations — mark season watched, mark episodes watched up to S##E##; essential for importing already-seen series [Phase 6]
-- [x] REQ-101b: Social features on Series — recommended_by, want_to_watch_with, personal_rating, content_blocks (full parity with Movies) [Phase 6]
-- [x] REQ-102: TV Series detail page with hero backdrop, tab bar (Overview, Cast & Crew, Episodes), season sidebar with progress counts, episode list with thumbnails/watch status/green checkmarks, "next up" highlight, rewatch session selector dropdown [Phase 6]
-- [x] REQ-102a: TV Series list page with search/filtering, poster grid/list, season count badges, "next up" preview, series status badges [Phase 6]
-- [x] REQ-102b: Polymorphic catalog entries — catalogs can hold both Movies and Series via MediaType discriminator [Phase 6]
-- [ ] REQ-102c: TV Series Dashboard with episode progress, next-to-watch across all series, watch time stats [Phase 6 — deferred]
-
-### Phase 7A: Game Catalog + Play Sessions
-
-- [x] REQ-200: Game aggregate with RAWG API import and manual creation. GameStatus lifecycle (Backlog/Playing/Completed/Abandoned/OnHold). Game store ownership tracking (predefined: Steam, Nintendo eShop, GOG, Epic Games Store, PlayStation Store, Xbox Store, Humble Bundle, itch.io). Steam Family ownership — mark games owned by family members (friendSlugs) vs personally owned. Social parity (recommended_by, want_to_play_with, personal_rating). Content blocks (reuse ContentBlocks aggregate pattern). [Phase 7A]
-- [x] REQ-201: RAWG API integration — search games, import metadata (name, year, genres, description, cover image, background image, RAWG rating), download images to local filesystem. API key stored in Settings (like TMDB). [Phase 7A]
-- [x] REQ-202: Play session tracking — date, duration (user-entered in minutes), friends present. Accumulated total play time on game detail and list views. [Phase 7A]
-- [x] REQ-203: Game list page (poster grid/list, search, GameStatus filter badges for Backlog/Playing/Completed/Abandoned/OnHold). Game detail page (hero backdrop, info, play sessions timeline, store badges, family owners, social sidebar — following Movie/Series layout pattern). [Phase 7A]
-- [x] REQ-204: Polymorphic catalog entries — catalogs can hold Movies, Series, and Games via MediaType discriminator. [Phase 7A]
-- [x] REQ-205: Unified search modal (Ctrl+K) — add Games column with RAWG search results alongside TMDB Movies and Series columns. [Phase 7A]
-- [x] REQ-206: Friend-game associations on Friend detail page — recommended games, want to play with, played together (same pattern as movies/series). [Phase 7A]
-
-### Phase 7B: Games Dashboard + Steam Integration
-
-- [ ] REQ-207: Games Dashboard — currently playing games, recent play sessions, total play time stats, completion progress (play time vs HowLongToBeat average), games by status breakdown. [Phase 7B]
-- [ ] REQ-208: Steam integration — import personal game library with play hours via Steam Web API. Steam Family support: configure family members in Settings (Steam ID → Friend mapping), import each family member's library, mark games with family owner (friendSlug). Match imported games with existing RAWG-imported entries or create new. Requires Steam API key + Steam IDs in Settings. [Phase 7B]
-- [ ] REQ-209: HowLongToBeat integration — fetch average completion times by game name. Display comparison on game detail page (your play time vs average) and dashboard. [Phase 7B]
+- [x] REQ-304: Movie watch sync (additive-only) — for matched movies where Jellyfin `Played=true`: check if Mediatheca already has a watch session on the same date as `LastPlayedDate`. If no session exists for that date, create a new `Watch_session_recorded` event. If a session already exists on that date, skip (avoid duplicates). Never remove existing sessions. [Phase 2]
+- [x] REQ-305: Series episode watch sync (additive-only) — for matched series, fetch episodes from Jellyfin (`/Shows/{seriesId}/Episodes`), match by season/episode number. For episodes where Jellyfin `Played=true` AND not yet watched in Mediatheca's default rewatch session, emit `Episode_watched` events using `LastPlayedDate`. Never unwatch episodes that Mediatheca already has marked as watched. [Phase 2]
+- [x] REQ-306: Jellyfin sync API endpoints — `scanJellyfinLibrary: unit -> Async<Result<JellyfinScanResult, string>>` (preview what will be added), `importJellyfinWatchHistory: unit -> Async<Result<JellyfinImportResult, string>>` (execute additive sync). Import result includes movies synced, episodes synced, items skipped (already watched / no match). [Phase 2]
+- [x] REQ-307: Jellyfin sync UI — scan button on Settings card, preview table showing what will be *added* (never removed), confirm import action, result summary (added/skipped/errors). [Phase 2]
 
 ## v2 (Future)
 
-- [ ] REQ-109: Book support with manual creation
-- [ ] REQ-110: Goodreads integration — import book library and reading status
-- [ ] REQ-121: Audible integration — import audiobook library and listening progress
-- [ ] REQ-111: ReadSession tracking for books (date, pages/chapters)
-- [ ] REQ-112: Books Dashboard with reading stats
-- [ ] REQ-113: Trakt.tv sync — import/export watch history
-- [ ] REQ-114: Jellyfin sync — import watch history from local media server
-- [ ] REQ-115: Rotten Tomatoes score display on movies
-- [ ] REQ-116: Trailer playback (YouTube embeds for movies, Steam trailers for games)
-- [ ] REQ-117: SQLite table inspector in Administration module
-- [ ] REQ-118: Yearly intelligence reports (total watch/play/read time)
-- [ ] REQ-119: Friend-level intelligence (media consumed per friend)
-- [ ] REQ-120: Planned future sessions with friends
-- [ ] REQ-102c: TV Series Dashboard with episode progress, next-to-watch across all series, watch time stats
+- [ ] REQ-308: Jellyfin webhook receiver & live playback progress — real-time playback events via jellyfin-plugin-webhook, progress bar on posters, auto-create watch sessions on completion (requires push-based client update, not polling)
+- [ ] REQ-320: Auto-import unmatched items — when Jellyfin has movies/series not in Mediatheca, offer to import them via TMDB using the Jellyfin-provided TMDB ID
+- [ ] REQ-321: Jellyfin image fallback — use Jellyfin server as image source when TMDB images are unavailable
+- [ ] REQ-322: Two-way sync — mark items watched in Mediatheca → mark watched in Jellyfin via `/Users/{userId}/PlayedItems/{itemId}`
+- [ ] REQ-323: Progress bar on movie/episode detail page — show resume position, "continue watching" state, time remaining
 
 ## Out of Scope
 
-- Multi-user accounts or authentication — single-user app, no login required
-- Social features (sharing, public profiles) — personal use only
-- Native mobile apps — web only, mobile-first responsive design
-- Cloud hosting or managed services — self-hosted Docker only
-- Real-time collaboration — single user, no concurrent editing
-- Serena MCP — revisit once codebase is large enough to benefit from LSP-based navigation
+- Jellyfin playback control from Mediatheca (not a media player)
+- Multi-user Jellyfin support (Mediatheca is single-user)
+- Jellyfin music/audiobook library sync (separate media types)
+- Removing watch sessions based on Jellyfin state (violates additive-only principle)

@@ -110,6 +110,14 @@ let main args =
             |> Option.defaultValue ""
         { ApiKey = apiKey }
 
+    // Dynamic Jellyfin config provider (reads from DB)
+    let getJellyfinConfig () : Jellyfin.JellyfinConfig =
+        { ServerUrl = SettingsStore.getSetting conn "jellyfin_server_url" |> Option.defaultValue ""
+          Username = SettingsStore.getSetting conn "jellyfin_username" |> Option.defaultValue ""
+          Password = SettingsStore.getSetting conn "jellyfin_password" |> Option.defaultValue ""
+          UserId = SettingsStore.getSetting conn "jellyfin_user_id" |> Option.defaultValue ""
+          AccessToken = SettingsStore.getSetting conn "jellyfin_access_token" |> Option.defaultValue "" }
+
     // Dynamic Steam config provider (reads from DB, falls back to env var)
     let getSteamConfig () : Steam.SteamConfig =
         let apiKey =
@@ -145,7 +153,7 @@ let main args =
     Projection.startAllProjections conn projectionHandlers
 
     // Create API
-    let api = Api.create conn httpClient getTmdbConfig getRawgConfig getSteamConfig imageBasePath projectionHandlers
+    let api = Api.create conn httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig imageBasePath projectionHandlers
 
     let remotingHandler =
         Remoting.createApi ()

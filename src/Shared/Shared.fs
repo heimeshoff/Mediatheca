@@ -532,6 +532,44 @@ type GameImageCandidate = {
     IsCover: bool
 }
 
+// Jellyfin Integration
+
+type JellyfinItemType =
+    | JellyfinMovie
+    | JellyfinSeries
+
+type JellyfinItem = {
+    JellyfinId: string
+    Name: string
+    Year: int option
+    ItemType: JellyfinItemType
+    TmdbId: int option
+    Played: bool
+    PlayCount: int
+    LastPlayedDate: string option
+}
+
+type JellyfinMatchedItem = {
+    JellyfinItem: JellyfinItem
+    MediathecaSlug: string
+    MediathecaName: string
+    HasExistingWatchData: bool
+}
+
+type JellyfinScanResult = {
+    MatchedMovies: JellyfinMatchedItem list
+    MatchedSeries: JellyfinMatchedItem list
+    UnmatchedMovies: JellyfinItem list
+    UnmatchedSeries: JellyfinItem list
+}
+
+type JellyfinImportResult = {
+    MoviesAdded: int
+    EpisodesAdded: int
+    ItemsSkipped: int
+    Errors: string list
+}
+
 // Import
 
 type ImportFromCinemarcoRequest = {
@@ -694,6 +732,14 @@ type IMediathecaApi = {
     setSteamFamilyMembers: SteamFamilyMember list -> Async<Result<unit, string>>
     fetchSteamFamilyMembers: unit -> Async<Result<SteamFamilyMember list, string>>
     importSteamFamily: unit -> Async<Result<SteamFamilyImportResult, string>>
+    // Jellyfin Integration
+    getJellyfinServerUrl: unit -> Async<string>
+    setJellyfinServerUrl: string -> Async<Result<unit, string>>
+    getJellyfinUsername: unit -> Async<string>
+    setJellyfinCredentials: string * string -> Async<Result<unit, string>>
+    testJellyfinConnection: string * string * string -> Async<Result<string, string>>
+    scanJellyfinLibrary: unit -> Async<Result<JellyfinScanResult, string>>
+    importJellyfinWatchHistory: unit -> Async<Result<JellyfinImportResult, string>>
     // Import
     importFromCinemarco: ImportFromCinemarcoRequest -> Async<Result<ImportResult, string>>
 }

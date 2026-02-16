@@ -941,6 +941,276 @@ let private cinemarcoDetail (model: Model) (dispatch: Msg -> unit) =
         ]
     ]
 
+// ── Jellyfin Detail ──
+
+let private jellyfinDetail (model: Model) (dispatch: Msg -> unit) =
+    Html.div [
+        prop.children [
+            Html.p [
+                prop.className "text-base-content/70 mb-4 text-sm"
+                prop.children [
+                    Html.text "Connect to your Jellyfin server to sync watch history. Enter your server URL and credentials below."
+                ]
+            ]
+
+            if model.JellyfinServerUrl <> "" then
+                Html.div [
+                    prop.className "mb-3 flex items-center gap-2 text-sm text-base-content/60"
+                    prop.children [
+                        Html.span [ prop.text "Server:" ]
+                        Html.span [ prop.className "font-mono"; prop.text model.JellyfinServerUrl ]
+                    ]
+                ]
+
+            if model.JellyfinUsername <> "" then
+                Html.div [
+                    prop.className "mb-3 flex items-center gap-2 text-sm text-base-content/60"
+                    prop.children [
+                        Html.span [ prop.text "User:" ]
+                        Html.span [ prop.className "font-mono"; prop.text model.JellyfinUsername ]
+                    ]
+                ]
+
+            // Server URL input
+            Html.div [
+                prop.className "form-control mb-3"
+                prop.children [
+                    Daisy.label [
+                        prop.className "label"
+                        prop.children [ Html.span [ prop.className "label-text"; prop.text "Server URL" ] ]
+                    ]
+                    Daisy.input [
+                        prop.className "w-full"
+                        prop.placeholder "http://your-server:8096"
+                        prop.value model.JellyfinServerUrlInput
+                        prop.onChange (Jellyfin_server_url_input_changed >> dispatch)
+                    ]
+                ]
+            ]
+
+            // Username input
+            Html.div [
+                prop.className "form-control mb-3"
+                prop.children [
+                    Daisy.label [
+                        prop.className "label"
+                        prop.children [ Html.span [ prop.className "label-text"; prop.text "Username" ] ]
+                    ]
+                    Daisy.input [
+                        prop.className "w-full"
+                        prop.placeholder "admin"
+                        prop.value model.JellyfinUsernameInput
+                        prop.onChange (Jellyfin_username_input_changed >> dispatch)
+                    ]
+                ]
+            ]
+
+            // Password input
+            Html.div [
+                prop.className "form-control mb-4"
+                prop.children [
+                    Daisy.label [
+                        prop.className "label"
+                        prop.children [ Html.span [ prop.className "label-text"; prop.text "Password" ] ]
+                    ]
+                    Daisy.input [
+                        prop.className "w-full"
+                        prop.type' "password"
+                        prop.placeholder "password"
+                        prop.value model.JellyfinPasswordInput
+                        prop.onChange (Jellyfin_password_input_changed >> dispatch)
+                    ]
+                ]
+            ]
+
+            feedbackAlert (model.JellyfinTestResult |> Option.map (Result.mapError id))
+            feedbackAlert model.JellyfinSaveResult
+
+            // Buttons
+            Html.div [
+                prop.className "flex gap-2 mb-4"
+                prop.children [
+                    Daisy.button.button [
+                        button.primary
+                        button.sm
+                        if model.IsTestingJellyfin then button.disabled
+                        prop.onClick (fun _ -> dispatch Test_jellyfin_connection)
+                        prop.children [
+                            if model.IsTestingJellyfin then
+                                Daisy.loading [ loading.spinner; loading.sm ]
+                            Html.text "Test & Save"
+                        ]
+                    ]
+                ]
+            ]
+
+            // ── Watch History Sync ──
+            let jellyfinConnected = model.JellyfinServerUrl <> "" && model.JellyfinUsername <> ""
+            if jellyfinConnected then
+                Html.div [
+                    prop.className "border-t border-base-content/10 pt-4 mt-2"
+                    prop.children [
+                        Html.h4 [
+                            prop.className "text-sm font-bold mb-3"
+                            prop.text "Watch History Sync"
+                        ]
+                        Html.p [
+                            prop.className "text-base-content/60 text-sm mb-3"
+                            prop.text "Scan your Jellyfin library to preview matches, then import watch history. Only adds data \u2014 never removes existing watches."
+                        ]
+
+                        // Scan button
+                        Html.div [
+                            prop.className "flex gap-2 mb-4"
+                            prop.children [
+                                Daisy.button.button [
+                                    button.outline
+                                    button.sm
+                                    if model.IsScanningJellyfin then button.disabled
+                                    prop.onClick (fun _ -> dispatch Scan_jellyfin_library)
+                                    prop.disabled model.IsScanningJellyfin
+                                    prop.children [
+                                        if model.IsScanningJellyfin then
+                                            Daisy.loading [ loading.spinner; loading.sm ]
+                                            Html.text "Scanning..."
+                                        else
+                                            Html.text "Scan Library"
+                                    ]
+                                ]
+                            ]
+                        ]
+
+                        // Scan result preview
+                        match model.JellyfinScanResult with
+                        | Some (Ok scanResult) ->
+                            let playedMovies = scanResult.MatchedMovies |> List.filter (fun m -> m.JellyfinItem.Played)
+                            let playedSeries = scanResult.MatchedSeries |> List.filter (fun m -> m.JellyfinItem.Played)
+                            Html.div [
+                                prop.className "mb-4 space-y-3"
+                                prop.children [
+                                    // Summary stats
+                                    Html.div [
+                                        prop.className "grid grid-cols-2 gap-2 text-sm"
+                                        prop.children [
+                                            Html.div [
+                                                prop.className "bg-base-200/50 rounded-lg p-3"
+                                                prop.children [
+                                                    Html.div [ prop.className "text-base-content/50 text-xs"; prop.text "Matched Movies" ]
+                                                    Html.div [ prop.className "font-bold"; prop.text (sprintf "%d (%d played)" scanResult.MatchedMovies.Length playedMovies.Length) ]
+                                                ]
+                                            ]
+                                            Html.div [
+                                                prop.className "bg-base-200/50 rounded-lg p-3"
+                                                prop.children [
+                                                    Html.div [ prop.className "text-base-content/50 text-xs"; prop.text "Matched Series" ]
+                                                    Html.div [ prop.className "font-bold"; prop.text (sprintf "%d (%d played)" scanResult.MatchedSeries.Length playedSeries.Length) ]
+                                                ]
+                                            ]
+                                            Html.div [
+                                                prop.className "bg-base-200/50 rounded-lg p-3"
+                                                prop.children [
+                                                    Html.div [ prop.className "text-base-content/50 text-xs"; prop.text "Unmatched Movies" ]
+                                                    Html.div [ prop.className "font-bold"; prop.text (string scanResult.UnmatchedMovies.Length) ]
+                                                ]
+                                            ]
+                                            Html.div [
+                                                prop.className "bg-base-200/50 rounded-lg p-3"
+                                                prop.children [
+                                                    Html.div [ prop.className "text-base-content/50 text-xs"; prop.text "Unmatched Series" ]
+                                                    Html.div [ prop.className "font-bold"; prop.text (string scanResult.UnmatchedSeries.Length) ]
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+
+                                    // Played movies list
+                                    if not (List.isEmpty playedMovies) then
+                                        Html.div [
+                                            prop.className "bg-base-200/50 rounded-lg p-3 max-h-48 overflow-y-auto text-xs font-mono space-y-0.5"
+                                            prop.children (
+                                                playedMovies |> List.map (fun m ->
+                                                    Html.div [
+                                                        prop.className "flex gap-2"
+                                                        prop.children [
+                                                            Html.span [ prop.className "text-base-content/50 truncate max-w-[250px]"; prop.text m.MediathecaName ]
+                                                            Html.span [ prop.className "text-base-content/30"; prop.text "\u2192" ]
+                                                            Html.span [
+                                                                prop.className (if m.HasExistingWatchData then "text-base-content/40" else "text-success")
+                                                                prop.text (if m.HasExistingWatchData then "has watch data" else "will add watch session")
+                                                            ]
+                                                        ]
+                                                    ])
+                                            )
+                                        ]
+
+                                    // Import button
+                                    if playedMovies.Length > 0 || playedSeries.Length > 0 then
+                                        Html.div [
+                                            prop.children [
+                                                Daisy.button.button [
+                                                    button.primary
+                                                    button.sm
+                                                    if model.IsImportingJellyfin then button.disabled
+                                                    prop.onClick (fun _ -> dispatch Import_jellyfin_watch_history)
+                                                    prop.disabled model.IsImportingJellyfin
+                                                    prop.children [
+                                                        if model.IsImportingJellyfin then
+                                                            Daisy.loading [ loading.spinner; loading.sm ]
+                                                            Html.text "Importing..."
+                                                        else
+                                                            Html.text "Import Watch History"
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                ]
+                            ]
+                        | Some (Error msg) ->
+                            Daisy.alert [ alert.error; prop.className "mb-4"; prop.text msg ]
+                        | None -> Html.none
+
+                        // Import result
+                        match model.JellyfinImportResult with
+                        | Some (Ok result) ->
+                            Daisy.alert [
+                                alert.success
+                                prop.className "mb-4"
+                                prop.children [
+                                    Html.div [
+                                        Html.p [ prop.className "font-bold"; prop.text "Jellyfin import completed!" ]
+                                        Html.ul [
+                                            prop.className "mt-2 text-sm space-y-1"
+                                            prop.children [
+                                                Html.li [ prop.text (sprintf "Movie watch sessions added: %d" result.MoviesAdded) ]
+                                                Html.li [ prop.text (sprintf "Episodes marked watched: %d" result.EpisodesAdded) ]
+                                                Html.li [ prop.text (sprintf "Items skipped: %d" result.ItemsSkipped) ]
+                                            ]
+                                        ]
+                                        if not (List.isEmpty result.Errors) then
+                                            Html.div [
+                                                prop.className "mt-2"
+                                                prop.children [
+                                                    Html.p [ prop.className "font-bold text-warning"; prop.text (sprintf "Warnings (%d):" result.Errors.Length) ]
+                                                    Html.ul [
+                                                        prop.className "text-sm text-warning"
+                                                        prop.children (
+                                                            result.Errors |> List.truncate 10 |> List.map (fun err ->
+                                                                Html.li [ prop.text err ])
+                                                        )
+                                                    ]
+                                                ]
+                                            ]
+                                    ]
+                                ]
+                            ]
+                        | Some (Error msg) ->
+                            Daisy.alert [ alert.error; prop.className "mb-4"; prop.text msg ]
+                        | None -> Html.none
+                    ]
+                ]
+        ]
+    ]
+
 // ── Main View ──
 
 let view (model: Model) (dispatch: Msg -> unit) =
@@ -1003,6 +1273,13 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         "Game library and play time import"
                         (statusBadge (steamConfigured || steamPartial) (if steamConfigured then "Connected" elif steamPartial then "Partial" else "Not configured"))
                         (steamDetail model dispatch)
+
+                    integrationCard
+                        Icons.tv
+                        "Jellyfin"
+                        "Watch history sync from media server"
+                        (statusBadge (model.JellyfinServerUrl <> "" && model.JellyfinUsername <> "") (if model.JellyfinServerUrl <> "" && model.JellyfinUsername <> "" then "Connected" else "Not configured"))
+                        (jellyfinDetail model dispatch)
                 ]
             ]
 
