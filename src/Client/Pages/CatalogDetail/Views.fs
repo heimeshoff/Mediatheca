@@ -197,11 +197,11 @@ let view (model: Model) (dispatch: Msg -> unit) =
         ]
     | false, Some catalog ->
         Html.div [
-            prop.className DesignSystem.animateFadeIn
+            prop.className (DesignSystem.pageContainer + " " + DesignSystem.animateFadeIn)
             prop.children [
                 // Header
                 Html.div [
-                    prop.className "bg-base-200/50 px-4 lg:px-6 py-6"
+                    prop.className "bg-base-200/50 py-6"
                     prop.children [
                         Html.div [
                             prop.className "flex items-start justify-between"
@@ -317,7 +317,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
 
                 // Entries
                 Html.div [
-                    prop.className DesignSystem.pagePadding
+                    prop.className "pt-4"
                     prop.children [
                         Html.div [
                             prop.className "flex items-center justify-between mb-4"

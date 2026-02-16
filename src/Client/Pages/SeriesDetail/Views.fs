@@ -8,6 +8,11 @@ open Mediatheca.Client.Pages.SeriesDetail.Types
 open Mediatheca.Client
 open Mediatheca.Client.Components
 
+let private formatDateOnly (date: string) =
+    match date.IndexOf('T') with
+    | -1 -> date
+    | i -> date.[..i-1]
+
 // ── Helpers ──
 
 let private sectionHeader (title: string) =
@@ -765,7 +770,7 @@ let private episodeCard
                                             Html.span [
                                                 prop.className "text-[10px] text-base-content/40 cursor-pointer hover:text-primary transition-colors"
                                                 prop.onClick (fun _ -> dispatch (Edit_episode_date (seasonNumber, episode.EpisodeNumber)))
-                                                prop.text (episode.WatchedDate |> Option.defaultValue "No date")
+                                                prop.text (episode.WatchedDate |> Option.map formatDateOnly |> Option.defaultValue "No date")
                                             ]
                                     ]
                                 ]
@@ -1441,10 +1446,12 @@ let private overviewTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
 
 // ── Tab Bar ──
 
-let private tabBar (activeTab: SeriesTab) (dispatch: Msg -> unit) =
+let private tabBar (series: SeriesDetail) (activeTab: SeriesTab) (dispatch: Msg -> unit) =
+    let totalEpisodes = series.Seasons |> List.sumBy (fun s -> s.Episodes.Length)
+    let watchedEpisodes = series.Seasons |> List.sumBy (fun s -> s.OverallWatchedCount)
     let tabs = [
         (Overview, "Overview")
-        (Episodes, "Episodes")
+        (Episodes, $"Episodes ({watchedEpisodes}/{totalEpisodes})")
     ]
     Html.div [
         prop.className "flex gap-1 border-b border-base-content/10 mb-8"
@@ -1579,12 +1586,12 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                 Html.div [
                                                     prop.className "flex flex-wrap items-center gap-3 mb-3"
                                                     prop.children [
-                                                        statusBadge series.Status
                                                         for genre in series.Genres |> List.truncate 3 do
                                                             Html.span [
                                                                 prop.className "bg-primary/80 px-3 py-1 rounded text-xs font-bold tracking-wider uppercase text-primary-content"
                                                                 prop.text genre
                                                             ]
+                                                        statusBadge series.Status
                                                         HeroRating (series.TmdbRating, series.PersonalRating, model.IsRatingOpen, dispatch)
                                                     ]
                                                 ]
@@ -1663,7 +1670,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 Html.div [
                     prop.className "max-w-6xl mx-auto px-4 lg:px-8 pt-4 lg:pt-6 pb-8 lg:pb-12"
                     prop.children [
-                        tabBar model.ActiveTab dispatch
+                        tabBar series model.ActiveTab dispatch
                         match model.ActiveTab with
                         | Overview -> overviewTab series model dispatch
                         | Episodes -> episodesTab series model dispatch
