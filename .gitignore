@@ -28,3 +28,6 @@ uploads/
 *.swo
 
 .fake
+
+## Docker
+*.tar

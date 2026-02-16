@@ -3,13 +3,11 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS server-build
 WORKDIR /app
 
 COPY global.json ./
-COPY Mediatheca.sln ./
 COPY src/Shared/Shared.fsproj src/Shared/
 COPY src/Server/Server.fsproj src/Server/
 COPY src/Client/Client.fsproj src/Client/
-COPY tests/Server.Tests/Server.Tests.fsproj tests/Server.Tests/
 
-RUN dotnet restore
+RUN dotnet restore src/Server/Server.fsproj
 
 COPY src/Shared/ src/Shared/
 COPY src/Server/ src/Server/

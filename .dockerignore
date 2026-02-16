@@ -9,3 +9,4 @@ tests/
 *.db-shm
 *.db-wal
 images/
+*.tar

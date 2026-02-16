@@ -6,7 +6,8 @@
     "dev:server": "dotnet watch run --project src/Server/Server.fsproj",
     "dev:client": "vite",
     "build": "vite build",
-    "test": "dotnet run --project tests/Server.Tests/Server.Tests.fsproj"
+    "test": "dotnet run --project tests/Server.Tests/Server.Tests.fsproj",
+    "deploy": "docker build -t mediatheca:latest . && docker save mediatheca:latest -o mediatheca.tar"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
