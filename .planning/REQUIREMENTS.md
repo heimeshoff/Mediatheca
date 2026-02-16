@@ -17,10 +17,10 @@ Jellyfin integration is **strictly additive**. Watch sessions and episode progre
 
 ### Phase 2: Additive Watch History Sync
 
-- [ ] REQ-304: Movie watch sync (additive-only) — for matched movies where Jellyfin `Played=true`: check if Mediatheca already has a watch session on the same date as `LastPlayedDate`. If no session exists for that date, create a new `Watch_session_recorded` event. If a session already exists on that date, skip (avoid duplicates). Never remove existing sessions. [Phase 2]
-- [ ] REQ-305: Series episode watch sync (additive-only) — for matched series, fetch episodes from Jellyfin (`/Shows/{seriesId}/Episodes`), match by season/episode number. For episodes where Jellyfin `Played=true` AND not yet watched in Mediatheca's default rewatch session, emit `Episode_watched` events using `LastPlayedDate`. Never unwatch episodes that Mediatheca already has marked as watched. [Phase 2]
-- [ ] REQ-306: Jellyfin sync API endpoints — `scanJellyfinLibrary: unit -> Async<Result<JellyfinScanResult, string>>` (preview what will be added), `importJellyfinWatchHistory: unit -> Async<Result<JellyfinImportResult, string>>` (execute additive sync). Import result includes movies synced, episodes synced, items skipped (already watched / no match). [Phase 2]
-- [ ] REQ-307: Jellyfin sync UI — scan button on Settings card, preview table showing what will be *added* (never removed), confirm import action, result summary (added/skipped/errors). [Phase 2]
+- [x] REQ-304: Movie watch sync (additive-only) — for matched movies where Jellyfin `Played=true`: check if Mediatheca already has a watch session on the same date as `LastPlayedDate`. If no session exists for that date, create a new `Watch_session_recorded` event. If a session already exists on that date, skip (avoid duplicates). Never remove existing sessions. [Phase 2]
+- [x] REQ-305: Series episode watch sync (additive-only) — for matched series, fetch episodes from Jellyfin (`/Shows/{seriesId}/Episodes`), match by season/episode number. For episodes where Jellyfin `Played=true` AND not yet watched in Mediatheca's default rewatch session, emit `Episode_watched` events using `LastPlayedDate`. Never unwatch episodes that Mediatheca already has marked as watched. [Phase 2]
+- [x] REQ-306: Jellyfin sync API endpoints — `scanJellyfinLibrary: unit -> Async<Result<JellyfinScanResult, string>>` (preview what will be added), `importJellyfinWatchHistory: unit -> Async<Result<JellyfinImportResult, string>>` (execute additive sync). Import result includes movies synced, episodes synced, items skipped (already watched / no match). [Phase 2]
+- [x] REQ-307: Jellyfin sync UI — scan button on Settings card, preview table showing what will be *added* (never removed), confirm import action, result summary (added/skipped/errors). [Phase 2]
 
 ## v2 (Future)
 

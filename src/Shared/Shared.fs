@@ -563,6 +563,13 @@ type JellyfinScanResult = {
     UnmatchedSeries: JellyfinItem list
 }
 
+type JellyfinImportResult = {
+    MoviesAdded: int
+    EpisodesAdded: int
+    ItemsSkipped: int
+    Errors: string list
+}
+
 // Import
 
 type ImportFromCinemarcoRequest = {
@@ -732,6 +739,7 @@ type IMediathecaApi = {
     setJellyfinCredentials: string * string -> Async<Result<unit, string>>
     testJellyfinConnection: string * string * string -> Async<Result<string, string>>
     scanJellyfinLibrary: unit -> Async<Result<JellyfinScanResult, string>>
+    importJellyfinWatchHistory: unit -> Async<Result<JellyfinImportResult, string>>
     // Import
     importFromCinemarco: ImportFromCinemarcoRequest -> Async<Result<ImportResult, string>>
 }

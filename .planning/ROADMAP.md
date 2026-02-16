@@ -11,7 +11,7 @@ All sync operations only *add* watch data to Mediatheca. Existing watch sessions
 | Phase | Name | Status | Requirements |
 |-------|------|--------|--------------|
 | 1 | Connection & Library Scan | :white_check_mark: Done | REQ-300, REQ-301, REQ-302, REQ-303 |
-| 2 | Additive Watch History Sync | Planned | REQ-304, REQ-305, REQ-306, REQ-307 |
+| 2 | Additive Watch History Sync | :white_check_mark: Done | REQ-304, REQ-305, REQ-306, REQ-307 |
 
 ### Phase 1: Connection & Library Scan
 

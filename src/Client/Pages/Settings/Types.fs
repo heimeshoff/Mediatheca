@@ -55,6 +55,10 @@ type Model = {
     IsSavingJellyfin: bool
     JellyfinTestResult: Result<string, string> option
     JellyfinSaveResult: Result<string, string> option
+    IsScanningJellyfin: bool
+    JellyfinScanResult: Result<JellyfinScanResult, string> option
+    IsImportingJellyfin: bool
+    JellyfinImportResult: Result<JellyfinImportResult, string> option
     // Cinemarco Import
     CinemarcoDbPath: string
     CinemarcoImagesPath: string
@@ -124,6 +128,10 @@ type Msg =
     | Jellyfin_test_result of Result<string, string>
     | Save_jellyfin_settings
     | Jellyfin_save_result of Result<unit, string>
+    | Scan_jellyfin_library
+    | Jellyfin_scan_completed of Result<JellyfinScanResult, string>
+    | Import_jellyfin_watch_history
+    | Jellyfin_import_completed of Result<JellyfinImportResult, string>
     // Cinemarco Import
     | Cinemarco_db_path_changed of string
     | Cinemarco_images_path_changed of string

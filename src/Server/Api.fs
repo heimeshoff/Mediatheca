@@ -2671,6 +2671,164 @@ module Api =
                     return Error $"Jellyfin scan failed: {ex.Message}"
             }
 
+            importJellyfinWatchHistory = fun () -> async {
+                try
+                    let config = getJellyfinConfig ()
+                    if System.String.IsNullOrWhiteSpace(config.AccessToken) || System.String.IsNullOrWhiteSpace(config.UserId) then
+                        return Error "Jellyfin not configured. Please test the connection first."
+                    else
+                        let mutable moviesAdded = 0
+                        let mutable episodesAdded = 0
+                        let mutable itemsSkipped = 0
+                        let mutable errors: string list = []
+
+                        // --- Movie watch sync (REQ-304) ---
+                        let! moviesResult = Jellyfin.getMovies httpClient config.ServerUrl config.UserId config.AccessToken
+                        match moviesResult with
+                        | Error e -> errors <- errors @ [sprintf "Failed to fetch Jellyfin movies: %s" e]
+                        | Ok jellyfinMovies ->
+                            // Build TMDB ID -> (slug, name) lookup
+                            let moviesByTmdbId =
+                                conn
+                                |> Db.newCommand "SELECT slug, name, tmdb_id FROM movie_detail"
+                                |> Db.query (fun (rd: IDataReader) ->
+                                    let tmdbId = rd.ReadInt32 "tmdb_id"
+                                    let slug = rd.ReadString "slug"
+                                    let name = rd.ReadString "name"
+                                    (tmdbId, (slug, name)))
+                                |> Map.ofList
+
+                            for item in jellyfinMovies do
+                                let played = item.UserData |> Option.map (fun ud -> ud.Played) |> Option.defaultValue false
+                                let tmdbId =
+                                    item.ProviderIds.Tmdb
+                                    |> Option.bind (fun s -> match System.Int32.TryParse(s) with true, v -> Some v | _ -> None)
+                                match played, tmdbId with
+                                | true, Some tid ->
+                                    match Map.tryFind tid moviesByTmdbId with
+                                    | Some (slug, _name) ->
+                                        let lastPlayedDate =
+                                            item.UserData
+                                            |> Option.bind (fun ud -> ud.LastPlayedDate)
+                                            |> Option.map (fun d -> d.Substring(0, min 10 d.Length))
+                                            |> Option.defaultValue (System.DateTime.UtcNow.ToString("yyyy-MM-dd"))
+                                        // Check if a watch session already exists on this date
+                                        let existsOnDate =
+                                            conn
+                                            |> Db.newCommand "SELECT COUNT(*) as cnt FROM watch_sessions WHERE movie_slug = @slug AND date = @date"
+                                            |> Db.setParams [ "slug", SqlType.String slug; "date", SqlType.String lastPlayedDate ]
+                                            |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "cnt")
+                                            |> Option.defaultValue 0
+                                            |> fun c -> c > 0
+                                        if existsOnDate then
+                                            itemsSkipped <- itemsSkipped + 1
+                                        else
+                                            let runtime =
+                                                conn
+                                                |> Db.newCommand "SELECT runtime FROM movie_detail WHERE slug = @slug"
+                                                |> Db.setParams [ "slug", SqlType.String slug ]
+                                                |> Db.querySingle (fun (rd: IDataReader) ->
+                                                    if rd.IsDBNull(rd.GetOrdinal("runtime")) then None
+                                                    else Some (rd.ReadInt32 "runtime"))
+                                                |> Option.flatten
+                                            let sessionId = System.Guid.NewGuid().ToString("N")
+                                            let sessionData: Movies.WatchSessionRecordedData = {
+                                                SessionId = sessionId
+                                                Date = lastPlayedDate
+                                                Duration = runtime
+                                                FriendSlugs = []
+                                            }
+                                            let sid = Movies.streamId slug
+                                            let result =
+                                                executeCommand
+                                                    conn sid
+                                                    Movies.Serialization.fromStoredEvent
+                                                    Movies.reconstitute
+                                                    Movies.decide
+                                                    Movies.Serialization.toEventData
+                                                    (Movies.Record_watch_session sessionData)
+                                                    movieProjections
+                                            match result with
+                                            | Ok () -> moviesAdded <- moviesAdded + 1
+                                            | Error e -> errors <- errors @ [sprintf "Movie '%s': %s" slug e]
+                                    | None -> itemsSkipped <- itemsSkipped + 1
+                                | _ -> itemsSkipped <- itemsSkipped + 1
+
+                        // --- Series episode watch sync (REQ-305) ---
+                        let! seriesResult = Jellyfin.getSeries httpClient config.ServerUrl config.UserId config.AccessToken
+                        match seriesResult with
+                        | Error e -> errors <- errors @ [sprintf "Failed to fetch Jellyfin series: %s" e]
+                        | Ok jellyfinSeries ->
+                            let seriesByTmdbId =
+                                conn
+                                |> Db.newCommand "SELECT slug, name, tmdb_id FROM series_detail"
+                                |> Db.query (fun (rd: IDataReader) ->
+                                    let tmdbId = rd.ReadInt32 "tmdb_id"
+                                    let slug = rd.ReadString "slug"
+                                    let name = rd.ReadString "name"
+                                    (tmdbId, (slug, name)))
+                                |> Map.ofList
+
+                            for seriesItem in jellyfinSeries do
+                                let tmdbId =
+                                    seriesItem.ProviderIds.Tmdb
+                                    |> Option.bind (fun s -> match System.Int32.TryParse(s) with true, v -> Some v | _ -> None)
+                                match tmdbId with
+                                | Some tid ->
+                                    match Map.tryFind tid seriesByTmdbId with
+                                    | Some (slug, _name) ->
+                                        // Fetch episodes from Jellyfin for this series
+                                        let! episodesResult = Jellyfin.getEpisodes httpClient config.ServerUrl config.UserId config.AccessToken seriesItem.Id
+                                        match episodesResult with
+                                        | Error e -> errors <- errors @ [sprintf "Series '%s' episodes: %s" slug e]
+                                        | Ok episodes ->
+                                            // Get already-watched episodes in default rewatch session
+                                            let alreadyWatched = SeriesProjection.getWatchedEpisodesForSession conn slug "default"
+                                            for ep in episodes do
+                                                let epPlayed = ep.UserData |> Option.map (fun ud -> ud.Played) |> Option.defaultValue false
+                                                match epPlayed, ep.ParentIndexNumber, ep.IndexNumber with
+                                                | true, Some seasonNum, Some epNum ->
+                                                    if alreadyWatched |> Set.contains (seasonNum, epNum) then
+                                                        itemsSkipped <- itemsSkipped + 1
+                                                    else
+                                                        let watchDate =
+                                                            ep.UserData
+                                                            |> Option.bind (fun ud -> ud.LastPlayedDate)
+                                                            |> Option.map (fun d -> d.Substring(0, min 10 d.Length))
+                                                            |> Option.defaultValue (System.DateTime.UtcNow.ToString("yyyy-MM-dd"))
+                                                        let sid = Series.streamId slug
+                                                        let result =
+                                                            executeCommand
+                                                                conn sid
+                                                                Series.Serialization.fromStoredEvent
+                                                                Series.reconstitute
+                                                                Series.decide
+                                                                Series.Serialization.toEventData
+                                                                (Series.Mark_episode_watched {
+                                                                    RewatchId = "default"
+                                                                    SeasonNumber = seasonNum
+                                                                    EpisodeNumber = epNum
+                                                                    Date = watchDate
+                                                                })
+                                                                projectionHandlers
+                                                        match result with
+                                                        | Ok () -> episodesAdded <- episodesAdded + 1
+                                                        | Error e -> errors <- errors @ [sprintf "Series '%s' S%02dE%02d: %s" slug seasonNum epNum e]
+                                                | _ -> itemsSkipped <- itemsSkipped + 1
+                                    | None -> ()
+                                | None -> ()
+
+                        let importResult: JellyfinImportResult = {
+                            MoviesAdded = moviesAdded
+                            EpisodesAdded = episodesAdded
+                            ItemsSkipped = itemsSkipped
+                            Errors = errors
+                        }
+                        return Ok importResult
+                with ex ->
+                    return Error $"Jellyfin import failed: {ex.Message}"
+            }
+
             testJellyfinConnection = fun (serverUrl, username, password) -> async {
                 try
                     let! authResult = Jellyfin.authenticate httpClient serverUrl username password

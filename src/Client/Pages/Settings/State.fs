@@ -61,6 +61,10 @@ let init () : Model * Cmd<Msg> =
       IsSavingJellyfin = false
       JellyfinTestResult = None
       JellyfinSaveResult = None
+      IsScanningJellyfin = false
+      JellyfinScanResult = None
+      IsImportingJellyfin = false
+      JellyfinImportResult = None
       CinemarcoDbPath = ""
       CinemarcoImagesPath = ""
       IsImporting = false
@@ -430,6 +434,24 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             | Ok () -> Cmd.ofMsg Load_jellyfin_settings
             | Error _ -> Cmd.none
         { model with IsSavingJellyfin = false; JellyfinSaveResult = Some saveResult }, cmd
+
+    | Scan_jellyfin_library ->
+        { model with IsScanningJellyfin = true; JellyfinScanResult = None; JellyfinImportResult = None },
+        Cmd.OfAsync.either api.scanJellyfinLibrary ()
+            Jellyfin_scan_completed
+            (fun ex -> Jellyfin_scan_completed (Error ex.Message))
+
+    | Jellyfin_scan_completed result ->
+        { model with IsScanningJellyfin = false; JellyfinScanResult = Some result }, Cmd.none
+
+    | Import_jellyfin_watch_history ->
+        { model with IsImportingJellyfin = true; JellyfinImportResult = None },
+        Cmd.OfAsync.either api.importJellyfinWatchHistory ()
+            Jellyfin_import_completed
+            (fun ex -> Jellyfin_import_completed (Error ex.Message))
+
+    | Jellyfin_import_completed result ->
+        { model with IsImportingJellyfin = false; JellyfinImportResult = Some result; JellyfinScanResult = None }, Cmd.none
 
     | Cinemarco_db_path_changed value ->
         { model with CinemarcoDbPath = value; ImportResult = None }, Cmd.none
