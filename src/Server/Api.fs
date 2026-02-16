@@ -2757,10 +2757,10 @@ module Api =
                                             |> Option.bind (fun ud -> ud.LastPlayedDate)
                                             |> Option.map (fun d -> d.Substring(0, min 10 d.Length))
                                             |> Option.defaultValue (System.DateTime.UtcNow.ToString("yyyy-MM-dd"))
-                                        // Check if a watch session already exists on this date
+                                        // Check if a watch session already exists on this date (substr to compare date part only)
                                         let existsOnDate =
                                             conn
-                                            |> Db.newCommand "SELECT COUNT(*) as cnt FROM watch_sessions WHERE movie_slug = @slug AND date = @date"
+                                            |> Db.newCommand "SELECT COUNT(*) as cnt FROM watch_sessions WHERE movie_slug = @slug AND SUBSTR(date, 1, 10) = @date"
                                             |> Db.setParams [ "slug", SqlType.String slug; "date", SqlType.String lastPlayedDate ]
                                             |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "cnt")
                                             |> Option.defaultValue 0
