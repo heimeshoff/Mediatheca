@@ -941,6 +941,111 @@ let private cinemarcoDetail (model: Model) (dispatch: Msg -> unit) =
         ]
     ]
 
+// ── Jellyfin Detail ──
+
+let private jellyfinDetail (model: Model) (dispatch: Msg -> unit) =
+    Html.div [
+        prop.children [
+            Html.p [
+                prop.className "text-base-content/70 mb-4 text-sm"
+                prop.children [
+                    Html.text "Connect to your Jellyfin server to sync watch history. Enter your server URL and credentials below."
+                ]
+            ]
+
+            if model.JellyfinServerUrl <> "" then
+                Html.div [
+                    prop.className "mb-3 flex items-center gap-2 text-sm text-base-content/60"
+                    prop.children [
+                        Html.span [ prop.text "Server:" ]
+                        Html.span [ prop.className "font-mono"; prop.text model.JellyfinServerUrl ]
+                    ]
+                ]
+
+            if model.JellyfinUsername <> "" then
+                Html.div [
+                    prop.className "mb-3 flex items-center gap-2 text-sm text-base-content/60"
+                    prop.children [
+                        Html.span [ prop.text "User:" ]
+                        Html.span [ prop.className "font-mono"; prop.text model.JellyfinUsername ]
+                    ]
+                ]
+
+            // Server URL input
+            Html.div [
+                prop.className "form-control mb-3"
+                prop.children [
+                    Daisy.label [
+                        prop.className "label"
+                        prop.children [ Html.span [ prop.className "label-text"; prop.text "Server URL" ] ]
+                    ]
+                    Daisy.input [
+                        prop.className "w-full"
+                        prop.placeholder "http://your-server:8096"
+                        prop.value model.JellyfinServerUrlInput
+                        prop.onChange (Jellyfin_server_url_input_changed >> dispatch)
+                    ]
+                ]
+            ]
+
+            // Username input
+            Html.div [
+                prop.className "form-control mb-3"
+                prop.children [
+                    Daisy.label [
+                        prop.className "label"
+                        prop.children [ Html.span [ prop.className "label-text"; prop.text "Username" ] ]
+                    ]
+                    Daisy.input [
+                        prop.className "w-full"
+                        prop.placeholder "admin"
+                        prop.value model.JellyfinUsernameInput
+                        prop.onChange (Jellyfin_username_input_changed >> dispatch)
+                    ]
+                ]
+            ]
+
+            // Password input
+            Html.div [
+                prop.className "form-control mb-4"
+                prop.children [
+                    Daisy.label [
+                        prop.className "label"
+                        prop.children [ Html.span [ prop.className "label-text"; prop.text "Password" ] ]
+                    ]
+                    Daisy.input [
+                        prop.className "w-full"
+                        prop.type' "password"
+                        prop.placeholder "password"
+                        prop.value model.JellyfinPasswordInput
+                        prop.onChange (Jellyfin_password_input_changed >> dispatch)
+                    ]
+                ]
+            ]
+
+            feedbackAlert (model.JellyfinTestResult |> Option.map (Result.mapError id))
+            feedbackAlert model.JellyfinSaveResult
+
+            // Buttons
+            Html.div [
+                prop.className "flex gap-2"
+                prop.children [
+                    Daisy.button.button [
+                        button.primary
+                        button.sm
+                        if model.IsTestingJellyfin then button.disabled
+                        prop.onClick (fun _ -> dispatch Test_jellyfin_connection)
+                        prop.children [
+                            if model.IsTestingJellyfin then
+                                Daisy.loading [ loading.spinner; loading.sm ]
+                            Html.text "Test & Save"
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+
 // ── Main View ──
 
 let view (model: Model) (dispatch: Msg -> unit) =
@@ -1003,6 +1108,13 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         "Game library and play time import"
                         (statusBadge (steamConfigured || steamPartial) (if steamConfigured then "Connected" elif steamPartial then "Partial" else "Not configured"))
                         (steamDetail model dispatch)
+
+                    integrationCard
+                        Icons.tv
+                        "Jellyfin"
+                        "Watch history sync from media server"
+                        (statusBadge (model.JellyfinServerUrl <> "" && model.JellyfinUsername <> "") (if model.JellyfinServerUrl <> "" && model.JellyfinUsername <> "" then "Connected" else "Not configured"))
+                        (jellyfinDetail model dispatch)
                 ]
             ]
 

@@ -52,11 +52,20 @@ let init () : Model * Cmd<Msg> =
       SteamFamilyImportResult = None
       ImportProgress = None
       ImportLog = []
+      JellyfinServerUrl = ""
+      JellyfinServerUrlInput = ""
+      JellyfinUsername = ""
+      JellyfinUsernameInput = ""
+      JellyfinPasswordInput = ""
+      IsTestingJellyfin = false
+      IsSavingJellyfin = false
+      JellyfinTestResult = None
+      JellyfinSaveResult = None
       CinemarcoDbPath = ""
       CinemarcoImagesPath = ""
       IsImporting = false
       ImportResult = None },
-    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends ]
+    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings ]
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
@@ -367,6 +376,60 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Steam_family_import_completed result ->
         { model with IsImportingSteamFamily = false; SteamFamilyImportResult = Some result; ImportProgress = None }, Cmd.none
+
+    // Jellyfin Integration
+    | Load_jellyfin_settings ->
+        model,
+        Cmd.batch [
+            Cmd.OfAsync.perform api.getJellyfinServerUrl () (fun url -> Jellyfin_settings_loaded (url, ""))
+            Cmd.OfAsync.perform api.getJellyfinUsername () (fun username -> Jellyfin_settings_loaded ("", username))
+        ]
+
+    | Jellyfin_settings_loaded (serverUrl, username) ->
+        let m =
+            if serverUrl <> "" then { model with JellyfinServerUrl = serverUrl; JellyfinServerUrlInput = serverUrl }
+            elif username <> "" then { model with JellyfinUsername = username; JellyfinUsernameInput = username }
+            else model
+        m, Cmd.none
+
+    | Jellyfin_server_url_input_changed value ->
+        { model with JellyfinServerUrlInput = value; JellyfinTestResult = None; JellyfinSaveResult = None }, Cmd.none
+
+    | Jellyfin_username_input_changed value ->
+        { model with JellyfinUsernameInput = value; JellyfinTestResult = None; JellyfinSaveResult = None }, Cmd.none
+
+    | Jellyfin_password_input_changed value ->
+        { model with JellyfinPasswordInput = value; JellyfinTestResult = None; JellyfinSaveResult = None }, Cmd.none
+
+    | Test_jellyfin_connection ->
+        { model with IsTestingJellyfin = true; JellyfinTestResult = None },
+        Cmd.OfAsync.either api.testJellyfinConnection (model.JellyfinServerUrlInput, model.JellyfinUsernameInput, model.JellyfinPasswordInput)
+            Jellyfin_test_result
+            (fun ex -> Jellyfin_test_result (Error ex.Message))
+
+    | Jellyfin_test_result result ->
+        let cmd =
+            match result with
+            | Ok _ -> Cmd.ofMsg Load_jellyfin_settings
+            | Error _ -> Cmd.none
+        { model with IsTestingJellyfin = false; JellyfinTestResult = Some result }, cmd
+
+    | Save_jellyfin_settings ->
+        { model with IsSavingJellyfin = true; JellyfinSaveResult = None },
+        Cmd.OfAsync.either api.setJellyfinCredentials (model.JellyfinUsernameInput, model.JellyfinPasswordInput)
+            Jellyfin_save_result
+            (fun ex -> Jellyfin_save_result (Error ex.Message))
+
+    | Jellyfin_save_result result ->
+        let saveResult =
+            match result with
+            | Ok () -> Ok "Credentials saved"
+            | Error e -> Error e
+        let cmd =
+            match result with
+            | Ok () -> Cmd.ofMsg Load_jellyfin_settings
+            | Error _ -> Cmd.none
+        { model with IsSavingJellyfin = false; JellyfinSaveResult = Some saveResult }, cmd
 
     | Cinemarco_db_path_changed value ->
         { model with CinemarcoDbPath = value; ImportResult = None }, Cmd.none

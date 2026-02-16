@@ -45,6 +45,16 @@ type Model = {
     SteamFamilyImportResult: Result<SteamFamilyImportResult, string> option
     ImportProgress: SteamFamilyImportProgress option
     ImportLog: (string * string) list
+    // Jellyfin Integration
+    JellyfinServerUrl: string
+    JellyfinServerUrlInput: string
+    JellyfinUsername: string
+    JellyfinUsernameInput: string
+    JellyfinPasswordInput: string
+    IsTestingJellyfin: bool
+    IsSavingJellyfin: bool
+    JellyfinTestResult: Result<string, string> option
+    JellyfinSaveResult: Result<string, string> option
     // Cinemarco Import
     CinemarcoDbPath: string
     CinemarcoImagesPath: string
@@ -104,6 +114,16 @@ type Msg =
     | Import_steam_family
     | Steam_family_import_progress of SteamFamilyImportProgress
     | Steam_family_import_completed of Result<SteamFamilyImportResult, string>
+    // Jellyfin Integration
+    | Load_jellyfin_settings
+    | Jellyfin_settings_loaded of serverUrl: string * username: string
+    | Jellyfin_server_url_input_changed of string
+    | Jellyfin_username_input_changed of string
+    | Jellyfin_password_input_changed of string
+    | Test_jellyfin_connection
+    | Jellyfin_test_result of Result<string, string>
+    | Save_jellyfin_settings
+    | Jellyfin_save_result of Result<unit, string>
     // Cinemarco Import
     | Cinemarco_db_path_changed of string
     | Cinemarco_images_path_changed of string
