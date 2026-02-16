@@ -567,7 +567,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
             prop.children [
                 // Hero Section
                 Html.div [
-                    prop.className "relative h-72 lg:h-[500px] w-full overflow-hidden"
+                    prop.className "relative h-72 lg:h-[500px] w-full overflow-hidden group/hero"
                     prop.children [
                         // Backdrop image
                         Html.div [
@@ -576,7 +576,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 match game.BackdropRef with
                                 | Some ref ->
                                     Html.img [
-                                        prop.src $"/images/{ref}"
+                                        prop.src $"/images/{ref}?v={model.ImageVersion}"
                                         prop.alt game.Name
                                         prop.className "w-full h-full object-cover"
                                     ]
@@ -584,7 +584,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                     match game.CoverRef with
                                     | Some ref ->
                                         Html.img [
-                                            prop.src $"/images/{ref}"
+                                            prop.src $"/images/{ref}?v={model.ImageVersion}"
                                             prop.alt game.Name
                                             prop.className "w-full h-full object-cover blur-xl scale-125"
                                         ]
@@ -608,6 +608,19 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 ]
                             ]
                         ]
+                        // Change backdrop button
+                        Html.div [
+                            prop.className "absolute top-4 right-4 z-10 opacity-0 group-hover/hero:opacity-100 transition-opacity"
+                            prop.children [
+                                Daisy.button.button [
+                                    button.ghost
+                                    button.sm
+                                    prop.className "text-base-content backdrop-blur-sm bg-base-300/30"
+                                    prop.onClick (fun _ -> dispatch (Open_image_picker Backdrop_picker))
+                                    prop.text "Change backdrop"
+                                ]
+                            ]
+                        ]
                         // Hero content at bottom
                         Html.div [
                             prop.className "relative h-full flex items-end pb-6 lg:pb-8 px-4 lg:px-8"
@@ -617,12 +630,13 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                     prop.children [
                                         // Cover image (desktop)
                                         Html.div [
-                                            prop.className "hidden lg:block w-52 h-80 flex-shrink-0 rounded-xl overflow-hidden shadow-2xl border border-base-content/10"
+                                            prop.className "hidden lg:block w-52 h-80 flex-shrink-0 rounded-xl overflow-hidden shadow-2xl border border-base-content/10 cursor-pointer group/cover relative"
+                                            prop.onClick (fun _ -> dispatch (Open_image_picker Cover_picker))
                                             prop.children [
                                                 match game.CoverRef with
                                                 | Some ref ->
                                                     Html.img [
-                                                        prop.src $"/images/{ref}"
+                                                        prop.src $"/images/{ref}?v={model.ImageVersion}"
                                                         prop.alt game.Name
                                                         prop.className "w-full h-full object-cover"
                                                     ]
@@ -631,16 +645,23 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         prop.className "flex items-center justify-center w-full h-full bg-base-200 text-base-content/30"
                                                         prop.children [ Icons.gamepad () ]
                                                     ]
+                                                Html.div [
+                                                    prop.className "absolute inset-0 bg-black/50 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center"
+                                                    prop.children [
+                                                        Html.span [ prop.className "text-white text-sm font-semibold"; prop.text "Change cover" ]
+                                                    ]
+                                                ]
                                             ]
                                         ]
                                         // Cover image (mobile)
                                         Html.div [
-                                            prop.className "lg:hidden w-28 h-44 flex-shrink-0 rounded-lg overflow-hidden shadow-xl border border-base-content/10"
+                                            prop.className "lg:hidden w-28 h-44 flex-shrink-0 rounded-lg overflow-hidden shadow-xl border border-base-content/10 cursor-pointer group/cover relative"
+                                            prop.onClick (fun _ -> dispatch (Open_image_picker Cover_picker))
                                             prop.children [
                                                 match game.CoverRef with
                                                 | Some ref ->
                                                     Html.img [
-                                                        prop.src $"/images/{ref}"
+                                                        prop.src $"/images/{ref}?v={model.ImageVersion}"
                                                         prop.alt game.Name
                                                         prop.className "w-full h-full object-cover"
                                                     ]
@@ -649,6 +670,12 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         prop.className "flex items-center justify-center w-full h-full bg-base-200 text-base-content/30"
                                                         prop.children [ Icons.gamepad () ]
                                                     ]
+                                                Html.div [
+                                                    prop.className "absolute inset-0 bg-black/50 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center"
+                                                    prop.children [
+                                                        Html.span [ prop.className "text-white text-xs font-semibold"; prop.text "Change" ]
+                                                    ]
+                                                ]
                                             ]
                                         ]
                                         // Title & Meta
@@ -1168,5 +1195,72 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         (fun slug entryId -> dispatch (Remove_from_catalog (slug, entryId)))
                         (fun name -> dispatch (Create_catalog_and_add name))
                         (fun () -> dispatch Close_catalog_picker)
+                // Image picker modal
+                match model.ShowImagePicker with
+                | Some pickerKind ->
+                    let title = match pickerKind with Cover_picker -> "Choose Cover Image" | Backdrop_picker -> "Choose Backdrop Image"
+                    let isCoverPicker = match pickerKind with Cover_picker -> true | Backdrop_picker -> false
+                    let filtered =
+                        if isCoverPicker then
+                            model.ImageCandidates |> List.sortByDescending (fun c -> c.IsCover)
+                        else
+                            model.ImageCandidates |> List.filter (fun c -> not c.IsCover)
+                    let content = [
+                        if model.IsSelectingImage then
+                            Html.div [
+                                prop.className "flex flex-col items-center justify-center py-12 gap-3"
+                                prop.children [
+                                    Daisy.loading [ loading.spinner; loading.lg ]
+                                    Html.p [ prop.className "text-base-content/60"; prop.text "Downloading image..." ]
+                                ]
+                            ]
+                        elif model.IsLoadingImages then
+                            Html.div [
+                                prop.className "flex justify-center py-12"
+                                prop.children [ Daisy.loading [ loading.spinner; loading.lg ] ]
+                            ]
+                        elif List.isEmpty model.ImageCandidates then
+                            Html.p [
+                                prop.className "text-base-content/60 py-8 text-center"
+                                prop.text "No image sources available. Add a Steam App ID or RAWG ID to this game first."
+                            ]
+                        elif List.isEmpty filtered then
+                            Html.p [
+                                prop.className "text-base-content/60 py-8 text-center"
+                                prop.text "No matching images found."
+                            ]
+                        else
+                            Html.div [
+                                prop.className $"grid grid-cols-2 sm:grid-cols-3 gap-3"
+                                prop.children [
+                                    for candidate in filtered do
+                                        Html.button [
+                                            prop.className "group/thumb rounded-lg overflow-hidden border border-base-content/10 hover:border-primary/50 transition-colors cursor-pointer bg-base-200"
+                                            prop.onClick (fun _ -> dispatch (Select_image candidate.Url))
+                                            prop.children [
+                                                Html.div [
+                                                    prop.className (if isCoverPicker then "aspect-[2/3]" else "aspect-video")
+                                                    prop.children [
+                                                        Html.img [
+                                                            prop.src candidate.Url
+                                                            prop.alt candidate.Label
+                                                            prop.className "w-full h-full object-cover"
+                                                        ]
+                                                    ]
+                                                ]
+                                                Html.div [
+                                                    prop.className "p-2"
+                                                    prop.children [
+                                                        Html.p [ prop.className "text-xs font-medium truncate"; prop.text candidate.Label ]
+                                                        Html.p [ prop.className "text-xs text-base-content/50"; prop.text candidate.Source ]
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                ]
+                            ]
+                    ]
+                    ModalPanel.view title (fun () -> dispatch Close_image_picker) content
+                | None -> ()
             ]
         ]

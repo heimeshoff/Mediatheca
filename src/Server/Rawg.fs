@@ -77,6 +77,26 @@ module Rawg =
             Genres = get.Optional.Field "genres" (Decode.list decodeGenre) |> Option.defaultValue []
         })
 
+    type RawgScreenshot = {
+        Id: int
+        Image: string
+    }
+
+    type RawgScreenshotsResponse = {
+        Results: RawgScreenshot list
+    }
+
+    let private decodeScreenshot: Decoder<RawgScreenshot> =
+        Decode.object (fun get -> {
+            Id = get.Required.Field "id" Decode.int
+            Image = get.Required.Field "image" Decode.string
+        })
+
+    let private decodeScreenshotsResponse: Decoder<RawgScreenshotsResponse> =
+        Decode.object (fun get -> {
+            Results = get.Required.Field "results" (Decode.list decodeScreenshot)
+        })
+
     // Search cache
 
     module private SearchCache =
@@ -170,6 +190,26 @@ module Rawg =
             match Decode.fromString decodeGameDetails json with
             | Ok details -> return details
             | Error e -> return failwith $"Failed to parse RAWG game details: {e}"
+        }
+
+    let getGameScreenshots (httpClient: HttpClient) (config: RawgConfig) (rawgId: int) : Async<Mediatheca.Shared.GameImageCandidate list> =
+        async {
+            if System.String.IsNullOrWhiteSpace(config.ApiKey) then return []
+            else
+                try
+                    let url = $"https://api.rawg.io/api/games/{rawgId}/screenshots?key={config.ApiKey}"
+                    let! json = fetchJson httpClient url
+                    match Decode.fromString decodeScreenshotsResponse json with
+                    | Ok response ->
+                        return
+                            response.Results
+                            |> List.mapi (fun i s ->
+                                { Mediatheca.Shared.GameImageCandidate.Url = s.Image
+                                  Source = "RAWG"
+                                  Label = $"RAWG Screenshot {i + 1}"
+                                  IsCover = false })
+                    | Error _ -> return []
+                with _ -> return []
         }
 
     let downloadGameImages (httpClient: HttpClient) (slug: string) (backgroundImage: string option) (imageBasePath: string) : Async<string option * string option> =

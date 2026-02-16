@@ -1,86 +1,96 @@
-# Codebase Snapshot (as of 2026-02-14)
+# Codebase Snapshot (as of 2026-02-15)
 
 ## Domain Model
 
-4 aggregates, all using Event Sourcing + CQRS with `NotCreated → Active → Removed` state machines (except ContentBlocks which is always-active).
+6 aggregates, all using Event Sourcing + CQRS with `NotCreated → Active → Removed` state machines (except ContentBlocks which is always-active).
 
 | Aggregate | Stream | Events | Key Validation | Cross-Agg Deps |
 |-----------|--------|--------|----------------|----------------|
-| **Movies** | `Movie-{slug}` | 14 events | Idempotency, session existence, dupes | References Friend slugs |
-| **Friends** | `Friend-{slug}` | 3 events | Simple state guards | Referenced by Movies |
-| **Catalogs** | `Catalog-{slug}` | 7 events | Unique entries per catalog, auto-position | References Movie slugs |
-| **ContentBlocks** | `ContentBlocks-{movieSlug}` | 4 events | Session-scoped positioning | Keyed by Movie slug |
+| **Movies** | `Movie-{slug}` | 15 events | Idempotency, session existence, dupes | References Friend slugs |
+| **Series** | `Series-{slug}` | 16+ events | Session/season existence, idempotency | References Friend slugs |
+| **Games** | `Game-{slug}` | 17 events | Idempotency, status guards | References Friend slugs |
+| **Friends** | `Friend-{slug}` | 3 events | Simple state guards | Referenced by Movies, Series, Games |
+| **Catalogs** | `Catalog-{slug}` | 7 events | Unique entries per catalog, auto-position | References media slugs (polymorphic) |
+| **ContentBlocks** | `ContentBlocks-{slug}` | 5 events | Session-scoped positioning | Keyed by parent slug |
 
 Key behaviors:
 - Watch session recording auto-removes friends from `Want_to_watch_with`
-- Friend removal cascades cleanup across movie JSON arrays
+- Friend removal cascades cleanup across movie/series/game JSON arrays
 - Decider pattern: pure `decide: State -> Command -> Result<Event list, string>`
+- Games: `played_with` is a flat set (not session-based); no play session events in aggregate
+- Series: default rewatch session auto-created on import; episode progress per session
 
 ## API Surface
 
-47 methods on `IMediathecaApi` via Fable.Remoting:
-- Movies: 11 methods (CRUD + metadata + rating)
-- Movie-Friend relations: 4 methods
-- Watch Sessions: 5 methods
-- Content Blocks: 6 methods
+137 methods on `IMediathecaApi` via Fable.Remoting:
+- Movies: 21 methods (CRUD, social, watch sessions, content blocks)
+- Series: 31 methods (CRUD, social, rewatch sessions, episode progress, content blocks)
+- Games: 29 methods (CRUD, social, stores, family owners, played-with, content blocks)
 - Friends: 7 methods
-- Catalogs: 9 methods
-- Dashboard/Admin: 5 methods
+- Catalogs: 10 methods
+- Dashboard: 3 methods (stats, recent series, activity)
+- Settings: 7 methods (TMDB/RAWG keys, trailers)
+- Event Store: 3 methods
+- Search: 2 methods (library, TMDB)
+- Import: 1 method (Cinemarco)
 
-All DTOs defined in `src/Shared/Shared.fs`. Slug module provides URL-safe identifiers.
+All DTOs in `src/Shared/Shared.fs`. Slug module provides URL-safe identifiers (`movieSlug`, `seriesSlug`, `gameSlug`, `friendSlug`, `catalogSlug`).
 
 ## Storage & Projections
 
-15 tables total across EventStore (2), MovieProjection (3), FriendProjection (1), CatalogProjection (2), ContentBlockProjection (1), CastStore (2), SettingsStore (1) + filesystem (ImageStore).
+### Event Store
+- SQLite append-only `events` table (global_position, stream_id, stream_position, event_type, data JSON, timestamp)
+- `projection_checkpoints` for incremental processing (100-event batches)
+- Stream IDs: `{Type}-{slug}` convention
 
-Key patterns:
-- JSON columns for collections (friend lists as JSON arrays)
-- Dual movie tables (movie_list for search, movie_detail for full info)
-- Projection checkpoint tracking for catch-up
-- MovieProjection rebuilt on startup for consistency
+### Projections (6 handlers)
+| Projection | Tables | Key Features |
+|-----------|--------|-------------|
+| **MovieProjection** | movie_list, movie_detail, watch_sessions | Dual summary/detail; JSON friend arrays |
+| **SeriesProjection** | series_list, series_detail, series_seasons, series_episodes, series_rewatch_sessions, series_episode_progress | Progress recalculation; next-up computation |
+| **GameProjection** | game_list, game_detail | Status tracking; JSON arrays for stores/family/social |
+| **FriendProjection** | friend_list | Cascade scrubs JSON arrays on removal |
+| **CatalogProjection** | catalog_list, catalog_entries | Polymorphic entries (Movie/Series/Game) |
+| **ContentBlockProjection** | content_blocks | Session-scoped blocks |
+
+### Non-Event-Sourced Stores
+- **CastStore**: cast_members + movie_cast + series_cast (orphan cleanup)
+- **ImageStore**: File-system operations
+- **SettingsStore**: key-value table (API keys)
 
 ## Client Architecture
 
-### Pages & Routes
+### Pages (10 routes)
 | Page | Route | Pattern |
 |------|-------|---------|
-| Dashboard | `/` | Stats cards, recent movies, activity timeline |
-| Movie_list | `/movies` | Grid with search/genre filter |
-| Movie_detail | `/movies/:slug` | Hero + two-column (content left, social right) |
-| Friend_list | `/friends` | Card grid with add form |
-| Friend_detail | `/friends/:slug` | Profile with recommended/watched movies |
-| Catalog_list | `/catalogs` | Catalog cards with create form |
-| Catalog_detail | `/catalogs/:slug` | Entries with management |
+| Dashboard | `/` | Stats cards, recent items, activity timeline |
+| Movie_list / Movie_detail | `/movies`, `/movies/:slug` | Grid with search; hero + two-column detail |
+| Series_list / Series_detail | `/series`, `/series/:slug` | Grid with search; hero + tabs + season sidebar |
+| Game_list / Game_detail | `/games`, `/games/:slug` | Grid with status filters; hero + stores/social |
+| Friend_list / Friend_detail | `/friends`, `/friends/:slug` | Card grid; profile + media associations |
+| Catalog_list / Catalog_detail | `/catalogs`, `/catalogs/:slug` | Catalog cards; entries with management |
 | Event_browser | `/events` | Event store explorer with filters |
-| Settings | `/settings` | Configuration page |
-| Not_found | `/not-found` | 404 |
+| Settings | `/settings` | API keys (TMDB, RAWG), Cinemarco import |
+| Styleguide | `/styleguide` | Design system documentation |
 
-### Reusable Components
-| Component | File | Public Functions |
-|-----------|------|-----------------|
-| **Icons** | `Icons.fs` | `svgIcon`, `svgIconSm` + named icons (Dashboard, Movie, Friends, etc.) |
-| **Layout** | `Layout.fs` | `view currentPage content` |
-| **Sidebar** | `Sidebar.fs` | `view currentPage` (desktop nav, glassmorphic) |
-| **BottomNav** | `BottomNav.fs` | `view currentPage` (mobile dock) |
-| **PageContainer** | `PageContainer.fs` | `view title children` |
-| **PosterCard** | `PosterCard.fs` | `view slug name year posterRef ratingBadge`, `thumbnail posterRef alt` |
-| **ModalPanel** | `ModalPanel.fs` | `view`, `viewCustom`, `viewWithFooter` (glassmorphic overlay) |
-| **SearchModal** | `SearchModal.fs` | Debounced TMDB search + library filter |
-| **FriendPill** | `FriendPill.fs` | `view`, `viewWithRemove`, `viewInline` |
-| **ContentBlockEditor** | `ContentBlockEditor.fs` | Block CRUD with inline editing |
+### MVU Pattern
+- Root Types.fs/State.fs/Views.fs delegates to child pages via Cmd.map
+- Each page: Types.fs (Model + Msg), State.fs (init + update), Views.fs (render)
+- SearchModal: global overlay (Ctrl+K), tabbed (Library, Movies, Series, Games)
 
-### Design Tokens (Current — Implicit)
-- **Typography:** Oswald (`font-display`, headings, uppercase, tracking 0.05em) / Inter (`font-sans`, body)
-- **Theme:** DaisyUI "dim" dark theme — primary (cyan-green oklch 86.1%), secondary (orange oklch 73.4%), accent (magenta oklch 74.2%)
-- **Glassmorphism:** `oklch(…/0.55–0.70)` bg, `backdrop-blur-[24px] saturate-[1.2]`, subtle border + inset highlight
-- **Spacing:** p-4 mobile, lg:p-6 desktop; gap-2 compact, gap-3 standard; rounded-xl cards, rounded-full avatars
-- **Animations:** fade-in (0.3s), fade-in-up (0.4s), scale-in (0.3s), stagger-grid (40ms cascading)
-- **Shadows:** Subtle (0 4px 12px -2px), deeper on hover; oklch-based
-- **Z-index:** auto (content), relative (cards), z-50 (modals/dropdowns)
+### Components
+Layout, Sidebar, BottomNav, PosterCard, ModalPanel, EntryList, SearchModal, FriendPill, ContentBlockEditor, PageContainer, Icons, DesignSystem
+
+### Design System (DesignSystem.fs + index.css)
+- Glassmorphism: glassCard, glassOverlay, glassSubtle, glassDropdown
+- Typography: Oswald (headings), Inter (body)
+- Theme: custom "dim" DaisyUI dark theme
+- Animations: fade-in, fade-in-up, scale-in, stagger-grid
 
 ## Cross-Cutting Observations
-- All design tokens are currently implicit — scattered across Tailwind classes in view functions and index.css
-- No centralized component library — components are reusable but design decisions are baked into each file
-- Glassmorphism convention documented in CLAUDE.md but not enforced programmatically
-- Typography rules (Oswald headings, Inter body) applied ad-hoc per component
-- Color usage follows DaisyUI semantic classes but specific opacity/oklch values vary per usage site
+
+- Games aggregate has `played_with` as a flat set but no play session events — differs from STATE.md domain model which describes full play sessions with events
+- No `play_sessions` projection table — total_play_time is on game_list/game_detail but no per-session tracking
+- Steam integration (REQ-208) will need: Steam Web API client, Settings entries for Steam API key + family member config, import logic to match Steam games to existing library entries
+- Dashboard stats already include TotalPlayTimeMinutes and GameCount
+- SeriesProjection is rebuilt on startup for data consistency

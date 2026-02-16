@@ -39,6 +39,8 @@ module Games =
         | Removed_want_to_play_with of friendSlug: string
         | Game_played_with of friendSlug: string
         | Game_played_with_removed of friendSlug: string
+        | Game_steam_app_id_set of steamAppId: int
+        | Game_play_time_set of totalMinutes: int
 
     // State
 
@@ -54,6 +56,8 @@ module Games =
         HltbHours: float option
         PersonalRating: int option
         Status: GameStatus
+        SteamAppId: int option
+        TotalPlayTimeMinutes: int
         Stores: Set<string>
         FamilyOwners: Set<string>
         RecommendedBy: Set<string>
@@ -87,6 +91,8 @@ module Games =
         | Remove_from_want_to_play_with of friendSlug: string
         | Add_played_with of friendSlug: string
         | Remove_played_with of friendSlug: string
+        | Set_steam_app_id of steamAppId: int
+        | Set_play_time of totalMinutes: int
 
     // Evolve
 
@@ -105,6 +111,8 @@ module Games =
                 HltbHours = None
                 PersonalRating = None
                 Status = Backlog
+                SteamAppId = None
+                TotalPlayTimeMinutes = 0
                 Stores = Set.empty
                 FamilyOwners = Set.empty
                 RecommendedBy = Set.empty
@@ -144,6 +152,10 @@ module Games =
             Active { game with PlayedWith = game.PlayedWith |> Set.add friendSlug }
         | Active game, Game_played_with_removed friendSlug ->
             Active { game with PlayedWith = game.PlayedWith |> Set.remove friendSlug }
+        | Active game, Game_steam_app_id_set steamAppId ->
+            Active { game with SteamAppId = Some steamAppId }
+        | Active game, Game_play_time_set totalMinutes ->
+            Active { game with TotalPlayTimeMinutes = totalMinutes }
         | _ -> state
 
     let reconstitute (events: GameEvent list) : GameState =
@@ -212,6 +224,12 @@ module Games =
             if game.PlayedWith |> Set.contains friendSlug then
                 Ok [ Game_played_with_removed friendSlug ]
             else Ok []
+        | Active game, Set_steam_app_id steamAppId ->
+            if game.SteamAppId = Some steamAppId then Ok []
+            else Ok [ Game_steam_app_id_set steamAppId ]
+        | Active game, Set_play_time totalMinutes ->
+            if game.TotalPlayTimeMinutes = totalMinutes then Ok []
+            else Ok [ Game_play_time_set totalMinutes ]
         | Removed, _ ->
             Error "Game has been removed"
         | Not_created, _ ->
@@ -304,6 +322,10 @@ module Games =
                 "Game_played_with", Encode.toString 0 (Encode.object [ "friendSlug", Encode.string friendSlug ])
             | Game_played_with_removed friendSlug ->
                 "Game_played_with_removed", Encode.toString 0 (Encode.object [ "friendSlug", Encode.string friendSlug ])
+            | Game_steam_app_id_set steamAppId ->
+                "Game_steam_app_id_set", Encode.toString 0 (Encode.object [ "steamAppId", Encode.int steamAppId ])
+            | Game_play_time_set totalMinutes ->
+                "Game_play_time_set", Encode.toString 0 (Encode.object [ "totalMinutes", Encode.int totalMinutes ])
 
         let deserialize (eventType: string) (data: string) : GameEvent option =
             match eventType with
@@ -377,6 +399,14 @@ module Games =
                 Decode.fromString (Decode.field "friendSlug" Decode.string) data
                 |> Result.toOption
                 |> Option.map Game_played_with_removed
+            | "Game_steam_app_id_set" ->
+                Decode.fromString (Decode.field "steamAppId" Decode.int) data
+                |> Result.toOption
+                |> Option.map Game_steam_app_id_set
+            | "Game_play_time_set" ->
+                Decode.fromString (Decode.field "totalMinutes" Decode.int) data
+                |> Result.toOption
+                |> Option.map Game_play_time_set
             | _ -> None
 
         let toEventData (event: GameEvent) : EventStore.EventData =

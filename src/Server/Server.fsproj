@@ -13,6 +13,7 @@
     <Compile Include="Games.fs" />
     <Compile Include="Tmdb.fs" />
     <Compile Include="Rawg.fs" />
+    <Compile Include="Steam.fs" />
     <Compile Include="ImageStore.fs" />
     <Compile Include="CastStore.fs" />
     <Compile Include="SettingsStore.fs" />

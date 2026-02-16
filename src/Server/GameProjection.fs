@@ -21,7 +21,8 @@ module GameProjection =
                 total_play_time INTEGER NOT NULL DEFAULT 0,
                 hltb_hours      REAL,
                 personal_rating INTEGER,
-                rawg_rating     REAL
+                rawg_rating     REAL,
+                steam_app_id    INTEGER
             );
 
             CREATE TABLE IF NOT EXISTS game_detail (
@@ -37,6 +38,7 @@ module GameProjection =
                 rawg_rating       REAL,
                 hltb_hours        REAL,
                 personal_rating   INTEGER,
+                steam_app_id      INTEGER,
                 stores            TEXT NOT NULL DEFAULT '[]',
                 family_owners     TEXT NOT NULL DEFAULT '[]',
                 recommended_by    TEXT NOT NULL DEFAULT '[]',
@@ -244,6 +246,26 @@ module GameProjection =
                 | Games.Game_played_with_removed friendSlug ->
                     updateJsonList conn "game_detail" "played_with" slug false friendSlug
 
+                | Games.Game_steam_app_id_set steamAppId ->
+                    conn
+                    |> Db.newCommand "UPDATE game_list SET steam_app_id = @steam_app_id WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "steam_app_id", SqlType.Int32 steamAppId ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE game_detail SET steam_app_id = @steam_app_id WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "steam_app_id", SqlType.Int32 steamAppId ]
+                    |> Db.exec
+
+                | Games.Game_play_time_set totalMinutes ->
+                    conn
+                    |> Db.newCommand "UPDATE game_list SET total_play_time = @total_play_time WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "total_play_time", SqlType.Int32 totalMinutes ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE game_detail SET total_play_time = @total_play_time WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "total_play_time", SqlType.Int32 totalMinutes ]
+                    |> Db.exec
+
     let handler: Projection.ProjectionHandler = {
         Name = "GameProjection"
         Handle = handleEvent
@@ -316,7 +338,7 @@ module GameProjection =
 
     let getBySlug (conn: SqliteConnection) (slug: string) : GameDetail option =
         conn
-        |> Db.newCommand "SELECT slug, name, year, description, cover_ref, backdrop_ref, genres, status, rawg_id, rawg_rating, hltb_hours, personal_rating, stores, family_owners, recommended_by, want_to_play_with, played_with, total_play_time FROM game_detail WHERE slug = @slug"
+        |> Db.newCommand "SELECT slug, name, year, description, cover_ref, backdrop_ref, genres, status, rawg_id, rawg_rating, hltb_hours, personal_rating, steam_app_id, stores, family_owners, recommended_by, want_to_play_with, played_with, total_play_time FROM game_detail WHERE slug = @slug"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
@@ -367,6 +389,10 @@ module GameProjection =
               PersonalRating =
                 if rd.IsDBNull(rd.GetOrdinal("personal_rating")) then None
                 else Some (rd.ReadInt32 "personal_rating")
+              SteamAppId =
+                if rd.IsDBNull(rd.GetOrdinal("steam_app_id")) then None
+                else Some (rd.ReadInt32 "steam_app_id")
+              TotalPlayTimeMinutes = rd.ReadInt32 "total_play_time"
               Stores = stores
               FamilyOwners = resolveFriendRefs conn familyOwnerSlugs
               RecommendedBy = resolveFriendRefs conn recommendedBySlugs
@@ -418,4 +444,20 @@ module GameProjection =
                 if rd.IsDBNull(rd.GetOrdinal("cover_ref")) then None
                 else Some (rd.ReadString "cover_ref")
               MediaType = Game }
+        )
+
+    let findBySteamAppId (conn: SqliteConnection) (appId: int) : string option =
+        conn
+        |> Db.newCommand "SELECT slug FROM game_detail WHERE steam_app_id = @app_id LIMIT 1"
+        |> Db.setParams [ "app_id", SqlType.Int32 appId ]
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "slug")
+
+    let findByName (conn: SqliteConnection) (name: string) : (string * int option) list =
+        conn
+        |> Db.newCommand "SELECT slug, steam_app_id FROM game_detail WHERE name = @name COLLATE NOCASE"
+        |> Db.setParams [ "name", SqlType.String name ]
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "slug",
+            if rd.IsDBNull(rd.GetOrdinal("steam_app_id")) then None
+            else Some (rd.ReadInt32 "steam_app_id")
         )
