@@ -55,27 +55,15 @@ let private gameCard (game: GameListItem) =
                                 ]
                             | None ->
                                 Html.div [
-                                    prop.className "flex items-center justify-center w-full h-full text-base-content/20"
-                                    prop.children [ Icons.gamepad () ]
-                                ]
-
-                            // Bottom gradient + title overlay (visible on hover)
-                            Html.div [
-                                prop.className "poster-overlay absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/70 to-transparent"
-                            ]
-                            Html.div [
-                                prop.className "poster-overlay absolute inset-x-0 bottom-0 p-3"
-                                prop.children [
-                                    Html.p [
-                                        prop.className "text-white text-xs font-medium line-clamp-2 drop-shadow-md"
-                                        prop.text game.Name
-                                    ]
-                                    Html.p [
-                                        prop.className "text-white/70 text-xs mt-0.5"
-                                        prop.text (string game.Year)
+                                    prop.className "flex flex-col items-center justify-center w-full h-full text-base-content/20 px-3 gap-2"
+                                    prop.children [
+                                        Icons.gamepad ()
+                                        Html.p [
+                                            prop.className "text-xs text-base-content/40 font-medium text-center line-clamp-2"
+                                            prop.text game.Name
+                                        ]
                                     ]
                                 ]
-                            ]
 
                             // Shine effect
                             Html.div [ prop.className DesignSystem.posterShine ]

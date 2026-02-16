@@ -32,8 +32,14 @@ let private seriesCard (series: SeriesListItem) =
                                 ]
                             | None ->
                                 Html.div [
-                                    prop.className "flex items-center justify-center w-full h-full text-base-content/20"
-                                    prop.children [ Icons.tv () ]
+                                    prop.className "flex flex-col items-center justify-center w-full h-full text-base-content/20 px-3 gap-2"
+                                    prop.children [
+                                        Icons.tv ()
+                                        Html.p [
+                                            prop.className "text-xs text-base-content/40 font-medium text-center line-clamp-2"
+                                            prop.text series.Name
+                                        ]
+                                    ]
                                 ]
 
                             // Shine effect

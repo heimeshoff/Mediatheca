@@ -34,32 +34,20 @@ let view
                                 ]
                             | None ->
                                 Html.div [
-                                    prop.className "flex items-center justify-center w-full h-full text-base-content/20"
-                                    prop.children [ Icons.movie () ]
+                                    prop.className "flex flex-col items-center justify-center w-full h-full text-base-content/20 px-3 gap-2"
+                                    prop.children [
+                                        Icons.movie ()
+                                        Html.p [
+                                            prop.className "text-xs text-base-content/40 font-medium text-center line-clamp-2"
+                                            prop.text name
+                                        ]
+                                    ]
                                 ]
 
                             // Optional rating badge (top-right)
                             match ratingBadge with
                             | Some badge -> badge
                             | None -> ()
-
-                            // Bottom gradient + title overlay (visible on hover)
-                            Html.div [
-                                prop.className "poster-overlay absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/70 to-transparent"
-                            ]
-                            Html.div [
-                                prop.className "poster-overlay absolute inset-x-0 bottom-0 p-3"
-                                prop.children [
-                                    Html.p [
-                                        prop.className "text-white text-xs font-medium line-clamp-2 drop-shadow-md"
-                                        prop.text name
-                                    ]
-                                    Html.p [
-                                        prop.className "text-white/70 text-xs mt-0.5"
-                                        prop.text (string year)
-                                    ]
-                                ]
-                            ]
 
                             // Shine effect
                             Html.div [ prop.className DesignSystem.posterShine ]
@@ -100,30 +88,19 @@ let viewForRoute
                                 ]
                             | None ->
                                 Html.div [
-                                    prop.className "flex items-center justify-center w-full h-full text-base-content/20"
-                                    prop.children [ Icons.movie () ]
+                                    prop.className "flex flex-col items-center justify-center w-full h-full text-base-content/20 px-3 gap-2"
+                                    prop.children [
+                                        Icons.movie ()
+                                        Html.p [
+                                            prop.className "text-xs text-base-content/40 font-medium text-center line-clamp-2"
+                                            prop.text name
+                                        ]
+                                    ]
                                 ]
 
                             match ratingBadge with
                             | Some badge -> badge
                             | None -> ()
-
-                            Html.div [
-                                prop.className "poster-overlay absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/70 to-transparent"
-                            ]
-                            Html.div [
-                                prop.className "poster-overlay absolute inset-x-0 bottom-0 p-3"
-                                prop.children [
-                                    Html.p [
-                                        prop.className "text-white text-xs font-medium line-clamp-2 drop-shadow-md"
-                                        prop.text name
-                                    ]
-                                    Html.p [
-                                        prop.className "text-white/70 text-xs mt-0.5"
-                                        prop.text (string year)
-                                    ]
-                                ]
-                            ]
 
                             Html.div [ prop.className DesignSystem.posterShine ]
                         ]
