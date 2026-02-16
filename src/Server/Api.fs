@@ -52,6 +52,236 @@ module Api =
             suffix <- suffix + 1
         slug
 
+    let private addMovieToLibrary
+        (conn: SqliteConnection)
+        (httpClient: HttpClient)
+        (getTmdbConfig: unit -> Tmdb.TmdbConfig)
+        (imageBasePath: string)
+        (movieProjections: Projection.ProjectionHandler list)
+        (tmdbId: int)
+        : Async<Result<string, string>> = async {
+            try
+                let tmdbConfig = getTmdbConfig()
+                let! details = Tmdb.getMovieDetails httpClient tmdbConfig tmdbId
+                let! credits = Tmdb.getMovieCredits httpClient tmdbConfig tmdbId
+
+                let year =
+                    details.ReleaseDate
+                    |> Option.bind (fun d ->
+                        if d.Length >= 4 then
+                            match System.Int32.TryParse(d.[0..3]) with
+                            | true, y -> Some y
+                            | _ -> None
+                        else None)
+                    |> Option.defaultValue 0
+
+                let baseSlug = Slug.movieSlug details.Title year
+                let slug = generateUniqueSlug conn Movies.streamId baseSlug
+                let sid = Movies.streamId slug
+
+                let posterRef =
+                    match details.PosterPath with
+                    | Some p ->
+                        let ref = sprintf "posters/%s.jpg" slug
+                        try
+                            Tmdb.downloadImage httpClient tmdbConfig p "w500" (System.IO.Path.Combine(imageBasePath, ref))
+                            |> Async.RunSynchronously
+                            Some ref
+                        with _ -> None
+                    | None -> None
+
+                let backdropRef =
+                    match details.BackdropPath with
+                    | Some p ->
+                        let ref = sprintf "backdrops/%s.jpg" slug
+                        try
+                            Tmdb.downloadImage httpClient tmdbConfig p "w1280" (System.IO.Path.Combine(imageBasePath, ref))
+                            |> Async.RunSynchronously
+                            Some ref
+                        with _ -> None
+                    | None -> None
+
+                let movieData: Movies.MovieAddedData = {
+                    Name = details.Title
+                    Year = year
+                    Runtime = details.Runtime
+                    Overview = details.Overview
+                    Genres = details.Genres |> List.map (fun g -> g.Name)
+                    PosterRef = posterRef
+                    BackdropRef = backdropRef
+                    TmdbId = tmdbId
+                    TmdbRating = details.VoteAverage
+                }
+
+                let result =
+                    executeCommand
+                        conn sid
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        (Movies.Add_movie_to_library movieData)
+                        movieProjections
+
+                match result with
+                | Error e -> return Error e
+                | Ok () ->
+                    let topBilled = credits.Cast |> List.sortBy (fun c -> c.Order) |> List.truncate 10
+                    for castMember in topBilled do
+                        let castImageRef =
+                            match castMember.ProfilePath with
+                            | Some p ->
+                                let ref = sprintf "cast/%d.jpg" castMember.Id
+                                let destPath = System.IO.Path.Combine(imageBasePath, ref)
+                                if not (ImageStore.imageExists imageBasePath ref) then
+                                    try
+                                        Tmdb.downloadImage httpClient tmdbConfig p "w185" destPath
+                                        |> Async.RunSynchronously
+                                    with _ -> ()
+                                Some ref
+                            | None -> None
+                        let cmId = CastStore.upsertCastMember conn castMember.Name castMember.Id castImageRef
+                        CastStore.addMovieCast conn sid cmId castMember.Character castMember.Order (castMember.Order < 10)
+
+                    return Ok slug
+            with ex ->
+                return Error $"Failed to add movie: {ex.Message}"
+        }
+
+    let private addSeriesToLibrary
+        (conn: SqliteConnection)
+        (httpClient: HttpClient)
+        (getTmdbConfig: unit -> Tmdb.TmdbConfig)
+        (imageBasePath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (tmdbId: int)
+        : Async<Result<string, string>> = async {
+            try
+                let tmdbConfig = getTmdbConfig()
+                let! detailsResult = Tmdb.getTvSeriesDetails httpClient tmdbConfig tmdbId
+                match detailsResult with
+                | Error e -> return Error e
+                | Ok details ->
+                    let year =
+                        details.FirstAirDate
+                        |> Option.bind (fun d ->
+                            if d.Length >= 4 then
+                                match System.Int32.TryParse(d.[0..3]) with
+                                | true, y -> Some y
+                                | _ -> None
+                            else None)
+                        |> Option.defaultValue 0
+
+                    let baseSlug = Slug.seriesSlug details.Name year
+                    let slug = generateUniqueSlug conn Series.streamId baseSlug
+                    let sid = Series.streamId slug
+
+                    let! posterRef, backdropRef =
+                        Tmdb.downloadSeriesImages httpClient tmdbConfig slug details.PosterPath details.BackdropPath imageBasePath
+
+                    let! seasons =
+                        details.Seasons
+                        |> List.filter (fun s -> s.SeasonNumber > 0)
+                        |> List.map (fun seasonSummary -> async {
+                            let! seasonResult = Tmdb.getTvSeasonDetails httpClient tmdbConfig tmdbId seasonSummary.SeasonNumber
+                            match seasonResult with
+                            | Ok seasonDetails ->
+                                let! episodes =
+                                    seasonDetails.Episodes
+                                    |> List.map (fun ep -> async {
+                                        let stillRef =
+                                            match ep.StillPath with
+                                            | Some stillPath ->
+                                                try
+                                                    Tmdb.downloadEpisodeStill httpClient tmdbConfig slug seasonSummary.SeasonNumber ep.EpisodeNumber stillPath imageBasePath
+                                                    |> Async.RunSynchronously
+                                                with _ -> None
+                                            | None -> None
+                                        let epData: Series.EpisodeImportData = {
+                                            EpisodeNumber = ep.EpisodeNumber
+                                            Name = ep.Name
+                                            Overview = ep.Overview
+                                            Runtime = ep.Runtime
+                                            AirDate = ep.AirDate
+                                            StillRef = stillRef
+                                            TmdbRating = if ep.VoteAverage > 0.0 then Some ep.VoteAverage else None
+                                        }
+                                        return epData
+                                    })
+                                    |> Async.Sequential
+                                let seasonData: Series.SeasonImportData = {
+                                    SeasonNumber = seasonSummary.SeasonNumber
+                                    Name = seasonSummary.Name
+                                    Overview = seasonSummary.Overview
+                                    PosterRef = None
+                                    AirDate = seasonSummary.AirDate
+                                    Episodes = episodes |> Array.toList
+                                }
+                                return Some seasonData
+                            | Error _ -> return None
+                        })
+                        |> Async.Sequential
+
+                    let validSeasons = seasons |> Array.toList |> List.choose id
+
+                    let episodeRuntime =
+                        match details.EpisodeRunTime with
+                        | first :: _ -> Some first
+                        | [] -> None
+
+                    let seriesData: Series.SeriesAddedData = {
+                        Name = details.Name
+                        Year = year
+                        Overview = details.Overview
+                        Genres = details.Genres |> List.map (fun g -> g.Name)
+                        Status = Tmdb.mapSeriesStatus details.Status
+                        PosterRef = posterRef
+                        BackdropRef = backdropRef
+                        TmdbId = tmdbId
+                        TmdbRating = if details.VoteAverage > 0.0 then Some details.VoteAverage else None
+                        EpisodeRuntime = episodeRuntime
+                        Seasons = validSeasons
+                    }
+
+                    let result =
+                        executeCommand
+                            conn sid
+                            Series.Serialization.fromStoredEvent
+                            Series.reconstitute
+                            Series.decide
+                            Series.Serialization.toEventData
+                            (Series.Add_series_to_library seriesData)
+                            projectionHandlers
+
+                    match result with
+                    | Error e -> return Error e
+                    | Ok () ->
+                        let! creditsResult = Tmdb.getTvSeriesCredits httpClient tmdbConfig tmdbId
+                        match creditsResult with
+                        | Ok credits ->
+                            let topBilled = credits.Cast |> List.sortBy (fun c -> c.Order) |> List.truncate 10
+                            for castMember in topBilled do
+                                let castImageRef =
+                                    match castMember.ProfilePath with
+                                    | Some p ->
+                                        let ref = sprintf "cast/%d.jpg" castMember.Id
+                                        let destPath = System.IO.Path.Combine(imageBasePath, ref)
+                                        if not (ImageStore.imageExists imageBasePath ref) then
+                                            try
+                                                Tmdb.downloadImage httpClient tmdbConfig p "w185" destPath
+                                                |> Async.RunSynchronously
+                                            with _ -> ()
+                                        Some ref
+                                    | None -> None
+                                let cmId = CastStore.upsertCastMember conn castMember.Name castMember.Id castImageRef
+                                CastStore.addSeriesCast conn sid cmId castMember.Character castMember.Order (castMember.Order < 10)
+                        | Error _ -> ()
+
+                        return Ok slug
+            with ex ->
+                return Error $"Failed to add series: {ex.Message}"
+        }
+
     let runSteamFamilyImport
         (conn: SqliteConnection)
         (httpClient: HttpClient)
@@ -336,99 +566,8 @@ module Api =
                 return! Tmdb.searchMovies httpClient (getTmdbConfig()) query
             }
 
-            addMovie = fun tmdbId -> async {
-                try
-                    // 1. Fetch TMDB details + credits
-                    let tmdbConfig = getTmdbConfig()
-                    let! details = Tmdb.getMovieDetails httpClient tmdbConfig tmdbId
-                    let! credits = Tmdb.getMovieCredits httpClient tmdbConfig tmdbId
-
-                    let year =
-                        details.ReleaseDate
-                        |> Option.bind (fun d ->
-                            if d.Length >= 4 then
-                                match System.Int32.TryParse(d.[0..3]) with
-                                | true, y -> Some y
-                                | _ -> None
-                            else None)
-                        |> Option.defaultValue 0
-
-                    // 2. Generate unique slug
-                    let baseSlug = Slug.movieSlug details.Title year
-                    let slug = generateUniqueSlug conn Movies.streamId baseSlug
-                    let sid = Movies.streamId slug
-
-                    // 3. Download poster + backdrop
-                    let posterRef =
-                        match details.PosterPath with
-                        | Some p ->
-                            let ref = sprintf "posters/%s.jpg" slug
-                            try
-                                Tmdb.downloadImage httpClient tmdbConfig p "w500" (System.IO.Path.Combine(imageBasePath, ref))
-                                |> Async.RunSynchronously
-                                Some ref
-                            with _ -> None
-                        | None -> None
-
-                    let backdropRef =
-                        match details.BackdropPath with
-                        | Some p ->
-                            let ref = sprintf "backdrops/%s.jpg" slug
-                            try
-                                Tmdb.downloadImage httpClient tmdbConfig p "w1280" (System.IO.Path.Combine(imageBasePath, ref))
-                                |> Async.RunSynchronously
-                                Some ref
-                            with _ -> None
-                        | None -> None
-
-                    // 4. Execute command
-                    let movieData: Movies.MovieAddedData = {
-                        Name = details.Title
-                        Year = year
-                        Runtime = details.Runtime
-                        Overview = details.Overview
-                        Genres = details.Genres |> List.map (fun g -> g.Name)
-                        PosterRef = posterRef
-                        BackdropRef = backdropRef
-                        TmdbId = tmdbId
-                        TmdbRating = details.VoteAverage
-                    }
-
-                    let result =
-                        executeCommand
-                            conn sid
-                            Movies.Serialization.fromStoredEvent
-                            Movies.reconstitute
-                            Movies.decide
-                            Movies.Serialization.toEventData
-                            (Movies.Add_movie_to_library movieData)
-                            movieProjections
-
-                    match result with
-                    | Error e -> return Error e
-                    | Ok () ->
-                        // 5. Insert cast into CastStore
-                        let topBilled = credits.Cast |> List.sortBy (fun c -> c.Order) |> List.truncate 10
-                        for castMember in topBilled do
-                            let castImageRef =
-                                match castMember.ProfilePath with
-                                | Some p ->
-                                    let ref = sprintf "cast/%d.jpg" castMember.Id
-                                    let destPath = System.IO.Path.Combine(imageBasePath, ref)
-                                    if not (ImageStore.imageExists imageBasePath ref) then
-                                        try
-                                            Tmdb.downloadImage httpClient tmdbConfig p "w185" destPath
-                                            |> Async.RunSynchronously
-                                        with _ -> ()
-                                    Some ref
-                                | None -> None
-                            let cmId = CastStore.upsertCastMember conn castMember.Name castMember.Id castImageRef
-                            CastStore.addMovieCast conn sid cmId castMember.Character castMember.Order (castMember.Order < 10)
-
-                        return Ok slug
-                with ex ->
-                    return Error $"Failed to add movie: {ex.Message}"
-            }
+            addMovie = fun tmdbId ->
+                addMovieToLibrary conn httpClient getTmdbConfig imageBasePath movieProjections tmdbId
 
             removeMovie = fun slug -> async {
                 let sid = Movies.streamId slug
@@ -1225,137 +1364,8 @@ module Api =
                 return! Tmdb.searchTvSeries httpClient (getTmdbConfig()) query
             }
 
-            addSeries = fun tmdbId -> async {
-                try
-                    let tmdbConfig = getTmdbConfig()
-                    let! detailsResult = Tmdb.getTvSeriesDetails httpClient tmdbConfig tmdbId
-                    match detailsResult with
-                    | Error e -> return Error e
-                    | Ok details ->
-                        let year =
-                            details.FirstAirDate
-                            |> Option.bind (fun d ->
-                                if d.Length >= 4 then
-                                    match System.Int32.TryParse(d.[0..3]) with
-                                    | true, y -> Some y
-                                    | _ -> None
-                                else None)
-                            |> Option.defaultValue 0
-
-                        // Generate unique slug
-                        let baseSlug = Slug.seriesSlug details.Name year
-                        let slug = generateUniqueSlug conn Series.streamId baseSlug
-                        let sid = Series.streamId slug
-
-                        // Download poster + backdrop
-                        let! posterRef, backdropRef =
-                            Tmdb.downloadSeriesImages httpClient tmdbConfig slug details.PosterPath details.BackdropPath imageBasePath
-
-                        // Fetch season details with episodes (skip Specials / season 0)
-                        let! seasons =
-                            details.Seasons
-                            |> List.filter (fun s -> s.SeasonNumber > 0)
-                            |> List.map (fun seasonSummary -> async {
-                                let! seasonResult = Tmdb.getTvSeasonDetails httpClient tmdbConfig tmdbId seasonSummary.SeasonNumber
-                                match seasonResult with
-                                | Ok seasonDetails ->
-                                    // Download episode stills
-                                    let! episodes =
-                                        seasonDetails.Episodes
-                                        |> List.map (fun ep -> async {
-                                            let stillRef =
-                                                match ep.StillPath with
-                                                | Some stillPath ->
-                                                    try
-                                                        Tmdb.downloadEpisodeStill httpClient tmdbConfig slug seasonSummary.SeasonNumber ep.EpisodeNumber stillPath imageBasePath
-                                                        |> Async.RunSynchronously
-                                                    with _ -> None
-                                                | None -> None
-                                            let epData: Series.EpisodeImportData = {
-                                                EpisodeNumber = ep.EpisodeNumber
-                                                Name = ep.Name
-                                                Overview = ep.Overview
-                                                Runtime = ep.Runtime
-                                                AirDate = ep.AirDate
-                                                StillRef = stillRef
-                                                TmdbRating = if ep.VoteAverage > 0.0 then Some ep.VoteAverage else None
-                                            }
-                                            return epData
-                                        })
-                                        |> Async.Sequential
-                                    let seasonData: Series.SeasonImportData = {
-                                        SeasonNumber = seasonSummary.SeasonNumber
-                                        Name = seasonSummary.Name
-                                        Overview = seasonSummary.Overview
-                                        PosterRef = None
-                                        AirDate = seasonSummary.AirDate
-                                        Episodes = episodes |> Array.toList
-                                    }
-                                    return Some seasonData
-                                | Error _ -> return None
-                            })
-                            |> Async.Sequential
-
-                        let validSeasons = seasons |> Array.toList |> List.choose id
-
-                        let episodeRuntime =
-                            match details.EpisodeRunTime with
-                            | first :: _ -> Some first
-                            | [] -> None
-
-                        let seriesData: Series.SeriesAddedData = {
-                            Name = details.Name
-                            Year = year
-                            Overview = details.Overview
-                            Genres = details.Genres |> List.map (fun g -> g.Name)
-                            Status = Tmdb.mapSeriesStatus details.Status
-                            PosterRef = posterRef
-                            BackdropRef = backdropRef
-                            TmdbId = tmdbId
-                            TmdbRating = if details.VoteAverage > 0.0 then Some details.VoteAverage else None
-                            EpisodeRuntime = episodeRuntime
-                            Seasons = validSeasons
-                        }
-
-                        let result =
-                            executeCommand
-                                conn sid
-                                Series.Serialization.fromStoredEvent
-                                Series.reconstitute
-                                Series.decide
-                                Series.Serialization.toEventData
-                                (Series.Add_series_to_library seriesData)
-                                projectionHandlers
-
-                        match result with
-                        | Error e -> return Error e
-                        | Ok () ->
-                            // Fetch and save series credits
-                            let! creditsResult = Tmdb.getTvSeriesCredits httpClient tmdbConfig tmdbId
-                            match creditsResult with
-                            | Ok credits ->
-                                let topBilled = credits.Cast |> List.sortBy (fun c -> c.Order) |> List.truncate 10
-                                for castMember in topBilled do
-                                    let castImageRef =
-                                        match castMember.ProfilePath with
-                                        | Some p ->
-                                            let ref = sprintf "cast/%d.jpg" castMember.Id
-                                            let destPath = System.IO.Path.Combine(imageBasePath, ref)
-                                            if not (ImageStore.imageExists imageBasePath ref) then
-                                                try
-                                                    Tmdb.downloadImage httpClient tmdbConfig p "w185" destPath
-                                                    |> Async.RunSynchronously
-                                                with _ -> ()
-                                            Some ref
-                                        | None -> None
-                                    let cmId = CastStore.upsertCastMember conn castMember.Name castMember.Id castImageRef
-                                    CastStore.addSeriesCast conn sid cmId castMember.Character castMember.Order (castMember.Order < 10)
-                            | Error _ -> ()
-
-                            return Ok slug
-                with ex ->
-                    return Error $"Failed to add series: {ex.Message}"
-            }
+            addSeries = fun tmdbId ->
+                addSeriesToLibrary conn httpClient getTmdbConfig imageBasePath projectionHandlers tmdbId
 
             removeSeries = fun slug -> async {
                 let sid = Series.streamId slug
@@ -2679,6 +2689,8 @@ module Api =
                     else
                         let mutable moviesAdded = 0
                         let mutable episodesAdded = 0
+                        let mutable moviesAutoAdded = 0
+                        let mutable seriesAutoAdded = 0
                         let mutable itemsSkipped = 0
                         let mutable errors: string list = []
 
@@ -2688,7 +2700,7 @@ module Api =
                         | Error e -> errors <- errors @ [sprintf "Failed to fetch Jellyfin movies: %s" e]
                         | Ok jellyfinMovies ->
                             // Build TMDB ID -> (slug, name) lookup
-                            let moviesByTmdbId =
+                            let mutable moviesByTmdbId =
                                 conn
                                 |> Db.newCommand "SELECT slug, name, tmdb_id FROM movie_detail"
                                 |> Db.query (fun (rd: IDataReader) ->
@@ -2698,6 +2710,26 @@ module Api =
                                     (tmdbId, (slug, name)))
                                 |> Map.ofList
 
+                            // Phase 1: Auto-add unmatched movies with TMDB IDs
+                            for item in jellyfinMovies do
+                                let tmdbId =
+                                    item.ProviderIds.Tmdb
+                                    |> Option.bind (fun s -> match System.Int32.TryParse(s) with true, v -> Some v | _ -> None)
+                                match tmdbId with
+                                | Some tid when not (Map.containsKey tid moviesByTmdbId) ->
+                                    try
+                                        let! addResult = addMovieToLibrary conn httpClient getTmdbConfig imageBasePath movieProjections tid
+                                        match addResult with
+                                        | Ok slug ->
+                                            moviesByTmdbId <- Map.add tid (slug, item.Name) moviesByTmdbId
+                                            moviesAutoAdded <- moviesAutoAdded + 1
+                                        | Error e ->
+                                            errors <- errors @ [sprintf "Auto-add movie '%s' (TMDB %d): %s" item.Name tid e]
+                                    with ex ->
+                                        errors <- errors @ [sprintf "Auto-add movie '%s' (TMDB %d): %s" item.Name tid ex.Message]
+                                | _ -> ()
+
+                            // Phase 2: Sync watch history
                             for item in jellyfinMovies do
                                 let played = item.UserData |> Option.map (fun ud -> ud.Played) |> Option.defaultValue false
                                 let tmdbId =
@@ -2759,7 +2791,7 @@ module Api =
                         match seriesResult with
                         | Error e -> errors <- errors @ [sprintf "Failed to fetch Jellyfin series: %s" e]
                         | Ok jellyfinSeries ->
-                            let seriesByTmdbId =
+                            let mutable seriesByTmdbId =
                                 conn
                                 |> Db.newCommand "SELECT slug, name, tmdb_id FROM series_detail"
                                 |> Db.query (fun (rd: IDataReader) ->
@@ -2769,6 +2801,26 @@ module Api =
                                     (tmdbId, (slug, name)))
                                 |> Map.ofList
 
+                            // Phase 1: Auto-add unmatched series with TMDB IDs
+                            for seriesItem in jellyfinSeries do
+                                let tmdbId =
+                                    seriesItem.ProviderIds.Tmdb
+                                    |> Option.bind (fun s -> match System.Int32.TryParse(s) with true, v -> Some v | _ -> None)
+                                match tmdbId with
+                                | Some tid when not (Map.containsKey tid seriesByTmdbId) ->
+                                    try
+                                        let! addResult = addSeriesToLibrary conn httpClient getTmdbConfig imageBasePath projectionHandlers tid
+                                        match addResult with
+                                        | Ok slug ->
+                                            seriesByTmdbId <- Map.add tid (slug, seriesItem.Name) seriesByTmdbId
+                                            seriesAutoAdded <- seriesAutoAdded + 1
+                                        | Error e ->
+                                            errors <- errors @ [sprintf "Auto-add series '%s' (TMDB %d): %s" seriesItem.Name tid e]
+                                    with ex ->
+                                        errors <- errors @ [sprintf "Auto-add series '%s' (TMDB %d): %s" seriesItem.Name tid ex.Message]
+                                | _ -> ()
+
+                            // Phase 2: Sync watch history
                             for seriesItem in jellyfinSeries do
                                 let tmdbId =
                                     seriesItem.ProviderIds.Tmdb
@@ -2821,6 +2873,8 @@ module Api =
                         let importResult: JellyfinImportResult = {
                             MoviesAdded = moviesAdded
                             EpisodesAdded = episodesAdded
+                            MoviesAutoAdded = moviesAutoAdded
+                            SeriesAutoAdded = seriesAutoAdded
                             ItemsSkipped = itemsSkipped
                             Errors = errors
                         }

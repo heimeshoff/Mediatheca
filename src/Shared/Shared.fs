@@ -566,6 +566,8 @@ type JellyfinScanResult = {
 type JellyfinImportResult = {
     MoviesAdded: int
     EpisodesAdded: int
+    MoviesAutoAdded: int
+    SeriesAutoAdded: int
     ItemsSkipped: int
     Errors: string list
 }

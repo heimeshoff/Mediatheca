@@ -1110,14 +1110,16 @@ let private jellyfinDetail (model: Model) (dispatch: Msg -> unit) =
                                                 prop.className "bg-base-200/50 rounded-lg p-3"
                                                 prop.children [
                                                     Html.div [ prop.className "text-base-content/50 text-xs"; prop.text "Unmatched Movies" ]
-                                                    Html.div [ prop.className "font-bold"; prop.text (string scanResult.UnmatchedMovies.Length) ]
+                                                    let withTmdb = scanResult.UnmatchedMovies |> List.filter (fun m -> m.TmdbId.IsSome) |> List.length
+                                                    Html.div [ prop.className "font-bold"; prop.text (sprintf "%d (%d will auto-add)" scanResult.UnmatchedMovies.Length withTmdb) ]
                                                 ]
                                             ]
                                             Html.div [
                                                 prop.className "bg-base-200/50 rounded-lg p-3"
                                                 prop.children [
                                                     Html.div [ prop.className "text-base-content/50 text-xs"; prop.text "Unmatched Series" ]
-                                                    Html.div [ prop.className "font-bold"; prop.text (string scanResult.UnmatchedSeries.Length) ]
+                                                    let withTmdb = scanResult.UnmatchedSeries |> List.filter (fun s -> s.TmdbId.IsSome) |> List.length
+                                                    Html.div [ prop.className "font-bold"; prop.text (sprintf "%d (%d will auto-add)" scanResult.UnmatchedSeries.Length withTmdb) ]
                                                 ]
                                             ]
                                         ]
@@ -1144,7 +1146,10 @@ let private jellyfinDetail (model: Model) (dispatch: Msg -> unit) =
                                         ]
 
                                     // Import button
-                                    if playedMovies.Length > 0 || playedSeries.Length > 0 then
+                                    let unmatchedWithTmdb =
+                                        (scanResult.UnmatchedMovies |> List.filter (fun m -> m.TmdbId.IsSome) |> List.length)
+                                        + (scanResult.UnmatchedSeries |> List.filter (fun s -> s.TmdbId.IsSome) |> List.length)
+                                    if playedMovies.Length > 0 || playedSeries.Length > 0 || unmatchedWithTmdb > 0 then
                                         Html.div [
                                             prop.children [
                                                 Daisy.button.button [
@@ -1181,6 +1186,8 @@ let private jellyfinDetail (model: Model) (dispatch: Msg -> unit) =
                                         Html.ul [
                                             prop.className "mt-2 text-sm space-y-1"
                                             prop.children [
+                                                Html.li [ prop.text (sprintf "Movies auto-added to library: %d" result.MoviesAutoAdded) ]
+                                                Html.li [ prop.text (sprintf "Series auto-added to library: %d" result.SeriesAutoAdded) ]
                                                 Html.li [ prop.text (sprintf "Movie watch sessions added: %d" result.MoviesAdded) ]
                                                 Html.li [ prop.text (sprintf "Episodes marked watched: %d" result.EpisodesAdded) ]
                                                 Html.li [ prop.text (sprintf "Items skipped: %d" result.ItemsSkipped) ]
