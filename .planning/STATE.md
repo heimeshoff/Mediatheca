@@ -6,6 +6,7 @@
 
 ## Recent Progress
 
+- **2026-02-16**: Move game status from poster peel (top-right badge) to text below poster (bottom-right), matching TV series pattern
 - **2026-02-15**: Search modal: only search active tab's API, preserve tab on typing
   - Active tab persists across query changes (no reset to Movies on every keystroke)
   - Only the active tab's API is called (TMDB for Movies/Series, RAWG for Games)

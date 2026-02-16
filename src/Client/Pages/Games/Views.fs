@@ -8,14 +8,6 @@ open Mediatheca.Client.Pages.Games.Types
 open Mediatheca.Client
 open Mediatheca.Client.Components
 
-let private statusBadgeClass (status: GameStatus) =
-    match status with
-    | Backlog -> "badge-ghost"
-    | Playing -> "badge-primary"
-    | Completed -> "badge-success"
-    | Abandoned -> "badge-error"
-    | OnHold -> "badge-warning"
-
 let private statusLabel (status: GameStatus) =
     match status with
     | Backlog -> "Backlog"
@@ -33,20 +25,15 @@ let private formatPlayTime (minutes: int) =
         if m = 0 then $"{h}h"
         else $"{h}h {m}m"
 
+let private statusTextClass (status: GameStatus) =
+    match status with
+    | Backlog -> "text-base-content/50"
+    | Playing -> "text-primary"
+    | Completed -> "text-success"
+    | Abandoned -> "text-error"
+    | OnHold -> "text-warning"
+
 let private gameCard (game: GameListItem) =
-    let statusBadge =
-        Some (
-            Html.div [
-                prop.className "absolute top-2 right-2 z-10"
-                prop.children [
-                    Daisy.badge [
-                        badge.sm
-                        prop.className (statusBadgeClass game.Status)
-                        prop.text (statusLabel game.Status)
-                    ]
-                ]
-            ]
-        )
     Html.a [
         prop.href (Router.format ("games", game.Slug))
         prop.onClick (fun e ->
@@ -71,10 +58,6 @@ let private gameCard (game: GameListItem) =
                                     prop.className "flex items-center justify-center w-full h-full text-base-content/20"
                                     prop.children [ Icons.gamepad () ]
                                 ]
-
-                            match statusBadge with
-                            | Some badge -> badge
-                            | None -> ()
 
                             // Bottom gradient + title overlay (visible on hover)
                             Html.div [
@@ -113,6 +96,10 @@ let private gameCard (game: GameListItem) =
                                     prop.className "text-xs text-base-content/30"
                                     prop.text "No sessions"
                                 ]
+                            Html.p [
+                                prop.className ("text-xs font-medium " + statusTextClass game.Status)
+                                prop.text (statusLabel game.Status)
+                            ]
                         ]
                     ]
                 ]
