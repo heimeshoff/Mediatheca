@@ -176,6 +176,108 @@ let private personalRatingCard (rating: int option) (isOpen: bool) (dispatch: Ms
         ]
     ]
 
+[<ReactComponent>]
+let private HeroRating (rawgRating: float option, personalRating: int option, isOpen: bool, dispatch: Msg -> unit) =
+    let triggerRef = React.useElementRef()
+    let pos, setPos = React.useState {| top = 0.0; left = 0.0 |}
+    let currentOption = getRatingOption personalRating
+    let hasPersonalRating = personalRating.IsSome && personalRating.Value > 0
+
+    React.useEffect ((fun () ->
+        if isOpen then
+            match triggerRef.current with
+            | Some el ->
+                let rect = el.getBoundingClientRect()
+                setPos {| top = rect.bottom + 8.0; left = rect.left |}
+            | None -> ()
+    ), [| box isOpen |])
+
+    Html.div [
+        prop.className "relative"
+        prop.children [
+            Html.div [
+                prop.ref triggerRef
+                prop.children [
+                    if hasPersonalRating then
+                        Html.button [
+                            prop.className $"flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity {currentOption.ColorClass}"
+                            prop.onClick (fun _ -> dispatch Toggle_rating_dropdown)
+                            prop.children [
+                                Html.span [
+                                    prop.className "w-5 h-5"
+                                    prop.children [ currentOption.Icon () ]
+                                ]
+                                Html.span [
+                                    prop.className "text-sm font-semibold"
+                                    prop.text currentOption.Name
+                                ]
+                            ]
+                        ]
+                    else
+                        Html.button [
+                            prop.className "cursor-pointer hover:opacity-80 transition-opacity"
+                            prop.onClick (fun _ -> dispatch Toggle_rating_dropdown)
+                            prop.children [
+                                match rawgRating with
+                                | Some r -> starRating r
+                                | None ->
+                                    Html.span [
+                                        prop.className "text-sm text-base-content/50 hover:text-primary transition-colors"
+                                        prop.text "Rate"
+                                    ]
+                            ]
+                        ]
+                ]
+            ]
+            if isOpen then
+                Html.div [
+                    prop.className "fixed inset-0 z-[200]"
+                    prop.onClick (fun _ -> dispatch Toggle_rating_dropdown)
+                ]
+                Html.div [
+                    prop.className "fixed z-[201] rating-dropdown"
+                    prop.style [ style.top (int pos.top); style.left (int pos.left) ]
+                    prop.children [
+                        for opt in ratingOptions do
+                            if opt.Value > 0 then
+                                let isActive = personalRating = Some opt.Value
+                                let itemClass =
+                                    if isActive then "rating-dropdown-item rating-dropdown-item-active"
+                                    else "rating-dropdown-item"
+                                Html.button [
+                                    prop.className itemClass
+                                    prop.onClick (fun _ -> dispatch (Set_personal_rating opt.Value))
+                                    prop.children [
+                                        Html.span [
+                                            prop.className $"w-5 h-5 {opt.ColorClass}"
+                                            prop.children [ opt.Icon () ]
+                                        ]
+                                        Html.div [
+                                            prop.className "flex flex-col items-start"
+                                            prop.children [
+                                                Html.span [ prop.className "font-medium"; prop.text opt.Name ]
+                                                Html.span [ prop.className "text-xs text-base-content/50"; prop.text opt.Description ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                        if personalRating.IsSome && personalRating.Value > 0 then
+                            Html.button [
+                                prop.className "rating-dropdown-item rating-dropdown-item-clear"
+                                prop.onClick (fun _ -> dispatch (Set_personal_rating 0))
+                                prop.children [
+                                    Html.span [
+                                        prop.className "w-5 h-5 text-base-content/40"
+                                        prop.children [ Icons.questionCircle () ]
+                                    ]
+                                    Html.span [ prop.className "font-medium text-base-content/60"; prop.text "Clear rating" ]
+                                ]
+                            ]
+                    ]
+                ]
+        ]
+    ]
+
 let private statusSelector (currentStatus: GameStatus) (isOpen: bool) (dispatch: Msg -> unit) =
     let allStatuses = [ Backlog; Playing; Completed; Abandoned; OnHold ]
     Html.div [
@@ -695,9 +797,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                             prop.className (statusBadgeClass game.Status)
                                                             prop.text (statusLabel game.Status)
                                                         ]
-                                                        match game.RawgRating with
-                                                        | Some r -> starRating r
-                                                        | None -> ()
+                                                        HeroRating (game.RawgRating, game.PersonalRating, model.IsRatingOpen, dispatch)
                                                     ]
                                                 ]
                                                 // Title
@@ -837,8 +937,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                     prop.children [
                                         // Status
                                         statusSelector game.Status model.IsStatusOpen dispatch
-                                        // Personal Rating
-                                        personalRatingCard game.PersonalRating model.IsRatingOpen dispatch
                                         // HLTB
                                         glassCard [
                                             Html.div [

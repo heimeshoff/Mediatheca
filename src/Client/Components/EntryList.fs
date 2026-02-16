@@ -24,6 +24,7 @@ type Props = {
 // ── Internal types ──
 
 type private Layout = Gallery | List
+type private GallerySize = Normal | Medium
 
 type private SortField = ByReleaseDate | ByName | ByRating | ByWatchOrder
 type private SortDirection = Ascending | Descending
@@ -81,6 +82,31 @@ let private layoutToggle (active: Layout) (onSwitch: Layout -> unit) =
                 )
                 prop.onClick (fun _ -> onSwitch List)
                 prop.children [ Icons.viewList () ]
+            ]
+        ]
+    ]
+
+let private sizeToggle (active: GallerySize) (onSwitch: GallerySize -> unit) =
+    Html.div [
+        prop.className "flex items-center gap-1 bg-base-200/50 rounded-lg p-1"
+        prop.children [
+            Html.button [
+                prop.className (
+                    "flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 text-xs font-bold "
+                    + (if active = Normal then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
+                )
+                prop.onClick (fun _ -> onSwitch Normal)
+                prop.title "Normal size"
+                prop.text "L"
+            ]
+            Html.button [
+                prop.className (
+                    "flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 text-xs font-bold "
+                    + (if active = Medium then "bg-primary/15 text-primary shadow-sm" else "text-base-content/50 hover:text-base-content")
+                )
+                prop.onClick (fun _ -> onSwitch Medium)
+                prop.title "Medium size"
+                prop.text "M"
             ]
         ]
     ]
@@ -154,9 +180,10 @@ let private SortButton (sort: SortState, onSort: SortState -> unit, showWatchOrd
         ]
     ]
 
-let private galleryView (entries: EntryItem list) =
+let private galleryView (size: GallerySize) (entries: EntryItem list) =
+    let gridClass = match size with Normal -> DesignSystem.movieGrid | Medium -> DesignSystem.movieGridMedium
     Html.div [
-        prop.className (DesignSystem.movieGrid + " " + DesignSystem.animateFadeIn)
+        prop.className (gridClass + " " + DesignSystem.animateFadeIn)
         prop.children [
             for entry in entries do
                 let navSlug =
@@ -180,6 +207,7 @@ let private listView (renderRow: EntryItem -> ReactElement) (entries: EntryItem 
 [<ReactComponent>]
 let view (props: Props) =
     let layout, setLayout = React.useState Gallery
+    let gallerySize, setGallerySize = React.useState Normal
     let defaultSort =
         if props.ShowWatchOrder then { Field = ByWatchOrder; Direction = Ascending }
         else { Field = ByReleaseDate; Direction = Descending }
@@ -201,13 +229,15 @@ let view (props: Props) =
                         prop.className "flex items-center gap-2"
                         prop.children [
                             SortButton (sort, setSort, props.ShowWatchOrder)
+                            if layout = Gallery then
+                                sizeToggle gallerySize setGallerySize
                             layoutToggle layout setLayout
                         ]
                     ]
                 ]
             ]
             match layout with
-            | Gallery -> galleryView sorted
+            | Gallery -> galleryView gallerySize sorted
             | List -> listView props.RenderListRow sorted
         ]
     ]

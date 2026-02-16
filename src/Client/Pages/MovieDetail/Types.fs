@@ -16,6 +16,7 @@ type Model = {
     TrailerKey: string option
     ShowTrailer: bool
     IsRatingOpen: bool
+    IsFriendsMenuOpen: bool
     ConfirmingRemove: bool
     Error: string option
 }
@@ -65,6 +66,8 @@ type Msg =
     | Open_trailer
     | Close_trailer
     | Toggle_rating_dropdown
+    | Toggle_friends_menu
+    | Close_friends_menu
     | Set_personal_rating of int
     | Personal_rating_result of Result<unit, string>
     | Catalogs_loaded of CatalogListItem list

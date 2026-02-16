@@ -120,7 +120,7 @@ let private statusFilterBadges (currentFilter: GameStatus option) (dispatch: Msg
 
 let view (model: Model) (dispatch: Msg -> unit) =
     Html.div [
-        prop.className (DesignSystem.pagePadding + " " + DesignSystem.animateFadeIn)
+        prop.className (DesignSystem.pageContainer + " " + DesignSystem.animateFadeIn)
         prop.children [
             Html.div [
                 prop.className "flex items-center justify-between mb-6"

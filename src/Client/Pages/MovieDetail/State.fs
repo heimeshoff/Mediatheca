@@ -18,6 +18,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       TrailerKey = None
       ShowTrailer = false
       IsRatingOpen = false
+      IsFriendsMenuOpen = false
       ConfirmingRemove = false
       Error = None },
     Cmd.batch [
@@ -256,6 +257,12 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Toggle_rating_dropdown ->
         { model with IsRatingOpen = not model.IsRatingOpen }, Cmd.none
+
+    | Toggle_friends_menu ->
+        { model with IsFriendsMenuOpen = not model.IsFriendsMenuOpen }, Cmd.none
+
+    | Close_friends_menu ->
+        { model with IsFriendsMenuOpen = false }, Cmd.none
 
     | Set_personal_rating rating ->
         let ratingValue = if rating = 0 then None else Some rating

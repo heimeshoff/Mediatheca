@@ -12,6 +12,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       SelectedSeason = 1
       SelectedRewatchId = "default"
       IsRatingOpen = false
+      IsFriendsMenuOpen = false
       ShowFriendPicker = None
       Friends = []
       AllCatalogs = []
@@ -246,6 +247,12 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Toggle_rating_dropdown ->
         { model with IsRatingOpen = not model.IsRatingOpen }, Cmd.none
+
+    | Toggle_friends_menu ->
+        { model with IsFriendsMenuOpen = not model.IsFriendsMenuOpen }, Cmd.none
+
+    | Close_friends_menu ->
+        { model with IsFriendsMenuOpen = false }, Cmd.none
 
     | Set_rating rating ->
         let ratingValue = if rating = 0 then None else Some rating

@@ -23,6 +23,7 @@ type Model = {
     SelectedRewatchId: string
     // Rating
     IsRatingOpen: bool
+    IsFriendsMenuOpen: bool
     // Social modals
     ShowFriendPicker: FriendPickerKind option
     Friends: FriendListItem list
@@ -76,6 +77,8 @@ type Msg =
     | Rewatch_friend_result of Result<unit, string>
     // Rating
     | Toggle_rating_dropdown
+    | Toggle_friends_menu
+    | Close_friends_menu
     | Set_rating of int
     | Rating_set of Result<unit, string>
     // Social
