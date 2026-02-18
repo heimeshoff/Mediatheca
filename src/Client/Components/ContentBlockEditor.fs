@@ -386,9 +386,32 @@ let view
     let menuBlockId, setMenuBlockId = React.useState<string option>(None)
     let draggedId, setDraggedId = React.useState<string option>(None)
     let dropLocation, setDropLocation = React.useState<DropLocation option>(None)
+    let pendingInsertIndex, setPendingInsertIndex = React.useState<int option>(None)
+    let prevBlockIdsRef = React.useRef(Set.empty<string>)
+    let newBlockHighlight, setNewBlockHighlight = React.useState(false)
+    let fileDragCounter = React.useRef(0)
 
     let sortedBlocks = blocks |> List.sortBy (fun b -> b.Position)
     let renderItems = buildRenderItems sortedBlocks
+
+    React.useEffect((fun () ->
+        let currentIds = sortedBlocks |> List.map (fun b -> b.BlockId) |> Set.ofList
+        let prevIds = prevBlockIdsRef.current
+        match pendingInsertIndex with
+        | Some insertIdx when not prevIds.IsEmpty ->
+            let newIds = Set.difference currentIds prevIds
+            if not newIds.IsEmpty then
+                let newId = newIds |> Set.toList |> List.head
+                let blockIds = sortedBlocks |> List.map (fun b -> b.BlockId)
+                let withoutNew = blockIds |> List.filter (fun id -> id <> newId)
+                let adjustedPos = min insertIdx withoutNew.Length
+                let before = withoutNew |> List.take adjustedPos
+                let after = withoutNew |> List.skip adjustedPos
+                onReorderBlocks (before @ [newId] @ after)
+                setPendingInsertIndex None
+        | _ -> ()
+        prevBlockIdsRef.current <- currentIds
+    ), [| box blocks; box pendingInsertIndex |])
 
     let startEditing (block: ContentBlockDto) =
         setEditingBlock (Some (editingFromBlock block))
@@ -438,7 +461,7 @@ let view
                 readFileAsBytes file (Some targetBlockId) uploadFn
         | _ ->
             match draggedId, onGroupBlocks with
-            | Some did, Some groupFn when did <> targetBlockId ->
+            | Some did, Some groupFn when did <> targetBlockId && did <> "__new__" && did <> "__file__" ->
                 let draggedBlock = sortedBlocks |> List.tryFind (fun b -> b.BlockId = did)
                 let targetBlock = sortedBlocks |> List.tryFind (fun b -> b.BlockId = targetBlockId)
                 let sameGroup =
@@ -453,15 +476,8 @@ let view
                     | _ ->
                         groupFn did targetBlockId
                 else
-                    // Different groups — reorder and group by drop zone
-                    let blockIds = sortedBlocks |> List.map (fun b -> b.BlockId)
-                    let withoutDragged = blockIds |> List.filter (fun id -> id <> did)
-                    let newOrder =
-                        withoutDragged
-                        |> List.collect (fun id ->
-                            if id = targetBlockId then [did; id]
-                            else [id])
-                    onReorderBlocks newOrder
+                    // Different groups — group by drop zone
+                    // (skip reorder to avoid concurrency conflict; pair renders at earliest block's position)
                     match zone with
                     | Left -> groupFn did targetBlockId
                     | Right -> groupFn targetBlockId did
@@ -469,37 +485,53 @@ let view
         setDraggedId None
         setDropLocation None
 
+    let handleNewBlockGapDrop (gapIndex: int) =
+        let insertPos = calculateInsertIndex gapIndex renderItems
+        setPendingInsertIndex (Some insertPos)
+        let req : AddContentBlockRequest = {
+            BlockType = "text"; Content = ""; ImageRef = None; Url = None; Caption = None
+        }
+        onAddBlock req
+        setDraggedId None
+        setDropLocation None
+
     let handleGapDrop (gapIndex: int) (e: Browser.Types.DragEvent) =
         let files = e.dataTransfer.files
-        let isFileDrop = draggedId.IsNone && files.length > 0
-        match isFileDrop, onUploadScreenshot with
-        | true, Some uploadFn ->
-            let file = files.[0]
-            let fileType : string = emitJsExpr file "$0.type"
-            if fileType.StartsWith("image/") then
-                readFileAsBytes file None uploadFn
-        | _ ->
-            match draggedId with
-            | Some did ->
-                let blockIds = sortedBlocks |> List.map (fun b -> b.BlockId)
-                let withoutDragged = blockIds |> List.filter (fun id -> id <> did)
-                let insertPos = calculateInsertIndex gapIndex renderItems
-                let draggedOrigPos = blockIds |> List.findIndex (fun id -> id = did)
-                let adjustedPos = if draggedOrigPos < insertPos then insertPos - 1 else insertPos
-                let adjustedPos = min adjustedPos withoutDragged.Length
-                let before = withoutDragged |> List.take adjustedPos
-                let after = withoutDragged |> List.skip adjustedPos
-                let newOrder = before @ [did] @ after
-                onReorderBlocks newOrder
-                // Ungroup if the dragged block was in a RowGroup
-                match onUngroupBlock with
-                | Some ungroupFn ->
-                    let draggedBlock = sortedBlocks |> List.tryFind (fun b -> b.BlockId = did)
-                    match draggedBlock with
-                    | Some b when b.RowGroup.IsSome -> ungroupFn did
-                    | _ -> ()
-                | None -> ()
+        match draggedId with
+        | Some "__file__" when files.length > 0 ->
+            match onUploadScreenshot with
+            | Some uploadFn ->
+                let file = files.[0]
+                let fileType : string = emitJsExpr file "$0.type"
+                if fileType.StartsWith("image/") then
+                    let insertPos = calculateInsertIndex gapIndex renderItems
+                    let insertBefore =
+                        sortedBlocks |> List.tryItem insertPos |> Option.map (fun b -> b.BlockId)
+                    readFileAsBytes file insertBefore uploadFn
             | None -> ()
+        | Some "__new__" ->
+            handleNewBlockGapDrop gapIndex
+        | Some did ->
+            let blockIds = sortedBlocks |> List.map (fun b -> b.BlockId)
+            let withoutDragged = blockIds |> List.filter (fun id -> id <> did)
+            let insertPos = calculateInsertIndex gapIndex renderItems
+            let draggedOrigPos = blockIds |> List.findIndex (fun id -> id = did)
+            let adjustedPos = if draggedOrigPos < insertPos then insertPos - 1 else insertPos
+            let adjustedPos = min adjustedPos withoutDragged.Length
+            let before = withoutDragged |> List.take adjustedPos
+            let after = withoutDragged |> List.skip adjustedPos
+            let newOrder = before @ [did] @ after
+            onReorderBlocks newOrder
+            // Ungroup if the dragged block was in a RowGroup
+            match onUngroupBlock with
+            | Some ungroupFn ->
+                let draggedBlock = sortedBlocks |> List.tryFind (fun b -> b.BlockId = did)
+                match draggedBlock with
+                | Some b when b.RowGroup.IsSome -> ungroupFn did
+                | _ -> ()
+            | None -> ()
+        | None -> ()
+        fileDragCounter.current <- 0
         setDraggedId None
         setDropLocation None
 
@@ -509,7 +541,28 @@ let view
             Html.div [
                 prop.key block.BlockId
                 prop.className "group relative py-1"
+                prop.draggable true
+                prop.onDragStart (fun e ->
+                    e.dataTransfer.effectAllowed <- "move"
+                    e.dataTransfer.setData("text/plain", block.BlockId) |> ignore
+                    saveEditing eb
+                    emitJsExpr (fun () -> setDraggedId (Some block.BlockId)) "setTimeout($0, 0)")
+                prop.onDragEnd (fun _ ->
+                    setDraggedId None
+                    setDropLocation None)
                 prop.children [
+                    // Drag handle — always visible during editing
+                    Html.div [
+                        prop.className "absolute -left-7 top-1 transition-opacity z-10 opacity-0 group-hover:opacity-100"
+                        prop.children [
+                            Html.button [
+                                prop.className "w-5 h-5 flex items-center justify-center text-base-content/30 hover:text-base-content/60 cursor-grab transition-colors"
+                                prop.onMouseDown (fun e -> e.stopPropagation ())
+                                prop.title "Drag to reorder"
+                                prop.children [ Icons.gripVertical () ]
+                            ]
+                        ]
+                    ]
                     renderEditingBlock block eb setEditingBlock saveEditing cancelEditing
                 ]
             ]
@@ -542,10 +595,7 @@ let view
                     setDraggedId None
                     setDropLocation None)
                 prop.onDragOver (fun e ->
-                    if e.dataTransfer.files.length > 0 then
-                        e.preventDefault ()
-                        e.dataTransfer.dropEffect <- "copy"
-                    elif draggedId.IsSome && draggedId <> Some block.BlockId then
+                    if draggedId.IsSome && draggedId <> Some block.BlockId && draggedId <> Some "__new__" && draggedId <> Some "__file__" then
                         e.preventDefault ()
                         e.dataTransfer.dropEffect <- "move"
                         if onGroupBlocks.IsSome then
@@ -678,6 +728,31 @@ let view
 
     Html.div [
         prop.className "space-y-1"
+        prop.onDragEnter (fun e ->
+            let hasFiles : bool = emitJsExpr e.dataTransfer.types "Array.from($0).includes('Files')"
+            if hasFiles then
+                fileDragCounter.current <- fileDragCounter.current + 1
+                if fileDragCounter.current = 1 && draggedId.IsNone then
+                    e.preventDefault ()
+                    setDraggedId (Some "__file__"))
+        prop.onDragOver (fun e ->
+            if draggedId = Some "__file__" then
+                e.preventDefault ()
+                e.dataTransfer.dropEffect <- "copy")
+        prop.onDragLeave (fun e ->
+            let hasFiles : bool = emitJsExpr e.dataTransfer.types "Array.from($0).includes('Files')"
+            if hasFiles then
+                fileDragCounter.current <- fileDragCounter.current - 1
+                if fileDragCounter.current <= 0 then
+                    fileDragCounter.current <- 0
+                    if draggedId = Some "__file__" then
+                        setDraggedId None
+                        setDropLocation None)
+        prop.onDrop (fun _ ->
+            fileDragCounter.current <- 0
+            if draggedId = Some "__file__" then
+                setDraggedId None
+                setDropLocation None)
         prop.children [
             renderGap 0
             for i in 0 .. renderItems.Length - 1 do
@@ -703,12 +778,34 @@ let view
 
             // Always-visible new block placeholder
             Html.div [
-                prop.className "py-1"
+                prop.className (
+                    "py-3 px-3 rounded-lg border-2 border-dashed transition-colors" +
+                    (if newBlockHighlight then " border-primary/60 bg-primary/30"
+                     else " border-transparent") +
+                    (if draggedId = Some "__new__" then " opacity-40" else ""))
+                prop.draggable true
+                prop.onDragStart (fun e ->
+                    e.dataTransfer.effectAllowed <- "move"
+                    e.dataTransfer.setData("text/plain", "__new__") |> ignore
+                    emitJsExpr (fun () -> setDraggedId (Some "__new__")) "setTimeout($0, 0)")
+                prop.onDragEnd (fun _ ->
+                    setDraggedId None
+                    setDropLocation None)
                 prop.onDragOver (fun e ->
                     if e.dataTransfer.files.length > 0 then
                         e.preventDefault ()
-                        e.dataTransfer.dropEffect <- "copy")
+                        e.dataTransfer.dropEffect <- "copy"
+                        setNewBlockHighlight true)
+                prop.onDragLeave (fun e ->
+                    let current : Browser.Types.Element = emitJsExpr e.currentTarget "$0"
+                    let related : Browser.Types.Element option = emitJsExpr e "($0.nativeEvent && $0.nativeEvent.relatedTarget ? $0.nativeEvent.relatedTarget : null)"
+                    let leaving =
+                        match related with
+                        | Some el -> not (emitJsExpr (current, el) "$0.contains($1)")
+                        | None -> true
+                    if leaving then setNewBlockHighlight false)
                 prop.onDrop (fun e ->
+                    setNewBlockHighlight false
                     match onUploadScreenshot with
                     | Some uploadFn when e.dataTransfer.files.length > 0 ->
                         e.preventDefault ()
@@ -719,7 +816,9 @@ let view
                     | _ -> ())
                 prop.children [
                     Html.input [
-                        prop.className "w-full bg-transparent outline-none text-sm text-base-content/80 placeholder:text-base-content/20 placeholder:italic"
+                        prop.className (
+                            "w-full bg-transparent outline-none text-sm text-base-content/80 placeholder:text-base-content/20 placeholder:italic" +
+                            (if newBlockHighlight then " pointer-events-none" else ""))
                         prop.placeholder "new block"
                         prop.value inputText
                         prop.onChange setInputText
