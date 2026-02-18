@@ -100,6 +100,10 @@ type Msg =
     | Remove_content_block of blockId: string
     | Change_content_block_type of blockId: string * blockType: string
     | Reorder_content_blocks of blockIds: string list
+    | Upload_screenshot of data: byte array * filename: string * insertBefore: string option
+    | Screenshot_uploaded of Result<string, string> * insertBefore: string option
+    | Group_content_blocks of leftId: string * rightId: string
+    | Ungroup_content_block of blockId: string
     | Content_block_result of Result<unit, string>
     // Catalogs
     | Catalogs_loaded of CatalogListItem list

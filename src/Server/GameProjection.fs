@@ -30,6 +30,8 @@ module GameProjection =
                 name              TEXT NOT NULL,
                 year              INTEGER NOT NULL,
                 description       TEXT NOT NULL DEFAULT '',
+                short_description TEXT NOT NULL DEFAULT '',
+                website_url       TEXT,
                 cover_ref         TEXT,
                 backdrop_ref      TEXT,
                 genres            TEXT NOT NULL DEFAULT '[]',
@@ -39,15 +41,23 @@ module GameProjection =
                 hltb_hours        REAL,
                 personal_rating   INTEGER,
                 steam_app_id      INTEGER,
-                stores            TEXT NOT NULL DEFAULT '[]',
+                play_modes        TEXT NOT NULL DEFAULT '[]',
                 family_owners     TEXT NOT NULL DEFAULT '[]',
                 recommended_by    TEXT NOT NULL DEFAULT '[]',
                 want_to_play_with TEXT NOT NULL DEFAULT '[]',
                 played_with       TEXT NOT NULL DEFAULT '[]',
-                total_play_time   INTEGER NOT NULL DEFAULT 0
+                total_play_time       INTEGER NOT NULL DEFAULT 0,
+                steam_library_date    TEXT,
+                steam_last_played     TEXT,
+                is_owned              INTEGER NOT NULL DEFAULT 0
             );
         """
         |> Db.exec
+
+        // Migration for existing databases
+        try
+            conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN is_owned INTEGER NOT NULL DEFAULT 0" |> Db.exec
+        with _ -> ()
 
     let private dropTables (conn: SqliteConnection) : unit =
         conn
@@ -120,14 +130,16 @@ module GameProjection =
 
                     conn
                     |> Db.newCommand """
-                        INSERT OR REPLACE INTO game_detail (slug, name, year, description, cover_ref, backdrop_ref, genres, status, rawg_id, rawg_rating, hltb_hours, personal_rating, stores, family_owners, recommended_by, want_to_play_with, played_with, total_play_time)
-                        VALUES (@slug, @name, @year, @description, @cover_ref, @backdrop_ref, @genres, 'Backlog', @rawg_id, @rawg_rating, NULL, NULL, '[]', '[]', '[]', '[]', '[]', 0)
+                        INSERT OR REPLACE INTO game_detail (slug, name, year, description, short_description, website_url, cover_ref, backdrop_ref, genres, status, rawg_id, rawg_rating, hltb_hours, personal_rating, play_modes, family_owners, recommended_by, want_to_play_with, played_with, total_play_time, steam_library_date, steam_last_played)
+                        VALUES (@slug, @name, @year, @description, @short_description, @website_url, @cover_ref, @backdrop_ref, @genres, 'Backlog', @rawg_id, @rawg_rating, NULL, NULL, '[]', '[]', '[]', '[]', '[]', 0, NULL, NULL)
                     """
                     |> Db.setParams [
                         "slug", SqlType.String slug
                         "name", SqlType.String data.Name
                         "year", SqlType.Int32 data.Year
                         "description", SqlType.String data.Description
+                        "short_description", SqlType.String data.ShortDescription
+                        "website_url", match data.WebsiteUrl with Some u -> SqlType.String u | None -> SqlType.Null
                         "cover_ref", match data.CoverRef with Some r -> SqlType.String r | None -> SqlType.Null
                         "backdrop_ref", match data.BackdropRef with Some r -> SqlType.String r | None -> SqlType.Null
                         "genres", SqlType.String genresJson
@@ -216,11 +228,8 @@ module GameProjection =
                     ]
                     |> Db.exec
 
-                | Games.Game_store_added store ->
-                    updateJsonList conn "game_detail" "stores" slug true store
-
-                | Games.Game_store_removed store ->
-                    updateJsonList conn "game_detail" "stores" slug false store
+                | Games.Game_store_added _ -> () // legacy event, ignored
+                | Games.Game_store_removed _ -> () // legacy event, ignored
 
                 | Games.Game_family_owner_added friendSlug ->
                     updateJsonList conn "game_detail" "family_owners" slug true friendSlug
@@ -264,6 +273,57 @@ module GameProjection =
                     conn
                     |> Db.newCommand "UPDATE game_detail SET total_play_time = @total_play_time WHERE slug = @slug"
                     |> Db.setParams [ "slug", SqlType.String slug; "total_play_time", SqlType.Int32 totalMinutes ]
+                    |> Db.exec
+
+                | Games.Game_short_description_set shortDescription ->
+                    conn
+                    |> Db.newCommand "UPDATE game_detail SET short_description = @short_description WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "short_description", SqlType.String shortDescription ]
+                    |> Db.exec
+
+                | Games.Game_website_url_set websiteUrl ->
+                    conn
+                    |> Db.newCommand "UPDATE game_detail SET website_url = @website_url WHERE slug = @slug"
+                    |> Db.setParams [
+                        "slug", SqlType.String slug
+                        "website_url", match websiteUrl with Some u -> SqlType.String u | None -> SqlType.Null
+                    ]
+                    |> Db.exec
+
+                | Games.Game_play_mode_added playMode ->
+                    updateJsonList conn "game_detail" "play_modes" slug true playMode
+
+                | Games.Game_play_mode_removed playMode ->
+                    updateJsonList conn "game_detail" "play_modes" slug false playMode
+
+                | Games.Game_steam_library_date_set dateAdded ->
+                    conn
+                    |> Db.newCommand "UPDATE game_detail SET steam_library_date = @val WHERE slug = @slug"
+                    |> Db.setParams [
+                        "slug", SqlType.String slug
+                        "val", match dateAdded with Some d -> SqlType.String d | None -> SqlType.Null
+                    ]
+                    |> Db.exec
+
+                | Games.Game_steam_last_played_set lastPlayed ->
+                    conn
+                    |> Db.newCommand "UPDATE game_detail SET steam_last_played = @val WHERE slug = @slug"
+                    |> Db.setParams [
+                        "slug", SqlType.String slug
+                        "val", match lastPlayed with Some d -> SqlType.String d | None -> SqlType.Null
+                    ]
+                    |> Db.exec
+
+                | Games.Game_marked_as_owned ->
+                    conn
+                    |> Db.newCommand "UPDATE game_detail SET is_owned = 1 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+
+                | Games.Game_ownership_removed ->
+                    conn
+                    |> Db.newCommand "UPDATE game_detail SET is_owned = 0 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.exec
 
     let handler: Projection.ProjectionHandler = {
@@ -338,16 +398,16 @@ module GameProjection =
 
     let getBySlug (conn: SqliteConnection) (slug: string) : GameDetail option =
         conn
-        |> Db.newCommand "SELECT slug, name, year, description, cover_ref, backdrop_ref, genres, status, rawg_id, rawg_rating, hltb_hours, personal_rating, steam_app_id, stores, family_owners, recommended_by, want_to_play_with, played_with, total_play_time FROM game_detail WHERE slug = @slug"
+        |> Db.newCommand "SELECT slug, name, year, description, short_description, website_url, cover_ref, backdrop_ref, genres, status, rawg_id, rawg_rating, hltb_hours, personal_rating, steam_app_id, play_modes, family_owners, recommended_by, want_to_play_with, played_with, total_play_time, steam_library_date, steam_last_played, is_owned FROM game_detail WHERE slug = @slug"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
             let genres =
                 Decode.fromString (Decode.list Decode.string) genresJson
                 |> Result.defaultValue []
-            let storesJson = rd.ReadString "stores"
-            let stores =
-                Decode.fromString (Decode.list Decode.string) storesJson
+            let playModesJson = rd.ReadString "play_modes"
+            let playModes =
+                Decode.fromString (Decode.list Decode.string) playModesJson
                 |> Result.defaultValue []
             let familyOwnersJson = rd.ReadString "family_owners"
             let familyOwnerSlugs =
@@ -369,6 +429,10 @@ module GameProjection =
               Name = rd.ReadString "name"
               Year = rd.ReadInt32 "year"
               Description = rd.ReadString "description"
+              ShortDescription = rd.ReadString "short_description"
+              WebsiteUrl =
+                if rd.IsDBNull(rd.GetOrdinal("website_url")) then None
+                else Some (rd.ReadString "website_url")
               CoverRef =
                 if rd.IsDBNull(rd.GetOrdinal("cover_ref")) then None
                 else Some (rd.ReadString "cover_ref")
@@ -392,8 +456,15 @@ module GameProjection =
               SteamAppId =
                 if rd.IsDBNull(rd.GetOrdinal("steam_app_id")) then None
                 else Some (rd.ReadInt32 "steam_app_id")
+              SteamLibraryDate =
+                if rd.IsDBNull(rd.GetOrdinal("steam_library_date")) then None
+                else Some (rd.ReadString "steam_library_date")
+              SteamLastPlayed =
+                if rd.IsDBNull(rd.GetOrdinal("steam_last_played")) then None
+                else Some (rd.ReadString "steam_last_played")
               TotalPlayTimeMinutes = rd.ReadInt32 "total_play_time"
-              Stores = stores
+              PlayModes = playModes
+              IsOwnedByMe = rd.ReadInt32 "is_owned" <> 0
               FamilyOwners = resolveFriendRefs conn familyOwnerSlugs
               RecommendedBy = resolveFriendRefs conn recommendedBySlugs
               WantToPlayWith = resolveFriendRefs conn wantToPlayWithSlugs
@@ -445,6 +516,11 @@ module GameProjection =
                 else Some (rd.ReadString "cover_ref")
               MediaType = Game }
         )
+
+    let getAllPlayModes (conn: SqliteConnection) : string list =
+        conn
+        |> Db.newCommand "SELECT DISTINCT je.value FROM game_detail, json_each(game_detail.play_modes) AS je ORDER BY je.value"
+        |> Db.query (fun (rd: IDataReader) -> rd.ReadString "value")
 
     let findBySteamAppId (conn: SqliteConnection) (appId: int) : string option =
         conn

@@ -1195,11 +1195,11 @@ let private componentsSection () =
 [<ReactComponent>]
 let private contentBlocksDemo () =
     let blocks, setBlocks = React.useState<ContentBlockDto list>([
-        { BlockId = "demo-1"; BlockType = "text"; Content = "This is a text note. Hover to see the drag handle on the left."; ImageRef = None; Url = None; Caption = None; Position = 0 }
-        { BlockId = "demo-2"; BlockType = "quote"; Content = "The only way to do great work is to love what you do."; ImageRef = None; Url = None; Caption = None; Position = 1 }
-        { BlockId = "demo-3"; BlockType = "callout"; Content = "Click the drag handle to open the context menu. Use \"Turn into\" to change block types."; ImageRef = None; Url = None; Caption = None; Position = 2 }
-        { BlockId = "demo-4"; BlockType = "code"; Content = "let hello = printfn \"Hello from Fable!\""; ImageRef = None; Url = None; Caption = None; Position = 3 }
-        { BlockId = "demo-5"; BlockType = "text"; Content = "Check out [Fable Documentation](https://fable.io/docs/) for more info on the compiler."; ImageRef = None; Url = None; Caption = None; Position = 4 }
+        { BlockId = "demo-1"; BlockType = "text"; Content = "This is a text note. Hover to see the drag handle on the left."; ImageRef = None; Url = None; Caption = None; Position = 0; RowGroup = None; RowPosition = None }
+        { BlockId = "demo-2"; BlockType = "quote"; Content = "The only way to do great work is to love what you do."; ImageRef = None; Url = None; Caption = None; Position = 1; RowGroup = None; RowPosition = None }
+        { BlockId = "demo-3"; BlockType = "callout"; Content = "Click the drag handle to open the context menu. Use \"Turn into\" to change block types."; ImageRef = None; Url = None; Caption = None; Position = 2; RowGroup = None; RowPosition = None }
+        { BlockId = "demo-4"; BlockType = "code"; Content = "let hello = printfn \"Hello from Fable!\""; ImageRef = None; Url = None; Caption = None; Position = 3; RowGroup = None; RowPosition = None }
+        { BlockId = "demo-5"; BlockType = "text"; Content = "Check out [Fable Documentation](https://fable.io/docs/) for more info on the compiler."; ImageRef = None; Url = None; Caption = None; Position = 4; RowGroup = None; RowPosition = None }
     ])
     let nextId, setNextId = React.useState(6)
 
@@ -1212,6 +1212,8 @@ let private contentBlocksDemo () =
             Url = req.Url
             Caption = req.Caption
             Position = blocks.Length
+            RowGroup = None
+            RowPosition = None
         }
         setBlocks (blocks @ [newBlock])
         setNextId (nextId + 1)
@@ -1238,7 +1240,7 @@ let private contentBlocksDemo () =
                 |> Option.map (fun b -> { b with Position = i }))
             |> List.choose id)
 
-    ContentBlockEditor.view blocks onAdd onUpdate onRemove onChangeType onReorder
+    ContentBlockEditor.view blocks onAdd onUpdate onRemove onChangeType onReorder None None None
 
 let private contentBlocksSection () =
     Html.div [
@@ -1382,6 +1384,220 @@ let private contentBlocksSection () =
                 "No-Card Styling"
                 "Content blocks render as plain text on the background -- no cards, no glass effects. Blocks are secondary content that should feel like natural text, not UI elements. New blocks appear via a subtle \"new block\" placeholder."
                 "Glass cards (too visually heavy, makes notes feel like separate components). Fully styled cards (compete with primary movie metadata)."
+        ]
+    ]
+
+// ── Section: Content Zone ──
+
+// Functional updaters (setState(fun prev -> ...)) ensure each callback sees
+// the latest state, even when ContentBlockEditor fires multiple callbacks
+// (e.g. onReorder then onUngroup) in the same React event.
+
+[<ReactComponent>]
+let private contentZoneDemo () =
+    let pairGroupId = "demo-row-group-1"
+    let blocks, setBlocks = React.useState<ContentBlockDto list>([
+        { BlockId = "zone-1"; BlockType = "text"; Content = "This standalone text block can be dragged to reorder, or dropped onto another block's left/right half to form a two-column row."; ImageRef = None; Url = None; Caption = None; Position = 0; RowGroup = None; RowPosition = None }
+        { BlockId = "zone-2"; BlockType = "text"; Content = "Left column -- this block is already paired in a RowPair. Drag within the pair to swap sides, or drag to a gap to extract."; ImageRef = None; Url = None; Caption = None; Position = 1; RowGroup = Some pairGroupId; RowPosition = Some 0 }
+        { BlockId = "zone-3"; BlockType = "text"; Content = "Right column -- the other half of the pre-existing RowPair."; ImageRef = None; Url = None; Caption = None; Position = 2; RowGroup = Some pairGroupId; RowPosition = Some 1 }
+        { BlockId = "zone-4"; BlockType = "quote"; Content = "Two-column layouts let you place related content side by side -- like a quote next to commentary."; ImageRef = None; Url = None; Caption = None; Position = 3; RowGroup = None; RowPosition = None }
+        { BlockId = "zone-5"; BlockType = "callout"; Content = "Try dragging this callout to the left or right half of the quote above to create a new pair!"; ImageRef = None; Url = None; Caption = None; Position = 4; RowGroup = None; RowPosition = None }
+    ])
+    let nextId, setNextId = React.useState(6)
+
+    let onAdd (req: AddContentBlockRequest) =
+        let newBlock : ContentBlockDto = {
+            BlockId = $"zone-{nextId}"
+            BlockType = req.BlockType
+            Content = req.Content
+            ImageRef = req.ImageRef
+            Url = req.Url
+            Caption = req.Caption
+            Position = blocks.Length
+            RowGroup = None
+            RowPosition = None
+        }
+        setBlocks (blocks @ [newBlock])
+        setNextId (nextId + 1)
+
+    let onUpdate (blockId: string) (req: UpdateContentBlockRequest) =
+        setBlocks (blocks |> List.map (fun b ->
+            if b.BlockId = blockId then
+                { b with Content = req.Content; Url = req.Url; ImageRef = req.ImageRef; Caption = req.Caption }
+            else b))
+
+    let onRemove (blockId: string) =
+        setBlocks (blocks |> List.filter (fun b -> b.BlockId <> blockId))
+
+    let onChangeType (blockId: string) (newType: string) =
+        setBlocks (blocks |> List.map (fun b ->
+            if b.BlockId = blockId then { b with BlockType = newType }
+            else b))
+
+    let onReorder (blockIds: string list) =
+        setBlocks (
+            blockIds
+            |> List.mapi (fun i bid ->
+                blocks |> List.tryFind (fun b -> b.BlockId = bid)
+                |> Option.map (fun b -> { b with Position = i }))
+            |> List.choose id)
+
+    let onGroup (leftId: string) (rightId: string) =
+        let groupId = System.Guid.NewGuid().ToString()
+        setBlocks (blocks |> List.map (fun b ->
+            if b.BlockId = leftId then { b with RowGroup = Some groupId; RowPosition = Some 0 }
+            elif b.BlockId = rightId then { b with RowGroup = Some groupId; RowPosition = Some 1 }
+            else b))
+
+    let onUngroup (blockId: string) =
+        let block = blocks |> List.tryFind (fun b -> b.BlockId = blockId)
+        match block |> Option.bind (fun b -> b.RowGroup) with
+        | Some rg ->
+            setBlocks (blocks |> List.map (fun b ->
+                if b.RowGroup = Some rg then { b with RowGroup = None; RowPosition = None }
+                else b))
+        | None -> ()
+
+    ContentBlockEditor.view
+        blocks
+        onAdd
+        onUpdate
+        onRemove
+        onChangeType
+        onReorder
+        None
+        (Some onGroup)
+        (Some onUngroup)
+
+let private contentZoneSection () =
+    Html.div [
+        prop.className "flex flex-col gap-6"
+        prop.children [
+            sectionTitle "Content Zone"
+
+            decision "The Content Zone is a Notion-like drag-and-drop layout system for content blocks. Beyond simple reordering, blocks can be grouped into two-column RowPairs by dragging onto the left or right half of another block. RowPair members can be swapped or extracted back to full-width by dragging to a gap indicator."
+
+            subheading "Live Demo"
+
+            Html.p [
+                prop.className DesignSystem.secondaryText
+                prop.text "This is a fully interactive demo with pre-existing paired and standalone blocks. Try these interactions:"
+            ]
+
+            Html.ul [
+                prop.className "mt-2 space-y-1 list-disc list-inside max-w-2xl"
+                prop.children [
+                    Html.li [
+                        prop.className "text-sm text-base-content/70"
+                        prop.text "Drag blocks between positions via the green full-width indicator lines"
+                    ]
+                    Html.li [
+                        prop.className "text-sm text-base-content/70"
+                        prop.text "Drag a block to the left or right half of another to create a two-column row"
+                    ]
+                    Html.li [
+                        prop.className "text-sm text-base-content/70"
+                        prop.text "Drag a RowPair member to a gap to extract it as full-width"
+                    ]
+                    Html.li [
+                        prop.className "text-sm text-base-content/70"
+                        prop.text "Drag within a RowPair to swap left/right positions"
+                    ]
+                ]
+            ]
+
+            Html.div [
+                prop.className "max-w-2xl mt-4"
+                prop.children [
+                    contentZoneDemo ()
+                ]
+            ]
+
+            subheading "Interaction Patterns"
+
+            Html.div [
+                prop.className "flex flex-col gap-3 max-w-3xl"
+                prop.children [
+                    Html.div [
+                        prop.className "p-4 rounded-lg bg-base-200/30 border border-base-content/5"
+                        prop.children [
+                            for (keys, desc) in [
+                                "Drag to gap", "Reorder: move a block to a new position (green full-width line)"
+                                "Drag to left half", "Group: create a RowPair with the dragged block on the left"
+                                "Drag to right half", "Group: create a RowPair with the dragged block on the right"
+                                "Drag pair member to gap", "Ungroup: extract block from pair, both become full-width"
+                                "Drag within pair", "Swap: exchange left/right positions in the RowPair"
+                            ] do
+                                Html.div [
+                                    prop.className "flex items-center gap-3 py-1"
+                                    prop.children [
+                                        Html.kbd [
+                                            prop.className "px-2 py-0.5 text-xs font-mono bg-base-300/50 rounded border border-base-content/10 text-base-content/70 min-w-[10rem] text-center"
+                                            prop.text keys
+                                        ]
+                                        Html.span [
+                                            prop.className "text-sm text-base-content/70"
+                                            prop.text desc
+                                        ]
+                                    ]
+                                ]
+                        ]
+                    ]
+                ]
+            ]
+
+            subheading "API"
+
+            Html.div [
+                prop.className "flex flex-col gap-3 max-w-3xl"
+                prop.children [
+                    Html.code [
+                        prop.className "text-xs font-mono text-base-content/60 bg-base-300/30 p-3 rounded block"
+                        prop.text "ContentBlockEditor.view blocks onAdd onUpdate onRemove onChangeType onReorder onUploadScreenshot onGroupBlocks onUngroupBlock"
+                    ]
+                    Html.div [
+                        prop.className "p-4 rounded-lg bg-base-200/30 border border-base-content/5"
+                        prop.children [
+                            Html.p [ prop.className DesignSystem.mutedText; prop.text "Parameters:" ]
+                            Html.ul [
+                                prop.className "mt-2 space-y-1"
+                                prop.children [
+                                    for (name, desc) in [
+                                        "blocks", "ContentBlockDto list -- sorted by Position"
+                                        "onAdd", "AddContentBlockRequest -> unit"
+                                        "onUpdate", "string -> UpdateContentBlockRequest -> unit"
+                                        "onRemove", "string -> unit"
+                                        "onChangeType", "string -> string -> unit (blockId, newType)"
+                                        "onReorder", "string list -> unit (ordered blockIds)"
+                                        "onUploadScreenshot", "(byte[] -> string -> string option -> unit) option"
+                                        "onGroupBlocks", "(string -> string -> unit) option -- (leftId, rightId)"
+                                        "onUngroupBlock", "(string -> unit) option -- blockId"
+                                    ] do
+                                        Html.li [
+                                            prop.className "text-sm text-base-content/70"
+                                            prop.children [
+                                                Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text name ]
+                                                Html.span [ prop.text $" -- {desc}" ]
+                                            ]
+                                        ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+
+            subheading "Decisions"
+
+            decisionBox
+                "Gap-Based Reordering"
+                "Green full-width indicator lines appear between blocks during drag, clearly showing where the block will land. This provides unambiguous drop targets and works naturally with both single blocks and RowPairs."
+                "Swap-on-hover (confusing with adjacent blocks). Drag handle only (no visual feedback for drop position). Sortable.js (external dependency, harder to integrate with RowPair grouping)."
+
+            decisionBox
+                "Left/Right Drop Zones for Grouping"
+                "Dragging onto the left or right half of a block creates a two-column RowPair. The drop zone (left vs right) determines which side the dragged block occupies. This mirrors Notion's column creation and is discoverable through visual feedback."
+                "Explicit 'group' button (extra UI, less fluid). Context menu grouping (requires selecting two blocks separately, slower workflow)."
         ]
     ]
 
@@ -1580,6 +1796,7 @@ let private sectionNav (activeSection: Section) (dispatch: Msg -> unit) =
         Animations, "Animations"
         Components, "Components"
         ContentBlocks, "Content Blocks"
+        ContentZone, "Content Zone"
         EntryList, "Entry List"
     ]
     Html.nav [
@@ -1606,6 +1823,7 @@ let private sectionContent (section: Section) =
     | Animations -> animationsSection ()
     | Components -> componentsSection ()
     | ContentBlocks -> contentBlocksSection ()
+    | ContentZone -> contentZoneSection ()
     | EntryList -> entryListSection ()
 
 // ── Page View ──

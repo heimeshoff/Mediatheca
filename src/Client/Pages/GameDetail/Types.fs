@@ -2,11 +2,12 @@ module Mediatheca.Client.Pages.GameDetail.Types
 
 open Mediatheca.Shared
 
+type GameTab = Overview | Journal
+
 type FriendPickerKind =
     | Recommend_picker
     | Play_with_picker
     | Played_with_picker
-    | Family_owner_picker
 
 type ImagePickerKind = Cover_picker | Backdrop_picker
 
@@ -21,19 +22,24 @@ type Model = {
     ShowFriendPicker: FriendPickerKind option
     IsRatingOpen: bool
     IsStatusOpen: bool
-    ShowStoreInput: bool
-    HltbInput: string
-    IsEditingHltb: bool
+    ShowPlayModePicker: bool
+    AllPlayModes: string list
+    IsDescriptionExpanded: bool
+    IsFriendsMenuOpen: bool
     ConfirmingRemove: bool
     ShowImagePicker: ImagePickerKind option
     ImageCandidates: GameImageCandidate list
     IsLoadingImages: bool
     IsSelectingImage: bool
     ImageVersion: int
+    ActiveTab: GameTab
     Error: string option
 }
 
 type Msg =
+    | Set_tab of GameTab
+    | Upload_screenshot of data: byte array * filename: string * insertBefore: string option
+    | Screenshot_uploaded of Result<string, string> * insertBefore: string option
     | Load_game of string
     | Game_loaded of GameDetail option
     | Friends_loaded of FriendListItem list
@@ -45,6 +51,7 @@ type Msg =
     | Remove_played_with of friendSlug: string
     | Add_family_owner of friendSlug: string
     | Remove_family_owner of friendSlug: string
+    | Toggle_ownership
     | Command_result of Result<unit, string>
     | Open_friend_picker of FriendPickerKind
     | Close_friend_picker
@@ -53,20 +60,12 @@ type Msg =
     | Toggle_rating_dropdown
     | Set_personal_rating of int
     | Personal_rating_result of Result<unit, string>
-    | Add_store of string
-    | Remove_store of string
-    | Toggle_store_input
-    | Set_hltb_hours of string
-    | Start_editing_hltb
-    | Save_hltb
-    | Cancel_editing_hltb
-    | Hltb_result of Result<unit, string>
+    | Toggle_friends_menu
+    | Close_friends_menu
     | Add_friend_and_recommend of name: string
     | Friend_and_recommend_result of Result<unit, string>
     | Add_friend_and_play_with of name: string
     | Friend_and_play_with_result of Result<unit, string>
-    | Add_friend_and_family_owner of name: string
-    | Friend_and_family_owner_result of Result<unit, string>
     | Add_friend_and_played_with of name: string
     | Friend_and_played_with_result of Result<unit, string>
     | Add_content_block of AddContentBlockRequest
@@ -74,6 +73,8 @@ type Msg =
     | Remove_content_block of blockId: string
     | Change_content_block_type of blockId: string * blockType: string
     | Reorder_content_blocks of blockIds: string list
+    | Group_content_blocks of leftId: string * rightId: string
+    | Ungroup_content_block of blockId: string
     | Content_block_result of Result<unit, string>
     | Catalogs_loaded of CatalogListItem list
     | Game_catalogs_loaded of CatalogRef list
@@ -88,6 +89,11 @@ type Msg =
     | Image_candidates_loaded of GameImageCandidate list
     | Select_image of url: string
     | Image_selected of Result<unit, string>
+    | Toggle_description_expanded
+    | Add_play_mode of string
+    | Remove_play_mode of string
+    | Toggle_play_mode_picker
+    | Play_modes_loaded of string list
     | Confirm_remove_game
     | Cancel_remove_game
     | Remove_game

@@ -17,6 +17,7 @@ module Steam =
         Name: string
         PlaytimeForever: int
         ImgIconUrl: string
+        RtimeLastPlayed: int
     }
 
     type SteamOwnedGamesResponse = {
@@ -43,6 +44,7 @@ module Steam =
         Appid: int
         Name: string
         OwnerSteamids: string list
+        RtTimeAcquired: int
     }
 
     // Decoders
@@ -53,6 +55,7 @@ module Steam =
             Name = get.Optional.Field "name" Decode.string |> Option.defaultValue ""
             PlaytimeForever = get.Optional.Field "playtime_forever" Decode.int |> Option.defaultValue 0
             ImgIconUrl = get.Optional.Field "img_icon_url" Decode.string |> Option.defaultValue ""
+            RtimeLastPlayed = get.Optional.Field "rtime_last_played" Decode.int |> Option.defaultValue 0
         })
 
     let private decodeOwnedGamesResponse: Decoder<SteamOwnedGamesResponse> =
@@ -104,6 +107,7 @@ module Steam =
             Appid = get.Required.Field "appid" Decode.int
             Name = get.Optional.Field "name" Decode.string |> Option.defaultValue ""
             OwnerSteamids = get.Optional.Field "owner_steamids" (Decode.list Decode.string) |> Option.defaultValue []
+            RtTimeAcquired = get.Optional.Field "rt_time_acquired" Decode.int |> Option.defaultValue 0
         })
 
     let private decodeSharedLibraryApps: Decoder<SteamSharedLibraryApp list> =
@@ -113,6 +117,15 @@ module Steam =
             ))
             response
         )
+
+    type SteamStoreDetails = {
+        ShortDescription: string
+        DetailedDescription: string
+        AboutTheGame: string
+        WebsiteUrl: string option
+        Categories: string list
+        HeaderImageUrl: string option
+    }
 
     type SteamPlayerSummary = {
         Steamid: string
@@ -132,6 +145,39 @@ module Steam =
             ))
             response
         )
+
+    let private decodeCategoryDescription: Decoder<string> =
+        Decode.object (fun get ->
+            get.Required.Field "description" Decode.string
+        )
+
+    let private decodeStoreData: Decoder<SteamStoreDetails> =
+        Decode.object (fun get -> {
+            ShortDescription = get.Optional.Field "short_description" Decode.string |> Option.defaultValue ""
+            DetailedDescription = get.Optional.Field "detailed_description" Decode.string |> Option.defaultValue ""
+            AboutTheGame = get.Optional.Field "about_the_game" Decode.string |> Option.defaultValue ""
+            WebsiteUrl = get.Optional.Field "website" Decode.string
+            Categories = get.Optional.Field "categories" (Decode.list decodeCategoryDescription) |> Option.defaultValue []
+            HeaderImageUrl = get.Optional.Field "header_image" Decode.string
+        })
+
+    let private decodeStoreAppEntry: Decoder<Result<SteamStoreDetails, string>> =
+        Decode.object (fun get ->
+            let success = get.Required.Field "success" Decode.bool
+            if success then
+                let data = get.Required.Field "data" decodeStoreData
+                Ok data
+            else
+                Error "Steam Store API returned success=false"
+        )
+
+    // Helpers
+
+    let unixTimestampToDateString (timestamp: int) : string option =
+        if timestamp = 0 then None
+        else
+            let dt = System.DateTimeOffset.UnixEpoch.AddSeconds(float timestamp).UtcDateTime
+            Some (dt.ToString("yyyy-MM-dd"))
 
     // HTTP helper
 
@@ -181,7 +227,8 @@ module Steam =
                         { Mediatheca.Shared.SteamOwnedGame.AppId = g.AppId
                           Name = g.Name
                           PlaytimeMinutes = g.PlaytimeForever
-                          ImgIconUrl = g.ImgIconUrl })
+                          ImgIconUrl = g.ImgIconUrl
+                          RtimeLastPlayed = g.RtimeLastPlayed })
                 | Error _ -> return []
         }
 
@@ -193,6 +240,26 @@ module Steam =
                 if response.IsSuccessStatusCode then
                     let! bytes = response.Content.ReadAsByteArrayAsync() |> Async.AwaitTask
                     let ref = sprintf "posters/game-%s.jpg" slug
+                    let destPath = System.IO.Path.Combine(imageBasePath, ref)
+                    let dir = System.IO.Path.GetDirectoryName(destPath)
+                    if not (System.IO.Directory.Exists(dir)) then
+                        System.IO.Directory.CreateDirectory(dir) |> ignore
+                    System.IO.File.WriteAllBytes(destPath, bytes)
+                    return Some ref
+                else
+                    return None
+            with _ ->
+                return None
+        }
+
+    let downloadSteamBackdrop (httpClient: HttpClient) (appId: int) (slug: string) (imageBasePath: string) : Async<string option> =
+        async {
+            try
+                let url = sprintf "https://steamcdn-a.akamaihd.net/steam/apps/%d/library_hero.jpg" appId
+                let! response = httpClient.GetAsync(url) |> Async.AwaitTask
+                if response.IsSuccessStatusCode then
+                    let! bytes = response.Content.ReadAsByteArrayAsync() |> Async.AwaitTask
+                    let ref = sprintf "backdrops/game-%s.jpg" slug
                     let destPath = System.IO.Path.Combine(imageBasePath, ref)
                     let dir = System.IO.Path.GetDirectoryName(destPath)
                     if not (System.IO.Directory.Exists(dir)) then
@@ -255,4 +322,21 @@ module Steam =
                     | Error e -> return Error (sprintf "Failed to parse player summaries: %s" e)
                 with ex ->
                     return Error (sprintf "Failed to get player summaries: %s" ex.Message)
+        }
+
+    let getSteamStoreDetails (httpClient: HttpClient) (appId: int) : Async<Result<SteamStoreDetails, string>> =
+        async {
+            try
+                let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d" appId
+                let! json = fetchJson httpClient url
+                let appIdKey = string appId
+                match Decode.fromString (Decode.dict decodeStoreAppEntry) json with
+                | Ok dict ->
+                    match dict.TryGetValue(appIdKey) with
+                    | true, Ok details -> return Ok details
+                    | true, Error e -> return Error e
+                    | false, _ -> return Error (sprintf "No entry found for appId %d in response" appId)
+                | Error e -> return Error (sprintf "Failed to parse Steam store response: %s" e)
+            with ex ->
+                return Error (sprintf "Failed to get Steam store details: %s" ex.Message)
         }

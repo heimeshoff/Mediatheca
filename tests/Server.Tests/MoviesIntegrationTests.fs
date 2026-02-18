@@ -10,6 +10,7 @@ let private createInMemoryConnection () =
     EventStore.initialize conn
     CastStore.initialize conn
     ContentBlockProjection.handler.Init conn
+    FriendProjection.handler.Init conn
     conn
 
 let private sampleMovieData: Movies.MovieAddedData = {

@@ -207,12 +207,13 @@ module Rawg =
                                 { Mediatheca.Shared.GameImageCandidate.Url = s.Image
                                   Source = "RAWG"
                                   Label = $"RAWG Screenshot {i + 1}"
-                                  IsCover = false })
+                                  IsCover = false
+                                  IsCurrent = false })
                     | Error _ -> return []
                 with _ -> return []
         }
 
-    let downloadGameImages (httpClient: HttpClient) (slug: string) (backgroundImage: string option) (imageBasePath: string) : Async<string option * string option> =
+    let downloadGameImages (httpClient: HttpClient) (slug: string) (backgroundImage: string option) (backgroundImageAdditional: string option) (imageBasePath: string) : Async<string option * string option> =
         async {
             let coverRef =
                 match backgroundImage with
@@ -225,7 +226,7 @@ module Rawg =
                     with _ -> None
                 | None -> None
             let backdropRef =
-                match backgroundImage with
+                match backgroundImageAdditional with
                 | Some url ->
                     let ref = $"backdrops/game-{slug}.jpg"
                     try

@@ -2,12 +2,17 @@ namespace Mediatheca.Server
 
 open System.Data
 open System.Net.Http
+open System.Text.RegularExpressions
 open Microsoft.Data.Sqlite
 open Donald
 open Giraffe
 open Mediatheca.Shared
 
 module Api =
+
+    let private stripHtmlTags (html: string) =
+        if System.String.IsNullOrEmpty(html) then ""
+        else Regex.Replace(html, "<[^>]+>", "")
 
     let private executeCommand
         (conn: SqliteConnection)
@@ -311,6 +316,7 @@ module Api =
                                     Mediatheca.Shared.SteamFamilyMember.SteamId = get.Required.Field "steamId" Thoth.Json.Net.Decode.string
                                     DisplayName = get.Required.Field "displayName" Thoth.Json.Net.Decode.string
                                     FriendSlug = get.Optional.Field "friendSlug" Thoth.Json.Net.Decode.string
+                                    IsMe = get.Optional.Field "isMe" Thoth.Json.Net.Decode.bool |> Option.defaultValue false
                                 })
                             )
                         let memberMappings =
@@ -355,20 +361,33 @@ module Api =
 
                             let setFamilyOwners (sid: string) (app: Steam.SteamSharedLibraryApp) =
                                 for ownerSteamId in app.OwnerSteamids do
-                                    match steamIdToFriendSlug |> Map.tryFind ownerSteamId with
-                                    | Some friendSlug ->
+                                    if ownerSteamId = userSteamId && not (System.String.IsNullOrWhiteSpace(userSteamId)) then
                                         let result =
                                             executeCommand conn sid
                                                 Games.Serialization.fromStoredEvent
                                                 Games.reconstitute
                                                 Games.decide
                                                 Games.Serialization.toEventData
-                                                (Games.Add_family_owner friendSlug)
+                                                Games.Mark_as_owned
                                                 projectionHandlers
                                         match result with
                                         | Ok () -> familyOwnersSet <- familyOwnersSet + 1
                                         | Error _ -> ()
-                                    | None -> ()
+                                    else
+                                        match steamIdToFriendSlug |> Map.tryFind ownerSteamId with
+                                        | Some friendSlug ->
+                                            let result =
+                                                executeCommand conn sid
+                                                    Games.Serialization.fromStoredEvent
+                                                    Games.reconstitute
+                                                    Games.decide
+                                                    Games.Serialization.toEventData
+                                                    (Games.Add_family_owner friendSlug)
+                                                    projectionHandlers
+                                            match result with
+                                            | Ok () -> familyOwnersSet <- familyOwnersSet + 1
+                                            | Error _ -> ()
+                                        | None -> ()
 
                             for app in enrichedApps do
                                 try
@@ -379,6 +398,13 @@ module Api =
                                     | Some slug ->
                                         let sid = Games.streamId slug
                                         setFamilyOwners sid app
+                                        executeCommand conn sid
+                                            Games.Serialization.fromStoredEvent
+                                            Games.reconstitute
+                                            Games.decide
+                                            Games.Serialization.toEventData
+                                            (Games.Set_steam_library_date (Steam.unixTimestampToDateString app.RtTimeAcquired))
+                                            projectionHandlers |> ignore
                                         emit { Current = gamesProcessed; Total = total; GameName = app.Name; Action = "Matched" }
                                     | None ->
                                         let existingByName =
@@ -394,14 +420,14 @@ module Api =
                                                 Games.Serialization.toEventData
                                                 (Games.Set_steam_app_id app.Appid)
                                                 projectionHandlers |> ignore
+                                            setFamilyOwners sid app
                                             executeCommand conn sid
                                                 Games.Serialization.fromStoredEvent
                                                 Games.reconstitute
                                                 Games.decide
                                                 Games.Serialization.toEventData
-                                                (Games.Add_store "Steam")
+                                                (Games.Set_steam_library_date (Steam.unixTimestampToDateString app.RtTimeAcquired))
                                                 projectionHandlers |> ignore
-                                            setFamilyOwners sid app
                                             emit { Current = gamesProcessed; Total = total; GameName = app.Name; Action = "Matched by name" }
                                         | [] ->
                                             if app.Name = "" then
@@ -428,14 +454,17 @@ module Api =
                                                 let baseSlug = Slug.gameSlug app.Name (if year > 0 then year else 2000)
                                                 let slug = generateUniqueSlug conn Games.streamId baseSlug
                                                 let! coverRef = Steam.downloadSteamCover httpClient app.Appid slug imageBasePath
+                                                let! backdropRef = Steam.downloadSteamBackdrop httpClient app.Appid slug imageBasePath
 
                                                 let gameData: Games.GameAddedData = {
                                                     Name = app.Name
                                                     Year = if year > 0 then year else 0
                                                     Genres = genres
                                                     Description = description
+                                                    ShortDescription = ""
+                                                    WebsiteUrl = None
                                                     CoverRef = coverRef
-                                                    BackdropRef = None
+                                                    BackdropRef = backdropRef
                                                     RawgId = rawgId
                                                     RawgRating = rawgRating
                                                 }
@@ -460,14 +489,14 @@ module Api =
                                                         Games.Serialization.toEventData
                                                         (Games.Set_steam_app_id app.Appid)
                                                         projectionHandlers |> ignore
+                                                    setFamilyOwners sid app
                                                     executeCommand conn sid
                                                         Games.Serialization.fromStoredEvent
                                                         Games.reconstitute
                                                         Games.decide
                                                         Games.Serialization.toEventData
-                                                        (Games.Add_store "Steam")
+                                                        (Games.Set_steam_library_date (Steam.unixTimestampToDateString app.RtTimeAcquired))
                                                         projectionHandlers |> ignore
-                                                    setFamilyOwners sid app
                                                     emit { Current = gamesProcessed; Total = total; GameName = app.Name; Action = "Created" }
                                                 | Error e ->
                                                     errors <- errors @ [ sprintf "Failed to create '%s': %s" app.Name e ]
@@ -887,6 +916,32 @@ module Api =
                 | None -> return ContentBlockProjection.getForMovieDetail conn slug
             }
 
+            groupContentBlocksInRow = fun slug leftId rightId rowGroup -> async {
+                let sid = ContentBlocks.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Group_content_blocks_in_row (leftId, rightId, rowGroup))
+                        projectionHandlers
+            }
+
+            ungroupContentBlock = fun slug blockId -> async {
+                let sid = ContentBlocks.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Ungroup_content_block blockId)
+                        projectionHandlers
+            }
+
             uploadContentImage = fun data filename -> async {
                 try
                     let ext = System.IO.Path.GetExtension(filename).ToLowerInvariant()
@@ -1141,8 +1196,8 @@ module Api =
                         | "Game_recommendation_removed" -> "Game recommendation removed"
                         | "Want_to_play_with" -> "Want to play game with friend"
                         | "Removed_want_to_play_with" -> "Removed want to play game with friend"
-                        | "Game_store_added" -> "Game store added"
-                        | "Game_store_removed" -> "Game store removed"
+                        | "Game_marked_as_owned" -> "Game marked as owned"
+                        | "Game_ownership_removed" -> "Game ownership removed"
                         | "Game_family_owner_added" -> "Game family owner added"
                         | "Game_family_owner_removed" -> "Game family owner removed"
                         | "Game_steam_app_id_set" -> "Game linked to Steam"
@@ -1784,7 +1839,12 @@ module Api =
                                     | Some d -> d.BackgroundImage |> Option.orElse request.CoverRef
                                     | None -> request.CoverRef
 
-                                let! coverRef, backdropRef = Rawg.downloadGameImages httpClient slug bgImage imageBasePath
+                                let bgImageAdditional =
+                                    match details with
+                                    | Some d -> d.BackgroundImageAdditional
+                                    | None -> None
+
+                                let! coverRef, backdropRef = Rawg.downloadGameImages httpClient slug bgImage bgImageAdditional imageBasePath
                                 return desc, coverRef, backdropRef
                             }
                         | None ->
@@ -1795,6 +1855,8 @@ module Api =
                         Year = year
                         Genres = request.Genres
                         Description = description
+                        ShortDescription = ""
+                        WebsiteUrl = None
                         CoverRef = coverRef
                         BackdropRef = backdropRef
                         RawgId = request.RawgId
@@ -1950,7 +2012,7 @@ module Api =
                         projectionHandlers
             }
 
-            addGameStore = fun slug store -> async {
+            addGamePlayMode = fun slug playMode -> async {
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -1959,11 +2021,11 @@ module Api =
                         Games.reconstitute
                         Games.decide
                         Games.Serialization.toEventData
-                        (Games.Add_store store)
+                        (Games.Add_play_mode playMode)
                         projectionHandlers
             }
 
-            removeGameStore = fun slug store -> async {
+            removeGamePlayMode = fun slug playMode -> async {
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -1972,7 +2034,37 @@ module Api =
                         Games.reconstitute
                         Games.decide
                         Games.Serialization.toEventData
-                        (Games.Remove_store store)
+                        (Games.Remove_play_mode playMode)
+                        projectionHandlers
+            }
+
+            getAllPlayModes = fun () -> async {
+                return GameProjection.getAllPlayModes conn
+            }
+
+            markGameAsOwned = fun slug -> async {
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        Games.Mark_as_owned
+                        projectionHandlers
+            }
+
+            removeGameOwnership = fun slug -> async {
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        Games.Remove_ownership
                         projectionHandlers
             }
 
@@ -2092,15 +2184,27 @@ module Api =
                 match GameProjection.getBySlug conn slug with
                 | None -> return []
                 | Some game ->
+                    let currentCandidates =
+                        [ match game.CoverRef with
+                          | Some ref ->
+                              { GameImageCandidate.Url = $"/images/{ref}"
+                                Source = "Current"; Label = "Current Cover"; IsCover = true; IsCurrent = true }
+                          | None -> ()
+                          match game.BackdropRef with
+                          | Some ref ->
+                              { GameImageCandidate.Url = $"/images/{ref}"
+                                Source = "Current"; Label = "Current Backdrop"; IsCover = false; IsCurrent = true }
+                          | None -> () ]
+
                     let steamCandidates =
                         match game.SteamAppId with
                         | Some appId ->
                             [ { GameImageCandidate.Url = $"https://cdn.akamai.steamstatic.com/steam/apps/{appId}/library_600x900_2x.jpg"
-                                Source = "Steam"; Label = "Steam Library Cover"; IsCover = true }
+                                Source = "Steam"; Label = "Steam Library Cover"; IsCover = true; IsCurrent = false }
                               { Url = $"https://cdn.akamai.steamstatic.com/steam/apps/{appId}/library_hero.jpg"
-                                Source = "Steam"; Label = "Steam Library Hero"; IsCover = false }
+                                Source = "Steam"; Label = "Steam Library Hero"; IsCover = false; IsCurrent = false }
                               { Url = $"https://cdn.akamai.steamstatic.com/steam/apps/{appId}/header.jpg"
-                                Source = "Steam"; Label = "Steam Header"; IsCover = false } ]
+                                Source = "Steam"; Label = "Steam Header"; IsCover = false; IsCurrent = false } ]
                         | None -> []
 
                     let! rawgCandidates = async {
@@ -2118,11 +2222,11 @@ module Api =
                                 | Some (d: Rawg.RawgGameDetailsResponse) ->
                                     [ match d.BackgroundImage with
                                       | Some url ->
-                                          { GameImageCandidate.Url = url; Source = "RAWG"; Label = "RAWG Background"; IsCover = false }
+                                          { GameImageCandidate.Url = url; Source = "RAWG"; Label = "RAWG Background"; IsCover = false; IsCurrent = false }
                                       | None -> ()
                                       match d.BackgroundImageAdditional with
                                       | Some url ->
-                                          { Url = url; Source = "RAWG"; Label = "RAWG Background 2"; IsCover = false }
+                                          { Url = url; Source = "RAWG"; Label = "RAWG Background 2"; IsCover = false; IsCurrent = false }
                                       | None -> () ]
                                 | None -> []
                             let! screenshots = Rawg.getGameScreenshots httpClient rawgConfig rawgId
@@ -2130,7 +2234,7 @@ module Api =
                         | None -> return []
                     }
 
-                    return steamCandidates @ rawgCandidates
+                    return currentCandidates @ steamCandidates @ rawgCandidates
             }
 
             selectGameImage = fun slug sourceUrl imageKind -> async {
@@ -2282,6 +2386,20 @@ module Api =
                                         match result with
                                         | Ok () -> playTimeUpdated <- playTimeUpdated + 1
                                         | Error _ -> ()
+                                    executeCommand conn sid
+                                        Games.Serialization.fromStoredEvent
+                                        Games.reconstitute
+                                        Games.decide
+                                        Games.Serialization.toEventData
+                                        (Games.Set_steam_last_played (Steam.unixTimestampToDateString steamGame.RtimeLastPlayed))
+                                        projectionHandlers |> ignore
+                                    executeCommand conn sid
+                                        Games.Serialization.fromStoredEvent
+                                        Games.reconstitute
+                                        Games.decide
+                                        Games.Serialization.toEventData
+                                        Games.Mark_as_owned
+                                        projectionHandlers |> ignore
                                 | None ->
                                     // Try to match by name
                                     let existingByName = GameProjection.findByName conn steamGame.Name
@@ -2297,13 +2415,6 @@ module Api =
                                             Games.Serialization.toEventData
                                             (Games.Set_steam_app_id steamGame.AppId)
                                             projectionHandlers |> ignore
-                                        executeCommand conn sid
-                                            Games.Serialization.fromStoredEvent
-                                            Games.reconstitute
-                                            Games.decide
-                                            Games.Serialization.toEventData
-                                            (Games.Add_store "Steam")
-                                            projectionHandlers |> ignore
                                         if steamGame.PlaytimeMinutes > 0 then
                                             let result =
                                                 executeCommand conn sid
@@ -2316,6 +2427,49 @@ module Api =
                                             match result with
                                             | Ok () -> playTimeUpdated <- playTimeUpdated + 1
                                             | Error _ -> ()
+                                        // Fetch Steam Store details for description, website, and play modes
+                                        let! storeDetails = Steam.getSteamStoreDetails httpClient steamGame.AppId
+                                        match storeDetails with
+                                        | Ok details ->
+                                            if details.AboutTheGame <> "" then
+                                                executeCommand conn sid
+                                                    Games.Serialization.fromStoredEvent
+                                                    Games.reconstitute
+                                                    Games.decide
+                                                    Games.Serialization.toEventData
+                                                    (Games.Set_short_description details.ShortDescription)
+                                                    projectionHandlers |> ignore
+                                            if details.WebsiteUrl.IsSome then
+                                                executeCommand conn sid
+                                                    Games.Serialization.fromStoredEvent
+                                                    Games.reconstitute
+                                                    Games.decide
+                                                    Games.Serialization.toEventData
+                                                    (Games.Set_website_url details.WebsiteUrl)
+                                                    projectionHandlers |> ignore
+                                            for category in details.Categories do
+                                                executeCommand conn sid
+                                                    Games.Serialization.fromStoredEvent
+                                                    Games.reconstitute
+                                                    Games.decide
+                                                    Games.Serialization.toEventData
+                                                    (Games.Add_play_mode category)
+                                                    projectionHandlers |> ignore
+                                        | Error _ -> ()
+                                        executeCommand conn sid
+                                            Games.Serialization.fromStoredEvent
+                                            Games.reconstitute
+                                            Games.decide
+                                            Games.Serialization.toEventData
+                                            (Games.Set_steam_last_played (Steam.unixTimestampToDateString steamGame.RtimeLastPlayed))
+                                            projectionHandlers |> ignore
+                                        executeCommand conn sid
+                                            Games.Serialization.fromStoredEvent
+                                            Games.reconstitute
+                                            Games.decide
+                                            Games.Serialization.toEventData
+                                            Games.Mark_as_owned
+                                            projectionHandlers |> ignore
                                     | [] ->
                                         // No match — create new game
                                         // Try RAWG enrichment
@@ -2328,7 +2482,7 @@ module Api =
 
                                         let rawgMatch = rawgResults |> List.tryHead
 
-                                        let description, genres, rawgId, rawgRating, year =
+                                        let rawgDescription, genres, rawgId, rawgRating, year =
                                             match rawgMatch with
                                             | Some r ->
                                                 let rawgYear = r.Year |> Option.defaultValue 0
@@ -2336,18 +2490,39 @@ module Api =
                                             | None ->
                                                 "", [], None, None, 0
 
-                                        // Download cover from Steam CDN
+                                        // Fetch Steam Store details for description, website, and play modes
+                                        let! storeDetails = Steam.getSteamStoreDetails httpClient steamGame.AppId
+                                        let steamDescription, steamShortDescription, steamWebsiteUrl, steamCategories =
+                                            match storeDetails with
+                                            | Ok details ->
+                                                let desc =
+                                                    if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
+                                                    elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
+                                                    else ""
+                                                desc, details.ShortDescription, details.WebsiteUrl, details.Categories
+                                            | Error _ -> "", "", None, []
+
+                                        // Use Steam description if available, then RAWG, then empty
+                                        let description =
+                                            if steamDescription <> "" then steamDescription
+                                            elif rawgDescription <> "" then rawgDescription
+                                            else ""
+
+                                        // Download cover and backdrop from Steam CDN
                                         let baseSlug = Slug.gameSlug steamGame.Name (if year > 0 then year else 2000)
                                         let slug = generateUniqueSlug conn Games.streamId baseSlug
                                         let! coverRef = Steam.downloadSteamCover httpClient steamGame.AppId slug imageBasePath
+                                        let! backdropRef = Steam.downloadSteamBackdrop httpClient steamGame.AppId slug imageBasePath
 
                                         let gameData: Games.GameAddedData = {
                                             Name = steamGame.Name
                                             Year = if year > 0 then year else 0
                                             Genres = genres
                                             Description = description
+                                            ShortDescription = steamShortDescription
+                                            WebsiteUrl = steamWebsiteUrl
                                             CoverRef = coverRef
-                                            BackdropRef = None
+                                            BackdropRef = backdropRef
                                             RawgId = rawgId
                                             RawgRating = rawgRating
                                         }
@@ -2373,13 +2548,6 @@ module Api =
                                                 Games.Serialization.toEventData
                                                 (Games.Set_steam_app_id steamGame.AppId)
                                                 projectionHandlers |> ignore
-                                            executeCommand conn sid
-                                                Games.Serialization.fromStoredEvent
-                                                Games.reconstitute
-                                                Games.decide
-                                                Games.Serialization.toEventData
-                                                (Games.Add_store "Steam")
-                                                projectionHandlers |> ignore
                                             if steamGame.PlaytimeMinutes > 0 then
                                                 let ptResult =
                                                     executeCommand conn sid
@@ -2392,6 +2560,29 @@ module Api =
                                                 match ptResult with
                                                 | Ok () -> playTimeUpdated <- playTimeUpdated + 1
                                                 | Error _ -> ()
+                                            // Add play modes from Steam categories
+                                            for category in steamCategories do
+                                                executeCommand conn sid
+                                                    Games.Serialization.fromStoredEvent
+                                                    Games.reconstitute
+                                                    Games.decide
+                                                    Games.Serialization.toEventData
+                                                    (Games.Add_play_mode category)
+                                                    projectionHandlers |> ignore
+                                            executeCommand conn sid
+                                                Games.Serialization.fromStoredEvent
+                                                Games.reconstitute
+                                                Games.decide
+                                                Games.Serialization.toEventData
+                                                (Games.Set_steam_last_played (Steam.unixTimestampToDateString steamGame.RtimeLastPlayed))
+                                                projectionHandlers |> ignore
+                                            executeCommand conn sid
+                                                Games.Serialization.fromStoredEvent
+                                                Games.reconstitute
+                                                Games.decide
+                                                Games.Serialization.toEventData
+                                                Games.Mark_as_owned
+                                                projectionHandlers |> ignore
                                         | Error e ->
                                             errors <- errors @ [ sprintf "Failed to create '%s': %s" steamGame.Name e ]
                             with ex ->
@@ -2431,16 +2622,21 @@ module Api =
                 let json =
                     SettingsStore.getSetting conn "steam_family_members"
                     |> Option.defaultValue "[]"
+                let steamConfig = getSteamConfig()
+                let userSteamId = steamConfig.SteamId
                 let decoder =
                     Thoth.Json.Net.Decode.list (
                         Thoth.Json.Net.Decode.object (fun get -> {
                             Mediatheca.Shared.SteamFamilyMember.SteamId = get.Required.Field "steamId" Thoth.Json.Net.Decode.string
                             DisplayName = get.Required.Field "displayName" Thoth.Json.Net.Decode.string
                             FriendSlug = get.Optional.Field "friendSlug" Thoth.Json.Net.Decode.string
+                            IsMe = get.Optional.Field "isMe" Thoth.Json.Net.Decode.bool |> Option.defaultValue false
                         })
                     )
                 match Thoth.Json.Net.Decode.fromString decoder json with
-                | Ok members -> return members
+                | Ok members ->
+                    return members |> List.map (fun m ->
+                        { m with IsMe = not (System.String.IsNullOrWhiteSpace(userSteamId)) && m.SteamId = userSteamId })
                 | Error _ -> return []
             }
 
@@ -2453,6 +2649,7 @@ module Api =
                                 "steamId", Thoth.Json.Net.Encode.string m.SteamId
                                 "displayName", Thoth.Json.Net.Encode.string m.DisplayName
                                 "friendSlug", Thoth.Json.Net.Encode.option Thoth.Json.Net.Encode.string m.FriendSlug
+                                "isMe", Thoth.Json.Net.Encode.bool m.IsMe
                             ])
                         |> Thoth.Json.Net.Encode.list
                         |> Thoth.Json.Net.Encode.toString 0
@@ -2516,6 +2713,7 @@ module Api =
                                         Mediatheca.Shared.SteamFamilyMember.SteamId = get.Required.Field "steamId" Thoth.Json.Net.Decode.string
                                         DisplayName = get.Required.Field "displayName" Thoth.Json.Net.Decode.string
                                         FriendSlug = get.Optional.Field "friendSlug" Thoth.Json.Net.Decode.string
+                                        IsMe = get.Optional.Field "isMe" Thoth.Json.Net.Decode.bool |> Option.defaultValue false
                                     })
                                 )
                             let existingMappings =
@@ -2523,12 +2721,14 @@ module Api =
                                 | Ok m -> m |> List.map (fun m -> m.SteamId, m.FriendSlug) |> Map.ofList
                                 | Error _ -> Map.empty
 
+                            let userSteamId = steamConfig.SteamId
                             let members =
                                 familyMembers
                                 |> List.map (fun m ->
                                     { Mediatheca.Shared.SteamFamilyMember.SteamId = m.Steamid
                                       DisplayName = nameMap |> Map.tryFind m.Steamid |> Option.defaultValue m.Steamid
-                                      FriendSlug = existingMappings |> Map.tryFind m.Steamid |> Option.flatten })
+                                      FriendSlug = existingMappings |> Map.tryFind m.Steamid |> Option.flatten
+                                      IsMe = not (System.String.IsNullOrWhiteSpace(userSteamId)) && m.Steamid = userSteamId })
 
                             // Persist
                             let json =
@@ -2538,6 +2738,7 @@ module Api =
                                         "steamId", Thoth.Json.Net.Encode.string m.SteamId
                                         "displayName", Thoth.Json.Net.Encode.string m.DisplayName
                                         "friendSlug", Thoth.Json.Net.Encode.option Thoth.Json.Net.Encode.string m.FriendSlug
+                                        "isMe", Thoth.Json.Net.Encode.bool m.IsMe
                                     ])
                                 |> Thoth.Json.Net.Encode.list
                                 |> Thoth.Json.Net.Encode.toString 0

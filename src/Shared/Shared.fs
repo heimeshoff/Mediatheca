@@ -140,6 +140,8 @@ type ContentBlockDto = {
     Url: string option
     Caption: string option
     Position: int
+    RowGroup: string option
+    RowPosition: int option
 }
 
 type AddContentBlockRequest = {
@@ -459,6 +461,8 @@ type GameDetail = {
     Name: string
     Year: int
     Description: string
+    ShortDescription: string
+    WebsiteUrl: string option
     CoverRef: string option
     BackdropRef: string option
     Genres: string list
@@ -468,8 +472,11 @@ type GameDetail = {
     HltbHours: float option
     PersonalRating: int option
     SteamAppId: int option
+    SteamLibraryDate: string option
+    SteamLastPlayed: string option
     TotalPlayTimeMinutes: int
-    Stores: string list
+    PlayModes: string list
+    IsOwnedByMe: bool
     FamilyOwners: FriendRef list
     RecommendedBy: FriendRef list
     WantToPlayWith: FriendRef list
@@ -495,6 +502,7 @@ type SteamOwnedGame = {
     Name: string
     PlaytimeMinutes: int
     ImgIconUrl: string
+    RtimeLastPlayed: int
 }
 
 type SteamImportResult = {
@@ -508,6 +516,7 @@ type SteamFamilyMember = {
     SteamId: string
     DisplayName: string
     FriendSlug: string option
+    IsMe: bool
 }
 
 type SteamFamilyImportResult = {
@@ -530,6 +539,7 @@ type GameImageCandidate = {
     Source: string
     Label: string
     IsCover: bool
+    IsCurrent: bool
 }
 
 // Jellyfin Integration
@@ -645,6 +655,8 @@ type IMediathecaApi = {
     changeContentBlockType: string -> string -> string -> Async<Result<unit, string>>
     reorderContentBlocks: string -> string option -> string list -> Async<Result<unit, string>>
     getContentBlocks: string -> string option -> Async<ContentBlockDto list>
+    groupContentBlocksInRow: string -> string -> string -> string -> Async<Result<unit, string>>
+    ungroupContentBlock: string -> string -> Async<Result<unit, string>>
     uploadContentImage: byte array -> string -> Async<Result<string, string>>
     // Catalogs
     createCatalog: CreateCatalogRequest -> Async<Result<string, string>>
@@ -718,12 +730,15 @@ type IMediathecaApi = {
     removeGameRecommendation: string -> string -> Async<Result<unit, string>>
     addGameWantToPlayWith: string -> string -> Async<Result<unit, string>>
     removeGameWantToPlayWith: string -> string -> Async<Result<unit, string>>
-    addGameStore: string -> string -> Async<Result<unit, string>>
-    removeGameStore: string -> string -> Async<Result<unit, string>>
+    markGameAsOwned: string -> Async<Result<unit, string>>
+    removeGameOwnership: string -> Async<Result<unit, string>>
     addGameFamilyOwner: string -> string -> Async<Result<unit, string>>
     removeGameFamilyOwner: string -> string -> Async<Result<unit, string>>
     addGamePlayedWith: string -> string -> Async<Result<unit, string>>
     removeGamePlayedWith: string -> string -> Async<Result<unit, string>>
+    addGamePlayMode: string -> string -> Async<Result<unit, string>>
+    removeGamePlayMode: string -> string -> Async<Result<unit, string>>
+    getAllPlayModes: unit -> Async<string list>
     getGameContentBlocks: string -> Async<ContentBlockDto list>
     addGameContentBlock: string -> AddContentBlockRequest -> Async<Result<string, string>>
     updateGameContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>

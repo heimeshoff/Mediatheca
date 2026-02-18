@@ -12,6 +12,8 @@ module Games =
         Year: int
         Genres: string list
         Description: string
+        ShortDescription: string
+        WebsiteUrl: string option
         CoverRef: string option
         BackdropRef: string option
         RawgId: int option
@@ -41,6 +43,14 @@ module Games =
         | Game_played_with_removed of friendSlug: string
         | Game_steam_app_id_set of steamAppId: int
         | Game_play_time_set of totalMinutes: int
+        | Game_short_description_set of shortDescription: string
+        | Game_website_url_set of websiteUrl: string option
+        | Game_play_mode_added of playMode: string
+        | Game_play_mode_removed of playMode: string
+        | Game_steam_library_date_set of dateAdded: string option
+        | Game_steam_last_played_set of lastPlayed: string option
+        | Game_marked_as_owned
+        | Game_ownership_removed
 
     // State
 
@@ -49,6 +59,8 @@ module Games =
         Year: int
         Genres: string list
         Description: string
+        ShortDescription: string
+        WebsiteUrl: string option
         CoverRef: string option
         BackdropRef: string option
         RawgId: int option
@@ -58,11 +70,14 @@ module Games =
         Status: GameStatus
         SteamAppId: int option
         TotalPlayTimeMinutes: int
-        Stores: Set<string>
         FamilyOwners: Set<string>
         RecommendedBy: Set<string>
         WantToPlayWith: Set<string>
         PlayedWith: Set<string>
+        PlayModes: Set<string>
+        SteamLibraryDate: string option
+        SteamLastPlayed: string option
+        IsOwnedByMe: bool
     }
 
     type GameState =
@@ -81,8 +96,6 @@ module Games =
         | Set_personal_rating of rating: int option
         | Change_status of GameStatus
         | Set_hltb_hours of hours: float option
-        | Add_store of store: string
-        | Remove_store of store: string
         | Add_family_owner of friendSlug: string
         | Remove_family_owner of friendSlug: string
         | Recommend_game of friendSlug: string
@@ -93,6 +106,14 @@ module Games =
         | Remove_played_with of friendSlug: string
         | Set_steam_app_id of steamAppId: int
         | Set_play_time of totalMinutes: int
+        | Set_short_description of shortDescription: string
+        | Set_website_url of websiteUrl: string option
+        | Add_play_mode of playMode: string
+        | Remove_play_mode of playMode: string
+        | Set_steam_library_date of dateAdded: string option
+        | Set_steam_last_played of lastPlayed: string option
+        | Mark_as_owned
+        | Remove_ownership
 
     // Evolve
 
@@ -104,6 +125,8 @@ module Games =
                 Year = data.Year
                 Genres = data.Genres
                 Description = data.Description
+                ShortDescription = data.ShortDescription
+                WebsiteUrl = data.WebsiteUrl
                 CoverRef = data.CoverRef
                 BackdropRef = data.BackdropRef
                 RawgId = data.RawgId
@@ -113,11 +136,14 @@ module Games =
                 Status = Backlog
                 SteamAppId = None
                 TotalPlayTimeMinutes = 0
-                Stores = Set.empty
                 FamilyOwners = Set.empty
                 RecommendedBy = Set.empty
                 WantToPlayWith = Set.empty
                 PlayedWith = Set.empty
+                PlayModes = Set.empty
+                SteamLibraryDate = None
+                SteamLastPlayed = None
+                IsOwnedByMe = false
             }
         | Active _, Game_removed_from_library -> Removed
         | Active game, Game_categorized genres ->
@@ -132,10 +158,8 @@ module Games =
             Active { game with Status = status }
         | Active game, Game_hltb_hours_set hours ->
             Active { game with HltbHours = hours }
-        | Active game, Game_store_added store ->
-            Active { game with Stores = game.Stores |> Set.add store }
-        | Active game, Game_store_removed store ->
-            Active { game with Stores = game.Stores |> Set.remove store }
+        | _, Game_store_added _ -> state // legacy event, ignored
+        | _, Game_store_removed _ -> state // legacy event, ignored
         | Active game, Game_family_owner_added friendSlug ->
             Active { game with FamilyOwners = game.FamilyOwners |> Set.add friendSlug }
         | Active game, Game_family_owner_removed friendSlug ->
@@ -156,6 +180,22 @@ module Games =
             Active { game with SteamAppId = Some steamAppId }
         | Active game, Game_play_time_set totalMinutes ->
             Active { game with TotalPlayTimeMinutes = totalMinutes }
+        | Active game, Game_short_description_set shortDescription ->
+            Active { game with ShortDescription = shortDescription }
+        | Active game, Game_website_url_set websiteUrl ->
+            Active { game with WebsiteUrl = websiteUrl }
+        | Active game, Game_play_mode_added playMode ->
+            Active { game with PlayModes = game.PlayModes |> Set.add playMode }
+        | Active game, Game_play_mode_removed playMode ->
+            Active { game with PlayModes = game.PlayModes |> Set.remove playMode }
+        | Active game, Game_steam_library_date_set dateAdded ->
+            Active { game with SteamLibraryDate = dateAdded }
+        | Active game, Game_steam_last_played_set lastPlayed ->
+            Active { game with SteamLastPlayed = lastPlayed }
+        | Active game, Game_marked_as_owned ->
+            Active { game with IsOwnedByMe = true }
+        | Active game, Game_ownership_removed ->
+            Active { game with IsOwnedByMe = false }
         | _ -> state
 
     let reconstitute (events: GameEvent list) : GameState =
@@ -189,13 +229,6 @@ module Games =
         | Active game, Set_hltb_hours hours ->
             if game.HltbHours = hours then Ok []
             else Ok [ Game_hltb_hours_set hours ]
-        | Active game, Add_store store ->
-            if game.Stores |> Set.contains store then Ok []
-            else Ok [ Game_store_added store ]
-        | Active game, Remove_store store ->
-            if game.Stores |> Set.contains store then
-                Ok [ Game_store_removed store ]
-            else Ok []
         | Active game, Add_family_owner friendSlug ->
             if game.FamilyOwners |> Set.contains friendSlug then Ok []
             else Ok [ Game_family_owner_added friendSlug ]
@@ -230,6 +263,29 @@ module Games =
         | Active game, Set_play_time totalMinutes ->
             if game.TotalPlayTimeMinutes = totalMinutes then Ok []
             else Ok [ Game_play_time_set totalMinutes ]
+        | Active game, Set_short_description shortDescription ->
+            if game.ShortDescription = shortDescription then Ok []
+            else Ok [ Game_short_description_set shortDescription ]
+        | Active game, Set_website_url websiteUrl ->
+            if game.WebsiteUrl = websiteUrl then Ok []
+            else Ok [ Game_website_url_set websiteUrl ]
+        | Active game, Add_play_mode playMode ->
+            if game.PlayModes |> Set.contains playMode then Ok []
+            else Ok [ Game_play_mode_added playMode ]
+        | Active game, Remove_play_mode playMode ->
+            if game.PlayModes |> Set.contains playMode then
+                Ok [ Game_play_mode_removed playMode ]
+            else Ok []
+        | Active game, Set_steam_library_date dateAdded ->
+            if game.SteamLibraryDate = dateAdded then Ok []
+            else Ok [ Game_steam_library_date_set dateAdded ]
+        | Active game, Set_steam_last_played lastPlayed ->
+            if game.SteamLastPlayed = lastPlayed then Ok []
+            else Ok [ Game_steam_last_played_set lastPlayed ]
+        | Active game, Mark_as_owned ->
+            if game.IsOwnedByMe then Ok [] else Ok [ Game_marked_as_owned ]
+        | Active game, Remove_ownership ->
+            if game.IsOwnedByMe then Ok [ Game_ownership_removed ] else Ok []
         | Removed, _ ->
             Error "Game has been removed"
         | Not_created, _ ->
@@ -249,6 +305,8 @@ module Games =
                 "year", Encode.int data.Year
                 "genres", data.Genres |> List.map Encode.string |> Encode.list
                 "description", Encode.string data.Description
+                "shortDescription", Encode.string data.ShortDescription
+                "websiteUrl", Encode.option Encode.string data.WebsiteUrl
                 "coverRef", Encode.option Encode.string data.CoverRef
                 "backdropRef", Encode.option Encode.string data.BackdropRef
                 "rawgId", Encode.option Encode.int data.RawgId
@@ -261,6 +319,8 @@ module Games =
                 Year = get.Required.Field "year" Decode.int
                 Genres = get.Required.Field "genres" (Decode.list Decode.string)
                 Description = get.Required.Field "description" Decode.string
+                ShortDescription = get.Optional.Field "shortDescription" Decode.string |> Option.defaultValue ""
+                WebsiteUrl = get.Optional.Field "websiteUrl" Decode.string
                 CoverRef = get.Optional.Field "coverRef" Decode.string
                 BackdropRef = get.Optional.Field "backdropRef" Decode.string
                 RawgId = get.Optional.Field "rawgId" Decode.int
@@ -326,6 +386,22 @@ module Games =
                 "Game_steam_app_id_set", Encode.toString 0 (Encode.object [ "steamAppId", Encode.int steamAppId ])
             | Game_play_time_set totalMinutes ->
                 "Game_play_time_set", Encode.toString 0 (Encode.object [ "totalMinutes", Encode.int totalMinutes ])
+            | Game_short_description_set shortDescription ->
+                "Game_short_description_set", Encode.toString 0 (Encode.object [ "shortDescription", Encode.string shortDescription ])
+            | Game_website_url_set websiteUrl ->
+                "Game_website_url_set", Encode.toString 0 (Encode.object [ "websiteUrl", Encode.option Encode.string websiteUrl ])
+            | Game_play_mode_added playMode ->
+                "Game_play_mode_added", Encode.toString 0 (Encode.object [ "playMode", Encode.string playMode ])
+            | Game_play_mode_removed playMode ->
+                "Game_play_mode_removed", Encode.toString 0 (Encode.object [ "playMode", Encode.string playMode ])
+            | Game_steam_library_date_set dateAdded ->
+                "Game_steam_library_date_set", Encode.toString 0 (Encode.object [ "dateAdded", Encode.option Encode.string dateAdded ])
+            | Game_steam_last_played_set lastPlayed ->
+                "Game_steam_last_played_set", Encode.toString 0 (Encode.object [ "lastPlayed", Encode.option Encode.string lastPlayed ])
+            | Game_marked_as_owned ->
+                "Game_marked_as_owned", "{}"
+            | Game_ownership_removed ->
+                "Game_ownership_removed", "{}"
 
         let deserialize (eventType: string) (data: string) : GameEvent option =
             match eventType with
@@ -407,6 +483,34 @@ module Games =
                 Decode.fromString (Decode.field "totalMinutes" Decode.int) data
                 |> Result.toOption
                 |> Option.map Game_play_time_set
+            | "Game_short_description_set" ->
+                Decode.fromString (Decode.field "shortDescription" Decode.string) data
+                |> Result.toOption
+                |> Option.map Game_short_description_set
+            | "Game_website_url_set" ->
+                Decode.fromString (Decode.object (fun get -> get.Optional.Field "websiteUrl" Decode.string)) data
+                |> Result.toOption
+                |> Option.map Game_website_url_set
+            | "Game_play_mode_added" ->
+                Decode.fromString (Decode.field "playMode" Decode.string) data
+                |> Result.toOption
+                |> Option.map Game_play_mode_added
+            | "Game_play_mode_removed" ->
+                Decode.fromString (Decode.field "playMode" Decode.string) data
+                |> Result.toOption
+                |> Option.map Game_play_mode_removed
+            | "Game_steam_library_date_set" ->
+                Decode.fromString (Decode.object (fun get -> get.Optional.Field "dateAdded" Decode.string)) data
+                |> Result.toOption
+                |> Option.map Game_steam_library_date_set
+            | "Game_steam_last_played_set" ->
+                Decode.fromString (Decode.object (fun get -> get.Optional.Field "lastPlayed" Decode.string)) data
+                |> Result.toOption
+                |> Option.map Game_steam_last_played_set
+            | "Game_marked_as_owned" ->
+                Some Game_marked_as_owned
+            | "Game_ownership_removed" ->
+                Some Game_ownership_removed
             | _ -> None
 
         let toEventData (event: GameEvent) : EventStore.EventData =

@@ -15,15 +15,17 @@ let init (slug: string) : Model * Cmd<Msg> =
       ShowFriendPicker = None
       IsRatingOpen = false
       IsStatusOpen = false
-      ShowStoreInput = false
-      HltbInput = ""
-      IsEditingHltb = false
+      ShowPlayModePicker = false
+      AllPlayModes = []
+      IsDescriptionExpanded = false
+      IsFriendsMenuOpen = false
       ConfirmingRemove = false
       ShowImagePicker = None
       ImageCandidates = []
       IsLoadingImages = false
       IsSelectingImage = false
       ImageVersion = 0
+      ActiveTab = Overview
       Error = None },
     Cmd.batch [
         Cmd.ofMsg (Load_game slug)
@@ -31,6 +33,52 @@ let init (slug: string) : Model * Cmd<Msg> =
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
+    | Set_tab tab ->
+        { model with ActiveTab = tab }, Cmd.none
+
+    | Upload_screenshot (data, filename, insertBefore) ->
+        model,
+        Cmd.OfAsync.either
+            (fun () -> api.uploadContentImage data filename)
+            ()
+            (fun r -> Screenshot_uploaded (r, insertBefore))
+            (fun ex -> Screenshot_uploaded (Error ex.Message, insertBefore))
+
+    | Screenshot_uploaded (Ok imageRef, insertBefore) ->
+        let req : AddContentBlockRequest = {
+            BlockType = "screenshot"
+            Content = ""
+            ImageRef = Some imageRef
+            Url = None
+            Caption = None
+        }
+        model,
+        Cmd.OfAsync.either
+            (fun () -> async {
+                match! api.addGameContentBlock model.Slug req with
+                | Ok newBlockId ->
+                    match insertBefore with
+                    | Some targetId ->
+                        match! api.getGameDetail model.Slug with
+                        | Some g ->
+                            let sorted = g.ContentBlocks |> List.sortBy (fun b -> b.Position)
+                            let ids = sorted |> List.map (fun b -> b.BlockId)
+                            let withoutNew = ids |> List.filter (fun id -> id <> newBlockId)
+                            let newOrder =
+                                withoutNew
+                                |> List.collect (fun id ->
+                                    if id = targetId then [newBlockId; id]
+                                    else [id])
+                            let! _ = api.reorderContentBlocks model.Slug None newOrder
+                            return Ok ()
+                        | None -> return Ok ()
+                    | None -> return Ok ()
+                | Error e -> return Error e
+            }) () Content_block_result (fun ex -> Content_block_result (Error ex.Message))
+
+    | Screenshot_uploaded (Error err, _) ->
+        { model with Error = Some err }, Cmd.none
+
     | Load_game slug ->
         { model with IsLoading = true; Slug = slug },
         Cmd.batch [
@@ -38,6 +86,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             Cmd.OfAsync.perform api.getFriends () Friends_loaded
             Cmd.OfAsync.perform api.getCatalogs () Catalogs_loaded
             Cmd.OfAsync.perform api.getCatalogsForGame slug Game_catalogs_loaded
+            Cmd.OfAsync.perform api.getAllPlayModes () Play_modes_loaded
         ]
 
     | Game_loaded game ->
@@ -78,8 +127,23 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         model,
         Cmd.OfAsync.perform (fun () -> api.removeGameFamilyOwner model.Slug friendSlug) () Command_result
 
+    | Toggle_ownership ->
+        match model.Game with
+        | Some game ->
+            if game.IsOwnedByMe then
+                model,
+                Cmd.OfAsync.perform (fun () -> api.removeGameOwnership model.Slug) () Command_result
+            else
+                model,
+                Cmd.OfAsync.perform (fun () -> api.markGameAsOwned model.Slug) () Command_result
+        | None -> model, Cmd.none
+
     | Command_result (Ok ()) ->
-        model, Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
+        model,
+        Cmd.batch [
+            Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
+            Cmd.OfAsync.perform api.getAllPlayModes () Play_modes_loaded
+        ]
 
     | Command_result (Error err) ->
         { model with Error = Some err }, Cmd.none
@@ -115,44 +179,11 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Personal_rating_result (Error err) ->
         { model with Error = Some err }, Cmd.none
 
-    | Add_store store ->
-        { model with ShowStoreInput = false },
-        Cmd.OfAsync.perform (fun () -> api.addGameStore model.Slug store) () Command_result
+    | Toggle_friends_menu ->
+        { model with IsFriendsMenuOpen = not model.IsFriendsMenuOpen }, Cmd.none
 
-    | Remove_store store ->
-        model,
-        Cmd.OfAsync.perform (fun () -> api.removeGameStore model.Slug store) () Command_result
-
-    | Toggle_store_input ->
-        { model with ShowStoreInput = not model.ShowStoreInput }, Cmd.none
-
-    | Start_editing_hltb ->
-        let current = model.Game |> Option.bind (fun g -> g.HltbHours) |> Option.map (fun h -> string h) |> Option.defaultValue ""
-        { model with IsEditingHltb = true; HltbInput = current }, Cmd.none
-
-    | Set_hltb_hours value ->
-        { model with HltbInput = value }, Cmd.none
-
-    | Save_hltb ->
-        let hours =
-            match System.Double.TryParse(model.HltbInput) with
-            | true, v when v > 0.0 -> Some v
-            | _ -> None
-        { model with IsEditingHltb = false },
-        Cmd.OfAsync.either
-            (fun () -> api.setGameHltbHours model.Slug hours)
-            ()
-            Hltb_result
-            (fun ex -> Hltb_result (Error ex.Message))
-
-    | Cancel_editing_hltb ->
-        { model with IsEditingHltb = false }, Cmd.none
-
-    | Hltb_result (Ok ()) ->
-        model, Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
-
-    | Hltb_result (Error err) ->
-        { model with Error = Some err }, Cmd.none
+    | Close_friends_menu ->
+        { model with IsFriendsMenuOpen = false }, Cmd.none
 
     | Add_friend_and_recommend name ->
         model,
@@ -196,28 +227,6 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         ]
 
     | Friend_and_play_with_result (Error err) ->
-        { model with Error = Some err }, Cmd.none
-
-    | Add_friend_and_family_owner name ->
-        model,
-        Cmd.OfAsync.perform (fun () ->
-            async {
-                match! api.addFriend name with
-                | Ok slug ->
-                    match! api.addGameFamilyOwner model.Slug slug with
-                    | Ok () -> return Ok ()
-                    | Error e -> return Error e
-                | Error e -> return Error e
-            }) () Friend_and_family_owner_result
-
-    | Friend_and_family_owner_result (Ok ()) ->
-        model,
-        Cmd.batch [
-            Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
-            Cmd.OfAsync.perform api.getFriends () Friends_loaded
-        ]
-
-    | Friend_and_family_owner_result (Error err) ->
         { model with Error = Some err }, Cmd.none
 
     | Add_friend_and_played_with name ->
@@ -274,6 +283,21 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         model,
         Cmd.OfAsync.perform
             (fun () -> api.reorderContentBlocks model.Slug None blockIds)
+            ()
+            Content_block_result
+
+    | Group_content_blocks (leftId, rightId) ->
+        let rowGroup = System.Guid.NewGuid().ToString("N")
+        model,
+        Cmd.OfAsync.perform
+            (fun () -> api.groupContentBlocksInRow model.Slug leftId rightId rowGroup)
+            ()
+            Content_block_result
+
+    | Ungroup_content_block blockId ->
+        model,
+        Cmd.OfAsync.perform
+            (fun () -> api.ungroupContentBlock model.Slug blockId)
             ()
             Content_block_result
 
@@ -377,6 +401,23 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Image_selected (Error err) ->
         { model with IsSelectingImage = false; Error = Some err }, Cmd.none
+
+    | Toggle_description_expanded ->
+        { model with IsDescriptionExpanded = not model.IsDescriptionExpanded }, Cmd.none
+
+    | Add_play_mode playMode ->
+        { model with ShowPlayModePicker = false },
+        Cmd.OfAsync.perform (fun () -> api.addGamePlayMode model.Slug playMode) () Command_result
+
+    | Remove_play_mode playMode ->
+        model,
+        Cmd.OfAsync.perform (fun () -> api.removeGamePlayMode model.Slug playMode) () Command_result
+
+    | Toggle_play_mode_picker ->
+        { model with ShowPlayModePicker = not model.ShowPlayModePicker }, Cmd.none
+
+    | Play_modes_loaded playModes ->
+        { model with AllPlayModes = playModes }, Cmd.none
 
     | Confirm_remove_game ->
         { model with ConfirmingRemove = true }, Cmd.none

@@ -23,6 +23,8 @@ module ContentBlocks =
         | Content_block_removed of blockId: string
         | Content_block_type_changed of blockId: string * blockType: string
         | Content_blocks_reordered of blockIds: string list * sessionId: string option
+        | Content_blocks_row_grouped of leftId: string * rightId: string * rowGroup: string
+        | Content_block_row_ungrouped of blockId: string
 
     // State
 
@@ -35,6 +37,8 @@ module ContentBlocks =
         Caption: string option
         Position: int
         SessionId: string option
+        RowGroup: string option
+        RowPosition: int option
     }
 
     type ContentBlocksState = {
@@ -50,6 +54,8 @@ module ContentBlocks =
         | Remove_content_block of blockId: string
         | Change_content_block_type of blockId: string * blockType: string
         | Reorder_content_blocks of blockIds: string list * sessionId: string option
+        | Group_content_blocks_in_row of leftId: string * rightId: string * rowGroup: string
+        | Ungroup_content_block of blockId: string
 
     // Evolve
 
@@ -65,6 +71,8 @@ module ContentBlocks =
                 Caption = data.Caption
                 Position = pos
                 SessionId = sid
+                RowGroup = None
+                RowPosition = None
             }
             { state with Blocks = state.Blocks |> Map.add data.BlockId block }
         | Content_block_updated (bid, content, imgRef, url, caption) ->
@@ -81,7 +89,7 @@ module ContentBlocks =
                 let updated = { block with BlockType = blockType }
                 { state with Blocks = state.Blocks |> Map.add bid updated }
             | None -> state
-        | Content_blocks_reordered (bids, sid) ->
+        | Content_blocks_reordered (bids, _sid) ->
             let updatedBlocks =
                 bids
                 |> List.mapi (fun i bid ->
@@ -91,6 +99,17 @@ module ContentBlocks =
                 |> List.choose id
                 |> List.fold (fun m (k, v) -> Map.add k v m) state.Blocks
             { state with Blocks = updatedBlocks }
+        | Content_blocks_row_grouped (leftId, rightId, rowGroup) ->
+            let blocks =
+                state.Blocks
+                |> Map.change leftId (Option.map (fun b -> { b with RowGroup = Some rowGroup; RowPosition = Some 0 }))
+                |> Map.change rightId (Option.map (fun b -> { b with RowGroup = Some rowGroup; RowPosition = Some 1 }))
+            { state with Blocks = blocks }
+        | Content_block_row_ungrouped bid ->
+            let blocks =
+                state.Blocks
+                |> Map.change bid (Option.map (fun b -> { b with RowGroup = None; RowPosition = None }))
+            { state with Blocks = blocks }
 
     let reconstitute (events: ContentBlockEvent list) : ContentBlocksState =
         List.fold evolve ContentBlocksState.empty events
@@ -118,7 +137,16 @@ module ContentBlocks =
                 Error $"Block with id '{bid}' does not exist"
         | Remove_content_block bid ->
             if state.Blocks |> Map.containsKey bid then
-                Ok [ Content_block_removed bid ]
+                let block = state.Blocks |> Map.find bid
+                let ungroupPartner =
+                    match block.RowGroup with
+                    | Some rg ->
+                        state.Blocks |> Map.values
+                        |> Seq.tryFind (fun b -> b.BlockId <> bid && b.RowGroup = Some rg)
+                        |> Option.map (fun b -> Content_block_row_ungrouped b.BlockId)
+                        |> Option.toList
+                    | None -> []
+                Ok (ungroupPartner @ [ Content_block_removed bid ])
             else
                 Ok []
         | Change_content_block_type (bid, blockType) ->
@@ -132,6 +160,44 @@ module ContentBlocks =
                 Error "One or more block ids do not exist"
             else
                 Ok [ Content_blocks_reordered (bids, sid) ]
+        | Group_content_blocks_in_row (leftId, rightId, rowGroup) ->
+            if leftId = rightId then
+                Error "Cannot group a block with itself"
+            elif not (state.Blocks |> Map.containsKey leftId) then
+                Error $"Block with id '{leftId}' does not exist"
+            elif not (state.Blocks |> Map.containsKey rightId) then
+                Error $"Block with id '{rightId}' does not exist"
+            else
+                // Auto-ungroup old partners of both blocks
+                let ungroupEvents =
+                    [leftId; rightId]
+                    |> List.collect (fun bid ->
+                        let block = state.Blocks |> Map.find bid
+                        match block.RowGroup with
+                        | Some rg ->
+                            state.Blocks |> Map.values
+                            |> Seq.filter (fun b -> b.RowGroup = Some rg)
+                            |> Seq.map (fun b -> Content_block_row_ungrouped b.BlockId)
+                            |> Seq.toList
+                        | None -> [])
+                    |> List.distinctBy (fun evt ->
+                        match evt with
+                        | Content_block_row_ungrouped bid -> bid
+                        | _ -> "")
+                Ok (ungroupEvents @ [ Content_blocks_row_grouped (leftId, rightId, rowGroup) ])
+        | Ungroup_content_block bid ->
+            match state.Blocks |> Map.tryFind bid with
+            | None -> Ok []
+            | Some block ->
+                match block.RowGroup with
+                | None -> Ok []
+                | Some rg ->
+                    let ungroupEvents =
+                        state.Blocks |> Map.values
+                        |> Seq.filter (fun b -> b.RowGroup = Some rg)
+                        |> Seq.map (fun b -> Content_block_row_ungrouped b.BlockId)
+                        |> Seq.toList
+                    Ok ungroupEvents
 
     // Stream ID
 
@@ -189,6 +255,14 @@ module ContentBlocks =
                     "blockIds", blockIds |> List.map Encode.string |> Encode.list
                     "sessionId", Encode.option Encode.string sessionId
                 ])
+            | Content_blocks_row_grouped (leftId, rightId, rowGroup) ->
+                "Content_blocks_row_grouped", Encode.toString 0 (Encode.object [
+                    "leftId", Encode.string leftId
+                    "rightId", Encode.string rightId
+                    "rowGroup", Encode.string rowGroup
+                ])
+            | Content_block_row_ungrouped blockId ->
+                "Content_block_row_ungrouped", Encode.toString 0 (Encode.object [ "blockId", Encode.string blockId ])
 
         let deserialize (eventType: string) (data: string) : ContentBlockEvent option =
             match eventType with
@@ -232,6 +306,19 @@ module ContentBlocks =
                         Content_blocks_reordered (blockIds, sessionId))
                 Decode.fromString decoder data
                 |> Result.toOption
+            | "Content_blocks_row_grouped" ->
+                let decoder =
+                    Decode.object (fun get ->
+                        let leftId = get.Required.Field "leftId" Decode.string
+                        let rightId = get.Required.Field "rightId" Decode.string
+                        let rowGroup = get.Required.Field "rowGroup" Decode.string
+                        Content_blocks_row_grouped (leftId, rightId, rowGroup))
+                Decode.fromString decoder data
+                |> Result.toOption
+            | "Content_block_row_ungrouped" ->
+                Decode.fromString (Decode.field "blockId" Decode.string) data
+                |> Result.toOption
+                |> Option.map Content_block_row_ungrouped
             | _ -> None
 
         let toEventData (event: ContentBlockEvent) : EventStore.EventData =

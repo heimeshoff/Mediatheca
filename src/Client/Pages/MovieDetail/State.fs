@@ -182,6 +182,64 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             ()
             Content_block_result
 
+    | Upload_screenshot (data, filename, insertBefore) ->
+        model,
+        Cmd.OfAsync.either
+            (fun () -> api.uploadContentImage data filename)
+            ()
+            (fun r -> Screenshot_uploaded (r, insertBefore))
+            (fun ex -> Screenshot_uploaded (Error ex.Message, insertBefore))
+
+    | Screenshot_uploaded (Ok imageRef, insertBefore) ->
+        let req : AddContentBlockRequest = {
+            BlockType = "screenshot"
+            Content = ""
+            ImageRef = Some imageRef
+            Url = None
+            Caption = None
+        }
+        model,
+        Cmd.OfAsync.either
+            (fun () -> async {
+                match! api.addContentBlock model.Slug None req with
+                | Ok newBlockId ->
+                    match insertBefore with
+                    | Some targetId ->
+                        match! api.getMovie model.Slug with
+                        | Some m ->
+                            let sorted = m.ContentBlocks |> List.sortBy (fun b -> b.Position)
+                            let ids = sorted |> List.map (fun b -> b.BlockId)
+                            let withoutNew = ids |> List.filter (fun id -> id <> newBlockId)
+                            let newOrder =
+                                withoutNew
+                                |> List.collect (fun id ->
+                                    if id = targetId then [newBlockId; id]
+                                    else [id])
+                            let! _ = api.reorderContentBlocks model.Slug None newOrder
+                            return Ok ()
+                        | None -> return Ok ()
+                    | None -> return Ok ()
+                | Error e -> return Error e
+            }) () Content_block_result (fun ex -> Content_block_result (Error ex.Message))
+
+    | Screenshot_uploaded (Error err, _) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Group_content_blocks (leftId, rightId) ->
+        let rowGroup = System.Guid.NewGuid().ToString("N")
+        model,
+        Cmd.OfAsync.perform
+            (fun () -> api.groupContentBlocksInRow model.Slug leftId rightId rowGroup)
+            ()
+            Content_block_result
+
+    | Ungroup_content_block blockId ->
+        model,
+        Cmd.OfAsync.perform
+            (fun () -> api.ungroupContentBlock model.Slug blockId)
+            ()
+            Content_block_result
+
     | Content_block_result (Ok _) ->
         model, Cmd.OfAsync.perform api.getMovie model.Slug Movie_loaded
 

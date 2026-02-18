@@ -278,32 +278,47 @@ let private HeroRating (rawgRating: float option, personalRating: int option, is
         ]
     ]
 
-let private statusSelector (currentStatus: GameStatus) (isOpen: bool) (dispatch: Msg -> unit) =
+[<ReactComponent>]
+let private HeroStatus (currentStatus: GameStatus, isOpen: bool, dispatch: Msg -> unit) =
+    let triggerRef = React.useElementRef()
+    let pos, setPos = React.useState {| top = 0.0; left = 0.0 |}
     let allStatuses = [ Backlog; Playing; Completed; Abandoned; OnHold ]
+
+    React.useEffect ((fun () ->
+        if isOpen then
+            match triggerRef.current with
+            | Some el ->
+                let rect = el.getBoundingClientRect()
+                setPos {| top = rect.bottom + 8.0; left = rect.left |}
+            | None -> ()
+    ), [| box isOpen |])
+
     Html.div [
         prop.className "relative"
         prop.children [
-            glassCard [
-                Html.div [
-                    prop.className "flex items-center justify-between mb-4"
-                    prop.children [
-                        Html.h3 [ prop.className "text-lg font-bold"; prop.text "Status" ]
-                    ]
-                ]
-                Html.button [
-                    prop.className "flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-                    prop.onClick (fun _ -> dispatch Toggle_status_dropdown)
-                    prop.children [
-                        Daisy.badge [
-                            prop.className (statusBadgeClass currentStatus)
-                            prop.text (statusLabel currentStatus)
+            Html.div [
+                prop.ref triggerRef
+                prop.children [
+                    Html.button [
+                        prop.className "cursor-pointer hover:opacity-80 transition-opacity"
+                        prop.onClick (fun _ -> dispatch Toggle_status_dropdown)
+                        prop.children [
+                            Daisy.badge [
+                                prop.className (statusBadgeClass currentStatus)
+                                prop.text (statusLabel currentStatus)
+                            ]
                         ]
                     ]
                 ]
             ]
             if isOpen then
                 Html.div [
-                    prop.className "absolute top-full left-0 mt-2 z-50 rating-dropdown"
+                    prop.className "fixed inset-0 z-[200]"
+                    prop.onClick (fun _ -> dispatch Toggle_status_dropdown)
+                ]
+                Html.div [
+                    prop.className "fixed z-[201] rating-dropdown"
+                    prop.style [ style.top (int pos.top); style.left (int pos.left) ]
                     prop.children [
                         for status in allStatuses do
                             let isActive = status = currentStatus
@@ -327,39 +342,136 @@ let private statusSelector (currentStatus: GameStatus) (isOpen: bool) (dispatch:
     ]
 
 [<ReactComponent>]
-let private StoreInput (onAdd: string -> unit) (onClose: unit -> unit) =
-    let value, setValue = React.useState("")
-    Html.div [
-        prop.className "flex items-center gap-2 mt-2"
-        prop.children [
-            Daisy.input [
-                input.sm
-                prop.className "flex-1"
-                prop.placeholder "Store name (e.g. Steam, GOG, Epic)..."
-                prop.autoFocus true
-                prop.value value
-                prop.onChange (fun (v: string) -> setValue v)
-                prop.onKeyDown (fun e ->
-                    match e.key with
-                    | "Enter" ->
-                        e.preventDefault()
-                        if value.Trim() <> "" then
-                            onAdd (value.Trim())
-                            setValue ""
-                    | "Escape" -> onClose ()
-                    | _ -> ())
+let private PlayModePicker
+    (allPlayModes: string list)
+    (currentModes: string list)
+    (onAdd: string -> unit)
+    (onRemove: string -> unit)
+    (onClose: unit -> unit) =
+    let searchText, setSearchText = React.useState("")
+    let highlightedIndex, setHighlightedIndex = React.useState(0)
+    let currentSet = currentModes |> Set.ofList
+    let available =
+        allPlayModes
+        |> List.filter (fun m ->
+            not (Set.contains m currentSet) &&
+            (searchText = "" || m.ToLowerInvariant().Contains(searchText.ToLowerInvariant())))
+    let availableArr = available |> List.toArray
+    let trimmedSearch = searchText.Trim()
+    let hasExactMatch = allPlayModes |> List.exists (fun m -> m.ToLowerInvariant() = trimmedSearch.ToLowerInvariant())
+    let showCreateNew = trimmedSearch <> "" && not hasExactMatch
+    let totalItems = availableArr.Length + (if showCreateNew then 1 else 0)
+
+    let headerExtra = [
+        if not (List.isEmpty currentModes) then
+            Html.div [
+                prop.className "flex flex-wrap gap-2 mb-4"
+                prop.children [
+                    for mode in currentModes do
+                        Html.span [
+                            prop.className "inline-flex items-center gap-1.5 bg-transparent border border-base-content/20 text-base-content/70 px-3 py-1 rounded-full text-sm font-semibold transition-colors hover:border-base-content/40"
+                            prop.children [
+                                Html.span [ prop.text mode ]
+                                Html.button [
+                                    prop.className "text-base-content/40 hover:text-error transition-colors cursor-pointer ml-0.5"
+                                    prop.onClick (fun e ->
+                                        e.stopPropagation()
+                                        onRemove mode)
+                                    prop.text "\u00D7"
+                                ]
+                            ]
+                        ]
+                ]
             ]
-            Daisy.button.button [
-                button.primary
-                button.sm
-                prop.onClick (fun _ ->
-                    if value.Trim() <> "" then
-                        onAdd (value.Trim())
-                        setValue "")
-                prop.text "Add"
-            ]
+        Daisy.input [
+            prop.className "w-full mb-4"
+            prop.type' "text"
+            prop.placeholder "Search play modes..."
+            prop.autoFocus true
+            prop.value searchText
+            prop.onChange (fun (v: string) ->
+                setSearchText v
+                setHighlightedIndex 0)
+            prop.onKeyDown (fun e ->
+                match e.key with
+                | "ArrowDown" ->
+                    e.preventDefault()
+                    if totalItems > 0 then
+                        setHighlightedIndex (min (highlightedIndex + 1) (totalItems - 1))
+                | "ArrowUp" ->
+                    e.preventDefault()
+                    setHighlightedIndex (max (highlightedIndex - 1) 0)
+                | "Enter" ->
+                    e.preventDefault()
+                    if highlightedIndex >= 0 && highlightedIndex < availableArr.Length then
+                        onAdd availableArr.[highlightedIndex]
+                        setSearchText ""
+                        setHighlightedIndex 0
+                    elif showCreateNew && highlightedIndex = availableArr.Length then
+                        onAdd trimmedSearch
+                        setSearchText ""
+                        setHighlightedIndex 0
+                | "Escape" -> onClose ()
+                | _ -> ())
         ]
     ]
+
+    let content = [
+        if totalItems = 0 && not showCreateNew then
+            Html.p [
+                prop.className "text-base-content/60 py-2 text-sm"
+                prop.text (
+                    if List.isEmpty allPlayModes && trimmedSearch = "" then "No play modes found across games."
+                    elif trimmedSearch = "" then "All known play modes already assigned."
+                    else "No matches found."
+                )
+            ]
+        else
+            Html.div [
+                prop.className "space-y-1"
+                prop.children [
+                    for i in 0 .. availableArr.Length - 1 do
+                        let mode = availableArr.[i]
+                        let isHighlighted = (i = highlightedIndex)
+                        Html.div [
+                            prop.className (
+                                "flex items-center gap-3 p-2 rounded-lg cursor-pointer " +
+                                (if isHighlighted then "bg-primary/20" else "hover:bg-base-200"))
+                            prop.onClick (fun _ -> onAdd mode)
+                            prop.children [
+                                Html.div [
+                                    prop.className "w-10 h-10 rounded-full bg-base-300 flex items-center justify-center text-base-content/40"
+                                    prop.children [ Icons.gamepad () ]
+                                ]
+                                Html.span [ prop.className "font-semibold"; prop.text mode ]
+                            ]
+                        ]
+                    if showCreateNew then
+                        let isHighlighted = (highlightedIndex = availableArr.Length)
+                        Html.div [
+                            prop.className (
+                                "flex items-center gap-3 p-2 rounded-lg cursor-pointer " +
+                                (if isHighlighted then "bg-primary/20" else "hover:bg-base-200"))
+                            prop.onClick (fun _ ->
+                                onAdd trimmedSearch
+                                setSearchText ""
+                                setHighlightedIndex 0)
+                            prop.children [
+                                Html.div [
+                                    prop.className "w-10 h-10 rounded-full bg-base-300 flex items-center justify-center text-base-content/40 text-lg"
+                                    prop.text "+"
+                                ]
+                                Html.span [
+                                    prop.className "font-semibold"
+                                    prop.text $"Add \"{trimmedSearch}\""
+                                ]
+                            ]
+                        ]
+                ]
+            ]
+    ]
+
+    ModalPanel.viewCustom "Play Modes" onClose headerExtra content []
 
 [<ReactComponent>]
 let private FriendManager
@@ -793,10 +905,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                 prop.className "bg-primary/80 px-3 py-1 rounded text-xs font-bold tracking-wider uppercase text-primary-content"
                                                                 prop.text genre
                                                             ]
-                                                        Daisy.badge [
-                                                            prop.className (statusBadgeClass game.Status)
-                                                            prop.text (statusLabel game.Status)
-                                                        ]
+                                                        HeroStatus (game.Status, model.IsStatusOpen, dispatch)
                                                         HeroRating (game.RawgRating, game.PersonalRating, model.IsRatingOpen, dispatch)
                                                     ]
                                                 ]
@@ -810,14 +919,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     prop.className "flex items-center gap-3 text-base-content/60 mb-4"
                                                     prop.children [
                                                         Html.span [ prop.text (string game.Year) ]
-                                                        match game.HltbHours with
-                                                        | Some h ->
-                                                            Html.span [ prop.className "text-base-content/30"; prop.text "\u00B7" ]
-                                                            Html.span [
-                                                                prop.className "text-sm"
-                                                                prop.text $"HLTB: {h}h"
-                                                            ]
-                                                        | None -> ()
                                                     ]
                                                 ]
                                             ]
@@ -828,421 +929,434 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         ]
                     ]
                 ]
-                // Content Grid
+                // Tab Bar + Content
                 Html.div [
                     prop.className "max-w-6xl mx-auto px-4 lg:px-8 pt-4 lg:pt-6 pb-8 lg:pb-12"
                     prop.children [
+                        // Tab bar
                         Html.div [
-                            prop.className "grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10"
+                            prop.className "flex gap-1 border-b border-base-content/10 mb-8"
                             prop.children [
-                                // Left Column: Details
-                                Html.div [
-                                    prop.className "lg:col-span-8 space-y-10"
-                                    prop.children [
-                                        // Catalogs
-                                        Html.div [
-                                            prop.className "flex flex-wrap items-center gap-2"
-                                            prop.children [
-                                                Html.button [
-                                                    prop.className "w-9 h-9 rounded-full bg-base-100/50 backdrop-blur-sm border border-base-content/15 hover:bg-base-100/70 text-base-content/50 hover:text-base-content flex items-center justify-center transition-colors cursor-pointer"
-                                                    prop.onClick (fun _ -> dispatch Open_catalog_picker)
-                                                    prop.children [
-                                                        Html.span [ prop.className "[&>svg]:w-5 [&>svg]:h-5"; prop.children [ Icons.catalog () ] ]
-                                                    ]
-                                                ]
-                                                for cat in model.GameCatalogs do
-                                                    Html.span [
-                                                        prop.className "inline-flex items-center gap-1.5 bg-transparent border border-base-content/20 text-base-content/70 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors hover:border-base-content/40 group/pill"
+                                for (tab, label) in [ (Overview, "Overview"); (Journal, "Journal") ] do
+                                    Html.button [
+                                        prop.className (
+                                            "px-5 py-3 text-sm font-semibold transition-all cursor-pointer " +
+                                            (if tab = model.ActiveTab then
+                                                "text-primary border-b-2 border-primary"
+                                             else
+                                                "text-base-content/50 hover:text-base-content"))
+                                        prop.onClick (fun _ -> dispatch (Set_tab tab))
+                                        prop.text label
+                                    ]
+                            ]
+                        ]
+                        // Tab content
+                        match model.ActiveTab with
+                        | Overview ->
+                            Html.div [
+                                prop.className "grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10"
+                                prop.children [
+                                    // Left Column: Details
+                                    Html.div [
+                                        prop.className "lg:col-span-8 space-y-10"
+                                        prop.children [
+                                            // Catalogs
+                                            Html.div [
+                                                prop.className "flex flex-wrap items-center gap-2"
+                                                prop.children [
+                                                    Html.button [
+                                                        prop.className "w-9 h-9 rounded-full bg-base-100/50 backdrop-blur-sm border border-base-content/15 hover:bg-base-100/70 text-base-content/50 hover:text-base-content flex items-center justify-center transition-colors cursor-pointer"
+                                                        prop.onClick (fun _ -> dispatch Open_catalog_picker)
                                                         prop.children [
-                                                            Html.a [
-                                                                prop.className "cursor-pointer hover:text-primary transition-colors"
-                                                                prop.href (Feliz.Router.Router.format ("catalogs", cat.Slug))
-                                                                prop.onClick (fun e ->
-                                                                    e.preventDefault()
-                                                                    Feliz.Router.Router.navigate ("catalogs", cat.Slug))
-                                                                prop.text cat.Name
-                                                            ]
-                                                            Html.button [
-                                                                prop.className "text-base-content/30 hover:text-error transition-colors cursor-pointer opacity-0 group-hover/pill:opacity-100"
-                                                                prop.onClick (fun e ->
-                                                                    e.stopPropagation()
-                                                                    dispatch (Remove_from_catalog (cat.Slug, cat.EntryId)))
-                                                                prop.text "\u00D7"
-                                                            ]
+                                                            Html.span [ prop.className "[&>svg]:w-5 [&>svg]:h-5"; prop.children [ Icons.catalog () ] ]
                                                         ]
                                                     ]
-                                            ]
-                                        ]
-                                        // Description
-                                        if not (System.String.IsNullOrWhiteSpace game.Description) then
-                                            Html.section [
-                                                prop.children [
-                                                    sectionHeader "Description"
-                                                    Html.p [
-                                                        prop.className "text-base-content/70 leading-relaxed text-lg"
-                                                        prop.text game.Description
-                                                    ]
+                                                    for cat in model.GameCatalogs do
+                                                        Html.span [
+                                                            prop.className "inline-flex items-center gap-1.5 bg-transparent border border-base-content/20 text-base-content/70 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors hover:border-base-content/40 group/pill"
+                                                            prop.children [
+                                                                Html.a [
+                                                                    prop.className "cursor-pointer hover:text-primary transition-colors"
+                                                                    prop.href (Feliz.Router.Router.format ("catalogs", cat.Slug))
+                                                                    prop.onClick (fun e ->
+                                                                        e.preventDefault()
+                                                                        Feliz.Router.Router.navigate ("catalogs", cat.Slug))
+                                                                    prop.text cat.Name
+                                                                ]
+                                                                Html.button [
+                                                                    prop.className "text-base-content/30 hover:text-error transition-colors cursor-pointer opacity-0 group-hover/pill:opacity-100"
+                                                                    prop.onClick (fun e ->
+                                                                        e.stopPropagation()
+                                                                        dispatch (Remove_from_catalog (cat.Slug, cat.EntryId)))
+                                                                    prop.text "\u00D7"
+                                                                ]
+                                                            ]
+                                                        ]
                                                 ]
                                             ]
-                                        // Stores
-                                        if not (List.isEmpty game.Stores) || model.ShowStoreInput then
+                                            // Description (expandable)
+                                            if not (System.String.IsNullOrWhiteSpace game.Description) || not (System.String.IsNullOrWhiteSpace game.ShortDescription) then
+                                                Html.section [
+                                                    prop.children [
+                                                        sectionHeader "Description"
+                                                        let hasShort = not (System.String.IsNullOrWhiteSpace game.ShortDescription)
+                                                        let hasFull = not (System.String.IsNullOrWhiteSpace game.Description)
+                                                        let showShort = hasShort && hasFull && not model.IsDescriptionExpanded
+                                                        if showShort then
+                                                            Html.div [
+                                                                prop.children [
+                                                                    Html.p [
+                                                                        prop.className "text-base-content/70 leading-relaxed text-lg"
+                                                                        prop.text game.ShortDescription
+                                                                    ]
+                                                                    Html.button [
+                                                                        prop.className "text-primary text-sm font-medium mt-2 cursor-pointer hover:underline"
+                                                                        prop.onClick (fun _ -> dispatch Toggle_description_expanded)
+                                                                        prop.text "Read more\u2026"
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                        elif hasFull then
+                                                            Html.div [
+                                                                prop.children [
+                                                                    Html.p [
+                                                                        prop.className "text-base-content/70 leading-relaxed text-lg"
+                                                                        prop.text game.Description
+                                                                    ]
+                                                                    if hasShort then
+                                                                        Html.button [
+                                                                            prop.className "text-primary text-sm font-medium mt-2 cursor-pointer hover:underline"
+                                                                            prop.onClick (fun _ -> dispatch Toggle_description_expanded)
+                                                                            prop.text "Show less"
+                                                                        ]
+                                                                ]
+                                                            ]
+                                                        else
+                                                            Html.p [
+                                                                prop.className "text-base-content/70 leading-relaxed text-lg"
+                                                                prop.text game.ShortDescription
+                                                            ]
+                                                    ]
+                                                ]
+                                            // Play Modes
                                             Html.section [
                                                 prop.children [
-                                                    sectionHeader "Stores"
+                                                    sectionHeader "Play Modes"
                                                     Html.div [
                                                         prop.className "flex flex-wrap gap-2"
                                                         prop.children [
-                                                            for store in game.Stores do
+                                                            for playMode in game.PlayModes do
                                                                 Html.span [
-                                                                    prop.className "inline-flex items-center gap-1.5 bg-base-100/50 border border-base-content/15 px-3 py-1.5 rounded-lg text-sm font-medium group/store"
+                                                                    prop.className "inline-flex items-center gap-1.5 bg-base-100/50 border border-base-content/15 px-3 py-1.5 rounded-lg text-sm font-medium group/mode"
                                                                     prop.children [
-                                                                        Html.span [ prop.text store ]
+                                                                        Html.span [ prop.text playMode ]
                                                                         Html.button [
-                                                                            prop.className "text-base-content/30 hover:text-error transition-colors cursor-pointer opacity-0 group-hover/store:opacity-100"
-                                                                            prop.onClick (fun _ -> dispatch (Remove_store store))
+                                                                            prop.className "text-base-content/30 hover:text-error transition-colors cursor-pointer opacity-0 group-hover/mode:opacity-100"
+                                                                            prop.onClick (fun _ -> dispatch (Remove_play_mode playMode))
                                                                             prop.text "\u00D7"
                                                                         ]
                                                                     ]
                                                                 ]
                                                             Html.button [
                                                                 prop.className "w-8 h-8 rounded-lg bg-base-content/10 flex items-center justify-center text-base-content/40 hover:bg-primary/30 hover:text-primary transition-colors text-sm cursor-pointer"
-                                                                prop.onClick (fun _ -> dispatch Toggle_store_input)
+                                                                prop.onClick (fun _ -> dispatch Toggle_play_mode_picker)
                                                                 prop.text "+"
                                                             ]
                                                         ]
                                                     ]
-                                                    if model.ShowStoreInput then
-                                                        StoreInput
-                                                            (fun store -> dispatch (Add_store store))
-                                                            (fun () -> dispatch Toggle_store_input)
                                                 ]
-                                            ]
-                                        // Notes
-                                        Html.section [
-                                            prop.children [
-                                                ContentBlockEditor.view
-                                                    game.ContentBlocks
-                                                    (fun req -> dispatch (Add_content_block req))
-                                                    (fun bid req -> dispatch (Update_content_block (bid, req)))
-                                                    (fun bid -> dispatch (Remove_content_block bid))
-                                                    (fun bid blockType -> dispatch (Change_content_block_type (bid, blockType)))
-                                                    (fun blockIds -> dispatch (Reorder_content_blocks blockIds))
                                             ]
                                         ]
                                     ]
-                                ]
-                                // Right Column: Social & Activity
-                                Html.div [
-                                    prop.className "lg:col-span-4 space-y-6"
-                                    prop.children [
-                                        // Status
-                                        statusSelector game.Status model.IsStatusOpen dispatch
-                                        // HLTB
-                                        glassCard [
-                                            Html.div [
-                                                prop.className "flex items-center justify-between mb-2"
-                                                prop.children [
-                                                    Html.h3 [ prop.className "text-lg font-bold"; prop.text "HowLongToBeat" ]
-                                                ]
-                                            ]
-                                            if model.IsEditingHltb then
+                                    // Right Column: Social & Activity
+                                    Html.div [
+                                        prop.className "lg:col-span-4 space-y-6"
+                                        prop.children [
+                                            // External Links
+                                            glassCard [
+                                                Html.h3 [ prop.className "text-lg font-bold mb-4"; prop.text "Links" ]
                                                 Html.div [
-                                                    prop.className "flex items-center gap-2"
+                                                    prop.className "space-y-3"
                                                     prop.children [
-                                                        Daisy.input [
-                                                            input.sm
-                                                            prop.className "w-24"
-                                                            prop.type' "number"
-                                                            prop.placeholder "Hours"
-                                                            prop.autoFocus true
-                                                            prop.value model.HltbInput
-                                                            prop.onChange (fun (v: string) -> dispatch (Set_hltb_hours v))
-                                                            prop.onKeyDown (fun e ->
-                                                                match e.key with
-                                                                | "Enter" -> dispatch Save_hltb
-                                                                | "Escape" -> dispatch Cancel_editing_hltb
-                                                                | _ -> ())
+                                                        match game.SteamAppId with
+                                                        | Some appId ->
+                                                            Html.a [
+                                                                prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-content/5 transition-colors text-sm font-medium text-base-content/70 hover:text-primary"
+                                                                prop.href $"https://store.steampowered.com/app/{appId}/"
+                                                                prop.target "_blank"
+                                                                prop.rel "noopener noreferrer"
+                                                                prop.children [
+                                                                    Icons.gamepad ()
+                                                                    Html.span [ prop.text "Steam Store" ]
+                                                                    Html.span [ prop.className "ml-auto text-base-content/30"; prop.children [ Icons.externalLink () ] ]
+                                                                ]
+                                                            ]
+                                                        | None -> ()
+                                                        match game.WebsiteUrl with
+                                                        | Some url ->
+                                                            Html.a [
+                                                                prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-content/5 transition-colors text-sm font-medium text-base-content/70 hover:text-primary"
+                                                                prop.href url
+                                                                prop.target "_blank"
+                                                                prop.rel "noopener noreferrer"
+                                                                prop.children [
+                                                                    Icons.globe ()
+                                                                    Html.span [ prop.text "Official Website" ]
+                                                                    Html.span [ prop.className "ml-auto text-base-content/30"; prop.children [ Icons.externalLink () ] ]
+                                                                ]
+                                                            ]
+                                                        | None -> ()
+                                                        Html.a [
+                                                            prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-content/5 transition-colors text-sm font-medium text-base-content/70 hover:text-primary"
+                                                            prop.href $"https://howlongtobeat.com/?q={System.Uri.EscapeDataString(game.Name)}"
+                                                            prop.target "_blank"
+                                                            prop.rel "noopener noreferrer"
+                                                            prop.children [
+                                                                Icons.hourglass ()
+                                                                Html.span [ prop.text "HowLongToBeat" ]
+                                                                Html.span [ prop.className "ml-auto text-base-content/30"; prop.children [ Icons.externalLink () ] ]
+                                                            ]
                                                         ]
-                                                        Html.span [
-                                                            prop.className "text-base-content/50 text-sm"
-                                                            prop.text "hours"
+                                                    ]
+                                                ]
+                                            ]
+                                            // Friends (consolidated)
+                                            let hasOwnership = game.IsOwnedByMe || not (List.isEmpty game.FamilyOwners)
+                                            let hasRecommended = not (List.isEmpty game.RecommendedBy)
+                                            let hasPending = not (List.isEmpty game.WantToPlayWith)
+                                            let hasPlayedWith = not (List.isEmpty game.PlayedWith)
+                                            let isEmpty = not hasOwnership && not hasRecommended && not hasPending && not hasPlayedWith
+                                            Html.div [
+                                                prop.className "relative"
+                                                prop.children [
+                                                    glassCard [
+                                                        // Header
+                                                        Html.div [
+                                                            prop.className "flex items-center justify-between mb-4"
+                                                            prop.children [
+                                                                Html.h3 [ prop.className "text-lg font-bold"; prop.text "Friends" ]
+                                                                Html.button [
+                                                                    prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold cursor-pointer"
+                                                                    prop.onClick (fun _ -> dispatch Toggle_friends_menu)
+                                                                    prop.text "+"
+                                                                ]
+                                                            ]
                                                         ]
-                                                    ]
-                                                ]
-                                            else
-                                                Html.button [
-                                                    prop.className "text-base-content/60 hover:text-primary transition-colors cursor-pointer text-sm"
-                                                    prop.onClick (fun _ -> dispatch Start_editing_hltb)
-                                                    prop.text (
-                                                        match game.HltbHours with
-                                                        | Some h -> $"{h}h"
-                                                        | None -> "Set HLTB hours"
-                                                    )
-                                                ]
-                                        ]
-                                        // Family Owners
-                                        glassCard [
-                                            Html.div [
-                                                prop.className "flex items-center justify-between mb-4"
-                                                prop.children [
-                                                    Html.h3 [ prop.className "text-lg font-bold"; prop.text "Family Sharing" ]
-                                                    Html.button [
-                                                        prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold"
-                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Family_owner_picker))
-                                                        prop.text "+"
-                                                    ]
-                                                ]
-                                            ]
-                                            if List.isEmpty game.FamilyOwners then
-                                                Html.p [
-                                                    prop.className "text-base-content/40 text-sm"
-                                                    prop.text "No family members own this game"
-                                                ]
-                                            else
-                                                Html.div [
-                                                    prop.className "space-y-3"
-                                                    prop.children [
-                                                        for fr in game.FamilyOwners do
+                                                        // Owned By sub-section
+                                                        if hasOwnership then
                                                             Html.div [
-                                                                prop.className "flex items-center justify-between group p-2 rounded-lg hover:bg-base-content/5 transition-colors"
+                                                                prop.className "mb-4"
                                                                 prop.children [
                                                                     Html.div [
-                                                                        prop.className "flex items-center gap-3"
+                                                                        prop.className "flex items-baseline gap-2 mb-2"
                                                                         prop.children [
-                                                                            friendAvatar "w-9 h-9" fr "bg-info/20 text-sm font-bold text-info"
-                                                                            Html.a [
-                                                                                prop.className "font-medium text-sm cursor-pointer hover:text-primary transition-colors"
-                                                                                prop.href (Router.format ("friends", fr.Slug))
-                                                                                prop.onClick (fun e ->
-                                                                                    e.preventDefault()
-                                                                                    Router.navigate ("friends", fr.Slug))
-                                                                                prop.text fr.Name
+                                                                            Html.p [
+                                                                                prop.className "text-xs font-bold text-base-content/40 uppercase tracking-wider"
+                                                                                prop.text "Owned By"
                                                                             ]
+                                                                            match game.SteamLibraryDate with
+                                                                            | Some date ->
+                                                                                Html.span [
+                                                                                    prop.className "text-xs text-base-content/30"
+                                                                                    prop.text $"since {date}"
+                                                                                ]
+                                                                            | None -> ()
                                                                         ]
                                                                     ]
-                                                                    Html.button [
-                                                                        prop.className "text-base-content/30 opacity-0 group-hover:opacity-100 transition-opacity text-xs hover:text-error"
-                                                                        prop.onClick (fun _ -> dispatch (Remove_family_owner fr.Slug))
-                                                                        prop.text "\u00D7"
+                                                                    Html.div [
+                                                                        prop.className "flex flex-wrap gap-2"
+                                                                        prop.children [
+                                                                            if game.IsOwnedByMe then
+                                                                                Daisy.badge [ badge.lg; badge.primary; prop.className "font-semibold"; prop.text "Me" ]
+                                                                            for fr in game.FamilyOwners do
+                                                                                FriendPill.view fr
+                                                                        ]
                                                                     ]
                                                                 ]
                                                             ]
-                                                    ]
-                                                ]
-                                        ]
-                                        // Recommended By card
-                                        glassCard [
-                                            Html.div [
-                                                prop.className "flex items-center justify-between mb-4"
-                                                prop.children [
-                                                    Html.h3 [ prop.className "text-lg font-bold"; prop.text "Recommended By" ]
-                                                    Html.button [
-                                                        prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold"
-                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Recommend_picker))
-                                                        prop.text "+"
-                                                    ]
-                                                ]
-                                            ]
-                                            if List.isEmpty game.RecommendedBy then
-                                                Html.p [
-                                                    prop.className "text-base-content/40 text-sm"
-                                                    prop.text "No recommendations yet"
-                                                ]
-                                            else
-                                                Html.div [
-                                                    prop.className "space-y-3"
-                                                    prop.children [
-                                                        for fr in game.RecommendedBy do
+                                                        // Recommended By sub-section
+                                                        if hasRecommended then
                                                             Html.div [
-                                                                prop.className "flex items-center justify-between group p-2 rounded-lg hover:bg-base-content/5 transition-colors"
+                                                                prop.className "mb-4"
                                                                 prop.children [
-                                                                    Html.div [
-                                                                        prop.className "flex items-center gap-3"
-                                                                        prop.children [
-                                                                            friendAvatar "w-9 h-9" fr "bg-primary/20 text-sm font-bold text-primary"
-                                                                            Html.a [
-                                                                                prop.className "font-medium text-sm cursor-pointer hover:text-primary transition-colors"
-                                                                                prop.href (Router.format ("friends", fr.Slug))
-                                                                                prop.onClick (fun e ->
-                                                                                    e.preventDefault()
-                                                                                    Router.navigate ("friends", fr.Slug))
-                                                                                prop.text fr.Name
-                                                                            ]
-                                                                        ]
+                                                                    Html.p [
+                                                                        prop.className "text-xs font-bold text-base-content/40 uppercase tracking-wider mb-2"
+                                                                        prop.text "Recommended By"
                                                                     ]
-                                                                    Html.button [
-                                                                        prop.className "text-base-content/30 opacity-0 group-hover:opacity-100 transition-opacity text-xs hover:text-error"
-                                                                        prop.onClick (fun _ -> dispatch (Remove_recommendation fr.Slug))
-                                                                        prop.text "\u00D7"
+                                                                    Html.div [
+                                                                        prop.className "flex flex-wrap gap-2"
+                                                                        prop.children [
+                                                                            for fr in game.RecommendedBy do
+                                                                                FriendPill.view fr
+                                                                        ]
                                                                     ]
                                                                 ]
                                                             ]
-                                                    ]
-                                                ]
-                                        ]
-                                        // Pending card
-                                        glassCard [
-                                            Html.div [
-                                                prop.className "flex items-center justify-between mb-4"
-                                                prop.children [
-                                                    Html.h3 [ prop.className "text-lg font-bold"; prop.text "Pending" ]
-                                                    Html.button [
-                                                        prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold"
-                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Play_with_picker))
-                                                        prop.text "+"
-                                                    ]
-                                                ]
-                                            ]
-                                            Html.p [
-                                                prop.className "text-base-content/40 text-sm mb-4"
-                                                prop.text "Friends who want to play this"
-                                            ]
-                                            if List.isEmpty game.WantToPlayWith then
-                                                Html.p [
-                                                    prop.className "text-base-content/30 text-sm italic"
-                                                    prop.text "No one yet"
-                                                ]
-                                            else
-                                                Html.div [
-                                                    prop.className "space-y-3"
-                                                    prop.children [
-                                                        for fr in game.WantToPlayWith do
+                                                        // Pending sub-section
+                                                        if hasPending then
                                                             Html.div [
-                                                                prop.className "flex items-center justify-between group p-2 rounded-lg hover:bg-base-content/5 transition-colors"
+                                                                prop.className "mb-4"
                                                                 prop.children [
-                                                                    Html.div [
-                                                                        prop.className "flex items-center gap-3"
-                                                                        prop.children [
-                                                                            friendAvatar "w-9 h-9" fr "bg-secondary/20 text-sm font-bold text-secondary"
-                                                                            Html.a [
-                                                                                prop.className "font-medium text-sm cursor-pointer hover:text-primary transition-colors"
-                                                                                prop.href (Router.format ("friends", fr.Slug))
-                                                                                prop.onClick (fun e ->
-                                                                                    e.preventDefault()
-                                                                                    Router.navigate ("friends", fr.Slug))
-                                                                                prop.text fr.Name
-                                                                            ]
-                                                                        ]
+                                                                    Html.p [
+                                                                        prop.className "text-xs font-bold text-base-content/40 uppercase tracking-wider mb-2"
+                                                                        prop.text "Pending"
                                                                     ]
-                                                                    Html.button [
-                                                                        prop.className "text-base-content/30 opacity-0 group-hover:opacity-100 transition-opacity text-xs hover:text-error"
-                                                                        prop.onClick (fun _ -> dispatch (Remove_want_to_play_with fr.Slug))
-                                                                        prop.text "\u00D7"
+                                                                    Html.div [
+                                                                        prop.className "flex flex-wrap gap-2"
+                                                                        prop.children [
+                                                                            for fr in game.WantToPlayWith do
+                                                                                FriendPill.view fr
+                                                                        ]
                                                                     ]
                                                                 ]
                                                             ]
-                                                    ]
-                                                ]
-                                        ]
-                                        // Played With card
-                                        glassCard [
-                                            Html.div [
-                                                prop.className "flex items-center justify-between mb-4"
-                                                prop.children [
-                                                    Html.h3 [ prop.className "text-lg font-bold"; prop.text "Played With" ]
-                                                    Html.button [
-                                                        prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold"
-                                                        prop.onClick (fun _ -> dispatch (Open_friend_picker Played_with_picker))
-                                                        prop.text "+"
-                                                    ]
-                                                ]
-                                            ]
-                                            Html.p [
-                                                prop.className "text-base-content/40 text-sm mb-4"
-                                                prop.text "Friends you've played this with"
-                                            ]
-                                            if List.isEmpty game.PlayedWith then
-                                                Html.p [
-                                                    prop.className "text-base-content/30 text-sm italic"
-                                                    prop.text "No one yet"
-                                                ]
-                                            else
-                                                Html.div [
-                                                    prop.className "space-y-3"
-                                                    prop.children [
-                                                        for fr in game.PlayedWith do
+                                                        // Played With sub-section
+                                                        if hasPlayedWith then
                                                             Html.div [
-                                                                prop.className "flex items-center justify-between group p-2 rounded-lg hover:bg-base-content/5 transition-colors"
                                                                 prop.children [
-                                                                    Html.div [
-                                                                        prop.className "flex items-center gap-3"
-                                                                        prop.children [
-                                                                            friendAvatar "w-9 h-9" fr "bg-accent/20 text-sm font-bold text-accent"
-                                                                            Html.a [
-                                                                                prop.className "font-medium text-sm cursor-pointer hover:text-primary transition-colors"
-                                                                                prop.href (Router.format ("friends", fr.Slug))
-                                                                                prop.onClick (fun e ->
-                                                                                    e.preventDefault()
-                                                                                    Router.navigate ("friends", fr.Slug))
-                                                                                prop.text fr.Name
-                                                                            ]
-                                                                        ]
+                                                                    Html.p [
+                                                                        prop.className "text-xs font-bold text-base-content/40 uppercase tracking-wider mb-2"
+                                                                        prop.text "Played With"
                                                                     ]
-                                                                    Html.button [
-                                                                        prop.className "text-base-content/30 opacity-0 group-hover:opacity-100 transition-opacity text-xs hover:text-error"
-                                                                        prop.onClick (fun _ -> dispatch (Remove_played_with fr.Slug))
-                                                                        prop.text "\u00D7"
+                                                                    Html.div [
+                                                                        prop.className "flex flex-wrap gap-2"
+                                                                        prop.children [
+                                                                            for fr in game.PlayedWith do
+                                                                                FriendPill.view fr
+                                                                        ]
                                                                     ]
                                                                 ]
                                                             ]
-                                                    ]
-                                                ]
-                                        ]
-                                        // Error display
-                                        match model.Error with
-                                        | Some err ->
-                                            Daisy.alert [
-                                                alert.error
-                                                prop.text err
-                                            ]
-                                        | None -> ()
-                                        // Remove game
-                                        Html.div [
-                                            prop.className "pt-4"
-                                            prop.children [
-                                                if model.ConfirmingRemove then
-                                                    Html.div [
-                                                        prop.className "bg-error/10 border border-error/30 rounded-xl p-4 space-y-3"
-                                                        prop.children [
+                                                        // Empty state
+                                                        if isEmpty then
                                                             Html.p [
-                                                                prop.className "text-sm font-semibold text-error"
-                                                                prop.text "Are you sure you want to remove this game?"
+                                                                prop.className "text-base-content/30 text-sm italic"
+                                                                prop.text "No friend activity yet"
                                                             ]
-                                                            Html.div [
-                                                                prop.className "flex gap-2"
-                                                                prop.children [
-                                                                    Daisy.button.button [
-                                                                        button.error
-                                                                        button.sm
-                                                                        prop.className "flex-1"
-                                                                        prop.onClick (fun _ -> dispatch Remove_game)
-                                                                        prop.text "Yes, remove"
+                                                    ]
+                                                    // Context menu dropdown
+                                                    if model.IsFriendsMenuOpen then
+                                                        Html.div [
+                                                            prop.className "fixed inset-0 z-40"
+                                                            prop.onClick (fun _ -> dispatch Close_friends_menu)
+                                                        ]
+                                                        Html.div [
+                                                            prop.className "absolute top-12 right-6 z-50 rating-dropdown py-1 min-w-[200px]"
+                                                            prop.children [
+                                                                Html.button [
+                                                                    prop.className "w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-base-content/10 transition-colors cursor-pointer"
+                                                                    prop.onClick (fun _ ->
+                                                                        dispatch Close_friends_menu
+                                                                        dispatch Toggle_ownership)
+                                                                    prop.children [
+                                                                        Html.span [
+                                                                            prop.className "text-base-content/60"
+                                                                            prop.text (if game.IsOwnedByMe then "Remove Ownership" else "Mark as Owned")
+                                                                        ]
                                                                     ]
-                                                                    Daisy.button.button [
-                                                                        button.ghost
-                                                                        button.sm
-                                                                        prop.className "flex-1"
-                                                                        prop.onClick (fun _ -> dispatch Cancel_remove_game)
-                                                                        prop.text "Cancel"
+                                                                ]
+                                                                Html.div [ prop.className "border-t border-base-content/10 my-1" ]
+                                                                Html.button [
+                                                                    prop.className "w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-base-content/10 transition-colors cursor-pointer"
+                                                                    prop.onClick (fun _ ->
+                                                                        dispatch Close_friends_menu
+                                                                        dispatch (Open_friend_picker Recommend_picker))
+                                                                    prop.children [
+                                                                        Html.span [ prop.className "text-base-content/60"; prop.text "Recommended By" ]
+                                                                    ]
+                                                                ]
+                                                                Html.button [
+                                                                    prop.className "w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-base-content/10 transition-colors cursor-pointer"
+                                                                    prop.onClick (fun _ ->
+                                                                        dispatch Close_friends_menu
+                                                                        dispatch (Open_friend_picker Play_with_picker))
+                                                                    prop.children [
+                                                                        Html.span [ prop.className "text-base-content/60"; prop.text "Pending" ]
+                                                                    ]
+                                                                ]
+                                                                Html.button [
+                                                                    prop.className "w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-base-content/10 transition-colors cursor-pointer"
+                                                                    prop.onClick (fun _ ->
+                                                                        dispatch Close_friends_menu
+                                                                        dispatch (Open_friend_picker Played_with_picker))
+                                                                    prop.children [
+                                                                        Html.span [ prop.className "text-base-content/60"; prop.text "Played With" ]
                                                                     ]
                                                                 ]
                                                             ]
                                                         ]
-                                                    ]
-                                                else
-                                                    Daisy.button.button [
-                                                        button.error
-                                                        button.sm
-                                                        prop.className "w-full"
-                                                        prop.onClick (fun _ -> dispatch Confirm_remove_game)
-                                                        prop.text "Remove Game"
-                                                    ]
+                                                ]
+                                            ]
+                                            // Error display
+                                            match model.Error with
+                                            | Some err ->
+                                                Daisy.alert [
+                                                    alert.error
+                                                    prop.text err
+                                                ]
+                                            | None -> ()
+                                            // Remove game
+                                            Html.div [
+                                                prop.className "pt-4"
+                                                prop.children [
+                                                    if model.ConfirmingRemove then
+                                                        Html.div [
+                                                            prop.className "bg-error/10 border border-error/30 rounded-xl p-4 space-y-3"
+                                                            prop.children [
+                                                                Html.p [
+                                                                    prop.className "text-sm font-semibold text-error"
+                                                                    prop.text "Are you sure you want to remove this game?"
+                                                                ]
+                                                                Html.div [
+                                                                    prop.className "flex gap-2"
+                                                                    prop.children [
+                                                                        Daisy.button.button [
+                                                                            button.error
+                                                                            button.sm
+                                                                            prop.className "flex-1"
+                                                                            prop.onClick (fun _ -> dispatch Remove_game)
+                                                                            prop.text "Yes, remove"
+                                                                        ]
+                                                                        Daisy.button.button [
+                                                                            button.ghost
+                                                                            button.sm
+                                                                            prop.className "flex-1"
+                                                                            prop.onClick (fun _ -> dispatch Cancel_remove_game)
+                                                                            prop.text "Cancel"
+                                                                        ]
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                        ]
+                                                    else
+                                                        Daisy.button.button [
+                                                            button.error
+                                                            button.sm
+                                                            prop.className "w-full"
+                                                            prop.onClick (fun _ -> dispatch Confirm_remove_game)
+                                                            prop.text "Remove Game"
+                                                        ]
+                                                ]
                                             ]
                                         ]
                                     ]
                                 ]
                             ]
-                        ]
+                        | Journal ->
+                            Html.section [
+                                prop.children [
+                                    ContentBlockEditor.view
+                                        game.ContentBlocks
+                                        (fun req -> dispatch (Add_content_block req))
+                                        (fun bid req -> dispatch (Update_content_block (bid, req)))
+                                        (fun bid -> dispatch (Remove_content_block bid))
+                                        (fun bid blockType -> dispatch (Change_content_block_type (bid, blockType)))
+                                        (fun blockIds -> dispatch (Reorder_content_blocks blockIds))
+                                        (Some (fun data filename insertBefore -> dispatch (Upload_screenshot (data, filename, insertBefore))))
+                                        (Some (fun leftId rightId -> dispatch (Group_content_blocks (leftId, rightId))))
+                                        (Some (fun blockId -> dispatch (Ungroup_content_block blockId)))
+                                ]
+                            ]
                     ]
                 ]
                 // Friend picker modals
@@ -1265,15 +1379,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         (fun slug -> dispatch (Remove_want_to_play_with slug))
                         (fun name -> dispatch (Add_friend_and_play_with name))
                         (fun () -> dispatch Close_friend_picker)
-                | Some Family_owner_picker ->
-                    FriendManager
-                        "Family Sharing"
-                        model.AllFriends
-                        game.FamilyOwners
-                        (fun slug -> dispatch (Add_family_owner slug))
-                        (fun slug -> dispatch (Remove_family_owner slug))
-                        (fun name -> dispatch (Add_friend_and_family_owner name))
-                        (fun () -> dispatch Close_friend_picker)
                 | Some Played_with_picker ->
                     FriendManager
                         "Played With"
@@ -1293,6 +1398,14 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         (fun slug entryId -> dispatch (Remove_from_catalog (slug, entryId)))
                         (fun name -> dispatch (Create_catalog_and_add name))
                         (fun () -> dispatch Close_catalog_picker)
+                // Play mode picker modal
+                if model.ShowPlayModePicker then
+                    PlayModePicker
+                        model.AllPlayModes
+                        game.PlayModes
+                        (fun mode -> dispatch (Add_play_mode mode))
+                        (fun mode -> dispatch (Remove_play_mode mode))
+                        (fun () -> dispatch Toggle_play_mode_picker)
                 // Image picker modal
                 match model.ShowImagePicker with
                 | Some pickerKind ->
@@ -1300,9 +1413,13 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     let isCoverPicker = match pickerKind with Cover_picker -> true | Backdrop_picker -> false
                     let filtered =
                         if isCoverPicker then
-                            model.ImageCandidates |> List.sortByDescending (fun c -> c.IsCover)
+                            model.ImageCandidates
+                            |> List.filter (fun c -> not c.IsCurrent || c.IsCover)
+                            |> List.sortByDescending (fun c -> c.IsCurrent, c.IsCover)
                         else
-                            model.ImageCandidates |> List.filter (fun c -> not c.IsCover)
+                            model.ImageCandidates
+                            |> List.filter (fun c -> not c.IsCover)
+                            |> List.sortByDescending (fun c -> c.IsCurrent)
                     let content = [
                         if model.IsSelectingImage then
                             Html.div [
@@ -1332,18 +1449,34 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 prop.className $"grid grid-cols-2 sm:grid-cols-3 gap-3"
                                 prop.children [
                                     for candidate in filtered do
+                                        let imgUrl =
+                                            if candidate.IsCurrent then $"{candidate.Url}?v={model.ImageVersion}"
+                                            else candidate.Url
                                         Html.button [
-                                            prop.className "group/thumb rounded-lg overflow-hidden border border-base-content/10 hover:border-primary/50 transition-colors cursor-pointer bg-base-200"
-                                            prop.onClick (fun _ -> dispatch (Select_image candidate.Url))
+                                            prop.className (
+                                                if candidate.IsCurrent then
+                                                    "group/thumb rounded-lg overflow-hidden border-2 border-primary ring-1 ring-primary/30 bg-base-200 cursor-default opacity-80"
+                                                else
+                                                    "group/thumb rounded-lg overflow-hidden border border-base-content/10 hover:border-primary/50 transition-colors cursor-pointer bg-base-200"
+                                            )
+                                            if not candidate.IsCurrent then
+                                                prop.onClick (fun _ -> dispatch (Select_image candidate.Url))
                                             prop.children [
                                                 Html.div [
-                                                    prop.className (if isCoverPicker then "aspect-[2/3]" else "aspect-video")
+                                                    prop.className (
+                                                        "relative " + (if isCoverPicker then "aspect-[2/3]" else "aspect-video")
+                                                    )
                                                     prop.children [
                                                         Html.img [
-                                                            prop.src candidate.Url
+                                                            prop.src imgUrl
                                                             prop.alt candidate.Label
                                                             prop.className "w-full h-full object-cover"
                                                         ]
+                                                        if candidate.IsCurrent then
+                                                            Html.span [
+                                                                prop.className "absolute top-1.5 left-1.5 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-primary text-primary-content rounded"
+                                                                prop.text "Current"
+                                                            ]
                                                     ]
                                                 ]
                                                 Html.div [

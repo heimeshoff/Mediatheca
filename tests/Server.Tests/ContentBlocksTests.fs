@@ -183,6 +183,136 @@ let contentBlockTests =
                 Expect.equal (Map.count state.Blocks) 0 "Should have no blocks"
         ]
 
+        testList "Group_content_blocks_in_row" [
+            testCase "grouping two blocks produces event" <| fun _ ->
+                let given = [
+                    Content_block_added (sampleBlockData, 0, None)
+                    Content_block_added (sampleImageBlockData, 1, None)
+                ]
+                let result = givenWhenThen given (Group_content_blocks_in_row ("block-1", "block-2", "row-1"))
+                match result with
+                | Ok events ->
+                    let grouped = events |> List.filter (fun e -> match e with Content_blocks_row_grouped _ -> true | _ -> false)
+                    Expect.equal (List.length grouped) 1 "Should produce one grouped event"
+                    match grouped.[0] with
+                    | Content_blocks_row_grouped (lid, rid, rg) ->
+                        Expect.equal lid "block-1" "Left id should match"
+                        Expect.equal rid "block-2" "Right id should match"
+                        Expect.equal rg "row-1" "Row group should match"
+                    | _ -> failtest "Expected Content_blocks_row_grouped"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "self-group fails" <| fun _ ->
+                let given = [ Content_block_added (sampleBlockData, 0, None) ]
+                let result = givenWhenThen given (Group_content_blocks_in_row ("block-1", "block-1", "row-1"))
+                match result with
+                | Error msg -> Expect.stringContains msg "itself" "Should say cannot group with itself"
+                | Ok _ -> failtest "Expected error"
+
+            testCase "re-grouping auto-ungroups old partner" <| fun _ ->
+                let given = [
+                    Content_block_added (sampleBlockData, 0, None)
+                    Content_block_added (sampleImageBlockData, 1, None)
+                    Content_block_added (sampleLinkBlockData, 2, None)
+                    Content_blocks_row_grouped ("block-1", "block-2", "row-1")
+                ]
+                let result = givenWhenThen given (Group_content_blocks_in_row ("block-1", "block-3", "row-2"))
+                match result with
+                | Ok events ->
+                    let ungroupEvents = events |> List.filter (fun e -> match e with Content_block_row_ungrouped _ -> true | _ -> false)
+                    let ungroupedIds = ungroupEvents |> List.map (fun e -> match e with Content_block_row_ungrouped bid -> bid | _ -> "")
+                    Expect.isTrue (List.contains "block-1" ungroupedIds) "block-1 should be ungrouped"
+                    Expect.isTrue (List.contains "block-2" ungroupedIds) "block-2 should be ungrouped"
+                    let grouped = events |> List.filter (fun e -> match e with Content_blocks_row_grouped _ -> true | _ -> false)
+                    Expect.equal (List.length grouped) 1 "Should produce new grouped event"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "grouping non-existent block fails" <| fun _ ->
+                let given = [ Content_block_added (sampleBlockData, 0, None) ]
+                let result = givenWhenThen given (Group_content_blocks_in_row ("block-1", "block-99", "row-1"))
+                match result with
+                | Error msg -> Expect.stringContains msg "does not exist" "Should say does not exist"
+                | Ok _ -> failtest "Expected error"
+        ]
+
+        testList "Ungroup_content_block" [
+            testCase "ungrouping both partners" <| fun _ ->
+                let given = [
+                    Content_block_added (sampleBlockData, 0, None)
+                    Content_block_added (sampleImageBlockData, 1, None)
+                    Content_blocks_row_grouped ("block-1", "block-2", "row-1")
+                ]
+                let result = givenWhenThen given (Ungroup_content_block "block-1")
+                match result with
+                | Ok events ->
+                    let ungroupedIds = events |> List.map (fun e -> match e with Content_block_row_ungrouped bid -> bid | _ -> "")
+                    Expect.isTrue (List.contains "block-1" ungroupedIds) "block-1 should be ungrouped"
+                    Expect.isTrue (List.contains "block-2" ungroupedIds) "block-2 should be ungrouped"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "ungrouping standalone block is no-op" <| fun _ ->
+                let given = [ Content_block_added (sampleBlockData, 0, None) ]
+                let result = givenWhenThen given (Ungroup_content_block "block-1")
+                match result with
+                | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "ungrouping non-existent block is no-op" <| fun _ ->
+                let result = givenWhenThen [] (Ungroup_content_block "block-99")
+                match result with
+                | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
+                | Error e -> failtest $"Expected success but got: {e}"
+        ]
+
+        testList "Remove auto-ungroups partner" [
+            testCase "removing grouped block ungroups partner" <| fun _ ->
+                let given = [
+                    Content_block_added (sampleBlockData, 0, None)
+                    Content_block_added (sampleImageBlockData, 1, None)
+                    Content_blocks_row_grouped ("block-1", "block-2", "row-1")
+                ]
+                let result = givenWhenThen given (Remove_content_block "block-1")
+                match result with
+                | Ok events ->
+                    let ungroupEvents = events |> List.filter (fun e -> match e with Content_block_row_ungrouped _ -> true | _ -> false)
+                    Expect.equal (List.length ungroupEvents) 1 "Should ungroup partner"
+                    match ungroupEvents.[0] with
+                    | Content_block_row_ungrouped bid ->
+                        Expect.equal bid "block-2" "Should ungroup block-2"
+                    | _ -> failtest "Expected Content_block_row_ungrouped"
+                    let removeEvents = events |> List.filter (fun e -> match e with Content_block_removed _ -> true | _ -> false)
+                    Expect.equal (List.length removeEvents) 1 "Should still remove block"
+                | Error e -> failtest $"Expected success but got: {e}"
+        ]
+
+        testList "Evolve row grouping" [
+            testCase "evolve applies row grouping" <| fun _ ->
+                let events = [
+                    Content_block_added (sampleBlockData, 0, None)
+                    Content_block_added (sampleImageBlockData, 1, None)
+                    Content_blocks_row_grouped ("block-1", "block-2", "row-1")
+                ]
+                let state = reconstitute events
+                let block1 = state.Blocks |> Map.find "block-1"
+                let block2 = state.Blocks |> Map.find "block-2"
+                Expect.equal block1.RowGroup (Some "row-1") "block-1 should have row group"
+                Expect.equal block1.RowPosition (Some 0) "block-1 should be position 0"
+                Expect.equal block2.RowGroup (Some "row-1") "block-2 should have row group"
+                Expect.equal block2.RowPosition (Some 1) "block-2 should be position 1"
+
+            testCase "evolve applies row ungrouping" <| fun _ ->
+                let events = [
+                    Content_block_added (sampleBlockData, 0, None)
+                    Content_block_added (sampleImageBlockData, 1, None)
+                    Content_blocks_row_grouped ("block-1", "block-2", "row-1")
+                    Content_block_row_ungrouped "block-1"
+                ]
+                let state = reconstitute events
+                let block1 = state.Blocks |> Map.find "block-1"
+                Expect.equal block1.RowGroup None "block-1 should have no row group"
+                Expect.equal block1.RowPosition None "block-1 should have no row position"
+        ]
+
         testList "Serialization" [
             testCase "Content_block_added round-trip" <| fun _ ->
                 let event = Content_block_added (sampleBlockData, 0, None)
@@ -222,6 +352,18 @@ let contentBlockTests =
 
             testCase "Content_blocks_reordered with session round-trip" <| fun _ ->
                 let event = Content_blocks_reordered ([ "block-1" ], Some "session-42")
+                let eventType, data = Serialization.serialize event
+                let deserialized = Serialization.deserialize eventType data
+                Expect.equal deserialized (Some event) "Should round-trip"
+
+            testCase "Content_blocks_row_grouped round-trip" <| fun _ ->
+                let event = Content_blocks_row_grouped ("block-1", "block-2", "row-group-abc")
+                let eventType, data = Serialization.serialize event
+                let deserialized = Serialization.deserialize eventType data
+                Expect.equal deserialized (Some event) "Should round-trip"
+
+            testCase "Content_block_row_ungrouped round-trip" <| fun _ ->
+                let event = Content_block_row_ungrouped "block-1"
                 let eventType, data = Serialization.serialize event
                 let deserialized = Serialization.deserialize eventType data
                 Expect.equal deserialized (Some event) "Should round-trip"

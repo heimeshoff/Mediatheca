@@ -9,6 +9,9 @@ export default defineConfig({
         tailwindcss(),
     ],
     server: {
+        headers: {
+            "Cache-Control": "no-store",
+        },
         proxy: {
             "/api": {
                 target: "http://localhost:5000",

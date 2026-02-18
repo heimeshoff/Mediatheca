@@ -18,12 +18,21 @@ module ContentBlockProjection =
                 image_ref    TEXT,
                 url          TEXT,
                 caption      TEXT,
-                position     INTEGER NOT NULL DEFAULT 0
+                position     INTEGER NOT NULL DEFAULT 0,
+                row_group    TEXT,
+                row_position INTEGER
             );
             CREATE INDEX IF NOT EXISTS idx_content_blocks_movie ON content_blocks(movie_slug);
             CREATE INDEX IF NOT EXISTS idx_content_blocks_session ON content_blocks(movie_slug, session_id);
         """
         |> Db.exec
+        // Idempotent migration for existing databases
+        try
+            conn |> Db.newCommand "ALTER TABLE content_blocks ADD COLUMN row_group TEXT" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "ALTER TABLE content_blocks ADD COLUMN row_position INTEGER" |> Db.exec
+        with _ -> ()
 
     let private dropTables (conn: SqliteConnection) : unit =
         conn
@@ -101,6 +110,30 @@ module ContentBlockProjection =
                         ]
                         |> Db.exec)
 
+                | ContentBlocks.Content_blocks_row_grouped (leftId, rightId, rowGroup) ->
+                    conn
+                    |> Db.newCommand "UPDATE content_blocks SET row_group = @row_group, row_position = @row_position WHERE block_id = @block_id"
+                    |> Db.setParams [
+                        "block_id", SqlType.String leftId
+                        "row_group", SqlType.String rowGroup
+                        "row_position", SqlType.Int32 0
+                    ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE content_blocks SET row_group = @row_group, row_position = @row_position WHERE block_id = @block_id"
+                    |> Db.setParams [
+                        "block_id", SqlType.String rightId
+                        "row_group", SqlType.String rowGroup
+                        "row_position", SqlType.Int32 1
+                    ]
+                    |> Db.exec
+
+                | ContentBlocks.Content_block_row_ungrouped blockId ->
+                    conn
+                    |> Db.newCommand "UPDATE content_blocks SET row_group = NULL, row_position = NULL WHERE block_id = @block_id"
+                    |> Db.setParams [ "block_id", SqlType.String blockId ]
+                    |> Db.exec
+
     let handler: Projection.ProjectionHandler = {
         Name = "ContentBlockProjection"
         Handle = handleEvent
@@ -123,12 +156,18 @@ module ContentBlockProjection =
           Caption =
             if rd.IsDBNull(rd.GetOrdinal("caption")) then None
             else Some (rd.ReadString "caption")
-          Position = rd.ReadInt32 "position" }
+          Position = rd.ReadInt32 "position"
+          RowGroup =
+            if rd.IsDBNull(rd.GetOrdinal("row_group")) then None
+            else Some (rd.ReadString "row_group")
+          RowPosition =
+            if rd.IsDBNull(rd.GetOrdinal("row_position")) then None
+            else Some (rd.ReadInt32 "row_position") }
 
     let getByMovie (conn: SqliteConnection) (movieSlug: string) : Mediatheca.Shared.ContentBlockDto list =
         conn
         |> Db.newCommand """
-            SELECT block_id, block_type, content, image_ref, url, caption, position
+            SELECT block_id, block_type, content, image_ref, url, caption, position, row_group, row_position
             FROM content_blocks
             WHERE movie_slug = @movie_slug
             ORDER BY position
@@ -139,7 +178,7 @@ module ContentBlockProjection =
     let getBySession (conn: SqliteConnection) (movieSlug: string) (sessionId: string) : Mediatheca.Shared.ContentBlockDto list =
         conn
         |> Db.newCommand """
-            SELECT block_id, block_type, content, image_ref, url, caption, position
+            SELECT block_id, block_type, content, image_ref, url, caption, position, row_group, row_position
             FROM content_blocks
             WHERE movie_slug = @movie_slug AND session_id = @session_id
             ORDER BY position
@@ -153,7 +192,7 @@ module ContentBlockProjection =
     let getForMovieDetail (conn: SqliteConnection) (movieSlug: string) : Mediatheca.Shared.ContentBlockDto list =
         conn
         |> Db.newCommand """
-            SELECT block_id, block_type, content, image_ref, url, caption, position
+            SELECT block_id, block_type, content, image_ref, url, caption, position, row_group, row_position
             FROM content_blocks
             WHERE movie_slug = @movie_slug AND session_id IS NULL
             ORDER BY position

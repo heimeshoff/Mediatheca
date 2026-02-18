@@ -606,18 +606,26 @@ let private steamFamilyDetail (model: Model) (dispatch: Msg -> unit) =
                                                         prop.className "text-base-content/40 text-sm"
                                                         prop.text "\u2192"
                                                     ]
-                                                    Daisy.select [
-                                                        prop.className "select-sm"
-                                                        prop.value (m.FriendSlug |> Option.defaultValue "")
-                                                        prop.onChange (fun (v: string) ->
-                                                            let slug = if v = "" then None else Some v
-                                                            dispatch (Update_family_member_friend (m.SteamId, slug)))
-                                                        prop.children [
-                                                            Html.option [ prop.value ""; prop.text "-- No mapping --" ]
-                                                            yield! model.Friends |> List.map (fun f ->
-                                                                Html.option [ prop.value f.Slug; prop.text f.Name ])
+                                                    if m.IsMe then
+                                                        Daisy.badge [
+                                                            badge.primary
+                                                            badge.sm
+                                                            prop.className "font-semibold"
+                                                            prop.text "Me (you)"
                                                         ]
-                                                    ]
+                                                    else
+                                                        Daisy.select [
+                                                            prop.className "select-sm"
+                                                            prop.value (m.FriendSlug |> Option.defaultValue "")
+                                                            prop.onChange (fun (v: string) ->
+                                                                let slug = if v = "" then None else Some v
+                                                                dispatch (Update_family_member_friend (m.SteamId, slug)))
+                                                            prop.children [
+                                                                Html.option [ prop.value ""; prop.text "-- No mapping --" ]
+                                                                yield! model.Friends |> List.map (fun f ->
+                                                                    Html.option [ prop.value f.Slug; prop.text f.Name ])
+                                                            ]
+                                                        ]
                                                 ]
                                             ])
                                     )

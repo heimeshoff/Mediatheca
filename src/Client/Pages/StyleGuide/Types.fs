@@ -9,6 +9,7 @@ type Section =
     | Animations
     | Components
     | ContentBlocks
+    | ContentZone
     | EntryList
 
 type Model = {

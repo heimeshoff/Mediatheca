@@ -9,6 +9,8 @@ let private sampleGameData: GameAddedData = {
     Year = 2015
     Genres = [ "RPG"; "Action" ]
     Description = "An open-world RPG about a monster hunter"
+    ShortDescription = "Monster hunting RPG"
+    WebsiteUrl = Some "https://thewitcher.com"
     CoverRef = Some "posters/game-the-witcher-3-2015.jpg"
     BackdropRef = Some "backdrops/game-the-witcher-3-2015.jpg"
     RawgId = Some 3328
@@ -44,11 +46,13 @@ let gameTests =
                     Expect.equal game.HltbHours None "HltbHours should default to None"
                     Expect.equal game.SteamAppId None "SteamAppId should default to None"
                     Expect.equal game.TotalPlayTimeMinutes 0 "TotalPlayTimeMinutes should default to 0"
-                    Expect.isTrue (Set.isEmpty game.Stores) "Stores should be empty"
                     Expect.isTrue (Set.isEmpty game.FamilyOwners) "FamilyOwners should be empty"
                     Expect.isTrue (Set.isEmpty game.RecommendedBy) "RecommendedBy should be empty"
                     Expect.isTrue (Set.isEmpty game.WantToPlayWith) "WantToPlayWith should be empty"
                     Expect.isTrue (Set.isEmpty game.PlayedWith) "PlayedWith should be empty"
+                    Expect.equal game.SteamLibraryDate None "SteamLibraryDate should default to None"
+                    Expect.equal game.SteamLastPlayed None "SteamLastPlayed should default to None"
+                    Expect.isFalse game.IsOwnedByMe "IsOwnedByMe should default to false"
                 | _ -> failtest "Expected Active state"
             | Error e -> failtest $"Expected success but got: {e}"
 
@@ -120,44 +124,6 @@ let gameTests =
                 match state with
                 | Active game -> Expect.equal game.PersonalRating None "Personal rating should be None"
                 | _ -> failtest "Expected Active state"
-            | Error e -> failtest $"Expected success but got: {e}"
-
-        testCase "Adding a store" <| fun _ ->
-            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Add_store "Steam")
-            match result with
-            | Ok events ->
-                Expect.equal (List.length events) 1 "Should produce one event"
-                let state = applyEvents ([ Game_added_to_library sampleGameData ] @ events)
-                match state with
-                | Active game -> Expect.isTrue (game.Stores |> Set.contains "Steam") "Steam should be in stores"
-                | _ -> failtest "Expected Active state"
-            | Error e -> failtest $"Expected success but got: {e}"
-
-        testCase "Adding same store is idempotent" <| fun _ ->
-            let result = givenWhenThen
-                            [ Game_added_to_library sampleGameData; Game_store_added "Steam" ]
-                            (Add_store "Steam")
-            match result with
-            | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
-            | Error e -> failtest $"Expected success but got: {e}"
-
-        testCase "Removing a store" <| fun _ ->
-            let result = givenWhenThen
-                            [ Game_added_to_library sampleGameData; Game_store_added "Steam" ]
-                            (Remove_store "Steam")
-            match result with
-            | Ok events ->
-                Expect.equal (List.length events) 1 "Should produce one event"
-                let state = applyEvents ([ Game_added_to_library sampleGameData; Game_store_added "Steam" ] @ events)
-                match state with
-                | Active game -> Expect.isFalse (game.Stores |> Set.contains "Steam") "Steam should be removed"
-                | _ -> failtest "Expected Active state"
-            | Error e -> failtest $"Expected success but got: {e}"
-
-        testCase "Removing non-existent store produces no events" <| fun _ ->
-            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Remove_store "Steam")
-            match result with
-            | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
             | Error e -> failtest $"Expected success but got: {e}"
 
         testCase "Adding a family owner" <| fun _ ->
@@ -347,6 +313,44 @@ let gameTests =
             | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
             | Error e -> failtest $"Expected success but got: {e}"
 
+        testCase "Marking a game as owned" <| fun _ ->
+            let result = givenWhenThen [ Game_added_to_library sampleGameData ] Mark_as_owned
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 1 "Should produce one event"
+                let state = applyEvents ([ Game_added_to_library sampleGameData ] @ events)
+                match state with
+                | Active game -> Expect.isTrue game.IsOwnedByMe "IsOwnedByMe should be true"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Already-owned game is idempotent" <| fun _ ->
+            let result = givenWhenThen
+                            [ Game_added_to_library sampleGameData; Game_marked_as_owned ]
+                            Mark_as_owned
+            match result with
+            | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Removing ownership" <| fun _ ->
+            let result = givenWhenThen
+                            [ Game_added_to_library sampleGameData; Game_marked_as_owned ]
+                            Remove_ownership
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 1 "Should produce one event"
+                let state = applyEvents ([ Game_added_to_library sampleGameData; Game_marked_as_owned ] @ events)
+                match state with
+                | Active game -> Expect.isFalse game.IsOwnedByMe "IsOwnedByMe should be false"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Removing when not owned is idempotent" <| fun _ ->
+            let result = givenWhenThen [ Game_added_to_library sampleGameData ] Remove_ownership
+            match result with
+            | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
+            | Error e -> failtest $"Expected success but got: {e}"
+
         testCase "Commands on removed game fail" <| fun _ ->
             let removedEvents = [ Game_added_to_library sampleGameData; Game_removed_from_library ]
             let commands: GameCommand list = [
@@ -358,8 +362,6 @@ let gameTests =
                 Set_personal_rating (Some 3)
                 Change_status Playing
                 Set_hltb_hours (Some 10.0)
-                Add_store "Steam"
-                Remove_store "Steam"
                 Add_family_owner "marco"
                 Remove_family_owner "marco"
                 Recommend_game "marco"
@@ -370,6 +372,14 @@ let gameTests =
                 Remove_played_with "marco"
                 Set_steam_app_id 292030
                 Set_play_time 3600
+                Set_short_description "A short desc"
+                Set_website_url (Some "https://example.com")
+                Add_play_mode "Co-op"
+                Remove_play_mode "Co-op"
+                Set_steam_library_date (Some "2024-01-15")
+                Set_steam_last_played (Some "2024-06-20")
+                Mark_as_owned
+                Remove_ownership
             ]
             for cmd in commands do
                 let result = givenWhenThen removedEvents cmd
@@ -430,6 +440,42 @@ let gameSerializationTests =
             let deserialized = Serialization.deserialize eventType data
             Expect.equal deserialized (Some event) "Should round-trip"
 
+        testCase "Game_steam_library_date_set round-trips (Some)" <| fun _ ->
+            let event = Game_steam_library_date_set (Some "2024-01-15")
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Game_steam_library_date_set round-trips (None)" <| fun _ ->
+            let event = Game_steam_library_date_set None
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Game_steam_last_played_set round-trips (Some)" <| fun _ ->
+            let event = Game_steam_last_played_set (Some "2024-06-20")
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Game_steam_last_played_set round-trips (None)" <| fun _ ->
+            let event = Game_steam_last_played_set None
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Game_marked_as_owned round-trips" <| fun _ ->
+            let event = Game_marked_as_owned
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Game_ownership_removed round-trips" <| fun _ ->
+            let event = Game_ownership_removed
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
         testCase "All event types serialize and deserialize" <| fun _ ->
             let events: GameEvent list = [
                 Game_added_to_library sampleGameData
@@ -446,8 +492,6 @@ let gameSerializationTests =
                 Game_status_changed Backlog
                 Game_hltb_hours_set (Some 50.5)
                 Game_hltb_hours_set None
-                Game_store_added "Steam"
-                Game_store_removed "Steam"
                 Game_family_owner_added "marco"
                 Game_family_owner_removed "marco"
                 Game_recommended_by "sarah"
@@ -458,6 +502,17 @@ let gameSerializationTests =
                 Game_played_with_removed "marco"
                 Game_steam_app_id_set 292030
                 Game_play_time_set 3600
+                Game_short_description_set "A short description"
+                Game_website_url_set (Some "https://example.com")
+                Game_website_url_set None
+                Game_play_mode_added "Co-op"
+                Game_play_mode_removed "Co-op"
+                Game_steam_library_date_set (Some "2024-01-15")
+                Game_steam_library_date_set None
+                Game_steam_last_played_set (Some "2024-06-20")
+                Game_steam_last_played_set None
+                Game_marked_as_owned
+                Game_ownership_removed
             ]
             for event in events do
                 let eventType, data = Serialization.serialize event
