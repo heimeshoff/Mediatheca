@@ -405,6 +405,40 @@ module Api =
                                             Games.Serialization.toEventData
                                             (Games.Set_steam_library_date (Steam.unixTimestampToDateString app.RtTimeAcquired))
                                             projectionHandlers |> ignore
+                                        // Fetch Steam Store details for description, website, and play modes
+                                        let! storeDetails = Steam.getSteamStoreDetails httpClient app.Appid
+                                        match storeDetails with
+                                        | Ok details ->
+                                            if details.AboutTheGame <> "" then
+                                                let desc =
+                                                    if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
+                                                    elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
+                                                    else ""
+                                                if desc <> "" then
+                                                    executeCommand conn sid
+                                                        Games.Serialization.fromStoredEvent
+                                                        Games.reconstitute
+                                                        Games.decide
+                                                        Games.Serialization.toEventData
+                                                        (Games.Set_short_description details.ShortDescription)
+                                                        projectionHandlers |> ignore
+                                            if details.WebsiteUrl.IsSome then
+                                                executeCommand conn sid
+                                                    Games.Serialization.fromStoredEvent
+                                                    Games.reconstitute
+                                                    Games.decide
+                                                    Games.Serialization.toEventData
+                                                    (Games.Set_website_url details.WebsiteUrl)
+                                                    projectionHandlers |> ignore
+                                            for category in details.Categories do
+                                                executeCommand conn sid
+                                                    Games.Serialization.fromStoredEvent
+                                                    Games.reconstitute
+                                                    Games.decide
+                                                    Games.Serialization.toEventData
+                                                    (Games.Add_play_mode category)
+                                                    projectionHandlers |> ignore
+                                        | Error _ -> ()
                                         emit { Current = gamesProcessed; Total = total; GameName = app.Name; Action = "Matched" }
                                     | None ->
                                         let existingByName =
@@ -428,6 +462,35 @@ module Api =
                                                 Games.Serialization.toEventData
                                                 (Games.Set_steam_library_date (Steam.unixTimestampToDateString app.RtTimeAcquired))
                                                 projectionHandlers |> ignore
+                                            // Fetch Steam Store details for description, website, and play modes
+                                            let! storeDetails = Steam.getSteamStoreDetails httpClient app.Appid
+                                            match storeDetails with
+                                            | Ok details ->
+                                                if details.AboutTheGame <> "" then
+                                                    executeCommand conn sid
+                                                        Games.Serialization.fromStoredEvent
+                                                        Games.reconstitute
+                                                        Games.decide
+                                                        Games.Serialization.toEventData
+                                                        (Games.Set_short_description details.ShortDescription)
+                                                        projectionHandlers |> ignore
+                                                if details.WebsiteUrl.IsSome then
+                                                    executeCommand conn sid
+                                                        Games.Serialization.fromStoredEvent
+                                                        Games.reconstitute
+                                                        Games.decide
+                                                        Games.Serialization.toEventData
+                                                        (Games.Set_website_url details.WebsiteUrl)
+                                                        projectionHandlers |> ignore
+                                                for category in details.Categories do
+                                                    executeCommand conn sid
+                                                        Games.Serialization.fromStoredEvent
+                                                        Games.reconstitute
+                                                        Games.decide
+                                                        Games.Serialization.toEventData
+                                                        (Games.Add_play_mode category)
+                                                        projectionHandlers |> ignore
+                                            | Error _ -> ()
                                             emit { Current = gamesProcessed; Total = total; GameName = app.Name; Action = "Matched by name" }
                                         | [] ->
                                             if app.Name = "" then
@@ -443,13 +506,30 @@ module Api =
 
                                                 let rawgMatch = rawgResults |> List.tryHead
 
-                                                let description, genres, rawgId, rawgRating, year =
+                                                let rawgDescription, genres, rawgId, rawgRating, year =
                                                     match rawgMatch with
                                                     | Some r ->
                                                         let rawgYear = r.Year |> Option.defaultValue 0
                                                         "", r.Genres, Some r.RawgId, r.Rating, rawgYear
                                                     | None ->
                                                         "", [], None, None, 0
+
+                                                // Fetch Steam Store details for description, website, and play modes
+                                                let! storeDetails = Steam.getSteamStoreDetails httpClient app.Appid
+                                                let steamDescription, steamShortDescription, steamWebsiteUrl, steamCategories =
+                                                    match storeDetails with
+                                                    | Ok details ->
+                                                        let desc =
+                                                            if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
+                                                            elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
+                                                            else ""
+                                                        desc, details.ShortDescription, details.WebsiteUrl, details.Categories
+                                                    | Error _ -> "", "", None, []
+
+                                                let description =
+                                                    if steamDescription <> "" then steamDescription
+                                                    elif rawgDescription <> "" then rawgDescription
+                                                    else ""
 
                                                 let baseSlug = Slug.gameSlug app.Name (if year > 0 then year else 2000)
                                                 let slug = generateUniqueSlug conn Games.streamId baseSlug
@@ -461,8 +541,8 @@ module Api =
                                                     Year = if year > 0 then year else 0
                                                     Genres = genres
                                                     Description = description
-                                                    ShortDescription = ""
-                                                    WebsiteUrl = None
+                                                    ShortDescription = steamShortDescription
+                                                    WebsiteUrl = steamWebsiteUrl
                                                     CoverRef = coverRef
                                                     BackdropRef = backdropRef
                                                     RawgId = rawgId
@@ -497,6 +577,14 @@ module Api =
                                                         Games.Serialization.toEventData
                                                         (Games.Set_steam_library_date (Steam.unixTimestampToDateString app.RtTimeAcquired))
                                                         projectionHandlers |> ignore
+                                                    for category in steamCategories do
+                                                        executeCommand conn sid
+                                                            Games.Serialization.fromStoredEvent
+                                                            Games.reconstitute
+                                                            Games.decide
+                                                            Games.Serialization.toEventData
+                                                            (Games.Add_play_mode category)
+                                                            projectionHandlers |> ignore
                                                     emit { Current = gamesProcessed; Total = total; GameName = app.Name; Action = "Created" }
                                                 | Error e ->
                                                     errors <- errors @ [ sprintf "Failed to create '%s': %s" app.Name e ]
