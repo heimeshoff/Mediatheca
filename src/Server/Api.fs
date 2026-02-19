@@ -832,6 +832,20 @@ module Api =
                         movieProjections
             }
 
+            setMovieInFocus = fun slug inFocus -> async {
+                let sid = Movies.streamId slug
+                let command = if inFocus then Movies.Set_movie_in_focus else Movies.Clear_movie_in_focus
+                return
+                    executeCommand
+                        conn sid
+                        Movies.Serialization.fromStoredEvent
+                        Movies.reconstitute
+                        Movies.decide
+                        Movies.Serialization.toEventData
+                        command
+                        movieProjections
+            }
+
             // Watch Sessions
             recordWatchSession = fun slug request -> async {
                 let sid = Movies.streamId slug

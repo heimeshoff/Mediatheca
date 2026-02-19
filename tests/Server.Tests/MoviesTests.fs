@@ -344,6 +344,89 @@ let catalogTests =
                     | Ok _ -> failtest $"Expected error for command on non-existent movie: {cmd}"
         ]
 
+        testList "In Focus" [
+            testCase "setting in focus on a movie produces Movie_in_focus_set" <| fun _ ->
+                let result = givenWhenThen [ Movie_added_to_library sampleMovieData ] Set_movie_in_focus
+                match result with
+                | Ok events ->
+                    Expect.equal (List.length events) 1 "Should produce one event"
+                    Expect.equal events.[0] Movie_in_focus_set "Should be Movie_in_focus_set"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "setting in focus when already in focus is idempotent" <| fun _ ->
+                let result = givenWhenThen
+                                [ Movie_added_to_library sampleMovieData; Movie_in_focus_set ]
+                                Set_movie_in_focus
+                match result with
+                | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "clearing in focus produces Movie_in_focus_cleared" <| fun _ ->
+                let result = givenWhenThen
+                                [ Movie_added_to_library sampleMovieData; Movie_in_focus_set ]
+                                Clear_movie_in_focus
+                match result with
+                | Ok events ->
+                    Expect.equal (List.length events) 1 "Should produce one event"
+                    Expect.equal events.[0] Movie_in_focus_cleared "Should be Movie_in_focus_cleared"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "clearing in focus when not in focus is idempotent" <| fun _ ->
+                let result = givenWhenThen [ Movie_added_to_library sampleMovieData ] Clear_movie_in_focus
+                match result with
+                | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "recording watch session auto-clears in focus" <| fun _ ->
+                let sessionData: WatchSessionRecordedData = {
+                    SessionId = System.Guid.NewGuid().ToString("N")
+                    Date = "2025-01-15"
+                    Duration = Some 136
+                    FriendSlugs = []
+                }
+                let given = [
+                    Movie_added_to_library sampleMovieData
+                    Movie_in_focus_set
+                ]
+                let result = givenWhenThen given (Record_watch_session sessionData)
+                match result with
+                | Ok events ->
+                    Expect.equal (List.length events) 2 "Should produce two events"
+                    match events.[0] with
+                    | Watch_session_recorded _ -> ()
+                    | _ -> failtest "First event should be Watch_session_recorded"
+                    Expect.equal events.[1] Movie_in_focus_cleared "Second event should be Movie_in_focus_cleared"
+                    // Verify state
+                    let state = reconstitute (given @ events)
+                    match state with
+                    | Active movie ->
+                        Expect.isFalse movie.InFocus "InFocus should be false after watch session"
+                    | _ -> failtest "Expected Active state"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "recording watch session when not in focus does not emit clear" <| fun _ ->
+                let sessionData: WatchSessionRecordedData = {
+                    SessionId = System.Guid.NewGuid().ToString("N")
+                    Date = "2025-01-15"
+                    Duration = Some 136
+                    FriendSlugs = []
+                }
+                let result = givenWhenThen [ Movie_added_to_library sampleMovieData ] (Record_watch_session sessionData)
+                match result with
+                | Ok events ->
+                    Expect.equal (List.length events) 1 "Should produce one event (no auto-clear)"
+                    match events.[0] with
+                    | Watch_session_recorded _ -> ()
+                    | _ -> failtest "Should be Watch_session_recorded"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "InFocus defaults to false on new movie" <| fun _ ->
+                let state = reconstitute [ Movie_added_to_library sampleMovieData ]
+                match state with
+                | Active movie -> Expect.isFalse movie.InFocus "InFocus should default to false"
+                | _ -> failtest "Expected Active state"
+        ]
+
         testList "Removed movie" [
             testCase "commands on removed movie fail" <| fun _ ->
                 let removedEvents = [ Movie_added_to_library sampleMovieData; Movie_removed_from_library ]
@@ -367,6 +450,8 @@ let catalogTests =
                     Change_watch_session_date ("test-session", "2025-02-20")
                     Add_friend_to_watch_session ("test-session", "marco")
                     Remove_friend_from_watch_session ("test-session", "marco")
+                    Set_movie_in_focus
+                    Clear_movie_in_focus
                 ]
                 for cmd in commands do
                     let result = givenWhenThen removedEvents cmd
@@ -442,6 +527,18 @@ let catalogTests =
 
             testCase "Friend_removed_from_watch_session round-trip" <| fun _ ->
                 let event = Friend_removed_from_watch_session ("session1", "marco")
+                let eventType, data = Serialization.serialize event
+                let deserialized = Serialization.deserialize eventType data
+                Expect.equal deserialized (Some event) "Should round-trip"
+
+            testCase "Movie_in_focus_set round-trip" <| fun _ ->
+                let event = Movie_in_focus_set
+                let eventType, data = Serialization.serialize event
+                let deserialized = Serialization.deserialize eventType data
+                Expect.equal deserialized (Some event) "Should round-trip"
+
+            testCase "Movie_in_focus_cleared round-trip" <| fun _ ->
+                let event = Movie_in_focus_cleared
                 let eventType, data = Serialization.serialize event
                 let deserialized = Serialization.deserialize eventType data
                 Expect.equal deserialized (Some event) "Should round-trip"

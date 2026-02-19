@@ -43,6 +43,8 @@ module Movies =
         | Friend_removed_from_watch_session of sessionId: string * friendSlug: string
         | Watch_session_removed of sessionId: string
         | Personal_rating_set of rating: int option
+        | Movie_in_focus_set
+        | Movie_in_focus_cleared
 
     // State
 
@@ -66,6 +68,7 @@ module Movies =
         RecommendedBy: Set<string>
         Want_to_watch_with: Set<string>
         WatchSessions: Map<string, WatchSessionState>
+        InFocus: bool
     }
 
     type MovieState =
@@ -91,6 +94,8 @@ module Movies =
         | Remove_friend_from_watch_session of sessionId: string * friendSlug: string
         | Remove_watch_session of sessionId: string
         | Set_personal_rating of rating: int option
+        | Set_movie_in_focus
+        | Clear_movie_in_focus
 
     // Evolve
 
@@ -111,6 +116,7 @@ module Movies =
                 RecommendedBy = Set.empty
                 Want_to_watch_with = Set.empty
                 WatchSessions = Map.empty
+                InFocus = false
             }
         | Active _, Movie_removed_from_library -> Removed
         | Active movie, Movie_categorized genres ->
@@ -140,6 +146,10 @@ module Movies =
                     WatchSessions = movie.WatchSessions |> Map.add data.SessionId session
                     Want_to_watch_with = updatedWantToWatch
             }
+        | Active movie, Movie_in_focus_set ->
+            Active { movie with InFocus = true }
+        | Active movie, Movie_in_focus_cleared ->
+            Active { movie with InFocus = false }
         | Active movie, Watch_session_date_changed (sessionId, date) ->
             match movie.WatchSessions |> Map.tryFind sessionId with
             | Some session ->
@@ -205,7 +215,9 @@ module Movies =
             if movie.WatchSessions |> Map.containsKey data.SessionId then
                 Error "Watch session already exists"
             else
-                Ok [ Watch_session_recorded data ]
+                let events = [ Watch_session_recorded data ]
+                let events = if movie.InFocus then events @ [ Movie_in_focus_cleared ] else events
+                Ok events
         | Active movie, Change_watch_session_date (sessionId, date) ->
             match movie.WatchSessions |> Map.tryFind sessionId with
             | Some _ -> Ok [ Watch_session_date_changed (sessionId, date) ]
@@ -230,6 +242,12 @@ module Movies =
         | Active movie, Set_personal_rating rating ->
             if movie.PersonalRating = rating then Ok []
             else Ok [ Personal_rating_set rating ]
+        | Active movie, Set_movie_in_focus ->
+            if movie.InFocus then Ok []
+            else Ok [ Movie_in_focus_set ]
+        | Active movie, Clear_movie_in_focus ->
+            if movie.InFocus then Ok [ Movie_in_focus_cleared ]
+            else Ok []
         | Removed, _ ->
             Error "Movie has been removed"
         | Not_created, _ ->
@@ -317,6 +335,10 @@ module Movies =
                 "Watch_session_removed", Encode.toString 0 (Encode.object [ "sessionId", Encode.string sessionId ])
             | Personal_rating_set rating ->
                 "Personal_rating_set", Encode.toString 0 (Encode.object [ "rating", Encode.option Encode.int rating ])
+            | Movie_in_focus_set ->
+                "Movie_in_focus_set", "{}"
+            | Movie_in_focus_cleared ->
+                "Movie_in_focus_cleared", "{}"
 
         let deserialize (eventType: string) (data: string) : MovieEvent option =
             match eventType with
@@ -384,6 +406,10 @@ module Movies =
                 Decode.fromString (Decode.object (fun get -> get.Optional.Field "rating" Decode.int)) data
                 |> Result.toOption
                 |> Option.map Personal_rating_set
+            | "Movie_in_focus_set" ->
+                Some Movie_in_focus_set
+            | "Movie_in_focus_cleared" ->
+                Some Movie_in_focus_cleared
             | _ -> None
 
         let toEventData (event: MovieEvent) : EventStore.EventData =

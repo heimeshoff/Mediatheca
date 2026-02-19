@@ -16,7 +16,8 @@ module MovieProjection =
                 year        INTEGER NOT NULL,
                 poster_ref  TEXT,
                 genres      TEXT NOT NULL DEFAULT '[]',
-                tmdb_rating REAL
+                tmdb_rating REAL,
+                in_focus    INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS movie_detail (
@@ -32,7 +33,8 @@ module MovieProjection =
                 tmdb_rating   REAL,
                 personal_rating INTEGER,
                 recommended_by     TEXT NOT NULL DEFAULT '[]',
-                want_to_watch_with TEXT NOT NULL DEFAULT '[]'
+                want_to_watch_with TEXT NOT NULL DEFAULT '[]',
+                in_focus    INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS watch_sessions (
@@ -50,6 +52,18 @@ module MovieProjection =
         try
             conn
             |> Db.newCommand "ALTER TABLE movie_detail ADD COLUMN personal_rating INTEGER"
+            |> Db.exec
+        with _ -> () // Column already exists
+
+        // Migration: add in_focus column if not present (existing databases)
+        try
+            conn
+            |> Db.newCommand "ALTER TABLE movie_list ADD COLUMN in_focus INTEGER NOT NULL DEFAULT 0"
+            |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn
+            |> Db.newCommand "ALTER TABLE movie_detail ADD COLUMN in_focus INTEGER NOT NULL DEFAULT 0"
             |> Db.exec
         with _ -> () // Column already exists
 
@@ -315,6 +329,26 @@ module MovieProjection =
                     ]
                     |> Db.exec
 
+                | Movies.Movie_in_focus_set ->
+                    conn
+                    |> Db.newCommand "UPDATE movie_list SET in_focus = 1 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE movie_detail SET in_focus = 1 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+
+                | Movies.Movie_in_focus_cleared ->
+                    conn
+                    |> Db.newCommand "UPDATE movie_list SET in_focus = 0 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE movie_detail SET in_focus = 0 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+
     let handler: Projection.ProjectionHandler = {
         Name = "MovieProjection"
         Handle = handleEvent
@@ -340,7 +374,7 @@ module MovieProjection =
 
     let getAll (conn: SqliteConnection) : Mediatheca.Shared.MovieListItem list =
         conn
-        |> Db.newCommand "SELECT slug, name, year, poster_ref, genres, tmdb_rating FROM movie_list ORDER BY name"
+        |> Db.newCommand "SELECT slug, name, year, poster_ref, genres, tmdb_rating, in_focus FROM movie_list ORDER BY name"
         |> Db.query (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
             let genres =
@@ -355,7 +389,8 @@ module MovieProjection =
               Genres = genres
               TmdbRating =
                 if rd.IsDBNull(rd.GetOrdinal("tmdb_rating")) then None
-                else Some (rd.ReadDouble "tmdb_rating") }
+                else Some (rd.ReadDouble "tmdb_rating")
+              InFocus = rd.ReadInt32 "in_focus" <> 0 }
         )
 
     let private resolveFriendRefs (conn: SqliteConnection) (slugs: string list) : Mediatheca.Shared.FriendRef list =
@@ -448,7 +483,7 @@ module MovieProjection =
 
     let getBySlug (conn: SqliteConnection) (slug: string) : Mediatheca.Shared.MovieDetail option =
         conn
-        |> Db.newCommand "SELECT slug, name, year, runtime, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, personal_rating, recommended_by, want_to_watch_with FROM movie_detail WHERE slug = @slug"
+        |> Db.newCommand "SELECT slug, name, year, runtime, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, personal_rating, in_focus, recommended_by, want_to_watch_with FROM movie_detail WHERE slug = @slug"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
@@ -486,6 +521,7 @@ module MovieProjection =
               PersonalRating =
                 if rd.IsDBNull(rd.GetOrdinal("personal_rating")) then None
                 else Some (rd.ReadInt32 "personal_rating")
+              InFocus = rd.ReadInt32 "in_focus" <> 0
               Cast = cast
               RecommendedBy = resolveFriendRefs conn recommendedBySlugs
               WantToWatchWith = resolveFriendRefs conn wantToWatchWithSlugs

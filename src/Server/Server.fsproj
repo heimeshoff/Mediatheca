@@ -14,6 +14,7 @@
     <Compile Include="Tmdb.fs" />
     <Compile Include="Rawg.fs" />
     <Compile Include="Steam.fs" />
+    <Compile Include="HowLongToBeat.fs" />
     <Compile Include="Jellyfin.fs" />
     <Compile Include="ImageStore.fs" />
     <Compile Include="CastStore.fs" />
