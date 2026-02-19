@@ -4,33 +4,55 @@ open Elmish
 open Mediatheca.Shared
 open Mediatheca.Client.Pages.Dashboard.Types
 
+let private fetchTabData (api: IMediathecaApi) (tab: DashboardTab) : Cmd<Msg> =
+    match tab with
+    | All ->
+        Cmd.OfAsync.either
+            api.getDashboardAllTab ()
+            AllTabLoaded
+            (fun ex -> TabLoadError ex.Message)
+    | MoviesTab ->
+        Cmd.OfAsync.either
+            api.getDashboardMoviesTab ()
+            MoviesTabLoaded
+            (fun ex -> TabLoadError ex.Message)
+    | SeriesTab ->
+        Cmd.OfAsync.either
+            api.getDashboardSeriesTab ()
+            SeriesTabLoaded
+            (fun ex -> TabLoadError ex.Message)
+    | GamesTab ->
+        Cmd.OfAsync.either
+            api.getDashboardGamesTab ()
+            GamesTabLoaded
+            (fun ex -> TabLoadError ex.Message)
+
 let init () : Model * Cmd<Msg> =
-    { Placeholder = "Welcome to Mediatheca"
-      Stats = None
-      RecentMovies = []
-      RecentSeries = []
-      RecentActivity = []
-      IsLoading = true
-      JellyfinSyncStatus = Syncing },
+    { ActiveTab = All
+      AllTabData = None
+      MoviesTabData = None
+      SeriesTabData = None
+      GamesTabData = None
+      IsLoading = true },
     Cmd.none
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
-    | NoOp ->
+    | SwitchTab tab ->
+        let cmd = fetchTabData api tab
+        { model with ActiveTab = tab; IsLoading = true }, cmd
+
+    | AllTabLoaded data ->
+        { model with AllTabData = Some data; IsLoading = false }, Cmd.none
+
+    | MoviesTabLoaded data ->
+        { model with MoviesTabData = Some data; IsLoading = false }, Cmd.none
+
+    | SeriesTabLoaded data ->
+        { model with SeriesTabData = Some data; IsLoading = false }, Cmd.none
+
+    | GamesTabLoaded data ->
+        { model with GamesTabData = Some data; IsLoading = false }, Cmd.none
+
+    | TabLoadError _ ->
         { model with IsLoading = false }, Cmd.none
-    | Stats_loaded stats ->
-        { model with Stats = Some stats; IsLoading = false }, Cmd.none
-    | Movies_loaded movies ->
-        let recent = movies |> List.truncate 4
-        { model with RecentMovies = recent; IsLoading = false }, Cmd.none
-    | Series_loaded series ->
-        let recent = series |> List.truncate 4
-        { model with RecentSeries = recent }, Cmd.none
-    | Activity_loaded activity ->
-        { model with RecentActivity = activity }, Cmd.none
-    | Jellyfin_sync_completed result ->
-        match result with
-        | Ok importResult ->
-            { model with JellyfinSyncStatus = Synced importResult }, Cmd.none
-        | Error _ ->
-            { model with JellyfinSyncStatus = SyncFailed }, Cmd.none

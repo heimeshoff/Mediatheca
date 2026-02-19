@@ -48,11 +48,10 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
 
     let cmd = Cmd.batch [
         Cmd.map Dashboard_msg dashboardCmd
-        Cmd.OfAsync.perform api.getDashboardStats () (fun stats -> Dashboard_msg (Pages.Dashboard.Types.Stats_loaded stats))
-        Cmd.OfAsync.perform api.getRecentActivity 10 (fun activity -> Dashboard_msg (Pages.Dashboard.Types.Activity_loaded activity))
-        Cmd.OfAsync.perform api.getMovies () (fun movies -> Dashboard_msg (Pages.Dashboard.Types.Movies_loaded movies))
-        Cmd.OfAsync.perform api.getRecentSeries 4 (fun s -> Dashboard_msg (Pages.Dashboard.Types.Series_loaded s))
-        Cmd.OfAsync.either api.importJellyfinWatchHistory () (fun r -> Dashboard_msg (Pages.Dashboard.Types.Jellyfin_sync_completed r)) (fun ex -> Dashboard_msg (Pages.Dashboard.Types.Jellyfin_sync_completed (Error ex.Message)))
+        Cmd.OfAsync.either
+            api.getDashboardAllTab ()
+            (fun data -> Dashboard_msg (Pages.Dashboard.Types.AllTabLoaded data))
+            (fun ex -> Dashboard_msg (Pages.Dashboard.Types.TabLoadError ex.Message))
         Cmd.map Movie_list_msg movieListCmd
         Cmd.map Series_list_msg seriesListCmd
         Cmd.map Settings_msg settingsCmd
@@ -298,11 +297,10 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             { model with DashboardModel = childModel },
             Cmd.batch [
                 Cmd.map Dashboard_msg childCmd
-                Cmd.OfAsync.perform api.getDashboardStats () (fun stats -> Dashboard_msg (Pages.Dashboard.Types.Stats_loaded stats))
-                Cmd.OfAsync.perform api.getRecentActivity 10 (fun activity -> Dashboard_msg (Pages.Dashboard.Types.Activity_loaded activity))
-                Cmd.OfAsync.perform api.getMovies () (fun movies -> Dashboard_msg (Pages.Dashboard.Types.Movies_loaded movies))
-                Cmd.OfAsync.perform api.getRecentSeries 4 (fun s -> Dashboard_msg (Pages.Dashboard.Types.Series_loaded s))
-                Cmd.OfAsync.either api.importJellyfinWatchHistory () (fun r -> Dashboard_msg (Pages.Dashboard.Types.Jellyfin_sync_completed r)) (fun ex -> Dashboard_msg (Pages.Dashboard.Types.Jellyfin_sync_completed (Error ex.Message)))
+                Cmd.OfAsync.either
+                    api.getDashboardAllTab ()
+                    (fun data -> Dashboard_msg (Pages.Dashboard.Types.AllTabLoaded data))
+                    (fun ex -> Dashboard_msg (Pages.Dashboard.Types.TabLoadError ex.Message))
             ]
         | _ -> model, Cmd.none
 

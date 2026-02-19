@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-02-19 — Task Completed: 007 - Dashboard client — tab structure + All tab
+
+**Type:** Task Completion
+**Task:** 007 - Dashboard client — tab structure + All tab
+**Summary:** Complete dashboard rewrite. Replaced old hero/stats/activity layout with tabbed dashboard (All/Movies/Series/Games). All tab shows four glass card sections: TV Series Next Up (with In Focus pinning, friend pills, finished/abandoned badges), Movies In Focus, Games In Focus, Games Recently Played (with HLTB progress). Placeholder tabs for individual media types. Updated root State.fs for new init/navigation.
+**Files changed:** 4 files (Dashboard/Types.fs, Dashboard/State.fs, Dashboard/Views.fs, root State.fs)
+
+---
+
+## 2026-02-19 — Batch Started: [007]
+
+**Type:** Batch Start
+**Tasks:** 007 - Dashboard client — tab structure + All tab
+**Mode:** Sequential (single task, blocks 008-010)
+
+---
+
 ## 2026-02-19 — Task Completed: 013 - HowLongToBeat display
 
 **Type:** Task Completion

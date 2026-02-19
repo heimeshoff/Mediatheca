@@ -1,43 +1,15 @@
 module Mediatheca.Client.Pages.Dashboard.Views
 
 open Feliz
-open Feliz.DaisyUI
 open Feliz.Router
 open Mediatheca.Client.Pages.Dashboard.Types
 open Mediatheca.Shared
 open Mediatheca.Client
 open Mediatheca.Client.Components
 
-let private statCard (icon: unit -> ReactElement) (label: string) (value: string) (color: string) (delay: int) =
-    Html.div [
-        prop.className $"{DesignSystem.statGlow} bg-base-100 rounded-2xl p-6 shadow-md card-hover"
-        prop.style [ style.custom ("animationDelay", $"{delay}ms") ]
-        prop.children [
-            Html.div [
-                prop.className "flex items-center justify-between"
-                prop.children [
-                    Html.div [
-                        prop.children [
-                            Html.p [
-                                prop.className "text-base-content/50 text-sm font-medium uppercase tracking-wide"
-                                prop.text label
-                            ]
-                            Html.p [
-                                prop.className $"text-4xl font-bold font-display mt-1 {color}"
-                                prop.text value
-                            ]
-                        ]
-                    ]
-                    Html.div [
-                        prop.className $"p-3 rounded-xl bg-base-300/50 {color}"
-                        prop.children [ icon () ]
-                    ]
-                ]
-            ]
-        ]
-    ]
+// ── Helpers ──
 
-let private formatWatchTime (minutes: int) =
+let private formatPlayTime (minutes: int) =
     if minutes = 0 then "0h"
     elif minutes < 60 then $"{minutes}m"
     else
@@ -46,69 +18,273 @@ let private formatWatchTime (minutes: int) =
         if mins = 0 then $"{hours}h"
         else $"{hours}h {mins}m"
 
-let private recentSeriesCard (series: Mediatheca.Shared.RecentSeriesItem) =
+let private formatDate (dateStr: string) =
+    try
+        let dt = System.DateTimeOffset.Parse(dateStr)
+        dt.LocalDateTime.ToString("MMM d")
+    with _ -> dateStr
+
+// ── Tab bar ──
+
+let private tabBar (activeTab: DashboardTab) (dispatch: Msg -> unit) =
+    Html.div [
+        prop.className "flex gap-1 p-1 rounded-xl bg-base-300/40 w-fit"
+        prop.role "tablist"
+        prop.children [
+            let tab (label: string) tabValue =
+                Html.button [
+                    prop.className (
+                        "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 "
+                        + if activeTab = tabValue then
+                            "bg-primary/15 text-primary border border-primary/30"
+                          else
+                            "text-base-content/60 hover:text-base-content hover:bg-base-300/50 border border-transparent"
+                    )
+                    prop.role "tab"
+                    prop.onClick (fun _ -> dispatch (SwitchTab tabValue))
+                    prop.text label
+                ]
+            tab "All" All
+            tab "Movies" MoviesTab
+            tab "TV Series" SeriesTab
+            tab "Games" GamesTab
+        ]
+    ]
+
+// ── Section card wrapper ──
+
+let private sectionCard (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
+    Html.div [
+        prop.className (DesignSystem.glassCard + " p-4 " + DesignSystem.animateFadeInUp)
+        prop.children [
+            Html.div [
+                prop.className "flex items-center gap-2 mb-3"
+                prop.children [
+                    Html.span [
+                        prop.className "text-primary/70"
+                        prop.children [ icon () ]
+                    ]
+                    Html.h2 [
+                        prop.className "text-lg font-display uppercase tracking-wider"
+                        prop.text title
+                    ]
+                ]
+            ]
+            Html.div [
+                prop.className "flex flex-col"
+                prop.children children
+            ]
+        ]
+    ]
+
+// ── TV Series: Next Up ──
+
+let private friendPill (friend: FriendRef) =
+    Html.span [
+        prop.className "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-secondary/15 text-secondary/80"
+        prop.children [
+            match friend.ImageRef with
+            | Some imgRef ->
+                Html.img [
+                    prop.src $"/images/{imgRef}"
+                    prop.alt friend.Name
+                    prop.className "w-3.5 h-3.5 rounded-full object-cover"
+                ]
+            | None -> ()
+            Html.span [ prop.text friend.Name ]
+        ]
+    ]
+
+let private seriesNextUpItem (item: DashboardSeriesNextUp) =
     Html.a [
-        prop.href (Router.format ("series", series.Slug))
+        prop.href (Router.format ("series", item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
-            Router.navigate ("series", series.Slug)
+            Router.navigate ("series", item.Slug)
         )
-        prop.className "flex items-center gap-3 p-3 rounded-xl hover:bg-base-300/50 transition-colors cursor-pointer group"
+        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
         prop.children [
-            PosterCard.thumbnail series.PosterRef series.Name
+            PosterCard.thumbnail item.PosterRef item.Name
             Html.div [
                 prop.className "flex-1 min-w-0"
                 prop.children [
-                    Html.p [
-                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
-                        prop.text series.Name
-                    ]
-                    Html.p [
-                        prop.className "text-xs text-base-content/50"
+                    Html.div [
+                        prop.className "flex items-center gap-1.5"
                         prop.children [
-                            Html.span [ prop.text (string series.Year) ]
+                            if item.InFocus then
+                                Html.span [
+                                    prop.className "text-warning/70 flex-shrink-0"
+                                    prop.children [ Icons.crosshairSmFilled () ]
+                                ]
+                            Html.p [
+                                prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                                prop.text item.Name
+                            ]
+                            if item.IsFinished then
+                                Html.span [
+                                    prop.className "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-success/15 text-success flex-shrink-0"
+                                    prop.text "Finished"
+                                ]
+                            if item.IsAbandoned then
+                                Html.span [
+                                    prop.className "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-error/15 text-error flex-shrink-0"
+                                    prop.text "Abandoned"
+                                ]
+                        ]
+                    ]
+                    if item.NextUpSeason > 0 then
+                        Html.p [
+                            prop.className "text-xs text-base-content/50"
+                            prop.text $"S{item.NextUpSeason}E{item.NextUpEpisode}: {item.NextUpTitle}"
+                        ]
+                    if not (List.isEmpty item.WatchWithFriends) then
+                        Html.div [
+                            prop.className "flex items-center gap-1 mt-0.5 flex-wrap"
+                            prop.children [
+                                for friend in item.WatchWithFriends do
+                                    friendPill friend
+                            ]
+                        ]
+                ]
+            ]
+        ]
+    ]
+
+let private seriesNextUpSection (items: DashboardSeriesNextUp list) =
+    if List.isEmpty items then
+        Html.none
+    else
+        sectionCard Icons.tv "Next Up" [
+            for item in items do
+                seriesNextUpItem item
+        ]
+
+// ── Movies: In Focus ──
+
+let private movieInFocusItem (item: DashboardMovieInFocus) =
+    Html.a [
+        prop.href (Router.format ("movies", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("movies", item.Slug)
+        )
+        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
+        prop.children [
+            PosterCard.thumbnail item.PosterRef item.Name
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.div [
+                        prop.className "flex items-center gap-1.5"
+                        prop.children [
                             Html.span [
-                                prop.text $" \u00B7 {series.WatchedEpisodeCount}/{series.EpisodeCount} eps"
+                                prop.className "text-warning/70 flex-shrink-0"
+                                prop.children [ Icons.crosshairSmFilled () ]
+                            ]
+                            Html.p [
+                                prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                                prop.text item.Name
                             ]
                         ]
                     ]
-                    match series.NextUp with
-                    | Some nextUp ->
-                        Html.p [
-                            prop.className "text-xs text-primary/70 mt-0.5"
-                            prop.text $"Next: S{nextUp.SeasonNumber}E{nextUp.EpisodeNumber} {nextUp.EpisodeName}"
-                        ]
-                    | None -> ()
+                    Html.p [
+                        prop.className "text-xs text-base-content/50"
+                        prop.text (string item.Year)
+                    ]
                 ]
             ]
         ]
     ]
 
-let private recentMovieCard (movie: Mediatheca.Shared.MovieListItem) =
+let private moviesInFocusSection (items: DashboardMovieInFocus list) =
+    if List.isEmpty items then
+        Html.none
+    else
+        sectionCard Icons.movie "Movies In Focus" [
+            for item in items do
+                movieInFocusItem item
+        ]
+
+// ── Games: In Focus ──
+
+let private gameInFocusItem (item: DashboardGameInFocus) =
     Html.a [
-        prop.href (Router.format ("movies", movie.Slug))
+        prop.href (Router.format ("games", item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
-            Router.navigate ("movies", movie.Slug)
+            Router.navigate ("games", item.Slug)
         )
-        prop.className "flex items-center gap-3 p-3 rounded-xl hover:bg-base-300/50 transition-colors cursor-pointer group"
+        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
         prop.children [
-            PosterCard.thumbnail movie.PosterRef movie.Name
+            PosterCard.thumbnail item.CoverRef item.Name
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.div [
+                        prop.className "flex items-center gap-1.5"
+                        prop.children [
+                            Html.span [
+                                prop.className "text-warning/70 flex-shrink-0"
+                                prop.children [ Icons.crosshairSmFilled () ]
+                            ]
+                            Html.p [
+                                prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                                prop.text item.Name
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+let private gamesInFocusSection (items: DashboardGameInFocus list) =
+    if List.isEmpty items then
+        Html.none
+    else
+        sectionCard Icons.gamepad "Games In Focus" [
+            for item in items do
+                gameInFocusItem item
+        ]
+
+// ── Games: Recently Played ──
+
+let private gameRecentlyPlayedItem (item: DashboardGameRecentlyPlayed) =
+    Html.a [
+        prop.href (Router.format ("games", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("games", item.Slug)
+        )
+        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
+        prop.children [
+            PosterCard.thumbnail item.CoverRef item.Name
             Html.div [
                 prop.className "flex-1 min-w-0"
                 prop.children [
                     Html.p [
                         prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
-                        prop.text movie.Name
+                        prop.text item.Name
                     ]
-                    Html.p [
-                        prop.className "text-xs text-base-content/50"
+                    Html.div [
+                        prop.className "flex items-center gap-2 text-xs text-base-content/50"
                         prop.children [
-                            Html.span [ prop.text (string movie.Year) ]
-                            match movie.TmdbRating with
-                            | Some r ->
-                                Html.span [ prop.text $" \u00B7 %.1f{r}" ]
-                            | None -> ()
+                            Html.span [
+                                prop.text (formatPlayTime item.TotalPlayTimeMinutes)
+                            ]
+                            Html.span [ prop.text "\u00B7" ]
+                            Html.span [
+                                prop.text (formatDate item.LastPlayedDate)
+                            ]
+                            match item.HltbHours with
+                            | Some hltb when hltb > 0.0 ->
+                                let playedHours = float item.TotalPlayTimeMinutes / 60.0
+                                Html.span [ prop.text "\u00B7" ]
+                                Html.span [
+                                    prop.className "text-info/70"
+                                    prop.text $"%.0f{playedHours}h / %.0f{hltb}h"
+                                ]
+                            | _ -> ()
                         ]
                     ]
                 ]
@@ -116,306 +292,89 @@ let private recentMovieCard (movie: Mediatheca.Shared.MovieListItem) =
         ]
     ]
 
-let private activityItem (item: Mediatheca.Shared.RecentActivityItem) =
+let private gamesRecentlyPlayedSection (items: DashboardGameRecentlyPlayed list) =
+    if List.isEmpty items then
+        Html.none
+    else
+        sectionCard Icons.hourglass "Recently Played" [
+            for item in items do
+                gameRecentlyPlayedItem item
+        ]
+
+// ── All Tab ──
+
+let private allTabView (data: DashboardAllTab) =
     Html.div [
-        prop.className "flex items-center gap-3 py-2"
+        prop.className "flex flex-col gap-4"
         prop.children [
-            Html.div [
-                prop.className "w-2 h-2 rounded-full bg-primary/50 flex-none"
-            ]
-            Html.div [
-                prop.className "flex-1 min-w-0"
-                prop.children [
-                    Html.p [
-                        prop.className "text-sm truncate"
-                        prop.text item.Description
-                    ]
-                    Html.p [
-                        prop.className "text-xs text-base-content/40"
-                        prop.text (
-                            try
-                                let dt = System.DateTimeOffset.Parse(item.Timestamp)
-                                dt.LocalDateTime.ToString("MMM d, HH:mm")
-                            with _ -> item.Timestamp
-                        )
-                    ]
-                ]
+            seriesNextUpSection data.SeriesNextUp
+            moviesInFocusSection data.MoviesInFocus
+            gamesInFocusSection data.GamesInFocus
+            gamesRecentlyPlayedSection data.GamesRecentlyPlayed
+        ]
+    ]
+
+// ── Placeholder tab ──
+
+let private placeholderTab (label: string) =
+    Html.div [
+        prop.className (DesignSystem.glassCard + " p-8 text-center " + DesignSystem.animateFadeIn)
+        prop.children [
+            Html.p [
+                prop.className "text-base-content/40 text-sm font-medium"
+                prop.text $"{label} tab coming soon."
             ]
         ]
     ]
 
-let view (model: Model) (_dispatch: Msg -> unit) =
-    let stats = model.Stats |> Option.defaultValue { MovieCount = 0; SeriesCount = 0; GameCount = 0; FriendCount = 0; CatalogCount = 0; WatchSessionCount = 0; TotalWatchTimeMinutes = 0; SeriesWatchTimeMinutes = 0; TotalPlayTimeMinutes = 0 }
+// ── Loading spinner ──
+
+let private loadingView =
+    Html.div [
+        prop.className "flex items-center justify-center py-16"
+        prop.children [
+            Html.span [
+                prop.className "loading loading-spinner loading-lg text-primary"
+            ]
+        ]
+    ]
+
+// ── Main view ──
+
+let view (model: Model) (dispatch: Msg -> unit) =
     Html.div [
         prop.className DesignSystem.animateFadeIn
         prop.children [
-            // Hero section
             Html.div [
-                prop.className "relative overflow-hidden bg-gradient-to-br from-base-200 via-base-200 to-primary/10 px-6 py-10 lg:px-10 lg:py-14"
+                prop.className DesignSystem.pageContainer
                 prop.children [
-                    // Decorative circles
-                    Html.div [
-                        prop.className "absolute -top-20 -right-20 w-64 h-64 rounded-full bg-primary/5 blur-3xl"
-                    ]
-                    Html.div [
-                        prop.className "absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-accent/5 blur-3xl"
-                    ]
-                    Html.div [
-                        prop.className "relative"
-                        prop.children [
-                            Html.h1 [
-                                prop.className "text-3xl lg:text-4xl font-bold font-display text-gradient-primary"
-                                prop.text "Dashboard"
-                            ]
-                            Html.div [
-                                prop.className "flex items-center gap-3 mt-2"
-                                prop.children [
-                                    Html.p [
-                                        prop.className "text-base-content/60 text-lg"
-                                        prop.text "Your personal media collection at a glance."
-                                    ]
-                                    match model.JellyfinSyncStatus with
-                                    | Syncing ->
-                                        Html.span [
-                                            prop.className "inline-flex items-center gap-1.5 text-xs text-info/70 animate-pulse"
-                                            prop.children [
-                                                Html.span [
-                                                    prop.className "loading loading-spinner loading-xs"
-                                                ]
-                                                Html.span [ prop.text "Jellyfin sync" ]
-                                            ]
-                                        ]
-                                    | Synced result ->
-                                        let checkIcon =
-                                            Svg.svg [
-                                                svg.className "w-3.5 h-3.5"
-                                                svg.fill "none"
-                                                svg.viewBox (0, 0, 24, 24)
-                                                svg.stroke "currentColor"
-                                                svg.custom ("strokeWidth", 2)
-                                                svg.children [
-                                                    Svg.path [
-                                                        svg.custom ("strokeLinecap", "round")
-                                                        svg.custom ("strokeLinejoin", "round")
-                                                        svg.d "M4.5 12.75l6 6 9-13.5"
-                                                    ]
-                                                ]
-                                            ]
-                                        let total = result.MoviesAdded + result.EpisodesAdded + result.MoviesAutoAdded + result.SeriesAutoAdded
-                                        if total > 0 then
-                                            let parts = [
-                                                if result.MoviesAutoAdded > 0 then $"+{result.MoviesAutoAdded} movies"
-                                                if result.SeriesAutoAdded > 0 then $"+{result.SeriesAutoAdded} series"
-                                                if result.MoviesAdded > 0 then $"+{result.MoviesAdded} watched"
-                                                if result.EpisodesAdded > 0 then $"+{result.EpisodesAdded} episodes"
-                                            ]
-                                            Html.span [
-                                                prop.className "inline-flex items-center gap-1.5 text-xs text-success/70"
-                                                prop.children [
-                                                    checkIcon
-                                                    Html.span [ prop.text (parts |> String.concat ", ") ]
-                                                ]
-                                            ]
-                                        else
-                                            Html.span [
-                                                prop.className "inline-flex items-center gap-1.5 text-xs text-base-content/30"
-                                                prop.children [
-                                                    checkIcon
-                                                    Html.span [ prop.text "Jellyfin synced" ]
-                                                ]
-                                            ]
-                                    | SyncFailed | Idle -> ()
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
-
-            Html.div [
-                prop.className (DesignSystem.pagePadding + " -mt-6 relative z-10")
-                prop.children [
-                    // Stats grid
-                    Html.div [
-                        prop.className ("grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8 " + DesignSystem.staggerGrid)
-                        prop.children [
-                            statCard Icons.movie "Movies" (string stats.MovieCount) "text-primary" 0
-                            statCard Icons.tv "Series" (string stats.SeriesCount) "text-warning" 100
-                            statCard Icons.friends "Friends" (string stats.FriendCount) "text-secondary" 200
-                            statCard Icons.catalog "Catalogs" (string stats.CatalogCount) "text-accent" 300
-                            statCard Icons.events "Watch Time" (formatWatchTime (stats.TotalWatchTimeMinutes + stats.SeriesWatchTimeMinutes)) "text-info" 400
-                        ]
+                    // Page title
+                    Html.h1 [
+                        prop.className (DesignSystem.pageTitle + " mb-4")
+                        prop.text "Dashboard"
                     ]
 
+                    // Tab bar
                     Html.div [
-                        prop.className "grid grid-cols-1 lg:grid-cols-2 gap-6"
-                        prop.children [
-                            // Recent movies section
-                            Html.div [
-                                prop.className DesignSystem.animateFadeInUp
-                                prop.children [
-                                    if not (List.isEmpty model.RecentMovies) then
-                                        Html.div [
-                                            prop.children [
-                                                Html.div [
-                                                    prop.className "flex items-center justify-between mb-4"
-                                                    prop.children [
-                                                        Html.h2 [
-                                                            prop.className "text-lg font-bold font-display"
-                                                            prop.text "Recent Movies"
-                                                        ]
-                                                        Html.a [
-                                                            prop.href (Router.format "movies")
-                                                            prop.onClick (fun e ->
-                                                                e.preventDefault()
-                                                                Router.navigate "movies"
-                                                            )
-                                                            prop.className "text-sm text-primary hover:text-primary/80 transition-colors font-medium"
-                                                            prop.text "View all"
-                                                        ]
-                                                    ]
-                                                ]
-                                                Daisy.card [
-                                                    prop.className "bg-base-100 shadow-md"
-                                                    prop.children [
-                                                        Daisy.cardBody [
-                                                            prop.className "p-2"
-                                                            prop.children [
-                                                                for movie in model.RecentMovies do
-                                                                    recentMovieCard movie
-                                                            ]
-                                                        ]
-                                                    ]
-                                                ]
-                                            ]
-                                        ]
-                                    else if not model.IsLoading then
-                                        Html.div [
-                                            prop.className ("text-center py-12 " + DesignSystem.animateFadeIn)
-                                            prop.children [
-                                                Html.div [
-                                                    prop.className "text-base-content/15 mb-4"
-                                                    prop.children [ Icons.mediatheca () ]
-                                                ]
-                                                Html.p [
-                                                    prop.className "text-base-content/40 font-medium"
-                                                    prop.text "Your library is empty."
-                                                ]
-                                                Html.p [
-                                                    prop.className "text-base-content/30 text-sm mt-1"
-                                                    prop.text "Head to Movies to start building your collection."
-                                                ]
-                                            ]
-                                        ]
-                                ]
-                            ]
-
-                            // Recent series section
-                            Html.div [
-                                prop.className DesignSystem.animateFadeInUp
-                                prop.children [
-                                    if not (List.isEmpty model.RecentSeries) then
-                                        Html.div [
-                                            prop.children [
-                                                Html.div [
-                                                    prop.className "flex items-center justify-between mb-4"
-                                                    prop.children [
-                                                        Html.h2 [
-                                                            prop.className "text-lg font-bold font-display"
-                                                            prop.text "Recent Series"
-                                                        ]
-                                                        Html.a [
-                                                            prop.href (Router.format "series")
-                                                            prop.onClick (fun e ->
-                                                                e.preventDefault()
-                                                                Router.navigate "series"
-                                                            )
-                                                            prop.className "text-sm text-primary hover:text-primary/80 transition-colors font-medium"
-                                                            prop.text "View all"
-                                                        ]
-                                                    ]
-                                                ]
-                                                Daisy.card [
-                                                    prop.className "bg-base-100 shadow-md"
-                                                    prop.children [
-                                                        Daisy.cardBody [
-                                                            prop.className "p-2"
-                                                            prop.children [
-                                                                for s in model.RecentSeries do
-                                                                    recentSeriesCard s
-                                                            ]
-                                                        ]
-                                                    ]
-                                                ]
-                                            ]
-                                        ]
-                                ]
-                            ]
-                        ]
+                        prop.className "mb-6"
+                        prop.children [ tabBar model.ActiveTab dispatch ]
                     ]
 
-                    // Continue Watching section (series with next-up episodes)
-                    let continueWatching = model.RecentSeries |> List.filter (fun s -> s.NextUp.IsSome && s.WatchedEpisodeCount > 0)
-                    if not (List.isEmpty continueWatching) then
-                        Html.div [
-                            prop.className ("mt-6 " + DesignSystem.animateFadeInUp)
-                            prop.children [
-                                Html.h2 [
-                                    prop.className "text-lg font-bold font-display mb-4"
-                                    prop.text "Continue Watching"
-                                ]
-                                Daisy.card [
-                                    prop.className "bg-base-100 shadow-md"
-                                    prop.children [
-                                        Daisy.cardBody [
-                                            prop.className "p-2"
-                                            prop.children [
-                                                for s in continueWatching do
-                                                    recentSeriesCard s
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
-
-                    // Recent activity section
-                    if not (List.isEmpty model.RecentActivity) then
-                        Html.div [
-                            prop.className ("mt-6 " + DesignSystem.animateFadeInUp)
-                            prop.children [
-                                Html.div [
-                                    prop.className "flex items-center justify-between mb-4"
-                                    prop.children [
-                                        Html.h2 [
-                                            prop.className "text-lg font-bold font-display"
-                                            prop.text "Recent Activity"
-                                        ]
-                                        Html.a [
-                                            prop.href (Router.format "events")
-                                            prop.onClick (fun e ->
-                                                e.preventDefault()
-                                                Router.navigate "events"
-                                            )
-                                            prop.className "text-sm text-primary hover:text-primary/80 transition-colors font-medium"
-                                            prop.text "View all"
-                                        ]
-                                    ]
-                                ]
-                                Daisy.card [
-                                    prop.className "bg-base-100 shadow-md"
-                                    prop.children [
-                                        Daisy.cardBody [
-                                            prop.className "p-4"
-                                            prop.children [
-                                                for item in model.RecentActivity |> List.truncate 8 do
-                                                    activityItem item
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
+                    // Tab content
+                    if model.IsLoading then
+                        loadingView
+                    else
+                        match model.ActiveTab with
+                        | All ->
+                            match model.AllTabData with
+                            | Some data -> allTabView data
+                            | None -> loadingView
+                        | MoviesTab ->
+                            placeholderTab "Movies"
+                        | SeriesTab ->
+                            placeholderTab "TV Series"
+                        | GamesTab ->
+                            placeholderTab "Games"
                 ]
             ]
         ]

@@ -65,13 +65,14 @@ Four sections, each as a card/region:
 - Remove the old hero section with Jellyfin sync status and stat cards
 
 ## Acceptance Criteria
-- [ ] Tab bar with All/Movies/TV Series/Games tabs
-- [ ] All tab loads and displays all four sections
-- [ ] TV Series sorted: In Focus pinned to top, then by recency
-- [ ] Each item clickable, navigates to detail page
-- [ ] Responsive: works on mobile (stacked) and desktop
-- [ ] Follows design system conventions
-- [ ] Old dashboard layout fully replaced
+- [x] Tab bar with All/Movies/TV Series/Games tabs
+- [x] All tab loads and displays all four sections
+- [x] TV Series sorted: In Focus pinned to top, then by recency
+- [x] Each item clickable, navigates to detail page
+- [x] Responsive: works on mobile (stacked) and desktop
+- [x] Follows design system conventions
+- [x] Old dashboard layout fully replaced
+- [x] Placeholder content for Movies/Series/Games tabs
 
 ## Notes
 - The Movies/Series/Games tabs will be placeholder "coming soon" in this task — filled in by tasks 008-010
@@ -79,3 +80,13 @@ Four sections, each as a card/region:
 
 ## Work Log
 <!-- Appended by /work during execution -->
+
+### 2026-02-19 — Implementation complete
+
+**Files changed:**
+- `src/Client/Pages/Dashboard/Types.fs` — Completely rewritten. Removed old model fields (Stats, RecentMovies, RecentSeries, RecentActivity, JellyfinSyncStatus) and old Msg cases. New DashboardTab DU (All | MoviesTab | SeriesTab | GamesTab). Model now has ActiveTab, AllTabData, MoviesTabData, SeriesTabData, GamesTabData, IsLoading. New Msg: SwitchTab, AllTabLoaded, MoviesTabLoaded, SeriesTabLoaded, GamesTabLoaded, TabLoadError.
+- `src/Client/Pages/Dashboard/State.fs` — Completely rewritten. init returns model with ActiveTab=All, IsLoading=true. update handles SwitchTab (fetches tab data via API), all tab-loaded messages, and TabLoadError. Private fetchTabData helper dispatches the right API call per tab.
+- `src/Client/Pages/Dashboard/Views.fs` — Completely rewritten. Tab bar with four tabs using pill-style buttons (matches DesignSystem.pill pattern). All tab renders four glass card sections: TV Series Next Up (with In Focus crosshair icon, Finished/Abandoned badges, friend pills, next episode info), Movies In Focus (crosshair icon, year), Games In Focus (crosshair icon), Games Recently Played (play time, last played date, HLTB progress). Placeholder tabs show "coming soon" message. Single-column stacked layout. All items are clickable links navigating to detail pages.
+- `src/Client/State.fs` — Updated init and Url_changed Dashboard handler to use getDashboardAllTab API instead of old getDashboardStats/getRecentActivity/getMovies/getRecentSeries/importJellyfinWatchHistory calls.
+
+**Build:** `npm run build` passes cleanly with no F# errors.
