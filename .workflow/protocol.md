@@ -2,6 +2,41 @@
 
 ---
 
+## 2026-02-19 — Task Completed: 010 - Dashboard Games tab
+
+**Type:** Task Completion
+**Task:** 010 - Dashboard Games tab
+**Summary:** Implemented Games tab with stats row (total games, play time, completed, in progress), recently added games section, and recently played section with HLTB comparison display.
+**Files changed:** 1 file (Dashboard/Views.fs)
+
+---
+
+## 2026-02-19 — Task Completed: 009 - Dashboard Series tab
+
+**Type:** Task Completion
+**Task:** 009 - Dashboard Series tab
+**Summary:** Implemented TV Series tab with stats row (series, episodes, watch time), full next-up list (In Focus sorted first), recently finished section (green badges), and recently abandoned section (red badges). Refactored statBadge for reuse.
+**Files changed:** 1 file (Dashboard/Views.fs)
+
+---
+
+## 2026-02-19 — Task Completed: 008 - Dashboard Movies tab
+
+**Type:** Task Completion
+**Task:** 008 - Dashboard Movies tab
+**Summary:** Implemented Movies tab with stats row (movies, sessions, watch time) and recently added unwatched movies as compact clickable rows with poster thumbnails.
+**Files changed:** 1 file (Dashboard/Views.fs)
+
+---
+
+## 2026-02-19 — Batch Started: [008, 009, 010]
+
+**Type:** Batch Start
+**Tasks:** 008 - Dashboard Movies tab, 009 - Dashboard Series tab, 010 - Dashboard Games tab
+**Mode:** Sequential (same file conflicts — Dashboard/Views.fs)
+
+---
+
 ## 2026-02-19 — Task Completed: 007 - Dashboard client — tab structure + All tab
 
 **Type:** Task Completion

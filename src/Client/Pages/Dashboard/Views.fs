@@ -314,6 +314,214 @@ let private allTabView (data: DashboardAllTab) =
         ]
     ]
 
+// ── Movies Tab ──
+
+let private statBadge (label: string) (value: string) =
+    Html.div [
+        prop.className "flex flex-col items-center px-3 py-1.5 rounded-lg bg-base-300/40"
+        prop.children [
+            Html.span [
+                prop.className "text-lg font-display font-bold text-primary"
+                prop.text value
+            ]
+            Html.span [
+                prop.className "text-[11px] text-base-content/50 uppercase tracking-wider"
+                prop.text label
+            ]
+        ]
+    ]
+
+let private movieStatsRow (stats: DashboardMovieStats) =
+    Html.div [
+        prop.className "flex gap-3 flex-wrap mb-4"
+        prop.children [
+            statBadge "Movies" (string stats.TotalMovies)
+            statBadge "Sessions" (string stats.TotalWatchSessions)
+            statBadge "Watch Time" (formatPlayTime stats.TotalWatchTimeMinutes)
+        ]
+    ]
+
+let private movieRecentlyAddedItem (item: MovieListItem) =
+    Html.a [
+        prop.href (Router.format ("movies", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("movies", item.Slug)
+        )
+        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
+        prop.children [
+            PosterCard.thumbnail item.PosterRef item.Name
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.p [
+                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                        prop.text item.Name
+                    ]
+                    Html.p [
+                        prop.className "text-xs text-base-content/50"
+                        prop.text (string item.Year)
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+let private moviesTabView (data: DashboardMoviesTab) =
+    Html.div [
+        prop.className "flex flex-col gap-4"
+        prop.children [
+            movieStatsRow data.Stats
+            if not (List.isEmpty data.RecentlyAdded) then
+                sectionCard Icons.movie "Recently Added" [
+                    for item in data.RecentlyAdded do
+                        movieRecentlyAddedItem item
+                ]
+        ]
+    ]
+
+// ── Series Tab ──
+
+let private seriesStatsRow (stats: DashboardSeriesStats) =
+    Html.div [
+        prop.className "flex gap-3 flex-wrap mb-4"
+        prop.children [
+            statBadge "Series" (string stats.TotalSeries)
+            statBadge "Episodes" (string stats.TotalEpisodesWatched)
+            statBadge "Watch Time" (formatPlayTime stats.TotalWatchTimeMinutes)
+        ]
+    ]
+
+let private seriesCompactItem (item: SeriesListItem) (badge: ReactElement) =
+    Html.a [
+        prop.href (Router.format ("series", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("series", item.Slug)
+        )
+        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
+        prop.children [
+            PosterCard.thumbnail item.PosterRef item.Name
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.div [
+                        prop.className "flex items-center gap-1.5"
+                        prop.children [
+                            Html.p [
+                                prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                                prop.text item.Name
+                            ]
+                            badge
+                        ]
+                    ]
+                    Html.p [
+                        prop.className "text-xs text-base-content/50"
+                        prop.text (string item.Year)
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+let private seriesTabView (data: DashboardSeriesTab) =
+    Html.div [
+        prop.className "flex flex-col gap-4"
+        prop.children [
+            seriesStatsRow data.Stats
+
+            // Next Up — full list (not truncated)
+            if not (List.isEmpty data.NextUp) then
+                sectionCard Icons.tv "Next Up" [
+                    for item in data.NextUp do
+                        seriesNextUpItem item
+                ]
+
+            // Recently Finished
+            if not (List.isEmpty data.RecentlyFinished) then
+                sectionCard Icons.trophy "Recently Finished" [
+                    for item in data.RecentlyFinished do
+                        seriesCompactItem item (
+                            Html.span [
+                                prop.className "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-success/15 text-success flex-shrink-0"
+                                prop.text "Finished"
+                            ]
+                        )
+                ]
+
+            // Recently Abandoned
+            if not (List.isEmpty data.RecentlyAbandoned) then
+                sectionCard Icons.tv "Recently Abandoned" [
+                    for item in data.RecentlyAbandoned do
+                        seriesCompactItem item (
+                            Html.span [
+                                prop.className "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-error/15 text-error flex-shrink-0"
+                                prop.text "Abandoned"
+                            ]
+                        )
+                ]
+        ]
+    ]
+
+// ── Games Tab ──
+
+let private gameStatsRow (stats: DashboardGameStats) =
+    Html.div [
+        prop.className "flex gap-3 flex-wrap mb-4"
+        prop.children [
+            statBadge "Games" (string stats.TotalGames)
+            statBadge "Play Time" (formatPlayTime stats.TotalPlayTimeMinutes)
+            statBadge "Completed" (string stats.GamesCompleted)
+            statBadge "In Progress" (string stats.GamesInProgress)
+        ]
+    ]
+
+let private gameRecentlyAddedItem (item: GameListItem) =
+    Html.a [
+        prop.href (Router.format ("games", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("games", item.Slug)
+        )
+        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
+        prop.children [
+            PosterCard.thumbnail item.CoverRef item.Name
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.p [
+                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                        prop.text item.Name
+                    ]
+                    Html.p [
+                        prop.className "text-xs text-base-content/50"
+                        prop.text (string item.Year)
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+let private gamesTabView (data: DashboardGamesTab) =
+    Html.div [
+        prop.className "flex flex-col gap-4"
+        prop.children [
+            gameStatsRow data.Stats
+
+            if not (List.isEmpty data.RecentlyAdded) then
+                sectionCard Icons.gamepad "Recently Added" [
+                    for item in data.RecentlyAdded do
+                        gameRecentlyAddedItem item
+                ]
+
+            if not (List.isEmpty data.RecentlyPlayed) then
+                sectionCard Icons.hourglass "Recently Played" [
+                    for item in data.RecentlyPlayed do
+                        gameRecentlyPlayedItem item
+                ]
+        ]
+    ]
+
 // ── Placeholder tab ──
 
 let private placeholderTab (label: string) =
@@ -370,11 +578,17 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             | Some data -> allTabView data
                             | None -> loadingView
                         | MoviesTab ->
-                            placeholderTab "Movies"
+                            match model.MoviesTabData with
+                            | Some data -> moviesTabView data
+                            | None -> loadingView
                         | SeriesTab ->
-                            placeholderTab "TV Series"
+                            match model.SeriesTabData with
+                            | Some data -> seriesTabView data
+                            | None -> loadingView
                         | GamesTab ->
-                            placeholderTab "Games"
+                            match model.GamesTabData with
+                            | Some data -> gamesTabView data
+                            | None -> loadingView
                 ]
             ]
         ]

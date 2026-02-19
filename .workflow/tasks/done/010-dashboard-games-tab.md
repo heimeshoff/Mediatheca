@@ -48,3 +48,12 @@ Games tab on the dashboard shows recently added games, recently played games, an
 
 ## Work Log
 <!-- Appended by /work during execution -->
+
+### 2026-02-19 — Implementation complete
+- Added `gameStatsRow` function: 4 stat badges (Total Games, Play Time, Completed, In Progress) using shared `statBadge` helper and `formatPlayTime` for hours display
+- Added `gameRecentlyAddedItem` function: compact rows with cover thumbnail, name, and year; clicks navigate to game detail via `Router.navigate ("games", item.Slug)`
+- Added `gamesTabView` function: composes stats row + "Recently Added" section (gamepad icon) + "Recently Played" section (hourglass icon); reuses existing `gameRecentlyPlayedItem` which already handles HLTB comparison ("Xh / Xh" format)
+- Replaced `placeholderTab "Games"` in the main view with `model.GamesTabData |> Option.map gamesTabView` pattern (matching Movies/Series tabs)
+- Follows same glass card + compact row style as Movies and Series tabs
+- Build verified: `npm run build` passes with no errors
+- Only file modified: `src/Client/Pages/Dashboard/Views.fs`

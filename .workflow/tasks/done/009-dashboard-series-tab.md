@@ -50,3 +50,20 @@ TV Series tab on the dashboard shows full next-up list, recently finished/abando
 
 ## Work Log
 <!-- Appended by /work during execution -->
+
+### 2026-02-19 — Implemented TV Series tab
+**File modified:** `src/Client/Pages/Dashboard/Views.fs`
+
+**Changes:**
+- Renamed `movieStatBadge` to `statBadge` for reuse across tabs (Movies tab still works, just uses shared helper)
+- Added `seriesStatsRow` — displays Total Series, Total Episodes Watched, and Total Watch Time using the shared `statBadge` component
+- Added `seriesCompactItem` — reusable compact row for `SeriesListItem` with poster thumbnail, name, year, and a badge parameter (used for Finished/Abandoned)
+- Added `seriesTabView` — main series tab layout with:
+  - Stats row at top (same pattern as Movies tab)
+  - Full Next Up list (reuses existing `seriesNextUpItem` from All tab, not truncated)
+  - Recently Finished section with green "Finished" badges (uses `Icons.trophy` header)
+  - Recently Abandoned section with red "Abandoned" badges (uses `Icons.tv` header)
+- Replaced `placeholderTab "TV Series"` in the main `view` function with `model.SeriesTabData` match — shows `seriesTabView` when data is loaded, `loadingView` while loading
+- Data fetching was already wired in `State.fs` via `getDashboardSeriesTab`; no state changes needed
+
+**Build:** `npm run build` passes with no errors.

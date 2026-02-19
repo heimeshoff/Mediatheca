@@ -42,3 +42,13 @@ Movies tab on the dashboard shows recently added unwatched movies and movie stat
 
 ## Work Log
 <!-- Appended by /work during execution -->
+
+### 2026-02-19 — Implementation complete
+- Replaced the Movies tab placeholder in `src/Client/Pages/Dashboard/Views.fs` with a fully functional Movies tab view
+- Added `movieStatBadge` helper: renders a compact stat badge (value + label) using `bg-base-300/40` background
+- Added `movieStatsRow`: displays 3 stat badges — Total Movies, Total Watch Sessions, Total Watch Time (formatted via existing `formatPlayTime`)
+- Added `movieRecentlyAddedItem`: compact clickable row with poster thumbnail, movie name, and year — follows the same pattern as All tab items (e.g., `movieInFocusItem`). Navigates to `/movies/{slug}` on click.
+- Added `moviesTabView`: composes stats row + "Recently Added" section card using `sectionCard Icons.movie`
+- Wired `MoviesTab` case in main `view` function to render `moviesTabView` when `MoviesTabData` is `Some`, or `loadingView` when `None`
+- Data fetching was already handled in State.fs (from task 007) — `SwitchTab MoviesTab` triggers `getDashboardMoviesTab` API call, result stored as `MoviesTabData`
+- Build verified: `npm run build` succeeds with no errors
