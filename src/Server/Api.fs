@@ -3233,4 +3233,20 @@ module Api =
                 let csv = sections |> String.concat ","
                 SettingsStore.setSetting conn ("collapsed:" + key) csv
             }
+
+            // Playtime Tracking
+            getGamePlaySessions = fun slug -> async {
+                return PlaytimeTracker.getPlaySessionsForGame conn slug
+            }
+
+            getPlaytimeSummary = fun fromDate toDate -> async {
+                return PlaytimeTracker.getPlaytimeSummary conn fromDate toDate
+            }
+
+            getPlaytimeSyncStatus = fun () -> async {
+                return PlaytimeTracker.getSyncStatus conn
+            }
+
+            triggerPlaytimeSync = fun () ->
+                PlaytimeTracker.runSync conn httpClient getSteamConfig projectionHandlers
         }

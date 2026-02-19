@@ -33,6 +33,7 @@ type Model = {
     IsSelectingImage: bool
     ImageVersion: int
     ActiveTab: GameTab
+    PlaySessions: PlaySessionDto list
     Error: string option
 }
 
@@ -97,4 +98,5 @@ type Msg =
     | Confirm_remove_game
     | Cancel_remove_game
     | Remove_game
+    | Play_sessions_loaded of PlaySessionDto list
     | Game_removed of Result<unit, string>

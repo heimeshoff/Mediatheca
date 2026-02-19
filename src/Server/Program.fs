@@ -49,6 +49,9 @@ let main args =
     // Initialize SettingsStore
     SettingsStore.initialize conn
 
+    // Initialize PlaytimeTracker tables
+    PlaytimeTracker.initialize conn
+
     // Seed TMDB API key from env var if DB has no value yet
     let envTmdbKey =
         Environment.GetEnvironmentVariable("TMDB_API_KEY")
@@ -189,6 +192,9 @@ let main args =
         ) |> ignore
 
     app.UseGiraffe webApp
+
+    // Start background playtime tracker
+    let _playtimeTimer = PlaytimeTracker.startBackgroundTimer conn httpClient getSteamConfig projectionHandlers
 
     app.Run()
     0

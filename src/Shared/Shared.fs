@@ -534,6 +534,34 @@ type SteamFamilyImportProgress = {
     Action: string
 }
 
+// Playtime Tracking
+
+type PlaySessionDto = {
+    GameSlug: string
+    Date: string
+    MinutesPlayed: int
+}
+
+type PlaytimeSummaryItem = {
+    GameSlug: string
+    GameName: string
+    CoverRef: string option
+    TotalMinutes: int
+    SessionCount: int
+}
+
+type PlaytimeSyncResult = {
+    SessionsRecorded: int
+    SnapshotsUpdated: int
+}
+
+type PlaytimeSyncStatus = {
+    LastSyncTime: string option
+    NextSyncTime: string option
+    IsEnabled: bool
+    SyncHourUtc: int
+}
+
 type GameImageCandidate = {
     Url: string
     Source: string
@@ -779,4 +807,9 @@ type IMediathecaApi = {
     saveViewSettings: string -> ViewSettings -> Async<unit>
     getCollapsedSections: string -> Async<string list>
     saveCollapsedSections: string -> string list -> Async<unit>
+    // Playtime Tracking
+    getGamePlaySessions: string -> Async<PlaySessionDto list>
+    getPlaytimeSummary: string -> string -> Async<PlaytimeSummaryItem list>
+    getPlaytimeSyncStatus: unit -> Async<PlaytimeSyncStatus>
+    triggerPlaytimeSync: unit -> Async<Result<PlaytimeSyncResult, string>>
 }

@@ -232,6 +232,24 @@ module Steam =
                 | Error _ -> return []
         }
 
+    let getRecentlyPlayedGames (httpClient: HttpClient) (config: SteamConfig) : Async<Mediatheca.Shared.SteamOwnedGame list> =
+        async {
+            if System.String.IsNullOrWhiteSpace(config.ApiKey) || System.String.IsNullOrWhiteSpace(config.SteamId) then
+                return []
+            else
+                let url = sprintf "https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key=%s&steamid=%s&include_appinfo=true" config.ApiKey config.SteamId
+                let! json = fetchJson httpClient url
+                match Decode.fromString decodeOwnedGamesResponse json with
+                | Ok response ->
+                    return response.Games |> List.map (fun g ->
+                        { Mediatheca.Shared.SteamOwnedGame.AppId = g.AppId
+                          Name = g.Name
+                          PlaytimeMinutes = g.PlaytimeForever
+                          ImgIconUrl = g.ImgIconUrl
+                          RtimeLastPlayed = g.RtimeLastPlayed })
+                | Error _ -> return []
+        }
+
     let downloadSteamCover (httpClient: HttpClient) (appId: int) (slug: string) (imageBasePath: string) : Async<string option> =
         async {
             try

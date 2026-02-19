@@ -26,6 +26,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       IsSelectingImage = false
       ImageVersion = 0
       ActiveTab = Overview
+      PlaySessions = []
       Error = None },
     Cmd.batch [
         Cmd.ofMsg (Load_game slug)
@@ -87,6 +88,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             Cmd.OfAsync.perform api.getCatalogs () Catalogs_loaded
             Cmd.OfAsync.perform api.getCatalogsForGame slug Game_catalogs_loaded
             Cmd.OfAsync.perform api.getAllPlayModes () Play_modes_loaded
+            Cmd.OfAsync.perform api.getGamePlaySessions slug Play_sessions_loaded
         ]
 
     | Game_loaded game ->
@@ -428,6 +430,9 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Remove_game ->
         { model with ConfirmingRemove = false },
         Cmd.OfAsync.perform (fun () -> api.removeGame model.Slug) () Game_removed
+
+    | Play_sessions_loaded sessions ->
+        { model with PlaySessions = sessions }, Cmd.none
 
     | Game_removed (Ok ()) ->
         model,

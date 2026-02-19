@@ -1038,34 +1038,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                             ]
                                                     ]
                                                 ]
-                                            // Play Modes
-                                            Html.section [
-                                                prop.children [
-                                                    sectionHeader "Play Modes"
-                                                    Html.div [
-                                                        prop.className "flex flex-wrap gap-2"
-                                                        prop.children [
-                                                            for playMode in game.PlayModes do
-                                                                Html.span [
-                                                                    prop.className "inline-flex items-center gap-1.5 bg-base-100/50 border border-base-content/15 px-3 py-1.5 rounded-lg text-sm font-medium group/mode"
-                                                                    prop.children [
-                                                                        Html.span [ prop.text playMode ]
-                                                                        Html.button [
-                                                                            prop.className "text-base-content/30 hover:text-error transition-colors cursor-pointer opacity-0 group-hover/mode:opacity-100"
-                                                                            prop.onClick (fun _ -> dispatch (Remove_play_mode playMode))
-                                                                            prop.text "\u00D7"
-                                                                        ]
-                                                                    ]
-                                                                ]
-                                                            Html.button [
-                                                                prop.className "w-8 h-8 rounded-lg bg-base-content/10 flex items-center justify-center text-base-content/40 hover:bg-primary/30 hover:text-primary transition-colors text-sm cursor-pointer"
-                                                                prop.onClick (fun _ -> dispatch Toggle_play_mode_picker)
-                                                                prop.text "+"
-                                                            ]
-                                                        ]
-                                                    ]
-                                                ]
-                                            ]
                                         ]
                                     ]
                                     // Right Column: Social & Activity
@@ -1120,6 +1092,31 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     ]
                                                 ]
                                             ]
+                                            // Play History
+                                            if not (List.isEmpty model.PlaySessions) then
+                                                glassCard [
+                                                    Html.h3 [ prop.className "text-lg font-bold mb-4"; prop.text "Play History" ]
+                                                    Html.div [
+                                                        prop.className "space-y-2"
+                                                        prop.children [
+                                                            for session in model.PlaySessions |> List.truncate 10 do
+                                                                Html.div [
+                                                                    prop.className "flex items-center justify-between py-1.5 border-b border-base-content/5 last:border-0"
+                                                                    prop.children [
+                                                                        Html.span [
+                                                                            prop.className "text-sm text-base-content/60"
+                                                                            prop.text session.Date
+                                                                        ]
+                                                                        Html.span [
+                                                                            prop.className "text-sm font-semibold text-primary"
+                                                                            prop.text (formatPlayTime session.MinutesPlayed)
+                                                                        ]
+                                                                    ]
+                                                                ]
+                                                        ]
+                                                    ]
+                                                ]
+
                                             // Friends (consolidated)
                                             let hasOwnership = game.IsOwnedByMe || not (List.isEmpty game.FamilyOwners)
                                             let hasRecommended = not (List.isEmpty game.RecommendedBy)
@@ -1286,6 +1283,43 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                             ]
                                                         ]
                                                 ]
+                                            ]
+                                            // Play Modes
+                                            glassCard [
+                                                Html.div [
+                                                    prop.className "flex items-center justify-between mb-4"
+                                                    prop.children [
+                                                        Html.h3 [ prop.className "text-lg font-bold"; prop.text "Play Modes" ]
+                                                        Html.button [
+                                                            prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold cursor-pointer"
+                                                            prop.onClick (fun _ -> dispatch Toggle_play_mode_picker)
+                                                            prop.text "+"
+                                                        ]
+                                                    ]
+                                                ]
+                                                if List.isEmpty game.PlayModes then
+                                                    Html.p [
+                                                        prop.className "text-base-content/30 text-sm italic"
+                                                        prop.text "No play modes yet"
+                                                    ]
+                                                else
+                                                    Html.div [
+                                                        prop.className "flex flex-wrap gap-2"
+                                                        prop.children [
+                                                            for playMode in game.PlayModes do
+                                                                Html.span [
+                                                                    prop.className "inline-flex items-center gap-1.5 bg-base-100/50 border border-base-content/15 px-3 py-1.5 rounded-lg text-sm font-medium group/mode"
+                                                                    prop.children [
+                                                                        Html.span [ prop.text playMode ]
+                                                                        Html.button [
+                                                                            prop.className "text-base-content/30 hover:text-error transition-colors cursor-pointer opacity-0 group-hover/mode:opacity-100"
+                                                                            prop.onClick (fun _ -> dispatch (Remove_play_mode playMode))
+                                                                            prop.text "\u00D7"
+                                                                        ]
+                                                                    ]
+                                                                ]
+                                                        ]
+                                                    ]
                                             ]
                                             // Error display
                                             match model.Error with
