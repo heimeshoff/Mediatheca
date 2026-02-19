@@ -1003,3 +1003,139 @@ module SeriesProjection =
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "rewatch_id")
         |> Option.defaultValue "default"
+
+    // Dashboard queries
+
+    let getDashboardSeriesNextUp (conn: SqliteConnection) (limit: int option) : Mediatheca.Shared.DashboardSeriesNextUp list =
+        let limitClause =
+            match limit with
+            | Some n -> sprintf "LIMIT %d" n
+            | None -> ""
+        conn
+        |> Db.newCommand (sprintf """
+            SELECT sl.slug, sl.name, sl.poster_ref, sl.next_up_season, sl.next_up_episode, sl.next_up_title,
+                   sl.in_focus, sl.abandoned, sl.episode_count, sl.watched_episode_count,
+                   rs.friends,
+                   (SELECT MAX(watched_date) FROM series_episode_progress WHERE series_slug = sl.slug) as last_watched_date
+            FROM series_list sl
+            LEFT JOIN series_rewatch_sessions rs ON rs.series_slug = sl.slug AND rs.is_default = 1
+            WHERE sl.next_up_season IS NOT NULL OR sl.in_focus = 1 OR sl.abandoned = 1
+            ORDER BY sl.in_focus DESC, last_watched_date DESC NULLS LAST
+            %s
+        """ limitClause)
+        |> Db.query (fun (rd: IDataReader) ->
+            let friendsJson =
+                if rd.IsDBNull(rd.GetOrdinal("friends")) then "[]"
+                else rd.ReadString "friends"
+            let friendSlugs =
+                Decode.fromString (Decode.list Decode.string) friendsJson
+                |> Result.defaultValue []
+            let episodeCount = rd.ReadInt32 "episode_count"
+            let watchedCount = rd.ReadInt32 "watched_episode_count"
+            let isFinished = episodeCount > 0 && watchedCount >= episodeCount
+            { Mediatheca.Shared.DashboardSeriesNextUp.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              PosterRef =
+                if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
+                else Some (rd.ReadString "poster_ref")
+              NextUpSeason =
+                if rd.IsDBNull(rd.GetOrdinal("next_up_season")) then 0
+                else rd.ReadInt32 "next_up_season"
+              NextUpEpisode =
+                if rd.IsDBNull(rd.GetOrdinal("next_up_episode")) then 0
+                else rd.ReadInt32 "next_up_episode"
+              NextUpTitle =
+                if rd.IsDBNull(rd.GetOrdinal("next_up_title")) then ""
+                else rd.ReadString "next_up_title"
+              WatchWithFriends = resolveFriendRefs conn friendSlugs
+              InFocus = rd.ReadInt32 "in_focus" <> 0
+              IsFinished = isFinished
+              IsAbandoned = rd.ReadInt32 "abandoned" = 1
+              LastWatchedDate =
+                if rd.IsDBNull(rd.GetOrdinal("last_watched_date")) then None
+                else Some (rd.ReadString "last_watched_date") }
+        )
+
+    let getRecentlyFinished (conn: SqliteConnection) : Mediatheca.Shared.SeriesListItem list =
+        conn
+        |> Db.newCommand """
+            SELECT slug, name, year, poster_ref, genres, tmdb_rating, status, season_count, episode_count,
+                   watched_episode_count, next_up_season, next_up_episode, next_up_title, abandoned, in_focus
+            FROM series_list
+            WHERE episode_count > 0 AND watched_episode_count >= episode_count AND abandoned = 0
+            ORDER BY rowid DESC
+            LIMIT 10
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            let genresJson = rd.ReadString "genres"
+            let genres =
+                Decode.fromString (Decode.list Decode.string) genresJson
+                |> Result.defaultValue []
+            let nextUp =
+                if rd.IsDBNull(rd.GetOrdinal("next_up_season")) then None
+                else
+                    Some {
+                        Mediatheca.Shared.NextUpDto.SeasonNumber = rd.ReadInt32 "next_up_season"
+                        Mediatheca.Shared.NextUpDto.EpisodeNumber = rd.ReadInt32 "next_up_episode"
+                        Mediatheca.Shared.NextUpDto.EpisodeName = rd.ReadString "next_up_title"
+                    }
+            { Mediatheca.Shared.SeriesListItem.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              Year = rd.ReadInt32 "year"
+              PosterRef =
+                if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
+                else Some (rd.ReadString "poster_ref")
+              Genres = genres
+              TmdbRating =
+                if rd.IsDBNull(rd.GetOrdinal("tmdb_rating")) then None
+                else Some (rd.ReadDouble "tmdb_rating")
+              Status = parseStatus (rd.ReadString "status")
+              SeasonCount = rd.ReadInt32 "season_count"
+              EpisodeCount = rd.ReadInt32 "episode_count"
+              WatchedEpisodeCount = rd.ReadInt32 "watched_episode_count"
+              NextUp = nextUp
+              IsAbandoned = rd.ReadInt32 "abandoned" = 1
+              InFocus = rd.ReadInt32 "in_focus" <> 0 }
+        )
+
+    let getRecentlyAbandoned (conn: SqliteConnection) : Mediatheca.Shared.SeriesListItem list =
+        conn
+        |> Db.newCommand """
+            SELECT slug, name, year, poster_ref, genres, tmdb_rating, status, season_count, episode_count,
+                   watched_episode_count, next_up_season, next_up_episode, next_up_title, abandoned, in_focus
+            FROM series_list
+            WHERE abandoned = 1
+            ORDER BY rowid DESC
+            LIMIT 10
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            let genresJson = rd.ReadString "genres"
+            let genres =
+                Decode.fromString (Decode.list Decode.string) genresJson
+                |> Result.defaultValue []
+            let nextUp =
+                if rd.IsDBNull(rd.GetOrdinal("next_up_season")) then None
+                else
+                    Some {
+                        Mediatheca.Shared.NextUpDto.SeasonNumber = rd.ReadInt32 "next_up_season"
+                        Mediatheca.Shared.NextUpDto.EpisodeNumber = rd.ReadInt32 "next_up_episode"
+                        Mediatheca.Shared.NextUpDto.EpisodeName = rd.ReadString "next_up_title"
+                    }
+            { Mediatheca.Shared.SeriesListItem.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              Year = rd.ReadInt32 "year"
+              PosterRef =
+                if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
+                else Some (rd.ReadString "poster_ref")
+              Genres = genres
+              TmdbRating =
+                if rd.IsDBNull(rd.GetOrdinal("tmdb_rating")) then None
+                else Some (rd.ReadDouble "tmdb_rating")
+              Status = parseStatus (rd.ReadString "status")
+              SeasonCount = rd.ReadInt32 "season_count"
+              EpisodeCount = rd.ReadInt32 "episode_count"
+              WatchedEpisodeCount = rd.ReadInt32 "watched_episode_count"
+              NextUp = nextUp
+              IsAbandoned = rd.ReadInt32 "abandoned" = 1
+              InFocus = rd.ReadInt32 "in_focus" <> 0 }
+        )

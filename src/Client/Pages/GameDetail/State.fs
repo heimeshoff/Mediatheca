@@ -27,6 +27,8 @@ let init (slug: string) : Model * Cmd<Msg> =
       ImageVersion = 0
       ActiveTab = Overview
       PlaySessions = []
+      HltbFetching = false
+      HltbNoData = false
       Error = None },
     Cmd.batch [
         Cmd.ofMsg (Load_game slug)
@@ -433,6 +435,24 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Play_sessions_loaded sessions ->
         { model with PlaySessions = sessions }, Cmd.none
+
+    | Fetch_hltb ->
+        { model with HltbFetching = true; HltbNoData = false },
+        Cmd.OfAsync.either
+            (fun () -> api.fetchHltbData model.Slug)
+            ()
+            Hltb_fetched
+            (fun ex -> Hltb_fetched (Error ex.Message))
+
+    | Hltb_fetched (Ok (Some _hours)) ->
+        { model with HltbFetching = false; HltbNoData = false },
+        Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
+
+    | Hltb_fetched (Ok None) ->
+        { model with HltbFetching = false; HltbNoData = true }, Cmd.none
+
+    | Hltb_fetched (Error err) ->
+        { model with HltbFetching = false; Error = Some err }, Cmd.none
 
     | Game_removed (Ok ()) ->
         model,

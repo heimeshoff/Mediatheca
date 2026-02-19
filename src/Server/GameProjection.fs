@@ -553,3 +553,75 @@ module GameProjection =
             if rd.IsDBNull(rd.GetOrdinal("steam_app_id")) then None
             else Some (rd.ReadInt32 "steam_app_id")
         )
+
+    // Dashboard queries
+
+    let getGamesInFocus (conn: SqliteConnection) : DashboardGameInFocus list =
+        conn
+        |> Db.newCommand "SELECT slug, name, year, cover_ref FROM game_list WHERE status = 'InFocus' ORDER BY rowid DESC"
+        |> Db.query (fun (rd: IDataReader) ->
+            { DashboardGameInFocus.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              Year = rd.ReadInt32 "year"
+              CoverRef =
+                if rd.IsDBNull(rd.GetOrdinal("cover_ref")) then None
+                else Some (rd.ReadString "cover_ref") }
+        )
+
+    let getGamesRecentlyPlayed (conn: SqliteConnection) (limit: int) : DashboardGameRecentlyPlayed list =
+        conn
+        |> Db.newCommand """
+            SELECT ps.game_slug, gl.name, gl.cover_ref, gl.total_play_time, gl.hltb_hours, MAX(ps.date) as last_played
+            FROM game_play_session ps
+            JOIN game_list gl ON gl.slug = ps.game_slug
+            GROUP BY ps.game_slug
+            ORDER BY last_played DESC
+            LIMIT @limit
+        """
+        |> Db.setParams [ "limit", SqlType.Int32 limit ]
+        |> Db.query (fun (rd: IDataReader) ->
+            { DashboardGameRecentlyPlayed.Slug = rd.ReadString "game_slug"
+              Name = rd.ReadString "name"
+              CoverRef =
+                if rd.IsDBNull(rd.GetOrdinal("cover_ref")) then None
+                else Some (rd.ReadString "cover_ref")
+              TotalPlayTimeMinutes = rd.ReadInt32 "total_play_time"
+              LastPlayedDate = rd.ReadString "last_played"
+              HltbHours =
+                if rd.IsDBNull(rd.GetOrdinal("hltb_hours")) then None
+                else Some (rd.ReadDouble "hltb_hours") }
+        )
+
+    let getRecentlyAddedGames (conn: SqliteConnection) (limit: int) : GameListItem list =
+        conn
+        |> Db.newCommand """
+            SELECT slug, name, year, cover_ref, genres, status, total_play_time, hltb_hours, personal_rating, rawg_rating
+            FROM game_list
+            ORDER BY rowid DESC
+            LIMIT @limit
+        """
+        |> Db.setParams [ "limit", SqlType.Int32 limit ]
+        |> Db.query (fun (rd: IDataReader) ->
+            let genresJson = rd.ReadString "genres"
+            let genres =
+                Decode.fromString (Decode.list Decode.string) genresJson
+                |> Result.defaultValue []
+            { GameListItem.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              Year = rd.ReadInt32 "year"
+              CoverRef =
+                if rd.IsDBNull(rd.GetOrdinal("cover_ref")) then None
+                else Some (rd.ReadString "cover_ref")
+              Genres = genres
+              Status = parseGameStatus (rd.ReadString "status")
+              TotalPlayTimeMinutes = rd.ReadInt32 "total_play_time"
+              HltbHours =
+                if rd.IsDBNull(rd.GetOrdinal("hltb_hours")) then None
+                else Some (rd.ReadDouble "hltb_hours")
+              PersonalRating =
+                if rd.IsDBNull(rd.GetOrdinal("personal_rating")) then None
+                else Some (rd.ReadInt32 "personal_rating")
+              RawgRating =
+                if rd.IsDBNull(rd.GetOrdinal("rawg_rating")) then None
+                else Some (rd.ReadDouble "rawg_rating") }
+        )

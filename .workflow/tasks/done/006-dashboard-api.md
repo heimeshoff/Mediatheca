@@ -132,3 +132,41 @@ DashboardGameStats = {
 
 ## Work Log
 <!-- Appended by /work during execution -->
+
+### 2026-02-19 — Implementation complete
+
+**Changes made:**
+
+1. **src/Shared/Shared.fs** — Added all shared dashboard tab types:
+   - `DashboardSeriesNextUp`, `DashboardMovieInFocus`, `DashboardGameInFocus`, `DashboardGameRecentlyPlayed`
+   - `DashboardAllTab`, `DashboardMoviesTab`, `DashboardSeriesTab`, `DashboardGamesTab`
+   - `DashboardMovieStats`, `DashboardSeriesStats`, `DashboardGameStats`
+   - 4 new API endpoints on `IMediathecaApi`: `getDashboardAllTab`, `getDashboardMoviesTab`, `getDashboardSeriesTab`, `getDashboardGamesTab`
+   - Types that reference `MovieListItem`/`SeriesListItem`/`GameListItem` placed after those types to satisfy F# declaration ordering.
+
+2. **src/Server/SeriesProjection.fs** — Added 3 query functions:
+   - `getDashboardSeriesNextUp`: Joins `series_list` with `series_rewatch_sessions` (default session) for watch-with friends. Uses subquery on `series_episode_progress` for `last_watched_date`. Filters `next_up_season IS NOT NULL OR in_focus = 1 OR abandoned = 1`. Sorts: `in_focus DESC, last_watched_date DESC NULLS LAST`. Optional limit param (6 for All tab, unlimited for Series tab).
+   - `getRecentlyFinished`: Series where `episode_count > 0 AND watched_episode_count >= episode_count AND abandoned = 0`, limit 10.
+   - `getRecentlyAbandoned`: Series where `abandoned = 1`, limit 10.
+
+3. **src/Server/MovieProjection.fs** — Added 2 query functions:
+   - `getMoviesInFocus`: Movies where `in_focus = 1`, ordered by rowid DESC, with limit.
+   - `getRecentlyAddedMovies`: Movies NOT in `watch_sessions`, ordered by rowid DESC, with limit.
+
+4. **src/Server/GameProjection.fs** — Added 3 query functions:
+   - `getGamesInFocus`: Games where `status = 'InFocus'`.
+   - `getGamesRecentlyPlayed`: Joins `game_play_session` with `game_list`, grouped by game, ordered by last played DESC.
+   - `getRecentlyAddedGames`: Games ordered by rowid DESC with limit.
+
+5. **src/Server/Api.fs** — Implemented all 4 API endpoint handlers:
+   - `getDashboardAllTab`: Calls projection queries with limit 6.
+   - `getDashboardMoviesTab`: Recently added (limit 10), movie stats (COUNT/SUM queries).
+   - `getDashboardSeriesTab`: Full next-up list, recently finished, recently abandoned, series stats.
+   - `getDashboardGamesTab`: Recently added (limit 10), recently played (limit 10), game stats.
+
+**Design decisions:**
+- Used subquery `(SELECT MAX(watched_date) FROM series_episode_progress WHERE series_slug = sl.slug)` instead of adding a projection column for `last_watched_date` — simpler, no schema migration needed.
+- Existing `getDashboardStats` and `getRecentActivity` endpoints preserved (not removed).
+- No files from task 013's domain (GameDetail/*) were touched.
+
+**Verification:** `npm run build` succeeds (client + Fable compilation). `npm test` passes all 232 tests.

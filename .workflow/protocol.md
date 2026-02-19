@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-02-19 — Task Completed: 013 - HowLongToBeat display
+
+**Type:** Task Completion
+**Task:** 013 - HowLongToBeat display
+**Summary:** Added fetchHltbData API endpoint, HLTB section on game detail page with progress bar comparison (play time vs HLTB average), "Fetch from HowLongToBeat" button for games without data, graceful "no data" state.
+**Files changed:** 5 files (Shared.fs, Api.fs, GameDetail/Types.fs, GameDetail/State.fs, GameDetail/Views.fs)
+
+---
+
+## 2026-02-19 — Task Completed: 006 - Dashboard API
+
+**Type:** Task Completion
+**Task:** 006 - Dashboard API
+**Summary:** Added 11 shared types and 4 API endpoints for unified dashboard tabs (All/Movies/Series/Games). Implemented query functions across MovieProjection, SeriesProjection, and GameProjection for next-up, in-focus, recently played, recently added, and stats data.
+**Files changed:** 5 files (Shared.fs, Api.fs, MovieProjection.fs, SeriesProjection.fs, GameProjection.fs)
+
+---
+
+## 2026-02-19 — Batch Started: [006, 013]
+
+**Type:** Batch Start
+**Tasks:** 006 - Dashboard API, 013 - HowLongToBeat display
+**Mode:** Parallel (batch of 2)
+
+---
+
 ## 2026-02-19 — Task Completed: 011 - Steam description backfill
 
 **Type:** Task Completion

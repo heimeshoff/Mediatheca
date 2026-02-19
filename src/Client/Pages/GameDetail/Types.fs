@@ -34,6 +34,8 @@ type Model = {
     ImageVersion: int
     ActiveTab: GameTab
     PlaySessions: PlaySessionDto list
+    HltbFetching: bool
+    HltbNoData: bool
     Error: string option
 }
 
@@ -99,4 +101,6 @@ type Msg =
     | Cancel_remove_game
     | Remove_game
     | Play_sessions_loaded of PlaySessionDto list
+    | Fetch_hltb
+    | Hltb_fetched of Result<float option, string>
     | Game_removed of Result<unit, string>

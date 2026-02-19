@@ -236,6 +236,58 @@ type RecentActivityItem = {
     Description: string
 }
 
+// Dashboard Tabs
+
+type DashboardSeriesNextUp = {
+    Slug: string
+    Name: string
+    PosterRef: string option
+    NextUpSeason: int
+    NextUpEpisode: int
+    NextUpTitle: string
+    WatchWithFriends: FriendRef list
+    InFocus: bool
+    IsFinished: bool
+    IsAbandoned: bool
+    LastWatchedDate: string option
+}
+
+type DashboardMovieInFocus = {
+    Slug: string
+    Name: string
+    Year: int
+    PosterRef: string option
+}
+
+type DashboardGameInFocus = {
+    Slug: string
+    Name: string
+    Year: int
+    CoverRef: string option
+}
+
+type DashboardGameRecentlyPlayed = {
+    Slug: string
+    Name: string
+    CoverRef: string option
+    TotalPlayTimeMinutes: int
+    LastPlayedDate: string
+    HltbHours: float option
+}
+
+type DashboardAllTab = {
+    SeriesNextUp: DashboardSeriesNextUp list
+    MoviesInFocus: DashboardMovieInFocus list
+    GamesInFocus: DashboardGameInFocus list
+    GamesRecentlyPlayed: DashboardGameRecentlyPlayed list
+}
+
+type DashboardMovieStats = {
+    TotalMovies: int
+    TotalWatchSessions: int
+    TotalWatchTimeMinutes: int
+}
+
 // Event Store Browser
 
 type EventDto = {
@@ -500,6 +552,39 @@ type AddGameRequest = {
     RawgRating: float option
 }
 
+// Dashboard Tabs (continued — types that reference MovieListItem / SeriesListItem / GameListItem)
+
+type DashboardMoviesTab = {
+    RecentlyAdded: MovieListItem list
+    Stats: DashboardMovieStats
+}
+
+type DashboardSeriesStats = {
+    TotalSeries: int
+    TotalEpisodesWatched: int
+    TotalWatchTimeMinutes: int
+}
+
+type DashboardSeriesTab = {
+    NextUp: DashboardSeriesNextUp list
+    RecentlyFinished: SeriesListItem list
+    RecentlyAbandoned: SeriesListItem list
+    Stats: DashboardSeriesStats
+}
+
+type DashboardGameStats = {
+    TotalGames: int
+    TotalPlayTimeMinutes: int
+    GamesCompleted: int
+    GamesInProgress: int
+}
+
+type DashboardGamesTab = {
+    RecentlyAdded: GameListItem list
+    RecentlyPlayed: DashboardGameRecentlyPlayed list
+    Stats: DashboardGameStats
+}
+
 // Steam Integration
 
 type SteamOwnedGame = {
@@ -707,6 +792,10 @@ type IMediathecaApi = {
     getDashboardStats: unit -> Async<DashboardStats>
     getRecentSeries: int -> Async<RecentSeriesItem list>
     getRecentActivity: int -> Async<RecentActivityItem list>
+    getDashboardAllTab: unit -> Async<DashboardAllTab>
+    getDashboardMoviesTab: unit -> Async<DashboardMoviesTab>
+    getDashboardSeriesTab: unit -> Async<DashboardSeriesTab>
+    getDashboardGamesTab: unit -> Async<DashboardGamesTab>
     // Event Store Browser
     getEvents: EventQuery -> Async<EventDto list>
     getEventStreams: unit -> Async<string list>
@@ -819,4 +908,6 @@ type IMediathecaApi = {
     getPlaytimeSummary: string -> string -> Async<PlaytimeSummaryItem list>
     getPlaytimeSyncStatus: unit -> Async<PlaytimeSyncStatus>
     triggerPlaytimeSync: unit -> Async<Result<PlaytimeSyncResult, string>>
+    // HowLongToBeat
+    fetchHltbData: string -> Async<Result<float option, string>>
 }

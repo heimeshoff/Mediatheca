@@ -1094,6 +1094,99 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     ]
                                                 ]
                                             ]
+                                            // HowLongToBeat
+                                            glassCard [
+                                                Html.h3 [
+                                                    prop.className "text-lg font-bold mb-4 flex items-center gap-2"
+                                                    prop.children [
+                                                        Icons.hourglass ()
+                                                        Html.text "HowLongToBeat"
+                                                    ]
+                                                ]
+                                                match game.HltbHours with
+                                                | Some hltbHours ->
+                                                    let totalPlayHours = float game.TotalPlayTimeMinutes / 60.0
+                                                    let percentage =
+                                                        if hltbHours > 0.0 then
+                                                            min 100.0 (totalPlayHours / hltbHours * 100.0)
+                                                        else 0.0
+                                                    Html.div [
+                                                        prop.className "space-y-3"
+                                                        prop.children [
+                                                            // Main Story hours
+                                                            Html.div [
+                                                                prop.className "text-sm text-base-content/60"
+                                                                prop.children [
+                                                                    Html.span [ prop.text "Main Story: " ]
+                                                                    Html.span [
+                                                                        prop.className "font-semibold text-base-content"
+                                                                        prop.text $"%.1f{hltbHours} hours"
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                            // Progress bar
+                                                            Html.div [
+                                                                prop.className "w-full bg-base-content/10 rounded-full h-3 overflow-hidden"
+                                                                prop.children [
+                                                                    Html.div [
+                                                                        prop.className (
+                                                                            if percentage >= 100.0 then "h-full rounded-full bg-success transition-all duration-500"
+                                                                            elif percentage >= 75.0 then "h-full rounded-full bg-warning transition-all duration-500"
+                                                                            else "h-full rounded-full bg-primary transition-all duration-500"
+                                                                        )
+                                                                        prop.style [ style.width (length.percent percentage) ]
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                            // Comparison text
+                                                            Html.div [
+                                                                prop.className "text-sm text-base-content/60"
+                                                                prop.children [
+                                                                    Html.span [ prop.text $"Your time: " ]
+                                                                    Html.span [
+                                                                        prop.className "font-semibold text-primary"
+                                                                        prop.text $"%.1f{totalPlayHours}h"
+                                                                    ]
+                                                                    Html.span [ prop.text $" / Average: " ]
+                                                                    Html.span [
+                                                                        prop.className "font-semibold text-base-content"
+                                                                        prop.text $"%.1f{hltbHours}h"
+                                                                    ]
+                                                                    Html.span [
+                                                                        prop.className "ml-1 text-base-content/40"
+                                                                        prop.text $"(%.0f{percentage}%%)"
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                        ]
+                                                    ]
+                                                | None ->
+                                                    if model.HltbNoData then
+                                                        Html.p [
+                                                            prop.className "text-sm text-base-content/40 italic"
+                                                            prop.text "No HLTB data available for this game"
+                                                        ]
+                                                    elif model.HltbFetching then
+                                                        Html.div [
+                                                            prop.className "flex items-center gap-2"
+                                                            prop.children [
+                                                                Html.span [ prop.className "loading loading-spinner loading-sm text-primary" ]
+                                                                Html.span [
+                                                                    prop.className "text-sm text-base-content/60"
+                                                                    prop.text "Fetching from HowLongToBeat..."
+                                                                ]
+                                                            ]
+                                                        ]
+                                                    else
+                                                        Html.button [
+                                                            prop.className "btn btn-sm btn-outline btn-primary gap-2"
+                                                            prop.onClick (fun _ -> dispatch Fetch_hltb)
+                                                            prop.children [
+                                                                Icons.hourglass ()
+                                                                Html.text "Fetch from HowLongToBeat"
+                                                            ]
+                                                        ]
+                                            ]
                                             // Play History
                                             if not (List.isEmpty model.PlaySessions) then
                                                 glassCard [

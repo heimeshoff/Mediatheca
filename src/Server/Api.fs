@@ -1312,6 +1312,117 @@ module Api =
                 )
             }
 
+            // Dashboard Tabs
+            getDashboardAllTab = fun () -> async {
+                let seriesNextUp = SeriesProjection.getDashboardSeriesNextUp conn (Some 6)
+                let moviesInFocus = MovieProjection.getMoviesInFocus conn 6
+                let gamesInFocus = GameProjection.getGamesInFocus conn
+                let gamesRecentlyPlayed = GameProjection.getGamesRecentlyPlayed conn 6
+                return {
+                    Mediatheca.Shared.DashboardAllTab.SeriesNextUp = seriesNextUp
+                    MoviesInFocus = moviesInFocus
+                    GamesInFocus = gamesInFocus
+                    GamesRecentlyPlayed = gamesRecentlyPlayed
+                }
+            }
+
+            getDashboardMoviesTab = fun () -> async {
+                let recentlyAdded = MovieProjection.getRecentlyAddedMovies conn 10
+                let totalMovies =
+                    conn
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM movie_list"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+                    |> Option.defaultValue 0
+                let totalWatchSessions =
+                    conn
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM watch_sessions"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+                    |> Option.defaultValue 0
+                let totalWatchTime =
+                    conn
+                    |> Db.newCommand "SELECT COALESCE(SUM(md.runtime), 0) as total FROM watch_sessions ws JOIN movie_detail md ON ws.movie_slug = md.slug"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
+                    |> Option.defaultValue 0
+                return {
+                    Mediatheca.Shared.DashboardMoviesTab.RecentlyAdded = recentlyAdded
+                    Stats = {
+                        Mediatheca.Shared.DashboardMovieStats.TotalMovies = totalMovies
+                        TotalWatchSessions = totalWatchSessions
+                        TotalWatchTimeMinutes = totalWatchTime
+                    }
+                }
+            }
+
+            getDashboardSeriesTab = fun () -> async {
+                let nextUp = SeriesProjection.getDashboardSeriesNextUp conn None
+                let recentlyFinished = SeriesProjection.getRecentlyFinished conn
+                let recentlyAbandoned = SeriesProjection.getRecentlyAbandoned conn
+                let totalSeries =
+                    conn
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_list"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+                    |> Option.defaultValue 0
+                let totalEpisodesWatched =
+                    conn
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM (SELECT DISTINCT series_slug, season_number, episode_number FROM series_episode_progress)"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+                    |> Option.defaultValue 0
+                let totalWatchTime =
+                    conn
+                    |> Db.newCommand """
+                        SELECT COALESCE(SUM(e.runtime), 0) as total
+                        FROM (SELECT DISTINCT series_slug, season_number, episode_number FROM series_episode_progress) p
+                        JOIN series_episodes e ON e.series_slug = p.series_slug AND e.season_number = p.season_number AND e.episode_number = p.episode_number
+                    """
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
+                    |> Option.defaultValue 0
+                return {
+                    Mediatheca.Shared.DashboardSeriesTab.NextUp = nextUp
+                    RecentlyFinished = recentlyFinished
+                    RecentlyAbandoned = recentlyAbandoned
+                    Stats = {
+                        Mediatheca.Shared.DashboardSeriesStats.TotalSeries = totalSeries
+                        TotalEpisodesWatched = totalEpisodesWatched
+                        TotalWatchTimeMinutes = totalWatchTime
+                    }
+                }
+            }
+
+            getDashboardGamesTab = fun () -> async {
+                let recentlyAdded = GameProjection.getRecentlyAddedGames conn 10
+                let recentlyPlayed = GameProjection.getGamesRecentlyPlayed conn 10
+                let totalGames =
+                    conn
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+                    |> Option.defaultValue 0
+                let totalPlayTime =
+                    conn
+                    |> Db.newCommand "SELECT COALESCE(SUM(total_play_time), 0) as total FROM game_list"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
+                    |> Option.defaultValue 0
+                let gamesCompleted =
+                    conn
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list WHERE status = 'Completed'"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+                    |> Option.defaultValue 0
+                let gamesInProgress =
+                    conn
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list WHERE status = 'Playing'"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+                    |> Option.defaultValue 0
+                return {
+                    Mediatheca.Shared.DashboardGamesTab.RecentlyAdded = recentlyAdded
+                    RecentlyPlayed = recentlyPlayed
+                    Stats = {
+                        Mediatheca.Shared.DashboardGameStats.TotalGames = totalGames
+                        TotalPlayTimeMinutes = totalPlayTime
+                        GamesCompleted = gamesCompleted
+                        GamesInProgress = gamesInProgress
+                    }
+                }
+            }
+
             // Event Store Browser
             getEvents = fun query -> async {
                 let events = EventStore.queryEvents conn query.StreamFilter query.EventTypeFilter query.Limit query.Offset
@@ -3332,4 +3443,33 @@ module Api =
 
             triggerPlaytimeSync = fun () ->
                 PlaytimeTracker.runSync conn httpClient getSteamConfig projectionHandlers
+
+            // HowLongToBeat
+            fetchHltbData = fun gameSlug -> async {
+                try
+                    // Look up the game name from the projection
+                    match GameProjection.getBySlug conn gameSlug with
+                    | None -> return Error "Game not found"
+                    | Some game ->
+                        match! HowLongToBeat.searchGame httpClient game.Name with
+                        | None -> return Ok None
+                        | Some hltbResult ->
+                            let hours = HowLongToBeat.toHours hltbResult.CompMainSeconds
+                            // Store the HLTB hours via the existing event
+                            let sid = Games.streamId gameSlug
+                            let result =
+                                executeCommand
+                                    conn sid
+                                    Games.Serialization.fromStoredEvent
+                                    Games.reconstitute
+                                    Games.decide
+                                    Games.Serialization.toEventData
+                                    (Games.Set_hltb_hours (Some hours))
+                                    projectionHandlers
+                            match result with
+                            | Ok () -> return Ok (Some hours)
+                            | Error e -> return Error e
+                with ex ->
+                    return Error $"Failed to fetch HLTB data: {ex.Message}"
+            }
         }

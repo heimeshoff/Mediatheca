@@ -48,3 +48,15 @@ Show HowLongToBeat completion time comparison on game detail page and Games dash
 
 ## Work Log
 <!-- Appended by /work during execution -->
+
+### 2026-02-19 - Implementation complete
+- Added `fetchHltbData: string -> Async<Result<float option, string>>` endpoint to `IMediathecaApi` in Shared.fs
+- Implemented `fetchHltbData` in Api.fs: looks up game name from projection, calls `HowLongToBeat.searchGame`, stores main story hours via `Game_hltb_hours_set` event
+- Added `Fetch_hltb` and `Hltb_fetched` messages to GameDetail/Types.fs with `HltbFetching` and `HltbNoData` model fields
+- Added message handlers in GameDetail/State.fs: on success with hours reloads game detail, on None shows "no data" state
+- Added HowLongToBeat glass card section in GameDetail/Views.fs right column (between Links and Play History):
+  - When `HltbHours` has a value: shows "Main Story: X.X hours", a color-coded progress bar (primary/warning/success based on %), and "Your time: Xh / Average: Xh (XX%)" text
+  - When no data and not fetched: shows "Fetch from HowLongToBeat" button with loading spinner state
+  - When fetch returned no results: shows "No HLTB data available" grey italic text
+- Dashboard display deferred to task 010 per scope notes
+- `npm run build` passes, `npm test` passes (232 tests)

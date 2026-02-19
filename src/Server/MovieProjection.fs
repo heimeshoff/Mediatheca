@@ -528,3 +528,46 @@ module MovieProjection =
               WatchSessions = getWatchSessions conn slug
               ContentBlocks = ContentBlockProjection.getForMovieDetail conn slug }
         )
+
+    // Dashboard queries
+
+    let getMoviesInFocus (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardMovieInFocus list =
+        conn
+        |> Db.newCommand "SELECT slug, name, year, poster_ref FROM movie_list WHERE in_focus = 1 ORDER BY rowid DESC LIMIT @limit"
+        |> Db.setParams [ "limit", SqlType.Int32 limit ]
+        |> Db.query (fun (rd: IDataReader) ->
+            { Mediatheca.Shared.DashboardMovieInFocus.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              Year = rd.ReadInt32 "year"
+              PosterRef =
+                if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
+                else Some (rd.ReadString "poster_ref") }
+        )
+
+    let getRecentlyAddedMovies (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.MovieListItem list =
+        conn
+        |> Db.newCommand """
+            SELECT slug, name, year, poster_ref, genres, tmdb_rating, in_focus
+            FROM movie_list
+            WHERE slug NOT IN (SELECT DISTINCT movie_slug FROM watch_sessions)
+            ORDER BY rowid DESC
+            LIMIT @limit
+        """
+        |> Db.setParams [ "limit", SqlType.Int32 limit ]
+        |> Db.query (fun (rd: IDataReader) ->
+            let genresJson = rd.ReadString "genres"
+            let genres =
+                Decode.fromString (Decode.list Decode.string) genresJson
+                |> Result.defaultValue []
+            { Mediatheca.Shared.MovieListItem.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              Year = rd.ReadInt32 "year"
+              PosterRef =
+                if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
+                else Some (rd.ReadString "poster_ref")
+              Genres = genres
+              TmdbRating =
+                if rd.IsDBNull(rd.GetOrdinal("tmdb_rating")) then None
+                else Some (rd.ReadDouble "tmdb_rating")
+              InFocus = rd.ReadInt32 "in_focus" <> 0 }
+        )
