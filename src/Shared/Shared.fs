@@ -433,6 +433,7 @@ type UpdateEpisodeWatchedDateRequest = {
 
 type GameStatus =
     | Backlog
+    | InFocus
     | Playing
     | Completed
     | Abandoned

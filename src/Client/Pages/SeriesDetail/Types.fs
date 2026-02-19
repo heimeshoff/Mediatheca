@@ -119,6 +119,9 @@ type Msg =
     | Season_trailer_loaded of seasonNumber: int * key: string option
     | Open_trailer of key: string
     | Close_trailer
+    // In Focus
+    | Set_in_focus of bool
+    | In_focus_result of Result<unit, string>
     // Abandon
     | Toggle_abandon_series
     | Series_abandon_toggled of Result<unit, string>

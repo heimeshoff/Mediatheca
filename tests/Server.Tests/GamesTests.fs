@@ -97,6 +97,30 @@ let gameTests =
                 | _ -> failtest "Expected Active state"
             | Error e -> failtest $"Expected success but got: {e}"
 
+        testCase "Transition Backlog to InFocus" <| fun _ ->
+            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Change_status InFocus)
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 1 "Should produce one event"
+                let state = applyEvents ([ Game_added_to_library sampleGameData ] @ events)
+                match state with
+                | Active game -> Expect.equal game.Status InFocus "Status should be InFocus"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Transition InFocus to Playing" <| fun _ ->
+            let result = givenWhenThen
+                            [ Game_added_to_library sampleGameData; Game_status_changed InFocus ]
+                            (Change_status Playing)
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 1 "Should produce one event"
+                let state = applyEvents ([ Game_added_to_library sampleGameData; Game_status_changed InFocus ] @ events)
+                match state with
+                | Active game -> Expect.equal game.Status Playing "Status should be Playing"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
         testCase "Same status is idempotent" <| fun _ ->
             let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Change_status Backlog)
             match result with
@@ -416,6 +440,12 @@ let gameSerializationTests =
             let deserialized = Serialization.deserialize eventType data
             Expect.equal deserialized (Some event) "Should round-trip"
 
+        testCase "Game_status_changed InFocus round-trips" <| fun _ ->
+            let event = Game_status_changed InFocus
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
         testCase "Game_played_with round-trips" <| fun _ ->
             let event = Game_played_with "marco"
             let eventType, data = Serialization.serialize event
@@ -486,6 +516,7 @@ let gameSerializationTests =
                 Game_personal_rating_set (Some 4)
                 Game_personal_rating_set None
                 Game_status_changed Playing
+                Game_status_changed InFocus
                 Game_status_changed Completed
                 Game_status_changed Abandoned
                 Game_status_changed OnHold

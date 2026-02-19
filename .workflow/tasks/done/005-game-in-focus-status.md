@@ -42,12 +42,12 @@ Games gain an "InFocus" status between Backlog and Playing in the lifecycle.
 - Test: serialization round-trip for InFocus status
 
 ## Acceptance Criteria
-- [ ] `InFocus` added to `GameStatus` DU in both Shared and Server
-- [ ] Serialization handles InFocus (including backward compat)
-- [ ] Game list filter badges include In Focus
-- [ ] Game detail status selector includes In Focus
-- [ ] Valid status transitions include InFocus
-- [ ] Tests passing
+- [x] `InFocus` added to `GameStatus` DU in both Shared and Server
+- [x] Serialization handles InFocus (including backward compat)
+- [x] Game list filter badges include In Focus
+- [x] Game detail status selector includes In Focus
+- [x] Valid status transitions include InFocus
+- [x] Tests passing
 
 ## Notes
 - Unlike Movies/Series where In Focus is a toggle flag, for Games it's a first-class status in the lifecycle
@@ -55,3 +55,14 @@ Games gain an "InFocus" status between Backlog and Playing in the lifecycle.
 
 ## Work Log
 <!-- Appended by /work during execution -->
+
+### 2026-02-19 — Implementation complete
+- Added `InFocus` case to `GameStatus` DU in `src/Shared/Shared.fs` (between Backlog and Playing)
+- Added `InFocus` case to serialization encode/decode in `src/Server/Games.fs` (Serialization module)
+- Added `InFocus` case to projection encode/parse in `src/Server/GameProjection.fs`
+- Updated `src/Client/Pages/Games/Views.fs`: added InFocus to `statusLabel`, `statusTextClass` (uses `text-info`), and `allStatuses` filter badge list
+- Updated `src/Client/Pages/GameDetail/Views.fs`: added InFocus to `statusBadgeClass` (uses `badge-info`), `statusLabel`, and `allStatuses` dropdown list
+- Added 3 new tests in `tests/Server.Tests/GamesTests.fs`: Backlog->InFocus transition, InFocus->Playing transition, InFocus serialization round-trip
+- Added `Game_status_changed InFocus` to the "all event types" serialization test
+- Backward compat: unknown status strings still default to `Backlog` (existing fallthrough in decode)
+- All 232 tests pass, Fable build succeeds

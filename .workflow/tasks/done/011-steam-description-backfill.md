@@ -51,3 +51,36 @@ In the `importSteamLibrary` function, after matching a game by `steam_app_id`:
 
 ## Work Log
 <!-- Appended by /work during execution -->
+
+### 2026-02-19 — Implementation Complete
+
+**Changes made:**
+
+1. **`src/Server/Games.fs`** — Added new `Game_description_set` event and `Set_description` command:
+   - New event: `Game_description_set of description: string`
+   - New command: `Set_description of description: string`
+   - Evolve handler: updates `Description` field on `ActiveGame`
+   - Decide handler: emits event only if description actually changed (idempotent)
+   - Serialization: encode/decode for `Game_description_set` event type
+
+2. **`src/Server/GameProjection.fs`** — Two additions:
+   - Projection handler for `Game_description_set`: updates `description` column in `game_detail` table
+   - New query `findGamesWithEmptyDescriptionAndSteamAppId`: returns `(slug, steam_app_id)` pairs for games that have a `steam_app_id` but both `description` and `short_description` are empty
+
+3. **`src/Server/Api.fs`** — Added description backfill phase to `importSteamLibrary`:
+   - After the main import loop completes, queries for all games with empty descriptions and a steam_app_id
+   - For each game, calls `Steam.getSteamStoreDetails` with a 300ms delay between calls (rate limiting)
+   - Sets full description (from `AboutTheGame` or `DetailedDescription`, HTML-stripped), short description, website URL, and play mode categories
+   - Tracks enrichment count and logs to console
+   - Errors during enrichment are captured but don't fail the import
+   - Idempotent: the query only finds games with truly empty descriptions, so re-import skips already-enriched games
+
+**Acceptance criteria verification:**
+- [x] Games matched by steam_app_id with empty descriptions get enriched from Steam Store
+- [x] Short description, website URL, and play modes also backfilled if missing
+- [x] Games that already have descriptions are skipped (SQL query filters them out)
+- [x] Steam Store API failures handled gracefully (try/catch per game, errors appended to list)
+- [x] Works on re-import (idempotent — only queries games with empty descriptions)
+
+**Build:** `npm run build` passes (Fable + Vite client compilation)
+**Tests:** `npm test` passes (all 232 Expecto tests)

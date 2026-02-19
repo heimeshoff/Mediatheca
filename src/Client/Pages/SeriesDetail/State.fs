@@ -524,6 +524,20 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Close_trailer ->
         { model with ShowTrailer = None }, Cmd.none
 
+    | Set_in_focus inFocus ->
+        model,
+        Cmd.OfAsync.either
+            (fun () -> api.setSeriesInFocus model.Slug inFocus)
+            ()
+            In_focus_result
+            (fun ex -> In_focus_result (Error ex.Message))
+
+    | In_focus_result (Ok ()) ->
+        model, Cmd.ofMsg Load_detail
+
+    | In_focus_result (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
     | Toggle_abandon_series ->
         let isAbandoned =
             model.Detail |> Option.map (fun d -> d.IsAbandoned) |> Option.defaultValue false

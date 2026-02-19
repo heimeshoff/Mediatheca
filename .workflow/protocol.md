@@ -2,6 +2,41 @@
 
 ---
 
+## 2026-02-19 — Task Completed: 011 - Steam description backfill
+
+**Type:** Task Completion
+**Task:** 011 - Steam description backfill
+**Summary:** Added description backfill phase to Steam library import. New Game_description_set event. After main import loop, queries games with empty descriptions + steam_app_id, fetches from Steam Store API with 300ms rate limiting, sets description/short_description/website/play_modes.
+**Files changed:** 3 files (Games.fs, GameProjection.fs, Api.fs)
+
+---
+
+## 2026-02-19 — Task Completed: 005 - Game InFocus status
+
+**Type:** Task Completion
+**Task:** 005 - Game InFocus status
+**Summary:** Added InFocus to GameStatus DU (Backlog → InFocus → Playing → ...) in Shared, Server, and Client. Updated filter badges, status selectors, serialization. 3 new tests, 232 total passing.
+**Files changed:** 7 files (Shared.fs, Games.fs, GameProjection.fs, Games/Views.fs, GameDetail/Views.fs, GamesTests.fs)
+
+---
+
+## 2026-02-19 — Task Completed: 004 - Series In Focus UI
+
+**Type:** Task Completion
+**Task:** 004 - Series In Focus UI
+**Summary:** Added In Focus toggle button (crosshair icon) to series detail hero section and circular badge overlay on series list poster cards. Mirrors Movie In Focus UI exactly.
+**Files changed:** 4 files (SeriesDetail/Types.fs, SeriesDetail/State.fs, SeriesDetail/Views.fs, Series/Views.fs)
+
+---
+
+## 2026-02-19 — Batch Started: [004, 005, 011]
+
+**Type:** Batch Start
+**Tasks:** 004 - Series In Focus UI, 005 - Game InFocus status, 011 - Steam description backfill
+**Mode:** Parallel (batch of 3)
+
+---
+
 ## 2026-02-19 — Task Completed: 003 - Series In Focus backend
 
 **Type:** Task Completion

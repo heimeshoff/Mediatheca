@@ -11,6 +11,7 @@ open Mediatheca.Client.Components
 let private statusLabel (status: GameStatus) =
     match status with
     | Backlog -> "Backlog"
+    | InFocus -> "In Focus"
     | Playing -> "Playing"
     | Completed -> "Completed"
     | Abandoned -> "Abandoned"
@@ -28,6 +29,7 @@ let private formatPlayTime (minutes: int) =
 let private statusTextClass (status: GameStatus) =
     match status with
     | Backlog -> "text-base-content/50"
+    | InFocus -> "text-info"
     | Playing -> "text-primary"
     | Completed -> "text-success"
     | Abandoned -> "text-error"
@@ -96,7 +98,7 @@ let private gameCard (game: GameListItem) =
     ]
 
 let private statusFilterBadges (currentFilter: GameStatus option) (dispatch: Msg -> unit) =
-    let allStatuses = [ Backlog; Playing; Completed; Abandoned; OnHold ]
+    let allStatuses = [ Backlog; InFocus; Playing; Completed; Abandoned; OnHold ]
     Html.div [
         prop.className "flex flex-wrap gap-2"
         prop.children [

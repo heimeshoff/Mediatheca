@@ -8,6 +8,15 @@ open Mediatheca.Client.Pages.Series.Types
 open Mediatheca.Client
 open Mediatheca.Client.Components
 
+let private inFocusBadge =
+    Html.div [
+        prop.className "absolute top-1.5 right-1.5 z-10 w-6 h-6 rounded-full bg-primary/80 backdrop-blur-sm flex items-center justify-center text-primary-content shadow-md border border-primary/30"
+        prop.title "In Focus"
+        prop.children [
+            Html.span [ prop.className "w-3.5 h-3.5"; prop.children [ Icons.crosshairSmFilled () ] ]
+        ]
+    ]
+
 let private seriesCard (series: SeriesListItem) =
     let progressText = $"{series.WatchedEpisodeCount}/{series.EpisodeCount} episodes"
     let isFinished = series.EpisodeCount > 0 && series.WatchedEpisodeCount >= series.EpisodeCount
@@ -41,6 +50,9 @@ let private seriesCard (series: SeriesListItem) =
                                         ]
                                     ]
                                 ]
+
+                            // In Focus badge
+                            if series.InFocus then inFocusBadge
 
                             // Shine effect
                             Html.div [ prop.className DesignSystem.posterShine ]

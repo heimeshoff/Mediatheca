@@ -70,6 +70,7 @@ module GameProjection =
     let private encodeGameStatus (status: GameStatus) =
         match status with
         | Backlog -> "Backlog"
+        | InFocus -> "InFocus"
         | Playing -> "Playing"
         | Completed -> "Completed"
         | Abandoned -> "Abandoned"
@@ -78,6 +79,7 @@ module GameProjection =
     let private parseGameStatus (s: string) : GameStatus =
         match s with
         | "Backlog" -> Backlog
+        | "InFocus" -> InFocus
         | "Playing" -> Playing
         | "Completed" -> Completed
         | "Abandoned" -> Abandoned
@@ -273,6 +275,12 @@ module GameProjection =
                     conn
                     |> Db.newCommand "UPDATE game_detail SET total_play_time = @total_play_time WHERE slug = @slug"
                     |> Db.setParams [ "slug", SqlType.String slug; "total_play_time", SqlType.Int32 totalMinutes ]
+                    |> Db.exec
+
+                | Games.Game_description_set description ->
+                    conn
+                    |> Db.newCommand "UPDATE game_detail SET description = @description WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "description", SqlType.String description ]
                     |> Db.exec
 
                 | Games.Game_short_description_set shortDescription ->
@@ -527,6 +535,14 @@ module GameProjection =
         |> Db.newCommand "SELECT slug FROM game_detail WHERE steam_app_id = @app_id LIMIT 1"
         |> Db.setParams [ "app_id", SqlType.Int32 appId ]
         |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "slug")
+
+    let findGamesWithEmptyDescriptionAndSteamAppId (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand "SELECT slug, steam_app_id FROM game_detail WHERE steam_app_id IS NOT NULL AND (description IS NULL OR description = '') AND (short_description IS NULL OR short_description = '')"
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "slug",
+            rd.ReadInt32 "steam_app_id"
+        )
 
     let findByName (conn: SqliteConnection) (name: string) : (string * int option) list =
         conn

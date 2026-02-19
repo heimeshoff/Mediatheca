@@ -43,6 +43,7 @@ module Games =
         | Game_played_with_removed of friendSlug: string
         | Game_steam_app_id_set of steamAppId: int
         | Game_play_time_set of totalMinutes: int
+        | Game_description_set of description: string
         | Game_short_description_set of shortDescription: string
         | Game_website_url_set of websiteUrl: string option
         | Game_play_mode_added of playMode: string
@@ -106,6 +107,7 @@ module Games =
         | Remove_played_with of friendSlug: string
         | Set_steam_app_id of steamAppId: int
         | Set_play_time of totalMinutes: int
+        | Set_description of description: string
         | Set_short_description of shortDescription: string
         | Set_website_url of websiteUrl: string option
         | Add_play_mode of playMode: string
@@ -180,6 +182,8 @@ module Games =
             Active { game with SteamAppId = Some steamAppId }
         | Active game, Game_play_time_set totalMinutes ->
             Active { game with TotalPlayTimeMinutes = totalMinutes }
+        | Active game, Game_description_set description ->
+            Active { game with Description = description }
         | Active game, Game_short_description_set shortDescription ->
             Active { game with ShortDescription = shortDescription }
         | Active game, Game_website_url_set websiteUrl ->
@@ -263,6 +267,9 @@ module Games =
         | Active game, Set_play_time totalMinutes ->
             if game.TotalPlayTimeMinutes = totalMinutes then Ok []
             else Ok [ Game_play_time_set totalMinutes ]
+        | Active game, Set_description description ->
+            if game.Description = description then Ok []
+            else Ok [ Game_description_set description ]
         | Active game, Set_short_description shortDescription ->
             if game.ShortDescription = shortDescription then Ok []
             else Ok [ Game_short_description_set shortDescription ]
@@ -330,6 +337,7 @@ module Games =
         let private encodeGameStatus (status: GameStatus) =
             match status with
             | Backlog -> "Backlog"
+            | InFocus -> "InFocus"
             | Playing -> "Playing"
             | Completed -> "Completed"
             | Abandoned -> "Abandoned"
@@ -338,6 +346,7 @@ module Games =
         let private decodeGameStatus (s: string) : GameStatus =
             match s with
             | "Backlog" -> Backlog
+            | "InFocus" -> InFocus
             | "Playing" -> Playing
             | "Completed" -> Completed
             | "Abandoned" -> Abandoned
@@ -386,6 +395,8 @@ module Games =
                 "Game_steam_app_id_set", Encode.toString 0 (Encode.object [ "steamAppId", Encode.int steamAppId ])
             | Game_play_time_set totalMinutes ->
                 "Game_play_time_set", Encode.toString 0 (Encode.object [ "totalMinutes", Encode.int totalMinutes ])
+            | Game_description_set description ->
+                "Game_description_set", Encode.toString 0 (Encode.object [ "description", Encode.string description ])
             | Game_short_description_set shortDescription ->
                 "Game_short_description_set", Encode.toString 0 (Encode.object [ "shortDescription", Encode.string shortDescription ])
             | Game_website_url_set websiteUrl ->
@@ -483,6 +494,10 @@ module Games =
                 Decode.fromString (Decode.field "totalMinutes" Decode.int) data
                 |> Result.toOption
                 |> Option.map Game_play_time_set
+            | "Game_description_set" ->
+                Decode.fromString (Decode.field "description" Decode.string) data
+                |> Result.toOption
+                |> Option.map Game_description_set
             | "Game_short_description_set" ->
                 Decode.fromString (Decode.field "shortDescription" Decode.string) data
                 |> Result.toOption

@@ -2704,6 +2704,61 @@ module Api =
                             with ex ->
                                 errors <- errors @ [ sprintf "Error processing '%s': %s" steamGame.Name ex.Message ]
 
+                        // Backfill descriptions for games matched by steam_app_id with empty descriptions
+                        let mutable descriptionsEnriched = 0
+                        let gamesToEnrich = GameProjection.findGamesWithEmptyDescriptionAndSteamAppId conn
+                        for (slug, steamAppId) in gamesToEnrich do
+                            try
+                                do! Async.Sleep 300 // Rate limit Steam Store API calls
+                                let! storeDetails = Steam.getSteamStoreDetails httpClient steamAppId
+                                match storeDetails with
+                                | Ok details ->
+                                    let sid = Games.streamId slug
+                                    let desc =
+                                        if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
+                                        elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
+                                        else ""
+                                    if desc <> "" then
+                                        executeCommand conn sid
+                                            Games.Serialization.fromStoredEvent
+                                            Games.reconstitute
+                                            Games.decide
+                                            Games.Serialization.toEventData
+                                            (Games.Set_description desc)
+                                            projectionHandlers |> ignore
+                                    if details.ShortDescription <> "" then
+                                        executeCommand conn sid
+                                            Games.Serialization.fromStoredEvent
+                                            Games.reconstitute
+                                            Games.decide
+                                            Games.Serialization.toEventData
+                                            (Games.Set_short_description details.ShortDescription)
+                                            projectionHandlers |> ignore
+                                    if details.WebsiteUrl.IsSome then
+                                        executeCommand conn sid
+                                            Games.Serialization.fromStoredEvent
+                                            Games.reconstitute
+                                            Games.decide
+                                            Games.Serialization.toEventData
+                                            (Games.Set_website_url details.WebsiteUrl)
+                                            projectionHandlers |> ignore
+                                    for category in details.Categories do
+                                        executeCommand conn sid
+                                            Games.Serialization.fromStoredEvent
+                                            Games.reconstitute
+                                            Games.decide
+                                            Games.Serialization.toEventData
+                                            (Games.Add_play_mode category)
+                                            projectionHandlers |> ignore
+                                    if desc <> "" || details.ShortDescription <> "" then
+                                        descriptionsEnriched <- descriptionsEnriched + 1
+                                | Error _ -> ()
+                            with ex ->
+                                errors <- errors @ [ sprintf "Failed to enrich '%s': %s" slug ex.Message ]
+
+                        if descriptionsEnriched > 0 then
+                            printfn "Steam import: enriched %d games with missing descriptions" descriptionsEnriched
+
                         return Ok {
                             Mediatheca.Shared.SteamImportResult.GamesMatched = gamesMatched
                             GamesCreated = gamesCreated
