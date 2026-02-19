@@ -377,6 +377,138 @@ let seriesTests =
                 | Rewatch_session_removed id -> Expect.equal id "default" "Should remove the old default"
                 | _ -> failtest "Expected Rewatch_session_removed event"
             | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Setting in focus on a series produces Series_in_focus_set" <| fun _ ->
+            let result = givenWhenThen [ Series_added_to_library sampleSeriesData ] Set_series_in_focus
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 1 "Should produce one event"
+                Expect.equal events.[0] Series_in_focus_set "Should be Series_in_focus_set"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Setting in focus when already in focus is idempotent" <| fun _ ->
+            let result = givenWhenThen
+                            [ Series_added_to_library sampleSeriesData; Series_in_focus_set ]
+                            Set_series_in_focus
+            match result with
+            | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Clearing in focus produces Series_in_focus_cleared" <| fun _ ->
+            let result = givenWhenThen
+                            [ Series_added_to_library sampleSeriesData; Series_in_focus_set ]
+                            Clear_series_in_focus
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 1 "Should produce one event"
+                Expect.equal events.[0] Series_in_focus_cleared "Should be Series_in_focus_cleared"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Clearing in focus when not in focus is idempotent" <| fun _ ->
+            let result = givenWhenThen [ Series_added_to_library sampleSeriesData ] Clear_series_in_focus
+            match result with
+            | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "InFocus defaults to false on new series" <| fun _ ->
+            let state = applyEvents [ Series_added_to_library sampleSeriesData ]
+            match state with
+            | Active series -> Expect.isFalse series.InFocus "InFocus should default to false"
+            | _ -> failtest "Expected Active state"
+
+        testCase "Auto-clear in focus on episode watched" <| fun _ ->
+            let watchData: EpisodeWatchedData = {
+                RewatchId = "default"
+                SeasonNumber = 1
+                EpisodeNumber = 2
+                Date = "2025-03-15"
+            }
+            let given = [
+                Series_added_to_library sampleSeriesData
+                Series_in_focus_set
+            ]
+            let result = givenWhenThen given (Mark_episode_watched watchData)
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 2 "Should produce two events"
+                match events.[0] with
+                | Episode_watched _ -> ()
+                | _ -> failtest "First event should be Episode_watched"
+                Expect.equal events.[1] Series_in_focus_cleared "Second event should be Series_in_focus_cleared"
+                // Verify state
+                let state = applyEvents (given @ events)
+                match state with
+                | Active series ->
+                    Expect.isFalse series.InFocus "InFocus should be false after episode watched"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Auto-clear in focus on season marked watched" <| fun _ ->
+            let seasonData: SeasonMarkedWatchedData = {
+                RewatchId = "default"
+                SeasonNumber = 1
+                Date = "2025-03-15"
+            }
+            let given = [
+                Series_added_to_library sampleSeriesData
+                Series_in_focus_set
+            ]
+            let result = givenWhenThen given (Mark_season_watched seasonData)
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 2 "Should produce two events"
+                match events.[0] with
+                | Season_marked_watched _ -> ()
+                | _ -> failtest "First event should be Season_marked_watched"
+                Expect.equal events.[1] Series_in_focus_cleared "Second event should be Series_in_focus_cleared"
+                let state = applyEvents (given @ events)
+                match state with
+                | Active series ->
+                    Expect.isFalse series.InFocus "InFocus should be false after season watched"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Auto-clear in focus on episodes watched up to" <| fun _ ->
+            let upToData: EpisodesWatchedUpToData = {
+                RewatchId = "default"
+                SeasonNumber = 1
+                EpisodeNumber = 3
+                Date = "2025-03-15"
+            }
+            let given = [
+                Series_added_to_library sampleSeriesData
+                Series_in_focus_set
+            ]
+            let result = givenWhenThen given (Mark_episodes_watched_up_to upToData)
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 2 "Should produce two events"
+                match events.[0] with
+                | Episodes_watched_up_to _ -> ()
+                | _ -> failtest "First event should be Episodes_watched_up_to"
+                Expect.equal events.[1] Series_in_focus_cleared "Second event should be Series_in_focus_cleared"
+                let state = applyEvents (given @ events)
+                match state with
+                | Active series ->
+                    Expect.isFalse series.InFocus "InFocus should be false after episodes watched up to"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Episode watched when not in focus does not emit clear" <| fun _ ->
+            let watchData: EpisodeWatchedData = {
+                RewatchId = "default"
+                SeasonNumber = 1
+                EpisodeNumber = 2
+                Date = "2025-03-15"
+            }
+            let result = givenWhenThen [ Series_added_to_library sampleSeriesData ] (Mark_episode_watched watchData)
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 1 "Should produce one event (no auto-clear)"
+                match events.[0] with
+                | Episode_watched _ -> ()
+                | _ -> failtest "Should be Episode_watched"
+            | Error e -> failtest $"Expected success but got: {e}"
     ]
 
 [<Tests>]
@@ -446,6 +578,18 @@ let seriesSerializationTests =
             let deserialized = Serialization.deserialize eventType data
             Expect.equal deserialized (Some event) "Should round-trip"
 
+        testCase "Series_in_focus_set round-trips" <| fun _ ->
+            let event = Series_in_focus_set
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Series_in_focus_cleared round-trips" <| fun _ ->
+            let event = Series_in_focus_cleared
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
         testCase "All event types serialize and deserialize" <| fun _ ->
             let events: SeriesEvent list = [
                 Series_added_to_library sampleSeriesData
@@ -469,6 +613,8 @@ let seriesSerializationTests =
                 Episodes_watched_up_to { RewatchId = "default"; SeasonNumber = 1; EpisodeNumber = 3; Date = "2025-01-01" }
                 Season_marked_unwatched { RewatchId = "default"; SeasonNumber = 1 }
                 Episode_watched_date_changed { RewatchId = "default"; SeasonNumber = 1; EpisodeNumber = 1; Date = "2025-04-01" }
+                Series_in_focus_set
+                Series_in_focus_cleared
             ]
             for event in events do
                 let eventType, data = Serialization.serialize event

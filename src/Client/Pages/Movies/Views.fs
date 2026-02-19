@@ -7,8 +7,18 @@ open Mediatheca.Client.Pages.Movies.Types
 open Mediatheca.Client
 open Mediatheca.Client.Components
 
+let private inFocusBadge =
+    Html.div [
+        prop.className "absolute top-1.5 right-1.5 z-10 w-6 h-6 rounded-full bg-primary/80 backdrop-blur-sm flex items-center justify-center text-primary-content shadow-md border border-primary/30"
+        prop.title "In Focus"
+        prop.children [
+            Html.span [ prop.className "w-3.5 h-3.5"; prop.children [ Icons.crosshairSmFilled () ] ]
+        ]
+    ]
+
 let private movieCard (movie: Mediatheca.Shared.MovieListItem) =
-    PosterCard.view movie.Slug movie.Name movie.Year movie.PosterRef None
+    let badge = if movie.InFocus then Some inFocusBadge else None
+    PosterCard.view movie.Slug movie.Name movie.Year movie.PosterRef badge
 
 let view (model: Model) (dispatch: Msg -> unit) =
     Html.div [

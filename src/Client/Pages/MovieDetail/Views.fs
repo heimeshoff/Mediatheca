@@ -962,18 +962,43 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         | None -> ()
                                                     ]
                                                 ]
-                                                // Trailer button
-                                                match model.TrailerKey with
-                                                | Some _ ->
-                                                    Html.button [
-                                                        prop.className "inline-flex items-center gap-2 bg-red-600/90 hover:bg-red-600 text-white px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
-                                                        prop.onClick (fun _ -> dispatch Open_trailer)
-                                                        prop.children [
-                                                            Icons.play ()
-                                                            Html.span [ prop.text "Play Trailer" ]
-                                                        ]
+                                                // Action buttons row
+                                                Html.div [
+                                                    prop.className "flex flex-wrap items-center gap-3"
+                                                    prop.children [
+                                                        // Trailer button
+                                                        match model.TrailerKey with
+                                                        | Some _ ->
+                                                            Html.button [
+                                                                prop.className "inline-flex items-center gap-2 bg-red-600/90 hover:bg-red-600 text-white px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
+                                                                prop.onClick (fun _ -> dispatch Open_trailer)
+                                                                prop.children [
+                                                                    Icons.play ()
+                                                                    Html.span [ prop.text "Play Trailer" ]
+                                                                ]
+                                                            ]
+                                                        | None -> ()
+                                                        // In Focus toggle
+                                                        if movie.InFocus then
+                                                            Html.button [
+                                                                prop.className "inline-flex items-center gap-2 bg-primary/90 hover:bg-primary text-primary-content px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
+                                                                prop.onClick (fun _ -> dispatch (Set_in_focus false))
+                                                                prop.children [
+                                                                    Html.span [ prop.className "w-4 h-4"; prop.children [ Icons.crosshairSmFilled () ] ]
+                                                                    Html.span [ prop.text "In Focus" ]
+                                                                ]
+                                                            ]
+                                                        else
+                                                            Html.button [
+                                                                prop.className "inline-flex items-center gap-2 bg-base-content/10 hover:bg-base-content/20 text-base-content/70 hover:text-base-content px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer backdrop-blur-sm"
+                                                                prop.onClick (fun _ -> dispatch (Set_in_focus true))
+                                                                prop.children [
+                                                                    Html.span [ prop.className "w-4 h-4"; prop.children [ Icons.crosshairOutline () ] ]
+                                                                    Html.span [ prop.text "Set In Focus" ]
+                                                                ]
+                                                            ]
                                                     ]
-                                                | None -> ()
+                                                ]
                                             ]
                                         ]
                                     ]

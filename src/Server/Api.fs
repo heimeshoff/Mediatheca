@@ -1611,6 +1611,20 @@ module Api =
                         projectionHandlers
             }
 
+            setSeriesInFocus = fun slug inFocus -> async {
+                let sid = Series.streamId slug
+                let command = if inFocus then Series.Set_series_in_focus else Series.Clear_series_in_focus
+                return
+                    executeCommand
+                        conn sid
+                        Series.Serialization.fromStoredEvent
+                        Series.reconstitute
+                        Series.decide
+                        Series.Serialization.toEventData
+                        command
+                        projectionHandlers
+            }
+
             addSeriesRecommendation = fun slug friendSlug -> async {
                 let sid = Series.streamId slug
                 return

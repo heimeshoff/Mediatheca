@@ -337,6 +337,20 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Personal_rating_result (Error err) ->
         { model with Error = Some err }, Cmd.none
 
+    | Set_in_focus inFocus ->
+        model,
+        Cmd.OfAsync.either
+            (fun () -> api.setMovieInFocus model.Slug inFocus)
+            ()
+            In_focus_result
+            (fun ex -> In_focus_result (Error ex.Message))
+
+    | In_focus_result (Ok ()) ->
+        model, Cmd.OfAsync.perform api.getMovie model.Slug Movie_loaded
+
+    | In_focus_result (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
     | Catalogs_loaded catalogs ->
         { model with AllCatalogs = catalogs }, Cmd.none
 

@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-02-19 — Task Completed: 003 - Series In Focus backend
+
+**Type:** Task Completion
+**Task:** 003 - Series In Focus backend
+**Summary:** Added Series_in_focus_set/cleared events, InFocus flag on ActiveSeries, auto-clear on episode/season/episodes-up-to watched, projection columns, shared DTOs, API endpoint, and 11 new tests. 229 tests passing.
+**Files changed:** 5 files (Series.fs, SeriesProjection.fs, Shared.fs, Api.fs, SeriesTests.fs)
+
+---
+
+## 2026-02-19 — Task Completed: 002 - Movie In Focus UI
+
+**Type:** Task Completion
+**Task:** 002 - Movie In Focus UI
+**Summary:** Added In Focus toggle button (crosshair icon) to movie detail hero section and circular badge overlay on movie list poster cards. New crosshair icons (filled, outline, small) in Icons module.
+**Files changed:** 5 files (Icons.fs, MovieDetail/Types.fs, MovieDetail/State.fs, MovieDetail/Views.fs, Movies/Views.fs)
+
+---
+
+## 2026-02-19 — Batch Started: [002, 003]
+
+**Type:** Batch Start
+**Tasks:** 002 - Movie In Focus UI, 003 - Series In Focus backend
+**Mode:** Parallel (batch of 2)
+
+---
+
 ## 2026-02-19 — Task Completed: 012 - HowLongToBeat API client
 
 **Type:** Task Completion

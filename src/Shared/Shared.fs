@@ -358,6 +358,7 @@ type SeriesListItem = {
     WatchedEpisodeCount: int
     NextUp: NextUpDto option
     IsAbandoned: bool
+    InFocus: bool
 }
 
 type SeriesDetail = {
@@ -374,6 +375,7 @@ type SeriesDetail = {
     EpisodeRuntime: int option
     PersonalRating: int option
     IsAbandoned: bool
+    InFocus: bool
     Cast: CastMemberDto list
     RecommendedBy: FriendRef list
     WantToWatchWith: FriendRef list
@@ -725,6 +727,7 @@ type IMediathecaApi = {
     getSeries: unit -> Async<SeriesListItem list>
     getSeriesDetail: string -> string option -> Async<SeriesDetail option>
     setSeriesPersonalRating: string -> int option -> Async<Result<unit, string>>
+    setSeriesInFocus: string -> bool -> Async<Result<unit, string>>
     addSeriesRecommendation: string -> string -> Async<Result<unit, string>>
     removeSeriesRecommendation: string -> string -> Async<Result<unit, string>>
     addSeriesWantToWatchWith: string -> string -> Async<Result<unit, string>>

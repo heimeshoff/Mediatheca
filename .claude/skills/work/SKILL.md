@@ -12,7 +12,7 @@ Execute tasks from the todo queue. Supports parallel execution of independent ta
 
 ## Instructions
 
-You are the task executor and orchestrator. In parallel mode, you analyze the dependency graph, identify independent tasks, and dispatch subagents. In sequential mode, you pick up tasks one at a time.
+You are the orchestrator. You coordinate task execution but **never do coding work yourself**. In all modes, you delegate the actual work to subagents and stay lean -- your job is to move files, log to protocol, commit, and dispatch. This keeps your context window small and prevents exhaustion.
 
 ---
 
@@ -66,7 +66,7 @@ For each batch of unblocked tasks:
 
 4. **Wait for all subagents to complete.** As each subagent finishes:
 
-   a. **Read the updated task file** to confirm the work log was appended and the task was moved to `done/`.
+   a. **Use the subagent's return message** (which contains a concise summary) for the protocol log. Do NOT re-read the task file -- trust the subagent's report.
    b. **Log "Task Completed"** to `.workflow/protocol.md` by prepending (the orchestrator does this, NOT the subagent):
 
    ```markdown
@@ -82,9 +82,7 @@ For each batch of unblocked tasks:
 
    c. **Auto-commit** the completed task's changes:
    ```
-   git add -A && git commit -m "Task NNN: [task title]
-
-   Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+   git add -A && git commit -m "Task NNN: [task title]"
    ```
 
    d. If a subagent **failed**, leave the task in `in-progress/`, log the failure to `protocol.md`, and continue with other subagents. Do NOT let one failure block the batch.
@@ -99,10 +97,8 @@ Each subagent is spawned with the Task tool using `subagent_type: "general-purpo
 You are a task executor for the Earthdawn Companion project.
 
 ## Your Task
-[Paste the full contents of the task file here]
-
-## Relevant Research
-[Paste contents of any research files referenced in the task's Notes section]
+Read the task file at: [absolute path to the task file in in-progress/]
+If the task references research files, read those too from `.workflow/research/`.
 
 ## Project Context
 - Working directory: [current working directory]
@@ -133,6 +129,23 @@ You are a task executor for the Earthdawn Companion project.
 
 8. **DO** move the task file from `in-progress/` to `done/` when all acceptance criteria are met.
 9. **If the task fails**, leave it in `in-progress/`, note the failure in the work log, and return a clear error message.
+
+## Context Hygiene -- IMPORTANT
+To avoid running out of context window, follow these rules:
+- **Read only what you need.** Use targeted reads (offset/limit) for large files. Don't read entire files if you only need a few lines.
+- **Don't echo file contents back.** After reading a file, work with it -- don't repeat it in your output.
+- **Keep tool output concise.** When running commands, limit output (e.g., use head/tail flags, --quiet modes).
+- **Don't re-read files you've already read** unless they've changed.
+
+## Return Format -- IMPORTANT
+When you are done, return ONLY a concise summary in this exact format (nothing else):
+
+RESULT: [SUCCESS or FAILED]
+SUMMARY: [1-2 sentences of what was done]
+FILES_CHANGED: [count]
+FILE_LIST: [comma-separated list of changed file paths]
+
+Do NOT return the full work log, file contents, or verbose descriptions.
 ```
 
 ### Centralized Coordination Rules
@@ -153,7 +166,7 @@ These rules prevent git conflicts and protocol corruption during parallel execut
 
 ## Sequential Mode
 
-Used when `/work [task-id]` or `/work --sequential` is invoked. This is the original single-task execution loop.
+Used when `/work [task-id]` or `/work --sequential` is invoked. Processes one task at a time, but still delegates the actual work to a subagent to protect the orchestrator's context window.
 
 ### Task Selection
 
@@ -186,56 +199,33 @@ For each task:
 ---
 ```
 
-3. **Read the task file thoroughly** -- understand the objective, details, and acceptance criteria.
-4. **Execute the work:**
-   - Write code, create files, modify configurations -- whatever the task requires.
-   - Follow existing code patterns and project conventions.
-   - Run tests if applicable.
-   - Refer to research files if the task references them.
+3. **Dispatch a subagent** to execute the task. Use the same Subagent Prompt Template from Parallel Mode (see above), but set the project context line to `This is a sequential task -- no other tasks are running concurrently.`
 
-5. **Verify acceptance criteria** -- Go through each criterion and confirm it's met.
+4. **When the subagent returns**, use its concise summary to:
 
-6. **Append a Work Log entry** to the task file:
+   a. **Log "Task Completed"** to `.workflow/protocol.md` by prepending:
 
-```markdown
-### YYYY-MM-DD HH:MM -- Work Completed
+   ```markdown
+   ## YYYY-MM-DD HH:MM -- Task Completed: NNN - [Task Title]
 
-**What was done:**
-- [Action 1]
-- [Action 2]
+   **Type:** Task Completion
+   **Task:** NNN - [Title]
+   **Summary:** [1-2 sentence summary from the subagent's return message]
+   **Files changed:** [count] files
 
-**Acceptance criteria status:**
-- [x] Criterion 1 -- [how it was verified]
-- [x] Criterion 2 -- [how it was verified]
+   ---
+   ```
 
-**Files changed:**
-- [file1.ext] -- [what changed]
-- [file2.ext] -- [what changed]
-```
-
-7. **Move the task file** from `in-progress/` to `done/`.
-
-8. **Log "Task Completed"** to `.workflow/protocol.md` by prepending:
-
-```markdown
-## YYYY-MM-DD HH:MM -- Task Completed: NNN - [Task Title]
-
-**Type:** Task Completion
-**Task:** NNN - [Title]
-**Summary:** [1-2 sentence summary of what was done]
-**Files changed:** [count] files
-
----
-```
-
-9. **Auto-commit** all changes (workflow state + code changes):
+   b. **Auto-commit** all changes (workflow state + code changes):
    ```
    git add -A && git commit -m "Task NNN: [task title]
 
    Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
    ```
 
-10. **Check for next task** -- Go back to step 1 (check `in-progress/`, then `todo/`).
+   c. If the subagent **failed**, leave the task in `in-progress/`, log the failure to `protocol.md`, and ask the user how to proceed.
+
+5. **Check for next task** -- Go back to step 1 (check `in-progress/`, then `todo/`).
 
 ---
 

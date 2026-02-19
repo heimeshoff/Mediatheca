@@ -74,6 +74,8 @@ type Msg =
     | Close_friends_menu
     | Set_personal_rating of int
     | Personal_rating_result of Result<unit, string>
+    | Set_in_focus of bool
+    | In_focus_result of Result<unit, string>
     | Catalogs_loaded of CatalogListItem list
     | Movie_catalogs_loaded of CatalogRef list
     | Open_catalog_picker

@@ -141,6 +141,33 @@ let externalLink () =
 let hourglass () =
     svgIconSm "M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
 
+let crosshairFilled () =
+    Svg.svg [
+        svg.className "w-6 h-6"
+        svg.fill "currentColor"
+        svg.viewBox (0, 0, 24, 24)
+        svg.children [
+            Svg.path [
+                svg.d "M12 2a1 1 0 011 1v2.07A7.002 7.002 0 0118.93 11H21a1 1 0 110 2h-2.07A7.002 7.002 0 0113 18.93V21a1 1 0 11-2 0v-2.07A7.002 7.002 0 015.07 13H3a1 1 0 110-2h2.07A7.002 7.002 0 0111 5.07V3a1 1 0 011-1zm0 5a5 5 0 100 10 5 5 0 000-10zm0 3a2 2 0 110 4 2 2 0 010-4z"
+            ]
+        ]
+    ]
+
+let crosshairOutline () =
+    svgIcon "M12 3v2.25m0 13.5V21m-9-9h2.25m13.5 0H21M12 8.25a3.75 3.75 0 100 7.5 3.75 3.75 0 000-7.5z"
+
+let crosshairSmFilled () =
+    Svg.svg [
+        svg.className "w-4 h-4"
+        svg.fill "currentColor"
+        svg.viewBox (0, 0, 24, 24)
+        svg.children [
+            Svg.path [
+                svg.d "M12 2a1 1 0 011 1v2.07A7.002 7.002 0 0118.93 11H21a1 1 0 110 2h-2.07A7.002 7.002 0 0113 18.93V21a1 1 0 11-2 0v-2.07A7.002 7.002 0 015.07 13H3a1 1 0 110-2h2.07A7.002 7.002 0 0111 5.07V3a1 1 0 011-1zm0 5a5 5 0 100 10 5 5 0 000-10zm0 3a2 2 0 110 4 2 2 0 010-4z"
+            ]
+        ]
+    ]
+
 let mediatheca () =
     Svg.svg [
         svg.className "w-8 h-8"

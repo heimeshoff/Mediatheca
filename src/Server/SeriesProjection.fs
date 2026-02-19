@@ -24,7 +24,8 @@ module SeriesProjection =
                 next_up_season INTEGER,
                 next_up_episode INTEGER,
                 next_up_title TEXT,
-                abandoned INTEGER NOT NULL DEFAULT 0
+                abandoned INTEGER NOT NULL DEFAULT 0,
+                in_focus INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS series_detail (
@@ -42,7 +43,8 @@ module SeriesProjection =
                 personal_rating INTEGER,
                 recommended_by TEXT NOT NULL DEFAULT '[]',
                 want_to_watch_with TEXT NOT NULL DEFAULT '[]',
-                abandoned INTEGER NOT NULL DEFAULT 0
+                abandoned INTEGER NOT NULL DEFAULT 0,
+                in_focus INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS series_seasons (
@@ -88,6 +90,18 @@ module SeriesProjection =
             );
         """
         |> Db.exec
+
+        // Migration: add in_focus column if not present (existing databases)
+        try
+            conn
+            |> Db.newCommand "ALTER TABLE series_list ADD COLUMN in_focus INTEGER NOT NULL DEFAULT 0"
+            |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn
+            |> Db.newCommand "ALTER TABLE series_detail ADD COLUMN in_focus INTEGER NOT NULL DEFAULT 0"
+            |> Db.exec
+        with _ -> () // Column already exists
 
     let private dropTables (conn: SqliteConnection) : unit =
         conn
@@ -598,6 +612,26 @@ module SeriesProjection =
                     |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.exec
 
+                | Series.Series_in_focus_set ->
+                    conn
+                    |> Db.newCommand "UPDATE series_list SET in_focus = 1 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE series_detail SET in_focus = 1 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+
+                | Series.Series_in_focus_cleared ->
+                    conn
+                    |> Db.newCommand "UPDATE series_list SET in_focus = 0 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE series_detail SET in_focus = 0 WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+
     let handler: Projection.ProjectionHandler = {
         Name = "SeriesProjection"
         Handle = handleEvent
@@ -637,7 +671,7 @@ module SeriesProjection =
 
     let getAll (conn: SqliteConnection) : Mediatheca.Shared.SeriesListItem list =
         conn
-        |> Db.newCommand "SELECT slug, name, year, poster_ref, genres, tmdb_rating, status, season_count, episode_count, watched_episode_count, next_up_season, next_up_episode, next_up_title, abandoned FROM series_list ORDER BY name"
+        |> Db.newCommand "SELECT slug, name, year, poster_ref, genres, tmdb_rating, status, season_count, episode_count, watched_episode_count, next_up_season, next_up_episode, next_up_title, abandoned, in_focus FROM series_list ORDER BY name"
         |> Db.query (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
             let genres =
@@ -666,7 +700,8 @@ module SeriesProjection =
               EpisodeCount = rd.ReadInt32 "episode_count"
               WatchedEpisodeCount = rd.ReadInt32 "watched_episode_count"
               NextUp = nextUp
-              IsAbandoned = rd.ReadInt32 "abandoned" = 1 }
+              IsAbandoned = rd.ReadInt32 "abandoned" = 1
+              InFocus = rd.ReadInt32 "in_focus" <> 0 }
         )
 
     let search (conn: SqliteConnection) (query: string) : Mediatheca.Shared.LibrarySearchResult list =
@@ -685,7 +720,7 @@ module SeriesProjection =
 
     let getBySlug (conn: SqliteConnection) (slug: string) (rewatchId: string option) : Mediatheca.Shared.SeriesDetail option =
         conn
-        |> Db.newCommand "SELECT slug, name, year, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, episode_runtime, status, personal_rating, recommended_by, want_to_watch_with, abandoned FROM series_detail WHERE slug = @slug"
+        |> Db.newCommand "SELECT slug, name, year, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, episode_runtime, status, personal_rating, recommended_by, want_to_watch_with, abandoned, in_focus FROM series_detail WHERE slug = @slug"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
@@ -863,6 +898,7 @@ module SeriesProjection =
                 if rd.IsDBNull(rd.GetOrdinal("personal_rating")) then None
                 else Some (rd.ReadInt32 "personal_rating")
               IsAbandoned = rd.ReadInt32 "abandoned" = 1
+              InFocus = rd.ReadInt32 "in_focus" <> 0
               Cast = cast
               RecommendedBy = resolveFriendRefs conn recommendedBySlugs
               WantToWatchWith = resolveFriendRefs conn wantToWatchWithSlugs

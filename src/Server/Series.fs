@@ -114,6 +114,8 @@ module Series =
         | Episode_watched_date_changed of EpisodeWatchedDateChangedData
         | Series_abandoned
         | Series_unabandoned
+        | Series_in_focus_set
+        | Series_in_focus_cleared
 
     // State
 
@@ -161,6 +163,7 @@ module Series =
         WantToWatchWith: Set<string>
         RewatchSessions: Map<string, RewatchSessionState>
         Abandoned: bool
+        InFocus: bool
     }
 
     type SeriesState =
@@ -194,6 +197,8 @@ module Series =
         | Change_episode_watched_date of EpisodeWatchedDateChangedData
         | Abandon_series
         | Unabandon_series
+        | Set_series_in_focus
+        | Clear_series_in_focus
 
     // Evolve
 
@@ -250,6 +255,7 @@ module Series =
                 WantToWatchWith = Set.empty
                 RewatchSessions = Map.ofList [ "default", defaultSession ]
                 Abandoned = false
+                InFocus = false
             }
         | Active _, Series_removed_from_library -> Removed
         | Active series, Series_categorized genres ->
@@ -346,6 +352,10 @@ module Series =
             Active { series with Abandoned = true }
         | Active series, Series_unabandoned ->
             Active { series with Abandoned = false }
+        | Active series, Series_in_focus_set ->
+            Active { series with InFocus = true }
+        | Active series, Series_in_focus_cleared ->
+            Active { series with InFocus = false }
         | _ -> state
 
     let reconstitute (events: SeriesEvent list) : SeriesState =
@@ -422,7 +432,10 @@ module Series =
             match series.RewatchSessions |> Map.tryFind data.RewatchId with
             | Some session ->
                 if session.WatchedEpisodes |> Set.contains (data.SeasonNumber, data.EpisodeNumber) then Ok []
-                else Ok [ Episode_watched data ]
+                else
+                    let events = [ Episode_watched data ]
+                    let events = if series.InFocus then events @ [ Series_in_focus_cleared ] else events
+                    Ok events
             | None -> Error "Rewatch session does not exist"
         | Active series, Mark_episode_unwatched data ->
             match series.RewatchSessions |> Map.tryFind data.RewatchId with
@@ -435,14 +448,20 @@ module Series =
             match series.RewatchSessions |> Map.tryFind data.RewatchId with
             | Some _ ->
                 match series.Seasons |> Map.tryFind data.SeasonNumber with
-                | Some _ -> Ok [ Season_marked_watched data ]
+                | Some _ ->
+                    let events = [ Season_marked_watched data ]
+                    let events = if series.InFocus then events @ [ Series_in_focus_cleared ] else events
+                    Ok events
                 | None -> Error "Season does not exist"
             | None -> Error "Rewatch session does not exist"
         | Active series, Mark_episodes_watched_up_to data ->
             match series.RewatchSessions |> Map.tryFind data.RewatchId with
             | Some _ ->
                 match series.Seasons |> Map.tryFind data.SeasonNumber with
-                | Some _ -> Ok [ Episodes_watched_up_to data ]
+                | Some _ ->
+                    let events = [ Episodes_watched_up_to data ]
+                    let events = if series.InFocus then events @ [ Series_in_focus_cleared ] else events
+                    Ok events
                 | None -> Error "Season does not exist"
             | None -> Error "Rewatch session does not exist"
         | Active series, Mark_season_unwatched data ->
@@ -465,6 +484,12 @@ module Series =
         | Active series, Unabandon_series ->
             if not series.Abandoned then Ok []
             else Ok [ Series_unabandoned ]
+        | Active series, Set_series_in_focus ->
+            if series.InFocus then Ok []
+            else Ok [ Series_in_focus_set ]
+        | Active series, Clear_series_in_focus ->
+            if series.InFocus then Ok [ Series_in_focus_cleared ]
+            else Ok []
         | Removed, _ ->
             Error "Series has been removed"
         | Not_created, _ ->
@@ -712,6 +737,10 @@ module Series =
                 "Series_abandoned", "{}"
             | Series_unabandoned ->
                 "Series_unabandoned", "{}"
+            | Series_in_focus_set ->
+                "Series_in_focus_set", "{}"
+            | Series_in_focus_cleared ->
+                "Series_in_focus_cleared", "{}"
 
         let deserialize (eventType: string) (data: string) : SeriesEvent option =
             match eventType with
@@ -801,6 +830,10 @@ module Series =
                 Some Series_abandoned
             | "Series_unabandoned" ->
                 Some Series_unabandoned
+            | "Series_in_focus_set" ->
+                Some Series_in_focus_set
+            | "Series_in_focus_cleared" ->
+                Some Series_in_focus_cleared
             | _ -> None
 
         let toEventData (event: SeriesEvent) : EventStore.EventData =
