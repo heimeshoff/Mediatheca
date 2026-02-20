@@ -117,6 +117,32 @@ module PlaytimeTracker =
               TotalMinutes = rd.ReadInt32 "total_minutes"
               SessionCount = rd.ReadInt32 "session_count" })
 
+    // Dashboard play sessions (cross-game, last N days)
+
+    let getDashboardPlaySessions (conn: SqliteConnection) (days: int) : DashboardPlaySession list =
+        let fromDate = DateTime.UtcNow.AddDays(float -days).ToString("yyyy-MM-dd")
+        conn
+        |> Db.newCommand """
+            SELECT ps.game_slug,
+                   COALESCE(gd.name, ps.game_slug) as game_name,
+                   gd.cover_ref,
+                   ps.date,
+                   ps.minutes_played
+            FROM game_play_session ps
+            LEFT JOIN game_detail gd ON gd.slug = ps.game_slug
+            WHERE ps.date >= @from_date
+            ORDER BY ps.date
+        """
+        |> Db.setParams [ "from_date", SqlType.String fromDate ]
+        |> Db.query (fun (rd: IDataReader) ->
+            { DashboardPlaySession.GameSlug = rd.ReadString "game_slug"
+              GameName = rd.ReadString "game_name"
+              CoverRef =
+                if rd.IsDBNull(rd.GetOrdinal("cover_ref")) then None
+                else Some (rd.ReadString "cover_ref")
+              Date = rd.ReadString "date"
+              MinutesPlayed = rd.ReadInt32 "minutes_played" })
+
     // Sync status
 
     let getSyncStatus (conn: SqliteConnection) : PlaytimeSyncStatus =

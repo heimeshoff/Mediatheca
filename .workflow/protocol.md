@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-02-20 -- Task Completed: 015 - Dashboard "All" Tab Visual Overhaul
+
+**Type:** Task Completion
+**Task:** 015 - Dashboard "All" Tab Visual Overhaul
+**Summary:** Redesigned Dashboard "All" tab with 2-column grid layout (2/3 + 1/3), TV Series poster card horizontal scroller with shine/shadow effects and In Focus badges, pure CSS stacked bar chart for game play sessions (last 14 days, 8-color palette, clickable legend), Games In Focus below the chart, and full-width Movies In Focus poster scroller. New DashboardPlaySession shared type and server-side query.
+**Files changed:** 6 files
+
+---
+
+## 2026-02-20 -- Batch Started: [015]
+
+**Type:** Batch Start
+**Tasks:** 015 - Dashboard "All" Tab Visual Overhaul
+**Mode:** Sequential (after 014 completed)
+
+---
+
+## 2026-02-20 -- Task Completed: 014 - Event History Viewer on Detail Pages
+
+**Type:** Task Completion
+**Task:** 014 - Event History Viewer on Detail Pages
+**Summary:** Implemented event history viewer across all 5 entity detail pages with a new backend API for human-readable event formatting, two shared frontend components (ActionMenu with glassmorphism dropdown, EventHistoryModal with date-grouped timeline and category icons), and per-page integration that replaces standalone delete buttons with hover-reveal action menus. 232 tests passing.
+**Files changed:** 24 files
+
+---
+
 ## 2026-02-20 -- Batch Started: [014]
 
 **Type:** Batch Start

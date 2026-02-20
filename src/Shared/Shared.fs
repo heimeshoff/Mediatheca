@@ -275,11 +275,20 @@ type DashboardGameRecentlyPlayed = {
     HltbHours: float option
 }
 
+type DashboardPlaySession = {
+    GameSlug: string
+    GameName: string
+    CoverRef: string option
+    Date: string
+    MinutesPlayed: int
+}
+
 type DashboardAllTab = {
     SeriesNextUp: DashboardSeriesNextUp list
     MoviesInFocus: DashboardMovieInFocus list
     GamesInFocus: DashboardGameInFocus list
     GamesRecentlyPlayed: DashboardGameRecentlyPlayed list
+    PlaySessions: DashboardPlaySession list
 }
 
 type DashboardMovieStats = {

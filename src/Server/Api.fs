@@ -1318,11 +1318,13 @@ module Api =
                 let moviesInFocus = MovieProjection.getMoviesInFocus conn 6
                 let gamesInFocus = GameProjection.getGamesInFocus conn
                 let gamesRecentlyPlayed = GameProjection.getGamesRecentlyPlayed conn 6
+                let playSessions = PlaytimeTracker.getDashboardPlaySessions conn 14
                 return {
                     Mediatheca.Shared.DashboardAllTab.SeriesNextUp = seriesNextUp
                     MoviesInFocus = moviesInFocus
                     GamesInFocus = gamesInFocus
                     GamesRecentlyPlayed = gamesRecentlyPlayed
+                    PlaySessions = playSessions
                 }
             }
 
