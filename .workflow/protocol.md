@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-02-20 -- Batch Started: [014]
+
+**Type:** Batch Start
+**Tasks:** 014 - Event History Viewer on Detail Pages
+**Mode:** Sequential (conflicts with 015 on Shared.fs and Api.fs)
+
+---
+
+## 2026-02-20 -- Idea Captured: Dashboard Visual Overhaul
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/015-dashboard-visual-overhaul.md
+**Summary:** Redesign the dashboard "All" tab from stacked lists to a spatially varied 2-column layout. TV Series Next Up becomes a Netflix-style horizontal poster scroller (top-left, 2/3 width). Games Recently Played gets a stacked bar chart of the last 14 days (top-right, 1/3 width) with Games In Focus below it. Movies In Focus spans the full bottom row. New API endpoint for cross-game daily play sessions. Pure CSS bar chart, no charting library.
+
+---
+
+## 2026-02-20 -- Idea Captured: Event History Viewer
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/014-event-history-viewer.md
+**Summary:** Event history viewer on every detail page (Movies, Series, Games, Friends, Catalogues). Hover-reveal action menu replaces standalone Remove/Delete buttons. "Event Log" opens a glassmorphism modal with a polished timeline of human-readable events grouped by date with icons. ContentBlocks streams merged into entity timelines. New shared `ActionMenu` and `EventHistoryModal` components.
+
+---
+
 ## 2026-02-19 — Task Completed: 010 - Dashboard Games tab
 
 **Type:** Task Completion

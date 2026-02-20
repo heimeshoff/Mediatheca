@@ -732,6 +732,14 @@ type ImportResult = {
     Errors: string list
 }
 
+// Event History
+
+type EventHistoryEntry = {
+    Timestamp: string
+    Label: string
+    Details: string list
+}
+
 module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
@@ -910,4 +918,6 @@ type IMediathecaApi = {
     triggerPlaytimeSync: unit -> Async<Result<PlaytimeSyncResult, string>>
     // HowLongToBeat
     fetchHltbData: string -> Async<Result<float option, string>>
+    // Event History
+    getStreamEvents: string -> Async<EventHistoryEntry list>
 }

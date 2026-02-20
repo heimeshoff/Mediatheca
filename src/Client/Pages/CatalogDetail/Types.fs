@@ -23,6 +23,7 @@ type Model = {
     ShowEditCatalog: bool
     EditName: string
     EditDescription: string
+    ShowEventHistory: bool
     Error: string option
     ViewSettings: ViewSettings option
 }
@@ -55,3 +56,5 @@ type Msg =
     | View_settings_loaded of ViewSettings option
     | Save_view_settings of ViewSettings
     | View_settings_saved
+    | Open_event_history
+    | Close_event_history

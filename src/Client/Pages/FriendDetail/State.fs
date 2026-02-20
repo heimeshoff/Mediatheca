@@ -13,6 +13,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       EditForm = { Name = ""; ImageRef = None }
       Error = None
       ShowRemoveConfirm = false
+      ShowEventHistory = false
       CollapsedSections = Set.empty
       SectionSettings = Map.empty },
     Cmd.ofMsg (Load_friend slug)
@@ -157,3 +158,9 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Settings_saved ->
         model, Cmd.none
+
+    | Open_event_history ->
+        { model with ShowEventHistory = true }, Cmd.none
+
+    | Close_event_history ->
+        { model with ShowEventHistory = false }, Cmd.none

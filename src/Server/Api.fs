@@ -3472,4 +3472,23 @@ module Api =
                 with ex ->
                     return Error $"Failed to fetch HLTB data: {ex.Message}"
             }
+
+            // Event History
+            getStreamEvents = fun streamPrefix -> async {
+                // Determine which streams to read based on the prefix
+                let mainStreamId = streamPrefix
+                let contentBlocksStreamId =
+                    // For Movie-X and Game-X, also read ContentBlocks-X
+                    if streamPrefix.StartsWith("Movie-") then
+                        let slug = streamPrefix.Substring(6)
+                        Some (ContentBlocks.streamId slug)
+                    elif streamPrefix.StartsWith("Game-") then
+                        let slug = streamPrefix.Substring(5)
+                        Some (ContentBlocks.streamId slug)
+                    else
+                        None
+                let streamIds =
+                    mainStreamId :: (contentBlocksStreamId |> Option.toList)
+                return EventFormatting.getStreamEvents conn streamIds
+            }
         }

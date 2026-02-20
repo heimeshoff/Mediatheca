@@ -29,6 +29,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       PlaySessions = []
       HltbFetching = false
       HltbNoData = false
+      ShowEventHistory = false
       Error = None },
     Cmd.batch [
         Cmd.ofMsg (Load_game slug)
@@ -460,3 +461,9 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Game_removed (Error err) ->
         { model with Error = Some err }, Cmd.none
+
+    | Open_event_history ->
+        { model with ShowEventHistory = true }, Cmd.none
+
+    | Close_event_history ->
+        { model with ShowEventHistory = false }, Cmd.none

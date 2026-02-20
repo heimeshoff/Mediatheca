@@ -255,14 +255,21 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 Daisy.card [
                     prop.className "bg-base-100 shadow-xl relative"
                     prop.children [
-                        // Trash icon in top right
-                        Daisy.button.button [
-                            button.ghost
-                            button.sm
-                            button.circle
-                            prop.className "absolute top-4 right-4 text-base-content/40 hover:text-error"
-                            prop.onClick (fun _ -> dispatch Remove_friend)
-                            prop.children [ Icons.trash () ]
+                        // Action menu in top right
+                        Html.div [
+                            prop.className "absolute top-4 right-4"
+                            prop.children [
+                                ActionMenu.view [
+                                    { Label = "Event Log"
+                                      Icon = Some Icons.events
+                                      OnClick = fun () -> dispatch Open_event_history
+                                      IsDestructive = false }
+                                    { Label = "Delete"
+                                      Icon = Some Icons.trash
+                                      OnClick = fun () -> dispatch Remove_friend
+                                      IsDestructive = true }
+                                ]
+                            ]
                         ]
                         Daisy.cardBody [
                             prop.className "p-8"
@@ -371,5 +378,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 prop.text "Remove"
                             ]
                         ]
+                // Event History Modal
+                if model.ShowEventHistory then
+                    EventHistoryModal.view $"Friend-{model.Slug}" (fun () -> dispatch Close_event_history)
             ]
         ]

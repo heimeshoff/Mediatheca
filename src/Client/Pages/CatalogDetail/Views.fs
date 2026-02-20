@@ -293,7 +293,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 ]
                                 if not model.ShowEditCatalog then
                                     Html.div [
-                                        prop.className "flex gap-2"
+                                        prop.className "flex items-center gap-2"
                                         prop.children [
                                             Daisy.button.button [
                                                 button.ghost
@@ -301,12 +301,15 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                 prop.onClick (fun _ -> dispatch Open_edit_catalog)
                                                 prop.text "Edit"
                                             ]
-                                            Daisy.button.button [
-                                                button.ghost
-                                                button.sm
-                                                prop.className "text-error"
-                                                prop.onClick (fun _ -> dispatch Remove_catalog)
-                                                prop.text "Delete"
+                                            ActionMenu.view [
+                                                { Label = "Event Log"
+                                                  Icon = Some Icons.events
+                                                  OnClick = fun () -> dispatch Open_event_history
+                                                  IsDestructive = false }
+                                                { Label = "Delete"
+                                                  Icon = Some Icons.trash
+                                                  OnClick = fun () -> dispatch Remove_catalog
+                                                  IsDestructive = true }
                                             ]
                                         ]
                                     ]
@@ -387,5 +390,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         | None -> ()
                     ]
                 ]
+                // Event History Modal
+                if model.ShowEventHistory then
+                    EventHistoryModal.view $"Catalog-{model.Slug}" (fun () -> dispatch Close_event_history)
             ]
         ]

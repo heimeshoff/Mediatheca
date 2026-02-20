@@ -33,6 +33,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       ShowTrailer = None
       SessionMenuOpen = None
       ConfirmingRemove = false
+      ShowEventHistory = false
       Error = None },
     Cmd.batch [
         Cmd.ofMsg Load_detail
@@ -573,3 +574,9 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Series_removed (Error err) ->
         { model with Error = Some err }, Cmd.none
+
+    | Open_event_history ->
+        { model with ShowEventHistory = true }, Cmd.none
+
+    | Close_event_history ->
+        { model with ShowEventHistory = false }, Cmd.none

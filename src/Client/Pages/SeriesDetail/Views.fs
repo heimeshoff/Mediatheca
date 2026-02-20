@@ -1429,11 +1429,11 @@ let private overviewTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                             ]
                         ]
                     ]
-                    // Remove series
-                    Html.div [
-                        prop.className "pt-2"
-                        prop.children [
-                            if model.ConfirmingRemove then
+                    // Remove series confirmation (triggered by ActionMenu)
+                    if model.ConfirmingRemove then
+                        Html.div [
+                            prop.className "pt-2"
+                            prop.children [
                                 Html.div [
                                     prop.className "bg-error/10 border border-error/30 rounded-xl p-4 space-y-3"
                                     prop.children [
@@ -1462,16 +1462,8 @@ let private overviewTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                                         ]
                                     ]
                                 ]
-                            else
-                                Daisy.button.button [
-                                    button.error
-                                    button.sm
-                                    prop.className "w-full"
-                                    prop.onClick (fun _ -> dispatch Confirm_remove_series)
-                                    prop.text "Remove Series"
-                                ]
+                            ]
                         ]
-                    ]
                 ]
             ]
         ]
@@ -1565,6 +1557,22 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                     prop.className "text-base-content backdrop-blur-sm bg-base-300/30"
                                     prop.onClick (fun _ -> Router.navigate "series")
                                     prop.text "\u2190 Back"
+                                ]
+                            ]
+                        ]
+                        // Top-right action menu (hover-reveal)
+                        Html.div [
+                            prop.className "absolute top-4 right-4 z-10 opacity-0 hover:opacity-100 transition-opacity"
+                            prop.children [
+                                ActionMenu.heroView [
+                                    { Label = "Event Log"
+                                      Icon = Some Icons.events
+                                      OnClick = fun () -> dispatch Open_event_history
+                                      IsDestructive = false }
+                                    { Label = "Remove Series"
+                                      Icon = Some Icons.trash
+                                      OnClick = fun () -> dispatch Confirm_remove_series
+                                      IsDestructive = true }
                                 ]
                             ]
                         ]
@@ -1817,5 +1825,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         (fun name -> dispatch (Create_catalog_and_add name))
                         (fun () -> dispatch Close_catalog_picker)
                 | None -> ()
+                // Event History Modal
+                if model.ShowEventHistory then
+                    EventHistoryModal.view $"Series-{model.Slug}" (fun () -> dispatch Close_event_history)
             ]
         ]

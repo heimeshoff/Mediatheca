@@ -20,6 +20,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       IsRatingOpen = false
       IsFriendsMenuOpen = false
       ConfirmingRemove = false
+      ShowEventHistory = false
       Error = None },
     Cmd.batch [
         Cmd.ofMsg (Load_movie slug)
@@ -412,3 +413,9 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Catalog_result (Error err) ->
         { model with Error = Some err }, Cmd.none
+
+    | Open_event_history ->
+        { model with ShowEventHistory = true }, Cmd.none
+
+    | Close_event_history ->
+        { model with ShowEventHistory = false }, Cmd.none

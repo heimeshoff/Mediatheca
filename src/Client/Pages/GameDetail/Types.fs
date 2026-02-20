@@ -36,6 +36,7 @@ type Model = {
     PlaySessions: PlaySessionDto list
     HltbFetching: bool
     HltbNoData: bool
+    ShowEventHistory: bool
     Error: string option
 }
 
@@ -104,3 +105,5 @@ type Msg =
     | Fetch_hltb
     | Hltb_fetched of Result<float option, string>
     | Game_removed of Result<unit, string>
+    | Open_event_history
+    | Close_event_history

@@ -16,6 +16,7 @@ type Model = {
     EditForm: EditForm
     Error: string option
     ShowRemoveConfirm: bool
+    ShowEventHistory: bool
     CollapsedSections: Set<string>
     SectionSettings: Map<string, ViewSettings>
 }
@@ -43,3 +44,5 @@ type Msg =
     | Section_settings_loaded of section: string * settings: ViewSettings option
     | Save_section_settings of section: string * settings: ViewSettings
     | Settings_saved
+    | Open_event_history
+    | Close_event_history

@@ -18,6 +18,7 @@ type Model = {
     IsRatingOpen: bool
     IsFriendsMenuOpen: bool
     ConfirmingRemove: bool
+    ShowEventHistory: bool
     Error: string option
 }
 
@@ -84,3 +85,5 @@ type Msg =
     | Remove_from_catalog of catalogSlug: string * entryId: string
     | Create_catalog_and_add of name: string
     | Catalog_result of Result<unit, string>
+    | Open_event_history
+    | Close_event_history

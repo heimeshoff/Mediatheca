@@ -41,6 +41,7 @@ type Model = {
     SessionMenuOpen: string option
     // Remove
     ConfirmingRemove: bool
+    ShowEventHistory: bool
     Error: string option
 }
 
@@ -130,3 +131,5 @@ type Msg =
     | Cancel_remove_series
     | Remove_series
     | Series_removed of Result<unit, string>
+    | Open_event_history
+    | Close_event_history

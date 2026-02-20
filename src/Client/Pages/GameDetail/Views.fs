@@ -824,9 +824,9 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 ]
                             ]
                         ]
-                        // Change backdrop button
+                        // Top-right action buttons (hover-reveal)
                         Html.div [
-                            prop.className "absolute top-4 right-4 z-10 opacity-0 group-hover/hero:opacity-100 transition-opacity"
+                            prop.className "absolute top-4 right-4 z-10 opacity-0 group-hover/hero:opacity-100 transition-opacity flex items-center gap-2"
                             prop.children [
                                 Daisy.button.button [
                                     button.ghost
@@ -834,6 +834,16 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                     prop.className "text-base-content backdrop-blur-sm bg-base-300/30"
                                     prop.onClick (fun _ -> dispatch (Open_image_picker Backdrop_picker))
                                     prop.text "Change backdrop"
+                                ]
+                                ActionMenu.heroView [
+                                    { Label = "Event Log"
+                                      Icon = Some Icons.events
+                                      OnClick = fun () -> dispatch Open_event_history
+                                      IsDestructive = false }
+                                    { Label = "Remove Game"
+                                      Icon = Some Icons.trash
+                                      OnClick = fun () -> dispatch Confirm_remove_game
+                                      IsDestructive = true }
                                 ]
                             ]
                         ]
@@ -1424,11 +1434,11 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     prop.text err
                                                 ]
                                             | None -> ()
-                                            // Remove game
-                                            Html.div [
-                                                prop.className "pt-4"
-                                                prop.children [
-                                                    if model.ConfirmingRemove then
+                                            // Remove game confirmation (triggered by ActionMenu)
+                                            if model.ConfirmingRemove then
+                                                Html.div [
+                                                    prop.className "pt-4"
+                                                    prop.children [
                                                         Html.div [
                                                             prop.className "bg-error/10 border border-error/30 rounded-xl p-4 space-y-3"
                                                             prop.children [
@@ -1457,16 +1467,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                 ]
                                                             ]
                                                         ]
-                                                    else
-                                                        Daisy.button.button [
-                                                            button.error
-                                                            button.sm
-                                                            prop.className "w-full"
-                                                            prop.onClick (fun _ -> dispatch Confirm_remove_game)
-                                                            prop.text "Remove Game"
-                                                        ]
+                                                    ]
                                                 ]
-                                            ]
                                         ]
                                     ]
                                 ]
@@ -1622,5 +1624,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     ]
                     ModalPanel.view title (fun () -> dispatch Close_image_picker) content
                 | None -> ()
+                // Event History Modal
+                if model.ShowEventHistory then
+                    EventHistoryModal.view $"Game-{model.Slug}" (fun () -> dispatch Close_event_history)
             ]
         ]
