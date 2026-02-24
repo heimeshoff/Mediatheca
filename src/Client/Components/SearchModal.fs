@@ -512,7 +512,7 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
 [<ReactComponent>]
 let view (model: Model) (dispatch: Msg -> unit) =
     let selIdx, setSelIdx = React.useState(-1)
-    let hoverTimerRef = React.useRef(None : float option)
+    let hoverTimerRef = React.useRef(None : int option)
     let activeTab = model.ActiveTab
 
     let localResults = filterLibrary model.Query model.LibraryMovies model.LibrarySeries model.LibraryGames
@@ -572,14 +572,14 @@ let view (model: Model) (dispatch: Msg -> unit) =
         { new System.IDisposable with
             member _.Dispose() =
                 match hoverTimerRef.current with
-                | Some tid -> Browser.Dom.window.clearTimeout(tid)
+                | Some tid -> emitJsExpr tid "clearTimeout($0)"
                 | None -> () }
     )
 
     let startHover (key: string) =
         // Cancel any existing timer
         match hoverTimerRef.current with
-        | Some tid -> Browser.Dom.window.clearTimeout(tid)
+        | Some tid -> emitJsExpr tid "clearTimeout($0)"
         | None -> ()
         // Check cache first
         match model.PreviewCache |> Map.tryFind key with
@@ -590,14 +590,12 @@ let view (model: Model) (dispatch: Msg -> unit) =
         | None ->
             // Start 500ms timer
             let newVersion = model.HoverVersion + 1
-            let tid = Browser.Dom.window.setTimeout((fun () ->
-                dispatch (Hover_start (key, newVersion))
-            ), 500.0)
+            let tid: int = emitJsExpr (fun () -> dispatch (Hover_start (key, newVersion))) "setTimeout($0, 500)"
             hoverTimerRef.current <- Some tid
 
     let cancelHover () =
         match hoverTimerRef.current with
-        | Some tid -> Browser.Dom.window.clearTimeout(tid)
+        | Some tid -> emitJsExpr tid "clearTimeout($0)"
         | None -> ()
         hoverTimerRef.current <- None
         dispatch Hover_clear
