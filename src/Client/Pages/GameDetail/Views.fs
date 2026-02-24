@@ -70,6 +70,7 @@ let private statusBadgeClass (status: GameStatus) =
     | Completed -> "badge-success"
     | Abandoned -> "badge-error"
     | OnHold -> "badge-warning"
+    | Dismissed -> "badge-neutral"
 
 let private statusLabel (status: GameStatus) =
     match status with
@@ -79,6 +80,7 @@ let private statusLabel (status: GameStatus) =
     | Completed -> "Completed"
     | Abandoned -> "Abandoned"
     | OnHold -> "On Hold"
+    | Dismissed -> "Dismissed"
 
 let private formatPlayTime (minutes: int) =
     if minutes = 0 then "No sessions"
@@ -284,7 +286,7 @@ let private HeroRating (rawgRating: float option, personalRating: int option, is
 let private HeroStatus (currentStatus: GameStatus, isOpen: bool, dispatch: Msg -> unit) =
     let triggerRef = React.useElementRef()
     let pos, setPos = React.useState {| top = 0.0; left = 0.0 |}
-    let allStatuses = [ Backlog; InFocus; Playing; Completed; Abandoned; OnHold ]
+    let allStatuses = [ Backlog; InFocus; Playing; Completed; Abandoned; OnHold; Dismissed ]
 
     React.useEffect ((fun () ->
         if isOpen then

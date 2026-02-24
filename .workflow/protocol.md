@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-02-24 -- Task Completed: 020 - Game "Dismissed" Status
+
+**Type:** Task Completion
+**Task:** 020 - Game "Dismissed" Status
+**Summary:** Added `Dismissed` status to `GameStatus` DU across all layers (shared types, server domain, projection, event formatting, both client views) with badge-neutral styling and default-hidden filter behavior. All 233 tests pass.
+**Files changed:** 7 files
+
+---
+
+## 2026-02-24 -- Batch Started: [020]
+
+**Type:** Batch Start
+**Tasks:** 020 - Game "Dismissed" Status
+**Mode:** Sequential (conflicts with 021, 022 on Shared.fs)
+
+---
+
 ## 2026-02-24 -- Idea Captured: Search Poster Grid with Hover Preview
 
 **Type:** Idea Capture

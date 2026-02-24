@@ -44,6 +44,7 @@ module EventFormatting =
         | "Completed" -> "Completed"
         | "Abandoned" -> "Abandoned"
         | "OnHold" -> "On Hold"
+        | "Dismissed" -> "Dismissed"
         | other -> other
 
     let formatMovieEvent (storedEvent: EventStore.StoredEvent) : EventHistoryEntry option =

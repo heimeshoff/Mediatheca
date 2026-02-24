@@ -516,6 +516,7 @@ type GameStatus =
     | Completed
     | Abandoned
     | OnHold
+    | Dismissed
 
 type RawgSearchResult = {
     RawgId: int

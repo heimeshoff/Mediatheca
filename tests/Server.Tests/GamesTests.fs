@@ -446,6 +446,12 @@ let gameSerializationTests =
             let deserialized = Serialization.deserialize eventType data
             Expect.equal deserialized (Some event) "Should round-trip"
 
+        testCase "Game_status_changed Dismissed round-trips" <| fun _ ->
+            let event = Game_status_changed Dismissed
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
         testCase "Game_played_with round-trips" <| fun _ ->
             let event = Game_played_with "marco"
             let eventType, data = Serialization.serialize event
@@ -521,6 +527,7 @@ let gameSerializationTests =
                 Game_status_changed Abandoned
                 Game_status_changed OnHold
                 Game_status_changed Backlog
+                Game_status_changed Dismissed
                 Game_hltb_hours_set (Some 50.5, Some 80.0, Some 120.0)
                 Game_hltb_hours_set (None, None, None)
                 Game_family_owner_added "marco"

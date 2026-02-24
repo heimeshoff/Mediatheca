@@ -83,6 +83,7 @@ module GameProjection =
         | Completed -> "Completed"
         | Abandoned -> "Abandoned"
         | OnHold -> "OnHold"
+        | Dismissed -> "Dismissed"
 
     let private parseGameStatus (s: string) : GameStatus =
         match s with
@@ -92,6 +93,7 @@ module GameProjection =
         | "Completed" -> Completed
         | "Abandoned" -> Abandoned
         | "OnHold" -> OnHold
+        | "Dismissed" -> Dismissed
         | _ -> Backlog
 
     let private updateJsonList (conn: SqliteConnection) (table: string) (column: string) (slug: string) (add: bool) (value: string) : unit =

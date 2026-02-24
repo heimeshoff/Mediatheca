@@ -16,6 +16,7 @@ let private statusLabel (status: GameStatus) =
     | Completed -> "Completed"
     | Abandoned -> "Abandoned"
     | OnHold -> "On Hold"
+    | Dismissed -> "Dismissed"
 
 let private formatPlayTime (minutes: int) =
     if minutes = 0 then ""
@@ -34,6 +35,7 @@ let private statusTextClass (status: GameStatus) =
     | Completed -> "text-success"
     | Abandoned -> "text-error"
     | OnHold -> "text-warning"
+    | Dismissed -> "text-neutral"
 
 let private gameCard (game: GameListItem) =
     Html.a [
@@ -98,7 +100,7 @@ let private gameCard (game: GameListItem) =
     ]
 
 let private statusFilterBadges (currentFilter: GameStatus option) (dispatch: Msg -> unit) =
-    let allStatuses = [ Backlog; InFocus; Playing; Completed; Abandoned; OnHold ]
+    let allStatuses = [ Backlog; InFocus; Playing; Completed; Abandoned; OnHold; Dismissed ]
     Html.div [
         prop.className "flex flex-wrap gap-2"
         prop.children [
@@ -199,8 +201,9 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         (model.SearchQuery = "" ||
                          g.Name.ToLowerInvariant().Contains(model.SearchQuery.ToLowerInvariant()))
                         &&
-                        (model.StatusFilter.IsNone ||
-                         model.StatusFilter = Some g.Status)
+                        (match model.StatusFilter with
+                         | None -> g.Status <> Dismissed
+                         | Some f -> f = g.Status)
                     )
                 if List.isEmpty filtered then
                     Html.div [

@@ -346,6 +346,7 @@ module Games =
             | Completed -> "Completed"
             | Abandoned -> "Abandoned"
             | OnHold -> "OnHold"
+            | Dismissed -> "Dismissed"
 
         let private decodeGameStatus (s: string) : GameStatus =
             match s with
@@ -355,6 +356,7 @@ module Games =
             | "Completed" -> Completed
             | "Abandoned" -> Abandoned
             | "OnHold" -> OnHold
+            | "Dismissed" -> Dismissed
             | _ -> Backlog
 
         let serialize (event: GameEvent) : string * string =
