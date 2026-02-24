@@ -1370,8 +1370,430 @@ let private movieStatsRow (stats: DashboardMovieStats) =
             statBadge "Movies" (string stats.TotalMovies)
             statBadge "Sessions" (string stats.TotalWatchSessions)
             statBadge "Watch Time" (formatPlayTime stats.TotalWatchTimeMinutes)
+            match stats.AverageRating with
+            | Some avg -> statBadge "Avg Rating" (sprintf "%.1f" avg)
+            | None -> ()
+            if stats.WatchlistCount > 0 then
+                statBadge "Watchlist" (string stats.WatchlistCount)
         ]
     ]
+
+// ── Ratings Distribution Bar Chart ──
+
+let private ratingsDistributionChart (distribution: (int * int) list) =
+    if List.isEmpty distribution then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No ratings yet"
+        ]
+    else
+        let maxCount =
+            distribution |> List.map snd |> List.max |> max 1
+        // Fill in all ratings 1-10 even if some are missing
+        let fullDistribution =
+            [ for r in 1..10 do
+                let count =
+                    distribution |> List.tryFind (fun (rating, _) -> rating = r)
+                    |> Option.map snd |> Option.defaultValue 0
+                r, count ]
+        Html.div [
+            prop.className "flex flex-col gap-0"
+            prop.children [
+                // Y-axis max label
+                Html.div [
+                    prop.className "flex items-center gap-1 mb-0.5"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-[10px] text-base-content/30 font-medium"
+                            prop.text (string maxCount)
+                        ]
+                        Html.div [
+                            prop.className "flex-1 border-t border-base-content/10"
+                        ]
+                    ]
+                ]
+                // Bar chart
+                Html.div [
+                    prop.className "flex items-end gap-1.5 h-[120px] px-1"
+                    prop.children [
+                        for (rating, count) in fullDistribution do
+                            let heightPct =
+                                if count = 0 then 0.0
+                                else float count / float maxCount * 100.0
+                            Html.div [
+                                prop.className "flex-1 flex flex-col justify-end items-center relative group"
+                                prop.style [ style.height (length.percent 100) ]
+                                prop.children [
+                                    // Tooltip on hover
+                                    if count > 0 then
+                                        Html.div [
+                                            prop.className "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded-md bg-base-300/90 text-xs text-base-content whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg"
+                                            prop.children [
+                                                Html.div [
+                                                    prop.className "font-medium"
+                                                    prop.text (sprintf "%d movie%s" count (if count = 1 then "" else "s"))
+                                                ]
+                                            ]
+                                        ]
+                                    // Bar
+                                    if count > 0 then
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-primary opacity-80 hover:opacity-100 transition-all duration-300"
+                                            prop.style [ style.height (length.percent heightPct) ]
+                                        ]
+                                    else
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-base-content/5"
+                                            prop.style [ style.height (length.px 2) ]
+                                        ]
+                                    // Rating label
+                                    Html.div [
+                                        prop.className "text-[10px] text-base-content/40 text-center mt-1 leading-none"
+                                        prop.text (string rating)
+                                    ]
+                                ]
+                            ]
+                    ]
+                ]
+            ]
+        ]
+
+// ── Genre Breakdown Horizontal Bars ──
+
+let private genreBreakdownBars (distribution: (string * int) list) =
+    if List.isEmpty distribution then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No genre data yet"
+        ]
+    else
+        let maxCount =
+            distribution |> List.head |> snd |> max 1
+        Html.div [
+            prop.className "flex flex-col gap-1.5"
+            prop.children [
+                for i, (genre, count) in distribution |> List.mapi (fun i x -> i, x) do
+                    let widthPct = float count / float maxCount * 100.0
+                    let opacity = 1.0 - (float i * 0.06)
+                    Html.div [
+                        prop.className "flex items-center gap-2"
+                        prop.children [
+                            Html.span [
+                                prop.className "text-xs text-base-content/70 w-20 text-right truncate flex-shrink-0"
+                                prop.text genre
+                            ]
+                            Html.div [
+                                prop.className "flex-1 h-5 rounded-sm overflow-hidden bg-base-content/5 relative"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "h-full rounded-sm bg-primary transition-all duration-500"
+                                        prop.style [
+                                            style.width (length.percent widthPct)
+                                            style.opacity opacity
+                                        ]
+                                    ]
+                                ]
+                            ]
+                            Html.span [
+                                prop.className "text-xs text-base-content/50 w-6 text-right flex-shrink-0"
+                                prop.text (string count)
+                            ]
+                        ]
+                    ]
+            ]
+        ]
+
+// ── Monthly Watch Activity Chart ──
+
+let private monthlyActivityChart (activity: (string * int * int) list) =
+    if List.isEmpty activity then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No watch activity yet"
+        ]
+    else
+        let maxMovies =
+            activity |> List.map (fun (_, m, _) -> m) |> List.max |> max 1
+        // Fill in all 12 months
+        let today = System.DateTimeOffset.Now
+        let allMonths =
+            [ for i in 11 .. -1 .. 0 do
+                let dt = today.AddMonths(-i)
+                let key = dt.ToString("yyyy-MM")
+                let label = dt.ToString("MMM")
+                let entry =
+                    activity |> List.tryFind (fun (m, _, _) -> m = key)
+                match entry with
+                | Some (_, movies, minutes) -> key, label, movies, minutes
+                | None -> key, label, 0, 0 ]
+        Html.div [
+            prop.className "flex flex-col gap-0"
+            prop.children [
+                // Y-axis max label
+                Html.div [
+                    prop.className "flex items-center gap-1 mb-0.5"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-[10px] text-base-content/30 font-medium"
+                            prop.text (string maxMovies)
+                        ]
+                        Html.div [
+                            prop.className "flex-1 border-t border-base-content/10"
+                        ]
+                    ]
+                ]
+                // Bar chart
+                Html.div [
+                    prop.className "flex items-end gap-1 h-[120px] px-1"
+                    prop.children [
+                        for (_key, label, movies, minutes) in allMonths do
+                            let heightPct =
+                                if movies = 0 then 0.0
+                                else float movies / float maxMovies * 100.0
+                            Html.div [
+                                prop.className "flex-1 flex flex-col justify-end items-center relative group"
+                                prop.style [ style.height (length.percent 100) ]
+                                prop.children [
+                                    // Tooltip
+                                    if movies > 0 then
+                                        Html.div [
+                                            prop.className "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded-md bg-base-300/90 text-xs text-base-content whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg"
+                                            prop.children [
+                                                Html.div [
+                                                    prop.className "font-medium"
+                                                    prop.text (sprintf "%d movie%s" movies (if movies = 1 then "" else "s"))
+                                                ]
+                                                Html.div [
+                                                    prop.className "text-base-content/60"
+                                                    prop.text (formatPlayTime minutes)
+                                                ]
+                                            ]
+                                        ]
+                                    // Bar
+                                    if movies > 0 then
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-info opacity-80 hover:opacity-100 transition-all duration-300"
+                                            prop.style [ style.height (length.percent heightPct) ]
+                                        ]
+                                    else
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-base-content/5"
+                                            prop.style [ style.height (length.px 2) ]
+                                        ]
+                                    // Month label
+                                    Html.div [
+                                        prop.className "text-[10px] text-base-content/40 text-center mt-1 leading-none"
+                                        prop.text label
+                                    ]
+                                ]
+                            ]
+                    ]
+                ]
+            ]
+        ]
+
+// ── Person Stats (Actors / Directors) ──
+
+let private personStatsSection (people: DashboardPersonStats list) (emptyMessage: string) =
+    if List.isEmpty people then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text emptyMessage
+        ]
+    else
+        Html.div [
+            prop.className "flex flex-col gap-2"
+            prop.children [
+                for person in people do
+                    Html.div [
+                        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/30 transition-colors"
+                        prop.children [
+                            // Person image or placeholder
+                            match person.ImageRef with
+                            | Some imageRef ->
+                                Html.img [
+                                    prop.src (sprintf "/images/%s" imageRef)
+                                    prop.alt person.Name
+                                    prop.className "w-10 h-10 rounded-full object-cover flex-shrink-0"
+                                ]
+                            | None ->
+                                Html.div [
+                                    prop.className "w-10 h-10 rounded-full bg-base-300/60 flex items-center justify-center flex-shrink-0"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "text-sm text-base-content/40 font-medium"
+                                            prop.text (person.Name.Substring(0, 1).ToUpper())
+                                        ]
+                                    ]
+                                ]
+                            Html.div [
+                                prop.className "flex-1 min-w-0"
+                                prop.children [
+                                    Html.p [
+                                        prop.className "font-semibold text-sm truncate"
+                                        prop.text person.Name
+                                    ]
+                                    Html.p [
+                                        prop.className "text-xs text-base-content/50"
+                                        prop.text (sprintf "%d movie%s" person.MovieCount (if person.MovieCount = 1 then "" else "s"))
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+            ]
+        ]
+
+// ── Most Watched With (Friends) ──
+
+let private watchedWithSection (watchedWith: DashboardWatchedWithStats list) =
+    if List.isEmpty watchedWith then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No shared sessions yet"
+        ]
+    else
+        Html.div [
+            prop.className "flex flex-col gap-2"
+            prop.children [
+                for friend in watchedWith do
+                    Html.a [
+                        prop.href (Router.format ("friends", friend.Slug))
+                        prop.onClick (fun e ->
+                            e.preventDefault()
+                            Router.navigate ("friends", friend.Slug)
+                        )
+                        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
+                        prop.children [
+                            match friend.ImageRef with
+                            | Some imageRef ->
+                                Html.img [
+                                    prop.src (sprintf "/images/%s" imageRef)
+                                    prop.alt friend.Name
+                                    prop.className "w-10 h-10 rounded-full object-cover flex-shrink-0"
+                                ]
+                            | None ->
+                                Html.div [
+                                    prop.className "w-10 h-10 rounded-full bg-base-300/60 flex items-center justify-center flex-shrink-0"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "text-sm text-base-content/40 font-medium"
+                                            prop.text (friend.Name.Substring(0, 1).ToUpper())
+                                        ]
+                                    ]
+                                ]
+                            Html.div [
+                                prop.className "flex-1 min-w-0"
+                                prop.children [
+                                    Html.p [
+                                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                                        prop.text friend.Name
+                                    ]
+                                    Html.p [
+                                        prop.className "text-xs text-base-content/50"
+                                        prop.text (sprintf "%d session%s" friend.SessionCount (if friend.SessionCount = 1 then "" else "s"))
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+            ]
+        ]
+
+// ── Country Distribution ──
+
+let private countryDistributionBars (distribution: (string * int) list) =
+    if List.isEmpty distribution then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No country data yet"
+        ]
+    else
+        let maxCount =
+            distribution |> List.head |> snd |> max 1
+        Html.div [
+            prop.className "flex flex-col gap-1.5"
+            prop.children [
+                for i, (country, count) in distribution |> List.mapi (fun i x -> i, x) do
+                    let widthPct = float count / float maxCount * 100.0
+                    let opacity = 1.0 - (float i * 0.04)
+                    Html.div [
+                        prop.className "flex items-center gap-2"
+                        prop.children [
+                            Html.span [
+                                prop.className "text-xs text-base-content/70 w-28 text-right truncate flex-shrink-0"
+                                prop.text country
+                            ]
+                            Html.div [
+                                prop.className "flex-1 h-5 rounded-sm overflow-hidden bg-base-content/5 relative"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "h-full rounded-sm bg-secondary transition-all duration-500"
+                                        prop.style [
+                                            style.width (length.percent widthPct)
+                                            style.opacity opacity
+                                        ]
+                                    ]
+                                ]
+                            ]
+                            Html.span [
+                                prop.className "text-xs text-base-content/50 w-6 text-right flex-shrink-0"
+                                prop.text (string count)
+                            ]
+                        ]
+                    ]
+            ]
+        ]
+
+// ── Recently Watched Item ──
+
+let private movieRecentlyWatchedItem (item: DashboardRecentlyWatched) =
+    Html.a [
+        prop.href (Router.format ("movies", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("movies", item.Slug)
+        )
+        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
+        prop.children [
+            PosterCard.thumbnail item.PosterRef item.Name
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.p [
+                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                        prop.text item.Name
+                    ]
+                    Html.div [
+                        prop.className "flex items-center gap-2"
+                        prop.children [
+                            Html.p [
+                                prop.className "text-xs text-base-content/50"
+                                prop.text (sprintf "%d" item.Year)
+                            ]
+                            Html.span [
+                                prop.className "text-xs text-base-content/30"
+                                prop.text "|"
+                            ]
+                            Html.p [
+                                prop.className "text-xs text-base-content/50"
+                                prop.text (formatDate item.WatchDate)
+                            ]
+                            if not (List.isEmpty item.Friends) then
+                                Html.span [
+                                    prop.className "text-[10px] text-base-content/30 ml-1"
+                                    prop.children [
+                                        Icons.friends ()
+                                    ]
+                                ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+// ── Recently Added Item ──
 
 let private movieRecentlyAddedItem (item: MovieListItem) =
     Html.a [
@@ -1399,11 +1821,63 @@ let private movieRecentlyAddedItem (item: MovieListItem) =
         ]
     ]
 
+// ── Movies Tab View ──
+
 let private moviesTabView (data: DashboardMoviesTab) =
     Html.div [
         prop.className "flex flex-col gap-4"
         prop.children [
+            // 1. Stats badges
             movieStatsRow data.Stats
+
+            // 2. Ratings distribution chart
+            sectionCard Icons.star "Ratings Distribution" [
+                ratingsDistributionChart data.Stats.RatingDistribution
+            ]
+
+            // 3. Genre breakdown bars
+            sectionCard Icons.tag "Genre Breakdown" [
+                genreBreakdownBars data.Stats.GenreDistribution
+            ]
+
+            // 4. Monthly watch activity
+            sectionCard Icons.calendar "Monthly Activity" [
+                monthlyActivityChart data.Stats.MonthlyActivity
+            ]
+
+            // 5. Actors & Directors (side by side on desktop)
+            Html.div [
+                prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
+                prop.children [
+                    sectionCard Icons.user "Most Watched Actors" [
+                        personStatsSection data.TopActors "No actor data yet"
+                    ]
+                    sectionCard Icons.user "Most Watched Directors" [
+                        personStatsSection data.TopDirectors "No director data yet"
+                    ]
+                ]
+            ]
+
+            // 6. Most watched with (friends)
+            if not (List.isEmpty data.TopWatchedWith) then
+                sectionCard Icons.friends "Most Watched With" [
+                    watchedWithSection data.TopWatchedWith
+                ]
+
+            // 7. Country distribution
+            if not (List.isEmpty data.Stats.CountryDistribution) then
+                sectionCard Icons.globe "Movie Origins" [
+                    countryDistributionBars data.Stats.CountryDistribution
+                ]
+
+            // 8. Recently watched
+            if not (List.isEmpty data.RecentlyWatched) then
+                sectionCard Icons.movie "Recently Watched" [
+                    for item in data.RecentlyWatched do
+                        movieRecentlyWatchedItem item
+                ]
+
+            // 9. Recently added (watchlist / unwatched)
             if not (List.isEmpty data.RecentlyAdded) then
                 sectionCard Icons.movie "Recently Added" [
                     for item in data.RecentlyAdded do

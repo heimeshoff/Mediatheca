@@ -311,6 +311,34 @@ type DashboardMovieStats = {
     TotalMovies: int
     TotalWatchSessions: int
     TotalWatchTimeMinutes: int
+    AverageRating: float option
+    WatchlistCount: int
+    RatingDistribution: (int * int) list
+    GenreDistribution: (string * int) list
+    MonthlyActivity: (string * int * int) list
+    CountryDistribution: (string * int) list
+}
+
+type DashboardRecentlyWatched = {
+    Slug: string
+    Name: string
+    Year: int
+    PosterRef: string option
+    WatchDate: string
+    Friends: string list
+}
+
+type DashboardPersonStats = {
+    Name: string
+    ImageRef: string option
+    MovieCount: int
+}
+
+type DashboardWatchedWithStats = {
+    Slug: string
+    Name: string
+    ImageRef: string option
+    SessionCount: int
 }
 
 // Event Store Browser
@@ -586,6 +614,10 @@ type AddGameRequest = {
 type DashboardMoviesTab = {
     RecentlyAdded: MovieListItem list
     Stats: DashboardMovieStats
+    RecentlyWatched: DashboardRecentlyWatched list
+    TopActors: DashboardPersonStats list
+    TopDirectors: DashboardPersonStats list
+    TopWatchedWith: DashboardWatchedWithStats list
 }
 
 type DashboardSeriesStats = {

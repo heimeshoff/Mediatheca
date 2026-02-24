@@ -74,6 +74,13 @@ module MovieProjection =
             |> Db.exec
         with _ -> () // Column already exists
 
+        // Migration: add production_countries column for world map visualization
+        try
+            conn
+            |> Db.newCommand "ALTER TABLE movie_detail ADD COLUMN production_countries TEXT NOT NULL DEFAULT '[]'"
+            |> Db.exec
+        with _ -> () // Column already exists
+
     let private dropTables (conn: SqliteConnection) : unit =
         conn
         |> Db.newCommand """
@@ -591,3 +598,206 @@ module MovieProjection =
                 else Some (rd.ReadDouble "tmdb_rating")
               InFocus = rd.ReadInt32 "in_focus" <> 0 }
         )
+
+    // Dashboard: Average rating
+    let getAverageRating (conn: SqliteConnection) : float option =
+        conn
+        |> Db.newCommand "SELECT AVG(CAST(personal_rating AS REAL)) as avg_rating FROM movie_detail WHERE personal_rating IS NOT NULL"
+        |> Db.querySingle (fun (rd: IDataReader) ->
+            if rd.IsDBNull(rd.GetOrdinal("avg_rating")) then None
+            else Some (rd.ReadDouble "avg_rating"))
+        |> Option.flatten
+
+    // Dashboard: Watchlist count (movies not yet watched)
+    let getWatchlistCount (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand "SELECT COUNT(*) as cnt FROM movie_list WHERE slug NOT IN (SELECT DISTINCT movie_slug FROM watch_sessions)"
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "cnt")
+        |> Option.defaultValue 0
+
+    // Dashboard: Rating distribution
+    let getRatingDistribution (conn: SqliteConnection) : (int * int) list =
+        conn
+        |> Db.newCommand """
+            SELECT personal_rating, COUNT(*) as count
+            FROM movie_detail
+            WHERE personal_rating IS NOT NULL
+            GROUP BY personal_rating
+            ORDER BY personal_rating
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadInt32 "personal_rating", rd.ReadInt32 "count")
+
+    // Dashboard: Genre distribution (top 10)
+    let getGenreDistribution (conn: SqliteConnection) : (string * int) list =
+        let allGenres =
+            conn
+            |> Db.newCommand "SELECT genres FROM movie_detail"
+            |> Db.query (fun (rd: IDataReader) ->
+                let genresJson = rd.ReadString "genres"
+                Decode.fromString (Decode.list Decode.string) genresJson
+                |> Result.defaultValue [])
+        allGenres
+        |> List.concat
+        |> List.countBy id
+        |> List.sortByDescending snd
+        |> List.truncate 10
+
+    // Dashboard: Recently watched movies
+    let getRecentlyWatched (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardRecentlyWatched list =
+        conn
+        |> Db.newCommand """
+            SELECT m.slug, m.name, m.year, m.poster_ref, ws.date, ws.friends
+            FROM movie_detail m
+            JOIN watch_sessions ws ON m.slug = ws.movie_slug
+            ORDER BY ws.date DESC
+            LIMIT @limit
+        """
+        |> Db.setParams [ "limit", SqlType.Int32 limit ]
+        |> Db.query (fun (rd: IDataReader) ->
+            let friendsJson = rd.ReadString "friends"
+            let friendSlugs =
+                Decode.fromString (Decode.list Decode.string) friendsJson
+                |> Result.defaultValue []
+            { Mediatheca.Shared.DashboardRecentlyWatched.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              Year = rd.ReadInt32 "year"
+              PosterRef =
+                if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
+                else Some (rd.ReadString "poster_ref")
+              WatchDate = rd.ReadString "date"
+              Friends = friendSlugs })
+
+    // Dashboard: Monthly watch activity (last 12 months)
+    let getMonthlyActivity (conn: SqliteConnection) : (string * int * int) list =
+        conn
+        |> Db.newCommand """
+            SELECT strftime('%Y-%m', ws.date) as month,
+                   COUNT(DISTINCT ws.movie_slug) as movies,
+                   COALESCE(SUM(md.runtime), 0) as minutes
+            FROM watch_sessions ws
+            JOIN movie_detail md ON ws.movie_slug = md.slug
+            WHERE ws.date >= date('now', '-12 months')
+            GROUP BY month
+            ORDER BY month
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "month",
+            rd.ReadInt32 "movies",
+            rd.ReadInt32 "minutes")
+
+    // Dashboard: Top actors (by movies watched)
+    let getTopActors (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardPersonStats list =
+        conn
+        |> Db.newCommand """
+            SELECT cm.name, cm.image_ref, COUNT(DISTINCT ws.movie_slug) as movie_count
+            FROM cast_members cm
+            JOIN movie_cast mc ON mc.cast_member_id = cm.id
+            JOIN watch_sessions ws ON ws.movie_slug = SUBSTR(mc.movie_stream_id, 7)
+            GROUP BY cm.tmdb_id
+            ORDER BY movie_count DESC
+            LIMIT @limit
+        """
+        |> Db.setParams [ "limit", SqlType.Int32 limit ]
+        |> Db.query (fun (rd: IDataReader) ->
+            { Mediatheca.Shared.DashboardPersonStats.Name = rd.ReadString "name"
+              ImageRef =
+                if rd.IsDBNull(rd.GetOrdinal("image_ref")) then None
+                else Some (rd.ReadString "image_ref")
+              MovieCount = rd.ReadInt32 "movie_count" })
+
+    // Dashboard: Top directors (by movies watched)
+    // Note: Directors are stored in the full credits (FullCreditsDto) but not in a separate crew table.
+    // We use cast_members data as best available; directors require a separate crew store.
+    // For now, return empty — this can be enhanced when a crew_members table is available.
+    let getTopDirectors (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardPersonStats list =
+        // Check if crew_members / movie_crew tables exist
+        let tableExists =
+            try
+                conn
+                |> Db.newCommand "SELECT 1 FROM sqlite_master WHERE type='table' AND name='movie_crew'"
+                |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "1")
+                |> Option.isSome
+            with _ -> false
+        if not tableExists then []
+        else
+            conn
+            |> Db.newCommand """
+                SELECT cm.name, cm.image_ref, COUNT(DISTINCT ws.movie_slug) as movie_count
+                FROM cast_members cm
+                JOIN movie_crew mcr ON mcr.crew_member_id = cm.id
+                JOIN watch_sessions ws ON ws.movie_slug = SUBSTR(mcr.movie_stream_id, 7)
+                WHERE mcr.department = 'Directing'
+                GROUP BY cm.tmdb_id
+                ORDER BY movie_count DESC
+                LIMIT @limit
+            """
+            |> Db.setParams [ "limit", SqlType.Int32 limit ]
+            |> Db.query (fun (rd: IDataReader) ->
+                { Mediatheca.Shared.DashboardPersonStats.Name = rd.ReadString "name"
+                  ImageRef =
+                    if rd.IsDBNull(rd.GetOrdinal("image_ref")) then None
+                    else Some (rd.ReadString "image_ref")
+                  MovieCount = rd.ReadInt32 "movie_count" })
+
+    // Dashboard: Top friends watched with
+    let getTopWatchedWith (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardWatchedWithStats list =
+        // Aggregate friend slugs from watch session JSON arrays
+        let allFriendSlugs =
+            conn
+            |> Db.newCommand "SELECT friends FROM watch_sessions WHERE friends <> '[]'"
+            |> Db.query (fun (rd: IDataReader) ->
+                let friendsJson = rd.ReadString "friends"
+                Decode.fromString (Decode.list Decode.string) friendsJson
+                |> Result.defaultValue [])
+        let friendCounts =
+            allFriendSlugs
+            |> List.concat
+            |> List.countBy id
+            |> List.sortByDescending snd
+            |> List.truncate limit
+        // Resolve friend names
+        let friendMap =
+            if List.isEmpty friendCounts then Map.empty
+            else
+                conn
+                |> Db.newCommand "SELECT slug, name, image_ref FROM friend_list"
+                |> Db.query (fun (rd: IDataReader) ->
+                    rd.ReadString "slug",
+                    (rd.ReadString "name",
+                     if rd.IsDBNull(rd.GetOrdinal("image_ref")) then None
+                     else Some (rd.ReadString "image_ref")))
+                |> Map.ofList
+        friendCounts
+        |> List.map (fun (slug, count) ->
+            let name, imageRef =
+                friendMap |> Map.tryFind slug |> Option.defaultValue (slug, None)
+            { Mediatheca.Shared.DashboardWatchedWithStats.Slug = slug
+              Name = name
+              ImageRef = imageRef
+              SessionCount = count })
+
+    // Dashboard: Country distribution (from production_countries if available)
+    let getCountryDistribution (conn: SqliteConnection) : (string * int) list =
+        // Check if production_countries column exists
+        let columnExists =
+            try
+                conn
+                |> Db.newCommand "SELECT production_countries FROM movie_detail LIMIT 1"
+                |> Db.querySingle (fun _ -> true)
+                |> Option.defaultValue false
+            with _ -> false
+        if not columnExists then []
+        else
+            let allCountries =
+                conn
+                |> Db.newCommand "SELECT production_countries FROM movie_detail WHERE production_countries IS NOT NULL AND production_countries <> '[]'"
+                |> Db.query (fun (rd: IDataReader) ->
+                    let json = rd.ReadString "production_countries"
+                    Decode.fromString (Decode.list Decode.string) json
+                    |> Result.defaultValue [])
+            allCountries
+            |> List.concat
+            |> List.countBy id
+            |> List.sortByDescending snd
+            |> List.truncate 20

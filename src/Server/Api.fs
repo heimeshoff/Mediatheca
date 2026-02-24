@@ -1351,12 +1351,32 @@ module Api =
                     |> Db.newCommand "SELECT COALESCE(SUM(md.runtime), 0) as total FROM watch_sessions ws JOIN movie_detail md ON ws.movie_slug = md.slug"
                     |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
                     |> Option.defaultValue 0
+                let averageRating = MovieProjection.getAverageRating conn
+                let watchlistCount = MovieProjection.getWatchlistCount conn
+                let ratingDistribution = MovieProjection.getRatingDistribution conn
+                let genreDistribution = MovieProjection.getGenreDistribution conn
+                let recentlyWatched = MovieProjection.getRecentlyWatched conn 10
+                let monthlyActivity = MovieProjection.getMonthlyActivity conn
+                let topActors = MovieProjection.getTopActors conn 5
+                let topDirectors = MovieProjection.getTopDirectors conn 5
+                let topWatchedWith = MovieProjection.getTopWatchedWith conn 5
+                let countryDistribution = MovieProjection.getCountryDistribution conn
                 return {
                     Mediatheca.Shared.DashboardMoviesTab.RecentlyAdded = recentlyAdded
+                    RecentlyWatched = recentlyWatched
+                    TopActors = topActors
+                    TopDirectors = topDirectors
+                    TopWatchedWith = topWatchedWith
                     Stats = {
                         Mediatheca.Shared.DashboardMovieStats.TotalMovies = totalMovies
                         TotalWatchSessions = totalWatchSessions
                         TotalWatchTimeMinutes = totalWatchTime
+                        AverageRating = averageRating
+                        WatchlistCount = watchlistCount
+                        RatingDistribution = ratingDistribution
+                        GenreDistribution = genreDistribution
+                        MonthlyActivity = monthlyActivity
+                        CountryDistribution = countryDistribution
                     }
                 }
             }

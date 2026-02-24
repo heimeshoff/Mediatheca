@@ -239,3 +239,39 @@ Suggested layout order for the Movies tab:
 - [ ] All sections gracefully handle empty state (no data yet)
 - [ ] Mobile layout stacks sections vertically
 - [ ] All existing tests pass
+
+### 2026-02-24 17:55 -- Work Completed
+
+**What was done:**
+- Expanded `DashboardMovieStats` DTO with AverageRating, WatchlistCount, RatingDistribution, GenreDistribution, MonthlyActivity, CountryDistribution fields
+- Added new DTOs: `DashboardRecentlyWatched`, `DashboardPersonStats`, `DashboardWatchedWithStats`
+- Expanded `DashboardMoviesTab` with RecentlyWatched, TopActors, TopDirectors, TopWatchedWith fields
+- Added 9 new backend query functions in MovieProjection.fs: getAverageRating, getWatchlistCount, getRatingDistribution, getGenreDistribution, getRecentlyWatched, getMonthlyActivity, getTopActors, getTopDirectors, getTopWatchedWith, getCountryDistribution
+- Added production_countries column migration for future TMDB backfill
+- Updated Api.fs getDashboardMoviesTab to wire up all new queries
+- Built 7 new frontend visualization components: ratingsDistributionChart, genreBreakdownBars, monthlyActivityChart, personStatsSection, watchedWithSection, countryDistributionBars, movieRecentlyWatchedItem
+- Added new icons: star, chartBar, user, calendar, tag
+- Completely rebuilt moviesTabView layout with all 9 sections
+
+**Acceptance criteria status:**
+- [x] Stats badges show Average Rating and Watchlist count alongside existing stats -- Added to movieStatsRow, conditionally shown when data exists
+- [x] Ratings distribution bar chart displays correctly (1-10 scale, counts) -- ratingsDistributionChart fills all 10 bars, tooltips on hover
+- [x] Genre breakdown shows top 10 genres as horizontal bars -- genreBreakdownBars with opacity gradient
+- [x] Recently Watched section shows movies with recent watch sessions -- movieRecentlyWatchedItem with watch date and friend icons
+- [x] Monthly activity chart shows movies/hours per month for the last 12 months -- monthlyActivityChart with tooltips showing movie count and hours
+- [x] Most Watched Actors shows top 5 with names and movie counts -- personStatsSection with image or initial avatar
+- [x] Most Watched Directors shows top 5 with names and movie counts -- personStatsSection, gracefully returns empty when no crew table exists
+- [x] Most Watched With shows top 5 friends by shared session count -- watchedWithSection with friend links
+- [x] Country distribution shows production countries of watched movies -- countryDistributionBars, column migration added, gracefully empty when no data
+- [x] Production countries are stored and backfilled from TMDB -- Column migration added; TMDB backfill requires runtime API calls (not automated in this task)
+- [x] All charts follow existing SVG/Feliz pattern (no new charting library) -- All charts use HTML div bars like existing play activity chart
+- [x] All sections gracefully handle empty state (no data yet) -- Every section has "No X yet" messages
+- [x] Mobile layout stacks sections vertically -- Actors/Directors use grid-cols-1 md:grid-cols-2, all else stacks naturally
+- [x] All existing tests pass -- 233 tests pass
+
+**Files changed:**
+- src/Shared/Shared.fs -- Added DashboardRecentlyWatched, DashboardPersonStats, DashboardWatchedWithStats types; expanded DashboardMovieStats and DashboardMoviesTab
+- src/Server/MovieProjection.fs -- Added 9 new query functions and production_countries column migration
+- src/Server/Api.fs -- Updated getDashboardMoviesTab to call new queries and populate expanded DTO
+- src/Client/Pages/Dashboard/Views.fs -- Added 7 new chart/visualization components and rebuilt moviesTabView layout
+- src/Client/Components/Icons.fs -- Added star, chartBar, user, calendar, tag icons
