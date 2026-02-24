@@ -33,7 +33,15 @@ let private formatShortDate (dateStr: string) =
 let private formatDayOfWeek (dateStr: string) =
     try
         let dt = System.DateTimeOffset.Parse(dateStr)
-        dt.LocalDateTime.ToString("ddd")
+        match dt.LocalDateTime.DayOfWeek with
+        | System.DayOfWeek.Monday -> "Mo"
+        | System.DayOfWeek.Tuesday -> "Tu"
+        | System.DayOfWeek.Wednesday -> "We"
+        | System.DayOfWeek.Thursday -> "Th"
+        | System.DayOfWeek.Friday -> "Fr"
+        | System.DayOfWeek.Saturday -> "Sa"
+        | System.DayOfWeek.Sunday -> "Su"
+        | _ -> ""
     with _ -> ""
 
 // ── Tab bar ──
@@ -582,29 +590,35 @@ let private buildChartData (sessions: DashboardPlaySession list) =
         |> List.mapi (fun i (slug, _) -> slug, i % chartColors.Length)
         |> Map.ofList
 
-    let gameNameMap =
-        games |> Map.ofList
-
     // Group sessions by date
     let byDate =
         sessions
         |> List.groupBy (fun s -> s.Date)
-        |> List.sortBy fst
+        |> Map.ofList
 
-    // Build day data
+    // Generate all 14 days (today - 13 days through today)
+    let today = System.DateTimeOffset.Now.Date
     let days =
-        byDate
-        |> List.map (fun (date, daySessions) ->
-            let segments =
-                daySessions
-                |> List.map (fun s ->
-                    {| GameSlug = s.GameSlug
-                       GameName = s.GameName
-                       Minutes = s.MinutesPlayed
-                       ColorIndex = gameColorMap |> Map.tryFind s.GameSlug |> Option.defaultValue 0 |})
-            { Date = date
-              Segments = segments
-              TotalMinutes = segments |> List.sumBy (fun s -> s.Minutes) })
+        [ for i in 13 .. -1 .. 0 do
+            let date = today.AddDays(float -i)
+            let dateStr = date.ToString("yyyy-MM-dd")
+            match byDate |> Map.tryFind dateStr with
+            | Some daySessions ->
+                let segments =
+                    daySessions
+                    |> List.map (fun s ->
+                        {| GameSlug = s.GameSlug
+                           GameName = s.GameName
+                           Minutes = s.MinutesPlayed
+                           ColorIndex = gameColorMap |> Map.tryFind s.GameSlug |> Option.defaultValue 0 |})
+                { Date = dateStr
+                  Segments = segments
+                  TotalMinutes = segments |> List.sumBy (fun s -> s.Minutes) }
+            | None ->
+                { Date = dateStr
+                  Segments = []
+                  TotalMinutes = 0 }
+        ]
 
     let maxMinutes =
         if List.isEmpty days then 1
@@ -612,66 +626,105 @@ let private buildChartData (sessions: DashboardPlaySession list) =
 
     days, maxMinutes, games, gameColorMap
 
-let private playSessionBarChart (sessions: DashboardPlaySession list) =
+let private playSessionChartArea (sessions: DashboardPlaySession list) =
     if List.isEmpty sessions then
         Html.div [
             prop.className "flex items-center justify-center py-8 text-base-content/40 text-sm"
             prop.text "No play sessions in the last 14 days"
         ]
     else
-        let days, maxMinutes, games, gameColorMap = buildChartData sessions
+        let days, maxMinutes, _games, _gameColorMap = buildChartData sessions
 
         Html.div [
-            prop.className "flex flex-col gap-3"
+            prop.className "flex flex-col gap-0"
             prop.children [
-                // Chart area
+                // Y-axis max label
+                Html.div [
+                    prop.className "flex items-center gap-1 mb-0.5"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-[10px] text-base-content/30 font-medium"
+                            prop.text (formatPlayTime maxMinutes)
+                        ]
+                        Html.div [
+                            prop.className "flex-1 border-t border-base-content/10"
+                        ]
+                    ]
+                ]
+                // Chart area with bars
                 Html.div [
                     prop.className "flex items-end gap-1 h-[140px] px-1"
                     prop.children [
                         for day in days do
-                            let heightPct = float day.TotalMinutes / float maxMinutes * 100.0
+                            let heightPct =
+                                if day.TotalMinutes = 0 then 0.0
+                                else float day.TotalMinutes / float maxMinutes * 100.0
                             Html.div [
                                 prop.className "flex-1 flex flex-col justify-end relative group"
                                 prop.style [ style.height (length.percent 100) ]
                                 prop.children [
-                                    // Tooltip on hover
-                                    Html.div [
-                                        prop.className "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded-md bg-base-300/90 text-xs text-base-content whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg"
-                                        prop.children [
-                                            Html.div [
-                                                prop.className "font-medium"
-                                                prop.text (formatDate day.Date)
-                                            ]
-                                            Html.div [
-                                                prop.className "text-base-content/60"
-                                                prop.text (formatPlayTime day.TotalMinutes)
-                                            ]
-                                        ]
-                                    ]
-                                    // Stacked bar
-                                    Html.div [
-                                        prop.className "w-full flex flex-col-reverse rounded-t-sm overflow-hidden transition-all duration-300"
-                                        prop.style [ style.height (length.percent heightPct) ]
-                                        prop.children [
-                                            for seg in day.Segments do
-                                                let segPct = float seg.Minutes / float day.TotalMinutes * 100.0
+                                    // Tooltip on hover (only if there's data)
+                                    if day.TotalMinutes > 0 then
+                                        Html.div [
+                                            prop.className "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded-md bg-base-300/90 text-xs text-base-content whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg"
+                                            prop.children [
                                                 Html.div [
-                                                    prop.className (chartColorClasses.[seg.ColorIndex] + " opacity-80 hover:opacity-100 transition-opacity")
-                                                    prop.style [ style.height (length.percent segPct) ]
-                                                    prop.title $"{seg.GameName}: {formatPlayTime seg.Minutes}"
+                                                    prop.className "font-medium"
+                                                    prop.text (formatDate day.Date)
                                                 ]
+                                                Html.div [
+                                                    prop.className "text-base-content/60"
+                                                    prop.text (formatPlayTime day.TotalMinutes)
+                                                ]
+                                            ]
                                         ]
-                                    ]
-                                    // Day label
+                                    // Stacked bar (or empty placeholder)
+                                    if day.TotalMinutes > 0 then
+                                        Html.div [
+                                            prop.className "w-full flex flex-col-reverse rounded-t-sm overflow-hidden transition-all duration-300"
+                                            prop.style [ style.height (length.percent heightPct) ]
+                                            prop.children [
+                                                for seg in day.Segments do
+                                                    let segPct = float seg.Minutes / float day.TotalMinutes * 100.0
+                                                    Html.div [
+                                                        prop.className (chartColorClasses.[seg.ColorIndex] + " opacity-80 hover:opacity-100 transition-opacity")
+                                                        prop.style [ style.height (length.percent segPct) ]
+                                                        prop.title $"{seg.GameName}: {formatPlayTime seg.Minutes}"
+                                                    ]
+                                            ]
+                                        ]
+                                    else
+                                        // Empty bar placeholder
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-base-content/5"
+                                            prop.style [ style.height (length.px 2) ]
+                                        ]
+                                    // Weekday label
                                     Html.div [
                                         prop.className "text-[10px] text-base-content/40 text-center mt-1 leading-none"
-                                        prop.text (formatShortDate day.Date)
+                                        prop.text (formatDayOfWeek day.Date)
                                     ]
                                 ]
                             ]
                     ]
                 ]
+            ]
+        ]
 
+/// Bar chart without legend (used on All tab where posters serve as legend)
+let private playSessionBarChartNoLegend (sessions: DashboardPlaySession list) =
+    playSessionChartArea sessions
+
+/// Bar chart with legend (used on Games tab)
+let private playSessionBarChart (sessions: DashboardPlaySession list) =
+    if List.isEmpty sessions then
+        playSessionChartArea sessions
+    else
+        let _days, _maxMinutes, games, gameColorMap = buildChartData sessions
+        Html.div [
+            prop.className "flex flex-col gap-3"
+            prop.children [
+                playSessionChartArea sessions
                 // Legend
                 Html.div [
                     prop.className "flex flex-wrap gap-x-3 gap-y-1 pt-1"
@@ -697,42 +750,557 @@ let private playSessionBarChart (sessions: DashboardPlaySession list) =
             ]
         ]
 
-let private gamesRecentlyPlayedChart (sessions: DashboardPlaySession list) =
-    sectionCard Icons.hourglass "Recently Played" [
-        playSessionBarChart sessions
-    ]
-
-// ── All Tab — 2-Column Grid Layout ──
-
-let private allTabView (data: DashboardAllTab) =
-    Html.div [
-        prop.className "flex flex-col gap-4"
+let private gamePosterFromSession (slug: string) (name: string) (coverRef: string option) (colorClass: string) =
+    Html.a [
+        prop.href (Router.format ("games", slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("games", slug)
+        )
+        prop.className "flex-shrink-0 w-[120px] sm:w-[130px] cursor-pointer group snap-start"
         prop.children [
-            // Top row: 3-column grid on desktop (2 left + 1 right)
             Html.div [
-                prop.className "grid grid-cols-1 lg:grid-cols-3 gap-4"
+                prop.className (DesignSystem.posterCard + " relative w-full")
                 prop.children [
-                    // Left column (2/3): TV Series Next Up poster scroller
                     Html.div [
-                        prop.className "lg:col-span-2"
+                        prop.className (DesignSystem.posterImageContainer + " poster-shadow")
                         prop.children [
-                            seriesNextUpScroller data.SeriesNextUp
-                        ]
-                    ]
-
-                    // Right column (1/3): Games Recently Played bar chart + Games In Focus
-                    Html.div [
-                        prop.className "lg:col-span-1 flex flex-col gap-4"
-                        prop.children [
-                            gamesRecentlyPlayedChart data.PlaySessions
-                            gamesInFocusSection data.GamesInFocus
+                            match coverRef with
+                            | Some ref ->
+                                Html.img [
+                                    prop.src $"/images/{ref}"
+                                    prop.alt name
+                                    prop.className DesignSystem.posterImage
+                                ]
+                            | None ->
+                                Html.div [
+                                    prop.className "flex flex-col items-center justify-center w-full h-full text-base-content/20 px-3 gap-2"
+                                    prop.children [
+                                        Icons.gamepad ()
+                                        Html.p [
+                                            prop.className "text-xs text-base-content/40 font-medium text-center line-clamp-2"
+                                            prop.text name
+                                        ]
+                                    ]
+                                ]
+                            Html.div [ prop.className DesignSystem.posterShine ]
                         ]
                     ]
                 ]
             ]
+            Html.p [
+                prop.className ("mt-2 px-0.5 text-sm font-semibold truncate group-hover:text-primary transition-colors " + colorClass)
+                prop.text name
+            ]
+        ]
+    ]
 
-            // Bottom row: Movies In Focus (full width, poster scroller)
-            moviesInFocusPosterSection data.MoviesInFocus
+let private gamesRecentlyPlayedChart (sessions: DashboardPlaySession list) =
+    let uniqueGames =
+        sessions
+        |> List.map (fun s -> s.GameSlug, (s.GameName, s.CoverRef))
+        |> List.distinctBy fst
+
+    let gameColorMap =
+        uniqueGames
+        |> List.mapi (fun i (slug, _) -> slug, i % chartColors.Length)
+        |> Map.ofList
+
+    sectionCardOverflow Icons.hourglass "Recently Played" [
+        // Game poster row
+        if not (List.isEmpty uniqueGames) then
+            Html.div [
+                prop.className "flex gap-3 overflow-x-auto pb-2 mb-3 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                prop.children [
+                    for (slug, (name, coverRef)) in uniqueGames do
+                        let colorIdx = gameColorMap |> Map.tryFind slug |> Option.defaultValue 0
+                        gamePosterFromSession slug name coverRef chartColorTextClasses.[colorIdx]
+                ]
+            ]
+        // Bar chart below (without legend)
+        playSessionBarChartNoLegend sessions
+    ]
+
+// ── Hero Episode Spotlight (top of left column) ──
+
+let private heroSpotlight (item: DashboardSeriesNextUp) =
+    let imageRef =
+        match item.EpisodeStillRef with
+        | Some stillRef -> Some stillRef
+        | None -> item.BackdropRef
+    Html.a [
+        prop.href (Router.format ("series", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("series", item.Slug)
+        )
+        prop.className ("hero-spotlight relative w-full rounded-xl overflow-hidden cursor-pointer group " + DesignSystem.animateFadeInUp)
+        prop.children [
+            // Background image
+            Html.div [
+                prop.className "relative w-full aspect-[21/9] sm:aspect-[2.5/1]"
+                prop.children [
+                    match imageRef with
+                    | Some ref ->
+                        Html.img [
+                            prop.src $"/images/{ref}"
+                            prop.alt item.Name
+                            prop.className "absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        ]
+                    | None ->
+                        Html.div [
+                            prop.className "absolute inset-0 bg-gradient-to-br from-primary/20 to-base-300"
+                        ]
+
+                    // Gradient overlay fading to dark at bottom
+                    Html.div [
+                        prop.className "absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"
+                    ]
+
+                    // Content overlay at bottom
+                    Html.div [
+                        prop.className "absolute bottom-0 left-0 right-0 p-4 sm:p-6"
+                        prop.children [
+                            // Series title
+                            Html.h2 [
+                                prop.className "text-xl sm:text-2xl font-display uppercase tracking-wider text-white/95 group-hover:text-primary transition-colors"
+                                prop.text item.Name
+                            ]
+                            // Episode label
+                            if item.NextUpSeason > 0 then
+                                Html.p [
+                                    prop.className "text-sm text-white/70 mt-1 font-medium"
+                                    prop.text $"S{item.NextUpSeason}E{item.NextUpEpisode}: {item.NextUpTitle}"
+                                ]
+                            // Episode overview
+                            match item.EpisodeOverview with
+                            | Some overview when not (System.String.IsNullOrWhiteSpace overview) ->
+                                Html.p [
+                                    prop.className "text-sm text-white/55 mt-2 line-clamp-2 sm:line-clamp-3 max-w-[600px]"
+                                    prop.text overview
+                                ]
+                            | _ -> ()
+                            // Friend pills
+                            if not (List.isEmpty item.WatchWithFriends) then
+                                Html.div [
+                                    prop.className "flex items-center gap-1 mt-2 flex-wrap"
+                                    prop.children [
+                                        for friend in item.WatchWithFriends do
+                                            friendPill friend
+                                    ]
+                                ]
+                        ]
+                    ]
+
+                    // In Focus glow indicator
+                    if item.InFocus then
+                        Html.div [
+                            prop.className "absolute top-3 left-3 z-10"
+                            prop.children [
+                                Html.span [
+                                    prop.className "flex items-center justify-center w-7 h-7 rounded-full bg-warning/90 text-warning-content shadow-md"
+                                    prop.children [ Icons.crosshairSmFilled () ]
+                                ]
+                            ]
+                        ]
+                ]
+            ]
+        ]
+    ]
+
+// ── Section: Open (title + content, no card chrome) ──
+
+let private sectionOpen (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
+    Html.div [
+        prop.className ("section-open " + DesignSystem.animateFadeInUp)
+        prop.children [
+            Html.div [
+                prop.className "flex items-center gap-2 mb-3"
+                prop.children [
+                    Html.span [
+                        prop.className "text-primary/70"
+                        prop.children [ icon () ]
+                    ]
+                    Html.h2 [
+                        prop.className "text-lg font-display uppercase tracking-wider"
+                        prop.text title
+                    ]
+                ]
+            ]
+            Html.div [
+                prop.children children
+            ]
+        ]
+    ]
+
+// ── Next Up — Open section scroller (All tab, below hero) ──
+
+let private seriesNextUpOpenScroller (items: DashboardSeriesNextUp list) =
+    if List.isEmpty items then
+        Html.none
+    else
+        sectionOpen Icons.tv "Next Up" [
+            Html.div [
+                prop.className "flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                prop.children [
+                    for item in items do
+                        seriesPosterCard item
+                ]
+            ]
+        ]
+
+// ── Games: In Focus — Poster Cards (restyle) ──
+
+let private gameInFocusPosterCard (item: DashboardGameInFocus) =
+    Html.a [
+        prop.href (Router.format ("games", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("games", item.Slug)
+        )
+        prop.className "cursor-pointer group"
+        prop.children [
+            Html.div [
+                prop.className (DesignSystem.posterCard + " relative w-full")
+                prop.children [
+                    Html.div [
+                        prop.className (DesignSystem.posterImageContainer + " poster-shadow")
+                        prop.children [
+                            match item.CoverRef with
+                            | Some ref ->
+                                Html.img [
+                                    prop.src $"/images/{ref}"
+                                    prop.alt item.Name
+                                    prop.className DesignSystem.posterImage
+                                ]
+                            | None ->
+                                Html.div [
+                                    prop.className "flex flex-col items-center justify-center w-full h-full text-base-content/20 px-3 gap-2"
+                                    prop.children [
+                                        Icons.gamepad ()
+                                        Html.p [
+                                            prop.className "text-xs text-base-content/40 font-medium text-center line-clamp-2"
+                                            prop.text item.Name
+                                        ]
+                                    ]
+                                ]
+
+                            // Crosshair badge
+                            Html.div [
+                                prop.className "absolute top-1.5 left-1.5 z-10"
+                                prop.children [
+                                    Html.span [
+                                        prop.className "flex items-center justify-center w-6 h-6 rounded-full bg-warning/90 text-warning-content shadow-md"
+                                        prop.children [ Icons.crosshairSmFilled () ]
+                                    ]
+                                ]
+                            ]
+
+                            Html.div [ prop.className DesignSystem.posterShine ]
+                        ]
+                    ]
+                ]
+            ]
+            Html.div [
+                prop.className "mt-2 px-0.5"
+                prop.children [
+                    Html.p [
+                        prop.className "text-sm font-semibold truncate group-hover:text-primary transition-colors"
+                        prop.text item.Name
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+let private gamesInFocusPosterSection (items: DashboardGameInFocus list) =
+    if List.isEmpty items then
+        Html.none
+    else
+        sectionCard Icons.gamepad "Games In Focus" [
+            Html.div [
+                prop.className "grid grid-cols-2 sm:grid-cols-3 gap-3"
+                prop.children [
+                    for item in items do
+                        gameInFocusPosterCard item
+                ]
+            ]
+        ]
+
+// ── Summary Stats for Recently Played ──
+
+let private playSessionSummaryStats (sessions: DashboardPlaySession list) =
+    let totalMinutes = sessions |> List.sumBy (fun s -> s.MinutesPlayed)
+    let sessionCount = sessions |> List.length
+    Html.div [
+        prop.className "flex items-center gap-4 mt-3 pt-3 border-t border-base-content/10"
+        prop.children [
+            Html.div [
+                prop.className "flex items-center gap-1.5 text-sm text-base-content/60"
+                prop.children [
+                    Html.span [
+                        prop.className "text-primary/70"
+                        prop.children [ Icons.hourglass () ]
+                    ]
+                    Html.span [
+                        prop.className "font-medium"
+                        prop.text (formatPlayTime totalMinutes)
+                    ]
+                    Html.span [
+                        prop.text "played"
+                    ]
+                ]
+            ]
+            Html.div [
+                prop.className "flex items-center gap-1.5 text-sm text-base-content/60"
+                prop.children [
+                    Html.span [
+                        prop.className "text-primary/70"
+                        prop.children [ Icons.gamepad () ]
+                    ]
+                    Html.span [
+                        prop.className "font-medium"
+                        prop.text (string sessionCount)
+                    ]
+                    Html.span [
+                        prop.text "sessions"
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+// ── Recently Played chart with summary stats ──
+
+let private gamesRecentlyPlayedChartWithStats (sessions: DashboardPlaySession list) =
+    let uniqueGames =
+        sessions
+        |> List.map (fun s -> s.GameSlug, (s.GameName, s.CoverRef))
+        |> List.distinctBy fst
+
+    let gameColorMap =
+        uniqueGames
+        |> List.mapi (fun i (slug, _) -> slug, i % chartColors.Length)
+        |> Map.ofList
+
+    sectionCardOverflow Icons.hourglass "Recently Played" [
+        // Game poster row
+        if not (List.isEmpty uniqueGames) then
+            Html.div [
+                prop.className "flex gap-3 overflow-x-auto pb-2 mb-3 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                prop.children [
+                    for (slug, (name, coverRef)) in uniqueGames do
+                        let colorIdx = gameColorMap |> Map.tryFind slug |> Option.defaultValue 0
+                        gamePosterFromSession slug name coverRef chartColorTextClasses.[colorIdx]
+                ]
+            ]
+        // Bar chart below (without legend)
+        playSessionBarChartNoLegend sessions
+        // Summary stats
+        playSessionSummaryStats sessions
+    ]
+
+// ── New Games Card ──
+
+let private newGameItem (item: DashboardNewGame) =
+    Html.a [
+        prop.href (Router.format ("games", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("games", item.Slug)
+        )
+        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
+        prop.children [
+            // Small poster
+            PosterCard.thumbnail item.CoverRef item.Name
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.p [
+                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                        prop.text item.Name
+                    ]
+                    Html.div [
+                        prop.className "flex items-center gap-2 flex-wrap"
+                        prop.children [
+                            if not (System.String.IsNullOrWhiteSpace item.AddedDate) then
+                                Html.span [
+                                    prop.className "text-xs text-base-content/50"
+                                    prop.text (formatDate item.AddedDate)
+                                ]
+                            // Family owner badges
+                            if not (List.isEmpty item.FamilyOwners) then
+                                for owner in item.FamilyOwners do
+                                    Html.span [
+                                        prop.className "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] bg-info/15 text-info/80"
+                                        prop.children [
+                                            match owner.ImageRef with
+                                            | Some imgRef ->
+                                                Html.img [
+                                                    prop.src $"/images/{imgRef}"
+                                                    prop.alt owner.Name
+                                                    prop.className "w-3 h-3 rounded-full object-cover"
+                                                ]
+                                            | None -> ()
+                                            Html.span [ prop.text owner.Name ]
+                                        ]
+                                    ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+let private newGamesSection (items: DashboardNewGame list) =
+    if List.isEmpty items then
+        Html.none
+    else
+        sectionCard Icons.gamepad "New Games" [
+            for item in items do
+                newGameItem item
+        ]
+
+// ── Steam Achievements Card ──
+
+let private achievementItem (achievement: SteamAchievement) =
+    Html.div [
+        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/30 transition-colors"
+        prop.children [
+            // Achievement icon
+            match achievement.IconUrl with
+            | Some iconUrl ->
+                Html.img [
+                    prop.src iconUrl
+                    prop.alt achievement.AchievementName
+                    prop.className "w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                ]
+            | None ->
+                Html.div [
+                    prop.className "w-10 h-10 rounded-lg bg-base-content/10 flex items-center justify-center flex-shrink-0"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-warning/60"
+                            prop.children [ Icons.trophy () ]
+                        ]
+                    ]
+                ]
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.p [
+                        prop.className "font-semibold text-sm truncate"
+                        prop.text achievement.AchievementName
+                    ]
+                    Html.p [
+                        prop.className "text-xs text-base-content/50 truncate"
+                        prop.text achievement.GameName
+                    ]
+                    if not (System.String.IsNullOrWhiteSpace achievement.UnlockTime) then
+                        Html.p [
+                            prop.className "text-[10px] text-base-content/40"
+                            prop.text (formatDate achievement.UnlockTime)
+                        ]
+                ]
+            ]
+        ]
+    ]
+
+let private achievementsSection (state: AchievementsState) =
+    sectionCard Icons.trophy "Recent Achievements" [
+        match state with
+        | AchievementsNotLoaded | AchievementsLoading ->
+            Html.div [
+                prop.className "flex items-center justify-center py-6"
+                prop.children [
+                    Html.span [
+                        prop.className "loading loading-spinner loading-md text-primary"
+                    ]
+                ]
+            ]
+        | AchievementsError msg ->
+            Html.div [
+                prop.className "flex items-center gap-2 py-4 px-2 text-sm text-base-content/50"
+                prop.children [
+                    Html.span [
+                        prop.className "text-warning/60"
+                        prop.children [ Icons.questionCircle () ]
+                    ]
+                    Html.span [ prop.text msg ]
+                ]
+            ]
+        | AchievementsReady achievements ->
+            if List.isEmpty achievements then
+                Html.div [
+                    prop.className "py-4 text-center text-sm text-base-content/40"
+                    prop.text "No recent achievements"
+                ]
+            else
+                Html.div [
+                    prop.children [
+                        for achievement in achievements do
+                            achievementItem achievement
+                    ]
+                ]
+    ]
+
+// ── All Tab — 2-Column Grid Layout ──
+
+let private allTabView (data: DashboardAllTab) (achievementsState: AchievementsState) =
+    // Pick the first active (non-finished, non-abandoned) series for the hero spotlight
+    let heroItem =
+        data.SeriesNextUp
+        |> List.tryFind (fun s -> not s.IsFinished && not s.IsAbandoned && s.NextUpSeason > 0)
+    // Remaining series for the Next Up scroller (skip the hero item)
+    let nextUpItems =
+        match heroItem with
+        | Some hero ->
+            data.SeriesNextUp |> List.filter (fun s -> s.Slug <> hero.Slug)
+        | None -> data.SeriesNextUp
+
+    Html.div [
+        prop.className "flex flex-col gap-4"
+        prop.children [
+            // 2-column grid on desktop
+            Html.div [
+                prop.className "grid grid-cols-1 lg:grid-cols-3 gap-4"
+                prop.children [
+                    // Left column (2/3)
+                    Html.div [
+                        prop.className "lg:col-span-2 flex flex-col gap-4"
+                        prop.children [
+                            // Hero Episode Spotlight
+                            match heroItem with
+                            | Some item -> heroSpotlight item
+                            | None -> ()
+
+                            // Next Up — open section (no card chrome)
+                            seriesNextUpOpenScroller nextUpItems
+
+                            // Movies In Focus
+                            moviesInFocusPosterSection data.MoviesInFocus
+                        ]
+                    ]
+
+                    // Right column (1/3)
+                    Html.div [
+                        prop.className "lg:col-span-1 flex flex-col gap-4"
+                        prop.children [
+                            // Recently Played bar chart with summary stats
+                            gamesRecentlyPlayedChartWithStats data.PlaySessions
+
+                            // Games In Focus — poster cards
+                            gamesInFocusPosterSection data.GamesInFocus
+
+                            // New Games
+                            newGamesSection data.NewGames
+
+                            // Steam Achievements
+                            achievementsSection achievementsState
+                        ]
+                    ]
+                ]
+            ]
         ]
     ]
 
@@ -997,7 +1565,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         match model.ActiveTab with
                         | All ->
                             match model.AllTabData with
-                            | Some data -> allTabView data
+                            | Some data -> allTabView data model.Achievements
                             | None -> loadingView
                         | MoviesTab ->
                             match model.MoviesTabData with

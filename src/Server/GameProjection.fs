@@ -625,3 +625,28 @@ module GameProjection =
                 if rd.IsDBNull(rd.GetOrdinal("rawg_rating")) then None
                 else Some (rd.ReadDouble "rawg_rating") }
         )
+
+    let getDashboardNewGames (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardNewGame list =
+        conn
+        |> Db.newCommand """
+            SELECT gd.slug, gd.name, gd.year, gd.cover_ref, gd.family_owners,
+                   COALESCE(gd.steam_library_date, '') as added_date
+            FROM game_detail gd
+            ORDER BY gd.rowid DESC
+            LIMIT @limit
+        """
+        |> Db.setParams [ "limit", SqlType.Int32 limit ]
+        |> Db.query (fun (rd: IDataReader) ->
+            let familyOwnersJson = rd.ReadString "family_owners"
+            let familyOwnerSlugs =
+                Decode.fromString (Decode.list Decode.string) familyOwnersJson
+                |> Result.defaultValue []
+            { Mediatheca.Shared.DashboardNewGame.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              Year = rd.ReadInt32 "year"
+              CoverRef =
+                if rd.IsDBNull(rd.GetOrdinal("cover_ref")) then None
+                else Some (rd.ReadString "cover_ref")
+              AddedDate = rd.ReadString "added_date"
+              FamilyOwners = resolveFriendRefs conn familyOwnerSlugs }
+        )

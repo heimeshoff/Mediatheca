@@ -1016,9 +1016,14 @@ module SeriesProjection =
             SELECT sl.slug, sl.name, sl.poster_ref, sl.next_up_season, sl.next_up_episode, sl.next_up_title,
                    sl.in_focus, sl.abandoned, sl.episode_count, sl.watched_episode_count,
                    rs.friends,
-                   (SELECT MAX(watched_date) FROM series_episode_progress WHERE series_slug = sl.slug) as last_watched_date
+                   (SELECT MAX(watched_date) FROM series_episode_progress WHERE series_slug = sl.slug) as last_watched_date,
+                   sd.backdrop_ref,
+                   ep.still_ref as episode_still_ref,
+                   ep.overview as episode_overview
             FROM series_list sl
             LEFT JOIN series_rewatch_sessions rs ON rs.series_slug = sl.slug AND rs.is_default = 1
+            LEFT JOIN series_detail sd ON sd.slug = sl.slug
+            LEFT JOIN series_episodes ep ON ep.series_slug = sl.slug AND ep.season_number = sl.next_up_season AND ep.episode_number = sl.next_up_episode
             WHERE sl.next_up_season IS NOT NULL OR sl.in_focus = 1 OR sl.abandoned = 1
             ORDER BY sl.in_focus DESC, last_watched_date DESC NULLS LAST
             %s
@@ -1038,6 +1043,17 @@ module SeriesProjection =
               PosterRef =
                 if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
                 else Some (rd.ReadString "poster_ref")
+              BackdropRef =
+                if rd.IsDBNull(rd.GetOrdinal("backdrop_ref")) then None
+                else Some (rd.ReadString "backdrop_ref")
+              EpisodeStillRef =
+                if rd.IsDBNull(rd.GetOrdinal("episode_still_ref")) then None
+                else Some (rd.ReadString "episode_still_ref")
+              EpisodeOverview =
+                if rd.IsDBNull(rd.GetOrdinal("episode_overview")) then None
+                else
+                    let ov = rd.ReadString "episode_overview"
+                    if System.String.IsNullOrWhiteSpace(ov) then None else Some ov
               NextUpSeason =
                 if rd.IsDBNull(rd.GetOrdinal("next_up_season")) then 0
                 else rd.ReadInt32 "next_up_season"

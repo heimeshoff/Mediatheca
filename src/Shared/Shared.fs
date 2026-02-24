@@ -242,6 +242,9 @@ type DashboardSeriesNextUp = {
     Slug: string
     Name: string
     PosterRef: string option
+    BackdropRef: string option
+    EpisodeStillRef: string option
+    EpisodeOverview: string option
     NextUpSeason: int
     NextUpEpisode: int
     NextUpTitle: string
@@ -283,12 +286,22 @@ type DashboardPlaySession = {
     MinutesPlayed: int
 }
 
+type DashboardNewGame = {
+    Slug: string
+    Name: string
+    Year: int
+    CoverRef: string option
+    AddedDate: string
+    FamilyOwners: FriendRef list
+}
+
 type DashboardAllTab = {
     SeriesNextUp: DashboardSeriesNextUp list
     MoviesInFocus: DashboardMovieInFocus list
     GamesInFocus: DashboardGameInFocus list
     GamesRecentlyPlayed: DashboardGameRecentlyPlayed list
     PlaySessions: DashboardPlaySession list
+    NewGames: DashboardNewGame list
 }
 
 type DashboardMovieStats = {
@@ -595,6 +608,15 @@ type DashboardGamesTab = {
 }
 
 // Steam Integration
+
+type SteamAchievement = {
+    GameName: string
+    GameAppId: int
+    AchievementName: string
+    AchievementDescription: string
+    IconUrl: string option
+    UnlockTime: string
+}
 
 type SteamOwnedGame = {
     AppId: int
@@ -925,6 +947,8 @@ type IMediathecaApi = {
     getPlaytimeSummary: string -> string -> Async<PlaytimeSummaryItem list>
     getPlaytimeSyncStatus: unit -> Async<PlaytimeSyncStatus>
     triggerPlaytimeSync: unit -> Async<Result<PlaytimeSyncResult, string>>
+    // Steam Achievements
+    getSteamRecentAchievements: unit -> Async<Result<SteamAchievement list, string>>
     // HowLongToBeat
     fetchHltbData: string -> Async<Result<float option, string>>
     // Event History

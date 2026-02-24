@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-02-24 -- Task Completed: 016 - Dashboard "All" Tab Overhaul V2
+
+**Type:** Task Completion
+**Task:** 016 - Dashboard "All" Tab Overhaul V2
+**Summary:** Implemented Dashboard "All" tab overhaul V2 with hero episode spotlight (episode still preferred, series backdrop fallback), open-section Next Up without card chrome, poster-style Games & Focus cards, Recently Played summary stats (total hours + sessions), New Games card with family owner badges, and live Steam achievements card with 5-minute TTL cache and error state handling. All 16 acceptance criteria met.
+**Files changed:** 9 files
+
+---
+
+## 2026-02-24 -- Task Started: 016 - Dashboard "All" Tab Overhaul V2
+
+**Type:** Task Start
+**Task:** 016 - Dashboard "All" Tab Overhaul V2
+**Milestone:** --
+
+---
+
+## 2026-02-24 -- Idea Captured: Dashboard "All" Tab Overhaul V2
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/016-dashboard-overhaul-v2.md
+**Summary:** Major dashboard redesign: hero episode spotlight with cinematic backdrop and episode description at top-left, card-less Next Up section, poster-style Games & Focus cards, "New Games" card with family ownership badges, Recently Played stats (total hours + sessions), and live Steam achievements card with error handling. Extends 2-column layout from task 015.
+
+---
+
 ## 2026-02-20 -- Task Completed: 015 - Dashboard "All" Tab Visual Overhaul
 
 **Type:** Task Completion

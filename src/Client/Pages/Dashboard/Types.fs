@@ -8,12 +8,19 @@ type DashboardTab =
     | SeriesTab
     | GamesTab
 
+type AchievementsState =
+    | AchievementsNotLoaded
+    | AchievementsLoading
+    | AchievementsReady of SteamAchievement list
+    | AchievementsError of string
+
 type Model = {
     ActiveTab: DashboardTab
     AllTabData: DashboardAllTab option
     MoviesTabData: DashboardMoviesTab option
     SeriesTabData: DashboardSeriesTab option
     GamesTabData: DashboardGamesTab option
+    Achievements: AchievementsState
     IsLoading: bool
 }
 
@@ -24,3 +31,4 @@ type Msg =
     | SeriesTabLoaded of DashboardSeriesTab
     | GamesTabLoaded of DashboardGamesTab
     | TabLoadError of string
+    | AchievementsLoaded of Result<SteamAchievement list, string>

@@ -342,6 +342,157 @@ module Steam =
                     return Error (sprintf "Failed to get player summaries: %s" ex.Message)
         }
 
+    // Steam Achievements types and decoders
+
+    type SteamPlayerAchievementResponse = {
+        ApiName: string
+        Achieved: int
+        UnlockTime: int
+    }
+
+    type SteamPlayerAchievementsResponse = {
+        Success: bool
+        Achievements: SteamPlayerAchievementResponse list
+        GameName: string
+    }
+
+    type SteamSchemaAchievement = {
+        Name: string
+        DisplayName: string
+        Description: string
+        Icon: string
+    }
+
+    let private decodePlayerAchievement: Decoder<SteamPlayerAchievementResponse> =
+        Decode.object (fun get -> {
+            ApiName = get.Required.Field "apiname" Decode.string
+            Achieved = get.Required.Field "achieved" Decode.int
+            UnlockTime = get.Optional.Field "unlocktime" Decode.int |> Option.defaultValue 0
+        })
+
+    let private decodePlayerAchievementsResponse: Decoder<SteamPlayerAchievementsResponse> =
+        Decode.object (fun get ->
+            let ps = get.Required.Field "playerstats" (Decode.object (fun get2 -> {
+                Success = get2.Optional.Field "success" Decode.bool |> Option.defaultValue false
+                Achievements = get2.Optional.Field "achievements" (Decode.list decodePlayerAchievement) |> Option.defaultValue []
+                GameName = get2.Optional.Field "gameName" Decode.string |> Option.defaultValue ""
+            }))
+            ps
+        )
+
+    let private decodeSchemaAchievement: Decoder<SteamSchemaAchievement> =
+        Decode.object (fun get -> {
+            Name = get.Required.Field "name" Decode.string
+            DisplayName = get.Optional.Field "displayName" Decode.string |> Option.defaultValue ""
+            Description = get.Optional.Field "description" Decode.string |> Option.defaultValue ""
+            Icon = get.Optional.Field "icon" Decode.string |> Option.defaultValue ""
+        })
+
+    let private decodeSchemaAchievements: Decoder<SteamSchemaAchievement list> =
+        Decode.object (fun get ->
+            let game = get.Required.Field "game" (Decode.object (fun get2 ->
+                let stats = get2.Optional.Field "availableGameStats" (Decode.object (fun get3 ->
+                    get3.Optional.Field "achievements" (Decode.list decodeSchemaAchievement) |> Option.defaultValue []
+                ))
+                stats |> Option.defaultValue []
+            ))
+            game
+        )
+
+    let getPlayerAchievements (httpClient: HttpClient) (config: SteamConfig) (appId: int) : Async<Result<SteamPlayerAchievementsResponse, string>> =
+        async {
+            try
+                let url = sprintf "https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?appid=%d&key=%s&steamid=%s" appId config.ApiKey config.SteamId
+                let! json = fetchJson httpClient url
+                match Decode.fromString decodePlayerAchievementsResponse json with
+                | Ok response -> return Ok response
+                | Error e -> return Error (sprintf "Failed to parse achievements: %s" e)
+            with ex ->
+                return Error (sprintf "Failed to get achievements for appId %d: %s" appId ex.Message)
+        }
+
+    let getGameSchema (httpClient: HttpClient) (apiKey: string) (appId: int) : Async<Result<SteamSchemaAchievement list, string>> =
+        async {
+            try
+                let url = sprintf "https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?appid=%d&key=%s" appId apiKey
+                let! json = fetchJson httpClient url
+                match Decode.fromString decodeSchemaAchievements json with
+                | Ok achievements -> return Ok achievements
+                | Error e -> return Error (sprintf "Failed to parse game schema: %s" e)
+            with ex ->
+                return Error (sprintf "Failed to get game schema for appId %d: %s" appId ex.Message)
+        }
+
+    // In-memory cache for achievements
+    let private achievementsCache = System.Collections.Concurrent.ConcurrentDictionary<string, (System.DateTime * Result<Mediatheca.Shared.SteamAchievement list, string>)>()
+    let private cacheTtl = System.TimeSpan.FromMinutes(5.0)
+
+    let getRecentAchievements (httpClient: HttpClient) (config: SteamConfig) : Async<Result<Mediatheca.Shared.SteamAchievement list, string>> =
+        async {
+            if System.String.IsNullOrWhiteSpace(config.ApiKey) || System.String.IsNullOrWhiteSpace(config.SteamId) then
+                return Error "Steam API key and Steam ID must be configured"
+            else
+                let cacheKey = sprintf "%s_%s" config.ApiKey config.SteamId
+                match achievementsCache.TryGetValue(cacheKey) with
+                | true, (cachedAt, cachedResult) when System.DateTime.UtcNow - cachedAt < cacheTtl ->
+                    return cachedResult
+                | _ ->
+                    try
+                        // Step 1: Get recently played games
+                        let! recentGames = getRecentlyPlayedGames httpClient config
+                        if List.isEmpty recentGames then
+                            let result = Ok []
+                            achievementsCache.[cacheKey] <- (System.DateTime.UtcNow, result)
+                            return result
+                        else
+                            // Step 2: For each game, get achievements
+                            let mutable allAchievements : Mediatheca.Shared.SteamAchievement list = []
+                            for game in recentGames do
+                                let! achievementsResult = getPlayerAchievements httpClient config game.AppId
+                                match achievementsResult with
+                                | Ok response when response.Success ->
+                                    // Get schema for display names and icons
+                                    let! schemaResult = getGameSchema httpClient config.ApiKey game.AppId
+                                    let schemaMap =
+                                        match schemaResult with
+                                        | Ok schemas ->
+                                            schemas |> List.map (fun s -> s.Name, s) |> Map.ofList
+                                        | Error _ -> Map.empty
+
+                                    let recentUnlocked =
+                                        response.Achievements
+                                        |> List.filter (fun a -> a.Achieved = 1 && a.UnlockTime > 0)
+                                        |> List.map (fun a ->
+                                            let schema = schemaMap |> Map.tryFind a.ApiName
+                                            let displayName = schema |> Option.map (fun s -> s.DisplayName) |> Option.defaultValue a.ApiName
+                                            let description = schema |> Option.map (fun s -> s.Description) |> Option.defaultValue ""
+                                            let iconUrl = schema |> Option.bind (fun s -> if System.String.IsNullOrEmpty(s.Icon) then None else Some s.Icon)
+                                            let unlockTimeStr =
+                                                unixTimestampToDateString a.UnlockTime
+                                                |> Option.defaultValue ""
+                                            ({ GameName = game.Name
+                                               GameAppId = game.AppId
+                                               AchievementName = displayName
+                                               AchievementDescription = description
+                                               IconUrl = iconUrl
+                                               UnlockTime = unlockTimeStr } : Mediatheca.Shared.SteamAchievement))
+                                    allAchievements <- allAchievements @ recentUnlocked
+                                | _ -> () // Skip games where achievements API fails
+
+                            // Sort by unlock time descending, take top 10
+                            let sorted =
+                                allAchievements
+                                |> List.sortByDescending (fun a -> a.UnlockTime)
+                                |> List.truncate 10
+                            let result = Ok sorted
+                            achievementsCache.[cacheKey] <- (System.DateTime.UtcNow, result)
+                            return result
+                    with ex ->
+                        let result = Error (sprintf "Failed to fetch achievements: %s" ex.Message)
+                        achievementsCache.[cacheKey] <- (System.DateTime.UtcNow, result)
+                        return result
+        }
+
     let getSteamStoreDetails (httpClient: HttpClient) (appId: int) : Async<Result<SteamStoreDetails, string>> =
         async {
             try

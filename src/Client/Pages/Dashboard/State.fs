@@ -27,12 +27,19 @@ let private fetchTabData (api: IMediathecaApi) (tab: DashboardTab) : Cmd<Msg> =
             GamesTabLoaded
             (fun ex -> TabLoadError ex.Message)
 
+let private fetchAchievements (api: IMediathecaApi) : Cmd<Msg> =
+    Cmd.OfAsync.either
+        api.getSteamRecentAchievements ()
+        AchievementsLoaded
+        (fun ex -> AchievementsLoaded (Error ex.Message))
+
 let init () : Model * Cmd<Msg> =
     { ActiveTab = All
       AllTabData = None
       MoviesTabData = None
       SeriesTabData = None
       GamesTabData = None
+      Achievements = AchievementsNotLoaded
       IsLoading = true },
     Cmd.none
 
@@ -43,7 +50,11 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with ActiveTab = tab; IsLoading = true }, cmd
 
     | AllTabLoaded data ->
-        { model with AllTabData = Some data; IsLoading = false }, Cmd.none
+        let achievementsCmd =
+            match model.Achievements with
+            | AchievementsNotLoaded -> fetchAchievements api
+            | _ -> Cmd.none
+        { model with AllTabData = Some data; IsLoading = false; Achievements = if model.Achievements = AchievementsNotLoaded then AchievementsLoading else model.Achievements }, achievementsCmd
 
     | MoviesTabLoaded data ->
         { model with MoviesTabData = Some data; IsLoading = false }, Cmd.none
@@ -56,3 +67,10 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | TabLoadError _ ->
         { model with IsLoading = false }, Cmd.none
+
+    | AchievementsLoaded result ->
+        match result with
+        | Ok achievements ->
+            { model with Achievements = AchievementsReady achievements }, Cmd.none
+        | Error msg ->
+            { model with Achievements = AchievementsError msg }, Cmd.none

@@ -1319,12 +1319,14 @@ module Api =
                 let gamesInFocus = GameProjection.getGamesInFocus conn
                 let gamesRecentlyPlayed = GameProjection.getGamesRecentlyPlayed conn 6
                 let playSessions = PlaytimeTracker.getDashboardPlaySessions conn 14
+                let newGames = GameProjection.getDashboardNewGames conn 10
                 return {
                     Mediatheca.Shared.DashboardAllTab.SeriesNextUp = seriesNextUp
                     MoviesInFocus = moviesInFocus
                     GamesInFocus = gamesInFocus
                     GamesRecentlyPlayed = gamesRecentlyPlayed
                     PlaySessions = playSessions
+                    NewGames = newGames
                 }
             }
 
@@ -3445,6 +3447,15 @@ module Api =
 
             triggerPlaytimeSync = fun () ->
                 PlaytimeTracker.runSync conn httpClient getSteamConfig projectionHandlers
+
+            // Steam Achievements
+            getSteamRecentAchievements = fun () -> async {
+                try
+                    let steamConfig = getSteamConfig()
+                    return! Steam.getRecentAchievements httpClient steamConfig
+                with ex ->
+                    return Error (sprintf "Failed to fetch achievements: %s" ex.Message)
+            }
 
             // HowLongToBeat
             fetchHltbData = fun gameSlug -> async {
