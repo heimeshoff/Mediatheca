@@ -3174,6 +3174,11 @@ module Api =
                                     | None -> (matched, jItem :: unmatched)
                                 ) ([], [])
 
+                            // Clear all existing Jellyfin IDs before re-populating (handles removed items)
+                            conn |> Db.newCommand "UPDATE movie_detail SET jellyfin_id = NULL WHERE jellyfin_id IS NOT NULL" |> Db.exec
+                            conn |> Db.newCommand "UPDATE series_detail SET jellyfin_id = NULL WHERE jellyfin_id IS NOT NULL" |> Db.exec
+                            conn |> Db.newCommand "DELETE FROM series_episode_jellyfin" |> Db.exec
+
                             // Persist Jellyfin IDs for matched movies
                             for m in matchedMovies do
                                 conn
@@ -3274,6 +3279,11 @@ module Api =
                                     with ex ->
                                         errors <- errors @ [sprintf "Auto-add movie '%s' (TMDB %d): %s" item.Name tid ex.Message]
                                 | _ -> ()
+
+                            // Clear all existing Jellyfin IDs before re-populating (handles removed items)
+                            conn |> Db.newCommand "UPDATE movie_detail SET jellyfin_id = NULL WHERE jellyfin_id IS NOT NULL" |> Db.exec
+                            conn |> Db.newCommand "UPDATE series_detail SET jellyfin_id = NULL WHERE jellyfin_id IS NOT NULL" |> Db.exec
+                            conn |> Db.newCommand "DELETE FROM series_episode_jellyfin" |> Db.exec
 
                             // Phase 1b: Persist Jellyfin IDs for all matched movies
                             for item in jellyfinMovies do
