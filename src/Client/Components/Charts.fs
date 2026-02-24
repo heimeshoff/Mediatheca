@@ -103,7 +103,7 @@ let donutChart (data: (string * int) list) (emptyMessage: string) =
                                                 svg.fill "none"
                                                 svg.stroke pieColors.[colorIdx]
                                                 svg.strokeWidth (r - innerR)
-                                                svg.opacity 0.85
+                                                svg.custom("opacity", "0.85")
                                             ]
                                         else
                                             let startRad = startAngle * System.Math.PI / 180.0
@@ -128,7 +128,7 @@ let donutChart (data: (string * int) list) (emptyMessage: string) =
                                             Svg.path [
                                                 svg.d pathD
                                                 svg.fill pieColors.[colorIdx]
-                                                svg.opacity 0.85
+                                                svg.custom("opacity", "0.85")
                                                 svg.className "hover:opacity-100 transition-opacity cursor-default"
                                             ]
 
