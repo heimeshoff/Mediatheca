@@ -695,6 +695,12 @@ type GameImageCandidate = {
     IsCurrent: bool
 }
 
+type GameTrailerInfo = {
+    VideoUrl: string
+    ThumbnailUrl: string option
+    Title: string option
+}
+
 // Jellyfin Integration
 
 type JellyfinItemType =
@@ -913,6 +919,7 @@ type IMediathecaApi = {
     getCatalogsForGame: string -> Async<CatalogRef list>
     getGameImageCandidates: string -> Async<GameImageCandidate list>
     selectGameImage: string -> string -> string -> Async<Result<unit, string>>
+    getGameTrailer: string -> Async<GameTrailerInfo option>
     // Games Settings
     getRawgApiKey: unit -> Async<string>
     setRawgApiKey: string -> Async<Result<unit, string>>

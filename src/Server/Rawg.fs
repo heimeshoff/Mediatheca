@@ -213,6 +213,70 @@ module Rawg =
                 with _ -> return []
         }
 
+    // RAWG trailer types and decoders
+
+    type RawgTrailerResult = {
+        Id: int
+        Name: string
+        Preview: string option
+        Data: RawgTrailerData
+    }
+
+    and RawgTrailerData = {
+        Max: string option
+        The480: string option
+    }
+
+    type RawgTrailersResponse = {
+        Results: RawgTrailerResult list
+    }
+
+    let private decodeTrailerData: Decoder<RawgTrailerData> =
+        Decode.object (fun get -> {
+            Max = get.Optional.Field "max" Decode.string
+            The480 = get.Optional.Field "480" Decode.string
+        })
+
+    let private decodeTrailerResult: Decoder<RawgTrailerResult> =
+        Decode.object (fun get -> {
+            Id = get.Required.Field "id" Decode.int
+            Name = get.Optional.Field "name" Decode.string |> Option.defaultValue ""
+            Preview = get.Optional.Field "preview" Decode.string
+            Data = get.Optional.Field "data" decodeTrailerData |> Option.defaultValue { Max = None; The480 = None }
+        })
+
+    let private decodeTrailersResponse: Decoder<RawgTrailersResponse> =
+        Decode.object (fun get -> {
+            Results = get.Required.Field "results" (Decode.list decodeTrailerResult)
+        })
+
+    let getGameTrailers (httpClient: HttpClient) (config: RawgConfig) (rawgId: int) : Async<Mediatheca.Shared.GameTrailerInfo option> =
+        async {
+            if System.String.IsNullOrWhiteSpace(config.ApiKey) then return None
+            else
+                try
+                    let url = $"https://api.rawg.io/api/games/{rawgId}/movies?key={config.ApiKey}"
+                    let! json = fetchJson httpClient url
+                    match Decode.fromString decodeTrailersResponse json with
+                    | Ok response ->
+                        match response.Results |> List.tryHead with
+                        | Some trailer ->
+                            let videoUrl =
+                                trailer.Data.Max
+                                |> Option.orElse trailer.Data.The480
+                            match videoUrl with
+                            | Some url ->
+                                return Some {
+                                    Mediatheca.Shared.GameTrailerInfo.VideoUrl = url
+                                    ThumbnailUrl = trailer.Preview
+                                    Title = if System.String.IsNullOrWhiteSpace(trailer.Name) then None else Some trailer.Name
+                                }
+                            | None -> return None
+                        | None -> return None
+                    | Error _ -> return None
+                with _ -> return None
+        }
+
     let downloadGameImages (httpClient: HttpClient) (slug: string) (backgroundImage: string option) (backgroundImageAdditional: string option) (imageBasePath: string) : Async<string option * string option> =
         async {
             let coverRef =

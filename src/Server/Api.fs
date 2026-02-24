@@ -2498,6 +2498,30 @@ module Api =
                     return Error $"Failed to download image: {ex.Message}"
             }
 
+            getGameTrailer = fun slug -> async {
+                try
+                    match GameProjection.getBySlug conn slug with
+                    | None -> return None
+                    | Some game ->
+                        // Try Steam Store API first
+                        let! steamResult = async {
+                            match game.SteamAppId with
+                            | Some appId -> return! Steam.getSteamStoreTrailer httpClient appId
+                            | None -> return None
+                        }
+                        match steamResult with
+                        | Some trailer -> return Some trailer
+                        | None ->
+                            // Fall back to RAWG API
+                            match game.RawgId with
+                            | Some rawgId ->
+                                let rawgConfig = getRawgConfig()
+                                return! Rawg.getGameTrailers httpClient rawgConfig rawgId
+                            | None -> return None
+                with _ ->
+                    return None
+            }
+
             // Games Settings
             getRawgApiKey = fun () -> async {
                 let key =

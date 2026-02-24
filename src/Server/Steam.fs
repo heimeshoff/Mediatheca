@@ -509,3 +509,93 @@ module Steam =
             with ex ->
                 return Error (sprintf "Failed to get Steam store details: %s" ex.Message)
         }
+
+    // Steam Store trailer types and decoders
+
+    type SteamMovieUrls = {
+        Quality480: string option
+        QualityMax: string option
+    }
+
+    type SteamMovie = {
+        Id: int
+        Name: string
+        Thumbnail: string option
+        Mp4: SteamMovieUrls
+        Webm: SteamMovieUrls
+        Highlight: bool
+    }
+
+    let private decodeMovieUrls: Decoder<SteamMovieUrls> =
+        Decode.object (fun get -> {
+            Quality480 = get.Optional.Field "480" Decode.string
+            QualityMax = get.Optional.Field "max" Decode.string
+        })
+
+    let private decodeSteamMovie: Decoder<SteamMovie> =
+        Decode.object (fun get -> {
+            Id = get.Required.Field "id" Decode.int
+            Name = get.Optional.Field "name" Decode.string |> Option.defaultValue ""
+            Thumbnail = get.Optional.Field "thumbnail" Decode.string
+            Mp4 = get.Optional.Field "mp4" decodeMovieUrls |> Option.defaultValue { Quality480 = None; QualityMax = None }
+            Webm = get.Optional.Field "webm" decodeMovieUrls |> Option.defaultValue { Quality480 = None; QualityMax = None }
+            Highlight = get.Optional.Field "highlight" Decode.bool |> Option.defaultValue false
+        })
+
+    let private decodeStoreMovies: Decoder<SteamMovie list> =
+        Decode.object (fun get ->
+            let appEntry = get.Required.At [] (Decode.object (fun get2 ->
+                let success = get2.Required.Field "success" Decode.bool
+                if success then
+                    get2.Optional.At [ "data"; "movies" ] (Decode.list decodeSteamMovie) |> Option.defaultValue []
+                else
+                    []))
+            appEntry
+        )
+
+    let getSteamStoreTrailer (httpClient: HttpClient) (appId: int) : Async<Mediatheca.Shared.GameTrailerInfo option> =
+        async {
+            try
+                let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d" appId
+                let! json = fetchJson httpClient url
+                let appIdKey = string appId
+                // Parse manually to extract movies from the nested response
+                match Decode.fromString (Decode.dict (Decode.object (fun get ->
+                    let success = get.Required.Field "success" Decode.bool
+                    if success then
+                        get.Optional.At [ "data"; "movies" ] (Decode.list decodeSteamMovie) |> Option.defaultValue []
+                    else
+                        []
+                ))) json with
+                | Ok dict ->
+                    match dict.TryGetValue(appIdKey) with
+                    | true, movies when not (List.isEmpty movies) ->
+                        // Prefer highlight trailer, else first
+                        let trailer =
+                            movies
+                            |> List.tryFind (fun m -> m.Highlight)
+                            |> Option.orElse (List.tryHead movies)
+                        match trailer with
+                        | Some t ->
+                            // Prefer mp4.max, then mp4.480, then webm.max, then webm.480
+                            let videoUrl =
+                                t.Mp4.QualityMax
+                                |> Option.orElse t.Mp4.Quality480
+                                |> Option.orElse t.Webm.QualityMax
+                                |> Option.orElse t.Webm.Quality480
+                            match videoUrl with
+                            | Some url ->
+                                // Ensure HTTPS
+                                let secureUrl = url.Replace("http://", "https://")
+                                return Some {
+                                    Mediatheca.Shared.GameTrailerInfo.VideoUrl = secureUrl
+                                    ThumbnailUrl = t.Thumbnail
+                                    Title = if System.String.IsNullOrWhiteSpace(t.Name) then None else Some t.Name
+                                }
+                            | None -> return None
+                        | None -> return None
+                    | _ -> return None
+                | Error _ -> return None
+            with _ ->
+                return None
+        }

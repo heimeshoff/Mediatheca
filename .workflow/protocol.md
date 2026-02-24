@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-02-24 -- Task Completed: 018 - Game Trailer Playback
+
+**Type:** Task Completion
+**Task:** 018 - Game Trailer Playback
+**Summary:** Implemented game trailer playback with Steam Store API (primary) and RAWG API (fallback) trailer fetching, new `getGameTrailer` API endpoint, and "Play Trailer" button with HTML5 video modal overlay on the game detail page. All 232 tests pass, `npm run build` succeeds.
+**Files changed:** 8 files
+
+---
+
+## 2026-02-24 -- Task Started: 018 - Game Trailer Playback
+
+**Type:** Task Start
+**Task:** 018 - Game Trailer Playback
+**Milestone:** --
+
+---
+
+## 2026-02-24 -- Idea Captured: Game Trailer Playback
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/018-game-trailers.md
+**Summary:** Add "Play Trailer" to game detail pages using Steam Store API (primary, direct MP4/WebM URLs) with RAWG API fallback. HTML5 `<video>` modal overlay matching movie trailer UX. Includes new shared `GameTrailerInfo` type, `getGameTrailer` API endpoint, and full Elmish state management.
+
+---
+
 ## 2026-02-24 -- Task Completed: 017 - Jellyfin Play Button
 
 **Type:** Task Completion

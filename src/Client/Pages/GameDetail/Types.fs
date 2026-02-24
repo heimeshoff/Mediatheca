@@ -36,6 +36,9 @@ type Model = {
     PlaySessions: PlaySessionDto list
     HltbFetching: bool
     HltbNoData: bool
+    TrailerInfo: GameTrailerInfo option
+    ShowTrailer: bool
+    IsLoadingTrailer: bool
     ShowEventHistory: bool
     Error: string option
 }
@@ -105,5 +108,9 @@ type Msg =
     | Fetch_hltb
     | Hltb_fetched of Result<float option, string>
     | Game_removed of Result<unit, string>
+    | Load_trailer
+    | Trailer_loaded of GameTrailerInfo option
+    | Open_trailer
+    | Close_trailer
     | Open_event_history
     | Close_event_history

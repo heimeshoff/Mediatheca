@@ -29,6 +29,9 @@ let init (slug: string) : Model * Cmd<Msg> =
       PlaySessions = []
       HltbFetching = false
       HltbNoData = false
+      TrailerInfo = None
+      ShowTrailer = false
+      IsLoadingTrailer = false
       ShowEventHistory = false
       Error = None },
     Cmd.batch [
@@ -95,7 +98,11 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         ]
 
     | Game_loaded game ->
-        { model with Game = game; IsLoading = false }, Cmd.none
+        let trailerCmd =
+            match game with
+            | Some _ -> Cmd.ofMsg Load_trailer
+            | None -> Cmd.none
+        { model with Game = game; IsLoading = false }, trailerCmd
 
     | Friends_loaded friends ->
         { model with AllFriends = friends }, Cmd.none
@@ -461,6 +468,23 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Game_removed (Error err) ->
         { model with Error = Some err }, Cmd.none
+
+    | Load_trailer ->
+        { model with IsLoadingTrailer = true },
+        Cmd.OfAsync.either
+            (fun () -> api.getGameTrailer model.Slug)
+            ()
+            Trailer_loaded
+            (fun _ -> Trailer_loaded None)
+
+    | Trailer_loaded info ->
+        { model with TrailerInfo = info; IsLoadingTrailer = false }, Cmd.none
+
+    | Open_trailer ->
+        { model with ShowTrailer = true }, Cmd.none
+
+    | Close_trailer ->
+        { model with ShowTrailer = false }, Cmd.none
 
     | Open_event_history ->
         { model with ShowEventHistory = true }, Cmd.none
