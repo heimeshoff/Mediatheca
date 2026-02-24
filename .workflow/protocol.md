@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-02-24 -- Task Completed: 019 - Fix HLTB Auth Token Endpoint
+
+**Type:** Task Completion
+**Task:** 019 - Fix HLTB Auth Token Endpoint
+**Summary:** Fixed HLTB auth token endpoint by making `fetchAuthToken` accept the discovered search endpoint and deriving the token URL as `{searchEndpoint}/init?t=...` instead of hardcoded `/api/search/init?t=...`. All 232 tests pass.
+**Files changed:** 1 file
+
+---
+
+## 2026-02-24 -- Task Started: 019 - Fix HLTB Auth Token Endpoint
+
+**Type:** Task Start
+**Task:** 019 - Fix HLTB Auth Token Endpoint
+**Milestone:** M4 - HowLongToBeat Integration
+
+---
+
+## 2026-02-24 -- Idea Captured: Fix HLTB Auth Token Endpoint
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/019-fix-hltb-auth-token.md
+**Summary:** HLTB integration broken for all games — auth token endpoint hardcoded to `/api/search/init` which now returns 404. Root cause: token URL must be relative to the discovered search endpoint (e.g., `/api/finder/init`). Fix is small — change `fetchAuthToken` to accept the search endpoint and derive the token URL from it. Identified by comparing with Python `howlongtobeatpy` library.
+
+---
+
 ## 2026-02-24 -- Task Completed: 018 - Game Trailer Playback
 
 **Type:** Task Completion

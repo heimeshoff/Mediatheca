@@ -142,10 +142,10 @@ module HowLongToBeat =
             get.Required.Field "token" Decode.string
         )
 
-    let private fetchAuthToken (httpClient: HttpClient) : Async<Result<string, string>> =
+    let private fetchAuthToken (httpClient: HttpClient) (searchEndpoint: string) : Async<Result<string, string>> =
         async {
             let timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-            let url = sprintf "%s/api/search/init?t=%d" baseUrl timestamp
+            let url = sprintf "%s%s/init?t=%d" baseUrl searchEndpoint timestamp
             printfn "[HLTB] Fetching auth token from %s" url
             match! fetchString httpClient url with
             | Error e ->
@@ -274,24 +274,20 @@ module HowLongToBeat =
             | Some cached ->
                 return Ok {| Endpoint = cached.SearchEndpoint; Token = cached.AuthToken |}
             | None ->
-                match! discoverSearchEndpoint httpClient with
-                | Error e ->
-                    printfn "[HLTB] WARNING: Endpoint discovery failed: %s" e
-                    // Fall back to known default endpoint
-                    printfn "[HLTB] Trying fallback endpoint /api/finder"
-                    match! fetchAuthToken httpClient with
-                    | Ok token ->
-                        ApiDataCache.set "/api/finder" token
-                        return Ok {| Endpoint = "/api/finder"; Token = token |}
-                    | Error tokenErr ->
-                        return Error (sprintf "Endpoint discovery failed (%s) and auth token fetch also failed (%s)" e tokenErr)
-                | Ok endpoint ->
-                    match! fetchAuthToken httpClient with
-                    | Ok token ->
-                        ApiDataCache.set endpoint token
-                        return Ok {| Endpoint = endpoint; Token = token |}
-                    | Error tokenErr ->
-                        return Error (sprintf "Auth token fetch failed: %s" tokenErr)
+                let! endpointResult = discoverSearchEndpoint httpClient
+                let endpoint =
+                    match endpointResult with
+                    | Ok ep -> ep
+                    | Error e ->
+                        printfn "[HLTB] WARNING: Endpoint discovery failed: %s" e
+                        printfn "[HLTB] Trying fallback endpoint /api/finder"
+                        "/api/finder"
+                match! fetchAuthToken httpClient endpoint with
+                | Ok token ->
+                    ApiDataCache.set endpoint token
+                    return Ok {| Endpoint = endpoint; Token = token |}
+                | Error tokenErr ->
+                    return Error (sprintf "Auth token fetch failed: %s" tokenErr)
         }
 
     // ─── Execute search request ──────────────────────────────────────────
