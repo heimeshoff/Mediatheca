@@ -22,6 +22,7 @@
     <Compile Include="Components\Sidebar.fs" />
     <Compile Include="Components\BottomNav.fs" />
     <Compile Include="Components\Layout.fs" />
+    <Compile Include="Components\Charts.fs" />
     <Compile Include="Pages\Dashboard\Types.fs" />
     <Compile Include="Pages\Dashboard\State.fs" />
     <Compile Include="Pages\Dashboard\Views.fs" />

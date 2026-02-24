@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-02-25 12:16 -- Task Completed: 032 - Movies Tab Overhaul
+
+**Type:** Task Completion
+**Task:** 032 - Movies Tab Overhaul
+**Summary:** Restructured Movies tab into 5-row layout with poster scrollers, added movie_crew table with director tracking from TMDB imports and startup backfill, created reusable donut chart component in Charts.fs. All 233 tests pass.
+**Files changed:** 7 files
+
+---
+
+## 2026-02-25 12:08 -- Task Started: 032 - Movies Tab Overhaul
+
+**Type:** Task Start
+**Task:** 032 - Movies Tab Overhaul
+**Milestone:** M5 (Dashboard V3)
+
+---
+
 ## 2026-02-25 12:07 -- Task Completed: 031 - All Tab Overhaul
 
 **Type:** Task Completion

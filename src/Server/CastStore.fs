@@ -37,6 +37,16 @@ module CastStore =
             );
 
             CREATE INDEX IF NOT EXISTS idx_series_cast_series ON series_cast(series_stream_id);
+
+            CREATE TABLE IF NOT EXISTS movie_crew (
+                movie_stream_id  TEXT    NOT NULL,
+                crew_member_id   INTEGER NOT NULL REFERENCES cast_members(id),
+                job              TEXT    NOT NULL,
+                department       TEXT    NOT NULL,
+                PRIMARY KEY (movie_stream_id, crew_member_id, job)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_movie_crew_movie ON movie_crew(movie_stream_id);
         """
         |> Db.exec
 
@@ -73,6 +83,20 @@ module CastStore =
         ]
         |> Db.exec
 
+    let addMovieCrew (conn: SqliteConnection) (movieStreamId: string) (crewMemberId: int64) (job: string) (department: string) : unit =
+        conn
+        |> Db.newCommand """
+            INSERT OR IGNORE INTO movie_crew (movie_stream_id, crew_member_id, job, department)
+            VALUES (@movie_stream_id, @crew_member_id, @job, @department)
+        """
+        |> Db.setParams [
+            "movie_stream_id", SqlType.String movieStreamId
+            "crew_member_id", SqlType.Int64 crewMemberId
+            "job", SqlType.String job
+            "department", SqlType.String department
+        ]
+        |> Db.exec
+
     let getMovieCast (conn: SqliteConnection) (movieStreamId: string) : Mediatheca.Shared.CastMemberDto list =
         conn
         |> Db.newCommand """
@@ -93,36 +117,56 @@ module CastStore =
         )
 
     let removeMovieCastAndCleanup (conn: SqliteConnection) (imageBasePath: string) (movieStreamId: string) : unit =
-        // Get orphan-candidate cast member ids before deleting
+        // Get orphan-candidate member ids from both cast and crew before deleting
         let castMemberIds =
             conn
             |> Db.newCommand "SELECT cast_member_id FROM movie_cast WHERE movie_stream_id = @movie_stream_id"
             |> Db.setParams [ "movie_stream_id", SqlType.String movieStreamId ]
             |> Db.query (fun (rd: IDataReader) -> rd.ReadInt64 "cast_member_id")
 
-        // Delete movie_cast rows
+        let crewMemberIds =
+            conn
+            |> Db.newCommand "SELECT crew_member_id FROM movie_crew WHERE movie_stream_id = @movie_stream_id"
+            |> Db.setParams [ "movie_stream_id", SqlType.String movieStreamId ]
+            |> Db.query (fun (rd: IDataReader) -> rd.ReadInt64 "crew_member_id")
+
+        let allMemberIds = (castMemberIds @ crewMemberIds) |> List.distinct
+
+        // Delete movie_cast and movie_crew rows
         conn
         |> Db.newCommand "DELETE FROM movie_cast WHERE movie_stream_id = @movie_stream_id"
         |> Db.setParams [ "movie_stream_id", SqlType.String movieStreamId ]
         |> Db.exec
 
-        // Find and clean up orphaned cast members
-        for cmId in castMemberIds do
-            let usageCount =
+        conn
+        |> Db.newCommand "DELETE FROM movie_crew WHERE movie_stream_id = @movie_stream_id"
+        |> Db.setParams [ "movie_stream_id", SqlType.String movieStreamId ]
+        |> Db.exec
+
+        // Find and clean up orphaned cast/crew members
+        for cmId in allMemberIds do
+            let movieCastCount =
                 conn
                 |> Db.newCommand "SELECT COUNT(*) as cnt FROM movie_cast WHERE cast_member_id = @id"
                 |> Db.setParams [ "id", SqlType.Int64 cmId ]
                 |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt64 "cnt")
                 |> Option.defaultValue 0L
 
-            let seriesUsageCount =
+            let seriesCastCount =
                 conn
                 |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_cast WHERE cast_member_id = @id"
                 |> Db.setParams [ "id", SqlType.Int64 cmId ]
                 |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt64 "cnt")
                 |> Option.defaultValue 0L
 
-            if usageCount = 0L && seriesUsageCount = 0L then
+            let movieCrewCount =
+                conn
+                |> Db.newCommand "SELECT COUNT(*) as cnt FROM movie_crew WHERE crew_member_id = @id"
+                |> Db.setParams [ "id", SqlType.Int64 cmId ]
+                |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt64 "cnt")
+                |> Option.defaultValue 0L
+
+            if movieCastCount = 0L && seriesCastCount = 0L && movieCrewCount = 0L then
                 // Get image ref before deleting
                 let imageRef =
                     conn
@@ -195,21 +239,28 @@ module CastStore =
 
         // Find and clean up orphaned cast members
         for cmId in castMemberIds do
-            let movieUsageCount =
+            let movieCastCount =
                 conn
                 |> Db.newCommand "SELECT COUNT(*) as cnt FROM movie_cast WHERE cast_member_id = @id"
                 |> Db.setParams [ "id", SqlType.Int64 cmId ]
                 |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt64 "cnt")
                 |> Option.defaultValue 0L
 
-            let seriesUsageCount =
+            let seriesCastCount =
                 conn
                 |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_cast WHERE cast_member_id = @id"
                 |> Db.setParams [ "id", SqlType.Int64 cmId ]
                 |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt64 "cnt")
                 |> Option.defaultValue 0L
 
-            if movieUsageCount = 0L && seriesUsageCount = 0L then
+            let movieCrewCount =
+                conn
+                |> Db.newCommand "SELECT COUNT(*) as cnt FROM movie_crew WHERE crew_member_id = @id"
+                |> Db.setParams [ "id", SqlType.Int64 cmId ]
+                |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt64 "cnt")
+                |> Option.defaultValue 0L
+
+            if movieCastCount = 0L && seriesCastCount = 0L && movieCrewCount = 0L then
                 // Get image ref before deleting
                 let imageRef =
                     conn
@@ -231,3 +282,16 @@ module CastStore =
                 match imageRef with
                 | Some ref -> ImageStore.deleteImage imageBasePath ref
                 | None -> ()
+
+    /// Get movie stream IDs that have no crew data (for backfill)
+    let getMoviesWithoutCrew (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand """
+            SELECT 'movie-' || md.slug as stream_id, md.tmdb_id
+            FROM movie_detail md
+            WHERE NOT EXISTS (
+                SELECT 1 FROM movie_crew mc WHERE mc.movie_stream_id = 'movie-' || md.slug
+            )
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "stream_id", rd.ReadInt32 "tmdb_id")

@@ -155,6 +155,41 @@ let main args =
     Projection.rebuildProjection conn GameProjection.handler
     Projection.startAllProjections conn projectionHandlers
 
+    // Backfill director/crew data for existing movies
+    let backfillDirectors () =
+        try
+            let moviesWithoutCrew = CastStore.getMoviesWithoutCrew conn
+            if not (List.isEmpty moviesWithoutCrew) then
+                printfn "Backfilling director data for %d movies..." moviesWithoutCrew.Length
+                let tmdbConfig = getTmdbConfig()
+                if tmdbConfig.ApiKey <> "" then
+                    for (streamId, tmdbId) in moviesWithoutCrew do
+                        try
+                            let credits = Tmdb.getMovieCredits httpClient tmdbConfig tmdbId |> Async.RunSynchronously
+                            let directors = credits.Crew |> List.filter (fun c -> c.Job = "Director")
+                            for director in directors do
+                                let dirImageRef =
+                                    match director.ProfilePath with
+                                    | Some p ->
+                                        let ref = sprintf "cast/%d.jpg" director.Id
+                                        let destPath = Path.Combine(imageBasePath, ref)
+                                        if not (ImageStore.imageExists imageBasePath ref) then
+                                            try
+                                                Tmdb.downloadImage httpClient tmdbConfig p "w185" destPath
+                                                |> Async.RunSynchronously
+                                            with _ -> ()
+                                        Some ref
+                                    | None -> None
+                                let cmId = CastStore.upsertCastMember conn director.Name director.Id dirImageRef
+                                CastStore.addMovieCrew conn streamId cmId director.Job director.Department
+                        with ex ->
+                            eprintfn "  Failed to backfill directors for %s (tmdb=%d): %s" streamId tmdbId ex.Message
+                    printfn "Director backfill complete."
+        with ex ->
+            eprintfn "Director backfill failed: %s" ex.Message
+
+    backfillDirectors()
+
     // Create API
     let api = Api.create conn httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig imageBasePath projectionHandlers
 

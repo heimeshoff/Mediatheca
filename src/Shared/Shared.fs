@@ -652,6 +652,8 @@ type DashboardMoviesTab = {
     RecentlyAdded: MovieListItem list
     Stats: DashboardMovieStats
     RecentlyWatched: DashboardRecentlyWatched list
+    MoviesInFocus: DashboardMovieInFocus list
+    JellyfinServerUrl: string option
     TopActors: DashboardPersonStats list
     TopDirectors: DashboardPersonStats list
     TopWatchedWith: DashboardWatchedWithStats list

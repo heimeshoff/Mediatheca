@@ -148,6 +148,24 @@ module Api =
                         let cmId = CastStore.upsertCastMember conn castMember.Name castMember.Id castImageRef
                         CastStore.addMovieCast conn sid cmId castMember.Character castMember.Order (castMember.Order < 10)
 
+                    // Store directors from crew
+                    let directors = credits.Crew |> List.filter (fun c -> c.Job = "Director")
+                    for director in directors do
+                        let dirImageRef =
+                            match director.ProfilePath with
+                            | Some p ->
+                                let ref = sprintf "cast/%d.jpg" director.Id
+                                let destPath = System.IO.Path.Combine(imageBasePath, ref)
+                                if not (ImageStore.imageExists imageBasePath ref) then
+                                    try
+                                        Tmdb.downloadImage httpClient tmdbConfig p "w185" destPath
+                                        |> Async.RunSynchronously
+                                    with _ -> ()
+                                Some ref
+                            | None -> None
+                        let cmId = CastStore.upsertCastMember conn director.Name director.Id dirImageRef
+                        CastStore.addMovieCrew conn sid cmId director.Job director.Department
+
                     return Ok slug
             with ex ->
                 return Error $"Failed to add movie: {ex.Message}"
@@ -1440,9 +1458,15 @@ module Api =
                 let topDirectors = MovieProjection.getTopDirectors conn 5
                 let topWatchedWith = MovieProjection.getTopWatchedWith conn 5
                 let countryDistribution = MovieProjection.getCountryDistribution conn
+                let moviesInFocus = MovieProjection.getMoviesInFocus conn 10
+                let jellyfinServerUrl = SettingsStore.getSetting conn "jellyfin_server_url"
                 return {
                     Mediatheca.Shared.DashboardMoviesTab.RecentlyAdded = recentlyAdded
                     RecentlyWatched = recentlyWatched
+                    MoviesInFocus = moviesInFocus
+                    JellyfinServerUrl =
+                        jellyfinServerUrl
+                        |> Option.bind (fun s -> if System.String.IsNullOrWhiteSpace(s) then None else Some s)
                     TopActors = topActors
                     TopDirectors = topDirectors
                     TopWatchedWith = topWatchedWith

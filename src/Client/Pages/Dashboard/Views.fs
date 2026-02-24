@@ -2284,33 +2284,138 @@ let private movieRecentlyAddedItem (item: MovieListItem) =
         ]
     ]
 
+// ── Recently Watched Poster Card (for horizontal scroller) ──
+
+let private recentlyWatchedPosterCard (item: DashboardRecentlyWatched) =
+    Html.a [
+        prop.href (Router.format ("movies", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("movies", item.Slug)
+        )
+        prop.className "flex-shrink-0 w-[120px] sm:w-[130px] cursor-pointer group snap-start"
+        prop.children [
+            Html.div [
+                prop.className (DesignSystem.posterCard + " relative w-full")
+                prop.children [
+                    Html.div [
+                        prop.className (DesignSystem.posterImageContainer + " poster-shadow")
+                        prop.children [
+                            match item.PosterRef with
+                            | Some ref ->
+                                Html.img [
+                                    prop.src $"/images/{ref}"
+                                    prop.alt item.Name
+                                    prop.className DesignSystem.posterImage
+                                ]
+                            | None ->
+                                Html.div [
+                                    prop.className "flex flex-col items-center justify-center w-full h-full text-base-content/20 px-3 gap-2"
+                                    prop.children [
+                                        Icons.movie ()
+                                        Html.p [
+                                            prop.className "text-xs text-base-content/40 font-medium text-center line-clamp-2"
+                                            prop.text item.Name
+                                        ]
+                                    ]
+                                ]
+                            Html.div [ prop.className DesignSystem.posterShine ]
+                        ]
+                    ]
+                ]
+            ]
+            Html.div [
+                prop.className "mt-2 px-0.5"
+                prop.children [
+                    Html.p [
+                        prop.className "text-sm font-semibold truncate group-hover:text-primary transition-colors"
+                        prop.text item.Name
+                    ]
+                    Html.p [
+                        prop.className "text-xs text-base-content/50"
+                        prop.text (formatDate item.WatchDate)
+                    ]
+                    if not (List.isEmpty item.Friends) then
+                        Html.p [
+                            prop.className "text-[10px] text-base-content/40 truncate"
+                            prop.text (item.Friends |> String.concat ", ")
+                        ]
+                ]
+            ]
+        ]
+    ]
+
 // ── Movies Tab View ──
 
 let private moviesTabView (data: DashboardMoviesTab) =
     Html.div [
         prop.className "flex flex-col gap-4"
         prop.children [
-            // 1. Stats badges
+            // Stats badges
             movieStatsRow data.Stats
 
-            // 2. Ratings distribution chart
-            sectionCard Icons.star "Ratings Distribution" [
-                ratingsDistributionChart data.Stats.RatingDistribution
+            // Row 1: Recently Watched (~2/3) | Recently Added (~1/3)
+            Html.div [
+                prop.className "grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4"
+                prop.children [
+                    // Recently Watched — horizontal poster scroller
+                    sectionCardOverflow Icons.movie "Recently Watched" [
+                        if List.isEmpty data.RecentlyWatched then
+                            Html.div [
+                                prop.className "flex items-center justify-center py-8 text-base-content/40 text-sm"
+                                prop.text "No movies watched yet"
+                            ]
+                        else
+                            Html.div [
+                                prop.className "flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                                prop.children [
+                                    for item in data.RecentlyWatched do
+                                        recentlyWatchedPosterCard item
+                                ]
+                            ]
+                    ]
+                    // Recently Added — narrower column, list format
+                    sectionCard Icons.movie "Recently Added" [
+                        if List.isEmpty data.RecentlyAdded then
+                            Html.div [
+                                prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+                                prop.text "No recently added movies"
+                            ]
+                        else
+                            for item in data.RecentlyAdded |> List.truncate 6 do
+                                movieRecentlyAddedItem item
+                    ]
+                ]
             ]
 
-            // 3. Genre breakdown bars
-            sectionCard Icons.tag "Genre Breakdown" [
-                genreBreakdownBars data.Stats.GenreDistribution
-            ]
-
-            // 4. Monthly watch activity
-            sectionCard Icons.calendar "Monthly Activity" [
-                monthlyActivityChart data.Stats.MonthlyActivity
-            ]
-
-            // 5. Actors & Directors (side by side on desktop)
+            // Row 2: Monthly Activity (50%) | Ratings Distribution (50%)
             Html.div [
                 prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
+                prop.children [
+                    sectionCard Icons.calendar "Monthly Activity" [
+                        monthlyActivityChart data.Stats.MonthlyActivity
+                    ]
+                    sectionCard Icons.star "Ratings Distribution" [
+                        ratingsDistributionChart data.Stats.RatingDistribution
+                    ]
+                ]
+            ]
+
+            // Row 3: Movies In Focus — full-width horizontal poster scroller
+            if not (List.isEmpty data.MoviesInFocus) then
+                sectionCardOverflow Icons.movie "Movies In Focus" [
+                    Html.div [
+                        prop.className "flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                        prop.children [
+                            for item in data.MoviesInFocus do
+                                movieInFocusPosterCard data.JellyfinServerUrl item
+                        ]
+                    ]
+                ]
+
+            // Row 4: Most Watched Actors | Most Watched Directors | Most Watched With
+            Html.div [
+                prop.className "grid grid-cols-1 md:grid-cols-3 gap-4"
                 prop.children [
                     sectionCard Icons.user "Most Watched Actors" [
                         personStatsSection data.TopActors "No actor data yet"
@@ -2318,33 +2423,21 @@ let private moviesTabView (data: DashboardMoviesTab) =
                     sectionCard Icons.user "Most Watched Directors" [
                         personStatsSection data.TopDirectors "No director data yet"
                     ]
+                    sectionCard Icons.friends "Most Watched With" [
+                        watchedWithSection data.TopWatchedWith
+                    ]
                 ]
             ]
 
-            // 6. Most watched with (friends)
-            if not (List.isEmpty data.TopWatchedWith) then
-                sectionCard Icons.friends "Most Watched With" [
-                    watchedWithSection data.TopWatchedWith
-                ]
+            // Row 5: Genre Breakdown — pie/donut chart
+            sectionCard Icons.tag "Genre Breakdown" [
+                Charts.donutChart data.Stats.GenreDistribution "No genre data yet"
+            ]
 
-            // 7. Country distribution
+            // Country distribution (bonus, kept from before)
             if not (List.isEmpty data.Stats.CountryDistribution) then
                 sectionCard Icons.globe "Movie Origins" [
                     countryDistributionBars data.Stats.CountryDistribution
-                ]
-
-            // 8. Recently watched
-            if not (List.isEmpty data.RecentlyWatched) then
-                sectionCard Icons.movie "Recently Watched" [
-                    for item in data.RecentlyWatched do
-                        movieRecentlyWatchedItem item
-                ]
-
-            // 9. Recently added (watchlist / unwatched)
-            if not (List.isEmpty data.RecentlyAdded) then
-                sectionCard Icons.movie "Recently Added" [
-                    for item in data.RecentlyAdded do
-                        movieRecentlyAddedItem item
                 ]
         ]
     ]
