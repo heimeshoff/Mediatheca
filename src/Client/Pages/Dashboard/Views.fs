@@ -272,28 +272,6 @@ let private seriesPosterCard (jellyfinServerUrl: string option) (item: Dashboard
                                     ]
                                 ]
 
-                            // Finished / Abandoned badge
-                            if item.IsFinished then
-                                Html.div [
-                                    prop.className "absolute top-1.5 right-1.5 z-10"
-                                    prop.children [
-                                        Html.span [
-                                            prop.className "inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-success/90 text-success-content shadow-md"
-                                            prop.text "DONE"
-                                        ]
-                                    ]
-                                ]
-                            if item.IsAbandoned then
-                                Html.div [
-                                    prop.className "absolute top-1.5 right-1.5 z-10"
-                                    prop.children [
-                                        Html.span [
-                                            prop.className "inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-error/90 text-error-content shadow-md"
-                                            prop.text "DROP"
-                                        ]
-                                    ]
-                                ]
-
                             // Jellyfin play button overlay (bottom-right)
                             match jellyfinServerUrl, item.JellyfinEpisodeId with
                             | Some serverUrl, Some episodeId ->
@@ -327,7 +305,17 @@ let private seriesPosterCard (jellyfinServerUrl: string option) (item: Dashboard
                         prop.className "text-sm font-semibold truncate group-hover:text-primary transition-colors"
                         prop.text item.Name
                     ]
-                    if item.NextUpSeason > 0 then
+                    if item.IsAbandoned then
+                        Html.p [
+                            prop.className "text-xs text-error font-medium"
+                            prop.text "Abandoned"
+                        ]
+                    elif item.IsFinished then
+                        Html.p [
+                            prop.className "text-xs text-success font-medium"
+                            prop.text "Finished"
+                        ]
+                    elif item.NextUpSeason > 0 then
                         Html.p [
                             prop.className "text-xs text-base-content/50 truncate"
                             prop.text $"S{item.NextUpSeason}E{item.NextUpEpisode}"
