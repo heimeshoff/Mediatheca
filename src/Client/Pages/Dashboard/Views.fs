@@ -3042,71 +3042,197 @@ let private seriesCompactItem (item: SeriesListItem) (badge: ReactElement) =
         ]
     ]
 
+/// Poster card for series tab Next Up scroller — includes progress bar and episode info
+let private seriesTabPosterCard (jellyfinServerUrl: string option) (item: DashboardSeriesNextUp) =
+    let progressPct =
+        if item.EpisodeCount > 0 then
+            float item.WatchedEpisodeCount / float item.EpisodeCount * 100.0
+        else 0.0
+    Html.a [
+        prop.href (Router.format ("series", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("series", item.Slug)
+        )
+        prop.className "flex-shrink-0 w-[140px] sm:w-[150px] cursor-pointer group snap-start"
+        prop.children [
+            Html.div [
+                prop.className (DesignSystem.posterCard + " relative w-full")
+                prop.children [
+                    Html.div [
+                        prop.className (DesignSystem.posterImageContainer + " " + "poster-shadow")
+                        prop.children [
+                            match item.PosterRef with
+                            | Some ref ->
+                                Html.img [
+                                    prop.src $"/images/{ref}"
+                                    prop.alt item.Name
+                                    prop.className DesignSystem.posterImage
+                                ]
+                            | None ->
+                                Html.div [
+                                    prop.className "flex flex-col items-center justify-center w-full h-full text-base-content/20 px-3 gap-2"
+                                    prop.children [
+                                        Icons.tv ()
+                                        Html.p [
+                                            prop.className "text-xs text-base-content/40 font-medium text-center line-clamp-2"
+                                            prop.text item.Name
+                                        ]
+                                    ]
+                                ]
+
+                            // In Focus glow indicator
+                            if item.InFocus then
+                                Html.div [
+                                    prop.className "absolute top-1.5 left-1.5 z-10"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "flex items-center justify-center w-6 h-6 rounded-full bg-warning/90 text-warning-content shadow-md"
+                                            prop.children [ Icons.crosshairSmFilled () ]
+                                        ]
+                                    ]
+                                ]
+
+                            // Jellyfin play button overlay (bottom-right)
+                            match jellyfinServerUrl, item.JellyfinEpisodeId with
+                            | Some serverUrl, Some episodeId ->
+                                Html.a [
+                                    prop.href (jellyfinPlayUrl serverUrl episodeId)
+                                    prop.target "_blank"
+                                    prop.rel "noopener noreferrer"
+                                    prop.onClick (fun e -> e.stopPropagation())
+                                    prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100/55 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg opacity-0 group-hover:opacity-100 cursor-pointer"
+                                    prop.title "Play in Jellyfin"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "w-4 h-4"
+                                            prop.children [ Icons.play () ]
+                                        ]
+                                    ]
+                                ]
+                            | _ -> ()
+
+                            // Shine effect
+                            Html.div [ prop.className DesignSystem.posterShine ]
+                        ]
+                    ]
+                ]
+            ]
+            // Text below poster
+            Html.div [
+                prop.className "mt-2 px-0.5"
+                prop.children [
+                    Html.p [
+                        prop.className "text-sm font-semibold truncate group-hover:text-primary transition-colors"
+                        prop.text item.Name
+                    ]
+                    if item.NextUpSeason > 0 then
+                        Html.p [
+                            prop.className "text-xs text-base-content/50 truncate"
+                            prop.text $"S{item.NextUpSeason}E{item.NextUpEpisode}"
+                        ]
+                    // Progress bar
+                    if item.EpisodeCount > 0 then
+                        Html.div [
+                            prop.className "mt-1"
+                            prop.children [
+                                Html.div [
+                                    prop.className "w-full h-1.5 rounded-full bg-base-content/10 overflow-hidden"
+                                    prop.children [
+                                        Html.div [
+                                            prop.className "h-full rounded-full bg-primary/70 transition-all"
+                                            prop.style [ style.width (length.percent progressPct) ]
+                                        ]
+                                    ]
+                                ]
+                                Html.p [
+                                    prop.className "text-[10px] text-base-content/40 mt-0.5"
+                                    prop.text $"{item.WatchedEpisodeCount}/{item.EpisodeCount} ep"
+                                ]
+                            ]
+                        ]
+                    if not (List.isEmpty item.WatchWithFriends) then
+                        Html.div [
+                            prop.className "flex items-center gap-1 mt-1 flex-wrap"
+                            prop.children [
+                                for friend in item.WatchWithFriends do
+                                    friendPill friend
+                            ]
+                        ]
+                ]
+            ]
+        ]
+    ]
+
 let private seriesTabView (data: DashboardSeriesTab) =
+    // Filter out abandoned series from Next Up
+    let nextUpItems = data.NextUp |> List.filter (fun s -> not s.IsAbandoned)
     Html.div [
         prop.className "flex flex-col gap-4"
         prop.children [
             // 1. Stats badges
             seriesStatsRow data.Stats
 
-            // 2. Episode activity chart (14-day)
-            sectionCard Icons.chartBar "Episode Activity" [
-                episodeActivityChart data.EpisodeActivity
-            ]
-
-            // 3. Next Up with progress bars and time remaining
-            if not (List.isEmpty data.NextUp) then
-                sectionCard Icons.tv "Next Up" [
-                    for item in data.NextUp do
-                        seriesNextUpItemEnhanced item
+            // Row 1: Next Up — full-width horizontal poster scroller
+            if not (List.isEmpty nextUpItems) then
+                sectionCardOverflow Icons.tv "Next Up" [
+                    Html.div [
+                        prop.className "flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                        prop.children [
+                            for item in nextUpItems do
+                                seriesTabPosterCard data.JellyfinServerUrl item
+                        ]
+                    ]
                 ]
 
-            // 4. Monthly episode activity
-            sectionCard Icons.calendar "Monthly Activity" [
-                monthlyEpisodeActivityChart data.Stats.MonthlyActivity
-            ]
+            // Row 2: Recently Finished | Recently Abandoned (side-by-side)
+            if not (List.isEmpty data.RecentlyFinished) || not (List.isEmpty data.RecentlyAbandoned) then
+                Html.div [
+                    prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
+                    prop.children [
+                        if not (List.isEmpty data.RecentlyFinished) then
+                            sectionCard Icons.trophy "Recently Finished" [
+                                for item in data.RecentlyFinished do
+                                    seriesCompactItem item (
+                                        Html.span [
+                                            prop.className "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-success/15 text-success flex-shrink-0"
+                                            prop.text "Finished"
+                                        ]
+                                    )
+                            ]
+                        if not (List.isEmpty data.RecentlyAbandoned) then
+                            sectionCard Icons.tv "Recently Abandoned" [
+                                for item in data.RecentlyAbandoned do
+                                    seriesCompactItem item (
+                                        Html.span [
+                                            prop.className "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-error/15 text-error flex-shrink-0"
+                                            prop.text "Abandoned"
+                                        ]
+                                    )
+                            ]
+                    ]
+                ]
 
-            // 5. Ratings & Genre (side by side on desktop)
+            // Row 3: Monthly Activity | Ratings Distribution | Genre Breakdown (pie chart)
             Html.div [
-                prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
+                prop.className "grid grid-cols-1 md:grid-cols-3 gap-4"
                 prop.children [
+                    sectionCard Icons.calendar "Monthly Activity" [
+                        monthlyEpisodeActivityChart data.Stats.MonthlyActivity
+                    ]
                     sectionCard Icons.star "Ratings Distribution" [
                         seriesRatingsDistributionChart data.Stats.RatingDistribution
                     ]
                     sectionCard Icons.tag "Genre Breakdown" [
-                        seriesGenreBreakdownBars data.Stats.GenreDistribution
+                        Charts.donutChart data.Stats.GenreDistribution "No genre data"
                     ]
                 ]
             ]
 
-            // 6. Most watched with (friends)
+            // Most watched with (friends)
             if not (List.isEmpty data.TopWatchedWith) then
                 sectionCard Icons.friends "Most Watched With" [
                     seriesWatchedWithSection data.TopWatchedWith
-                ]
-
-            // 7. Recently Finished
-            if not (List.isEmpty data.RecentlyFinished) then
-                sectionCard Icons.trophy "Recently Finished" [
-                    for item in data.RecentlyFinished do
-                        seriesCompactItem item (
-                            Html.span [
-                                prop.className "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-success/15 text-success flex-shrink-0"
-                                prop.text "Finished"
-                            ]
-                        )
-                ]
-
-            // 8. Recently Abandoned
-            if not (List.isEmpty data.RecentlyAbandoned) then
-                sectionCard Icons.tv "Recently Abandoned" [
-                    for item in data.RecentlyAbandoned do
-                        seriesCompactItem item (
-                            Html.span [
-                                prop.className "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-error/15 text-error flex-shrink-0"
-                                prop.text "Abandoned"
-                            ]
-                        )
                 ]
         ]
     ]

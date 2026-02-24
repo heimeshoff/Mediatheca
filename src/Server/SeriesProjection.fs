@@ -1119,11 +1119,16 @@ module SeriesProjection =
     let getRecentlyFinished (conn: SqliteConnection) : Mediatheca.Shared.SeriesListItem list =
         conn
         |> Db.newCommand """
-            SELECT slug, name, year, poster_ref, genres, tmdb_rating, status, season_count, episode_count,
-                   watched_episode_count, next_up_season, next_up_episode, next_up_title, abandoned, in_focus
-            FROM series_list
-            WHERE episode_count > 0 AND watched_episode_count >= episode_count AND abandoned = 0
-            ORDER BY rowid DESC
+            SELECT sl.slug, sl.name, sl.year, sl.poster_ref, sl.genres, sl.tmdb_rating, sl.status, sl.season_count, sl.episode_count,
+                   sl.watched_episode_count, sl.next_up_season, sl.next_up_episode, sl.next_up_title, sl.abandoned, sl.in_focus
+            FROM series_list sl
+            LEFT JOIN (
+                SELECT series_slug, MAX(watched_date) as last_watched_date
+                FROM series_episode_progress
+                GROUP BY series_slug
+            ) lw ON lw.series_slug = sl.slug
+            WHERE sl.episode_count > 0 AND sl.watched_episode_count >= sl.episode_count AND sl.abandoned = 0
+            ORDER BY lw.last_watched_date DESC NULLS LAST
             LIMIT 10
         """
         |> Db.query (fun (rd: IDataReader) ->
@@ -1161,11 +1166,16 @@ module SeriesProjection =
     let getRecentlyAbandoned (conn: SqliteConnection) : Mediatheca.Shared.SeriesListItem list =
         conn
         |> Db.newCommand """
-            SELECT slug, name, year, poster_ref, genres, tmdb_rating, status, season_count, episode_count,
-                   watched_episode_count, next_up_season, next_up_episode, next_up_title, abandoned, in_focus
-            FROM series_list
-            WHERE abandoned = 1
-            ORDER BY rowid DESC
+            SELECT sl.slug, sl.name, sl.year, sl.poster_ref, sl.genres, sl.tmdb_rating, sl.status, sl.season_count, sl.episode_count,
+                   sl.watched_episode_count, sl.next_up_season, sl.next_up_episode, sl.next_up_title, sl.abandoned, sl.in_focus
+            FROM series_list sl
+            LEFT JOIN (
+                SELECT series_slug, MAX(watched_date) as last_watched_date
+                FROM series_episode_progress
+                GROUP BY series_slug
+            ) lw ON lw.series_slug = sl.slug
+            WHERE sl.abandoned = 1
+            ORDER BY lw.last_watched_date DESC NULLS LAST
             LIMIT 10
         """
         |> Db.query (fun (rd: IDataReader) ->

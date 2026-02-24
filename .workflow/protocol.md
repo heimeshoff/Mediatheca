@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-02-25 12:22 -- Task Completed: 033 - TV Series Tab Overhaul
+
+**Type:** Task Completion
+**Task:** 033 - TV Series Tab Overhaul
+**Summary:** Removed Episode Activity card, converted Next Up to poster scroller excluding abandoned series, placed Recently Finished/Abandoned side-by-side, arranged Monthly Activity/Ratings/Genre in 3-column row with shared donut chart, updated backend sorting. All 233 tests pass.
+**Files changed:** 4 files
+
+---
+
+## 2026-02-25 12:17 -- Task Started: 033 - TV Series Tab Overhaul
+
+**Type:** Task Start
+**Task:** 033 - TV Series Tab Overhaul
+**Milestone:** M5 (Dashboard V3)
+
+---
+
 ## 2026-02-25 12:16 -- Task Completed: 032 - Movies Tab Overhaul
 
 **Type:** Task Completion

@@ -692,6 +692,7 @@ type DashboardSeriesTab = {
     Stats: DashboardSeriesStats
     EpisodeActivity: DashboardEpisodeActivity list
     TopWatchedWith: DashboardSeriesWatchedWith list
+    JellyfinServerUrl: string option
 }
 
 type DashboardGameStats = {

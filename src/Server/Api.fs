@@ -1515,12 +1515,16 @@ module Api =
                 let monthlyActivity = SeriesProjection.getMonthlyEpisodeActivity conn
                 let episodeActivity = SeriesProjection.getEpisodeActivity conn
                 let topWatchedWith = SeriesProjection.getSeriesTopWatchedWith conn 5
+                let jellyfinServerUrl = SettingsStore.getSetting conn "jellyfin_server_url"
                 return {
                     Mediatheca.Shared.DashboardSeriesTab.NextUp = nextUp
                     RecentlyFinished = recentlyFinished
                     RecentlyAbandoned = recentlyAbandoned
                     EpisodeActivity = episodeActivity
                     TopWatchedWith = topWatchedWith
+                    JellyfinServerUrl =
+                        jellyfinServerUrl
+                        |> Option.bind (fun s -> if System.String.IsNullOrWhiteSpace(s) then None else Some s)
                     Stats = {
                         Mediatheca.Shared.DashboardSeriesStats.TotalSeries = totalSeries
                         TotalEpisodesWatched = totalEpisodesWatched
