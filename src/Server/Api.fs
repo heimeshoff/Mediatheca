@@ -3631,6 +3631,25 @@ module Api =
             }
 
             // Event History
+            // Search Preview
+            previewTmdbMovie = fun tmdbId -> async {
+                try
+                    return! Tmdb.previewMovie httpClient (getTmdbConfig()) tmdbId
+                with _ -> return None
+            }
+
+            previewTmdbSeries = fun tmdbId -> async {
+                try
+                    return! Tmdb.previewSeries httpClient (getTmdbConfig()) tmdbId
+                with _ -> return None
+            }
+
+            previewRawgGame = fun rawgId -> async {
+                try
+                    return! Rawg.previewGame httpClient (getRawgConfig()) rawgId
+                with _ -> return None
+            }
+
             getStreamEvents = fun streamPrefix -> async {
                 // Determine which streams to read based on the prefix
                 let mainStreamId = streamPrefix

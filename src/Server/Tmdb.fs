@@ -172,6 +172,44 @@ module Tmdb =
             let key = query.ToLowerInvariant().Trim()
             cache.[key] <- { Results = results; ExpiresAt = DateTime.UtcNow.AddHours(1.0) }
 
+    // Preview cache (separate from search cache, for detail previews)
+
+    module private PreviewCache =
+        open System
+        open System.Collections.Concurrent
+
+        type CacheEntry<'T> = {
+            Data: 'T
+            ExpiresAt: DateTime
+        }
+
+        let private movieCache = ConcurrentDictionary<int, CacheEntry<Mediatheca.Shared.TmdbPreviewData>>()
+        let private seriesCache = ConcurrentDictionary<int, CacheEntry<Mediatheca.Shared.TmdbPreviewData>>()
+
+        let tryGetMovie (id: int) : Mediatheca.Shared.TmdbPreviewData option =
+            match movieCache.TryGetValue(id) with
+            | true, entry ->
+                if entry.ExpiresAt > DateTime.UtcNow then Some entry.Data
+                else
+                    movieCache.TryRemove(id) |> ignore
+                    None
+            | _ -> None
+
+        let setMovie (id: int) (data: Mediatheca.Shared.TmdbPreviewData) =
+            movieCache.[id] <- { Data = data; ExpiresAt = DateTime.UtcNow.AddHours(1.0) }
+
+        let tryGetSeries (id: int) : Mediatheca.Shared.TmdbPreviewData option =
+            match seriesCache.TryGetValue(id) with
+            | true, entry ->
+                if entry.ExpiresAt > DateTime.UtcNow then Some entry.Data
+                else
+                    seriesCache.TryRemove(id) |> ignore
+                    None
+            | _ -> None
+
+        let setSeries (id: int) (data: Mediatheca.Shared.TmdbPreviewData) =
+            seriesCache.[id] <- { Data = data; ExpiresAt = DateTime.UtcNow.AddHours(1.0) }
+
     // API functions
 
     let private fetchJson (httpClient: HttpClient) (url: string) : Async<string> =
@@ -514,4 +552,102 @@ module Tmdb =
                 |> Async.RunSynchronously
                 return Some ref
             with _ -> return None
+        }
+
+    // ─── Preview functions (for search hover preview) ─────────────────
+
+    /// Decoder for movie details with appended credits
+    let private decodeMovieDetailsWithCredits: Decoder<TmdbMovieDetailsResponse * TmdbCreditsResponse> =
+        Decode.object (fun get ->
+            let details = {
+                Id = get.Required.Field "id" Decode.int
+                Title = get.Required.Field "title" Decode.string
+                ReleaseDate = get.Optional.Field "release_date" Decode.string
+                Overview = get.Required.Field "overview" Decode.string
+                Runtime = get.Optional.Field "runtime" Decode.int
+                Genres = get.Required.Field "genres" (Decode.list decodeGenre)
+                PosterPath = get.Optional.Field "poster_path" Decode.string
+                BackdropPath = get.Optional.Field "backdrop_path" Decode.string
+                VoteAverage = get.Optional.Field "vote_average" Decode.float
+            }
+            let credits = get.Required.Field "credits" decodeCredits
+            (details, credits)
+        )
+
+    /// Decoder for TV series details with appended credits
+    let private decodeTvDetailsWithCredits: Decoder<TmdbTvDetailsResponse * TmdbCreditsResponse> =
+        Decode.object (fun get ->
+            let details = {
+                Id = get.Required.Field "id" Decode.int
+                Name = get.Required.Field "name" Decode.string
+                FirstAirDate = get.Optional.Field "first_air_date" Decode.string
+                Overview = get.Required.Field "overview" Decode.string
+                Genres = get.Required.Field "genres" (Decode.list decodeGenre)
+                PosterPath = get.Optional.Field "poster_path" Decode.string
+                BackdropPath = get.Optional.Field "backdrop_path" Decode.string
+                VoteAverage = get.Optional.Field "vote_average" Decode.float |> Option.defaultValue 0.0
+                Status = get.Required.Field "status" Decode.string
+                NumberOfSeasons = get.Required.Field "number_of_seasons" Decode.int
+                NumberOfEpisodes = get.Required.Field "number_of_episodes" Decode.int
+                EpisodeRunTime = get.Optional.Field "episode_run_time" (Decode.list Decode.int) |> Option.defaultValue []
+                Seasons = get.Required.Field "seasons" (Decode.list decodeTvSeasonSummary)
+            }
+            let credits = get.Required.Field "credits" decodeCredits
+            (details, credits)
+        )
+
+    let previewMovie (httpClient: HttpClient) (config: TmdbConfig) (tmdbId: int) : Async<Mediatheca.Shared.TmdbPreviewData option> =
+        async {
+            match PreviewCache.tryGetMovie tmdbId with
+            | Some cached -> return Some cached
+            | None ->
+                try
+                    let url = $"https://api.themoviedb.org/3/movie/{tmdbId}?api_key={config.ApiKey}&append_to_response=credits"
+                    let! json = fetchJson httpClient url
+                    match Decode.fromString decodeMovieDetailsWithCredits json with
+                    | Ok (details, credits) ->
+                        let preview : Mediatheca.Shared.TmdbPreviewData = {
+                            Title = details.Title
+                            Year = parseYear details.ReleaseDate
+                            Overview = details.Overview
+                            Genres = details.Genres |> List.map (fun g -> g.Name)
+                            PosterPath = details.PosterPath
+                            BackdropPath = details.BackdropPath
+                            Cast = credits.Cast |> List.sortBy (fun c -> c.Order) |> List.truncate 5 |> List.map (fun c -> c.Name)
+                            Runtime = details.Runtime
+                            SeasonCount = None
+                            Rating = details.VoteAverage
+                        }
+                        PreviewCache.setMovie tmdbId preview
+                        return Some preview
+                    | Error _ -> return None
+                with _ -> return None
+        }
+
+    let previewSeries (httpClient: HttpClient) (config: TmdbConfig) (tmdbId: int) : Async<Mediatheca.Shared.TmdbPreviewData option> =
+        async {
+            match PreviewCache.tryGetSeries tmdbId with
+            | Some cached -> return Some cached
+            | None ->
+                try
+                    let url = $"https://api.themoviedb.org/3/tv/{tmdbId}?api_key={config.ApiKey}&language=en-US&append_to_response=credits"
+                    let! json = fetchJson httpClient url
+                    match Decode.fromString decodeTvDetailsWithCredits json with
+                    | Ok (details, credits) ->
+                        let preview : Mediatheca.Shared.TmdbPreviewData = {
+                            Title = details.Name
+                            Year = parseYear details.FirstAirDate
+                            Overview = details.Overview
+                            Genres = details.Genres |> List.map (fun g -> g.Name)
+                            PosterPath = details.PosterPath
+                            BackdropPath = details.BackdropPath
+                            Cast = credits.Cast |> List.sortBy (fun c -> c.Order) |> List.truncate 5 |> List.map (fun c -> c.Name)
+                            Runtime = None
+                            SeasonCount = Some details.NumberOfSeasons
+                            Rating = Some details.VoteAverage
+                        }
+                        PreviewCache.setSeries tmdbId preview
+                        return Some preview
+                    | Error _ -> return None
+                with _ -> return None
         }

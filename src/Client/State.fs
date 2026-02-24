@@ -236,6 +236,100 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
             { model with SearchModal = None },
             Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate (fst navSegments, snd navSegments))
 
+        | SearchModal.Hover_start (key, _version) ->
+            // Check if cached
+            match searchModel.PreviewCache |> Map.tryFind key with
+            | Some cached ->
+                { model with SearchModal = Some { searchModel with HoverTarget = Some key; HoverPreview = cached } }, Cmd.none
+            | None ->
+                let cmd =
+                    if key.StartsWith("tmdb:movie:") then
+                        let tmdbId = key.Replace("tmdb:movie:", "") |> int
+                        Cmd.OfAsync.either
+                            api.previewTmdbMovie tmdbId
+                            (fun data -> Search_modal_msg (SearchModal.Hover_preview_tmdb_loaded (key, data)))
+                            (fun _ -> Search_modal_msg SearchModal.Hover_clear)
+                    elif key.StartsWith("tmdb:series:") then
+                        let tmdbId = key.Replace("tmdb:series:", "") |> int
+                        Cmd.OfAsync.either
+                            api.previewTmdbSeries tmdbId
+                            (fun data -> Search_modal_msg (SearchModal.Hover_preview_tmdb_loaded (key, data)))
+                            (fun _ -> Search_modal_msg SearchModal.Hover_clear)
+                    elif key.StartsWith("rawg:") then
+                        let rawgId = key.Replace("rawg:", "") |> int
+                        Cmd.OfAsync.either
+                            api.previewRawgGame rawgId
+                            (fun data -> Search_modal_msg (SearchModal.Hover_preview_rawg_loaded (key, data)))
+                            (fun _ -> Search_modal_msg SearchModal.Hover_clear)
+                    elif key.StartsWith("lib:movie:") then
+                        let slug = key.Replace("lib:movie:", "")
+                        Cmd.OfAsync.either
+                            api.getMovie slug
+                            (fun data -> Search_modal_msg (SearchModal.Hover_preview_library_movie_loaded (key, data)))
+                            (fun _ -> Search_modal_msg SearchModal.Hover_clear)
+                    elif key.StartsWith("lib:series:") then
+                        let slug = key.Replace("lib:series:", "")
+                        Cmd.OfAsync.either
+                            (fun s -> api.getSeriesDetail s None) slug
+                            (fun data -> Search_modal_msg (SearchModal.Hover_preview_library_series_loaded (key, data)))
+                            (fun _ -> Search_modal_msg SearchModal.Hover_clear)
+                    elif key.StartsWith("lib:game:") then
+                        let slug = key.Replace("lib:game:", "")
+                        Cmd.OfAsync.either
+                            api.getGameDetail slug
+                            (fun data -> Search_modal_msg (SearchModal.Hover_preview_library_game_loaded (key, data)))
+                            (fun _ -> Search_modal_msg SearchModal.Hover_clear)
+                    else Cmd.none
+                { model with SearchModal = Some { searchModel with HoverTarget = Some key; HoverPreview = SearchModal.Loading } }, cmd
+
+        | SearchModal.Hover_preview_tmdb_loaded (key, data) ->
+            match data with
+            | Some d ->
+                let preview = SearchModal.LoadedTmdb d
+                let cache = searchModel.PreviewCache |> Map.add key preview
+                { model with SearchModal = Some { searchModel with HoverPreview = preview; PreviewCache = cache } }, Cmd.none
+            | None ->
+                { model with SearchModal = Some { searchModel with HoverPreview = SearchModal.Failed } }, Cmd.none
+
+        | SearchModal.Hover_preview_rawg_loaded (key, data) ->
+            match data with
+            | Some d ->
+                let preview = SearchModal.LoadedRawg d
+                let cache = searchModel.PreviewCache |> Map.add key preview
+                { model with SearchModal = Some { searchModel with HoverPreview = preview; PreviewCache = cache } }, Cmd.none
+            | None ->
+                { model with SearchModal = Some { searchModel with HoverPreview = SearchModal.Failed } }, Cmd.none
+
+        | SearchModal.Hover_preview_library_movie_loaded (key, data) ->
+            match data with
+            | Some d ->
+                let preview = SearchModal.LoadedLibraryMovie d
+                let cache = searchModel.PreviewCache |> Map.add key preview
+                { model with SearchModal = Some { searchModel with HoverPreview = preview; PreviewCache = cache } }, Cmd.none
+            | None ->
+                { model with SearchModal = Some { searchModel with HoverPreview = SearchModal.Failed } }, Cmd.none
+
+        | SearchModal.Hover_preview_library_series_loaded (key, data) ->
+            match data with
+            | Some d ->
+                let preview = SearchModal.LoadedLibrarySeries d
+                let cache = searchModel.PreviewCache |> Map.add key preview
+                { model with SearchModal = Some { searchModel with HoverPreview = preview; PreviewCache = cache } }, Cmd.none
+            | None ->
+                { model with SearchModal = Some { searchModel with HoverPreview = SearchModal.Failed } }, Cmd.none
+
+        | SearchModal.Hover_preview_library_game_loaded (key, data) ->
+            match data with
+            | Some d ->
+                let preview = SearchModal.LoadedLibraryGame d
+                let cache = searchModel.PreviewCache |> Map.add key preview
+                { model with SearchModal = Some { searchModel with HoverPreview = preview; PreviewCache = cache } }, Cmd.none
+            | None ->
+                { model with SearchModal = Some { searchModel with HoverPreview = SearchModal.Failed } }, Cmd.none
+
+        | SearchModal.Hover_clear ->
+            { model with SearchModal = Some { searchModel with HoverTarget = None; HoverPreview = SearchModal.NotHovering } }, Cmd.none
+
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
     | Url_changed segments ->

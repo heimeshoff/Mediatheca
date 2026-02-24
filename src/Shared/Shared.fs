@@ -784,6 +784,33 @@ type EventHistoryEntry = {
     Details: string list
 }
 
+// Preview Data Types (for search hover preview)
+
+type TmdbPreviewData = {
+    Title: string
+    Year: int option
+    Overview: string
+    Genres: string list
+    PosterPath: string option
+    BackdropPath: string option
+    Cast: string list
+    Runtime: int option
+    SeasonCount: int option
+    Rating: float option
+}
+
+type RawgPreviewData = {
+    Name: string
+    Year: int option
+    Description: string
+    Genres: string list
+    BackgroundImage: string option
+    Screenshots: string list
+    Rating: float option
+    Metacritic: int option
+    Platforms: string list
+}
+
 module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
@@ -967,4 +994,8 @@ type IMediathecaApi = {
     fetchHltbData: string -> Async<Result<float option, string>>
     // Event History
     getStreamEvents: string -> Async<EventHistoryEntry list>
+    // Search Preview
+    previewTmdbMovie: int -> Async<TmdbPreviewData option>
+    previewTmdbSeries: int -> Async<TmdbPreviewData option>
+    previewRawgGame: int -> Async<RawgPreviewData option>
 }

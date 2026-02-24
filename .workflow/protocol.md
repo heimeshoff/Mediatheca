@@ -2,12 +2,52 @@
 
 ---
 
+## 2026-02-24 14:30 -- Research: Dashboard Content for Movies, TV Series, and Games
+
+**Type:** Research
+**Topic:** What should movie, TV series, and games dashboards show? Industry standards across 18+ media tracking apps.
+**File:** research/dashboard-content-research.md
+**Key findings:**
+- Ratings distribution charts, genre breakdowns, and activity heatmaps are the highest-impact additions — present in every major competitor (Letterboxd, Trakt, Backloggd)
+- Time-based analytics (monthly trends, day-of-week patterns) are consistently the most engaging visualizations and most requested by users
+- Mediatheca's cross-media unified tracking is its unique differentiator — the #1 user request across all community discussions
+- Quick wins: ratings bar chart, genre horizontal bars, per-series progress bars, game status donut chart, backlog time estimate
+- Year-in-Review / Wrapped summaries are the single biggest engagement feature across all platforms (Letterboxd, Trakt, Steam, PlayStation, Xbox)
+
+---
+
 ## 2026-02-24 -- Idea Captured: Show Finished Series in Next Up for 7 Days
 
 **Type:** Idea Capture
 **Mode:** Deep
 **Filed to:** tasks/todo/023-finished-series-7day-nextup.md
 **Summary:** Finished TV series (not InFocus, not abandoned) should stay in dashboard Next Up for 7 days after last watch date. Single SQL WHERE clause change in `getDashboardSeriesNextUp` — no client, shared type, or API changes needed. The `last_watched_date` subselect and `IsFinished` flag already exist in the query and DTO.
+
+---
+
+## 2026-02-24 -- Task Completed: 023 - Finished Series 7-Day Next Up
+
+**Type:** Task Completion
+**Task:** 023 - Show Finished Series in Next Up for 7 Days
+**Summary:** Extended `getDashboardSeriesNextUp` SQL WHERE clause in SeriesProjection.fs to include finished (non-abandoned) series whose last watched date is within 7 days. All 233 tests pass.
+**Files changed:** 1 file
+
+---
+
+## 2026-02-24 -- Task Completed: 022 - Search Poster Grid with Hover Preview
+
+**Type:** Task Completion
+**Task:** 022 - Search Poster Grid with Hover Preview
+**Summary:** Redesigned Ctrl+K search modal from text lists to a 4-column poster grid with 500ms hover preview popovers. Added 3 new API endpoints (previewTmdbMovie, previewTmdbSeries, previewRawgGame) with server-side caching, glassmorphic preview popover as sibling element, grid keyboard navigation, and in-memory client-side preview cache. All 233 tests pass.
+**Files changed:** 6 files
+
+---
+
+## 2026-02-24 -- Batch Started: [022, 023]
+
+**Type:** Batch Start
+**Tasks:** 022 - Search Poster Grid with Hover Preview, 023 - Finished Series 7-Day Next Up
+**Mode:** Parallel (batch of 2, no file conflicts)
 
 ---
 

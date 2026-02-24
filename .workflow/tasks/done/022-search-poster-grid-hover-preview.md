@@ -172,18 +172,67 @@ New: Grid navigation with 4 columns.
 
 ## Acceptance Criteria
 
-- [ ] All four search tabs display results as a 4-column poster grid
-- [ ] Posters show the correct image (local path for library, TMDB URL for movies/series, RAWG URL for games)
-- [ ] Hovering a poster for 500ms shows a glassmorphic preview popover
-- [ ] Library hover fetches full detail from local DB and shows name, year, overview, cast/description, genres
-- [ ] Movies/Series tab hover fetches from TMDB API and shows title, overview, cast, rating
-- [ ] Games tab hover fetches from RAWG API and shows name, description, screenshots, rating
-- [ ] Hover previews are cached in memory (re-hovering is instant)
-- [ ] No data is written to the database on hover — imports only happen on click
-- [ ] Preview popover uses glassmorphism (semi-transparent bg, backdrop-blur, border)
-- [ ] Preview popover renders as a sibling to the grid (not nested inside a backdrop-filter parent)
-- [ ] Keyboard navigation works with grid layout (←→↑↓)
-- [ ] Keyboard-selected items also show the preview popover
-- [ ] Fallback placeholder shown for items without poster images
-- [ ] No performance issues with rapid hovering (debounce prevents excessive API calls)
-- [ ] All existing tests pass
+- [x] All four search tabs display results as a 4-column poster grid
+- [x] Posters show the correct image (local path for library, TMDB URL for movies/series, RAWG URL for games)
+- [x] Hovering a poster for 500ms shows a glassmorphic preview popover
+- [x] Library hover fetches full detail from local DB and shows name, year, overview, cast/description, genres
+- [x] Movies/Series tab hover fetches from TMDB API and shows title, overview, cast, rating
+- [x] Games tab hover fetches from RAWG API and shows name, description, screenshots, rating
+- [x] Hover previews are cached in memory (re-hovering is instant)
+- [x] No data is written to the database on hover — imports only happen on click
+- [x] Preview popover uses glassmorphism (semi-transparent bg, backdrop-blur, border)
+- [x] Preview popover renders as a sibling to the grid (not nested inside a backdrop-filter parent)
+- [x] Keyboard navigation works with grid layout (←→↑↓)
+- [x] Keyboard-selected items also show the preview popover
+- [x] Fallback placeholder shown for items without poster images
+- [x] No performance issues with rapid hovering (debounce prevents excessive API calls)
+- [x] All existing tests pass
+
+## Work Log
+
+### 2026-02-24
+
+**Implemented search poster grid with hover preview.**
+
+**Shared types (`src/Shared/Shared.fs`):**
+- Added `TmdbPreviewData` record (title, year, overview, genres, poster/backdrop paths, cast names, runtime, season count, rating)
+- Added `RawgPreviewData` record (name, year, description, genres, background image, screenshots, rating, metacritic, platforms)
+- Added 3 new API endpoints to `IMediathecaApi`: `previewTmdbMovie`, `previewTmdbSeries`, `previewRawgGame`
+
+**Server — TMDB preview (`src/Server/Tmdb.fs`):**
+- Added `PreviewCache` module with separate ConcurrentDictionary caches for movie/series previews (1hr TTL)
+- Added `decodeMovieDetailsWithCredits` and `decodeTvDetailsWithCredits` decoders for `?append_to_response=credits` single-call fetches
+- Added `previewMovie` and `previewSeries` functions that fetch details+credits in one API call, cache results, return top-5 cast names
+
+**Server — RAWG preview (`src/Server/Rawg.fs`):**
+- Added `RawgGamePreviewResponse` type with metacritic and platforms support
+- Added `PreviewCache` module (1hr TTL)
+- Added `previewGame` function that fetches game details + screenshots, strips HTML from description, caches results
+
+**Server — API wiring (`src/Server/Api.fs`):**
+- Wired `previewTmdbMovie`, `previewTmdbSeries`, `previewRawgGame` endpoints with error handling
+
+**Client — SearchModal redesign (`src/Client/Components/SearchModal.fs`):**
+- Replaced `space-y-1` list layout with `grid grid-cols-4 gap-3` poster grid across all 4 tabs
+- Poster cards: aspect-[2/3], object-cover, rounded-lg, gradient name overlay at bottom, fallback placeholder icons
+- Library tab shows media-type badges (Movie/Series/Game) in corner
+- Image sources: `/images/{ref}` for library, `w185` TMDB URLs for movies/series, direct RAWG URLs for games
+- Modal width increased from `max-w-2xl` to `max-w-4xl`
+- Increased result limit from 10 to 20 for grid layout
+- Added `HoverPreviewState` DU with variants: NotHovering, Loading, LoadedTmdb, LoadedRawg, LoadedLibraryMovie/Series/Game, Failed
+- Added hover state fields to Model: `HoverTarget`, `HoverPreview`, `HoverVersion`, `PreviewCache` (Map for instant re-hover)
+- Added hover messages: `Hover_start`, `Hover_preview_*_loaded`, `Hover_clear`
+- Hover trigger: 500ms `setTimeout` on mouseEnter, cancelled on mouseLeave
+- Preview popover: glassmorphic panel (bg-base-100/65, backdrop-blur-[24px], saturate-[1.2], border, inset highlight) rendered as **sibling** to modal panel
+- Popover shows: title, year, rating, genres, truncated overview, cast/platforms, screenshots (games)
+- Keyboard navigation: ArrowLeft/Right for columns, ArrowUp/Down jumps by 4 (grid rows)
+- Keyboard-selected items trigger hover preview via `useEffect`
+- Updated keyboard hints footer to show all 4 arrows
+
+**Client — State.fs updates:**
+- Added handlers for all new hover messages in `updateSearchModal`
+- Library hover uses existing `getMovie`/`getSeriesDetail`/`getGameDetail` endpoints
+- External hover uses new `previewTmdbMovie`/`previewTmdbSeries`/`previewRawgGame` endpoints
+- Results cached in `PreviewCache` map for instant re-display
+
+**Build verification:** `npm run build` succeeds, `npm test` passes all 233 tests.

@@ -1047,7 +1047,14 @@ module SeriesProjection =
             LEFT JOIN series_detail sd ON sd.slug = sl.slug
             LEFT JOIN series_episodes ep ON ep.series_slug = sl.slug AND ep.season_number = sl.next_up_season AND ep.episode_number = sl.next_up_episode
             LEFT JOIN series_episode_jellyfin jej ON jej.series_slug = sl.slug AND jej.season_number = sl.next_up_season AND jej.episode_number = sl.next_up_episode
-            WHERE sl.next_up_season IS NOT NULL OR sl.in_focus = 1 OR sl.abandoned = 1
+            WHERE sl.next_up_season IS NOT NULL
+               OR sl.in_focus = 1
+               OR sl.abandoned = 1
+               OR (sl.episode_count > 0
+                   AND sl.watched_episode_count >= sl.episode_count
+                   AND sl.abandoned = 0
+                   AND (SELECT MAX(watched_date) FROM series_episode_progress
+                        WHERE series_slug = sl.slug) >= date('now', '-7 days'))
             ORDER BY sl.in_focus DESC, last_watched_date DESC NULLS LAST
             %s
         """ limitClause)

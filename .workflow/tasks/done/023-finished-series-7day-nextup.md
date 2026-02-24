@@ -55,9 +55,13 @@ This single SQL change is the entire implementation. No shared types, client cod
 
 ## Acceptance Criteria
 
-- [ ] Finished series appear in dashboard Next Up for 7 days after last watch date
-- [ ] After 7 days, finished non-InFocus series drop off the Next Up list
-- [ ] InFocus finished series still appear indefinitely (no regression)
-- [ ] Abandoned series still appear regardless of watch date (no regression)
-- [ ] Series with unwatched episodes still appear as before (no regression)
-- [ ] All existing tests pass
+- [x] Finished series appear in dashboard Next Up for 7 days after last watch date
+- [x] After 7 days, finished non-InFocus series drop off the Next Up list
+- [x] InFocus finished series still appear indefinitely (no regression)
+- [x] Abandoned series still appear regardless of watch date (no regression)
+- [x] Series with unwatched episodes still appear as before (no regression)
+- [x] All existing tests pass
+
+## Work Log
+
+**2026-02-24** — Extended `getDashboardSeriesNextUp` WHERE clause in `src/Server/SeriesProjection.fs` (line 1050) to include finished, non-abandoned series whose last watched episode is within the past 7 days. The new OR condition checks `episode_count > 0 AND watched_episode_count >= episode_count AND abandoned = 0` plus a subquery on `series_episode_progress.watched_date >= date('now', '-7 days')`. All 233 existing tests pass. Client build succeeds.

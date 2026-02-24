@@ -41,6 +41,27 @@ module Rawg =
         Genres: RawgGenre list
     }
 
+    type RawgPlatformInfo = {
+        Id: int
+        Name: string
+    }
+
+    type RawgPlatformWrapper = {
+        Platform: RawgPlatformInfo
+    }
+
+    type RawgGamePreviewResponse = {
+        Id: int
+        Name: string
+        Released: string option
+        DescriptionRaw: string
+        BackgroundImage: string option
+        Rating: float option
+        MetacriticScore: int option
+        Genres: RawgGenre list
+        Platforms: RawgPlatformWrapper list
+    }
+
     // Decoders
 
     let private decodeGenre: Decoder<RawgGenre> =
@@ -75,6 +96,30 @@ module Rawg =
             BackgroundImageAdditional = get.Optional.Field "background_image_additional" Decode.string
             Rating = get.Optional.Field "rating" Decode.float
             Genres = get.Optional.Field "genres" (Decode.list decodeGenre) |> Option.defaultValue []
+        })
+
+    let private decodePlatformInfo: Decoder<RawgPlatformInfo> =
+        Decode.object (fun get -> {
+            Id = get.Required.Field "id" Decode.int
+            Name = get.Required.Field "name" Decode.string
+        })
+
+    let private decodePlatformWrapper: Decoder<RawgPlatformWrapper> =
+        Decode.object (fun get -> {
+            Platform = get.Required.Field "platform" decodePlatformInfo
+        })
+
+    let private decodeGamePreview: Decoder<RawgGamePreviewResponse> =
+        Decode.object (fun get -> {
+            Id = get.Required.Field "id" Decode.int
+            Name = get.Required.Field "name" Decode.string
+            Released = get.Optional.Field "released" Decode.string
+            DescriptionRaw = get.Optional.Field "description_raw" Decode.string |> Option.defaultValue ""
+            BackgroundImage = get.Optional.Field "background_image" Decode.string
+            Rating = get.Optional.Field "rating" Decode.float
+            MetacriticScore = get.Optional.Field "metacritic" Decode.int
+            Genres = get.Optional.Field "genres" (Decode.list decodeGenre) |> Option.defaultValue []
+            Platforms = get.Optional.Field "platforms" (Decode.list decodePlatformWrapper) |> Option.defaultValue []
         })
 
     type RawgScreenshot = {
@@ -123,6 +168,31 @@ module Rawg =
         let set (query: string) (results: Mediatheca.Shared.RawgSearchResult list) =
             let key = query.ToLowerInvariant().Trim()
             cache.[key] <- { Results = results; ExpiresAt = DateTime.UtcNow.AddHours(1.0) }
+
+    // Preview cache
+
+    module private PreviewCache =
+        open System
+        open System.Collections.Concurrent
+
+        type CacheEntry = {
+            Data: Mediatheca.Shared.RawgPreviewData
+            ExpiresAt: DateTime
+        }
+
+        let private cache = ConcurrentDictionary<int, CacheEntry>()
+
+        let tryGet (id: int) : Mediatheca.Shared.RawgPreviewData option =
+            match cache.TryGetValue(id) with
+            | true, entry ->
+                if entry.ExpiresAt > DateTime.UtcNow then Some entry.Data
+                else
+                    cache.TryRemove(id) |> ignore
+                    None
+            | _ -> None
+
+        let set (id: int) (data: Mediatheca.Shared.RawgPreviewData) =
+            cache.[id] <- { Data = data; ExpiresAt = DateTime.UtcNow.AddHours(1.0) }
 
     // API functions
 
@@ -302,4 +372,51 @@ module Rawg =
                     with _ -> None
                 | None -> None
             return (coverRef, backdropRef)
+        }
+
+    // ─── Preview function (for search hover preview) ──────────────────
+
+    let private stripHtmlTags (html: string) =
+        if System.String.IsNullOrEmpty(html) then ""
+        else System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", "")
+
+    let previewGame (httpClient: HttpClient) (config: RawgConfig) (rawgId: int) : Async<Mediatheca.Shared.RawgPreviewData option> =
+        async {
+            if System.String.IsNullOrWhiteSpace(config.ApiKey) then return None
+            else
+            match PreviewCache.tryGet rawgId with
+            | Some cached -> return Some cached
+            | None ->
+                try
+                    // Fetch details and screenshots in parallel
+                    let detailUrl = $"https://api.rawg.io/api/games/{rawgId}?key={config.ApiKey}"
+                    let screenshotUrl = $"https://api.rawg.io/api/games/{rawgId}/screenshots?key={config.ApiKey}&page_size=3"
+                    let! detailJson = fetchJson httpClient detailUrl
+                    let! screenshotJson =
+                        async {
+                            try
+                                return! fetchJson httpClient screenshotUrl
+                            with _ -> return """{"results":[]}"""
+                        }
+                    match Decode.fromString decodeGamePreview detailJson with
+                    | Ok details ->
+                        let screenshots =
+                            match Decode.fromString decodeScreenshotsResponse screenshotJson with
+                            | Ok resp -> resp.Results |> List.truncate 3 |> List.map (fun s -> s.Image)
+                            | Error _ -> []
+                        let preview : Mediatheca.Shared.RawgPreviewData = {
+                            Name = details.Name
+                            Year = parseYear details.Released
+                            Description = stripHtmlTags details.DescriptionRaw
+                            Genres = details.Genres |> List.map (fun g -> g.Name)
+                            BackgroundImage = details.BackgroundImage
+                            Screenshots = screenshots
+                            Rating = details.Rating
+                            Metacritic = details.MetacriticScore
+                            Platforms = details.Platforms |> List.map (fun p -> p.Platform.Name)
+                        }
+                        PreviewCache.set rawgId preview
+                        return Some preview
+                    | Error _ -> return None
+                with _ -> return None
         }
