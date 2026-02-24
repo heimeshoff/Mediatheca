@@ -1349,23 +1349,29 @@ let private crossMediaHeroStats (stats: DashboardCrossMediaStats) =
                     // Active now
                     let activeCount = stats.ActiveSeriesCount + stats.ActiveGamesCount
                     let activeDetail =
+                        let gameSuffix = if stats.ActiveGamesCount > 1 then "s" else ""
                         [ if stats.ActiveSeriesCount > 0 then $"{stats.ActiveSeriesCount} series"
-                          if stats.ActiveGamesCount > 0 then $"{stats.ActiveGamesCount} game{if stats.ActiveGamesCount > 1 then "s" else ""}" ]
+                          if stats.ActiveGamesCount > 0 then $"{stats.ActiveGamesCount} game{gameSuffix}" ]
                         |> String.concat ", "
                     heroStatCard "Active Now" (string activeCount) activeDetail "text-success"
                     // This year
                     let yearItems =
-                        [ if stats.MoviesWatchedThisYear > 0 then $"{stats.MoviesWatchedThisYear} movie{if stats.MoviesWatchedThisYear > 1 then "s" else ""}"
-                          if stats.EpisodesWatchedThisYear > 0 then $"{stats.EpisodesWatchedThisYear} ep{if stats.EpisodesWatchedThisYear > 1 then "s" else ""}"
+                        let movieS = if stats.MoviesWatchedThisYear > 1 then "s" else ""
+                        let epS = if stats.EpisodesWatchedThisYear > 1 then "s" else ""
+                        [ if stats.MoviesWatchedThisYear > 0 then $"{stats.MoviesWatchedThisYear} movie{movieS}"
+                          if stats.EpisodesWatchedThisYear > 0 then $"{stats.EpisodesWatchedThisYear} ep{epS}"
                           if stats.GamesBeatenThisYear > 0 then $"{stats.GamesBeatenThisYear} beaten" ]
                         |> String.concat ", "
                     let yearTotal = stats.MoviesWatchedThisYear + stats.EpisodesWatchedThisYear + stats.GamesBeatenThisYear
                     heroStatCard "This Year" (string yearTotal) yearItems "text-info"
                     // This month
                     let monthItems =
-                        [ if stats.MoviesWatchedThisMonth > 0 then $"{stats.MoviesWatchedThisMonth} movie{if stats.MoviesWatchedThisMonth > 1 then "s" else ""}"
-                          if stats.EpisodesWatchedThisMonth > 0 then $"{stats.EpisodesWatchedThisMonth} ep{if stats.EpisodesWatchedThisMonth > 1 then "s" else ""}"
-                          if stats.GamesPlayedThisMonth > 0 then $"{stats.GamesPlayedThisMonth} game{if stats.GamesPlayedThisMonth > 1 then "s" else ""}" ]
+                        let movieS = if stats.MoviesWatchedThisMonth > 1 then "s" else ""
+                        let epS = if stats.EpisodesWatchedThisMonth > 1 then "s" else ""
+                        let gameS = if stats.GamesPlayedThisMonth > 1 then "s" else ""
+                        [ if stats.MoviesWatchedThisMonth > 0 then $"{stats.MoviesWatchedThisMonth} movie{movieS}"
+                          if stats.EpisodesWatchedThisMonth > 0 then $"{stats.EpisodesWatchedThisMonth} ep{epS}"
+                          if stats.GamesPlayedThisMonth > 0 then $"{stats.GamesPlayedThisMonth} game{gameS}" ]
                         |> String.concat ", "
                     let monthTotal = stats.MoviesWatchedThisMonth + stats.EpisodesWatchedThisMonth + stats.GamesPlayedThisMonth
                     heroStatCard "This Month" (string monthTotal) monthItems "text-warning"
@@ -1378,10 +1384,12 @@ let private crossMediaHeroStats (stats: DashboardCrossMediaStats) =
 
 let private weeklyActivitySummary (stats: DashboardCrossMediaStats) =
     let parts =
+        let epS = if stats.WeekEpisodeCount > 1 then "s" else ""
+        let movieS = if stats.WeekMovieCount > 1 then "s" else ""
         [ if stats.WeekEpisodeCount > 0 then
-            $"{stats.WeekEpisodeCount} episode{if stats.WeekEpisodeCount > 1 then "s" else ""}"
+            $"{stats.WeekEpisodeCount} episode{epS}"
           if stats.WeekMovieCount > 0 then
-            $"{stats.WeekMovieCount} movie{if stats.WeekMovieCount > 1 then "s" else ""}"
+            $"{stats.WeekMovieCount} movie{movieS}"
           if stats.WeekGameMinutes > 0 then
             $"{formatPlayTime stats.WeekGameMinutes} of gaming" ]
     if List.isEmpty parts then
@@ -1520,14 +1528,17 @@ let private activityHeatmap (activityDays: DashboardActivityDay list) =
                                         let tooltipParts =
                                             match detailMap |> Map.tryFind dateStr with
                                             | Some d ->
+                                                let epS = if d.EpisodesWatched > 1 then "s" else ""
+                                                let movieS = if d.MovieSessions > 1 then "s" else ""
+                                                let gameS = if d.GameSessions > 1 then "s" else ""
                                                 let parts =
-                                                    [ if d.EpisodesWatched > 0 then $"{d.EpisodesWatched} episode{if d.EpisodesWatched > 1 then "s" else ""}"
-                                                      if d.MovieSessions > 0 then $"{d.MovieSessions} movie{if d.MovieSessions > 1 then "s" else ""}"
-                                                      if d.GameSessions > 0 then $"{d.GameSessions} game{if d.GameSessions > 1 then "s" else ""}" ]
+                                                    [ if d.EpisodesWatched > 0 then $"{d.EpisodesWatched} episode{epS}"
+                                                      if d.MovieSessions > 0 then $"{d.MovieSessions} movie{movieS}"
+                                                      if d.GameSessions > 0 then $"{d.GameSessions} game{gameS}" ]
                                                 day.ToString("MMM d") + ": " + (if List.isEmpty parts then "No activity" else parts |> String.concat ", ")
                                             | None ->
                                                 day.ToString("MMM d") + ": No activity"
-                                        Svg.title [ prop.text tooltipParts ]
+                                        Svg.title tooltipParts
                                     ]
                                 ]
                     ]
