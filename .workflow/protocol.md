@@ -2,6 +2,40 @@
 
 ---
 
+## 2026-02-24 18:00 -- Task Completed: 027 - Dashboard All Tab Enhancements
+
+**Type:** Task Completion
+**Task:** 027 - Dashboard All Tab Enhancements
+**Summary:** Enhanced Dashboard All tab with cross-media hero stats, adaptive weekly activity summary, GitHub-style 365-day activity heatmap with per-day tooltips, and cross-media monthly stacked bar chart — all backed by new backend queries across all three projections.
+**Files changed:** 7 files
+
+---
+
+## 2026-02-24 17:50 -- Batch Started: [027]
+
+**Type:** Batch Start
+**Tasks:** 027 - Dashboard All Tab Enhancements
+**Mode:** Sequential (last remaining task)
+
+---
+
+## 2026-02-24 17:45 -- Task Completed: 026 - Games Dashboard Stats & Visualizations
+
+**Type:** Task Completion
+**Task:** 026 - Games Dashboard Stats & Visualizations
+**Summary:** Expanded Games dashboard tab with status distribution stacked bar, backlog time estimate hero card, ratings distribution, genre breakdown, monthly play time trend, HLTB comparison grouped bars, games completed per year, and 3 new stats badges. Platform/store breakdown skipped (no game_store table exists).
+**Files changed:** 4 files
+
+---
+
+## 2026-02-24 17:35 -- Batch Started: [026]
+
+**Type:** Batch Start
+**Tasks:** 026 - Games Dashboard Stats & Visualizations
+**Mode:** Sequential (027 depends on 026)
+
+---
+
 ## 2026-02-24 17:30 -- Task Completed: 025 - TV Series Dashboard Stats & Visualizations
 
 **Type:** Task Completion
