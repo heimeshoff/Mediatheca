@@ -791,7 +791,7 @@ module Route =
 type IMediathecaApi = {
     healthCheck: unit -> Async<string>
     searchLibrary: string -> Async<LibrarySearchResult list>
-    searchTmdb: string -> Async<TmdbSearchResult list>
+    searchTmdb: string * int option -> Async<TmdbSearchResult list>
     addMovie: int -> Async<Result<string, string>>
     removeMovie: string -> Async<Result<unit, string>>
     getMovie: string -> Async<MovieDetail option>
@@ -861,7 +861,7 @@ type IMediathecaApi = {
     getSeriesTrailer: int -> Async<string option>
     getSeasonTrailer: int -> int -> Async<string option>
     // TV Series
-    searchTvSeries: string -> Async<TmdbSearchResult list>
+    searchTvSeries: string * int option -> Async<TmdbSearchResult list>
     addSeries: int -> Async<Result<string, string>>
     removeSeries: string -> Async<Result<unit, string>>
     abandonSeries: string -> Async<Result<unit, string>>
@@ -894,7 +894,7 @@ type IMediathecaApi = {
     removeSeriesContentBlock: string -> string -> Async<Result<unit, string>>
     getCatalogsForSeries: string -> Async<CatalogRef list>
     // Games
-    searchRawgGames: string -> Async<RawgSearchResult list>
+    searchRawgGames: string * int option -> Async<RawgSearchResult list>
     addGame: AddGameRequest -> Async<Result<string, string>>
     removeGame: string -> Async<Result<unit, string>>
     getGames: unit -> Async<GameListItem list>

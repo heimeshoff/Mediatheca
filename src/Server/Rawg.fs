@@ -155,14 +155,16 @@ module Rawg =
             System.IO.File.WriteAllBytes(destPath, bytes)
         }
 
-    let searchGames (httpClient: HttpClient) (config: RawgConfig) (query: string) : Async<Mediatheca.Shared.RawgSearchResult list> =
+    let searchGames (httpClient: HttpClient) (config: RawgConfig) (query: string) (year: int option) : Async<Mediatheca.Shared.RawgSearchResult list> =
         async {
             if System.String.IsNullOrWhiteSpace(config.ApiKey) then return []
             else
-            match SearchCache.tryGet query with
+            let cacheKey = match year with Some y -> $"{query}:{y}" | None -> query
+            match SearchCache.tryGet cacheKey with
             | Some cached -> return cached
             | None ->
-                let url = $"https://api.rawg.io/api/games?key={config.ApiKey}&search={System.Uri.EscapeDataString(query)}&page_size=10"
+                let yearParam = match year with Some y -> $"&dates={y}-01-01,{y}-12-31" | None -> ""
+                let url = $"https://api.rawg.io/api/games?key={config.ApiKey}&search={System.Uri.EscapeDataString(query)}&page_size=10{yearParam}"
                 let! json = fetchJson httpClient url
                 match Decode.fromString decodeSearchResponse json with
                 | Ok response ->
@@ -176,7 +178,7 @@ module Rawg =
                               Rating = r.Rating
                               Genres = r.Genres |> List.map (fun g -> g.Name) }
                         )
-                    SearchCache.set query results
+                    SearchCache.set cacheKey results
                     return results
                 | Error _ -> return []
         }

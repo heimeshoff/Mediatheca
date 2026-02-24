@@ -69,37 +69,45 @@ let initWithGames (movies: MovieListItem list) (series: SeriesListItem list) (ga
 let filterLibrary (query: string) (movies: MovieListItem list) (series: SeriesListItem list) (games: GameListItem list) : LibrarySearchResult list =
     if query = "" then []
     else
-        let q = query.ToLowerInvariant()
-        let movieResults =
+        let searchQuery, yearFilter = FuzzyMatch.extractYear query
+        let movieItems =
             movies
-            |> List.filter (fun m -> m.Name.ToLowerInvariant().Contains(q))
             |> List.map (fun m ->
-                { LibrarySearchResult.Slug = m.Slug
-                  Name = m.Name
-                  Year = m.Year
-                  PosterRef = m.PosterRef
-                  MediaType = MediaType.Movie })
-        let seriesResults =
+                (m.Name, { LibrarySearchResult.Slug = m.Slug
+                           Name = m.Name
+                           Year = m.Year
+                           PosterRef = m.PosterRef
+                           MediaType = MediaType.Movie }))
+        let seriesItems =
             series
-            |> List.filter (fun s -> s.Name.ToLowerInvariant().Contains(q))
             |> List.map (fun s ->
-                { LibrarySearchResult.Slug = s.Slug
-                  Name = s.Name
-                  Year = s.Year
-                  PosterRef = s.PosterRef
-                  MediaType = MediaType.Series })
-        let gameResults =
+                (s.Name, { LibrarySearchResult.Slug = s.Slug
+                           Name = s.Name
+                           Year = s.Year
+                           PosterRef = s.PosterRef
+                           MediaType = MediaType.Series }))
+        let gameItems =
             games
-            |> List.filter (fun g -> g.Name.ToLowerInvariant().Contains(q))
             |> List.map (fun g ->
-                { LibrarySearchResult.Slug = g.Slug
-                  Name = g.Name
-                  Year = g.Year
-                  PosterRef = g.CoverRef
-                  MediaType = MediaType.Game })
-        (movieResults @ seriesResults @ gameResults)
-        |> List.sortBy (fun r -> r.Name.ToLowerInvariant())
-        |> List.truncate 10
+                (g.Name, { LibrarySearchResult.Slug = g.Slug
+                           Name = g.Name
+                           Year = g.Year
+                           PosterRef = g.CoverRef
+                           MediaType = MediaType.Game }))
+        let allItems = movieItems @ seriesItems @ gameItems
+        let results = FuzzyMatch.fuzzyMatch 10 searchQuery allItems
+        // If year was extracted, boost items matching that year by adjusting sort order
+        match yearFilter with
+        | Some year ->
+            results
+            |> List.map (fun (score, item) ->
+                let adjustedScore = if item.Year = year then score * 0.5 else score
+                (adjustedScore, item))
+            |> List.sortBy fst
+            |> List.map snd
+            |> List.truncate 10
+        | None ->
+            results |> List.map snd
 
 let private renderTmdbItem (result: TmdbSearchResult) (isSelected: bool) (onImport: unit -> unit) =
     Html.div [

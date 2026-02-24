@@ -500,7 +500,7 @@ module Api =
                                                 let rawgConfig = getRawgConfig()
                                                 let! rawgResults =
                                                     if not (System.String.IsNullOrWhiteSpace(rawgConfig.ApiKey)) then
-                                                        Rawg.searchGames httpClient rawgConfig app.Name
+                                                        Rawg.searchGames httpClient rawgConfig app.Name None
                                                     else
                                                         async { return [] }
 
@@ -679,8 +679,8 @@ module Api =
                 return movieResults @ seriesResults @ gameResults
             }
 
-            searchTmdb = fun query -> async {
-                return! Tmdb.searchMovies httpClient (getTmdbConfig()) query
+            searchTmdb = fun (query, year) -> async {
+                return! Tmdb.searchMovies httpClient (getTmdbConfig()) query year
             }
 
             addMovie = fun tmdbId ->
@@ -1576,7 +1576,7 @@ module Api =
                         ApiKey = key
                         ImageBaseUrl = "https://image.tmdb.org/t/p/"
                     }
-                    let! results = Tmdb.searchMovies httpClient testConfig "test"
+                    let! results = Tmdb.searchMovies httpClient testConfig "test" None
                     return Ok ()
                 with ex ->
                     return Error $"TMDB API key validation failed: {ex.Message}"
@@ -1636,8 +1636,8 @@ module Api =
             }
 
             // TV Series
-            searchTvSeries = fun query -> async {
-                return! Tmdb.searchTvSeries httpClient (getTmdbConfig()) query
+            searchTvSeries = fun (query, year) -> async {
+                return! Tmdb.searchTvSeries httpClient (getTmdbConfig()) query year
             }
 
             addSeries = fun tmdbId ->
@@ -2037,8 +2037,8 @@ module Api =
             }
 
             // Games
-            searchRawgGames = fun query -> async {
-                return! Rawg.searchGames httpClient (getRawgConfig()) query
+            searchRawgGames = fun (query, year) -> async {
+                return! Rawg.searchGames httpClient (getRawgConfig()) query year
             }
 
             addGame = fun request -> async {
@@ -2548,7 +2548,7 @@ module Api =
                     let testConfig: Rawg.RawgConfig = {
                         ApiKey = key
                     }
-                    let! _ = Rawg.searchGames httpClient testConfig "test"
+                    let! _ = Rawg.searchGames httpClient testConfig "test" None
                     return Ok ()
                 with ex ->
                     return Error $"RAWG API key validation failed: {ex.Message}"
@@ -2735,7 +2735,7 @@ module Api =
                                         let rawgConfig = getRawgConfig()
                                         let! rawgResults =
                                             if not (System.String.IsNullOrWhiteSpace(rawgConfig.ApiKey)) then
-                                                Rawg.searchGames httpClient rawgConfig steamGame.Name
+                                                Rawg.searchGames httpClient rawgConfig steamGame.Name None
                                             else
                                                 async { return [] }
 

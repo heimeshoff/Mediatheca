@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-02-24 -- Idea Captured: Show Finished Series in Next Up for 7 Days
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/023-finished-series-7day-nextup.md
+**Summary:** Finished TV series (not InFocus, not abandoned) should stay in dashboard Next Up for 7 days after last watch date. Single SQL WHERE clause change in `getDashboardSeriesNextUp` — no client, shared type, or API changes needed. The `last_watched_date` subselect and `IsFinished` flag already exist in the query and DTO.
+
+---
+
+## 2026-02-24 -- Task Completed: 021 - Fuzzy Search
+
+**Type:** Task Completion
+**Task:** 021 - Fuzzy Search
+**Summary:** Implemented fuzzy search with Levenshtein distance-based matching for local library search in the Ctrl+K modal, plus year extraction for TMDB/RAWG external API queries. New FuzzyMatch.fs client module, updated API contracts to accept optional year parameter. All 233 tests pass.
+**Files changed:** 8 files
+
+---
+
+## 2026-02-24 -- Batch Started: [021]
+
+**Type:** Batch Start
+**Tasks:** 021 - Fuzzy Search
+**Mode:** Sequential (conflicts with 022 on SearchModal.fs, Shared.fs, Tmdb.fs, Rawg.fs, Api.fs, State.fs)
+
+---
+
 ## 2026-02-24 -- Task Completed: 020 - Game "Dismissed" Status
 
 **Type:** Task Completion

@@ -77,12 +77,43 @@ Update the debounce handler that fires API calls:
 
 ## Acceptance Criteria
 
-- [ ] Typing "incption" (missing 'e') in the Library tab finds "Inception" in local results
-- [ ] Typing "the wtcher" finds "The Witcher" locally
-- [ ] Typing "inception 2010" on the Movies tab passes year=2010 to TMDB, improving result ranking
-- [ ] Typing "zelda 2023" on the Games tab passes dates filter to RAWG
-- [ ] RAWG search continues to handle typos natively (no regression)
-- [ ] Results are scored and sorted by relevance (best matches first)
-- [ ] Existing exact-match searches continue to work at least as well as before
-- [ ] No performance regression on keystroke (fuzzy matching on ~hundreds of items should be <5ms)
-- [ ] All existing tests pass
+- [x] Typing "incption" (missing 'e') in the Library tab finds "Inception" in local results
+- [x] Typing "the wtcher" finds "The Witcher" locally
+- [x] Typing "inception 2010" on the Movies tab passes year=2010 to TMDB, improving result ranking
+- [x] Typing "zelda 2023" on the Games tab passes dates filter to RAWG
+- [x] RAWG search continues to handle typos natively (no regression)
+- [x] Results are scored and sorted by relevance (best matches first)
+- [x] Existing exact-match searches continue to work at least as well as before
+- [x] No performance regression on keystroke (fuzzy matching on ~hundreds of items should be <5ms)
+- [x] All existing tests pass
+
+## Work Log
+
+### 2026-02-24 - Implementation Complete
+
+**Changes made:**
+
+1. **Created `src/Client/FuzzyMatch.fs`** - New fuzzy matching module with:
+   - `levenshteinDistance`: Standard edit-distance algorithm using two-row optimization
+   - `fuzzyScore`: Scoring combining normalized Levenshtein distance, substring containment bonus, and 35% threshold rejection
+   - `fuzzyMatch`: Takes query + keyed items, returns scored/sorted/filtered results
+   - `extractYear`: Extracts trailing 4-digit year from query ("inception 2010" -> ("inception", Some 2010))
+
+2. **Updated `src/Shared/Shared.fs`** - Changed API contract signatures:
+   - `searchTmdb: string * int option -> ...`
+   - `searchTvSeries: string * int option -> ...`
+   - `searchRawgGames: string * int option -> ...`
+
+3. **Updated `src/Server/Tmdb.fs`** - `searchMovies` and `searchTvSeries` now accept optional year parameter, appending `&year=` or `&first_air_date_year=` to TMDB API URLs. Cache keys incorporate year.
+
+4. **Updated `src/Server/Rawg.fs`** - `searchGames` now accepts optional year parameter, appending `&dates={year}-01-01,{year}-12-31` to RAWG API URL. Cache keys incorporate year.
+
+5. **Updated `src/Server/Api.fs`** - All API endpoint implementations destructure the `(query, year)` tuple. Also fixed 3 internal call sites (testTmdbApiKey, testRawgApiKey, Steam sync) to pass `None` for year.
+
+6. **Updated `src/Client/Components/SearchModal.fs`** - Replaced substring `.Contains()` filtering in `filterLibrary` with fuzzy matching via `FuzzyMatch.fuzzyMatch`. Year extraction boosts year-matching items.
+
+7. **Updated `src/Client/State.fs`** - Added `FuzzyMatch.extractYear` before all external search API calls. Passes `(cleanQuery, yearOpt)` tuples to API methods.
+
+8. **Updated `src/Client/Client.fsproj`** - Added `FuzzyMatch.fs` before `SearchModal.fs` in compilation order.
+
+**Verification:** `npm run build` succeeds, `npm test` passes all 233 tests.

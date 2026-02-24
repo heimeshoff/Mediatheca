@@ -192,12 +192,14 @@ module Tmdb =
             else None
         )
 
-    let searchMovies (httpClient: HttpClient) (config: TmdbConfig) (query: string) : Async<Mediatheca.Shared.TmdbSearchResult list> =
+    let searchMovies (httpClient: HttpClient) (config: TmdbConfig) (query: string) (year: int option) : Async<Mediatheca.Shared.TmdbSearchResult list> =
         async {
-            match SearchCache.tryGet query with
+            let cacheKey = match year with Some y -> $"{query}:{y}" | None -> query
+            match SearchCache.tryGet cacheKey with
             | Some cached -> return cached
             | None ->
-                let url = $"https://api.themoviedb.org/3/search/movie?api_key={config.ApiKey}&query={System.Uri.EscapeDataString(query)}"
+                let yearParam = match year with Some y -> $"&year={y}" | None -> ""
+                let url = $"https://api.themoviedb.org/3/search/movie?api_key={config.ApiKey}&query={System.Uri.EscapeDataString(query)}{yearParam}"
                 let! json = fetchJson httpClient url
                 match Decode.fromString decodeSearchResponse json with
                 | Ok response ->
@@ -211,7 +213,7 @@ module Tmdb =
                               PosterPath = r.PosterPath
                               MediaType = Mediatheca.Shared.Movie }
                         )
-                    SearchCache.set query results
+                    SearchCache.set cacheKey results
                     return results
                 | Error _ -> return []
         }
@@ -426,13 +428,14 @@ module Tmdb =
 
     // ─── TV Series API functions ────────────────────────────────────────
 
-    let searchTvSeries (httpClient: HttpClient) (config: TmdbConfig) (query: string) : Async<Mediatheca.Shared.TmdbSearchResult list> =
+    let searchTvSeries (httpClient: HttpClient) (config: TmdbConfig) (query: string) (year: int option) : Async<Mediatheca.Shared.TmdbSearchResult list> =
         async {
-            let cacheKey = $"tv:{query}"
+            let cacheKey = match year with Some y -> $"tv:{query}:{y}" | None -> $"tv:{query}"
             match SearchCache.tryGet cacheKey with
             | Some cached -> return cached
             | None ->
-                let url = $"https://api.themoviedb.org/3/search/tv?api_key={config.ApiKey}&query={System.Uri.EscapeDataString(query)}&language=en-US&page=1"
+                let yearParam = match year with Some y -> $"&first_air_date_year={y}" | None -> ""
+                let url = $"https://api.themoviedb.org/3/search/tv?api_key={config.ApiKey}&query={System.Uri.EscapeDataString(query)}&language=en-US&page=1{yearParam}"
                 let! json = fetchJson httpClient url
                 match Decode.fromString decodeTvSearchResponse json with
                 | Ok response ->

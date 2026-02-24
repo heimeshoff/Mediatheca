@@ -84,12 +84,13 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                     | SearchModal.Movies | SearchModal.Series -> { updatedSearch with IsSearchingTmdb = true }
                     | SearchModal.Games -> { updatedSearch with IsSearchingRawg = true }
                     | SearchModal.Library -> updatedSearch
+                let cleanQuery, yearOpt = FuzzyMatch.extractYear searchModel.Query
                 let searchCmd =
                     match tab with
                     | SearchModal.Movies | SearchModal.Series ->
                         let searchBoth = async {
-                            let! movieResults = api.searchTmdb searchModel.Query
-                            let! seriesResults = api.searchTvSeries searchModel.Query
+                            let! movieResults = api.searchTmdb (cleanQuery, yearOpt)
+                            let! seriesResults = api.searchTvSeries (cleanQuery, yearOpt)
                             return movieResults @ seriesResults
                         }
                         Cmd.OfAsync.either
@@ -98,7 +99,7 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                             (fun ex -> Search_modal_msg (SearchModal.Tmdb_search_failed ex.Message))
                     | SearchModal.Games ->
                         Cmd.OfAsync.either
-                            api.searchRawgGames searchModel.Query
+                            api.searchRawgGames (cleanQuery, yearOpt)
                             (fun results -> Search_modal_msg (SearchModal.Rawg_search_completed results))
                             (fun ex -> Search_modal_msg (SearchModal.Rawg_search_failed ex.Message))
                     | SearchModal.Library -> Cmd.none
@@ -138,11 +139,12 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
             if version <> searchModel.SearchVersion || searchModel.Query = "" then
                 model, Cmd.none
             else
+                let cleanQuery, yearOpt = FuzzyMatch.extractYear searchModel.Query
                 match searchModel.ActiveTab with
                 | SearchModal.Movies | SearchModal.Series ->
                     let searchBoth = async {
-                        let! movieResults = api.searchTmdb searchModel.Query
-                        let! seriesResults = api.searchTvSeries searchModel.Query
+                        let! movieResults = api.searchTmdb (cleanQuery, yearOpt)
+                        let! seriesResults = api.searchTvSeries (cleanQuery, yearOpt)
                         return movieResults @ seriesResults
                     }
                     model,
@@ -153,7 +155,7 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                 | SearchModal.Games ->
                     model,
                     Cmd.OfAsync.either
-                        api.searchRawgGames searchModel.Query
+                        api.searchRawgGames (cleanQuery, yearOpt)
                         (fun results -> Search_modal_msg (SearchModal.Rawg_search_completed results))
                         (fun ex -> Search_modal_msg (SearchModal.Rawg_search_failed ex.Message))
                 | SearchModal.Library ->
