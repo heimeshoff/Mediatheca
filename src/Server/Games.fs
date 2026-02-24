@@ -30,7 +30,7 @@ module Games =
         | Game_backdrop_replaced of backdropRef: string
         | Game_personal_rating_set of rating: int option
         | Game_status_changed of GameStatus
-        | Game_hltb_hours_set of hours: float option
+        | Game_hltb_hours_set of hours: float option * mainPlusHours: float option * completionistHours: float option
         | Game_store_added of store: string
         | Game_store_removed of store: string
         | Game_family_owner_added of friendSlug: string
@@ -67,6 +67,8 @@ module Games =
         RawgId: int option
         RawgRating: float option
         HltbHours: float option
+        HltbMainPlusHours: float option
+        HltbCompletionistHours: float option
         PersonalRating: int option
         Status: GameStatus
         SteamAppId: int option
@@ -96,7 +98,7 @@ module Games =
         | Replace_backdrop of backdropRef: string
         | Set_personal_rating of rating: int option
         | Change_status of GameStatus
-        | Set_hltb_hours of hours: float option
+        | Set_hltb_hours of hours: float option * mainPlusHours: float option * completionistHours: float option
         | Add_family_owner of friendSlug: string
         | Remove_family_owner of friendSlug: string
         | Recommend_game of friendSlug: string
@@ -134,6 +136,8 @@ module Games =
                 RawgId = data.RawgId
                 RawgRating = data.RawgRating
                 HltbHours = None
+                HltbMainPlusHours = None
+                HltbCompletionistHours = None
                 PersonalRating = None
                 Status = Backlog
                 SteamAppId = None
@@ -158,8 +162,8 @@ module Games =
             Active { game with PersonalRating = rating }
         | Active game, Game_status_changed status ->
             Active { game with Status = status }
-        | Active game, Game_hltb_hours_set hours ->
-            Active { game with HltbHours = hours }
+        | Active game, Game_hltb_hours_set (hours, mainPlusHours, completionistHours) ->
+            Active { game with HltbHours = hours; HltbMainPlusHours = mainPlusHours; HltbCompletionistHours = completionistHours }
         | _, Game_store_added _ -> state // legacy event, ignored
         | _, Game_store_removed _ -> state // legacy event, ignored
         | Active game, Game_family_owner_added friendSlug ->
@@ -230,9 +234,9 @@ module Games =
         | Active game, Change_status status ->
             if game.Status = status then Ok []
             else Ok [ Game_status_changed status ]
-        | Active game, Set_hltb_hours hours ->
-            if game.HltbHours = hours then Ok []
-            else Ok [ Game_hltb_hours_set hours ]
+        | Active game, Set_hltb_hours (hours, mainPlusHours, completionistHours) ->
+            if game.HltbHours = hours && game.HltbMainPlusHours = mainPlusHours && game.HltbCompletionistHours = completionistHours then Ok []
+            else Ok [ Game_hltb_hours_set (hours, mainPlusHours, completionistHours) ]
         | Active game, Add_family_owner friendSlug ->
             if game.FamilyOwners |> Set.contains friendSlug then Ok []
             else Ok [ Game_family_owner_added friendSlug ]
@@ -369,8 +373,12 @@ module Games =
                 "Game_personal_rating_set", Encode.toString 0 (Encode.object [ "rating", Encode.option Encode.int rating ])
             | Game_status_changed status ->
                 "Game_status_changed", Encode.toString 0 (Encode.object [ "status", Encode.string (encodeGameStatus status) ])
-            | Game_hltb_hours_set hours ->
-                "Game_hltb_hours_set", Encode.toString 0 (Encode.object [ "hours", Encode.option Encode.float hours ])
+            | Game_hltb_hours_set (hours, mainPlusHours, completionistHours) ->
+                "Game_hltb_hours_set", Encode.toString 0 (Encode.object [
+                    "hours", Encode.option Encode.float hours
+                    "mainPlusHours", Encode.option Encode.float mainPlusHours
+                    "completionistHours", Encode.option Encode.float completionistHours
+                ])
             | Game_store_added store ->
                 "Game_store_added", Encode.toString 0 (Encode.object [ "store", Encode.string store ])
             | Game_store_removed store ->
@@ -443,7 +451,12 @@ module Games =
                 |> Result.toOption
                 |> Option.map (decodeGameStatus >> Game_status_changed)
             | "Game_hltb_hours_set" ->
-                Decode.fromString (Decode.object (fun get -> get.Optional.Field "hours" Decode.float)) data
+                Decode.fromString (Decode.object (fun get ->
+                    let hours = get.Optional.Field "hours" Decode.float
+                    let mainPlusHours = get.Optional.Field "mainPlusHours" Decode.float
+                    let completionistHours = get.Optional.Field "completionistHours" Decode.float
+                    (hours, mainPlusHours, completionistHours)
+                )) data
                 |> Result.toOption
                 |> Option.map Game_hltb_hours_set
             | "Game_store_added" ->

@@ -39,6 +39,8 @@ module GameProjection =
                 rawg_id           INTEGER,
                 rawg_rating       REAL,
                 hltb_hours        REAL,
+                hltb_main_plus_hours REAL,
+                hltb_completionist_hours REAL,
                 personal_rating   INTEGER,
                 steam_app_id      INTEGER,
                 play_modes        TEXT NOT NULL DEFAULT '[]',
@@ -57,6 +59,12 @@ module GameProjection =
         // Migration for existing databases
         try
             conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN is_owned INTEGER NOT NULL DEFAULT 0" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN hltb_main_plus_hours REAL" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN hltb_completionist_hours REAL" |> Db.exec
         with _ -> ()
 
     let private dropTables (conn: SqliteConnection) : unit =
@@ -214,7 +222,7 @@ module GameProjection =
                     |> Db.setParams [ "slug", SqlType.String slug; "status", SqlType.String statusStr ]
                     |> Db.exec
 
-                | Games.Game_hltb_hours_set hours ->
+                | Games.Game_hltb_hours_set (hours, mainPlusHours, completionistHours) ->
                     conn
                     |> Db.newCommand "UPDATE game_list SET hltb_hours = @hltb_hours WHERE slug = @slug"
                     |> Db.setParams [
@@ -223,10 +231,12 @@ module GameProjection =
                     ]
                     |> Db.exec
                     conn
-                    |> Db.newCommand "UPDATE game_detail SET hltb_hours = @hltb_hours WHERE slug = @slug"
+                    |> Db.newCommand "UPDATE game_detail SET hltb_hours = @hltb_hours, hltb_main_plus_hours = @hltb_main_plus_hours, hltb_completionist_hours = @hltb_completionist_hours WHERE slug = @slug"
                     |> Db.setParams [
                         "slug", SqlType.String slug
                         "hltb_hours", match hours with Some h -> SqlType.Double h | None -> SqlType.Null
+                        "hltb_main_plus_hours", match mainPlusHours with Some h -> SqlType.Double h | None -> SqlType.Null
+                        "hltb_completionist_hours", match completionistHours with Some h -> SqlType.Double h | None -> SqlType.Null
                     ]
                     |> Db.exec
 
@@ -406,7 +416,7 @@ module GameProjection =
 
     let getBySlug (conn: SqliteConnection) (slug: string) : GameDetail option =
         conn
-        |> Db.newCommand "SELECT slug, name, year, description, short_description, website_url, cover_ref, backdrop_ref, genres, status, rawg_id, rawg_rating, hltb_hours, personal_rating, steam_app_id, play_modes, family_owners, recommended_by, want_to_play_with, played_with, total_play_time, steam_library_date, steam_last_played, is_owned FROM game_detail WHERE slug = @slug"
+        |> Db.newCommand "SELECT slug, name, year, description, short_description, website_url, cover_ref, backdrop_ref, genres, status, rawg_id, rawg_rating, hltb_hours, hltb_main_plus_hours, hltb_completionist_hours, personal_rating, steam_app_id, play_modes, family_owners, recommended_by, want_to_play_with, played_with, total_play_time, steam_library_date, steam_last_played, is_owned FROM game_detail WHERE slug = @slug"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
@@ -458,6 +468,12 @@ module GameProjection =
               HltbHours =
                 if rd.IsDBNull(rd.GetOrdinal("hltb_hours")) then None
                 else Some (rd.ReadDouble "hltb_hours")
+              HltbMainPlusHours =
+                if rd.IsDBNull(rd.GetOrdinal("hltb_main_plus_hours")) then None
+                else Some (rd.ReadDouble "hltb_main_plus_hours")
+              HltbCompletionistHours =
+                if rd.IsDBNull(rd.GetOrdinal("hltb_completionist_hours")) then None
+                else Some (rd.ReadDouble "hltb_completionist_hours")
               PersonalRating =
                 if rd.IsDBNull(rd.GetOrdinal("personal_rating")) then None
                 else Some (rd.ReadInt32 "personal_rating")

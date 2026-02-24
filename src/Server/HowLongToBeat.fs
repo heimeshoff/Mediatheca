@@ -147,16 +147,25 @@ module HowLongToBeat =
             let timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
             let url = sprintf "%s%s/init?t=%d" baseUrl searchEndpoint timestamp
             printfn "[HLTB] Fetching auth token from %s" url
-            match! fetchString httpClient url with
-            | Error e ->
-                return Error (sprintf "Failed to fetch auth token: %s" e)
-            | Ok json ->
-                match Decode.fromString decodeToken json with
-                | Ok token ->
-                    printfn "[HLTB] Auth token obtained successfully"
-                    return Ok token
-                | Error e ->
-                    return Error (sprintf "Failed to parse auth token response: %s" e)
+            try
+                use request = new HttpRequestMessage(HttpMethod.Get, url)
+                request.Headers.Add("User-Agent", userAgent)
+                request.Headers.Add("Referer", sprintf "%s/" baseUrl)
+                request.Headers.Add("Origin", baseUrl)
+                let cts = new Threading.CancellationTokenSource(requestTimeoutMs)
+                let! response = httpClient.SendAsync(request, cts.Token) |> Async.AwaitTask
+                if response.IsSuccessStatusCode then
+                    let! json = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+                    match Decode.fromString decodeToken json with
+                    | Ok token ->
+                        printfn "[HLTB] Auth token obtained successfully"
+                        return Ok token
+                    | Error e ->
+                        return Error (sprintf "Failed to parse auth token response: %s" e)
+                else
+                    return Error (sprintf "HTTP %d from %s" (int response.StatusCode) url)
+            with ex ->
+                return Error (sprintf "Request to %s failed: %s" url ex.Message)
         }
 
     // ─── Step 3: Search ──────────────────────────────────────────────────

@@ -553,6 +553,8 @@ type GameDetail = {
     RawgId: int option
     RawgRating: float option
     HltbHours: float option
+    HltbMainPlusHours: float option
+    HltbCompletionistHours: float option
     PersonalRating: int option
     SteamAppId: int option
     SteamLibraryDate: string option

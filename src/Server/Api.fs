@@ -2191,7 +2191,7 @@ module Api =
                         Games.reconstitute
                         Games.decide
                         Games.Serialization.toEventData
-                        (Games.Set_hltb_hours hours)
+                        (Games.Set_hltb_hours (hours, None, None))
                         projectionHandlers
             }
 
@@ -3607,8 +3607,9 @@ module Api =
                         match! HowLongToBeat.searchGame httpClient game.Name with
                         | None -> return Ok None
                         | Some hltbResult ->
-                            let hours = HowLongToBeat.toHours hltbResult.CompMainSeconds
-                            // Store the HLTB hours via the existing event
+                            let mainHours = HowLongToBeat.toHours hltbResult.CompMainSeconds
+                            let mainPlusHours = HowLongToBeat.toHours hltbResult.CompPlusSeconds
+                            let completionistHours = HowLongToBeat.toHours hltbResult.Comp100Seconds
                             let sid = Games.streamId gameSlug
                             let result =
                                 executeCommand
@@ -3617,10 +3618,13 @@ module Api =
                                     Games.reconstitute
                                     Games.decide
                                     Games.Serialization.toEventData
-                                    (Games.Set_hltb_hours (Some hours))
+                                    (Games.Set_hltb_hours (
+                                        Some mainHours,
+                                        (if mainPlusHours > 0.0 then Some mainPlusHours else None),
+                                        (if completionistHours > 0.0 then Some completionistHours else None)))
                                     projectionHandlers
                             match result with
-                            | Ok () -> return Ok (Some hours)
+                            | Ok () -> return Ok (Some mainHours)
                             | Error e -> return Error e
                 with ex ->
                     return Error $"Failed to fetch HLTB data: {ex.Message}"

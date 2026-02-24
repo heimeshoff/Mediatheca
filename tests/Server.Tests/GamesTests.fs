@@ -289,7 +289,7 @@ let gameTests =
             | Error e -> failtest $"Expected success but got: {e}"
 
         testCase "Setting HLTB hours" <| fun _ ->
-            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Set_hltb_hours (Some 50.5))
+            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Set_hltb_hours (Some 50.5, Some 80.0, Some 120.0))
             match result with
             | Ok events ->
                 Expect.equal (List.length events) 1 "Should produce one event"
@@ -385,7 +385,7 @@ let gameTests =
                 Replace_backdrop "x"
                 Set_personal_rating (Some 3)
                 Change_status Playing
-                Set_hltb_hours (Some 10.0)
+                Set_hltb_hours (Some 10.0, None, None)
                 Add_family_owner "marco"
                 Remove_family_owner "marco"
                 Recommend_game "marco"
@@ -521,8 +521,8 @@ let gameSerializationTests =
                 Game_status_changed Abandoned
                 Game_status_changed OnHold
                 Game_status_changed Backlog
-                Game_hltb_hours_set (Some 50.5)
-                Game_hltb_hours_set None
+                Game_hltb_hours_set (Some 50.5, Some 80.0, Some 120.0)
+                Game_hltb_hours_set (None, None, None)
                 Game_family_owner_added "marco"
                 Game_family_owner_removed "marco"
                 Game_recommended_by "sarah"

@@ -98,11 +98,13 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         ]
 
     | Game_loaded game ->
-        let trailerCmd =
+        let cmds =
             match game with
-            | Some _ -> Cmd.ofMsg Load_trailer
-            | None -> Cmd.none
-        { model with Game = game; IsLoading = false }, trailerCmd
+            | Some g ->
+                [ Cmd.ofMsg Load_trailer
+                  if g.HltbHours.IsNone then Cmd.ofMsg Fetch_hltb ]
+            | None -> []
+        { model with Game = game; IsLoading = false }, Cmd.batch cmds
 
     | Friends_loaded friends ->
         { model with AllFriends = friends }, Cmd.none

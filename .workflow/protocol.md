@@ -2,6 +2,33 @@
 
 ---
 
+## 2026-02-24 -- Idea Captured: Search Poster Grid with Hover Preview
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/022-search-poster-grid-hover-preview.md
+**Summary:** Redesign Ctrl+K search modal from text lists to a 4-column poster grid. Hovering a poster for 500ms shows a glassmorphic preview popover with rich details: library items fetch full detail from local DB (overview, cast, description); Movies/Series tab fetches from TMDB API (`/3/movie/{id}?append_to_response=credits`); Games tab fetches from RAWG (`/api/games/{id}` + screenshots). All hover fetches are read-only -- nothing written to DB. New shared preview types, 3 new API endpoints, in-memory preview cache, grid keyboard navigation (←→↑↓).
+
+---
+
+## 2026-02-24 -- Idea Captured: Fuzzy Search
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/021-fuzzy-search.md
+**Summary:** Make Ctrl+K search typo-tolerant using Levenshtein distance for local library matching, year extraction from queries (e.g., "inception 2010") passed to TMDB's `year` and RAWG's `dates` parameters. RAWG already has native fuzzy search. TMDB has no fuzziness but benefits from year filtering. New FuzzyMatch.fs client module, updated API contract to accept optional year parameter.
+
+---
+
+## 2026-02-24 -- Idea Captured: Game "Dismissed" Status
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/020-game-dismissed-status.md
+**Summary:** Add `Dismissed` status to GameStatus DU for games the user isn't interested in. Uses `badge-neutral` (solid grey) pill. Dismissed games hidden from default game list — only visible when the "Dismissed" filter is explicitly selected. Small task touching 7 files: shared types, server encode/decode, projection, event formatting, both client views, and tests.
+
+---
+
 ## 2026-02-24 -- Task Completed: 019 - Fix HLTB Auth Token Endpoint
 
 **Type:** Task Completion
