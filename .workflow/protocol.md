@@ -2,6 +2,15 @@
 
 ---
 
+## 2026-02-24 15:00 -- Idea Captured: Dashboard Stats & Visualizations (4 tasks)
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/024-movies-dashboard-stats.md, tasks/todo/025-series-dashboard-stats.md, tasks/todo/026-games-dashboard-stats.md, tasks/todo/027-dashboard-all-tab-enhancements.md
+**Summary:** Based on research across 18+ media tracking apps, created 4 tasks to expand all dashboard tabs with charts, stats, and visualizations. Movies: ratings chart, genre bars, actor/director stats, world map. TV Series: progress bars, episode activity chart, upcoming air dates, binge detection. Games: status donut, backlog time estimate, HLTB comparison, platform breakdown. All tab: cross-media hero stats, activity heatmap, monthly stacked bars.
+
+---
+
 ## 2026-02-24 14:30 -- Research: Dashboard Content for Movies, TV Series, and Games
 
 **Type:** Research

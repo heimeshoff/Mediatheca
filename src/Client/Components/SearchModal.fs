@@ -4,6 +4,7 @@ open Feliz
 open Feliz.DaisyUI
 open Fable.Core.JsInterop
 open Mediatheca.Shared
+open Mediatheca.Client
 
 type SearchTab = Library | Movies | Series | Games
 
@@ -174,7 +175,7 @@ let private renderPosterCard
                             prop.src src
                             prop.className "w-full h-full object-cover"
                             prop.alt name
-                            prop.loading.lazy_
+                            prop.custom ("loading", "lazy")
                         ]
                     | None ->
                         Html.div [
@@ -250,7 +251,8 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
                             | None -> ()
                             match data.SeasonCount with
                             | Some sc ->
-                                Html.span [ prop.text $" \u00B7 {sc} season{if sc > 1 then "s" else ""}" ]
+                                let suffix = if sc > 1 then "s" else ""
+                                Html.span [ prop.text $" \u00B7 {sc} season{suffix}" ]
                             | None -> ()
                         ]
                     ]
@@ -356,7 +358,7 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
                                 Html.img [
                                     prop.src ss
                                     prop.className "w-1/2 rounded object-cover aspect-video"
-                                    prop.loading.lazy_
+                                    prop.custom ("loading", "lazy")
                                 ]
                         ]
                     ]
@@ -426,7 +428,8 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
                     prop.className "text-xs text-base-content/50 mb-2"
                     prop.children [
                         Html.span [ prop.text (string data.Year) ]
-                        Html.span [ prop.text $" \u00B7 {data.Seasons.Length} season{if data.Seasons.Length > 1 then "s" else ""}" ]
+                        let suffix = if data.Seasons.Length > 1 then "s" else ""
+                        Html.span [ prop.text $" \u00B7 {data.Seasons.Length} season{suffix}" ]
                     ]
                 ]
                 match data.TmdbRating with
@@ -509,7 +512,7 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
 [<ReactComponent>]
 let view (model: Model) (dispatch: Msg -> unit) =
     let selIdx, setSelIdx = React.useState(-1)
-    let hoverTimerRef = React.useRef(None : int option)
+    let hoverTimerRef = React.useRef(None : float option)
     let activeTab = model.ActiveTab
 
     let localResults = filterLibrary model.Query model.LibraryMovies model.LibrarySeries model.LibraryGames
@@ -565,13 +568,13 @@ let view (model: Model) (dispatch: Msg -> unit) =
     ), [| box selIdx; box activeTab |])
 
     // Cleanup hover timer on unmount
-    React.useEffectDisposable((fun () ->
+    React.useEffectOnce(fun () ->
         { new System.IDisposable with
             member _.Dispose() =
                 match hoverTimerRef.current with
                 | Some tid -> Browser.Dom.window.clearTimeout(tid)
                 | None -> () }
-    ), [||])
+    )
 
     let startHover (key: string) =
         // Cancel any existing timer
@@ -589,7 +592,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
             let newVersion = model.HoverVersion + 1
             let tid = Browser.Dom.window.setTimeout((fun () ->
                 dispatch (Hover_start (key, newVersion))
-            ), 500)
+            ), 500.0)
             hoverTimerRef.current <- Some tid
 
     let cancelHover () =
