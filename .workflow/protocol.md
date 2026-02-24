@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-02-24 17:30 -- Task Completed: 025 - TV Series Dashboard Stats & Visualizations
+
+**Type:** Task Completion
+**Task:** 025 - TV Series Dashboard Stats & Visualizations
+**Summary:** Expanded TV Series dashboard tab with new stat badges (Currently Watching, Average Rating, Completion Rate), per-series progress bars and time remaining on Next Up, 14-day episode activity chart with binge detection, monthly episode activity, ratings distribution, genre breakdown, and most watched with friends. Upcoming Episodes deferred (requires TMDB air date infrastructure).
+**Files changed:** 4 files
+
+---
+
+## 2026-02-24 17:20 -- Batch Started: [025]
+
+**Type:** Batch Start
+**Tasks:** 025 - TV Series Dashboard Stats & Visualizations
+**Mode:** Sequential (conflicts with 026 on Shared.fs, Api.fs, Dashboard/Views.fs)
+
+---
+
 ## 2026-02-24 17:15 -- Task Completed: 029 - List Page Fuzzy Search
 
 **Type:** Task Completion
