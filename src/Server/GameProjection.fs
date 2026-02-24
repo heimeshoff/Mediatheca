@@ -787,7 +787,7 @@ module GameProjection =
             SELECT CAST(strftime('%Y', COALESCE(
                 (SELECT MAX(date) FROM game_play_session WHERE game_slug = gl.slug),
                 gd.steam_last_played
-            )) AS INTEGER) as year, COUNT(*) as count
+            )) AS INTEGER) as completion_year, COUNT(*) as count
             FROM game_list gl
             LEFT JOIN game_detail gd ON gd.slug = gl.slug
             WHERE gl.status = 'Completed'
@@ -795,11 +795,11 @@ module GameProjection =
                 (SELECT MAX(date) FROM game_play_session WHERE game_slug = gl.slug),
                 gd.steam_last_played
               ) IS NOT NULL
-            GROUP BY year
-            ORDER BY year
+            GROUP BY completion_year
+            ORDER BY completion_year
         """
         |> Db.query (fun (rd: IDataReader) ->
-            rd.ReadInt32 "year", rd.ReadInt32 "count")
+            rd.ReadInt32 "completion_year", rd.ReadInt32 "count")
 
     // Cross-media: Total game play time in minutes
     let getTotalGamePlayTimeMinutes (conn: SqliteConnection) : int =
