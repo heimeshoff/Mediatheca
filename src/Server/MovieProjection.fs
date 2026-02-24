@@ -801,3 +801,58 @@ module MovieProjection =
             |> List.countBy id
             |> List.sortByDescending snd
             |> List.truncate 20
+
+    // Cross-media: Total watch time in minutes (all movies)
+    let getTotalWatchTimeMinutes (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand "SELECT COALESCE(SUM(md.runtime), 0) as total FROM watch_sessions ws JOIN movie_detail md ON ws.movie_slug = md.slug"
+        |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
+        |> Option.defaultValue 0
+
+    // Cross-media: Movies watched this year
+    let getMoviesWatchedThisYear (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand "SELECT COUNT(DISTINCT movie_slug) as cnt FROM watch_sessions WHERE date >= strftime('%Y-01-01', 'now')"
+        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+        |> Option.defaultValue 0
+
+    // Cross-media: Movies watched this month
+    let getMoviesWatchedThisMonth (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand "SELECT COUNT(DISTINCT movie_slug) as cnt FROM watch_sessions WHERE date >= strftime('%Y-%m-01', 'now')"
+        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+        |> Option.defaultValue 0
+
+    // Cross-media: Movies watched this week (last 7 days)
+    let getMoviesWatchedThisWeek (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand "SELECT COUNT(DISTINCT movie_slug) as cnt FROM watch_sessions WHERE date >= date('now', '-7 days')"
+        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+        |> Option.defaultValue 0
+
+    // Cross-media: Daily movie activity for last 365 days
+    let getDailyMovieActivity (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand """
+            SELECT date, COUNT(*) as count
+            FROM watch_sessions
+            WHERE date >= date('now', '-365 days')
+            GROUP BY date
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "date", rd.ReadInt32 "count")
+
+    // Cross-media: Monthly movie minutes for last 12 months
+    let getMonthlyMovieMinutes (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand """
+            SELECT strftime('%Y-%m', ws.date) as month,
+                   COALESCE(SUM(md.runtime), 0) as minutes
+            FROM watch_sessions ws
+            JOIN movie_detail md ON ws.movie_slug = md.slug
+            WHERE ws.date >= date('now', '-12 months')
+            GROUP BY month
+            ORDER BY month
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "month", rd.ReadInt32 "minutes")

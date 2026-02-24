@@ -300,6 +300,37 @@ type DashboardNewGame = {
     FamilyOwners: FriendRef list
 }
 
+type DashboardCrossMediaStats = {
+    TotalMovieMinutes: int
+    TotalSeriesMinutes: int
+    TotalGameMinutes: int
+    MoviesWatchedThisYear: int
+    EpisodesWatchedThisYear: int
+    GamesBeatenThisYear: int
+    MoviesWatchedThisMonth: int
+    EpisodesWatchedThisMonth: int
+    GamesPlayedThisMonth: int
+    ActiveSeriesCount: int
+    ActiveGamesCount: int
+    WeekMovieCount: int
+    WeekEpisodeCount: int
+    WeekGameMinutes: int
+}
+
+type DashboardActivityDay = {
+    Date: string
+    MovieSessions: int
+    EpisodesWatched: int
+    GameSessions: int
+}
+
+type DashboardMonthlyBreakdown = {
+    Month: string
+    MovieMinutes: int
+    SeriesMinutes: int
+    GameMinutes: int
+}
+
 type DashboardAllTab = {
     SeriesNextUp: DashboardSeriesNextUp list
     MoviesInFocus: DashboardMovieInFocus list
@@ -308,6 +339,9 @@ type DashboardAllTab = {
     PlaySessions: DashboardPlaySession list
     NewGames: DashboardNewGame list
     JellyfinServerUrl: string option
+    CrossMediaStats: DashboardCrossMediaStats
+    ActivityDays: DashboardActivityDay list
+    MonthlyBreakdown: DashboardMonthlyBreakdown list
 }
 
 type DashboardMovieStats = {

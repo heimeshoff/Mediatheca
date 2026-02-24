@@ -1289,6 +1289,427 @@ let private achievementsSection (state: AchievementsState) =
                 ]
     ]
 
+// ── All Tab: Cross-Media Hero Stats ──
+
+let private formatTotalTime (totalMinutes: int) =
+    if totalMinutes = 0 then "0h"
+    else
+        let days = totalMinutes / (60 * 24)
+        let hours = (totalMinutes % (60 * 24)) / 60
+        if days > 0 then
+            if hours > 0 then $"{days}d {hours}h"
+            else $"{days}d"
+        elif hours > 0 then $"{hours}h"
+        else $"{totalMinutes}m"
+
+let private heroStatCard (label: string) (value: string) (sublabel: string) (colorClass: string) =
+    Html.div [
+        prop.className (DesignSystem.glassCard + " p-4 flex flex-col items-center justify-center text-center min-h-[90px]")
+        prop.children [
+            Html.span [
+                prop.className $"text-2xl font-display font-bold {colorClass}"
+                prop.text value
+            ]
+            Html.span [
+                prop.className "text-xs text-base-content/50 uppercase tracking-wider mt-1"
+                prop.text label
+            ]
+            if not (System.String.IsNullOrWhiteSpace sublabel) then
+                Html.span [
+                    prop.className "text-[10px] text-base-content/35 mt-0.5"
+                    prop.text sublabel
+                ]
+        ]
+    ]
+
+let private crossMediaHeroStats (stats: DashboardCrossMediaStats) =
+    let totalMinutes = stats.TotalMovieMinutes + stats.TotalSeriesMinutes + stats.TotalGameMinutes
+    Html.div [
+        prop.className (DesignSystem.glassCard + " p-4 " + DesignSystem.animateFadeInUp)
+        prop.children [
+            Html.div [
+                prop.className "flex items-center gap-2 mb-3"
+                prop.children [
+                    Html.span [
+                        prop.className "text-primary/70"
+                        prop.children [ Icons.sparkles () ]
+                    ]
+                    Html.h2 [
+                        prop.className "text-lg font-display uppercase tracking-wider"
+                        prop.text "Media Overview"
+                    ]
+                ]
+            ]
+            // Stats grid
+            Html.div [
+                prop.className "grid grid-cols-2 sm:grid-cols-4 gap-3"
+                prop.children [
+                    // Total media time
+                    heroStatCard "Total Media Time" (formatTotalTime totalMinutes) "" "text-primary"
+                    // Active now
+                    let activeCount = stats.ActiveSeriesCount + stats.ActiveGamesCount
+                    let activeDetail =
+                        [ if stats.ActiveSeriesCount > 0 then $"{stats.ActiveSeriesCount} series"
+                          if stats.ActiveGamesCount > 0 then $"{stats.ActiveGamesCount} game{if stats.ActiveGamesCount > 1 then "s" else ""}" ]
+                        |> String.concat ", "
+                    heroStatCard "Active Now" (string activeCount) activeDetail "text-success"
+                    // This year
+                    let yearItems =
+                        [ if stats.MoviesWatchedThisYear > 0 then $"{stats.MoviesWatchedThisYear} movie{if stats.MoviesWatchedThisYear > 1 then "s" else ""}"
+                          if stats.EpisodesWatchedThisYear > 0 then $"{stats.EpisodesWatchedThisYear} ep{if stats.EpisodesWatchedThisYear > 1 then "s" else ""}"
+                          if stats.GamesBeatenThisYear > 0 then $"{stats.GamesBeatenThisYear} beaten" ]
+                        |> String.concat ", "
+                    let yearTotal = stats.MoviesWatchedThisYear + stats.EpisodesWatchedThisYear + stats.GamesBeatenThisYear
+                    heroStatCard "This Year" (string yearTotal) yearItems "text-info"
+                    // This month
+                    let monthItems =
+                        [ if stats.MoviesWatchedThisMonth > 0 then $"{stats.MoviesWatchedThisMonth} movie{if stats.MoviesWatchedThisMonth > 1 then "s" else ""}"
+                          if stats.EpisodesWatchedThisMonth > 0 then $"{stats.EpisodesWatchedThisMonth} ep{if stats.EpisodesWatchedThisMonth > 1 then "s" else ""}"
+                          if stats.GamesPlayedThisMonth > 0 then $"{stats.GamesPlayedThisMonth} game{if stats.GamesPlayedThisMonth > 1 then "s" else ""}" ]
+                        |> String.concat ", "
+                    let monthTotal = stats.MoviesWatchedThisMonth + stats.EpisodesWatchedThisMonth + stats.GamesPlayedThisMonth
+                    heroStatCard "This Month" (string monthTotal) monthItems "text-warning"
+                ]
+            ]
+        ]
+    ]
+
+// ── All Tab: Weekly Activity Summary ──
+
+let private weeklyActivitySummary (stats: DashboardCrossMediaStats) =
+    let parts =
+        [ if stats.WeekEpisodeCount > 0 then
+            $"{stats.WeekEpisodeCount} episode{if stats.WeekEpisodeCount > 1 then "s" else ""}"
+          if stats.WeekMovieCount > 0 then
+            $"{stats.WeekMovieCount} movie{if stats.WeekMovieCount > 1 then "s" else ""}"
+          if stats.WeekGameMinutes > 0 then
+            $"{formatPlayTime stats.WeekGameMinutes} of gaming" ]
+    if List.isEmpty parts then
+        Html.div [
+            prop.className ("text-sm text-base-content/40 italic " + DesignSystem.animateFadeInUp)
+            prop.text "No activity this week yet"
+        ]
+    else
+        Html.div [
+            prop.className ("text-sm text-base-content/60 " + DesignSystem.animateFadeInUp)
+            prop.children [
+                Html.span [
+                    prop.className "font-medium text-base-content/80"
+                    prop.text "This week: "
+                ]
+                Html.span [
+                    prop.text (parts |> String.concat ", ")
+                ]
+            ]
+        ]
+
+// ── All Tab: Activity Heatmap (GitHub-style) ──
+
+let private activityHeatmap (activityDays: DashboardActivityDay list) =
+    let today = System.DateTimeOffset.Now.Date
+    // Build a map of date string -> activity count
+    let activityMap =
+        activityDays
+        |> List.map (fun d -> d.Date, d.MovieSessions + d.EpisodesWatched + d.GameSessions)
+        |> Map.ofList
+    let detailMap =
+        activityDays
+        |> List.map (fun d -> d.Date, d)
+        |> Map.ofList
+
+    // Calculate start date: go back ~52 weeks from today to the nearest Sunday
+    let daysBack = 364
+    let startDate = today.AddDays(float -daysBack)
+    // Adjust start to Sunday
+    let startDayOfWeek = int startDate.DayOfWeek
+    let adjustedStart = startDate.AddDays(float -startDayOfWeek)
+
+    // Generate all days from adjustedStart to today
+    let totalDays = int (today - adjustedStart).TotalDays + 1
+    let allDays =
+        [ for i in 0 .. totalDays - 1 do
+            adjustedStart.AddDays(float i) ]
+
+    // Group by week (column) — each column is 7 days starting from Sunday
+    let weeks =
+        allDays
+        |> List.chunkBySize 7
+
+    let cellSize = 12
+    let cellGap = 2
+    let weekWidth = cellSize + cellGap
+    let numWeeks = weeks.Length
+    let chartWidth = numWeeks * weekWidth + 30 // 30 for day labels
+    let chartHeight = 7 * (cellSize + cellGap) + 25 // 25 for month labels
+
+    // Color levels based on activity count
+    let getColorClass (count: int) =
+        if count = 0 then "fill-base-content/5"
+        elif count = 1 then "fill-primary/30"
+        elif count <= 3 then "fill-primary/55"
+        else "fill-primary/85"
+
+    sectionCardOverflow Icons.calendar "Activity" [
+        Html.div [
+            prop.className "overflow-x-auto scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+            prop.children [
+                Svg.svg [
+                    svg.width chartWidth
+                    svg.height chartHeight
+                    svg.viewBox (0, 0, chartWidth, chartHeight)
+                    svg.children [
+                        // Day-of-week labels
+                        Svg.text [
+                            svg.x 0; svg.y (1 * (cellSize + cellGap) + cellSize + 20)
+                            svg.className "fill-base-content/30"
+                            svg.custom ("fontSize", "9")
+                            svg.text "Mon"
+                        ]
+                        Svg.text [
+                            svg.x 0; svg.y (3 * (cellSize + cellGap) + cellSize + 20)
+                            svg.className "fill-base-content/30"
+                            svg.custom ("fontSize", "9")
+                            svg.text "Wed"
+                        ]
+                        Svg.text [
+                            svg.x 0; svg.y (5 * (cellSize + cellGap) + cellSize + 20)
+                            svg.className "fill-base-content/30"
+                            svg.custom ("fontSize", "9")
+                            svg.text "Fri"
+                        ]
+
+                        // Month labels at top
+                        let mutable lastMonth = -1
+                        for weekIdx in 0 .. numWeeks - 1 do
+                            let week = weeks.[weekIdx]
+                            if not (List.isEmpty week) then
+                                let firstDay = week.[0]
+                                let month = firstDay.Month
+                                if month <> lastMonth then
+                                    lastMonth <- month
+                                    let monthLabel = firstDay.ToString("MMM")
+                                    Svg.text [
+                                        svg.x (30 + weekIdx * weekWidth)
+                                        svg.y 10
+                                        svg.className "fill-base-content/30"
+                                        svg.custom ("fontSize", "9")
+                                        svg.text monthLabel
+                                    ]
+
+                        // Heatmap cells
+                        for weekIdx in 0 .. numWeeks - 1 do
+                            let week = weeks.[weekIdx]
+                            for dayIdx in 0 .. week.Length - 1 do
+                                let day = week.[dayIdx]
+                                let dateStr = day.ToString("yyyy-MM-dd")
+                                let count = activityMap |> Map.tryFind dateStr |> Option.defaultValue 0
+                                let colorClass = getColorClass count
+                                let x = 30 + weekIdx * weekWidth
+                                let y = 18 + dayIdx * (cellSize + cellGap)
+
+                                Svg.g [
+                                    svg.className "group"
+                                    svg.children [
+                                        Svg.rect [
+                                            svg.x x; svg.y y
+                                            svg.width cellSize; svg.height cellSize
+                                            svg.custom ("rx", "2")
+                                            svg.className ($"{colorClass} hover:stroke-base-content/40 hover:stroke-1 transition-colors cursor-pointer")
+                                        ]
+                                        // Tooltip rendered as title element for SVG
+                                        let tooltipParts =
+                                            match detailMap |> Map.tryFind dateStr with
+                                            | Some d ->
+                                                let parts =
+                                                    [ if d.EpisodesWatched > 0 then $"{d.EpisodesWatched} episode{if d.EpisodesWatched > 1 then "s" else ""}"
+                                                      if d.MovieSessions > 0 then $"{d.MovieSessions} movie{if d.MovieSessions > 1 then "s" else ""}"
+                                                      if d.GameSessions > 0 then $"{d.GameSessions} game{if d.GameSessions > 1 then "s" else ""}" ]
+                                                day.ToString("MMM d") + ": " + (if List.isEmpty parts then "No activity" else parts |> String.concat ", ")
+                                            | None ->
+                                                day.ToString("MMM d") + ": No activity"
+                                        Svg.title [ prop.text tooltipParts ]
+                                    ]
+                                ]
+                    ]
+                ]
+
+                // Legend
+                Html.div [
+                    prop.className "flex items-center justify-end gap-1 mt-2 text-[10px] text-base-content/40"
+                    prop.children [
+                        Html.span [ prop.text "Less" ]
+                        for level in [ "bg-base-content/5"; "bg-primary/30"; "bg-primary/55"; "bg-primary/85" ] do
+                            Html.div [
+                                prop.className $"w-3 h-3 rounded-sm {level}"
+                            ]
+                        Html.span [ prop.text "More" ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+// ── All Tab: Cross-Media Monthly Stacked Bar Chart ──
+
+let private crossMediaMonthlyChart (breakdown: DashboardMonthlyBreakdown list) =
+    if List.isEmpty breakdown then
+        sectionCard Icons.chartBar "Monthly Breakdown" [
+            Html.div [
+                prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+                prop.text "No activity data yet"
+            ]
+        ]
+    else
+        // Fill in all 12 months
+        let today = System.DateTimeOffset.Now
+        let allMonths =
+            [ for i in 11 .. -1 .. 0 do
+                let dt = today.AddMonths(-i)
+                let key = dt.ToString("yyyy-MM")
+                let label = dt.ToString("MMM")
+                let entry = breakdown |> List.tryFind (fun m -> m.Month = key)
+                match entry with
+                | Some m -> key, label, m.MovieMinutes, m.SeriesMinutes, m.GameMinutes
+                | None -> key, label, 0, 0, 0 ]
+
+        let maxMinutes =
+            allMonths
+            |> List.map (fun (_, _, m, s, g) -> m + s + g)
+            |> List.max
+            |> max 1
+
+        let maxHours = float maxMinutes / 60.0
+
+        sectionCard Icons.chartBar "Monthly Breakdown" [
+            // Legend
+            Html.div [
+                prop.className "flex items-center gap-4 mb-3 text-xs text-base-content/60"
+                prop.children [
+                    Html.div [
+                        prop.className "flex items-center gap-1.5"
+                        prop.children [
+                            Html.div [ prop.className "w-3 h-3 rounded-sm bg-info/80" ]
+                            Html.span [ prop.text "Movies" ]
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "flex items-center gap-1.5"
+                        prop.children [
+                            Html.div [ prop.className "w-3 h-3 rounded-sm bg-secondary/80" ]
+                            Html.span [ prop.text "TV Series" ]
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "flex items-center gap-1.5"
+                        prop.children [
+                            Html.div [ prop.className "w-3 h-3 rounded-sm bg-warning/80" ]
+                            Html.span [ prop.text "Games" ]
+                        ]
+                    ]
+                ]
+            ]
+            // Y-axis label
+            Html.div [
+                prop.className "flex items-center gap-1 mb-0.5"
+                prop.children [
+                    Html.span [
+                        prop.className "text-[10px] text-base-content/30 font-medium"
+                        prop.text (sprintf "%.0fh" maxHours)
+                    ]
+                    Html.div [
+                        prop.className "flex-1 border-t border-base-content/10"
+                    ]
+                ]
+            ]
+            // Stacked bar chart
+            Html.div [
+                prop.className "flex items-end gap-1 h-[140px] px-1"
+                prop.children [
+                    for (_key, label, movieMin, seriesMin, gameMin) in allMonths do
+                        let totalMin = movieMin + seriesMin + gameMin
+                        let totalPct =
+                            if totalMin = 0 then 0.0
+                            else float totalMin / float maxMinutes * 100.0
+                        let moviePct = if totalMin = 0 then 0.0 else float movieMin / float totalMin * 100.0
+                        let seriesPct = if totalMin = 0 then 0.0 else float seriesMin / float totalMin * 100.0
+                        let gamePct = if totalMin = 0 then 0.0 else float gameMin / float totalMin * 100.0
+                        Html.div [
+                            prop.className "flex-1 flex flex-col justify-end items-center relative group"
+                            prop.style [ style.height (length.percent 100) ]
+                            prop.children [
+                                // Tooltip
+                                if totalMin > 0 then
+                                    Html.div [
+                                        prop.className "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1.5 rounded-md bg-base-300/90 text-xs text-base-content whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg"
+                                        prop.children [
+                                            if movieMin > 0 then
+                                                Html.div [
+                                                    prop.className "flex items-center gap-1"
+                                                    prop.children [
+                                                        Html.div [ prop.className "w-2 h-2 rounded-sm bg-info/80" ]
+                                                        Html.span [ prop.text (sprintf "Movies: %s" (formatPlayTime movieMin)) ]
+                                                    ]
+                                                ]
+                                            if seriesMin > 0 then
+                                                Html.div [
+                                                    prop.className "flex items-center gap-1"
+                                                    prop.children [
+                                                        Html.div [ prop.className "w-2 h-2 rounded-sm bg-secondary/80" ]
+                                                        Html.span [ prop.text (sprintf "TV: %s" (formatPlayTime seriesMin)) ]
+                                                    ]
+                                                ]
+                                            if gameMin > 0 then
+                                                Html.div [
+                                                    prop.className "flex items-center gap-1"
+                                                    prop.children [
+                                                        Html.div [ prop.className "w-2 h-2 rounded-sm bg-warning/80" ]
+                                                        Html.span [ prop.text (sprintf "Games: %s" (formatPlayTime gameMin)) ]
+                                                    ]
+                                                ]
+                                        ]
+                                    ]
+                                // Stacked bar segments
+                                if totalMin > 0 then
+                                    Html.div [
+                                        prop.className "w-full flex flex-col justify-end rounded-t-sm overflow-hidden"
+                                        prop.style [ style.height (length.percent totalPct) ]
+                                        prop.children [
+                                            // Games (top = warning)
+                                            if gameMin > 0 then
+                                                Html.div [
+                                                    prop.className "w-full bg-warning/70 hover:bg-warning/90 transition-colors"
+                                                    prop.style [ style.height (length.percent gamePct) ]
+                                                ]
+                                            // Series (middle = secondary)
+                                            if seriesMin > 0 then
+                                                Html.div [
+                                                    prop.className "w-full bg-secondary/70 hover:bg-secondary/90 transition-colors"
+                                                    prop.style [ style.height (length.percent seriesPct) ]
+                                                ]
+                                            // Movies (bottom = info)
+                                            if movieMin > 0 then
+                                                Html.div [
+                                                    prop.className "w-full bg-info/70 hover:bg-info/90 transition-colors"
+                                                    prop.style [ style.height (length.percent moviePct) ]
+                                                ]
+                                        ]
+                                    ]
+                                else
+                                    Html.div [
+                                        prop.className "w-full rounded-t-sm bg-base-content/5"
+                                        prop.style [ style.height (length.px 2) ]
+                                    ]
+                                // Month label
+                                Html.div [
+                                    prop.className "text-[10px] text-base-content/40 text-center mt-1 leading-none"
+                                    prop.text label
+                                ]
+                            ]
+                        ]
+                ]
+            ]
+        ]
+
 // ── All Tab — 2-Column Grid Layout ──
 
 let private allTabView (data: DashboardAllTab) =
@@ -1306,6 +1727,15 @@ let private allTabView (data: DashboardAllTab) =
     Html.div [
         prop.className "flex flex-col gap-4"
         prop.children [
+            // 1. Cross-media hero stats
+            crossMediaHeroStats data.CrossMediaStats
+
+            // 2. Weekly activity summary
+            weeklyActivitySummary data.CrossMediaStats
+
+            // 3. Activity heatmap (365 days)
+            activityHeatmap data.ActivityDays
+
             // 2-column grid on desktop
             Html.div [
                 prop.className "grid grid-cols-1 lg:grid-cols-3 gap-4"
@@ -1314,15 +1744,15 @@ let private allTabView (data: DashboardAllTab) =
                     Html.div [
                         prop.className "lg:col-span-2 flex flex-col gap-4"
                         prop.children [
-                            // Hero Episode Spotlight
+                            // 4. Hero Episode Spotlight
                             match heroItem with
                             | Some item -> heroSpotlight data.JellyfinServerUrl item
                             | None -> ()
 
-                            // Next Up — open section (no card chrome)
+                            // 5. Next Up — open section (no card chrome)
                             seriesNextUpOpenScroller data.JellyfinServerUrl nextUpItems
 
-                            // Movies In Focus
+                            // 6. Movies In Focus
                             moviesInFocusPosterSection data.JellyfinServerUrl data.MoviesInFocus
                         ]
                     ]
@@ -1331,13 +1761,16 @@ let private allTabView (data: DashboardAllTab) =
                     Html.div [
                         prop.className "lg:col-span-1 flex flex-col gap-4"
                         prop.children [
-                            // Recently Played bar chart with summary stats
+                            // 7. Cross-media monthly chart
+                            crossMediaMonthlyChart data.MonthlyBreakdown
+
+                            // 8. Games play activity chart (existing 14-day chart)
                             gamesRecentlyPlayedChartWithStats data.PlaySessions
 
-                            // Games In Focus — poster cards
+                            // 9. Games In Focus — poster cards
                             gamesInFocusPosterSection data.GamesInFocus
 
-                            // New Games
+                            // 10. New Games
                             newGamesSection data.NewGames
                         ]
                     ]

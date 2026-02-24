@@ -195,14 +195,53 @@ These could live in a new `src/Client/Components/Charts.fs` module to avoid dupl
 
 ## Acceptance Criteria
 
-- [ ] Cross-media hero stats show total time, this-year counts, this-month counts, active counts
-- [ ] Weekly activity summary shows natural language recap of last 7 days
-- [ ] Activity heatmap displays 365 days of cross-media activity as a calendar grid
-- [ ] Heatmap tooltip shows per-day breakdown by media type
-- [ ] Cross-media monthly stacked bar chart shows 12 months of movies + TV + games hours
-- [ ] All existing All tab sections (hero spotlight, next up, in focus, play chart, new games) remain intact
-- [ ] New sections are positioned above existing content (hero stats, heatmap at top)
-- [ ] Heatmap renders correctly on mobile (horizontally scrollable if needed)
-- [ ] All charts follow existing SVG/Feliz pattern
-- [ ] Empty states handled gracefully (new users with no activity)
-- [ ] All existing tests pass
+- [x] Cross-media hero stats show total time, this-year counts, this-month counts, active counts
+- [x] Weekly activity summary shows natural language recap of last 7 days
+- [x] Activity heatmap displays 365 days of cross-media activity as a calendar grid
+- [x] Heatmap tooltip shows per-day breakdown by media type
+- [x] Cross-media monthly stacked bar chart shows 12 months of movies + TV + games hours
+- [x] All existing All tab sections (hero spotlight, next up, in focus, play chart, new games) remain intact
+- [x] New sections are positioned above existing content (hero stats, heatmap at top)
+- [x] Heatmap renders correctly on mobile (horizontally scrollable if needed)
+- [x] All charts follow existing SVG/Feliz pattern
+- [x] Empty states handled gracefully (new users with no activity)
+- [x] All existing tests pass
+
+### 2026-02-24 17:50 -- Work Completed
+
+**What was done:**
+- Added DashboardCrossMediaStats, DashboardActivityDay, DashboardMonthlyBreakdown DTOs to Shared.fs
+- Extended DashboardAllTab with CrossMediaStats, ActivityDays, and MonthlyBreakdown fields
+- Added cross-media query functions to MovieProjection.fs (total watch time, this-year/month/week counts, daily activity, monthly minutes)
+- Added cross-media query functions to SeriesProjection.fs (total watch time, this-year/month/week episode counts, daily activity, monthly minutes)
+- Added cross-media query functions to GameProjection.fs (total play time, games beaten this year, played this month, week minutes, active count, daily activity, monthly minutes)
+- Updated Api.fs getDashboardAllTab to aggregate all cross-media data, merge daily activities into unified activity days, and combine monthly breakdowns
+- Built cross-media hero stats section with 4 stat cards (Total Media Time, Active Now, This Year, This Month) using glassmorphism
+- Built weekly activity summary with adaptive natural language ("This week: 4 episodes, 2 movies, 6h of gaming")
+- Built GitHub-style activity heatmap as SVG with 365 days, color intensity levels, day-of-week labels, month labels, and SVG title tooltips for per-day breakdown
+- Built cross-media monthly stacked bar chart with 12 months of movies (info) + TV (secondary) + games (warning) hours with tooltips and legend
+- Added clock, bolt, fire, and sparkles icons to Icons.fs
+- All new sections positioned above existing content; all existing sections preserved
+- Heatmap is horizontally scrollable on mobile via overflow-x-auto
+
+**Acceptance criteria status:**
+- [x] Cross-media hero stats show total time, this-year counts, this-month counts, active counts -- hero stat cards with 4 metrics implemented
+- [x] Weekly activity summary shows natural language recap of last 7 days -- adaptive text only mentioning active media types
+- [x] Activity heatmap displays 365 days of cross-media activity as a calendar grid -- SVG grid with 52+ weeks x 7 days
+- [x] Heatmap tooltip shows per-day breakdown by media type -- SVG title elements with episode/movie/game counts
+- [x] Cross-media monthly stacked bar chart shows 12 months of movies + TV + games hours -- stacked bars with 3 color segments
+- [x] All existing All tab sections (hero spotlight, next up, in focus, play chart, new games) remain intact -- verified in allTabView layout
+- [x] New sections are positioned above existing content (hero stats, heatmap at top) -- hero stats first, then weekly summary, then heatmap
+- [x] Heatmap renders correctly on mobile (horizontally scrollable if needed) -- overflow-x-auto wrapper on SVG
+- [x] All charts follow existing SVG/Feliz pattern -- uses same Svg.svg/Svg.rect/Html.div patterns as other charts
+- [x] Empty states handled gracefully (new users with no activity) -- "No activity this week yet", "No activity data yet" messages
+- [x] All existing tests pass -- 233 tests pass, npm run build succeeds
+
+**Files changed:**
+- src/Shared/Shared.fs -- Added DashboardCrossMediaStats, DashboardActivityDay, DashboardMonthlyBreakdown DTOs; extended DashboardAllTab
+- src/Server/MovieProjection.fs -- Added getTotalWatchTimeMinutes, getMoviesWatchedThisYear/Month/Week, getDailyMovieActivity, getMonthlyMovieMinutes
+- src/Server/SeriesProjection.fs -- Added getTotalSeriesWatchTimeMinutes, getEpisodesWatchedThisYear/Month/Week, getDailyEpisodeActivity, getMonthlySeriesMinutes
+- src/Server/GameProjection.fs -- Added getTotalGamePlayTimeMinutes, getGamesBeatenThisYear, getGamesPlayedThisMonth, getGameMinutesThisWeek, getActiveGamesCount, getDailyGameActivity, getMonthlyGameMinutes
+- src/Server/Api.fs -- Expanded getDashboardAllTab to compute cross-media stats, merge daily activities, combine monthly breakdowns
+- src/Client/Pages/Dashboard/Views.fs -- Added crossMediaHeroStats, weeklyActivitySummary, activityHeatmap, crossMediaMonthlyChart; updated allTabView layout
+- src/Client/Components/Icons.fs -- Added clock, bolt, fire, sparkles icons

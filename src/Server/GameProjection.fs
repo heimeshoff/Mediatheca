@@ -800,3 +800,71 @@ module GameProjection =
         """
         |> Db.query (fun (rd: IDataReader) ->
             rd.ReadInt32 "year", rd.ReadInt32 "count")
+
+    // Cross-media: Total game play time in minutes
+    let getTotalGamePlayTimeMinutes (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand "SELECT COALESCE(SUM(total_play_time), 0) as total FROM game_list"
+        |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
+        |> Option.defaultValue 0
+
+    // Cross-media: Games beaten this year (approximate using last play session date)
+    let getGamesBeatenThisYear (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand """
+            SELECT COUNT(*) as cnt
+            FROM game_list gl
+            WHERE gl.status = 'Completed'
+              AND COALESCE(
+                (SELECT MAX(date) FROM game_play_session WHERE game_slug = gl.slug),
+                gl.steam_last_played
+              ) >= strftime('%Y-01-01', 'now')
+        """
+        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+        |> Option.defaultValue 0
+
+    // Cross-media: Games played this month (distinct games with play sessions)
+    let getGamesPlayedThisMonth (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand "SELECT COUNT(DISTINCT game_slug) as cnt FROM game_play_session WHERE date >= strftime('%Y-%m-01', 'now')"
+        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+        |> Option.defaultValue 0
+
+    // Cross-media: Game minutes this week (last 7 days)
+    let getGameMinutesThisWeek (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand "SELECT COALESCE(SUM(minutes_played), 0) as total FROM game_play_session WHERE date >= date('now', '-7 days')"
+        |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
+        |> Option.defaultValue 0
+
+    // Cross-media: Active games count (currently playing)
+    let getActiveGamesCount (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list WHERE status = 'Playing'"
+        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+        |> Option.defaultValue 0
+
+    // Cross-media: Daily game activity for last 365 days
+    let getDailyGameActivity (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand """
+            SELECT date, COUNT(DISTINCT game_slug) as count
+            FROM game_play_session
+            WHERE date >= date('now', '-365 days')
+            GROUP BY date
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "date", rd.ReadInt32 "count")
+
+    // Cross-media: Monthly game minutes for last 12 months
+    let getMonthlyGameMinutes (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand """
+            SELECT strftime('%Y-%m', date) as month, SUM(minutes_played) as total_minutes
+            FROM game_play_session
+            WHERE date >= date('now', '-12 months')
+            GROUP BY month
+            ORDER BY month
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "month", rd.ReadInt32 "total_minutes")

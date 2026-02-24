@@ -1343,3 +1343,65 @@ module SeriesProjection =
                         else Some (rd.ReadString "image_ref")
                       EpisodeCount = epCount } : Mediatheca.Shared.DashboardSeriesWatchedWith)
             friendRef)
+
+    // Cross-media: Total series watch time in minutes
+    let getTotalSeriesWatchTimeMinutes (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand """
+            SELECT COALESCE(SUM(e.runtime), 0) as total
+            FROM (SELECT DISTINCT series_slug, season_number, episode_number FROM series_episode_progress) p
+            JOIN series_episodes e ON e.series_slug = p.series_slug AND e.season_number = p.season_number AND e.episode_number = p.episode_number
+        """
+        |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
+        |> Option.defaultValue 0
+
+    // Cross-media: Episodes watched this year
+    let getEpisodesWatchedThisYear (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_episode_progress WHERE watched_date >= strftime('%Y-01-01', 'now') AND watched_date IS NOT NULL"
+        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+        |> Option.defaultValue 0
+
+    // Cross-media: Episodes watched this month
+    let getEpisodesWatchedThisMonth (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_episode_progress WHERE watched_date >= strftime('%Y-%m-01', 'now') AND watched_date IS NOT NULL"
+        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+        |> Option.defaultValue 0
+
+    // Cross-media: Episodes watched this week (last 7 days)
+    let getEpisodesWatchedThisWeek (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_episode_progress WHERE watched_date >= date('now', '-7 days') AND watched_date IS NOT NULL"
+        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+        |> Option.defaultValue 0
+
+    // Cross-media: Daily episode activity for last 365 days
+    let getDailyEpisodeActivity (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand """
+            SELECT watched_date as date, COUNT(*) as count
+            FROM series_episode_progress
+            WHERE watched_date >= date('now', '-365 days') AND watched_date IS NOT NULL
+            GROUP BY watched_date
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "date", rd.ReadInt32 "count")
+
+    // Cross-media: Monthly series minutes for last 12 months
+    let getMonthlySeriesMinutes (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand """
+            SELECT strftime('%Y-%m', sep.watched_date) as month,
+                   COALESCE(SUM(e.runtime), 0) as minutes
+            FROM series_episode_progress sep
+            JOIN series_episodes e ON e.series_slug = sep.series_slug
+                AND e.season_number = sep.season_number
+                AND e.episode_number = sep.episode_number
+            WHERE sep.watched_date >= date('now', '-12 months')
+              AND sep.watched_date IS NOT NULL
+            GROUP BY month
+            ORDER BY month
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "month", rd.ReadInt32 "minutes")

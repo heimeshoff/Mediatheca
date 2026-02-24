@@ -1321,6 +1321,67 @@ module Api =
                 let playSessions = PlaytimeTracker.getDashboardPlaySessions conn 14
                 let newGames = GameProjection.getDashboardNewGames conn 10
                 let jellyfinServerUrl = SettingsStore.getSetting conn "jellyfin_server_url"
+
+                // Cross-media stats
+                let totalMovieMinutes = MovieProjection.getTotalWatchTimeMinutes conn
+                let totalSeriesMinutes = SeriesProjection.getTotalSeriesWatchTimeMinutes conn
+                let totalGameMinutes = GameProjection.getTotalGamePlayTimeMinutes conn
+                let moviesWatchedThisYear = MovieProjection.getMoviesWatchedThisYear conn
+                let episodesWatchedThisYear = SeriesProjection.getEpisodesWatchedThisYear conn
+                let gamesBeatenThisYear = GameProjection.getGamesBeatenThisYear conn
+                let moviesWatchedThisMonth = MovieProjection.getMoviesWatchedThisMonth conn
+                let episodesWatchedThisMonth = SeriesProjection.getEpisodesWatchedThisMonth conn
+                let gamesPlayedThisMonth = GameProjection.getGamesPlayedThisMonth conn
+                let activeSeriesCount = SeriesProjection.getCurrentlyWatchingCount conn
+                let activeGamesCount = GameProjection.getActiveGamesCount conn
+                let weekMovieCount = MovieProjection.getMoviesWatchedThisWeek conn
+                let weekEpisodeCount = SeriesProjection.getEpisodesWatchedThisWeek conn
+                let weekGameMinutes = GameProjection.getGameMinutesThisWeek conn
+
+                // Activity heatmap data (365 days)
+                let dailyMovies = MovieProjection.getDailyMovieActivity conn
+                let dailyEpisodes = SeriesProjection.getDailyEpisodeActivity conn
+                let dailyGames = GameProjection.getDailyGameActivity conn
+
+                // Merge daily activity into unified list
+                let allDates =
+                    [ for (d, _) in dailyMovies -> d
+                      for (d, _) in dailyEpisodes -> d
+                      for (d, _) in dailyGames -> d ]
+                    |> List.distinct
+                    |> List.sort
+                let movieMap = dailyMovies |> Map.ofList
+                let episodeMap = dailyEpisodes |> Map.ofList
+                let gameMap = dailyGames |> Map.ofList
+                let activityDays =
+                    allDates
+                    |> List.map (fun d ->
+                        { Mediatheca.Shared.DashboardActivityDay.Date = d
+                          MovieSessions = movieMap |> Map.tryFind d |> Option.defaultValue 0
+                          EpisodesWatched = episodeMap |> Map.tryFind d |> Option.defaultValue 0
+                          GameSessions = gameMap |> Map.tryFind d |> Option.defaultValue 0 })
+
+                // Monthly breakdown (12 months)
+                let monthlyMovies = MovieProjection.getMonthlyMovieMinutes conn
+                let monthlySeries = SeriesProjection.getMonthlySeriesMinutes conn
+                let monthlyGames = GameProjection.getMonthlyGameMinutes conn
+                let allMonths =
+                    [ for (m, _) in monthlyMovies -> m
+                      for (m, _) in monthlySeries -> m
+                      for (m, _) in monthlyGames -> m ]
+                    |> List.distinct
+                    |> List.sort
+                let monthlyMovieMap = monthlyMovies |> Map.ofList
+                let monthlySeriesMap = monthlySeries |> Map.ofList
+                let monthlyGameMap = monthlyGames |> Map.ofList
+                let monthlyBreakdown =
+                    allMonths
+                    |> List.map (fun m ->
+                        { Mediatheca.Shared.DashboardMonthlyBreakdown.Month = m
+                          MovieMinutes = monthlyMovieMap |> Map.tryFind m |> Option.defaultValue 0
+                          SeriesMinutes = monthlySeriesMap |> Map.tryFind m |> Option.defaultValue 0
+                          GameMinutes = monthlyGameMap |> Map.tryFind m |> Option.defaultValue 0 })
+
                 return {
                     Mediatheca.Shared.DashboardAllTab.SeriesNextUp = seriesNextUp
                     MoviesInFocus = moviesInFocus
@@ -1331,6 +1392,24 @@ module Api =
                     JellyfinServerUrl =
                         jellyfinServerUrl
                         |> Option.bind (fun s -> if System.String.IsNullOrWhiteSpace(s) then None else Some s)
+                    CrossMediaStats = {
+                        Mediatheca.Shared.DashboardCrossMediaStats.TotalMovieMinutes = totalMovieMinutes
+                        TotalSeriesMinutes = totalSeriesMinutes
+                        TotalGameMinutes = totalGameMinutes
+                        MoviesWatchedThisYear = moviesWatchedThisYear
+                        EpisodesWatchedThisYear = episodesWatchedThisYear
+                        GamesBeatenThisYear = gamesBeatenThisYear
+                        MoviesWatchedThisMonth = moviesWatchedThisMonth
+                        EpisodesWatchedThisMonth = episodesWatchedThisMonth
+                        GamesPlayedThisMonth = gamesPlayedThisMonth
+                        ActiveSeriesCount = activeSeriesCount
+                        ActiveGamesCount = activeGamesCount
+                        WeekMovieCount = weekMovieCount
+                        WeekEpisodeCount = weekEpisodeCount
+                        WeekGameMinutes = weekGameMinutes
+                    }
+                    ActivityDays = activityDays
+                    MonthlyBreakdown = monthlyBreakdown
                 }
             }
 
