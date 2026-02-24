@@ -668,3 +668,135 @@ module GameProjection =
               AddedDate = rd.ReadString "added_date"
               FamilyOwners = resolveFriendRefs conn familyOwnerSlugs }
         )
+
+    // ── Dashboard Stats Queries ──
+
+    let getGameStatusDistribution (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand """
+            SELECT status, COUNT(*) as count
+            FROM game_list
+            GROUP BY status
+            ORDER BY count DESC
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "status", rd.ReadInt32 "count")
+
+    let getAverageGameRating (conn: SqliteConnection) : float option =
+        conn
+        |> Db.newCommand "SELECT AVG(CAST(personal_rating AS REAL)) as avg_rating FROM game_list WHERE personal_rating IS NOT NULL"
+        |> Db.querySingle (fun (rd: IDataReader) ->
+            if rd.IsDBNull(rd.GetOrdinal("avg_rating")) then None
+            else Some (rd.ReadDouble "avg_rating"))
+        |> Option.flatten
+
+    let getGameCompletionRate (conn: SqliteConnection) : float option =
+        let completed =
+            conn
+            |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list WHERE status = 'Completed'"
+            |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+            |> Option.defaultValue 0
+        let nonBacklog =
+            conn
+            |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list WHERE status NOT IN ('Backlog', 'Dismissed')"
+            |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+            |> Option.defaultValue 0
+        if nonBacklog = 0 then None
+        else Some (float completed / float nonBacklog * 100.0)
+
+    let getBacklogStats (conn: SqliteConnection) : float * int * int =
+        let backlogGames =
+            conn
+            |> Db.newCommand """
+                SELECT hltb_hours FROM game_list
+                WHERE status IN ('Backlog', 'InFocus')
+            """
+            |> Db.query (fun (rd: IDataReader) ->
+                if rd.IsDBNull(rd.GetOrdinal("hltb_hours")) then None
+                else Some (rd.ReadDouble "hltb_hours"))
+        let totalHours =
+            backlogGames
+            |> List.choose id
+            |> List.sumBy id
+        let totalCount = List.length backlogGames
+        let withoutHltb = backlogGames |> List.filter Option.isNone |> List.length
+        (totalHours, totalCount, withoutHltb)
+
+    let getGameRatingDistribution (conn: SqliteConnection) : (int * int) list =
+        conn
+        |> Db.newCommand """
+            SELECT personal_rating, COUNT(*) as count
+            FROM game_list
+            WHERE personal_rating IS NOT NULL
+            GROUP BY personal_rating
+            ORDER BY personal_rating
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadInt32 "personal_rating", rd.ReadInt32 "count")
+
+    let getGameGenreDistribution (conn: SqliteConnection) : (string * int) list =
+        let allGenres =
+            conn
+            |> Db.newCommand "SELECT genres FROM game_list"
+            |> Db.query (fun (rd: IDataReader) ->
+                let genresJson = rd.ReadString "genres"
+                Decode.fromString (Decode.list Decode.string) genresJson
+                |> Result.defaultValue [])
+        allGenres
+        |> List.concat
+        |> List.countBy id
+        |> List.sortByDescending snd
+        |> List.truncate 10
+
+    let getMonthlyPlayTime (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand """
+            SELECT strftime('%Y-%m', date) as month, SUM(minutes_played) as total_minutes
+            FROM game_play_session
+            WHERE date >= date('now', '-12 months')
+            GROUP BY month
+            ORDER BY month
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "month", rd.ReadInt32 "total_minutes")
+
+    let getHltbComparisons (conn: SqliteConnection) : Mediatheca.Shared.DashboardHltbComparison list =
+        conn
+        |> Db.newCommand """
+            SELECT gl.slug, gl.name, gl.cover_ref, gl.total_play_time, gl.hltb_hours
+            FROM game_list gl
+            WHERE gl.status = 'Completed'
+              AND gl.hltb_hours IS NOT NULL
+              AND gl.total_play_time > 0
+            ORDER BY gl.rowid DESC
+            LIMIT 10
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            { Mediatheca.Shared.DashboardHltbComparison.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              CoverRef =
+                if rd.IsDBNull(rd.GetOrdinal("cover_ref")) then None
+                else Some (rd.ReadString "cover_ref")
+              PlayMinutes = rd.ReadInt32 "total_play_time"
+              HltbMainHours = rd.ReadDouble "hltb_hours" })
+
+    let getGamesCompletedPerYear (conn: SqliteConnection) : (int * int) list =
+        // Approximate completion year using last play session date for completed games
+        conn
+        |> Db.newCommand """
+            SELECT CAST(strftime('%Y', COALESCE(
+                (SELECT MAX(date) FROM game_play_session WHERE game_slug = gl.slug),
+                gl.steam_last_played
+            )) AS INTEGER) as year, COUNT(*) as count
+            FROM game_list gl
+            LEFT JOIN game_detail gd ON gd.slug = gl.slug
+            WHERE gl.status = 'Completed'
+              AND COALESCE(
+                (SELECT MAX(date) FROM game_play_session WHERE game_slug = gl.slug),
+                gd.steam_last_played
+              ) IS NOT NULL
+            GROUP BY year
+            ORDER BY year
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadInt32 "year", rd.ReadInt32 "count")

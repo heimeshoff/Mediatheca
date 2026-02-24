@@ -1455,14 +1455,40 @@ module Api =
                     |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list WHERE status = 'Playing'"
                     |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
                     |> Option.defaultValue 0
+                let backlogSize =
+                    conn
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list WHERE status = 'Backlog'"
+                    |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+                    |> Option.defaultValue 0
+                let completionRate = GameProjection.getGameCompletionRate conn
+                let averageRating = GameProjection.getAverageGameRating conn
+                let (backlogTimeHours, backlogGameCount, backlogGamesWithoutHltb) = GameProjection.getBacklogStats conn
+                let statusDistribution = GameProjection.getGameStatusDistribution conn
+                let ratingDistribution = GameProjection.getGameRatingDistribution conn
+                let genreDistribution = GameProjection.getGameGenreDistribution conn
+                let monthlyPlayTime = GameProjection.getMonthlyPlayTime conn
+                let completedPerYear = GameProjection.getGamesCompletedPerYear conn
+                let hltbComparisons = GameProjection.getHltbComparisons conn
                 return {
                     Mediatheca.Shared.DashboardGamesTab.RecentlyAdded = recentlyAdded
                     RecentlyPlayed = recentlyPlayed
+                    HltbComparisons = hltbComparisons
                     Stats = {
                         Mediatheca.Shared.DashboardGameStats.TotalGames = totalGames
                         TotalPlayTimeMinutes = totalPlayTime
                         GamesCompleted = gamesCompleted
                         GamesInProgress = gamesInProgress
+                        BacklogSize = backlogSize
+                        CompletionRate = completionRate
+                        AverageRating = averageRating
+                        BacklogTimeHours = backlogTimeHours
+                        BacklogGameCount = backlogGameCount
+                        BacklogGamesWithoutHltb = backlogGamesWithoutHltb
+                        StatusDistribution = statusDistribution
+                        RatingDistribution = ratingDistribution
+                        GenreDistribution = genreDistribution
+                        MonthlyPlayTime = monthlyPlayTime
+                        CompletedPerYear = completedPerYear
                     }
                 }
             }

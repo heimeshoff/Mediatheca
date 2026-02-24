@@ -202,3 +202,38 @@ Suggested layout order for the Games tab:
 - [ ] All sections handle empty state gracefully
 - [ ] Mobile layout stacks vertically
 - [ ] All existing tests pass
+
+---
+
+### 2026-02-24 18:13 -- Work Completed
+
+**What was done:**
+- Expanded `DashboardGameStats` DTO with BacklogSize, CompletionRate, AverageRating, BacklogTimeHours, BacklogGameCount, BacklogGamesWithoutHltb, StatusDistribution, RatingDistribution, GenreDistribution, MonthlyPlayTime, CompletedPerYear
+- Added `DashboardHltbComparison` DTO and `HltbComparisons` field to `DashboardGamesTab`
+- Added 9 new query functions to `GameProjection.fs`: getGameStatusDistribution, getAverageGameRating, getGameCompletionRate, getBacklogStats, getGameRatingDistribution, getGameGenreDistribution, getMonthlyPlayTime, getHltbComparisons, getGamesCompletedPerYear
+- Updated `Api.fs` getDashboardGamesTab to call all new queries and populate expanded DTO
+- Added 7 new chart/visualization components to `Views.fs`: backlogTimeEstimateCard, gameStatusDistributionChart (stacked horizontal bar), gameRatingsDistributionChart, gameGenreBreakdownBars, monthlyPlayTimeChart, hltbComparisonChart (grouped dual bars), gamesCompletedPerYearChart
+- Updated gameStatsRow to show Backlog, Completion Rate, and Average Rating badges
+- Reorganized gamesTabView layout: stats badges, backlog estimate hero, status distribution, monthly play time, HLTB comparison, genre/ratings side-by-side, completed per year, recently played, recently added, achievements
+- Note: Platform/store breakdown skipped since there is no `game_store` table in the database schema. Games are associated with stores only implicitly through Steam integration. This can be added later if a store tracking feature is implemented.
+
+**Acceptance criteria status:**
+- [x] Stats badges show Backlog Size, Completion Rate, and Average Rating -- Added to gameStatsRow with conditional rendering
+- [x] Status distribution chart shows games per status with color-coding -- Stacked horizontal bar with per-status colors and legend
+- [x] Backlog time estimate shows total HLTB hours for Backlog + InFocus games -- Hero card with hours/days display and game count
+- [x] Ratings distribution bar chart displays correctly (1-10 scale) -- Full 1-10 range with accent color bars
+- [x] Genre breakdown shows top 10 genres as horizontal bars -- Horizontal bars with fade opacity
+- [~] Platform/store breakdown shows games per store -- Skipped: no game_store table exists in schema
+- [x] Monthly play time trend shows hours per month (last 12 months) -- Bar chart from game_play_session data
+- [x] HLTB comparison chart shows your time vs average for completed games -- Grouped dual bars with diff labels
+- [x] Games completed per year chart shows yearly completion trend -- Bar chart using last play session/steam dates
+- [x] All charts follow existing SVG/Feliz pattern (no new library) -- Pure Feliz/HTML/CSS, same as movies/series
+- [x] All sections handle empty state gracefully -- All charts show empty state message when no data
+- [x] Mobile layout stacks vertically -- Genre/ratings use grid-cols-1 md:grid-cols-2, all else stacks
+- [x] All existing tests pass -- 233 tests pass, npm run build succeeds
+
+**Files changed:**
+- `src/Shared/Shared.fs` -- Expanded DashboardGameStats with 11 new fields, added DashboardHltbComparison DTO, added HltbComparisons to DashboardGamesTab
+- `src/Server/GameProjection.fs` -- Added 9 new dashboard query functions
+- `src/Server/Api.fs` -- Updated getDashboardGamesTab to populate all new stats and HLTB comparisons
+- `src/Client/Pages/Dashboard/Views.fs` -- Added 7 new chart components, updated gameStatsRow and gamesTabView layout

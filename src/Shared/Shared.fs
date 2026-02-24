@@ -663,12 +663,32 @@ type DashboardGameStats = {
     TotalPlayTimeMinutes: int
     GamesCompleted: int
     GamesInProgress: int
+    BacklogSize: int
+    CompletionRate: float option
+    AverageRating: float option
+    BacklogTimeHours: float
+    BacklogGameCount: int
+    BacklogGamesWithoutHltb: int
+    StatusDistribution: (string * int) list
+    RatingDistribution: (int * int) list
+    GenreDistribution: (string * int) list
+    MonthlyPlayTime: (string * int) list
+    CompletedPerYear: (int * int) list
+}
+
+type DashboardHltbComparison = {
+    Slug: string
+    Name: string
+    CoverRef: string option
+    PlayMinutes: int
+    HltbMainHours: float
 }
 
 type DashboardGamesTab = {
     RecentlyAdded: GameListItem list
     RecentlyPlayed: DashboardGameRecentlyPlayed list
     Stats: DashboardGameStats
+    HltbComparisons: DashboardHltbComparison list
 }
 
 // Steam Integration

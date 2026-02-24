@@ -2565,8 +2565,522 @@ let private gameStatsRow (stats: DashboardGameStats) =
             statBadge "Play Time" (formatPlayTime stats.TotalPlayTimeMinutes)
             statBadge "Completed" (string stats.GamesCompleted)
             statBadge "In Progress" (string stats.GamesInProgress)
+            if stats.BacklogSize > 0 then
+                statBadge "Backlog" (string stats.BacklogSize)
+            match stats.CompletionRate with
+            | Some rate -> statBadge "Completion" (sprintf "%.0f%%" rate)
+            | None -> ()
+            match stats.AverageRating with
+            | Some avg -> statBadge "Avg Rating" (sprintf "%.1f" avg)
+            | None -> ()
         ]
     ]
+
+// ── Backlog Time Estimate Hero Card ──
+
+let private backlogTimeEstimateCard (stats: DashboardGameStats) =
+    if stats.BacklogGameCount = 0 then
+        Html.none
+    else
+        let hoursDisplay =
+            if stats.BacklogTimeHours >= 24.0 then
+                let days = stats.BacklogTimeHours / 24.0
+                sprintf "~%.0f days (~%.0f hrs)" days stats.BacklogTimeHours
+            else
+                sprintf "~%.0f hours" stats.BacklogTimeHours
+        Html.div [
+            prop.className (DesignSystem.glassCard + " p-5 " + DesignSystem.animateFadeInUp)
+            prop.children [
+                Html.div [
+                    prop.className "flex items-center gap-2 mb-2"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-warning/70"
+                            prop.children [ Icons.hourglass () ]
+                        ]
+                        Html.h2 [
+                            prop.className "text-lg font-display uppercase tracking-wider"
+                            prop.text "Backlog Estimate"
+                        ]
+                    ]
+                ]
+                Html.div [
+                    prop.className "text-center py-2"
+                    prop.children [
+                        Html.div [
+                            prop.className "text-3xl font-display font-bold text-warning"
+                            prop.text hoursDisplay
+                        ]
+                        Html.div [
+                            prop.className "text-sm text-base-content/50 mt-1"
+                            prop.children [
+                                Html.text (sprintf "across %d game%s" stats.BacklogGameCount (if stats.BacklogGameCount = 1 then "" else "s"))
+                                if stats.BacklogGamesWithoutHltb > 0 then
+                                    Html.text (sprintf " (%d without HLTB data)" stats.BacklogGamesWithoutHltb)
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+// ── Status Distribution Chart (Stacked Horizontal Bar) ──
+
+let private gameStatusColors (status: string) =
+    match status with
+    | "Backlog" -> "bg-base-content/30"
+    | "InFocus" -> "bg-warning"
+    | "Playing" -> "bg-info"
+    | "Completed" -> "bg-success"
+    | "Abandoned" -> "bg-error"
+    | "OnHold" -> "bg-base-content/50"
+    | "Dismissed" -> "bg-base-content/20"
+    | _ -> "bg-primary"
+
+let private gameStatusDistributionChart (distribution: (string * int) list) =
+    if List.isEmpty distribution then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No games yet"
+        ]
+    else
+        let total = distribution |> List.sumBy snd |> max 1
+        Html.div [
+            prop.className "flex flex-col gap-3"
+            prop.children [
+                // Stacked horizontal bar
+                Html.div [
+                    prop.className "flex h-8 rounded-lg overflow-hidden"
+                    prop.children [
+                        for (status, count) in distribution do
+                            let widthPct = float count / float total * 100.0
+                            if widthPct > 0.0 then
+                                Html.div [
+                                    prop.className (sprintf "%s opacity-80 hover:opacity-100 transition-all duration-300 relative group" (gameStatusColors status))
+                                    prop.style [ style.width (length.percent widthPct) ]
+                                    prop.children [
+                                        Html.div [
+                                            prop.className "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded-md bg-base-300/90 text-xs text-base-content whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg"
+                                            prop.text (sprintf "%s: %d (%.0f%%)" status count (float count / float total * 100.0))
+                                        ]
+                                    ]
+                                ]
+                    ]
+                ]
+                // Legend
+                Html.div [
+                    prop.className "flex flex-wrap gap-x-4 gap-y-1"
+                    prop.children [
+                        for (status, count) in distribution do
+                            Html.div [
+                                prop.className "flex items-center gap-1.5"
+                                prop.children [
+                                    Html.div [
+                                        prop.className (sprintf "w-3 h-3 rounded-sm %s" (gameStatusColors status))
+                                    ]
+                                    Html.span [
+                                        prop.className "text-xs text-base-content/60"
+                                        prop.text (sprintf "%s %d" status count)
+                                    ]
+                                ]
+                            ]
+                    ]
+                ]
+            ]
+        ]
+
+// ── Games Ratings Distribution ──
+
+let private gameRatingsDistributionChart (distribution: (int * int) list) =
+    if List.isEmpty distribution then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No ratings yet"
+        ]
+    else
+        let maxCount =
+            distribution |> List.map snd |> List.max |> max 1
+        let fullDistribution =
+            [ for r in 1..10 do
+                let count =
+                    distribution |> List.tryFind (fun (rating, _) -> rating = r)
+                    |> Option.map snd |> Option.defaultValue 0
+                r, count ]
+        Html.div [
+            prop.className "flex flex-col gap-0"
+            prop.children [
+                Html.div [
+                    prop.className "flex items-center gap-1 mb-0.5"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-[10px] text-base-content/30 font-medium"
+                            prop.text (string maxCount)
+                        ]
+                        Html.div [
+                            prop.className "flex-1 border-t border-base-content/10"
+                        ]
+                    ]
+                ]
+                Html.div [
+                    prop.className "flex items-end gap-1.5 h-[120px] px-1"
+                    prop.children [
+                        for (rating, count) in fullDistribution do
+                            let heightPct =
+                                if count = 0 then 0.0
+                                else float count / float maxCount * 100.0
+                            Html.div [
+                                prop.className "flex-1 flex flex-col justify-end items-center relative group"
+                                prop.style [ style.height (length.percent 100) ]
+                                prop.children [
+                                    if count > 0 then
+                                        Html.div [
+                                            prop.className "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded-md bg-base-300/90 text-xs text-base-content whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg"
+                                            prop.children [
+                                                Html.div [
+                                                    prop.className "font-medium"
+                                                    prop.text (sprintf "%d game%s" count (if count = 1 then "" else "s"))
+                                                ]
+                                            ]
+                                        ]
+                                    if count > 0 then
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-accent opacity-80 hover:opacity-100 transition-all duration-300"
+                                            prop.style [ style.height (length.percent heightPct) ]
+                                        ]
+                                    else
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-base-content/5"
+                                            prop.style [ style.height (length.px 2) ]
+                                        ]
+                                    Html.div [
+                                        prop.className "text-[10px] text-base-content/40 text-center mt-1 leading-none"
+                                        prop.text (string rating)
+                                    ]
+                                ]
+                            ]
+                    ]
+                ]
+            ]
+        ]
+
+// ── Games Genre Breakdown ──
+
+let private gameGenreBreakdownBars (distribution: (string * int) list) =
+    if List.isEmpty distribution then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No genre data yet"
+        ]
+    else
+        let maxCount =
+            distribution |> List.head |> snd |> max 1
+        Html.div [
+            prop.className "flex flex-col gap-1.5"
+            prop.children [
+                for i, (genre, count) in distribution |> List.mapi (fun i x -> i, x) do
+                    let widthPct = float count / float maxCount * 100.0
+                    let opacity = 1.0 - (float i * 0.06)
+                    Html.div [
+                        prop.className "flex items-center gap-2"
+                        prop.children [
+                            Html.span [
+                                prop.className "text-xs text-base-content/70 w-20 text-right truncate flex-shrink-0"
+                                prop.text genre
+                            ]
+                            Html.div [
+                                prop.className "flex-1 h-5 rounded-sm overflow-hidden bg-base-content/5 relative"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "h-full rounded-sm bg-accent transition-all duration-500"
+                                        prop.style [
+                                            style.width (length.percent widthPct)
+                                            style.opacity opacity
+                                        ]
+                                    ]
+                                ]
+                            ]
+                            Html.span [
+                                prop.className "text-xs text-base-content/50 w-6 text-right flex-shrink-0"
+                                prop.text (string count)
+                            ]
+                        ]
+                    ]
+            ]
+        ]
+
+// ── Monthly Play Time Chart ──
+
+let private monthlyPlayTimeChart (activity: (string * int) list) =
+    if List.isEmpty activity then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No play time data yet"
+        ]
+    else
+        let today = System.DateTimeOffset.Now
+        let allMonths =
+            [ for i in 11 .. -1 .. 0 do
+                let dt = today.AddMonths(-i)
+                let key = dt.ToString("yyyy-MM")
+                let label = dt.ToString("MMM")
+                let entry =
+                    activity |> List.tryFind (fun (m, _) -> m = key)
+                match entry with
+                | Some (_, minutes) -> key, label, minutes
+                | None -> key, label, 0 ]
+        let maxMinutes =
+            allMonths |> List.map (fun (_, _, m) -> m) |> List.max |> max 1
+        Html.div [
+            prop.className "flex flex-col gap-0"
+            prop.children [
+                Html.div [
+                    prop.className "flex items-center gap-1 mb-0.5"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-[10px] text-base-content/30 font-medium"
+                            prop.text (formatPlayTime maxMinutes)
+                        ]
+                        Html.div [
+                            prop.className "flex-1 border-t border-base-content/10"
+                        ]
+                    ]
+                ]
+                Html.div [
+                    prop.className "flex items-end gap-1 h-[120px] px-1"
+                    prop.children [
+                        for (_key, label, minutes) in allMonths do
+                            let heightPct =
+                                if minutes = 0 then 0.0
+                                else float minutes / float maxMinutes * 100.0
+                            Html.div [
+                                prop.className "flex-1 flex flex-col justify-end items-center relative group"
+                                prop.style [ style.height (length.percent 100) ]
+                                prop.children [
+                                    if minutes > 0 then
+                                        Html.div [
+                                            prop.className "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded-md bg-base-300/90 text-xs text-base-content whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg"
+                                            prop.children [
+                                                Html.div [
+                                                    prop.className "font-medium"
+                                                    prop.text (formatPlayTime minutes)
+                                                ]
+                                            ]
+                                        ]
+                                    if minutes > 0 then
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-info opacity-80 hover:opacity-100 transition-all duration-300"
+                                            prop.style [ style.height (length.percent heightPct) ]
+                                        ]
+                                    else
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-base-content/5"
+                                            prop.style [ style.height (length.px 2) ]
+                                        ]
+                                    Html.div [
+                                        prop.className "text-[10px] text-base-content/40 text-center mt-1 leading-none"
+                                        prop.text label
+                                    ]
+                                ]
+                            ]
+                    ]
+                ]
+            ]
+        ]
+
+// ── HLTB Comparison Chart ──
+
+let private hltbComparisonChart (comparisons: DashboardHltbComparison list) =
+    if List.isEmpty comparisons then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No completed games with HLTB data yet"
+        ]
+    else
+        let maxHours =
+            comparisons
+            |> List.map (fun c -> max (float c.PlayMinutes / 60.0) c.HltbMainHours)
+            |> List.max |> max 1.0
+        Html.div [
+            prop.className "flex flex-col gap-2"
+            prop.children [
+                for comp in comparisons do
+                    let yourHours = float comp.PlayMinutes / 60.0
+                    let yourPct = yourHours / maxHours * 100.0
+                    let hltbPct = comp.HltbMainHours / maxHours * 100.0
+                    let diff =
+                        if comp.HltbMainHours > 0.0 then
+                            (yourHours - comp.HltbMainHours) / comp.HltbMainHours * 100.0
+                        else 0.0
+                    let diffLabel =
+                        if diff > 5.0 then sprintf "+%.0f%% slower" diff
+                        elif diff < -5.0 then sprintf "%.0f%% faster" (abs diff)
+                        else "on par"
+                    Html.div [
+                        prop.className "flex flex-col gap-0.5"
+                        prop.children [
+                            Html.div [
+                                prop.className "flex items-center justify-between"
+                                prop.children [
+                                    Html.a [
+                                        prop.href (Router.format ("games", comp.Slug))
+                                        prop.onClick (fun e ->
+                                            e.preventDefault()
+                                            Router.navigate ("games", comp.Slug)
+                                        )
+                                        prop.className "text-xs text-base-content/70 truncate max-w-[160px] hover:text-primary transition-colors"
+                                        prop.text comp.Name
+                                    ]
+                                    Html.span [
+                                        prop.className (
+                                            "text-[10px] font-medium "
+                                            + if diff > 5.0 then "text-warning/70"
+                                              elif diff < -5.0 then "text-success/70"
+                                              else "text-base-content/40"
+                                        )
+                                        prop.text diffLabel
+                                    ]
+                                ]
+                            ]
+                            // Two bars: your time and HLTB
+                            Html.div [
+                                prop.className "flex flex-col gap-0.5"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "flex items-center gap-1.5"
+                                        prop.children [
+                                            Html.div [
+                                                prop.className "flex-1 h-3 rounded-sm overflow-hidden bg-base-content/5 relative"
+                                                prop.children [
+                                                    Html.div [
+                                                        prop.className "h-full rounded-sm bg-primary opacity-80"
+                                                        prop.style [ style.width (length.percent yourPct) ]
+                                                    ]
+                                                ]
+                                            ]
+                                            Html.span [
+                                                prop.className "text-[10px] text-base-content/50 w-10 text-right flex-shrink-0"
+                                                prop.text (sprintf "%.0fh" yourHours)
+                                            ]
+                                        ]
+                                    ]
+                                    Html.div [
+                                        prop.className "flex items-center gap-1.5"
+                                        prop.children [
+                                            Html.div [
+                                                prop.className "flex-1 h-3 rounded-sm overflow-hidden bg-base-content/5 relative"
+                                                prop.children [
+                                                    Html.div [
+                                                        prop.className "h-full rounded-sm bg-base-content/25"
+                                                        prop.style [ style.width (length.percent hltbPct) ]
+                                                    ]
+                                                ]
+                                            ]
+                                            Html.span [
+                                                prop.className "text-[10px] text-base-content/40 w-10 text-right flex-shrink-0"
+                                                prop.text (sprintf "%.0fh" comp.HltbMainHours)
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                // Legend
+                Html.div [
+                    prop.className "flex gap-4 mt-2 pt-2 border-t border-base-content/10"
+                    prop.children [
+                        Html.div [
+                            prop.className "flex items-center gap-1.5"
+                            prop.children [
+                                Html.div [ prop.className "w-3 h-3 rounded-sm bg-primary opacity-80" ]
+                                Html.span [
+                                    prop.className "text-[10px] text-base-content/50"
+                                    prop.text "Your time"
+                                ]
+                            ]
+                        ]
+                        Html.div [
+                            prop.className "flex items-center gap-1.5"
+                            prop.children [
+                                Html.div [ prop.className "w-3 h-3 rounded-sm bg-base-content/25" ]
+                                Html.span [
+                                    prop.className "text-[10px] text-base-content/50"
+                                    prop.text "HLTB average"
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+// ── Games Completed Per Year ──
+
+let private gamesCompletedPerYearChart (data: (int * int) list) =
+    if List.isEmpty data then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No completion data yet"
+        ]
+    else
+        let maxCount =
+            data |> List.map snd |> List.max |> max 1
+        Html.div [
+            prop.className "flex flex-col gap-0"
+            prop.children [
+                Html.div [
+                    prop.className "flex items-center gap-1 mb-0.5"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-[10px] text-base-content/30 font-medium"
+                            prop.text (string maxCount)
+                        ]
+                        Html.div [
+                            prop.className "flex-1 border-t border-base-content/10"
+                        ]
+                    ]
+                ]
+                Html.div [
+                    prop.className "flex items-end gap-1.5 h-[120px] px-1"
+                    prop.children [
+                        for (year, count) in data do
+                            let heightPct =
+                                if count = 0 then 0.0
+                                else float count / float maxCount * 100.0
+                            Html.div [
+                                prop.className "flex-1 flex flex-col justify-end items-center relative group"
+                                prop.style [ style.height (length.percent 100) ]
+                                prop.children [
+                                    if count > 0 then
+                                        Html.div [
+                                            prop.className "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded-md bg-base-300/90 text-xs text-base-content whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg"
+                                            prop.children [
+                                                Html.div [
+                                                    prop.className "font-medium"
+                                                    prop.text (sprintf "%d game%s" count (if count = 1 then "" else "s"))
+                                                ]
+                                            ]
+                                        ]
+                                    if count > 0 then
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-success opacity-80 hover:opacity-100 transition-all duration-300"
+                                            prop.style [ style.height (length.percent heightPct) ]
+                                        ]
+                                    else
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-base-content/5"
+                                            prop.style [ style.height (length.px 2) ]
+                                        ]
+                                    Html.div [
+                                        prop.className "text-[10px] text-base-content/40 text-center mt-1 leading-none"
+                                        prop.text (string year)
+                                    ]
+                                ]
+                            ]
+                    ]
+                ]
+            ]
+        ]
 
 let private gameRecentlyAddedItem (item: GameListItem) =
     Html.a [
@@ -2598,21 +3112,62 @@ let private gamesTabView (data: DashboardGamesTab) (achievementsState: Achieveme
     Html.div [
         prop.className "flex flex-col gap-4"
         prop.children [
+            // 1. Stats badges
             gameStatsRow data.Stats
 
-            if not (List.isEmpty data.RecentlyAdded) then
-                sectionCard Icons.gamepad "Recently Added" [
-                    for item in data.RecentlyAdded do
-                        gameRecentlyAddedItem item
+            // 2. Backlog time estimate hero card
+            backlogTimeEstimateCard data.Stats
+
+            // 3. Status distribution chart
+            sectionCard Icons.chartBar "Status Distribution" [
+                gameStatusDistributionChart data.Stats.StatusDistribution
+            ]
+
+            // 4. Monthly play time trend
+            sectionCard Icons.calendar "Monthly Play Time" [
+                monthlyPlayTimeChart data.Stats.MonthlyPlayTime
+            ]
+
+            // 5. HLTB comparison chart
+            if not (List.isEmpty data.HltbComparisons) then
+                sectionCard Icons.hourglass "Your Time vs HLTB" [
+                    hltbComparisonChart data.HltbComparisons
                 ]
 
+            // 6 & 7. Genre breakdown and ratings (side by side on desktop)
+            Html.div [
+                prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
+                prop.children [
+                    sectionCard Icons.tag "Genre Breakdown" [
+                        gameGenreBreakdownBars data.Stats.GenreDistribution
+                    ]
+                    sectionCard Icons.star "Ratings Distribution" [
+                        gameRatingsDistributionChart data.Stats.RatingDistribution
+                    ]
+                ]
+            ]
+
+            // 8. Games completed per year
+            if not (List.isEmpty data.Stats.CompletedPerYear) then
+                sectionCard Icons.trophy "Games Completed Per Year" [
+                    gamesCompletedPerYearChart data.Stats.CompletedPerYear
+                ]
+
+            // 9. Recently Played
             if not (List.isEmpty data.RecentlyPlayed) then
                 sectionCard Icons.hourglass "Recently Played" [
                     for item in data.RecentlyPlayed do
                         gameRecentlyPlayedItem item
                 ]
 
-            // Steam Achievements
+            // 10. Recently Added
+            if not (List.isEmpty data.RecentlyAdded) then
+                sectionCard Icons.gamepad "Recently Added" [
+                    for item in data.RecentlyAdded do
+                        gameRecentlyAddedItem item
+                ]
+
+            // 11. Steam Achievements
             achievementsSection achievementsState
         ]
     ]
