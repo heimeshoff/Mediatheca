@@ -195,15 +195,21 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     ]
                 ]
             else
+                let fuzzyFiltered =
+                    if model.SearchQuery = "" then model.Games
+                    else
+                        let query, yearFilter = FuzzyMatch.extractYear model.SearchQuery
+                        let items = model.Games |> List.map (fun g -> (g.Name, g))
+                        let matched = FuzzyMatch.fuzzyFilter query items
+                        match yearFilter with
+                        | Some year -> matched |> List.filter (fun g -> g.Year = year)
+                        | None -> matched
                 let filtered =
-                    model.Games
+                    fuzzyFiltered
                     |> List.filter (fun g ->
-                        (model.SearchQuery = "" ||
-                         g.Name.ToLowerInvariant().Contains(model.SearchQuery.ToLowerInvariant()))
-                        &&
-                        (match model.StatusFilter with
-                         | None -> g.Status <> Dismissed
-                         | Some f -> f = g.Status)
+                        match model.StatusFilter with
+                        | None -> g.Status <> Dismissed
+                        | Some f -> f = g.Status
                     )
                 if List.isEmpty filtered then
                     Html.div [

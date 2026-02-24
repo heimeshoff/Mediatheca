@@ -82,11 +82,14 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 ]
             else
                 let filtered =
-                    model.Movies
-                    |> List.filter (fun m ->
-                        model.SearchQuery = "" ||
-                        m.Name.ToLowerInvariant().Contains(model.SearchQuery.ToLowerInvariant())
-                    )
+                    if model.SearchQuery = "" then model.Movies
+                    else
+                        let query, yearFilter = FuzzyMatch.extractYear model.SearchQuery
+                        let items = model.Movies |> List.map (fun m -> (m.Name, m))
+                        let matched = FuzzyMatch.fuzzyFilter query items
+                        match yearFilter with
+                        | Some year -> matched |> List.filter (fun m -> m.Year = year)
+                        | None -> matched
                 if List.isEmpty filtered then
                     Html.div [
                         prop.className ("text-center py-20 " + DesignSystem.animateFadeIn)

@@ -58,6 +58,17 @@ let fuzzyMatch (maxResults: int) (query: string) (items: (string * 'T) list) : (
         |> List.sortBy fst
         |> List.truncate maxResults
 
+/// Filter items by fuzzy match, preserving original list order.
+/// Unlike fuzzyMatch which sorts by score, this keeps items in their original position.
+let fuzzyFilter (query: string) (items: (string * 'T) list) : 'T list =
+    if query.Trim() = "" then items |> List.map snd
+    else
+        items
+        |> List.choose (fun (key, item) ->
+            fuzzyScore query key
+            |> Option.map (fun _ -> item)
+        )
+
 /// Extract a trailing 4-digit year from a query string.
 /// "inception 2010" -> ("inception", Some 2010)
 /// "the matrix" -> ("the matrix", None)
