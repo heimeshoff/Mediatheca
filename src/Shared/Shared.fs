@@ -253,6 +253,7 @@ type DashboardSeriesNextUp = {
     IsFinished: bool
     IsAbandoned: bool
     LastWatchedDate: string option
+    JellyfinEpisodeId: string option
 }
 
 type DashboardMovieInFocus = {
@@ -260,6 +261,7 @@ type DashboardMovieInFocus = {
     Name: string
     Year: int
     PosterRef: string option
+    JellyfinId: string option
 }
 
 type DashboardGameInFocus = {
@@ -302,6 +304,7 @@ type DashboardAllTab = {
     GamesRecentlyPlayed: DashboardGameRecentlyPlayed list
     PlaySessions: DashboardPlaySession list
     NewGames: DashboardNewGame list
+    JellyfinServerUrl: string option
 }
 
 type DashboardMovieStats = {
@@ -353,6 +356,7 @@ type MovieDetail = {
     TmdbRating: float option
     PersonalRating: int option
     InFocus: bool
+    JellyfinId: string option
     Cast: CastMemberDto list
     RecommendedBy: FriendRef list
     WantToWatchWith: FriendRef list

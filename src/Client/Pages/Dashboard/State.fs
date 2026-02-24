@@ -50,11 +50,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with ActiveTab = tab; IsLoading = true }, cmd
 
     | AllTabLoaded data ->
-        let achievementsCmd =
-            match model.Achievements with
-            | AchievementsNotLoaded -> fetchAchievements api
-            | _ -> Cmd.none
-        { model with AllTabData = Some data; IsLoading = false; Achievements = if model.Achievements = AchievementsNotLoaded then AchievementsLoading else model.Achievements }, achievementsCmd
+        { model with AllTabData = Some data; IsLoading = false }, Cmd.none
 
     | MoviesTabLoaded data ->
         { model with MoviesTabData = Some data; IsLoading = false }, Cmd.none
@@ -63,7 +59,11 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with SeriesTabData = Some data; IsLoading = false }, Cmd.none
 
     | GamesTabLoaded data ->
-        { model with GamesTabData = Some data; IsLoading = false }, Cmd.none
+        let achievementsCmd =
+            match model.Achievements with
+            | AchievementsNotLoaded -> fetchAchievements api
+            | _ -> Cmd.none
+        { model with GamesTabData = Some data; IsLoading = false; Achievements = if model.Achievements = AchievementsNotLoaded then AchievementsLoading else model.Achievements }, achievementsCmd
 
     | TabLoadError _ ->
         { model with IsLoading = false }, Cmd.none

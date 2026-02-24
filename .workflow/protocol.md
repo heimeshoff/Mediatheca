@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-02-24 -- Task Completed: 017 - Jellyfin Play Button
+
+**Type:** Task Completion
+**Task:** 017 - Jellyfin Play Button
+**Summary:** Added Jellyfin play buttons throughout the app -- backend persists Jellyfin item IDs (movie, series, episode-level) during scan/import into new DB columns and a mapping table; frontend shows glassmorphism play buttons on dashboard hero spotlight, series poster cards, movie in-focus poster cards, and movie detail page, all opening the Jellyfin web UI in a new tab. All 232 tests pass.
+**Files changed:** 9 files
+
+---
+
+## 2026-02-24 -- Task Started: 017 - Jellyfin Play Button
+
+**Type:** Task Start
+**Task:** 017 - Jellyfin Play Button
+**Milestone:** --
+
+---
+
+## 2026-02-24 -- Idea Captured: Jellyfin Play Button
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/017-jellyfin-play-button.md
+**Summary:** Add "Play in Jellyfin" buttons linking to Jellyfin's web UI for direct playback. Requires persisting Jellyfin item IDs (movies, series, episodes) during library scan. Play buttons appear on: dashboard hero (next-up episode), dashboard series poster cards (next episode), and movie detail pages. Items without a Jellyfin match show no button. Embedded HLS player deferred as future enhancement.
+
+---
+
 ## 2026-02-24 -- Task Completed: 016 - Dashboard "All" Tab Overhaul V2
 
 **Type:** Task Completion

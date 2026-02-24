@@ -21,6 +21,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       IsFriendsMenuOpen = false
       ConfirmingRemove = false
       ShowEventHistory = false
+      JellyfinServerUrl = None
       Error = None },
     Cmd.batch [
         Cmd.ofMsg (Load_movie slug)
@@ -35,6 +36,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             Cmd.OfAsync.perform api.getFriends () Friends_loaded
             Cmd.OfAsync.perform api.getCatalogs () Catalogs_loaded
             Cmd.OfAsync.perform api.getCatalogsForMovie slug Movie_catalogs_loaded
+            Cmd.OfAsync.perform api.getJellyfinServerUrl () Jellyfin_server_url_loaded
         ]
 
     | Movie_loaded movie ->
@@ -419,3 +421,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Close_event_history ->
         { model with ShowEventHistory = false }, Cmd.none
+
+    | Jellyfin_server_url_loaded url ->
+        let serverUrl = if System.String.IsNullOrWhiteSpace(url) then None else Some url
+        { model with JellyfinServerUrl = serverUrl }, Cmd.none

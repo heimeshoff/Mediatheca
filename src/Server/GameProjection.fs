@@ -632,7 +632,7 @@ module GameProjection =
             SELECT gd.slug, gd.name, gd.year, gd.cover_ref, gd.family_owners,
                    COALESCE(gd.steam_library_date, '') as added_date
             FROM game_detail gd
-            ORDER BY gd.rowid DESC
+            ORDER BY gd.steam_library_date DESC, gd.rowid DESC
             LIMIT @limit
         """
         |> Db.setParams [ "limit", SqlType.Int32 limit ]

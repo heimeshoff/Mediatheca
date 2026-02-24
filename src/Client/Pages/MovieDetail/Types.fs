@@ -19,6 +19,7 @@ type Model = {
     IsFriendsMenuOpen: bool
     ConfirmingRemove: bool
     ShowEventHistory: bool
+    JellyfinServerUrl: string option
     Error: string option
 }
 
@@ -87,3 +88,4 @@ type Msg =
     | Catalog_result of Result<unit, string>
     | Open_event_history
     | Close_event_history
+    | Jellyfin_server_url_loaded of string

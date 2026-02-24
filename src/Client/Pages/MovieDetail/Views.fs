@@ -982,6 +982,20 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                 Html.div [
                                                     prop.className "flex flex-wrap items-center gap-3"
                                                     prop.children [
+                                                        // Jellyfin play button
+                                                        match model.JellyfinServerUrl, movie.JellyfinId with
+                                                        | Some serverUrl, Some jellyfinId ->
+                                                            Html.a [
+                                                                prop.href $"{serverUrl.TrimEnd('/')}/web/index.html#!/details?id={jellyfinId}"
+                                                                prop.target "_blank"
+                                                                prop.rel "noopener noreferrer"
+                                                                prop.className "inline-flex items-center gap-2 bg-primary/90 hover:bg-primary text-primary-content px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
+                                                                prop.children [
+                                                                    Icons.play ()
+                                                                    Html.span [ prop.text "Play in Jellyfin" ]
+                                                                ]
+                                                            ]
+                                                        | _ -> ()
                                                         // Trailer button
                                                         match model.TrailerKey with
                                                         | Some _ ->

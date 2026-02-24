@@ -7,6 +7,11 @@ open Mediatheca.Shared
 open Mediatheca.Client
 open Mediatheca.Client.Components
 
+// ── Jellyfin ──
+
+let private jellyfinPlayUrl (serverUrl: string) (itemId: string) =
+    $"{serverUrl.TrimEnd('/')}/web/index.html#!/details?id={itemId}"
+
 // ── Helpers ──
 
 let private formatPlayTime (minutes: int) =
@@ -121,6 +126,31 @@ let private sectionCardOverflow (icon: unit -> ReactElement) (title: string) (ch
         ]
     ]
 
+// ── Section: Open (title + content, no card chrome) ──
+
+let private sectionOpen (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
+    Html.div [
+        prop.className ("section-open " + DesignSystem.animateFadeInUp)
+        prop.children [
+            Html.div [
+                prop.className "flex items-center gap-2 mb-3"
+                prop.children [
+                    Html.span [
+                        prop.className "text-primary/70"
+                        prop.children [ icon () ]
+                    ]
+                    Html.h2 [
+                        prop.className "text-lg font-display uppercase tracking-wider"
+                        prop.text title
+                    ]
+                ]
+            ]
+            Html.div [
+                prop.children children
+            ]
+        ]
+    ]
+
 // ── TV Series: Next Up (list row — used by Series tab) ──
 
 let private friendPill (friend: FriendRef) =
@@ -196,7 +226,7 @@ let private seriesNextUpItem (item: DashboardSeriesNextUp) =
 
 // ── TV Series: Next Up — Poster Card Scroller (All tab) ──
 
-let private seriesPosterCard (item: DashboardSeriesNextUp) =
+let private seriesPosterCard (jellyfinServerUrl: string option) (item: DashboardSeriesNextUp) =
     Html.a [
         prop.href (Router.format ("series", item.Slug))
         prop.onClick (fun e ->
@@ -264,6 +294,25 @@ let private seriesPosterCard (item: DashboardSeriesNextUp) =
                                     ]
                                 ]
 
+                            // Jellyfin play button overlay (bottom-right)
+                            match jellyfinServerUrl, item.JellyfinEpisodeId with
+                            | Some serverUrl, Some episodeId ->
+                                Html.a [
+                                    prop.href (jellyfinPlayUrl serverUrl episodeId)
+                                    prop.target "_blank"
+                                    prop.rel "noopener noreferrer"
+                                    prop.onClick (fun e -> e.stopPropagation())
+                                    prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100/55 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg opacity-0 group-hover:opacity-100 cursor-pointer"
+                                    prop.title "Play in Jellyfin"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "w-4 h-4"
+                                            prop.children [ Icons.play () ]
+                                        ]
+                                    ]
+                                ]
+                            | _ -> ()
+
                             // Shine effect
                             Html.div [ prop.className DesignSystem.posterShine ]
                         ]
@@ -296,7 +345,7 @@ let private seriesPosterCard (item: DashboardSeriesNextUp) =
         ]
     ]
 
-let private seriesNextUpScroller (items: DashboardSeriesNextUp list) =
+let private seriesNextUpScroller (jellyfinServerUrl: string option) (items: DashboardSeriesNextUp list) =
     if List.isEmpty items then
         Html.none
     else
@@ -305,7 +354,7 @@ let private seriesNextUpScroller (items: DashboardSeriesNextUp list) =
                 prop.className "flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
                 prop.children [
                     for item in items do
-                        seriesPosterCard item
+                        seriesPosterCard jellyfinServerUrl item
                 ]
             ]
         ]
@@ -322,7 +371,7 @@ let private seriesNextUpSection (items: DashboardSeriesNextUp list) =
 
 // ── Movies: In Focus — Poster Cards (All tab) ──
 
-let private movieInFocusPosterCard (item: DashboardMovieInFocus) =
+let private movieInFocusPosterCard (jellyfinServerUrl: string option) (item: DashboardMovieInFocus) =
     Html.a [
         prop.href (Router.format ("movies", item.Slug))
         prop.onClick (fun e ->
@@ -367,6 +416,25 @@ let private movieInFocusPosterCard (item: DashboardMovieInFocus) =
                                 ]
                             ]
 
+                            // Jellyfin play button overlay (bottom-right)
+                            match jellyfinServerUrl, item.JellyfinId with
+                            | Some serverUrl, Some jellyfinId ->
+                                Html.a [
+                                    prop.href (jellyfinPlayUrl serverUrl jellyfinId)
+                                    prop.target "_blank"
+                                    prop.rel "noopener noreferrer"
+                                    prop.onClick (fun e -> e.stopPropagation())
+                                    prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100/55 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg opacity-0 group-hover:opacity-100 cursor-pointer"
+                                    prop.title "Play in Jellyfin"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "w-4 h-4"
+                                            prop.children [ Icons.play () ]
+                                        ]
+                                    ]
+                                ]
+                            | _ -> ()
+
                             Html.div [ prop.className DesignSystem.posterShine ]
                         ]
                     ]
@@ -388,16 +456,16 @@ let private movieInFocusPosterCard (item: DashboardMovieInFocus) =
         ]
     ]
 
-let private moviesInFocusPosterSection (items: DashboardMovieInFocus list) =
+let private moviesInFocusPosterSection (jellyfinServerUrl: string option) (items: DashboardMovieInFocus list) =
     if List.isEmpty items then
         Html.none
     else
-        sectionCardOverflow Icons.movie "Movies In Focus" [
+        sectionOpen Icons.movie "Movies In Focus" [
             Html.div [
                 prop.className "flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
                 prop.children [
                     for item in items do
-                        movieInFocusPosterCard item
+                        movieInFocusPosterCard jellyfinServerUrl item
                 ]
             ]
         ]
@@ -823,7 +891,7 @@ let private gamesRecentlyPlayedChart (sessions: DashboardPlaySession list) =
 
 // ── Hero Episode Spotlight (top of left column) ──
 
-let private heroSpotlight (item: DashboardSeriesNextUp) =
+let private heroSpotlight (jellyfinServerUrl: string option) (item: DashboardSeriesNextUp) =
     let imageRef =
         match item.EpisodeStillRef with
         | Some stillRef -> Some stillRef
@@ -892,6 +960,20 @@ let private heroSpotlight (item: DashboardSeriesNextUp) =
                         ]
                     ]
 
+                    // Jellyfin play button (top-right)
+                    match jellyfinServerUrl, item.JellyfinEpisodeId with
+                    | Some serverUrl, Some episodeId ->
+                        Html.a [
+                            prop.href (jellyfinPlayUrl serverUrl episodeId)
+                            prop.target "_blank"
+                            prop.rel "noopener noreferrer"
+                            prop.onClick (fun e -> e.stopPropagation())
+                            prop.className "absolute top-3 right-3 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-base-100/55 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg cursor-pointer"
+                            prop.title "Play in Jellyfin"
+                            prop.children [ Icons.play () ]
+                        ]
+                    | _ -> ()
+
                     // In Focus glow indicator
                     if item.InFocus then
                         Html.div [
@@ -908,34 +990,9 @@ let private heroSpotlight (item: DashboardSeriesNextUp) =
         ]
     ]
 
-// ── Section: Open (title + content, no card chrome) ──
-
-let private sectionOpen (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
-    Html.div [
-        prop.className ("section-open " + DesignSystem.animateFadeInUp)
-        prop.children [
-            Html.div [
-                prop.className "flex items-center gap-2 mb-3"
-                prop.children [
-                    Html.span [
-                        prop.className "text-primary/70"
-                        prop.children [ icon () ]
-                    ]
-                    Html.h2 [
-                        prop.className "text-lg font-display uppercase tracking-wider"
-                        prop.text title
-                    ]
-                ]
-            ]
-            Html.div [
-                prop.children children
-            ]
-        ]
-    ]
-
 // ── Next Up — Open section scroller (All tab, below hero) ──
 
-let private seriesNextUpOpenScroller (items: DashboardSeriesNextUp list) =
+let private seriesNextUpOpenScroller (jellyfinServerUrl: string option) (items: DashboardSeriesNextUp list) =
     if List.isEmpty items then
         Html.none
     else
@@ -944,7 +1001,7 @@ let private seriesNextUpOpenScroller (items: DashboardSeriesNextUp list) =
                 prop.className "flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
                 prop.children [
                     for item in items do
-                        seriesPosterCard item
+                        seriesPosterCard jellyfinServerUrl item
                 ]
             ]
         ]
@@ -1246,7 +1303,7 @@ let private achievementsSection (state: AchievementsState) =
 
 // ── All Tab — 2-Column Grid Layout ──
 
-let private allTabView (data: DashboardAllTab) (achievementsState: AchievementsState) =
+let private allTabView (data: DashboardAllTab) =
     // Pick the first active (non-finished, non-abandoned) series for the hero spotlight
     let heroItem =
         data.SeriesNextUp
@@ -1271,14 +1328,14 @@ let private allTabView (data: DashboardAllTab) (achievementsState: AchievementsS
                         prop.children [
                             // Hero Episode Spotlight
                             match heroItem with
-                            | Some item -> heroSpotlight item
+                            | Some item -> heroSpotlight data.JellyfinServerUrl item
                             | None -> ()
 
                             // Next Up — open section (no card chrome)
-                            seriesNextUpOpenScroller nextUpItems
+                            seriesNextUpOpenScroller data.JellyfinServerUrl nextUpItems
 
                             // Movies In Focus
-                            moviesInFocusPosterSection data.MoviesInFocus
+                            moviesInFocusPosterSection data.JellyfinServerUrl data.MoviesInFocus
                         ]
                     ]
 
@@ -1294,9 +1351,6 @@ let private allTabView (data: DashboardAllTab) (achievementsState: AchievementsS
 
                             // New Games
                             newGamesSection data.NewGames
-
-                            // Steam Achievements
-                            achievementsSection achievementsState
                         ]
                     ]
                 ]
@@ -1492,7 +1546,7 @@ let private gameRecentlyAddedItem (item: GameListItem) =
         ]
     ]
 
-let private gamesTabView (data: DashboardGamesTab) =
+let private gamesTabView (data: DashboardGamesTab) (achievementsState: AchievementsState) =
     Html.div [
         prop.className "flex flex-col gap-4"
         prop.children [
@@ -1509,6 +1563,9 @@ let private gamesTabView (data: DashboardGamesTab) =
                     for item in data.RecentlyPlayed do
                         gameRecentlyPlayedItem item
                 ]
+
+            // Steam Achievements
+            achievementsSection achievementsState
         ]
     ]
 
@@ -1565,7 +1622,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         match model.ActiveTab with
                         | All ->
                             match model.AllTabData with
-                            | Some data -> allTabView data model.Achievements
+                            | Some data -> allTabView data
                             | None -> loadingView
                         | MoviesTab ->
                             match model.MoviesTabData with
@@ -1577,7 +1634,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             | None -> loadingView
                         | GamesTab ->
                             match model.GamesTabData with
-                            | Some data -> gamesTabView data
+                            | Some data -> gamesTabView data model.Achievements
                             | None -> loadingView
                 ]
             ]
