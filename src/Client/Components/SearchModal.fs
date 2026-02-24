@@ -221,7 +221,7 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
     | NotHovering | Failed -> Html.none
     | Loading ->
         Html.div [
-            prop.className "absolute right-0 top-0 z-[60] w-80 p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
+            prop.className "w-80 p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
             prop.style [ style.custom ("boxShadow", "inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 20px 25px -5px rgb(0 0 0 / 0.1)") ]
             prop.children [
                 Html.div [
@@ -232,7 +232,7 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
         ]
     | LoadedTmdb data ->
         Html.div [
-            prop.className "absolute right-0 top-0 z-[60] w-80 max-h-[50vh] overflow-y-auto p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
+            prop.className "w-80 max-h-[50vh] overflow-y-auto p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
             prop.style [ style.custom ("boxShadow", "inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 20px 25px -5px rgb(0 0 0 / 0.1)") ]
             prop.children [
                 Html.h4 [
@@ -296,7 +296,7 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
         ]
     | LoadedRawg data ->
         Html.div [
-            prop.className "absolute right-0 top-0 z-[60] w-80 max-h-[50vh] overflow-y-auto p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
+            prop.className "w-80 max-h-[50vh] overflow-y-auto p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
             prop.style [ style.custom ("boxShadow", "inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 20px 25px -5px rgb(0 0 0 / 0.1)") ]
             prop.children [
                 Html.h4 [
@@ -366,7 +366,7 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
         ]
     | LoadedLibraryMovie data ->
         Html.div [
-            prop.className "absolute right-0 top-0 z-[60] w-80 max-h-[50vh] overflow-y-auto p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
+            prop.className "w-80 max-h-[50vh] overflow-y-auto p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
             prop.style [ style.custom ("boxShadow", "inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 20px 25px -5px rgb(0 0 0 / 0.1)") ]
             prop.children [
                 Html.h4 [
@@ -417,7 +417,7 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
         ]
     | LoadedLibrarySeries data ->
         Html.div [
-            prop.className "absolute right-0 top-0 z-[60] w-80 max-h-[50vh] overflow-y-auto p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
+            prop.className "w-80 max-h-[50vh] overflow-y-auto p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
             prop.style [ style.custom ("boxShadow", "inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 20px 25px -5px rgb(0 0 0 / 0.1)") ]
             prop.children [
                 Html.h4 [
@@ -467,7 +467,7 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
         ]
     | LoadedLibraryGame data ->
         Html.div [
-            prop.className "absolute right-0 top-0 z-[60] w-80 max-h-[50vh] overflow-y-auto p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
+            prop.className "w-80 max-h-[50vh] overflow-y-auto p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
             prop.style [ style.custom ("boxShadow", "inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 20px 25px -5px rgb(0 0 0 / 0.1)") ]
             prop.children [
                 Html.h4 [
@@ -600,29 +600,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
         hoverTimerRef.current <- None
         dispatch Hover_clear
 
-    // Trigger hover preview for keyboard-selected items
-    React.useEffect((fun () ->
-        if selIdx >= 0 then
-            let key =
-                match activeTab with
-                | Library ->
-                    localResults |> List.tryItem selIdx |> Option.map (fun r ->
-                        match r.MediaType with
-                        | MediaType.Movie -> $"lib:movie:{r.Slug}"
-                        | MediaType.Series -> $"lib:series:{r.Slug}"
-                        | MediaType.Game -> $"lib:game:{r.Slug}")
-                | Movies ->
-                    movieResults |> List.tryItem selIdx |> Option.map (fun r -> $"tmdb:movie:{r.TmdbId}")
-                | Series ->
-                    seriesResults |> List.tryItem selIdx |> Option.map (fun r -> $"tmdb:series:{r.TmdbId}")
-                | Games ->
-                    gameResults |> List.tryItem selIdx |> Option.map (fun r -> $"rawg:{r.RawgId}")
-            match key with
-            | Some k -> startHover k
-            | None -> ()
-        else
-            cancelHover ()
-    ), [| box selIdx; box activeTab |])
+    // Mouse position tracking for cursor-following popover
+    let mousePos, setMousePos = React.useState((0.0, 0.0))
 
     let handleKeyDown (e: Browser.Types.KeyboardEvent) =
         match e.key with
@@ -831,13 +810,14 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 prop.className Mediatheca.Client.DesignSystem.modalBackdrop
                 prop.onClick (fun _ -> dispatch Close)
             ]
-            // Wrapper for modal + popover (siblings, no backdrop-filter on wrapper)
+            // Modal wrapper (no flex — popover is rendered separately as fixed overlay)
             Html.div [
-                prop.className "relative w-full max-w-4xl mx-4 flex"
+                prop.className "relative w-full max-w-4xl mx-4"
+                prop.onMouseMove (fun e -> setMousePos (e.clientX, e.clientY))
                 prop.children [
                     // Modal panel
                     Html.div [
-                        prop.className ("flex-1 max-h-[70vh] flex flex-col " + Mediatheca.Client.DesignSystem.modalPanel)
+                        prop.className ("max-h-[70vh] flex flex-col " + Mediatheca.Client.DesignSystem.modalPanel)
                         prop.children [
                             // Header with search input
                             Html.div [
@@ -925,17 +905,33 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             ]
                         ]
                     ]
-                    // Preview popover (sibling to modal panel, not child)
-                    if model.HoverPreview <> NotHovering then
-                        Html.div [
-                            prop.className "hidden lg:block ml-3 w-80 flex-shrink-0"
-                            prop.onMouseEnter (fun _ -> ()) // keep popover visible
-                            prop.onMouseLeave (fun _ -> cancelHover ())
-                            prop.children [
-                                renderPreviewPopover model.HoverPreview
-                            ]
-                        ]
                 ]
             ]
+            // Preview popover (fixed overlay following cursor)
+            if model.HoverPreview <> NotHovering then
+                let (mx, my) = mousePos
+                let popoverWidth = 320.0
+                let popoverHeight = 400.0
+                let windowWidth = Browser.Dom.window.innerWidth
+                let windowHeight = Browser.Dom.window.innerHeight
+
+                let left =
+                    if mx + 16.0 + popoverWidth > windowWidth
+                    then mx - popoverWidth - 16.0
+                    else mx + 16.0
+
+                let top =
+                    if my - 8.0 + popoverHeight > windowHeight
+                    then windowHeight - popoverHeight - 16.0
+                    else my - 8.0
+
+                Html.div [
+                    prop.className "hidden lg:block fixed z-[100] w-80 pointer-events-none"
+                    prop.style [
+                        style.left (int left)
+                        style.top (int top)
+                    ]
+                    prop.children [ renderPreviewPopover model.HoverPreview ]
+                ]
         ]
     ]
