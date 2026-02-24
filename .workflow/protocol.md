@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-02-25 12:32 -- Task Completed: 034 - Games Tab Overhaul
+
+**Type:** Task Completion
+**Task:** 034 - Games Tab Overhaul
+**Summary:** Added In-Focus Estimate hero card with clamped HLTB remaining time, converted poster scrollers excluding dismissed games, added pie chart for Status Distribution, new spider/radar chart for Genre Breakdown, per-game color-coded Monthly Play Time stacked bars, and achievements in 2fr/1fr grid. All 233 tests pass.
+**Files changed:** 5 files
+
+---
+
+## 2026-02-25 12:23 -- Task Started: 034 - Games Tab Overhaul
+
+**Type:** Task Start
+**Task:** 034 - Games Tab Overhaul
+**Milestone:** M5 (Dashboard V3)
+
+---
+
 ## 2026-02-25 12:22 -- Task Completed: 033 - TV Series Tab Overhaul
 
 **Type:** Task Completion

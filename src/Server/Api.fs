@@ -1576,10 +1576,14 @@ module Api =
                 let monthlyPlayTime = GameProjection.getMonthlyPlayTime conn
                 let completedPerYear = GameProjection.getGamesCompletedPerYear conn
                 let hltbComparisons = GameProjection.getHltbComparisons conn
+                let inFocusEstimate = GameProjection.getInFocusEstimate conn
+                let monthlyPlayTimePerGame = GameProjection.getMonthlyPlayTimePerGame conn
                 return {
                     Mediatheca.Shared.DashboardGamesTab.RecentlyAdded = recentlyAdded
                     RecentlyPlayed = recentlyPlayed
                     HltbComparisons = hltbComparisons
+                    InFocusEstimate = inFocusEstimate
+                    MonthlyPlayTimePerGame = monthlyPlayTimePerGame
                     Stats = {
                         Mediatheca.Shared.DashboardGameStats.TotalGames = totalGames
                         TotalPlayTimeMinutes = totalPlayTime

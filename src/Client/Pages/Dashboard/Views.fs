@@ -3258,18 +3258,22 @@ let private gameStatsRow (stats: DashboardGameStats) =
         ]
     ]
 
-// ── Backlog Time Estimate Hero Card ──
+// ── In-Focus Estimate Hero Card ──
 
-let private backlogTimeEstimateCard (stats: DashboardGameStats) =
-    if stats.BacklogGameCount = 0 then
+let private inFocusEstimateCard (estimate: InFocusEstimate) =
+    if estimate.GameCount = 0 then
         Html.none
     else
+        let totalMinutes = estimate.TotalRemainingMinutes
         let hoursDisplay =
-            if stats.BacklogTimeHours >= 24.0 then
-                let days = stats.BacklogTimeHours / 24.0
-                sprintf "~%.0f days (~%.0f hrs)" days stats.BacklogTimeHours
+            if totalMinutes >= 60 * 24 then
+                let days = float totalMinutes / (60.0 * 24.0)
+                let hrs = float totalMinutes / 60.0
+                sprintf "~%.0f days (~%.0f hrs)" days hrs
+            elif totalMinutes >= 60 then
+                sprintf "~%d hours" (totalMinutes / 60)
             else
-                sprintf "~%.0f hours" stats.BacklogTimeHours
+                sprintf "%d min" totalMinutes
         Html.div [
             prop.className (DesignSystem.glassCard + " p-5 " + DesignSystem.animateFadeInUp)
             prop.children [
@@ -3277,12 +3281,12 @@ let private backlogTimeEstimateCard (stats: DashboardGameStats) =
                     prop.className "flex items-center gap-2 mb-2"
                     prop.children [
                         Html.span [
-                            prop.className "text-warning/70"
+                            prop.className "text-info/70"
                             prop.children [ Icons.hourglass () ]
                         ]
                         Html.h2 [
                             prop.className "text-lg font-display uppercase tracking-wider"
-                            prop.text "Backlog Estimate"
+                            prop.text "In-Focus Estimate"
                         ]
                     ]
                 ]
@@ -3290,15 +3294,15 @@ let private backlogTimeEstimateCard (stats: DashboardGameStats) =
                     prop.className "text-center py-2"
                     prop.children [
                         Html.div [
-                            prop.className "text-3xl font-display font-bold text-warning"
-                            prop.text hoursDisplay
+                            prop.className "text-3xl font-display font-bold text-info"
+                            prop.text (sprintf "%s remaining" hoursDisplay)
                         ]
                         Html.div [
                             prop.className "text-sm text-base-content/50 mt-1"
                             prop.children [
-                                Html.text (sprintf "across %d game%s" stats.BacklogGameCount (if stats.BacklogGameCount = 1 then "" else "s"))
-                                if stats.BacklogGamesWithoutHltb > 0 then
-                                    Html.text (sprintf " (%d without HLTB data)" stats.BacklogGamesWithoutHltb)
+                                Html.text (sprintf "across %d in-focus game%s" estimate.GameCount (if estimate.GameCount = 1 then "" else "s"))
+                                if estimate.GamesWithoutHltb > 0 then
+                                    Html.text (sprintf " (%d without HLTB data)" estimate.GamesWithoutHltb)
                             ]
                         ]
                     ]
@@ -3764,21 +3768,103 @@ let private gamesCompletedPerYearChart (data: (int * int) list) =
             ]
         ]
 
-let private gameRecentlyAddedItem (item: GameListItem) =
+let private gameRecentlyPlayedPosterCard (item: DashboardGameRecentlyPlayed) =
     Html.a [
         prop.href (Router.format ("games", item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
             Router.navigate ("games", item.Slug)
         )
-        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
+        prop.className "flex-shrink-0 w-[120px] sm:w-[130px] cursor-pointer group snap-start"
         prop.children [
-            PosterCard.thumbnail item.CoverRef item.Name
             Html.div [
-                prop.className "flex-1 min-w-0"
+                prop.className (DesignSystem.posterCard + " relative w-full")
+                prop.children [
+                    Html.div [
+                        prop.className (DesignSystem.posterImageContainer + " poster-shadow")
+                        prop.children [
+                            match item.CoverRef with
+                            | Some ref ->
+                                Html.img [
+                                    prop.src $"/images/{ref}"
+                                    prop.alt item.Name
+                                    prop.className DesignSystem.posterImage
+                                ]
+                            | None ->
+                                Html.div [
+                                    prop.className "flex flex-col items-center justify-center w-full h-full text-base-content/20 px-3 gap-2"
+                                    prop.children [
+                                        Icons.gamepad ()
+                                        Html.p [
+                                            prop.className "text-xs text-base-content/40 font-medium text-center line-clamp-2"
+                                            prop.text item.Name
+                                        ]
+                                    ]
+                                ]
+                            Html.div [ prop.className DesignSystem.posterShine ]
+                        ]
+                    ]
+                ]
+            ]
+            Html.div [
+                prop.className "mt-2 px-0.5"
                 prop.children [
                     Html.p [
-                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                        prop.className "text-sm font-semibold truncate group-hover:text-primary transition-colors"
+                        prop.text item.Name
+                    ]
+                    Html.p [
+                        prop.className "text-xs text-base-content/50 truncate"
+                        prop.text (sprintf "%s \u00B7 %s" (formatPlayTime item.TotalPlayTimeMinutes) (formatDate item.LastPlayedDate))
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+let private gameRecentlyAddedPosterCard (item: GameListItem) =
+    Html.a [
+        prop.href (Router.format ("games", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("games", item.Slug)
+        )
+        prop.className "flex-shrink-0 w-[120px] sm:w-[130px] cursor-pointer group snap-start"
+        prop.children [
+            Html.div [
+                prop.className (DesignSystem.posterCard + " relative w-full")
+                prop.children [
+                    Html.div [
+                        prop.className (DesignSystem.posterImageContainer + " poster-shadow")
+                        prop.children [
+                            match item.CoverRef with
+                            | Some ref ->
+                                Html.img [
+                                    prop.src $"/images/{ref}"
+                                    prop.alt item.Name
+                                    prop.className DesignSystem.posterImage
+                                ]
+                            | None ->
+                                Html.div [
+                                    prop.className "flex flex-col items-center justify-center w-full h-full text-base-content/20 px-3 gap-2"
+                                    prop.children [
+                                        Icons.gamepad ()
+                                        Html.p [
+                                            prop.className "text-xs text-base-content/40 font-medium text-center line-clamp-2"
+                                            prop.text item.Name
+                                        ]
+                                    ]
+                                ]
+                            Html.div [ prop.className DesignSystem.posterShine ]
+                        ]
+                    ]
+                ]
+            ]
+            Html.div [
+                prop.className "mt-2 px-0.5"
+                prop.children [
+                    Html.p [
+                        prop.className "text-sm font-semibold truncate group-hover:text-primary transition-colors"
                         prop.text item.Name
                     ]
                     Html.p [
@@ -3790,67 +3876,234 @@ let private gameRecentlyAddedItem (item: GameListItem) =
         ]
     ]
 
+// ── Per-Game Color-Coded Monthly Play Time Chart ──
+
+let private perGameMonthlyPlayTimeChart (monthlyData: GameMonthlyPlayTime list) =
+    if List.isEmpty monthlyData then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No play time data yet"
+        ]
+    else
+        let today = System.DateTimeOffset.Now
+        let allMonthKeys =
+            [ for i in 11 .. -1 .. 0 do
+                let dt = today.AddMonths(-i)
+                dt.ToString("yyyy-MM"), dt.ToString("MMM") ]
+
+        // Get unique games across all data, ordered by total play time desc
+        let gamesByTotal =
+            monthlyData
+            |> List.groupBy (fun d -> d.GameSlug, d.GameName)
+            |> List.map (fun ((slug, name), entries) -> slug, name, entries |> List.sumBy (fun e -> e.MinutesPlayed))
+            |> List.sortByDescending (fun (_, _, total) -> total)
+
+        // Build per-month stacked data
+        let monthData =
+            allMonthKeys
+            |> List.map (fun (key, label) ->
+                let gameMinutes =
+                    gamesByTotal
+                    |> List.map (fun (slug, name, _) ->
+                        let mins =
+                            monthlyData
+                            |> List.tryFind (fun d -> d.Month = key && d.GameSlug = slug)
+                            |> Option.map (fun d -> d.MinutesPlayed)
+                            |> Option.defaultValue 0
+                        slug, name, mins)
+                key, label, gameMinutes)
+
+        let maxMinutes =
+            monthData
+            |> List.map (fun (_, _, games) -> games |> List.sumBy (fun (_, _, m) -> m))
+            |> List.max |> max 1
+
+        Html.div [
+            prop.className "flex flex-col gap-2"
+            prop.children [
+                // Y-axis label
+                Html.div [
+                    prop.className "flex items-center gap-1 mb-0.5"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-[10px] text-base-content/30 font-medium"
+                            prop.text (formatPlayTime maxMinutes)
+                        ]
+                        Html.div [
+                            prop.className "flex-1 border-t border-base-content/10"
+                        ]
+                    ]
+                ]
+                // Stacked bar chart
+                Html.div [
+                    prop.className "flex items-end gap-1 h-[140px] px-1"
+                    prop.children [
+                        for (_key, label, gameMinutes) in monthData do
+                            let totalForMonth = gameMinutes |> List.sumBy (fun (_, _, m) -> m)
+                            Html.div [
+                                prop.className "flex-1 flex flex-col justify-end items-center relative group"
+                                prop.style [ style.height (length.percent 100) ]
+                                prop.children [
+                                    // Tooltip
+                                    if totalForMonth > 0 then
+                                        Html.div [
+                                            prop.className "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded-md bg-base-300/90 text-xs text-base-content whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg"
+                                            prop.children [
+                                                Html.div [
+                                                    prop.className "font-medium"
+                                                    prop.text (formatPlayTime totalForMonth)
+                                                ]
+                                            ]
+                                        ]
+                                    // Stacked segments
+                                    Html.div [
+                                        prop.className "w-full flex flex-col-reverse"
+                                        prop.style [
+                                            let heightPct = if totalForMonth = 0 then 0.0 else float totalForMonth / float maxMinutes * 100.0
+                                            style.height (length.percent heightPct)
+                                        ]
+                                        prop.children [
+                                            for gi, (_, _, mins) in gameMinutes |> List.mapi (fun i x -> i, x) do
+                                                if mins > 0 then
+                                                    let segPct = float mins / float totalForMonth * 100.0
+                                                    let colorIdx = gi % Charts.chartColors.Length
+                                                    Html.div [
+                                                        prop.className "w-full first:rounded-t-sm opacity-80 hover:opacity-100 transition-all duration-300"
+                                                        prop.style [
+                                                            style.height (length.percent segPct)
+                                                            style.backgroundColor Charts.chartColors.[colorIdx]
+                                                        ]
+                                                    ]
+                                        ]
+                                    ]
+                                    if totalForMonth = 0 then
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-base-content/5"
+                                            prop.style [ style.height (length.px 2) ]
+                                        ]
+                                    // Month label
+                                    Html.div [
+                                        prop.className "text-[10px] text-base-content/40 text-center mt-1 leading-none"
+                                        prop.text label
+                                    ]
+                                ]
+                            ]
+                    ]
+                ]
+                // Legend
+                Html.div [
+                    prop.className "flex flex-wrap gap-x-3 gap-y-1 mt-2"
+                    prop.children [
+                        for gi, (_, name, _) in gamesByTotal |> List.mapi (fun i x -> i, x) do
+                            let colorIdx = gi % Charts.chartBgColors.Length
+                            Html.div [
+                                prop.className "flex items-center gap-1.5"
+                                prop.children [
+                                    Html.div [
+                                        prop.className (sprintf "w-2.5 h-2.5 rounded-sm %s opacity-80" Charts.chartBgColors.[colorIdx])
+                                    ]
+                                    Html.span [
+                                        prop.className "text-[11px] text-base-content/60 truncate max-w-[120px]"
+                                        prop.text name
+                                    ]
+                                ]
+                            ]
+                    ]
+                ]
+            ]
+        ]
+
 let private gamesTabView (data: DashboardGamesTab) (achievementsState: AchievementsState) =
     Html.div [
         prop.className "flex flex-col gap-4"
         prop.children [
-            // 1. Stats badges
+            // Stats badges
             gameStatsRow data.Stats
 
-            // 2. Backlog time estimate hero card
-            backlogTimeEstimateCard data.Stats
+            // Row 1: In-Focus Estimate hero card (full width)
+            inFocusEstimateCard data.InFocusEstimate
 
-            // 3. Status distribution chart
-            sectionCard Icons.chartBar "Status Distribution" [
-                gameStatusDistributionChart data.Stats.StatusDistribution
+            // Row 2: Recently Played | Recently Added (poster scrollers)
+            Html.div [
+                prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
+                prop.children [
+                    sectionCardOverflow Icons.hourglass "Recently Played" [
+                        if List.isEmpty data.RecentlyPlayed then
+                            Html.div [
+                                prop.className "flex items-center justify-center py-8 text-base-content/40 text-sm"
+                                prop.text "No games played yet"
+                            ]
+                        else
+                            Html.div [
+                                prop.className "flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                                prop.children [
+                                    for item in data.RecentlyPlayed do
+                                        gameRecentlyPlayedPosterCard item
+                                ]
+                            ]
+                    ]
+                    sectionCardOverflow Icons.gamepad "Recently Added" [
+                        if List.isEmpty data.RecentlyAdded then
+                            Html.div [
+                                prop.className "flex items-center justify-center py-8 text-base-content/40 text-sm"
+                                prop.text "No games added yet"
+                            ]
+                        else
+                            Html.div [
+                                prop.className "flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                                prop.children [
+                                    for item in data.RecentlyAdded do
+                                        gameRecentlyAddedPosterCard item
+                                ]
+                            ]
+                    ]
+                ]
             ]
 
-            // 4. Monthly play time trend
-            sectionCard Icons.calendar "Monthly Play Time" [
-                monthlyPlayTimeChart data.Stats.MonthlyPlayTime
+            // Row 3: Status Distribution (pie) | Genre Breakdown (spider/radar)
+            Html.div [
+                prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
+                prop.children [
+                    sectionCard Icons.chartBar "Status Distribution" [
+                        Charts.donutChart data.Stats.StatusDistribution "No games yet"
+                    ]
+                    sectionCard Icons.tag "Genre Breakdown" [
+                        Charts.radarChart data.Stats.GenreDistribution "No genre data yet"
+                    ]
+                ]
             ]
 
-            // 5. HLTB comparison chart
+            // Row 4: Monthly Play Time (2/3) | Recent Achievements (1/3)
+            Html.div [
+                prop.className "grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4"
+                prop.children [
+                    sectionCard Icons.calendar "Monthly Play Time" [
+                        perGameMonthlyPlayTimeChart data.MonthlyPlayTimePerGame
+                    ]
+                    achievementsSection achievementsState
+                ]
+            ]
+
+            // Additional sections below the main layout
+            // HLTB comparison chart
             if not (List.isEmpty data.HltbComparisons) then
                 sectionCard Icons.hourglass "Your Time vs HLTB" [
                     hltbComparisonChart data.HltbComparisons
                 ]
 
-            // 6 & 7. Genre breakdown and ratings (side by side on desktop)
+            // Ratings and completed per year
             Html.div [
                 prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
                 prop.children [
-                    sectionCard Icons.tag "Genre Breakdown" [
-                        gameGenreBreakdownBars data.Stats.GenreDistribution
-                    ]
                     sectionCard Icons.star "Ratings Distribution" [
                         gameRatingsDistributionChart data.Stats.RatingDistribution
                     ]
+                    if not (List.isEmpty data.Stats.CompletedPerYear) then
+                        sectionCard Icons.trophy "Games Completed Per Year" [
+                            gamesCompletedPerYearChart data.Stats.CompletedPerYear
+                        ]
                 ]
             ]
-
-            // 8. Games completed per year
-            if not (List.isEmpty data.Stats.CompletedPerYear) then
-                sectionCard Icons.trophy "Games Completed Per Year" [
-                    gamesCompletedPerYearChart data.Stats.CompletedPerYear
-                ]
-
-            // 9. Recently Played
-            if not (List.isEmpty data.RecentlyPlayed) then
-                sectionCard Icons.hourglass "Recently Played" [
-                    for item in data.RecentlyPlayed do
-                        gameRecentlyPlayedItem item
-                ]
-
-            // 10. Recently Added
-            if not (List.isEmpty data.RecentlyAdded) then
-                sectionCard Icons.gamepad "Recently Added" [
-                    for item in data.RecentlyAdded do
-                        gameRecentlyAddedItem item
-                ]
-
-            // 11. Steam Achievements
-            achievementsSection achievementsState
         ]
     ]
 

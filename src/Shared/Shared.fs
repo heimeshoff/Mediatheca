@@ -721,11 +721,27 @@ type DashboardHltbComparison = {
     HltbMainHours: float
 }
 
+type InFocusEstimate = {
+    TotalRemainingMinutes: int
+    GameCount: int
+    GamesWithoutHltb: int
+}
+
+/// Per-game monthly play time for color-coded stacked bars
+type GameMonthlyPlayTime = {
+    Month: string
+    GameSlug: string
+    GameName: string
+    MinutesPlayed: int
+}
+
 type DashboardGamesTab = {
     RecentlyAdded: GameListItem list
     RecentlyPlayed: DashboardGameRecentlyPlayed list
     Stats: DashboardGameStats
     HltbComparisons: DashboardHltbComparison list
+    InFocusEstimate: InFocusEstimate
+    MonthlyPlayTimePerGame: GameMonthlyPlayTime list
 }
 
 // Steam Integration

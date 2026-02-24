@@ -44,6 +44,10 @@ let private pieBgColors = [|
     "bg-[oklch(75%_0.1_180)]"
 |]
 
+/// Color palette exposed for external consumers (e.g. per-game monthly chart)
+let chartColors = pieColors
+let chartBgColors = pieBgColors
+
 /// Renders a donut/pie chart as SVG with a legend.
 /// data: list of (label, value) pairs.
 /// emptyMessage: text shown when there's no data.
@@ -170,6 +174,132 @@ let donutChart (data: (string * int) list) (emptyMessage: string) =
                                         prop.text (sprintf "%d (%.0f%%)" value (pct * 100.0))
                                     ]
                                 ]
+                            ]
+                    ]
+                ]
+            ]
+        ]
+
+/// Renders a spider/radar chart as SVG with a legend.
+/// data: list of (label, value) pairs.
+/// emptyMessage: text shown when there's no data.
+let radarChart (data: (string * int) list) (emptyMessage: string) =
+    if List.isEmpty data then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text emptyMessage
+        ]
+    else
+        let data = data |> List.truncate 12 // max 12 axes for readability
+        let n = List.length data
+        let maxVal = data |> List.map snd |> List.max |> max 1
+        let cx, cy, r = 150.0, 150.0, 110.0
+        let rings = 4
+
+        // Calculate points for each axis
+        let axisAngle i = -System.Math.PI / 2.0 + (2.0 * System.Math.PI * float i / float n)
+
+        let pointAt i (radius: float) =
+            let angle = axisAngle i
+            cx + radius * System.Math.Cos(angle), cy + radius * System.Math.Sin(angle)
+
+        // Build the polygon path for data values
+        let dataPoints =
+            data |> List.mapi (fun i (_label, value) ->
+                let pct = float value / float maxVal
+                let pr = r * pct
+                pointAt i pr)
+
+        let polygonPath =
+            dataPoints
+            |> List.mapi (fun i (x, y) ->
+                if i = 0 then sprintf "M %f %f" x y
+                else sprintf "L %f %f" x y)
+            |> String.concat " "
+            |> fun s -> s + " Z"
+
+        Html.div [
+            prop.className "flex flex-col items-center gap-3"
+            prop.children [
+                Svg.svg [
+                    svg.viewBox (0, 0, 300, 300)
+                    svg.width 260
+                    svg.height 260
+                    svg.children [
+                        // Grid rings
+                        for ring in 1 .. rings do
+                            let ringR = r * float ring / float rings
+                            let ringPath =
+                                [0 .. n - 1]
+                                |> List.mapi (fun i _ ->
+                                    let (x, y) = pointAt i ringR
+                                    if i = 0 then sprintf "M %f %f" x y
+                                    else sprintf "L %f %f" x y)
+                                |> String.concat " "
+                                |> fun s -> s + " Z"
+                            Svg.path [
+                                svg.d ringPath
+                                svg.fill "none"
+                                svg.stroke "oklch(100% 0 0 / 0.08)"
+                                svg.strokeWidth 1
+                            ]
+
+                        // Axis lines
+                        for i in 0 .. n - 1 do
+                            let (x, y) = pointAt i r
+                            Svg.line [
+                                svg.x1 cx
+                                svg.y1 cy
+                                svg.x2 x
+                                svg.y2 y
+                                svg.stroke "oklch(100% 0 0 / 0.06)"
+                                svg.strokeWidth 1
+                            ]
+
+                        // Data polygon fill
+                        Svg.path [
+                            svg.d polygonPath
+                            svg.fill pieColors.[0]
+                            svg.className "opacity-20"
+                        ]
+
+                        // Data polygon outline
+                        Svg.path [
+                            svg.d polygonPath
+                            svg.fill "none"
+                            svg.stroke pieColors.[0]
+                            svg.strokeWidth 2
+                            svg.className "opacity-80"
+                        ]
+
+                        // Data points
+                        for (x, y) in dataPoints do
+                            Svg.circle [
+                                svg.cx x
+                                svg.cy y
+                                svg.r 3.5
+                                svg.fill pieColors.[0]
+                                svg.className "opacity-90"
+                            ]
+
+                        // Axis labels
+                        for i in 0 .. n - 1 do
+                            let (label, value) = data.[i]
+                            let labelR = r + 18.0
+                            let (lx, ly) = pointAt i labelR
+                            let anchor =
+                                let angle = axisAngle i
+                                let cos = System.Math.Cos(angle)
+                                if cos > 0.3 then "start"
+                                elif cos < -0.3 then "end"
+                                else "middle"
+                            Svg.text [
+                                svg.x lx
+                                svg.y ly
+                                svg.dominantBaseline.middle
+                                svg.custom ("text-anchor", anchor)
+                                svg.className "fill-base-content/60 text-[10px]"
+                                svg.text (sprintf "%s (%d)" label value)
                             ]
                     ]
                 ]

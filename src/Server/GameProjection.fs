@@ -592,6 +592,7 @@ module GameProjection =
             SELECT ps.game_slug, gl.name, gl.cover_ref, gl.total_play_time, gl.hltb_hours, MAX(ps.date) as last_played
             FROM game_play_session ps
             JOIN game_list gl ON gl.slug = ps.game_slug
+            WHERE gl.status != 'Dismissed'
             GROUP BY ps.game_slug
             ORDER BY last_played DESC
             LIMIT @limit
@@ -615,6 +616,7 @@ module GameProjection =
         |> Db.newCommand """
             SELECT slug, name, year, cover_ref, genres, status, total_play_time, hltb_hours, personal_rating, rawg_rating
             FROM game_list
+            WHERE status != 'Dismissed'
             ORDER BY rowid DESC
             LIMIT @limit
         """
@@ -779,6 +781,49 @@ module GameProjection =
                 else Some (rd.ReadString "cover_ref")
               PlayMinutes = rd.ReadInt32 "total_play_time"
               HltbMainHours = rd.ReadDouble "hltb_hours" })
+
+    let getInFocusEstimate (conn: SqliteConnection) : Mediatheca.Shared.InFocusEstimate =
+        let inFocusGames =
+            conn
+            |> Db.newCommand """
+                SELECT total_play_time, hltb_hours FROM game_list
+                WHERE status = 'InFocus'
+            """
+            |> Db.query (fun (rd: IDataReader) ->
+                let playMinutes = rd.ReadInt32 "total_play_time"
+                let hltb =
+                    if rd.IsDBNull(rd.GetOrdinal("hltb_hours")) then None
+                    else Some (rd.ReadDouble "hltb_hours")
+                playMinutes, hltb)
+        let totalRemaining =
+            inFocusGames
+            |> List.sumBy (fun (playMin, hltb) ->
+                match hltb with
+                | Some h ->
+                    let hltbMinutes = int (h * 60.0)
+                    max 0 (hltbMinutes - playMin)
+                | None -> 0)
+        let gamesWithoutHltb =
+            inFocusGames |> List.filter (fun (_, h) -> h.IsNone) |> List.length
+        { InFocusEstimate.TotalRemainingMinutes = totalRemaining
+          GameCount = List.length inFocusGames
+          GamesWithoutHltb = gamesWithoutHltb }
+
+    let getMonthlyPlayTimePerGame (conn: SqliteConnection) : Mediatheca.Shared.GameMonthlyPlayTime list =
+        conn
+        |> Db.newCommand """
+            SELECT strftime('%Y-%m', ps.date) as month, ps.game_slug, gl.name, SUM(ps.minutes_played) as total_minutes
+            FROM game_play_session ps
+            JOIN game_list gl ON gl.slug = ps.game_slug
+            WHERE ps.date >= date('now', '-12 months')
+            GROUP BY month, ps.game_slug
+            ORDER BY month, total_minutes DESC
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            { Mediatheca.Shared.GameMonthlyPlayTime.Month = rd.ReadString "month"
+              GameSlug = rd.ReadString "game_slug"
+              GameName = rd.ReadString "name"
+              MinutesPlayed = rd.ReadInt32 "total_minutes" })
 
     let getGamesCompletedPerYear (conn: SqliteConnection) : (int * int) list =
         // Approximate completion year using last play session date for completed games
