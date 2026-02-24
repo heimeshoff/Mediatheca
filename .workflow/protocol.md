@@ -2,6 +2,59 @@
 
 ---
 
+## 2026-02-24 17:15 -- Task Completed: 029 - List Page Fuzzy Search
+
+**Type:** Task Completion
+**Task:** 029 - List Page Fuzzy Search
+**Summary:** Replaced naive `.Contains()` substring search on Movies, Series, and Games list pages with fuzzy matching using `FuzzyMatch.fuzzyFilter` and `FuzzyMatch.extractYear`, providing typo tolerance and year filtering while preserving original sort order.
+**Files changed:** 4 files
+
+---
+
+## 2026-02-24 17:10 -- Task Completed: 028 - Search Hover Preview UX Fix
+
+**Type:** Task Completion
+**Task:** 028 - Search Hover Preview UX Fix
+**Summary:** Removed keyboard-triggered hover preview and changed preview popover from flex sibling to fixed-position cursor-following overlay with viewport edge detection, preventing modal shrinkage and layout shifts.
+**Files changed:** 1 file
+
+---
+
+## 2026-02-24 17:08 -- Task Completed: 024 - Movies Dashboard Stats & Visualizations
+
+**Type:** Task Completion
+**Task:** 024 - Movies Dashboard Stats & Visualizations
+**Summary:** Expanded Movies dashboard tab with 9 new sections: ratings distribution bar chart, genre breakdown horizontal bars, monthly watch activity, most watched actors/directors, most watched with friends, country distribution, and recently watched — all backed by new server-side queries with graceful empty states.
+**Files changed:** 5 files
+
+---
+
+## 2026-02-24 17:00 -- Batch Started: [024, 028, 029]
+
+**Type:** Batch Start
+**Tasks:** 024 - Movies Dashboard Stats & Visualizations, 028 - Search Hover Preview UX Fix, 029 - List Page Fuzzy Search
+**Mode:** Parallel (batch of 3)
+
+---
+
+## 2026-02-24 16:00 -- Idea Captured: Unify List Page Search with Fuzzy Matching
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/029-list-page-fuzzy-search.md
+**Summary:** Replace naive `.Contains()` substring search on Movies, Series, and Games list pages with the FuzzyMatch algorithm from task 021. Adds typo tolerance and year filtering. Filter-only mode — preserves existing sort order.
+
+---
+
+## 2026-02-24 15:30 -- Idea Captured: Search Hover Preview UX Fix
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/028-search-hover-preview-ux-fix.md
+**Summary:** Fix two UX issues from task 022: (1) keyboard arrow navigation should not trigger the hover preview — mouse-only, (2) preview popover should float as a fixed overlay following the cursor instead of being a flex sibling that shrinks the modal.
+
+---
+
 ## 2026-02-24 15:00 -- Idea Captured: Dashboard Stats & Visualizations (4 tasks)
 
 **Type:** Idea Capture
