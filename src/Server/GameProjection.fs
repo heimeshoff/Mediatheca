@@ -786,7 +786,7 @@ module GameProjection =
         |> Db.newCommand """
             SELECT CAST(strftime('%Y', COALESCE(
                 (SELECT MAX(date) FROM game_play_session WHERE game_slug = gl.slug),
-                gl.steam_last_played
+                gd.steam_last_played
             )) AS INTEGER) as year, COUNT(*) as count
             FROM game_list gl
             LEFT JOIN game_detail gd ON gd.slug = gl.slug
@@ -814,10 +814,11 @@ module GameProjection =
         |> Db.newCommand """
             SELECT COUNT(*) as cnt
             FROM game_list gl
+            LEFT JOIN game_detail gd ON gd.slug = gl.slug
             WHERE gl.status = 'Completed'
               AND COALESCE(
                 (SELECT MAX(date) FROM game_play_session WHERE game_slug = gl.slug),
-                gl.steam_last_played
+                gd.steam_last_played
               ) >= strftime('%Y-01-01', 'now')
         """
         |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
