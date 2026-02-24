@@ -1411,9 +1411,9 @@ let private weeklyActivitySummary (stats: DashboardCrossMediaStats) =
             ]
         ]
 
-// ── All Tab: Activity Heatmap (GitHub-style) ──
+// ── All Tab: Activity Heatmap (GitHub-style) — standalone (no card chrome) ──
 
-let private activityHeatmap (activityDays: DashboardActivityDay list) =
+let private activityHeatmapContent (activityDays: DashboardActivityDay list) =
     let today = System.DateTimeOffset.Now.Date
     // Build a map of date string -> activity count
     let activityMap =
@@ -1457,118 +1457,118 @@ let private activityHeatmap (activityDays: DashboardActivityDay list) =
         elif count <= 3 then "fill-primary/55"
         else "fill-primary/85"
 
-    sectionCardOverflow Icons.calendar "Activity" [
-        Html.div [
-            prop.className "overflow-x-auto scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
-            prop.children [
-                Svg.svg [
-                    svg.width chartWidth
-                    svg.height chartHeight
-                    svg.viewBox (0, 0, chartWidth, chartHeight)
-                    svg.children [
-                        // Day-of-week labels
-                        Svg.text [
-                            svg.x 0; svg.y (1 * (cellSize + cellGap) + cellSize + 20)
-                            svg.className "fill-base-content/30"
-                            svg.custom ("fontSize", "9")
-                            svg.text "Mon"
-                        ]
-                        Svg.text [
-                            svg.x 0; svg.y (3 * (cellSize + cellGap) + cellSize + 20)
-                            svg.className "fill-base-content/30"
-                            svg.custom ("fontSize", "9")
-                            svg.text "Wed"
-                        ]
-                        Svg.text [
-                            svg.x 0; svg.y (5 * (cellSize + cellGap) + cellSize + 20)
-                            svg.className "fill-base-content/30"
-                            svg.custom ("fontSize", "9")
-                            svg.text "Fri"
-                        ]
-
-                        // Month labels at top
-                        let mutable lastMonth = -1
-                        for weekIdx in 0 .. numWeeks - 1 do
-                            let week = weeks.[weekIdx]
-                            if not (List.isEmpty week) then
-                                let firstDay = week.[0]
-                                let month = firstDay.Month
-                                if month <> lastMonth then
-                                    lastMonth <- month
-                                    let monthLabel = firstDay.ToString("MMM")
-                                    Svg.text [
-                                        svg.x (30 + weekIdx * weekWidth)
-                                        svg.y 10
-                                        svg.className "fill-base-content/30"
-                                        svg.custom ("fontSize", "9")
-                                        svg.text monthLabel
-                                    ]
-
-                        // Heatmap cells
-                        for weekIdx in 0 .. numWeeks - 1 do
-                            let week = weeks.[weekIdx]
-                            for dayIdx in 0 .. week.Length - 1 do
-                                let day = week.[dayIdx]
-                                let dateStr = day.ToString("yyyy-MM-dd")
-                                let count = activityMap |> Map.tryFind dateStr |> Option.defaultValue 0
-                                let colorClass = getColorClass count
-                                let x = 30 + weekIdx * weekWidth
-                                let y = 18 + dayIdx * (cellSize + cellGap)
-
-                                Svg.g [
-                                    svg.className "group"
-                                    svg.children [
-                                        Svg.rect [
-                                            svg.x x; svg.y y
-                                            svg.width cellSize; svg.height cellSize
-                                            svg.custom ("rx", "2")
-                                            svg.className ($"{colorClass} hover:stroke-base-content/40 hover:stroke-1 transition-colors cursor-pointer")
-                                        ]
-                                        // Tooltip rendered as title element for SVG
-                                        let tooltipParts =
-                                            match detailMap |> Map.tryFind dateStr with
-                                            | Some d ->
-                                                let epS = if d.EpisodesWatched > 1 then "s" else ""
-                                                let movieS = if d.MovieSessions > 1 then "s" else ""
-                                                let gameS = if d.GameSessions > 1 then "s" else ""
-                                                let parts =
-                                                    [ if d.EpisodesWatched > 0 then $"{d.EpisodesWatched} episode{epS}"
-                                                      if d.MovieSessions > 0 then $"{d.MovieSessions} movie{movieS}"
-                                                      if d.GameSessions > 0 then $"{d.GameSessions} game{gameS}" ]
-                                                day.ToString("MMM d") + ": " + (if List.isEmpty parts then "No activity" else parts |> String.concat ", ")
-                                            | None ->
-                                                day.ToString("MMM d") + ": No activity"
-                                        Svg.title tooltipParts
-                                    ]
-                                ]
-                    ]
-                ]
-
-                // Legend
-                Html.div [
-                    prop.className "flex items-center justify-end gap-1 mt-2 text-[10px] text-base-content/40"
-                    prop.children [
-                        Html.span [ prop.text "Less" ]
-                        for level in [ "bg-base-content/5"; "bg-primary/30"; "bg-primary/55"; "bg-primary/85" ] do
-                            Html.div [
-                                prop.className $"w-3 h-3 rounded-sm {level}"
+    Html.div [
+        prop.children [
+            Html.div [
+                prop.className "overflow-x-auto scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                prop.children [
+                    Svg.svg [
+                        svg.width chartWidth
+                        svg.height chartHeight
+                        svg.viewBox (0, 0, chartWidth, chartHeight)
+                        svg.children [
+                            // Day-of-week labels
+                            Svg.text [
+                                svg.x 0; svg.y (1 * (cellSize + cellGap) + cellSize + 20)
+                                svg.className "fill-base-content/30"
+                                svg.custom ("fontSize", "9")
+                                svg.text "Mon"
                             ]
-                        Html.span [ prop.text "More" ]
+                            Svg.text [
+                                svg.x 0; svg.y (3 * (cellSize + cellGap) + cellSize + 20)
+                                svg.className "fill-base-content/30"
+                                svg.custom ("fontSize", "9")
+                                svg.text "Wed"
+                            ]
+                            Svg.text [
+                                svg.x 0; svg.y (5 * (cellSize + cellGap) + cellSize + 20)
+                                svg.className "fill-base-content/30"
+                                svg.custom ("fontSize", "9")
+                                svg.text "Fri"
+                            ]
+
+                            // Month labels at top
+                            let mutable lastMonth = -1
+                            for weekIdx in 0 .. numWeeks - 1 do
+                                let week = weeks.[weekIdx]
+                                if not (List.isEmpty week) then
+                                    let firstDay = week.[0]
+                                    let month = firstDay.Month
+                                    if month <> lastMonth then
+                                        lastMonth <- month
+                                        let monthLabel = firstDay.ToString("MMM")
+                                        Svg.text [
+                                            svg.x (30 + weekIdx * weekWidth)
+                                            svg.y 10
+                                            svg.className "fill-base-content/30"
+                                            svg.custom ("fontSize", "9")
+                                            svg.text monthLabel
+                                        ]
+
+                            // Heatmap cells
+                            for weekIdx in 0 .. numWeeks - 1 do
+                                let week = weeks.[weekIdx]
+                                for dayIdx in 0 .. week.Length - 1 do
+                                    let day = week.[dayIdx]
+                                    let dateStr = day.ToString("yyyy-MM-dd")
+                                    let count = activityMap |> Map.tryFind dateStr |> Option.defaultValue 0
+                                    let colorClass = getColorClass count
+                                    let x = 30 + weekIdx * weekWidth
+                                    let y = 18 + dayIdx * (cellSize + cellGap)
+
+                                    Svg.g [
+                                        svg.className "group"
+                                        svg.children [
+                                            Svg.rect [
+                                                svg.x x; svg.y y
+                                                svg.width cellSize; svg.height cellSize
+                                                svg.custom ("rx", "2")
+                                                svg.className ($"{colorClass} hover:stroke-base-content/40 hover:stroke-1 transition-colors cursor-pointer")
+                                            ]
+                                            // Tooltip rendered as title element for SVG
+                                            let tooltipParts =
+                                                match detailMap |> Map.tryFind dateStr with
+                                                | Some d ->
+                                                    let epS = if d.EpisodesWatched > 1 then "s" else ""
+                                                    let movieS = if d.MovieSessions > 1 then "s" else ""
+                                                    let gameS = if d.GameSessions > 1 then "s" else ""
+                                                    let parts =
+                                                        [ if d.EpisodesWatched > 0 then $"{d.EpisodesWatched} episode{epS}"
+                                                          if d.MovieSessions > 0 then $"{d.MovieSessions} movie{movieS}"
+                                                          if d.GameSessions > 0 then $"{d.GameSessions} game{gameS}" ]
+                                                    day.ToString("MMM d") + ": " + (if List.isEmpty parts then "No activity" else parts |> String.concat ", ")
+                                                | None ->
+                                                    day.ToString("MMM d") + ": No activity"
+                                            Svg.title tooltipParts
+                                        ]
+                                    ]
+                        ]
+                    ]
+
+                    // Legend
+                    Html.div [
+                        prop.className "flex items-center justify-end gap-1 mt-2 text-[10px] text-base-content/40"
+                        prop.children [
+                            Html.span [ prop.text "Less" ]
+                            for level in [ "bg-base-content/5"; "bg-primary/30"; "bg-primary/55"; "bg-primary/85" ] do
+                                Html.div [
+                                    prop.className $"w-3 h-3 rounded-sm {level}"
+                                ]
+                            Html.span [ prop.text "More" ]
+                        ]
                     ]
                 ]
             ]
         ]
     ]
 
-// ── All Tab: Cross-Media Monthly Stacked Bar Chart ──
+// ── All Tab: Cross-Media Monthly Stacked Bar Chart (embedded, no card chrome) ──
 
-let private crossMediaMonthlyChart (breakdown: DashboardMonthlyBreakdown list) =
+let private monthlyBreakdownContent (breakdown: DashboardMonthlyBreakdown list) =
     if List.isEmpty breakdown then
-        sectionCard Icons.chartBar "Monthly Breakdown" [
-            Html.div [
-                prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
-                prop.text "No activity data yet"
-            ]
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No activity data yet"
         ]
     else
         // Fill in all 12 months
@@ -1591,135 +1591,163 @@ let private crossMediaMonthlyChart (breakdown: DashboardMonthlyBreakdown list) =
 
         let maxHours = float maxMinutes / 60.0
 
-        sectionCard Icons.chartBar "Monthly Breakdown" [
-            // Legend
-            Html.div [
-                prop.className "flex items-center gap-4 mb-3 text-xs text-base-content/60"
-                prop.children [
-                    Html.div [
-                        prop.className "flex items-center gap-1.5"
-                        prop.children [
-                            Html.div [ prop.className "w-3 h-3 rounded-sm bg-info/80" ]
-                            Html.span [ prop.text "Movies" ]
-                        ]
-                    ]
-                    Html.div [
-                        prop.className "flex items-center gap-1.5"
-                        prop.children [
-                            Html.div [ prop.className "w-3 h-3 rounded-sm bg-secondary/80" ]
-                            Html.span [ prop.text "TV Series" ]
-                        ]
-                    ]
-                    Html.div [
-                        prop.className "flex items-center gap-1.5"
-                        prop.children [
-                            Html.div [ prop.className "w-3 h-3 rounded-sm bg-warning/80" ]
-                            Html.span [ prop.text "Games" ]
-                        ]
-                    ]
-                ]
-            ]
-            // Y-axis label
-            Html.div [
-                prop.className "flex items-center gap-1 mb-0.5"
-                prop.children [
-                    Html.span [
-                        prop.className "text-[10px] text-base-content/30 font-medium"
-                        prop.text (sprintf "%.0fh" maxHours)
-                    ]
-                    Html.div [
-                        prop.className "flex-1 border-t border-base-content/10"
-                    ]
-                ]
-            ]
-            // Stacked bar chart
-            Html.div [
-                prop.className "flex items-end gap-1 h-[140px] px-1"
-                prop.children [
-                    for (_key, label, movieMin, seriesMin, gameMin) in allMonths do
-                        let totalMin = movieMin + seriesMin + gameMin
-                        let totalPct =
-                            if totalMin = 0 then 0.0
-                            else float totalMin / float maxMinutes * 100.0
-                        let moviePct = if totalMin = 0 then 0.0 else float movieMin / float totalMin * 100.0
-                        let seriesPct = if totalMin = 0 then 0.0 else float seriesMin / float totalMin * 100.0
-                        let gamePct = if totalMin = 0 then 0.0 else float gameMin / float totalMin * 100.0
+        // Calculate totals across all 12 months for legend labels
+        let totalMovieMinutes =
+            allMonths |> List.sumBy (fun (_, _, m, _, _) -> m)
+        let totalSeriesMinutes =
+            allMonths |> List.sumBy (fun (_, _, _, s, _) -> s)
+        let totalGameMinutes =
+            allMonths |> List.sumBy (fun (_, _, _, _, g) -> g)
+        let formatLegendTime (minutes: int) =
+            if minutes < 60 then $"{minutes}m"
+            else $"{minutes / 60}h"
+
+        Html.div [
+            prop.children [
+                // Legend with totals
+                Html.div [
+                    prop.className "flex items-center gap-4 mb-3 text-xs text-base-content/60"
+                    prop.children [
                         Html.div [
-                            prop.className "flex-1 flex flex-col justify-end items-center relative group"
-                            prop.style [ style.height (length.percent 100) ]
+                            prop.className "flex items-center gap-1.5"
                             prop.children [
-                                // Tooltip
-                                if totalMin > 0 then
-                                    Html.div [
-                                        prop.className "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1.5 rounded-md bg-base-300/90 text-xs text-base-content whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg"
-                                        prop.children [
-                                            if movieMin > 0 then
-                                                Html.div [
-                                                    prop.className "flex items-center gap-1"
-                                                    prop.children [
-                                                        Html.div [ prop.className "w-2 h-2 rounded-sm bg-info/80" ]
-                                                        Html.span [ prop.text (sprintf "Movies: %s" (formatPlayTime movieMin)) ]
-                                                    ]
-                                                ]
-                                            if seriesMin > 0 then
-                                                Html.div [
-                                                    prop.className "flex items-center gap-1"
-                                                    prop.children [
-                                                        Html.div [ prop.className "w-2 h-2 rounded-sm bg-secondary/80" ]
-                                                        Html.span [ prop.text (sprintf "TV: %s" (formatPlayTime seriesMin)) ]
-                                                    ]
-                                                ]
-                                            if gameMin > 0 then
-                                                Html.div [
-                                                    prop.className "flex items-center gap-1"
-                                                    prop.children [
-                                                        Html.div [ prop.className "w-2 h-2 rounded-sm bg-warning/80" ]
-                                                        Html.span [ prop.text (sprintf "Games: %s" (formatPlayTime gameMin)) ]
-                                                    ]
-                                                ]
-                                        ]
-                                    ]
-                                // Stacked bar segments
-                                if totalMin > 0 then
-                                    Html.div [
-                                        prop.className "w-full flex flex-col justify-end rounded-t-sm overflow-hidden"
-                                        prop.style [ style.height (length.percent totalPct) ]
-                                        prop.children [
-                                            // Games (top = warning)
-                                            if gameMin > 0 then
-                                                Html.div [
-                                                    prop.className "w-full bg-warning/70 hover:bg-warning/90 transition-colors"
-                                                    prop.style [ style.height (length.percent gamePct) ]
-                                                ]
-                                            // Series (middle = secondary)
-                                            if seriesMin > 0 then
-                                                Html.div [
-                                                    prop.className "w-full bg-secondary/70 hover:bg-secondary/90 transition-colors"
-                                                    prop.style [ style.height (length.percent seriesPct) ]
-                                                ]
-                                            // Movies (bottom = info)
-                                            if movieMin > 0 then
-                                                Html.div [
-                                                    prop.className "w-full bg-info/70 hover:bg-info/90 transition-colors"
-                                                    prop.style [ style.height (length.percent moviePct) ]
-                                                ]
-                                        ]
-                                    ]
-                                else
-                                    Html.div [
-                                        prop.className "w-full rounded-t-sm bg-base-content/5"
-                                        prop.style [ style.height (length.px 2) ]
-                                    ]
-                                // Month label
-                                Html.div [
-                                    prop.className "text-[10px] text-base-content/40 text-center mt-1 leading-none"
-                                    prop.text label
-                                ]
+                                Html.div [ prop.className "w-3 h-3 rounded-sm bg-info/80" ]
+                                Html.span [ prop.text $"{formatLegendTime totalMovieMinutes} Movies" ]
                             ]
                         ]
+                        Html.div [
+                            prop.className "flex items-center gap-1.5"
+                            prop.children [
+                                Html.div [ prop.className "w-3 h-3 rounded-sm bg-secondary/80" ]
+                                Html.span [ prop.text $"{formatLegendTime totalSeriesMinutes} TV Series" ]
+                            ]
+                        ]
+                        Html.div [
+                            prop.className "flex items-center gap-1.5"
+                            prop.children [
+                                Html.div [ prop.className "w-3 h-3 rounded-sm bg-warning/80" ]
+                                Html.span [ prop.text $"{formatLegendTime totalGameMinutes} Games" ]
+                            ]
+                        ]
+                    ]
+                ]
+                // Y-axis label
+                Html.div [
+                    prop.className "flex items-center gap-1 mb-0.5"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-[10px] text-base-content/30 font-medium"
+                            prop.text (sprintf "%.0fh" maxHours)
+                        ]
+                        Html.div [
+                            prop.className "flex-1 border-t border-base-content/10"
+                        ]
+                    ]
+                ]
+                // Stacked bar chart
+                Html.div [
+                    prop.className "flex items-end gap-1 h-[140px] px-1"
+                    prop.children [
+                        for (_key, label, movieMin, seriesMin, gameMin) in allMonths do
+                            let totalMin = movieMin + seriesMin + gameMin
+                            let totalPct =
+                                if totalMin = 0 then 0.0
+                                else float totalMin / float maxMinutes * 100.0
+                            let moviePct = if totalMin = 0 then 0.0 else float movieMin / float totalMin * 100.0
+                            let seriesPct = if totalMin = 0 then 0.0 else float seriesMin / float totalMin * 100.0
+                            let gamePct = if totalMin = 0 then 0.0 else float gameMin / float totalMin * 100.0
+                            Html.div [
+                                prop.className "flex-1 flex flex-col justify-end items-center relative group"
+                                prop.style [ style.height (length.percent 100) ]
+                                prop.children [
+                                    // Tooltip
+                                    if totalMin > 0 then
+                                        Html.div [
+                                            prop.className "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1.5 rounded-md bg-base-300/90 text-xs text-base-content whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg"
+                                            prop.children [
+                                                if movieMin > 0 then
+                                                    Html.div [
+                                                        prop.className "flex items-center gap-1"
+                                                        prop.children [
+                                                            Html.div [ prop.className "w-2 h-2 rounded-sm bg-info/80" ]
+                                                            Html.span [ prop.text (sprintf "Movies: %s" (formatPlayTime movieMin)) ]
+                                                        ]
+                                                    ]
+                                                if seriesMin > 0 then
+                                                    Html.div [
+                                                        prop.className "flex items-center gap-1"
+                                                        prop.children [
+                                                            Html.div [ prop.className "w-2 h-2 rounded-sm bg-secondary/80" ]
+                                                            Html.span [ prop.text (sprintf "TV: %s" (formatPlayTime seriesMin)) ]
+                                                        ]
+                                                    ]
+                                                if gameMin > 0 then
+                                                    Html.div [
+                                                        prop.className "flex items-center gap-1"
+                                                        prop.children [
+                                                            Html.div [ prop.className "w-2 h-2 rounded-sm bg-warning/80" ]
+                                                            Html.span [ prop.text (sprintf "Games: %s" (formatPlayTime gameMin)) ]
+                                                        ]
+                                                    ]
+                                            ]
+                                        ]
+                                    // Stacked bar segments
+                                    if totalMin > 0 then
+                                        Html.div [
+                                            prop.className "w-full flex flex-col justify-end rounded-t-sm overflow-hidden"
+                                            prop.style [ style.height (length.percent totalPct) ]
+                                            prop.children [
+                                                // Games (top = warning)
+                                                if gameMin > 0 then
+                                                    Html.div [
+                                                        prop.className "w-full bg-warning/70 hover:bg-warning/90 transition-colors"
+                                                        prop.style [ style.height (length.percent gamePct) ]
+                                                    ]
+                                                // Series (middle = secondary)
+                                                if seriesMin > 0 then
+                                                    Html.div [
+                                                        prop.className "w-full bg-secondary/70 hover:bg-secondary/90 transition-colors"
+                                                        prop.style [ style.height (length.percent seriesPct) ]
+                                                    ]
+                                                // Movies (bottom = info)
+                                                if movieMin > 0 then
+                                                    Html.div [
+                                                        prop.className "w-full bg-info/70 hover:bg-info/90 transition-colors"
+                                                        prop.style [ style.height (length.percent moviePct) ]
+                                                    ]
+                                            ]
+                                        ]
+                                    else
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-base-content/5"
+                                            prop.style [ style.height (length.px 2) ]
+                                        ]
+                                    // Month label
+                                    Html.div [
+                                        prop.className "text-[10px] text-base-content/40 text-center mt-1 leading-none"
+                                        prop.text label
+                                    ]
+                                ]
+                            ]
+                    ]
                 ]
             ]
         ]
+
+// ── All Tab: Combined Activity Section (heatmap + monthly breakdown) ──
+
+let private activitySection (activityDays: DashboardActivityDay list) (breakdown: DashboardMonthlyBreakdown list) =
+    sectionOpen Icons.calendar "Activity" [
+        Html.div [
+            prop.className "grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4"
+            prop.children [
+                // Heatmap (left on desktop, top on mobile)
+                activityHeatmapContent activityDays
+                // Monthly breakdown (right on desktop, bottom on mobile)
+                monthlyBreakdownContent breakdown
+            ]
+        ]
+    ]
 
 // ── All Tab — 2-Column Grid Layout ──
 
@@ -1738,14 +1766,8 @@ let private allTabView (data: DashboardAllTab) =
     Html.div [
         prop.className "flex flex-col gap-4"
         prop.children [
-            // 1. Cross-media hero stats
-            crossMediaHeroStats data.CrossMediaStats
-
-            // 2. Weekly activity summary
-            weeklyActivitySummary data.CrossMediaStats
-
-            // 3. Activity heatmap (365 days)
-            activityHeatmap data.ActivityDays
+            // 1. Activity section — heatmap + monthly breakdown side by side
+            activitySection data.ActivityDays data.MonthlyBreakdown
 
             // 2-column grid on desktop
             Html.div [
@@ -1755,15 +1777,15 @@ let private allTabView (data: DashboardAllTab) =
                     Html.div [
                         prop.className "lg:col-span-2 flex flex-col gap-4"
                         prop.children [
-                            // 4. Hero Episode Spotlight
+                            // 2. Hero Episode Spotlight
                             match heroItem with
                             | Some item -> heroSpotlight data.JellyfinServerUrl item
                             | None -> ()
 
-                            // 5. Next Up — open section (no card chrome)
+                            // 3. Next Up — open section (no card chrome)
                             seriesNextUpOpenScroller data.JellyfinServerUrl nextUpItems
 
-                            // 6. Movies In Focus
+                            // 4. Movies In Focus
                             moviesInFocusPosterSection data.JellyfinServerUrl data.MoviesInFocus
                         ]
                     ]
@@ -1772,16 +1794,13 @@ let private allTabView (data: DashboardAllTab) =
                     Html.div [
                         prop.className "lg:col-span-1 flex flex-col gap-4"
                         prop.children [
-                            // 7. Cross-media monthly chart
-                            crossMediaMonthlyChart data.MonthlyBreakdown
-
-                            // 8. Games play activity chart (existing 14-day chart)
+                            // 5. Games play activity chart (existing 14-day chart)
                             gamesRecentlyPlayedChartWithStats data.PlaySessions
 
-                            // 9. Games In Focus — poster cards
+                            // 6. Games In Focus — poster cards
                             gamesInFocusPosterSection data.GamesInFocus
 
-                            // 10. New Games
+                            // 7. New Games
                             newGamesSection data.NewGames
                         ]
                     ]

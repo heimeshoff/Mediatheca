@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-02-25 12:07 -- Task Completed: 031 - All Tab Overhaul
+
+**Type:** Task Completion
+**Task:** 031 - All Tab Overhaul
+**Summary:** Removed Media Overview card and weekly summary text, merged activity heatmap and monthly breakdown into a responsive side-by-side section (no card chrome), added totals to legend, excluded abandoned series from Next Up via SQL filter, increased Next Up limit to 10. Build and 233 tests pass.
+**Files changed:** 3 files
+
+---
+
+## 2026-02-25 12:00 -- Task Started: 031 - All Tab Overhaul
+
+**Type:** Task Start
+**Task:** 031 - All Tab Overhaul
+**Milestone:** M5 (Dashboard V3)
+
+---
+
+## 2026-02-25 10:00 -- Idea Captured: Dashboard Overhaul V3
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/030-dashboard-overhaul-v3.md
+**Summary:** Full redesign of all four dashboard tabs. All tab: remove Media Overview card, merge Monthly Breakdown into Activity heatmap section, mobile-first layout, show 10 series in Next Up (no abandoned). Movies tab: horizontal poster scrollers, new director tracking from TMDB, pie chart genre breakdown. TV Series tab: remove Episode Activity, poster scroller Next Up, Recently Finished/Abandoned side-by-side sorted by last watch date, pie chart genre. Games tab: In-Focus estimate (replaces backlog), per-game color-coded monthly play time, spider graph genres, pie chart status distribution, exclude dismissed games. Broken into subtasks 031-034.
+
+---
+
 ## 2026-02-24 18:00 -- Task Completed: 027 - Dashboard All Tab Enhancements
 
 **Type:** Task Completion

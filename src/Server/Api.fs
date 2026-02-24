@@ -1314,7 +1314,7 @@ module Api =
 
             // Dashboard Tabs
             getDashboardAllTab = fun () -> async {
-                let seriesNextUp = SeriesProjection.getDashboardSeriesNextUp conn (Some 6)
+                let seriesNextUp = SeriesProjection.getDashboardSeriesNextUp conn (Some 11)
                 let moviesInFocus = MovieProjection.getMoviesInFocus conn 6
                 let gamesInFocus = GameProjection.getGamesInFocus conn
                 let gamesRecentlyPlayed = GameProjection.getGamesRecentlyPlayed conn 6
