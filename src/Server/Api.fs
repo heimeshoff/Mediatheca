@@ -1404,14 +1404,30 @@ module Api =
                     """
                     |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
                     |> Option.defaultValue 0
+                let currentlyWatching = SeriesProjection.getCurrentlyWatchingCount conn
+                let averageRating = SeriesProjection.getAverageSeriesRating conn
+                let completionRate = SeriesProjection.getCompletionRate conn
+                let ratingDistribution = SeriesProjection.getSeriesRatingDistribution conn
+                let genreDistribution = SeriesProjection.getSeriesGenreDistribution conn
+                let monthlyActivity = SeriesProjection.getMonthlyEpisodeActivity conn
+                let episodeActivity = SeriesProjection.getEpisodeActivity conn
+                let topWatchedWith = SeriesProjection.getSeriesTopWatchedWith conn 5
                 return {
                     Mediatheca.Shared.DashboardSeriesTab.NextUp = nextUp
                     RecentlyFinished = recentlyFinished
                     RecentlyAbandoned = recentlyAbandoned
+                    EpisodeActivity = episodeActivity
+                    TopWatchedWith = topWatchedWith
                     Stats = {
                         Mediatheca.Shared.DashboardSeriesStats.TotalSeries = totalSeries
                         TotalEpisodesWatched = totalEpisodesWatched
                         TotalWatchTimeMinutes = totalWatchTime
+                        CurrentlyWatching = currentlyWatching
+                        AverageRating = averageRating
+                        CompletionRate = completionRate
+                        RatingDistribution = ratingDistribution
+                        GenreDistribution = genreDistribution
+                        MonthlyActivity = monthlyActivity
                     }
                 }
             }

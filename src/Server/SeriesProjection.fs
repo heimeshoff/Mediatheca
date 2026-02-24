@@ -1059,6 +1059,7 @@ module SeriesProjection =
             %s
         """ limitClause)
         |> Db.query (fun (rd: IDataReader) ->
+            let slug = rd.ReadString "slug"
             let friendsJson =
                 if rd.IsDBNull(rd.GetOrdinal("friends")) then "[]"
                 else rd.ReadString "friends"
@@ -1068,7 +1069,7 @@ module SeriesProjection =
             let episodeCount = rd.ReadInt32 "episode_count"
             let watchedCount = rd.ReadInt32 "watched_episode_count"
             let isFinished = episodeCount > 0 && watchedCount >= episodeCount
-            { Mediatheca.Shared.DashboardSeriesNextUp.Slug = rd.ReadString "slug"
+            { Mediatheca.Shared.DashboardSeriesNextUp.Slug = slug
               Name = rd.ReadString "name"
               PosterRef =
                 if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
@@ -1102,7 +1103,18 @@ module SeriesProjection =
                 else Some (rd.ReadString "last_watched_date")
               JellyfinEpisodeId =
                 if rd.IsDBNull(rd.GetOrdinal("jellyfin_episode_id")) then None
-                else Some (rd.ReadString "jellyfin_episode_id") }
+                else Some (rd.ReadString "jellyfin_episode_id")
+              EpisodeCount = episodeCount
+              WatchedEpisodeCount = watchedCount
+              AverageRuntimeMinutes =
+                let avgRt =
+                    conn
+                    |> Db.newCommand "SELECT AVG(runtime) as avg_rt FROM series_episodes WHERE series_slug = @slug AND runtime IS NOT NULL"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.querySingle (fun rd2 ->
+                        if rd2.IsDBNull(rd2.GetOrdinal("avg_rt")) then None
+                        else Some (rd2.ReadInt32 "avg_rt"))
+                avgRt |> Option.flatten }
         )
 
     let getRecentlyFinished (conn: SqliteConnection) : Mediatheca.Shared.SeriesListItem list =
@@ -1188,3 +1200,146 @@ module SeriesProjection =
               IsAbandoned = rd.ReadInt32 "abandoned" = 1
               InFocus = rd.ReadInt32 "in_focus" <> 0 }
         )
+
+    // Dashboard: Currently watching count (series with unwatched episodes, not abandoned)
+    let getCurrentlyWatchingCount (conn: SqliteConnection) : int =
+        conn
+        |> Db.newCommand """
+            SELECT COUNT(*) as cnt FROM series_list
+            WHERE watched_episode_count > 0
+              AND watched_episode_count < episode_count
+              AND abandoned = 0
+              AND episode_count > 0
+        """
+        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+        |> Option.defaultValue 0
+
+    // Dashboard: Average series rating
+    let getAverageSeriesRating (conn: SqliteConnection) : float option =
+        conn
+        |> Db.newCommand """
+            SELECT AVG(CAST(personal_rating AS REAL)) as avg_rating
+            FROM series_detail
+            WHERE personal_rating IS NOT NULL
+        """
+        |> Db.querySingle (fun rd ->
+            if rd.IsDBNull(rd.GetOrdinal("avg_rating")) then None
+            else Some (rd.ReadDouble "avg_rating"))
+        |> Option.flatten
+
+    // Dashboard: Completion rate (finished / (finished + in-progress), excluding abandoned)
+    let getCompletionRate (conn: SqliteConnection) : float option =
+        let finished =
+            conn
+            |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_list WHERE episode_count > 0 AND watched_episode_count >= episode_count AND abandoned = 0"
+            |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+            |> Option.defaultValue 0
+        let started =
+            conn
+            |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_list WHERE watched_episode_count > 0 AND abandoned = 0 AND episode_count > 0"
+            |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+            |> Option.defaultValue 0
+        if started = 0 then None
+        else Some (float finished / float started * 100.0)
+
+    // Dashboard: Series ratings distribution
+    let getSeriesRatingDistribution (conn: SqliteConnection) : (int * int) list =
+        conn
+        |> Db.newCommand """
+            SELECT personal_rating, COUNT(*) as count
+            FROM series_detail
+            WHERE personal_rating IS NOT NULL
+            GROUP BY personal_rating
+            ORDER BY personal_rating
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadInt32 "personal_rating", rd.ReadInt32 "count")
+
+    // Dashboard: Series genre distribution (top 10)
+    let getSeriesGenreDistribution (conn: SqliteConnection) : (string * int) list =
+        let allGenres =
+            conn
+            |> Db.newCommand "SELECT genres FROM series_detail"
+            |> Db.query (fun (rd: IDataReader) ->
+                let genresJson = rd.ReadString "genres"
+                Decode.fromString (Decode.list Decode.string) genresJson
+                |> Result.defaultValue [])
+        allGenres
+        |> List.concat
+        |> List.countBy id
+        |> List.sortByDescending snd
+        |> List.truncate 10
+
+    // Dashboard: Monthly episode activity (last 12 months)
+    let getMonthlyEpisodeActivity (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand """
+            SELECT strftime('%Y-%m', watched_date) as month, COUNT(*) as episodes
+            FROM series_episode_progress
+            WHERE watched_date >= date('now', '-12 months')
+              AND watched_date IS NOT NULL
+            GROUP BY month
+            ORDER BY month
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "month", rd.ReadInt32 "episodes")
+
+    // Dashboard: Episode activity per day (last 14 days), grouped by series
+    let getEpisodeActivity (conn: SqliteConnection) : Mediatheca.Shared.DashboardEpisodeActivity list =
+        conn
+        |> Db.newCommand """
+            SELECT sep.watched_date, s.name, s.slug, COUNT(*) as episode_count
+            FROM series_episode_progress sep
+            JOIN series_list s ON sep.series_slug = s.slug
+            WHERE sep.watched_date >= date('now', '-14 days')
+              AND sep.watched_date IS NOT NULL
+            GROUP BY sep.watched_date, s.slug
+            ORDER BY sep.watched_date
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            { Mediatheca.Shared.DashboardEpisodeActivity.Date = rd.ReadString "watched_date"
+              SeriesName = rd.ReadString "name"
+              SeriesSlug = rd.ReadString "slug"
+              EpisodeCount = rd.ReadInt32 "episode_count" })
+
+    // Dashboard: Most watched with (friends from rewatch sessions, by episode count)
+    let getSeriesTopWatchedWith (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardSeriesWatchedWith list =
+        // Get all rewatch sessions with friends
+        let sessionsWithFriends =
+            conn
+            |> Db.newCommand """
+                SELECT rs.rewatch_id, rs.series_slug, rs.friends,
+                       (SELECT COUNT(*) FROM series_episode_progress WHERE series_slug = rs.series_slug AND rewatch_id = rs.rewatch_id) as ep_count
+                FROM series_rewatch_sessions rs
+                WHERE rs.friends != '[]' AND rs.friends IS NOT NULL
+            """
+            |> Db.query (fun (rd: IDataReader) ->
+                let friendsJson = rd.ReadString "friends"
+                let friendSlugs =
+                    Decode.fromString (Decode.list Decode.string) friendsJson
+                    |> Result.defaultValue []
+                let epCount = rd.ReadInt32 "ep_count"
+                friendSlugs |> List.map (fun slug -> slug, epCount))
+        // Aggregate by friend slug
+        let friendEpisodeCounts =
+            sessionsWithFriends
+            |> List.concat
+            |> List.groupBy fst
+            |> List.map (fun (slug, entries) -> slug, entries |> List.sumBy snd)
+            |> List.sortByDescending snd
+            |> List.truncate limit
+        // Resolve friend details
+        friendEpisodeCounts
+        |> List.choose (fun (slug, epCount) ->
+            let friendRef =
+                conn
+                |> Db.newCommand "SELECT slug, name, image_ref FROM friend_list WHERE slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String slug ]
+                |> Db.querySingle (fun rd ->
+                    { Slug = rd.ReadString "slug"
+                      Name = rd.ReadString "name"
+                      ImageRef =
+                        if rd.IsDBNull(rd.GetOrdinal("image_ref")) then None
+                        else Some (rd.ReadString "image_ref")
+                      EpisodeCount = epCount } : Mediatheca.Shared.DashboardSeriesWatchedWith)
+            friendRef)

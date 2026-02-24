@@ -254,6 +254,9 @@ type DashboardSeriesNextUp = {
     IsAbandoned: bool
     LastWatchedDate: string option
     JellyfinEpisodeId: string option
+    EpisodeCount: int
+    WatchedEpisodeCount: int
+    AverageRuntimeMinutes: int option
 }
 
 type DashboardMovieInFocus = {
@@ -620,10 +623,30 @@ type DashboardMoviesTab = {
     TopWatchedWith: DashboardWatchedWithStats list
 }
 
+type DashboardEpisodeActivity = {
+    Date: string
+    SeriesName: string
+    SeriesSlug: string
+    EpisodeCount: int
+}
+
+type DashboardSeriesWatchedWith = {
+    Slug: string
+    Name: string
+    ImageRef: string option
+    EpisodeCount: int
+}
+
 type DashboardSeriesStats = {
     TotalSeries: int
     TotalEpisodesWatched: int
     TotalWatchTimeMinutes: int
+    CurrentlyWatching: int
+    AverageRating: float option
+    CompletionRate: float option
+    RatingDistribution: (int * int) list
+    GenreDistribution: (string * int) list
+    MonthlyActivity: (string * int) list
 }
 
 type DashboardSeriesTab = {
@@ -631,6 +654,8 @@ type DashboardSeriesTab = {
     RecentlyFinished: SeriesListItem list
     RecentlyAbandoned: SeriesListItem list
     Stats: DashboardSeriesStats
+    EpisodeActivity: DashboardEpisodeActivity list
+    TopWatchedWith: DashboardSeriesWatchedWith list
 }
 
 type DashboardGameStats = {

@@ -226,3 +226,51 @@ Suggested layout order for the TV Series tab:
 - [ ] All sections handle empty state gracefully
 - [ ] Mobile layout stacks vertically
 - [ ] All existing tests pass
+
+---
+
+### 2026-02-24 18:06 -- Work Completed
+
+**What was done:**
+- Expanded `DashboardSeriesStats` with `CurrentlyWatching`, `AverageRating`, `CompletionRate`, `RatingDistribution`, `GenreDistribution`, `MonthlyActivity` fields
+- Added `DashboardEpisodeActivity` and `DashboardSeriesWatchedWith` DTOs to Shared.fs
+- Added `EpisodeCount`, `WatchedEpisodeCount`, `AverageRuntimeMinutes` to `DashboardSeriesNextUp` DTO
+- Expanded `DashboardSeriesTab` with `EpisodeActivity` and `TopWatchedWith` fields
+- Added 8 new query functions to SeriesProjection.fs: `getCurrentlyWatchingCount`, `getAverageSeriesRating`, `getCompletionRate`, `getSeriesRatingDistribution`, `getSeriesGenreDistribution`, `getMonthlyEpisodeActivity`, `getEpisodeActivity`, `getSeriesTopWatchedWith`
+- Updated `getDashboardSeriesNextUp` to populate new fields (EpisodeCount, WatchedEpisodeCount, AverageRuntimeMinutes via per-series AVG query)
+- Updated `getDashboardSeriesTab` in Api.fs to call all new projection queries
+- Added enhanced `seriesNextUpItemEnhanced` component with progress bars and time remaining estimates
+- Added `episodeActivityChart` with 14-day stacked bars color-coded by series, with binge detection (3+ episodes same series = BINGE badge)
+- Added `monthlyEpisodeActivityChart` for 12-month bar chart
+- Added `seriesRatingsDistributionChart` (1-10 scale, secondary color)
+- Added `seriesGenreBreakdownBars` horizontal bars (top 10)
+- Added `seriesWatchedWithSection` for top 5 friends from rewatch sessions
+- Updated `seriesStatsRow` with new stat badges (Watching, Avg Rating, Completed %)
+- Reordered Series tab layout: stats -> episode activity -> next up -> monthly activity -> ratings+genre (side-by-side) -> watched with -> recently finished -> recently abandoned
+
+**Not implemented (deferred -- requires significant infrastructure):**
+- Upcoming episodes section (requires TMDB air date storage + refresh mechanism -- Section 10 of task)
+- Episode air dates storage from TMDB (requires schema migration + TMDB import changes -- Section 10 of task)
+
+**Acceptance criteria status:**
+- [x] Stats badges show Currently Watching, Average Rating, and Completion Rate -- Added to seriesStatsRow
+- [x] Next Up cards display progress bars (watched / total episodes) -- seriesNextUpItemEnhanced with thin primary bar at poster bottom
+- [x] Next Up cards show estimated time remaining -- "~Xh Ym remaining" using AverageRuntimeMinutes
+- [x] Episode activity chart shows episodes per day for last 14 days (color-coded by series) -- episodeActivityChart with stacked bars and legend
+- [x] Ratings distribution bar chart displays correctly (1-10 scale) -- seriesRatingsDistributionChart with secondary color
+- [x] Genre breakdown shows top 10 genres as horizontal bars -- seriesGenreBreakdownBars
+- [x] Monthly activity chart shows episodes watched per month (last 12 months) -- monthlyEpisodeActivityChart
+- [x] Binge days (3+ episodes of same series) are highlighted -- BINGE badge on chart bars + tooltip
+- [x] Most Watched With shows top 5 friends from rewatch sessions -- seriesWatchedWithSection
+- [ ] Upcoming episodes section shows next air dates for tracked series -- Deferred (requires TMDB air date infrastructure)
+- [ ] Episode air dates are stored from TMDB and refreshable -- Deferred (requires schema migration + TMDB import)
+- [x] All charts follow existing SVG/Feliz pattern -- Same bar chart pattern as movies/games tabs
+- [x] All sections handle empty state gracefully -- All chart functions have isEmpty checks with placeholder text
+- [x] Mobile layout stacks vertically -- Uses flex-col, grid-cols-1 md:grid-cols-2 for ratings+genre
+- [x] All existing tests pass -- 233 tests pass
+
+**Files changed:**
+- `src/Shared/Shared.fs` -- Expanded DashboardSeriesStats, DashboardSeriesNextUp, DashboardSeriesTab DTOs; added DashboardEpisodeActivity, DashboardSeriesWatchedWith types
+- `src/Server/SeriesProjection.fs` -- Added 8 new dashboard query functions; updated getDashboardSeriesNextUp with new fields
+- `src/Server/Api.fs` -- Updated getDashboardSeriesTab to call new queries and populate expanded DTOs
+- `src/Client/Pages/Dashboard/Views.fs` -- Added enhanced series tab with progress bars, episode activity chart, monthly activity, ratings distribution, genre breakdown, binge detection, watched-with friends section

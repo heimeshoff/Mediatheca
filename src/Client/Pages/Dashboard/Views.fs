@@ -1895,8 +1895,564 @@ let private seriesStatsRow (stats: DashboardSeriesStats) =
             statBadge "Series" (string stats.TotalSeries)
             statBadge "Episodes" (string stats.TotalEpisodesWatched)
             statBadge "Watch Time" (formatPlayTime stats.TotalWatchTimeMinutes)
+            if stats.CurrentlyWatching > 0 then
+                statBadge "Watching" (string stats.CurrentlyWatching)
+            match stats.AverageRating with
+            | Some avg -> statBadge "Avg Rating" (sprintf "%.1f" avg)
+            | None -> ()
+            match stats.CompletionRate with
+            | Some rate -> statBadge "Completed" (sprintf "%.0f%%" rate)
+            | None -> ()
         ]
     ]
+
+// ── Series Next Up Item with Progress Bar ──
+
+let private seriesNextUpItemEnhanced (item: DashboardSeriesNextUp) =
+    let progressPct =
+        if item.EpisodeCount > 0 then
+            float item.WatchedEpisodeCount / float item.EpisodeCount * 100.0
+        else 0.0
+    let timeRemaining =
+        match item.AverageRuntimeMinutes with
+        | Some avgRt when item.EpisodeCount > item.WatchedEpisodeCount ->
+            let remaining = (item.EpisodeCount - item.WatchedEpisodeCount) * avgRt
+            Some remaining
+        | _ -> None
+    Html.a [
+        prop.href (Router.format ("series", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("series", item.Slug)
+        )
+        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
+        prop.children [
+            // Poster with progress bar overlay at bottom
+            Html.div [
+                prop.className "relative flex-shrink-0"
+                prop.children [
+                    PosterCard.thumbnail item.PosterRef item.Name
+                    // Progress bar at bottom of poster
+                    if item.EpisodeCount > 0 then
+                        Html.div [
+                            prop.className "absolute bottom-0 left-0 right-0 h-1 bg-base-content/10 rounded-b"
+                            prop.children [
+                                Html.div [
+                                    prop.className "h-full bg-primary rounded-b transition-all duration-500"
+                                    prop.style [ style.width (length.percent progressPct) ]
+                                ]
+                            ]
+                        ]
+                ]
+            ]
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.div [
+                        prop.className "flex items-center gap-1.5"
+                        prop.children [
+                            if item.InFocus then
+                                Html.span [
+                                    prop.className "text-warning/70 flex-shrink-0"
+                                    prop.children [ Icons.crosshairSmFilled () ]
+                                ]
+                            Html.p [
+                                prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                                prop.text item.Name
+                            ]
+                            if item.IsFinished then
+                                Html.span [
+                                    prop.className "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-success/15 text-success flex-shrink-0"
+                                    prop.text "Finished"
+                                ]
+                            if item.IsAbandoned then
+                                Html.span [
+                                    prop.className "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-error/15 text-error flex-shrink-0"
+                                    prop.text "Abandoned"
+                                ]
+                        ]
+                    ]
+                    if item.NextUpSeason > 0 then
+                        Html.p [
+                            prop.className "text-xs text-base-content/50"
+                            prop.text $"S{item.NextUpSeason}E{item.NextUpEpisode}: {item.NextUpTitle}"
+                        ]
+                    // Progress text and time remaining
+                    Html.div [
+                        prop.className "flex items-center gap-2 mt-0.5"
+                        prop.children [
+                            if item.EpisodeCount > 0 then
+                                Html.span [
+                                    prop.className "text-[11px] text-base-content/40"
+                                    prop.text (sprintf "%d of %d episodes (%d%%)" item.WatchedEpisodeCount item.EpisodeCount (int progressPct))
+                                ]
+                            match timeRemaining with
+                            | Some mins ->
+                                Html.span [
+                                    prop.className "text-[11px] text-base-content/30"
+                                    prop.text "|"
+                                ]
+                                Html.span [
+                                    prop.className "text-[11px] text-info/60"
+                                    prop.text (sprintf "~%s remaining" (formatPlayTime mins))
+                                ]
+                            | None -> ()
+                        ]
+                    ]
+                    if not (List.isEmpty item.WatchWithFriends) then
+                        Html.div [
+                            prop.className "flex items-center gap-1 mt-0.5 flex-wrap"
+                            prop.children [
+                                for friend in item.WatchWithFriends do
+                                    friendPill friend
+                            ]
+                        ]
+                ]
+            ]
+        ]
+    ]
+
+// ── Episode Activity Chart (14 days, stacked by series) ──
+
+type private EpisodeDayData = {
+    Date: string
+    Segments: {| SeriesSlug: string; SeriesName: string; EpisodeCount: int; ColorIndex: int |} list
+    TotalEpisodes: int
+    HasBinge: bool
+}
+
+let private buildEpisodeChartData (activity: DashboardEpisodeActivity list) =
+    // Get unique series and assign color indices
+    let seriesList =
+        activity
+        |> List.map (fun a -> a.SeriesSlug, a.SeriesName)
+        |> List.distinct
+
+    let seriesColorMap =
+        seriesList
+        |> List.mapi (fun i (slug, _) -> slug, i % chartColors.Length)
+        |> Map.ofList
+
+    // Group by date
+    let byDate =
+        activity
+        |> List.groupBy (fun a -> a.Date)
+        |> Map.ofList
+
+    // Generate all 14 days
+    let today = System.DateTimeOffset.Now.Date
+    let days =
+        [ for i in 13 .. -1 .. 0 do
+            let date = today.AddDays(float -i)
+            let dateStr = date.ToString("yyyy-MM-dd")
+            match byDate |> Map.tryFind dateStr with
+            | Some dayActivity ->
+                let segments =
+                    dayActivity
+                    |> List.map (fun a ->
+                        {| SeriesSlug = a.SeriesSlug
+                           SeriesName = a.SeriesName
+                           EpisodeCount = a.EpisodeCount
+                           ColorIndex = seriesColorMap |> Map.tryFind a.SeriesSlug |> Option.defaultValue 0 |})
+                let hasBinge = dayActivity |> List.exists (fun a -> a.EpisodeCount >= 3)
+                { Date = dateStr
+                  Segments = segments
+                  TotalEpisodes = segments |> List.sumBy (fun s -> s.EpisodeCount)
+                  HasBinge = hasBinge }
+            | None ->
+                { Date = dateStr
+                  Segments = []
+                  TotalEpisodes = 0
+                  HasBinge = false }
+        ]
+
+    let maxEpisodes =
+        if List.isEmpty days then 1
+        else days |> List.map (fun d -> d.TotalEpisodes) |> List.max |> max 1
+
+    days, maxEpisodes, seriesList, seriesColorMap
+
+let private episodeActivityChart (activity: DashboardEpisodeActivity list) =
+    if List.isEmpty activity then
+        Html.div [
+            prop.className "flex items-center justify-center py-8 text-base-content/40 text-sm"
+            prop.text "No episodes watched in the last 14 days"
+        ]
+    else
+        let days, maxEpisodes, seriesList, seriesColorMap = buildEpisodeChartData activity
+
+        Html.div [
+            prop.className "flex flex-col gap-3"
+            prop.children [
+                Html.div [
+                    prop.className "flex flex-col gap-0"
+                    prop.children [
+                        // Y-axis max label
+                        Html.div [
+                            prop.className "flex items-center gap-1 mb-0.5"
+                            prop.children [
+                                Html.span [
+                                    prop.className "text-[10px] text-base-content/30 font-medium"
+                                    prop.text (string maxEpisodes)
+                                ]
+                                Html.div [
+                                    prop.className "flex-1 border-t border-base-content/10"
+                                ]
+                            ]
+                        ]
+                        // Chart bars
+                        Html.div [
+                            prop.className "flex items-end gap-1 h-[140px] px-1"
+                            prop.children [
+                                for day in days do
+                                    let heightPct =
+                                        if day.TotalEpisodes = 0 then 0.0
+                                        else float day.TotalEpisodes / float maxEpisodes * 100.0
+                                    Html.div [
+                                        prop.className "flex-1 flex flex-col justify-end relative group"
+                                        prop.style [ style.height (length.percent 100) ]
+                                        prop.children [
+                                            // Tooltip
+                                            if day.TotalEpisodes > 0 then
+                                                Html.div [
+                                                    prop.className "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded-md bg-base-300/90 text-xs text-base-content whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg"
+                                                    prop.children [
+                                                        Html.div [
+                                                            prop.className "font-medium"
+                                                            prop.text (formatDate day.Date)
+                                                        ]
+                                                        Html.div [
+                                                            prop.className "text-base-content/60"
+                                                            prop.text (sprintf "%d episode%s" day.TotalEpisodes (if day.TotalEpisodes = 1 then "" else "s"))
+                                                        ]
+                                                        if day.HasBinge then
+                                                            Html.div [
+                                                                prop.className "text-warning font-medium"
+                                                                prop.text "Binge session!"
+                                                            ]
+                                                    ]
+                                                ]
+                                            // Stacked bar
+                                            if day.TotalEpisodes > 0 then
+                                                Html.div [
+                                                    prop.className "w-full flex flex-col-reverse rounded-t-sm overflow-hidden transition-all duration-300 relative"
+                                                    prop.style [ style.height (length.percent heightPct) ]
+                                                    prop.children [
+                                                        for seg in day.Segments do
+                                                            let segPct = float seg.EpisodeCount / float day.TotalEpisodes * 100.0
+                                                            Html.div [
+                                                                prop.className (chartColorClasses.[seg.ColorIndex] + " opacity-80 hover:opacity-100 transition-opacity")
+                                                                prop.style [ style.height (length.percent segPct) ]
+                                                                prop.title $"{seg.SeriesName}: {seg.EpisodeCount} ep"
+                                                            ]
+                                                    ]
+                                                ]
+                                            else
+                                                Html.div [
+                                                    prop.className "w-full rounded-t-sm bg-base-content/5"
+                                                    prop.style [ style.height (length.px 2) ]
+                                                ]
+                                            // Binge indicator
+                                            if day.HasBinge then
+                                                Html.div [
+                                                    prop.className "absolute -top-4 left-1/2 -translate-x-1/2 px-1 py-0.5 rounded text-[8px] font-bold bg-warning/20 text-warning whitespace-nowrap"
+                                                    prop.title "Binge day (3+ episodes of same series)"
+                                                    prop.text "BINGE"
+                                                ]
+                                            // Day label
+                                            Html.div [
+                                                prop.className "text-[10px] text-base-content/40 text-center mt-1 leading-none"
+                                                prop.text (formatDayOfWeek day.Date)
+                                            ]
+                                        ]
+                                    ]
+                            ]
+                        ]
+                    ]
+                ]
+                // Legend
+                if seriesList.Length > 1 then
+                    Html.div [
+                        prop.className "flex flex-wrap gap-x-3 gap-y-1 px-1"
+                        prop.children [
+                            for (slug, name) in seriesList do
+                                let colorIdx = seriesColorMap |> Map.tryFind slug |> Option.defaultValue 0
+                                Html.div [
+                                    prop.className "flex items-center gap-1.5"
+                                    prop.children [
+                                        Html.div [
+                                            prop.className (chartColorClasses.[colorIdx] + " w-2.5 h-2.5 rounded-full opacity-80")
+                                        ]
+                                        Html.span [
+                                            prop.className "text-[11px] text-base-content/60 truncate max-w-[120px]"
+                                            prop.text name
+                                        ]
+                                    ]
+                                ]
+                        ]
+                    ]
+            ]
+        ]
+
+// ── Series Monthly Episode Activity Chart ──
+
+let private monthlyEpisodeActivityChart (activity: (string * int) list) =
+    if List.isEmpty activity then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No episode activity yet"
+        ]
+    else
+        let maxEpisodes =
+            activity |> List.map snd |> List.max |> max 1
+        // Fill in all 12 months
+        let today = System.DateTimeOffset.Now
+        let allMonths =
+            [ for i in 11 .. -1 .. 0 do
+                let dt = today.AddMonths(-i)
+                let key = dt.ToString("yyyy-MM")
+                let label = dt.ToString("MMM")
+                let entry =
+                    activity |> List.tryFind (fun (m, _) -> m = key)
+                match entry with
+                | Some (_, episodes) -> key, label, episodes
+                | None -> key, label, 0 ]
+        Html.div [
+            prop.className "flex flex-col gap-0"
+            prop.children [
+                // Y-axis max label
+                Html.div [
+                    prop.className "flex items-center gap-1 mb-0.5"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-[10px] text-base-content/30 font-medium"
+                            prop.text (string maxEpisodes)
+                        ]
+                        Html.div [
+                            prop.className "flex-1 border-t border-base-content/10"
+                        ]
+                    ]
+                ]
+                // Bar chart
+                Html.div [
+                    prop.className "flex items-end gap-1 h-[120px] px-1"
+                    prop.children [
+                        for (_key, label, episodes) in allMonths do
+                            let heightPct =
+                                if episodes = 0 then 0.0
+                                else float episodes / float maxEpisodes * 100.0
+                            Html.div [
+                                prop.className "flex-1 flex flex-col justify-end items-center relative group"
+                                prop.style [ style.height (length.percent 100) ]
+                                prop.children [
+                                    // Tooltip
+                                    if episodes > 0 then
+                                        Html.div [
+                                            prop.className "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded-md bg-base-300/90 text-xs text-base-content whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg"
+                                            prop.children [
+                                                Html.div [
+                                                    prop.className "font-medium"
+                                                    prop.text (sprintf "%d episode%s" episodes (if episodes = 1 then "" else "s"))
+                                                ]
+                                            ]
+                                        ]
+                                    // Bar
+                                    if episodes > 0 then
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-info opacity-80 hover:opacity-100 transition-all duration-300"
+                                            prop.style [ style.height (length.percent heightPct) ]
+                                        ]
+                                    else
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-base-content/5"
+                                            prop.style [ style.height (length.px 2) ]
+                                        ]
+                                    // Month label
+                                    Html.div [
+                                        prop.className "text-[10px] text-base-content/40 text-center mt-1 leading-none"
+                                        prop.text label
+                                    ]
+                                ]
+                            ]
+                    ]
+                ]
+            ]
+        ]
+
+// ── Series Ratings Distribution (reuses same pattern as movies) ──
+
+let private seriesRatingsDistributionChart (distribution: (int * int) list) =
+    if List.isEmpty distribution then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No ratings yet"
+        ]
+    else
+        let maxCount =
+            distribution |> List.map snd |> List.max |> max 1
+        let fullDistribution =
+            [ for r in 1..10 do
+                let count =
+                    distribution |> List.tryFind (fun (rating, _) -> rating = r)
+                    |> Option.map snd |> Option.defaultValue 0
+                r, count ]
+        Html.div [
+            prop.className "flex flex-col gap-0"
+            prop.children [
+                Html.div [
+                    prop.className "flex items-center gap-1 mb-0.5"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-[10px] text-base-content/30 font-medium"
+                            prop.text (string maxCount)
+                        ]
+                        Html.div [
+                            prop.className "flex-1 border-t border-base-content/10"
+                        ]
+                    ]
+                ]
+                Html.div [
+                    prop.className "flex items-end gap-1.5 h-[120px] px-1"
+                    prop.children [
+                        for (rating, count) in fullDistribution do
+                            let heightPct =
+                                if count = 0 then 0.0
+                                else float count / float maxCount * 100.0
+                            Html.div [
+                                prop.className "flex-1 flex flex-col justify-end items-center relative group"
+                                prop.style [ style.height (length.percent 100) ]
+                                prop.children [
+                                    if count > 0 then
+                                        Html.div [
+                                            prop.className "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded-md bg-base-300/90 text-xs text-base-content whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg"
+                                            prop.children [
+                                                Html.div [
+                                                    prop.className "font-medium"
+                                                    prop.text (sprintf "%d series" count)
+                                                ]
+                                            ]
+                                        ]
+                                    if count > 0 then
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-secondary opacity-80 hover:opacity-100 transition-all duration-300"
+                                            prop.style [ style.height (length.percent heightPct) ]
+                                        ]
+                                    else
+                                        Html.div [
+                                            prop.className "w-full rounded-t-sm bg-base-content/5"
+                                            prop.style [ style.height (length.px 2) ]
+                                        ]
+                                    Html.div [
+                                        prop.className "text-[10px] text-base-content/40 text-center mt-1 leading-none"
+                                        prop.text (string rating)
+                                    ]
+                                ]
+                            ]
+                    ]
+                ]
+            ]
+        ]
+
+// ── Series Genre Breakdown (reuses same pattern as movies) ──
+
+let private seriesGenreBreakdownBars (distribution: (string * int) list) =
+    if List.isEmpty distribution then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No genre data yet"
+        ]
+    else
+        let maxCount =
+            distribution |> List.head |> snd |> max 1
+        Html.div [
+            prop.className "flex flex-col gap-1.5"
+            prop.children [
+                for i, (genre, count) in distribution |> List.mapi (fun i x -> i, x) do
+                    let widthPct = float count / float maxCount * 100.0
+                    let opacity = 1.0 - (float i * 0.06)
+                    Html.div [
+                        prop.className "flex items-center gap-2"
+                        prop.children [
+                            Html.span [
+                                prop.className "text-xs text-base-content/70 w-20 text-right truncate flex-shrink-0"
+                                prop.text genre
+                            ]
+                            Html.div [
+                                prop.className "flex-1 h-5 rounded-sm overflow-hidden bg-base-content/5 relative"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "h-full rounded-sm bg-secondary transition-all duration-500"
+                                        prop.style [
+                                            style.width (length.percent widthPct)
+                                            style.opacity opacity
+                                        ]
+                                    ]
+                                ]
+                            ]
+                            Html.span [
+                                prop.className "text-xs text-base-content/50 w-6 text-right flex-shrink-0"
+                                prop.text (string count)
+                            ]
+                        ]
+                    ]
+            ]
+        ]
+
+// ── Series Most Watched With (Friends) ──
+
+let private seriesWatchedWithSection (watchedWith: DashboardSeriesWatchedWith list) =
+    if List.isEmpty watchedWith then
+        Html.div [
+            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+            prop.text "No shared rewatch sessions yet"
+        ]
+    else
+        Html.div [
+            prop.className "flex flex-col gap-2"
+            prop.children [
+                for friend in watchedWith do
+                    Html.a [
+                        prop.href (Router.format ("friends", friend.Slug))
+                        prop.onClick (fun e ->
+                            e.preventDefault()
+                            Router.navigate ("friends", friend.Slug)
+                        )
+                        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
+                        prop.children [
+                            match friend.ImageRef with
+                            | Some imageRef ->
+                                Html.img [
+                                    prop.src (sprintf "/images/%s" imageRef)
+                                    prop.alt friend.Name
+                                    prop.className "w-10 h-10 rounded-full object-cover flex-shrink-0"
+                                ]
+                            | None ->
+                                Html.div [
+                                    prop.className "w-10 h-10 rounded-full bg-base-300/60 flex items-center justify-center flex-shrink-0"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "text-sm text-base-content/40 font-medium"
+                                            prop.text (friend.Name.Substring(0, 1).ToUpper())
+                                        ]
+                                    ]
+                                ]
+                            Html.div [
+                                prop.className "flex-1 min-w-0"
+                                prop.children [
+                                    Html.p [
+                                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                                        prop.text friend.Name
+                                    ]
+                                    Html.p [
+                                        prop.className "text-xs text-base-content/50"
+                                        prop.text (sprintf "%d episode%s together" friend.EpisodeCount (if friend.EpisodeCount = 1 then "" else "s"))
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+            ]
+        ]
 
 let private seriesCompactItem (item: SeriesListItem) (badge: ReactElement) =
     Html.a [
@@ -1934,16 +2490,46 @@ let private seriesTabView (data: DashboardSeriesTab) =
     Html.div [
         prop.className "flex flex-col gap-4"
         prop.children [
+            // 1. Stats badges
             seriesStatsRow data.Stats
 
-            // Next Up — full list (not truncated)
+            // 2. Episode activity chart (14-day)
+            sectionCard Icons.chartBar "Episode Activity" [
+                episodeActivityChart data.EpisodeActivity
+            ]
+
+            // 3. Next Up with progress bars and time remaining
             if not (List.isEmpty data.NextUp) then
                 sectionCard Icons.tv "Next Up" [
                     for item in data.NextUp do
-                        seriesNextUpItem item
+                        seriesNextUpItemEnhanced item
                 ]
 
-            // Recently Finished
+            // 4. Monthly episode activity
+            sectionCard Icons.calendar "Monthly Activity" [
+                monthlyEpisodeActivityChart data.Stats.MonthlyActivity
+            ]
+
+            // 5. Ratings & Genre (side by side on desktop)
+            Html.div [
+                prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
+                prop.children [
+                    sectionCard Icons.star "Ratings Distribution" [
+                        seriesRatingsDistributionChart data.Stats.RatingDistribution
+                    ]
+                    sectionCard Icons.tag "Genre Breakdown" [
+                        seriesGenreBreakdownBars data.Stats.GenreDistribution
+                    ]
+                ]
+            ]
+
+            // 6. Most watched with (friends)
+            if not (List.isEmpty data.TopWatchedWith) then
+                sectionCard Icons.friends "Most Watched With" [
+                    seriesWatchedWithSection data.TopWatchedWith
+                ]
+
+            // 7. Recently Finished
             if not (List.isEmpty data.RecentlyFinished) then
                 sectionCard Icons.trophy "Recently Finished" [
                     for item in data.RecentlyFinished do
@@ -1955,7 +2541,7 @@ let private seriesTabView (data: DashboardSeriesTab) =
                         )
                 ]
 
-            // Recently Abandoned
+            // 8. Recently Abandoned
             if not (List.isEmpty data.RecentlyAbandoned) then
                 sectionCard Icons.tv "Recently Abandoned" [
                     for item in data.RecentlyAbandoned do
