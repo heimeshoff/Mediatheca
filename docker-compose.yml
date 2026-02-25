@@ -7,7 +7,7 @@ services:
     # ports removed - accessed via Tailscale only
     # - "5000:5000"
     volumes:
-      - ${HOME}/heimeshoff/mediatheca:/app/data
+      - ${MEDIATHECA_DATA:-${HOME}/heimeshoff/mediatheca}:/app/data
     restart: unless-stopped
     environment:
       - ASPNETCORE_URLS=http://+:5000
