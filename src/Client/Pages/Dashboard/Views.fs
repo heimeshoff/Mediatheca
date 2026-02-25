@@ -1426,11 +1426,11 @@ let private activityHeatmapContent (activityDays: DashboardActivityDay list) =
         |> List.map (fun d -> d.Date, d)
         |> Map.ofList
 
-    // Calculate start date: go back ~52 weeks from today to the nearest Sunday
+    // Calculate start date: go back ~52 weeks from today to the nearest Monday
     let daysBack = 364
     let startDate = today.AddDays(float -daysBack)
-    // Adjust start to Sunday
-    let startDayOfWeek = int startDate.DayOfWeek
+    // Adjust start to Monday (Monday=0, Tuesday=1, ..., Sunday=6)
+    let startDayOfWeek = (int startDate.DayOfWeek + 6) % 7
     let adjustedStart = startDate.AddDays(float -startDayOfWeek)
 
     // Generate all days from adjustedStart to today
@@ -1439,7 +1439,7 @@ let private activityHeatmapContent (activityDays: DashboardActivityDay list) =
         [ for i in 0 .. totalDays - 1 do
             adjustedStart.AddDays(float i) ]
 
-    // Group by week (column) — each column is 7 days starting from Sunday
+    // Group by week (column) — each column is 7 days starting from Monday
     let weeks =
         allDays
         |> List.chunkBySize 7
@@ -1468,21 +1468,21 @@ let private activityHeatmapContent (activityDays: DashboardActivityDay list) =
                         svg.height chartHeight
                         svg.viewBox (0, 0, chartWidth, chartHeight)
                         svg.children [
-                            // Day-of-week labels
+                            // Day-of-week labels (Monday-first: row 0=Mon, 2=Wed, 4=Fri)
                             Svg.text [
-                                svg.x 0; svg.y (1 * (cellSize + cellGap) + cellSize + 20)
+                                svg.x 0; svg.y (0 * (cellSize + cellGap) + cellSize + 20)
                                 svg.className "fill-base-content/30"
                                 svg.custom ("fontSize", "9")
                                 svg.text "Mon"
                             ]
                             Svg.text [
-                                svg.x 0; svg.y (3 * (cellSize + cellGap) + cellSize + 20)
+                                svg.x 0; svg.y (2 * (cellSize + cellGap) + cellSize + 20)
                                 svg.className "fill-base-content/30"
                                 svg.custom ("fontSize", "9")
                                 svg.text "Wed"
                             ]
                             Svg.text [
-                                svg.x 0; svg.y (5 * (cellSize + cellGap) + cellSize + 20)
+                                svg.x 0; svg.y (4 * (cellSize + cellGap) + cellSize + 20)
                                 svg.className "fill-base-content/30"
                                 svg.custom ("fontSize", "9")
                                 svg.text "Fri"

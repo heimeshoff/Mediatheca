@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-02-25 -- Task Completed: 036 - Activity Heatmap Monday-First Weeks
+
+**Type:** Task Completion
+**Task:** 036 - Activity Heatmap Monday-First Weeks
+**Summary:** Changed activity heatmap to Monday-first weeks (ISO 8601) by adjusting start-date alignment formula and shifting day-of-week label positions. Build verified.
+**Files changed:** 1 file
+
+---
+
+## 2026-02-25 -- Task Started: 036 - Activity Heatmap Monday-First Weeks
+
+**Type:** Task Start
+**Task:** 036 - Activity Heatmap Monday-First Weeks
+**Milestone:** --
+
+---
+
+## 2026-02-25 -- Idea Captured: Activity Heatmap Monday-First Weeks
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/036-heatmap-monday-first.md
+**Summary:** Change activity heatmap weeks to start on Monday (ISO 8601) instead of Sunday. Client-only change in Views.fs.
+
+---
+
 ## 2026-02-25 14:45 -- Task Completed: 035 - Movies to Watch Card
 
 **Type:** Task Completion
