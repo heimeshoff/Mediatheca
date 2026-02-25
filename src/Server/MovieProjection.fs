@@ -67,7 +67,7 @@ module MovieProjection =
             |> Db.exec
         with _ -> () // Column already exists
 
-        // Migration: add jellyfin_id column for Jellyfin play links
+        // Migration: add jellyfin_id column for Jellyfin play links (legacy, kept for compat)
         try
             conn
             |> Db.newCommand "ALTER TABLE movie_detail ADD COLUMN jellyfin_id TEXT"
@@ -497,7 +497,7 @@ module MovieProjection =
 
     let getBySlug (conn: SqliteConnection) (slug: string) : Mediatheca.Shared.MovieDetail option =
         conn
-        |> Db.newCommand "SELECT slug, name, year, runtime, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, personal_rating, in_focus, jellyfin_id, recommended_by, want_to_watch_with FROM movie_detail WHERE slug = @slug"
+        |> Db.newCommand "SELECT slug, name, year, runtime, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, personal_rating, in_focus, recommended_by, want_to_watch_with FROM movie_detail WHERE slug = @slug"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
@@ -536,9 +536,7 @@ module MovieProjection =
                 if rd.IsDBNull(rd.GetOrdinal("personal_rating")) then None
                 else Some (rd.ReadInt32 "personal_rating")
               InFocus = rd.ReadInt32 "in_focus" <> 0
-              JellyfinId =
-                if rd.IsDBNull(rd.GetOrdinal("jellyfin_id")) then None
-                else Some (rd.ReadString "jellyfin_id")
+              JellyfinId = JellyfinStore.getMovieJellyfinId conn slug
               Cast = cast
               RecommendedBy = resolveFriendRefs conn recommendedBySlugs
               WantToWatchWith = resolveFriendRefs conn wantToWatchWithSlugs
@@ -551,24 +549,22 @@ module MovieProjection =
     let getMoviesInFocus (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardMovieInFocus list =
         conn
         |> Db.newCommand """
-            SELECT ml.slug, ml.name, ml.year, ml.poster_ref, md.jellyfin_id
+            SELECT ml.slug, ml.name, ml.year, ml.poster_ref
             FROM movie_list ml
-            LEFT JOIN movie_detail md ON md.slug = ml.slug
             WHERE ml.in_focus = 1
             ORDER BY ml.rowid DESC
             LIMIT @limit
         """
         |> Db.setParams [ "limit", SqlType.Int32 limit ]
         |> Db.query (fun (rd: IDataReader) ->
-            { Mediatheca.Shared.DashboardMovieInFocus.Slug = rd.ReadString "slug"
+            let slug = rd.ReadString "slug"
+            { Mediatheca.Shared.DashboardMovieInFocus.Slug = slug
               Name = rd.ReadString "name"
               Year = rd.ReadInt32 "year"
               PosterRef =
                 if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
                 else Some (rd.ReadString "poster_ref")
-              JellyfinId =
-                if rd.IsDBNull(rd.GetOrdinal("jellyfin_id")) then None
-                else Some (rd.ReadString "jellyfin_id") }
+              JellyfinId = JellyfinStore.getMovieJellyfinId conn slug }
         )
 
     let getRecentlyAddedMovies (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.MovieListItem list =

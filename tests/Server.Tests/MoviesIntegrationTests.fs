@@ -9,6 +9,7 @@ let private createInMemoryConnection () =
     conn.Open()
     EventStore.initialize conn
     CastStore.initialize conn
+    JellyfinStore.initialize conn
     ContentBlockProjection.handler.Init conn
     FriendProjection.handler.Init conn
     conn

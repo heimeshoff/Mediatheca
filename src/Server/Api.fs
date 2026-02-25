@@ -3372,29 +3372,15 @@ module Api =
                                 ) ([], [])
 
                             // Clear all existing Jellyfin IDs before re-populating (handles removed items)
-                            conn |> Db.newCommand "UPDATE movie_detail SET jellyfin_id = NULL WHERE jellyfin_id IS NOT NULL" |> Db.exec
-                            conn |> Db.newCommand "UPDATE series_detail SET jellyfin_id = NULL WHERE jellyfin_id IS NOT NULL" |> Db.exec
-                            conn |> Db.newCommand "DELETE FROM series_episode_jellyfin" |> Db.exec
+                            JellyfinStore.clearAll conn
 
                             // Persist Jellyfin IDs for matched movies
                             for m in matchedMovies do
-                                conn
-                                |> Db.newCommand "UPDATE movie_detail SET jellyfin_id = @jellyfin_id WHERE slug = @slug"
-                                |> Db.setParams [
-                                    "slug", SqlType.String m.MediathecaSlug
-                                    "jellyfin_id", SqlType.String m.JellyfinItem.JellyfinId
-                                ]
-                                |> Db.exec
+                                JellyfinStore.setMovieJellyfinId conn m.MediathecaSlug m.JellyfinItem.JellyfinId
 
                             // Persist Jellyfin IDs for matched series + fetch episode IDs
                             for m in matchedSeries do
-                                conn
-                                |> Db.newCommand "UPDATE series_detail SET jellyfin_id = @jellyfin_id WHERE slug = @slug"
-                                |> Db.setParams [
-                                    "slug", SqlType.String m.MediathecaSlug
-                                    "jellyfin_id", SqlType.String m.JellyfinItem.JellyfinId
-                                ]
-                                |> Db.exec
+                                JellyfinStore.setSeriesJellyfinId conn m.MediathecaSlug m.JellyfinItem.JellyfinId
 
                                 // Fetch episodes from Jellyfin for this series
                                 let! episodesResult = Jellyfin.getEpisodes httpClient config.ServerUrl config.UserId config.AccessToken m.JellyfinItem.JellyfinId
@@ -3403,18 +3389,7 @@ module Api =
                                     for ep in episodes do
                                         match ep.ParentIndexNumber, ep.IndexNumber with
                                         | Some seasonNum, Some episodeNum ->
-                                            conn
-                                            |> Db.newCommand """
-                                                INSERT OR REPLACE INTO series_episode_jellyfin (series_slug, season_number, episode_number, jellyfin_id)
-                                                VALUES (@slug, @season, @episode, @jellyfin_id)
-                                            """
-                                            |> Db.setParams [
-                                                "slug", SqlType.String m.MediathecaSlug
-                                                "season", SqlType.Int32 seasonNum
-                                                "episode", SqlType.Int32 episodeNum
-                                                "jellyfin_id", SqlType.String ep.Id
-                                            ]
-                                            |> Db.exec
+                                            JellyfinStore.setEpisodeJellyfinId conn m.MediathecaSlug seasonNum episodeNum ep.Id
                                         | _ -> () // Skip episodes without season/episode numbers
                                 | Error _ -> () // Skip if episode fetch fails
 
@@ -3478,9 +3453,7 @@ module Api =
                                 | _ -> ()
 
                             // Clear all existing Jellyfin IDs before re-populating (handles removed items)
-                            conn |> Db.newCommand "UPDATE movie_detail SET jellyfin_id = NULL WHERE jellyfin_id IS NOT NULL" |> Db.exec
-                            conn |> Db.newCommand "UPDATE series_detail SET jellyfin_id = NULL WHERE jellyfin_id IS NOT NULL" |> Db.exec
-                            conn |> Db.newCommand "DELETE FROM series_episode_jellyfin" |> Db.exec
+                            JellyfinStore.clearAll conn
 
                             // Phase 1b: Persist Jellyfin IDs for all matched movies
                             for item in jellyfinMovies do
@@ -3491,13 +3464,7 @@ module Api =
                                 | Some tid ->
                                     match Map.tryFind tid moviesByTmdbId with
                                     | Some (slug, _) ->
-                                        conn
-                                        |> Db.newCommand "UPDATE movie_detail SET jellyfin_id = @jellyfin_id WHERE slug = @slug"
-                                        |> Db.setParams [
-                                            "slug", SqlType.String slug
-                                            "jellyfin_id", SqlType.String item.Id
-                                        ]
-                                        |> Db.exec
+                                        JellyfinStore.setMovieJellyfinId conn slug item.Id
                                     | None -> ()
                                 | None -> ()
 
@@ -3602,13 +3569,7 @@ module Api =
                                     match Map.tryFind tid seriesByTmdbId with
                                     | Some (slug, _) ->
                                         // Persist series Jellyfin ID
-                                        conn
-                                        |> Db.newCommand "UPDATE series_detail SET jellyfin_id = @jellyfin_id WHERE slug = @slug"
-                                        |> Db.setParams [
-                                            "slug", SqlType.String slug
-                                            "jellyfin_id", SqlType.String seriesItem.Id
-                                        ]
-                                        |> Db.exec
+                                        JellyfinStore.setSeriesJellyfinId conn slug seriesItem.Id
                                         // Fetch and persist episode Jellyfin IDs
                                         let! episodesForIds = Jellyfin.getEpisodes httpClient config.ServerUrl config.UserId config.AccessToken seriesItem.Id
                                         match episodesForIds with
@@ -3616,18 +3577,7 @@ module Api =
                                             for ep in eps do
                                                 match ep.ParentIndexNumber, ep.IndexNumber with
                                                 | Some seasonNum, Some episodeNum ->
-                                                    conn
-                                                    |> Db.newCommand """
-                                                        INSERT OR REPLACE INTO series_episode_jellyfin (series_slug, season_number, episode_number, jellyfin_id)
-                                                        VALUES (@slug, @season, @episode, @jellyfin_id)
-                                                    """
-                                                    |> Db.setParams [
-                                                        "slug", SqlType.String slug
-                                                        "season", SqlType.Int32 seasonNum
-                                                        "episode", SqlType.Int32 episodeNum
-                                                        "jellyfin_id", SqlType.String ep.Id
-                                                    ]
-                                                    |> Db.exec
+                                                    JellyfinStore.setEpisodeJellyfinId conn slug seasonNum episodeNum ep.Id
                                                 | _ -> ()
                                         | Error _ -> ()
                                     | None -> ()

@@ -19,6 +19,7 @@
     <Compile Include="ImageStore.fs" />
     <Compile Include="CastStore.fs" />
     <Compile Include="SettingsStore.fs" />
+    <Compile Include="JellyfinStore.fs" />
     <Compile Include="ContentBlocks.fs" />
     <Compile Include="ContentBlockProjection.fs" />
     <Compile Include="Catalogs.fs" />

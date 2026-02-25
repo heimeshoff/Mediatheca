@@ -103,25 +103,12 @@ module SeriesProjection =
             |> Db.exec
         with _ -> () // Column already exists
 
-        // Migration: add jellyfin_id column for Jellyfin play links
+        // Migration: add jellyfin_id column for Jellyfin play links (legacy, kept for compat)
         try
             conn
             |> Db.newCommand "ALTER TABLE series_detail ADD COLUMN jellyfin_id TEXT"
             |> Db.exec
         with _ -> () // Column already exists
-
-        // Create series_episode_jellyfin table for episode-level Jellyfin IDs
-        conn
-        |> Db.newCommand """
-            CREATE TABLE IF NOT EXISTS series_episode_jellyfin (
-                series_slug TEXT NOT NULL,
-                season_number INTEGER NOT NULL,
-                episode_number INTEGER NOT NULL,
-                jellyfin_id TEXT NOT NULL,
-                PRIMARY KEY (series_slug, season_number, episode_number)
-            )
-        """
-        |> Db.exec
 
     let private dropTables (conn: SqliteConnection) : unit =
         conn
@@ -132,7 +119,6 @@ module SeriesProjection =
             DROP TABLE IF EXISTS series_episodes;
             DROP TABLE IF EXISTS series_rewatch_sessions;
             DROP TABLE IF EXISTS series_episode_progress;
-            DROP TABLE IF EXISTS series_episode_jellyfin;
         """
         |> Db.exec
 
@@ -1046,7 +1032,7 @@ module SeriesProjection =
             LEFT JOIN series_rewatch_sessions rs ON rs.series_slug = sl.slug AND rs.is_default = 1
             LEFT JOIN series_detail sd ON sd.slug = sl.slug
             LEFT JOIN series_episodes ep ON ep.series_slug = sl.slug AND ep.season_number = sl.next_up_season AND ep.episode_number = sl.next_up_episode
-            LEFT JOIN series_episode_jellyfin jej ON jej.series_slug = sl.slug AND jej.season_number = sl.next_up_season AND jej.episode_number = sl.next_up_episode
+            LEFT JOIN jellyfin_episode jej ON jej.series_slug = sl.slug AND jej.season_number = sl.next_up_season AND jej.episode_number = sl.next_up_episode
             WHERE sl.abandoned = 0
               AND (sl.next_up_season IS NOT NULL
                OR sl.in_focus = 1

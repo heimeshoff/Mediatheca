@@ -49,6 +49,12 @@ let main args =
     // Initialize SettingsStore
     SettingsStore.initialize conn
 
+    // Initialize JellyfinStore tables
+    JellyfinStore.initialize conn
+
+    // Migrate Jellyfin data from old projection tables (one-time, idempotent)
+    JellyfinStore.migrateFromProjections conn
+
     // Initialize PlaytimeTracker tables
     PlaytimeTracker.initialize conn
 
