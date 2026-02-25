@@ -1333,7 +1333,7 @@ module Api =
             // Dashboard Tabs
             getDashboardAllTab = fun () -> async {
                 let seriesNextUp = SeriesProjection.getDashboardSeriesNextUp conn (Some 11)
-                let moviesInFocus = MovieProjection.getMoviesInFocus conn 6
+                let moviesToWatch = MovieProjection.getMoviesToWatch conn
                 let gamesInFocus = GameProjection.getGamesInFocus conn
                 let gamesRecentlyPlayed = GameProjection.getGamesRecentlyPlayed conn 6
                 let playSessions = PlaytimeTracker.getDashboardPlaySessions conn 14
@@ -1402,7 +1402,7 @@ module Api =
 
                 return {
                     Mediatheca.Shared.DashboardAllTab.SeriesNextUp = seriesNextUp
-                    MoviesInFocus = moviesInFocus
+                    MoviesToWatch = moviesToWatch
                     GamesInFocus = gamesInFocus
                     GamesRecentlyPlayed = gamesRecentlyPlayed
                     PlaySessions = playSessions
@@ -1458,12 +1458,12 @@ module Api =
                 let topDirectors = MovieProjection.getTopDirectors conn 5
                 let topWatchedWith = MovieProjection.getTopWatchedWith conn 5
                 let countryDistribution = MovieProjection.getCountryDistribution conn
-                let moviesInFocus = MovieProjection.getMoviesInFocus conn 10
+                let moviesToWatch = MovieProjection.getMoviesToWatch conn
                 let jellyfinServerUrl = SettingsStore.getSetting conn "jellyfin_server_url"
                 return {
                     Mediatheca.Shared.DashboardMoviesTab.RecentlyAdded = recentlyAdded
                     RecentlyWatched = recentlyWatched
-                    MoviesInFocus = moviesInFocus
+                    MoviesToWatch = moviesToWatch
                     JellyfinServerUrl =
                         jellyfinServerUrl
                         |> Option.bind (fun s -> if System.String.IsNullOrWhiteSpace(s) then None else Some s)

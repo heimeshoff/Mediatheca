@@ -357,9 +357,9 @@ let private seriesNextUpSection (items: DashboardSeriesNextUp list) =
                 seriesNextUpItem item
         ]
 
-// ── Movies: In Focus — Poster Cards (All tab) ──
+// ── Movies to Watch — Poster Cards (All tab) ──
 
-let private movieInFocusPosterCard (jellyfinServerUrl: string option) (item: DashboardMovieInFocus) =
+let private movieToWatchPosterCard (jellyfinServerUrl: string option) (item: DashboardMovieToWatch) =
     Html.a [
         prop.href (Router.format ("movies", item.Slug))
         prop.onClick (fun e ->
@@ -393,18 +393,19 @@ let private movieInFocusPosterCard (jellyfinServerUrl: string option) (item: Das
                                     ]
                                 ]
 
-                            // Crosshair badge
-                            Html.div [
-                                prop.className "absolute top-1.5 left-1.5 z-10"
-                                prop.children [
-                                    Html.span [
-                                        prop.className "flex items-center justify-center w-6 h-6 rounded-full bg-warning/90 text-warning-content shadow-md"
-                                        prop.children [ Icons.crosshairSmFilled () ]
+                            // Crosshair badge — only for in-focus movies
+                            if item.InFocus then
+                                Html.div [
+                                    prop.className "absolute top-1.5 left-1.5 z-10"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "flex items-center justify-center w-6 h-6 rounded-full bg-warning/90 text-warning-content shadow-md"
+                                            prop.children [ Icons.crosshairSmFilled () ]
+                                        ]
                                     ]
                                 ]
-                            ]
 
-                            // Jellyfin play button overlay (bottom-right)
+                            // Jellyfin play button overlay (bottom-right) — always visible ghost style
                             match jellyfinServerUrl, item.JellyfinId with
                             | Some serverUrl, Some jellyfinId ->
                                 Html.a [
@@ -412,7 +413,7 @@ let private movieInFocusPosterCard (jellyfinServerUrl: string option) (item: Das
                                     prop.target "_blank"
                                     prop.rel "noopener noreferrer"
                                     prop.onClick (fun e -> e.stopPropagation())
-                                    prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100/55 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg opacity-0 group-hover:opacity-100 cursor-pointer"
+                                    prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100/55 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg cursor-pointer"
                                     prop.title "Play in Jellyfin"
                                     prop.children [
                                         Html.span [
@@ -444,23 +445,23 @@ let private movieInFocusPosterCard (jellyfinServerUrl: string option) (item: Das
         ]
     ]
 
-let private moviesInFocusPosterSection (jellyfinServerUrl: string option) (items: DashboardMovieInFocus list) =
+let private moviesToWatchPosterSection (jellyfinServerUrl: string option) (items: DashboardMovieToWatch list) =
     if List.isEmpty items then
         Html.none
     else
-        sectionOpen Icons.movie "Movies In Focus" [
+        sectionOpen Icons.movie "Movies to Watch" [
             Html.div [
                 prop.className "flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
                 prop.children [
                     for item in items do
-                        movieInFocusPosterCard jellyfinServerUrl item
+                        movieToWatchPosterCard jellyfinServerUrl item
                 ]
             ]
         ]
 
-// ── Movies: In Focus (list row — kept for reference/fallback) ──
+// ── Movies to Watch (list row — kept for reference/fallback) ──
 
-let private movieInFocusItem (item: DashboardMovieInFocus) =
+let private movieToWatchItem (item: DashboardMovieToWatch) =
     Html.a [
         prop.href (Router.format ("movies", item.Slug))
         prop.onClick (fun e ->
@@ -1785,8 +1786,8 @@ let private allTabView (data: DashboardAllTab) =
                             // 3. Next Up — open section (no card chrome)
                             seriesNextUpOpenScroller data.JellyfinServerUrl nextUpItems
 
-                            // 4. Movies In Focus
-                            moviesInFocusPosterSection data.JellyfinServerUrl data.MoviesInFocus
+                            // 4. Movies to Watch
+                            moviesToWatchPosterSection data.JellyfinServerUrl data.MoviesToWatch
                         ]
                     ]
 
@@ -2401,14 +2402,14 @@ let private moviesTabView (data: DashboardMoviesTab) =
                 ]
             ]
 
-            // Row 3: Movies In Focus — full-width horizontal poster scroller
-            if not (List.isEmpty data.MoviesInFocus) then
-                sectionCardOverflow Icons.movie "Movies In Focus" [
+            // Row 3: Movies to Watch — full-width horizontal poster scroller
+            if not (List.isEmpty data.MoviesToWatch) then
+                sectionCardOverflow Icons.movie "Movies to Watch" [
                     Html.div [
                         prop.className "flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
                         prop.children [
-                            for item in data.MoviesInFocus do
-                                movieInFocusPosterCard data.JellyfinServerUrl item
+                            for item in data.MoviesToWatch do
+                                movieToWatchPosterCard data.JellyfinServerUrl item
                         ]
                     ]
                 ]

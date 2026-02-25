@@ -3,5 +3,9 @@
     "allow": [
       "Bash(dir:*)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "chrome-devtools"
+  ],
+  "enableAllProjectMcpServers": true
 }

@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-02-25 14:45 -- Task Completed: 035 - Movies to Watch Card
+
+**Type:** Task Completion
+**Task:** 035 - Movies to Watch Card
+**Summary:** Renamed "Movies In Focus" to "Movies to Watch" across full stack. Server query now returns union of in-focus and Jellyfin-available unwatched movies via LEFT JOIN (fixing N+1), shared type renamed to DashboardMovieToWatch with InFocus bool, client shows conditional crosshair badge and always-visible ghost play button.
+**Files changed:** 4 files
+
+---
+
+## 2026-02-25 14:30 -- Task Started: 035 - Movies to Watch Card
+
+**Type:** Task Start
+**Task:** 035 - Movies to Watch Card
+**Milestone:** --
+
+---
+
+## 2026-02-25 14:00 -- Idea Captured: Movies to Watch Card
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/035-movies-to-watch-card.md
+**Summary:** Expand "Movies In Focus" card to "Movies to Watch" — showing the union of in-focus movies and unwatched Jellyfin-available movies, with always-visible ghost play buttons for Jellyfin items, crosshair badge only for in-focus ones, ordered by in-focus first then Jellyfin-only, secondary by recency.
+
+---
+
 ## 2026-02-25 12:32 -- Task Completed: 034 - Games Tab Overhaul
 
 **Type:** Task Completion

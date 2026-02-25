@@ -546,25 +546,28 @@ module MovieProjection =
 
     // Dashboard queries
 
-    let getMoviesInFocus (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardMovieInFocus list =
+    let getMoviesToWatch (conn: SqliteConnection) : Mediatheca.Shared.DashboardMovieToWatch list =
         conn
         |> Db.newCommand """
-            SELECT ml.slug, ml.name, ml.year, ml.poster_ref
+            SELECT ml.slug, ml.name, ml.year, ml.poster_ref, ml.in_focus,
+                   jm.jellyfin_id
             FROM movie_list ml
-            WHERE ml.in_focus = 1
+            LEFT JOIN jellyfin_movie jm ON jm.movie_slug = ml.slug
+            WHERE (ml.in_focus = 1 OR jm.jellyfin_id IS NOT NULL)
+              AND ml.slug NOT IN (SELECT DISTINCT movie_slug FROM watch_sessions)
             ORDER BY ml.rowid DESC
-            LIMIT @limit
         """
-        |> Db.setParams [ "limit", SqlType.Int32 limit ]
         |> Db.query (fun (rd: IDataReader) ->
-            let slug = rd.ReadString "slug"
-            { Mediatheca.Shared.DashboardMovieInFocus.Slug = slug
+            { Mediatheca.Shared.DashboardMovieToWatch.Slug = rd.ReadString "slug"
               Name = rd.ReadString "name"
               Year = rd.ReadInt32 "year"
               PosterRef =
                 if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
                 else Some (rd.ReadString "poster_ref")
-              JellyfinId = JellyfinStore.getMovieJellyfinId conn slug }
+              JellyfinId =
+                if rd.IsDBNull(rd.GetOrdinal("jellyfin_id")) then None
+                else Some (rd.ReadString "jellyfin_id")
+              InFocus = rd.ReadInt32 "in_focus" <> 0 }
         )
 
     let getRecentlyAddedMovies (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.MovieListItem list =

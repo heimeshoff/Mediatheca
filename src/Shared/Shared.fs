@@ -259,12 +259,13 @@ type DashboardSeriesNextUp = {
     AverageRuntimeMinutes: int option
 }
 
-type DashboardMovieInFocus = {
+type DashboardMovieToWatch = {
     Slug: string
     Name: string
     Year: int
     PosterRef: string option
     JellyfinId: string option
+    InFocus: bool
 }
 
 type DashboardGameInFocus = {
@@ -333,7 +334,7 @@ type DashboardMonthlyBreakdown = {
 
 type DashboardAllTab = {
     SeriesNextUp: DashboardSeriesNextUp list
-    MoviesInFocus: DashboardMovieInFocus list
+    MoviesToWatch: DashboardMovieToWatch list
     GamesInFocus: DashboardGameInFocus list
     GamesRecentlyPlayed: DashboardGameRecentlyPlayed list
     PlaySessions: DashboardPlaySession list
@@ -652,7 +653,7 @@ type DashboardMoviesTab = {
     RecentlyAdded: MovieListItem list
     Stats: DashboardMovieStats
     RecentlyWatched: DashboardRecentlyWatched list
-    MoviesInFocus: DashboardMovieInFocus list
+    MoviesToWatch: DashboardMovieToWatch list
     JellyfinServerUrl: string option
     TopActors: DashboardPersonStats list
     TopDirectors: DashboardPersonStats list
