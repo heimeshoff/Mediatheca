@@ -19,8 +19,8 @@ module JellyfinSync =
     let initialize (conn: SqliteConnection) : unit =
         match SettingsStore.getSetting conn "jellyfin_last_sync" with
         | Some iso ->
-            match DateTime.TryParse(iso) with
-            | true, dt -> lastSyncTime <- Some dt
+            match DateTimeOffset.TryParse(iso) with
+            | true, dto -> lastSyncTime <- Some dto.UtcDateTime
             | _ -> ()
         | None -> ()
 

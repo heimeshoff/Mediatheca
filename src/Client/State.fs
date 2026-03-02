@@ -402,6 +402,8 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                     api.getDashboardAllTab ()
                     (fun data -> Dashboard_msg (Pages.Dashboard.Types.AllTabLoaded data))
                     (fun ex -> Dashboard_msg (Pages.Dashboard.Types.TabLoadError ex.Message))
+                // Re-trigger Jellyfin auto-sync on dashboard visit (server enforces 5-min cooldown)
+                Cmd.OfAsync.perform api.triggerJellyfinSync () JellyfinSyncTriggered
             ]
         | _ -> model, Cmd.none
 
@@ -413,7 +415,14 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Dashboard_msg childMsg ->
         let childModel, childCmd = Pages.Dashboard.State.update api childMsg model.DashboardModel
-        { model with DashboardModel = childModel }, Cmd.map Dashboard_msg childCmd
+        let extraCmd =
+            match childMsg with
+            | Pages.Dashboard.Types.SwitchTab _ ->
+                // Re-trigger Jellyfin sync on tab switch (server enforces 5-min cooldown)
+                Cmd.OfAsync.perform api.triggerJellyfinSync () JellyfinSyncTriggered
+            | _ -> Cmd.none
+        { model with DashboardModel = childModel },
+        Cmd.batch [ Cmd.map Dashboard_msg childCmd; extraCmd ]
 
     | Movie_list_msg childMsg ->
         match childMsg with
