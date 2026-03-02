@@ -8,6 +8,32 @@ open Mediatheca.Client
 
 // ── Helpers ──
 
+let private formatRelativeTime (isoTime: string) =
+    try
+        let dt = System.DateTime.Parse(isoTime)
+        let now = System.DateTime.UtcNow
+        let diff = now - dt
+        if diff.TotalSeconds < 60.0 then "just now"
+        elif diff.TotalMinutes < 60.0 then sprintf "%d minute%s ago" (int diff.TotalMinutes) (if int diff.TotalMinutes = 1 then "" else "s")
+        elif diff.TotalHours < 24.0 then sprintf "%d hour%s ago" (int diff.TotalHours) (if int diff.TotalHours = 1 then "" else "s")
+        elif diff.TotalDays < 2.0 then "yesterday"
+        else sprintf "%d days ago" (int diff.TotalDays)
+    with _ -> isoTime
+
+let private lastSyncLabel (lastSync: string option) =
+    match lastSync with
+    | None ->
+        Html.span [
+            prop.className "text-sm text-base-content/50"
+            prop.text "Never synced"
+        ]
+    | Some isoTime ->
+        Html.span [
+            prop.className "text-sm text-base-content/50"
+            prop.title isoTime
+            prop.text (sprintf "Last synced: %s" (formatRelativeTime isoTime))
+        ]
+
 let private statusBadge configured (label: string) =
     Daisy.badge [
         if configured then badge.success else badge.warning
@@ -245,6 +271,13 @@ let private rawgDetail (model: Model) (dispatch: Msg -> unit) =
 let private steamDetail (model: Model) (dispatch: Msg -> unit) =
     Html.div [
         prop.children [
+            Html.div [
+                prop.className "mb-4"
+                prop.children [
+                    lastSyncLabel (model.PlaytimeSyncStatus |> Option.bind (fun s -> s.LastSyncTime))
+                ]
+            ]
+
             Html.p [
                 prop.className "text-base-content/70 mb-4 text-sm"
                 prop.children [
@@ -456,6 +489,13 @@ let private steamFamilyDetail (model: Model) (dispatch: Msg -> unit) =
 
     Html.div [
         prop.children [
+            Html.div [
+                prop.className "mb-4"
+                prop.children [
+                    lastSyncLabel model.SteamFamilyLastSync
+                ]
+            ]
+
             Html.p [
                 prop.className "text-base-content/70 mb-4 text-sm"
                 prop.text "Import shared library from your Steam Family group. First discover members, map them to friends, then import."
@@ -954,6 +994,13 @@ let private cinemarcoDetail (model: Model) (dispatch: Msg -> unit) =
 let private jellyfinDetail (model: Model) (dispatch: Msg -> unit) =
     Html.div [
         prop.children [
+            Html.div [
+                prop.className "mb-4"
+                prop.children [
+                    lastSyncLabel model.JellyfinLastSyncTime
+                ]
+            ]
+
             Html.p [
                 prop.className "text-base-content/70 mb-4 text-sm"
                 prop.children [

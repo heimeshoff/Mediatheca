@@ -59,6 +59,10 @@ type Model = {
     JellyfinScanResult: Result<JellyfinScanResult, string> option
     IsImportingJellyfin: bool
     JellyfinImportResult: Result<JellyfinImportResult, string> option
+    // Sync Status
+    PlaytimeSyncStatus: PlaytimeSyncStatus option
+    JellyfinLastSyncTime: string option
+    SteamFamilyLastSync: string option
     // Cinemarco Import
     CinemarcoDbPath: string
     CinemarcoImagesPath: string
@@ -132,6 +136,13 @@ type Msg =
     | Jellyfin_scan_completed of Result<JellyfinScanResult, string>
     | Import_jellyfin_watch_history
     | Jellyfin_import_completed of Result<JellyfinImportResult, string>
+    // Sync Status
+    | Load_playtime_sync_status
+    | Playtime_sync_status_loaded of PlaytimeSyncStatus
+    | Load_jellyfin_sync_status
+    | Jellyfin_sync_status_loaded of JellyfinSyncStatus
+    | Load_steam_family_last_sync
+    | Steam_family_last_sync_loaded of string option
     // Cinemarco Import
     | Cinemarco_db_path_changed of string
     | Cinemarco_images_path_changed of string

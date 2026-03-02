@@ -29,6 +29,7 @@
     <Compile Include="SeriesProjection.fs" />
     <Compile Include="GameProjection.fs" />
     <Compile Include="PlaytimeTracker.fs" />
+    <Compile Include="JellyfinSync.fs" />
     <Compile Include="CinemarcoImport.fs" />
     <Compile Include="EventFormatting.fs" />
     <Compile Include="Api.fs" />

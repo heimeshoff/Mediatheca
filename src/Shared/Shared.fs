@@ -875,6 +875,20 @@ type JellyfinImportResult = {
     Errors: string list
 }
 
+// Jellyfin Auto-Sync
+
+type JellyfinSyncTriggerResult =
+    | SyncStarted
+    | SyncAlreadyInProgress
+    | SyncCooldownActive of lastSyncTime: string
+    | SyncNotConfigured
+
+type JellyfinSyncStatus =
+    | SyncIdle of lastSyncTime: string option
+    | SyncInProgress
+    | SyncCompleted of result: JellyfinImportResult * lastSyncTime: string
+    | SyncFailed of error: string * lastSyncTime: string option
+
 // View Settings
 
 type ViewSortField = ByReleaseDate | ByName | ByRating | ByWatchOrder
@@ -1107,6 +1121,11 @@ type IMediathecaApi = {
     testJellyfinConnection: string * string * string -> Async<Result<string, string>>
     scanJellyfinLibrary: unit -> Async<Result<JellyfinScanResult, string>>
     importJellyfinWatchHistory: unit -> Async<Result<JellyfinImportResult, string>>
+    // Jellyfin Auto-Sync
+    triggerJellyfinSync: unit -> Async<JellyfinSyncTriggerResult>
+    getJellyfinSyncStatus: unit -> Async<JellyfinSyncStatus>
+    // Steam Family Last Sync
+    getSteamFamilyLastSync: unit -> Async<string option>
     // Import
     importFromCinemarco: ImportFromCinemarcoRequest -> Async<Result<ImportResult, string>>
     // View Settings

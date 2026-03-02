@@ -44,6 +44,9 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
         SettingsModel = settingsModel
         StyleGuideModel = styleGuideModel
         SearchModal = None
+        JellyfinSyncing = false
+        JellyfinSyncResult = None
+        ShowJellyfinSyncToast = false
     }
 
     let cmd = Cmd.batch [
@@ -55,6 +58,8 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
         Cmd.map Movie_list_msg movieListCmd
         Cmd.map Series_list_msg seriesListCmd
         Cmd.map Settings_msg settingsCmd
+        // Trigger Jellyfin auto-sync on app visit
+        Cmd.OfAsync.perform api.triggerJellyfinSync () JellyfinSyncTriggered
     ]
 
     model, cmd
@@ -473,3 +478,60 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Styleguide_msg childMsg ->
         let childModel, childCmd = Pages.StyleGuide.State.update childMsg model.StyleGuideModel
         { model with StyleGuideModel = childModel }, Cmd.map Styleguide_msg childCmd
+
+    // Jellyfin Auto-Sync
+    | TriggerJellyfinSync ->
+        model, Cmd.OfAsync.perform api.triggerJellyfinSync () JellyfinSyncTriggered
+
+    | JellyfinSyncTriggered result ->
+        match result with
+        | Mediatheca.Shared.SyncStarted ->
+            let pollCmd =
+                Cmd.OfAsync.perform
+                    (fun () -> async {
+                        do! Async.Sleep 3000
+                        return! api.getJellyfinSyncStatus ()
+                    }) () JellyfinSyncStatusReceived
+            { model with JellyfinSyncing = true }, pollCmd
+        | _ ->
+            // CooldownActive, AlreadyInProgress, NotConfigured — do nothing
+            model, Cmd.none
+
+    | JellyfinSyncStatusReceived status ->
+        match status with
+        | Mediatheca.Shared.SyncInProgress ->
+            // Continue polling
+            let pollCmd =
+                Cmd.OfAsync.perform
+                    (fun () -> async {
+                        do! Async.Sleep 3000
+                        return! api.getJellyfinSyncStatus ()
+                    }) () JellyfinSyncStatusReceived
+            model, pollCmd
+        | Mediatheca.Shared.SyncCompleted (result, _lastSyncTime) ->
+            let hasChanges =
+                result.MoviesAdded > 0 || result.EpisodesAdded > 0 ||
+                result.MoviesAutoAdded > 0 || result.SeriesAutoAdded > 0
+            let refreshCmd =
+                Cmd.OfAsync.either
+                    api.getDashboardAllTab ()
+                    (fun data -> Dashboard_msg (Pages.Dashboard.Types.AllTabLoaded data))
+                    (fun ex -> Dashboard_msg (Pages.Dashboard.Types.TabLoadError ex.Message))
+            let autoDismissCmd =
+                if hasChanges then
+                    Cmd.ofEffect (fun dispatch ->
+                        Fable.Core.JS.setTimeout (fun () -> dispatch DismissJellyfinSyncToast) 5000 |> ignore
+                    )
+                else Cmd.none
+            { model with
+                JellyfinSyncing = false
+                JellyfinSyncResult = if hasChanges then Some result else None
+                ShowJellyfinSyncToast = hasChanges },
+            Cmd.batch [ refreshCmd; autoDismissCmd ]
+        | Mediatheca.Shared.SyncFailed (_error, _lastSyncTime) ->
+            { model with JellyfinSyncing = false }, Cmd.none
+        | Mediatheca.Shared.SyncIdle _ ->
+            { model with JellyfinSyncing = false }, Cmd.none
+
+    | DismissJellyfinSyncToast ->
+        { model with ShowJellyfinSyncToast = false; JellyfinSyncResult = None }, Cmd.none

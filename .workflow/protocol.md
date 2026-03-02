@@ -2,6 +2,41 @@
 
 ---
 
+## 2026-03-02 -- Task Completed: 037 - Jellyfin Auto-Sync on App Visit
+
+**Type:** Task Completion
+**Task:** 037 - Jellyfin Auto-Sync on App Visit
+**Summary:** Implemented Jellyfin auto-sync on app visit with background sync (5-min cooldown), polling status indicator, toast notifications, dashboard refresh on completion, and "Last synced" display for Steam, Jellyfin, and Steam Family integrations in Settings. All 233 tests pass.
+**Files changed:** 11 files
+
+---
+
+## 2026-03-02 -- Idea Captured: IPTorrents Search Button
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/backlog/038-iptorrents-search-button.md
+**Summary:** When a movie/series has no Jellyfin play button, show an "IPTorrents" search button that opens iptorrents.com with the title pre-filled and categories pre-filtered. Pure client-side feature — no scraping, no server changes. Movies pre-filter to movie categories (72, 48, 20, 100), series to TV categories (73, 5, 22, 99). qBittorrent integration deferred to a future task.
+
+---
+
+## 2026-03-02 -- Task Started: 037 - Jellyfin Auto-Sync on App Visit
+
+**Type:** Task Start
+**Task:** 037 - Jellyfin Auto-Sync on App Visit
+**Milestone:** --
+
+---
+
+## 2026-03-02 -- Idea Captured: Jellyfin Auto-Sync on App Visit
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/037-jellyfin-auto-sync.md
+**Summary:** Automatically trigger a non-blocking Jellyfin import when the user visits Mediatheca. Syncs watch history, auto-adds new items, and refreshes play-link IDs. 5-minute cooldown prevents redundant syncs. Subtle spinner during sync, toast notification with summary on completion.
+
+---
+
 ## 2026-02-25 -- Task Completed: 036 - Activity Heatmap Monday-First Weeks
 
 **Type:** Task Completion

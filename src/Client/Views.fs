@@ -3,6 +3,7 @@ module Mediatheca.Client.Views
 open Fable.Core
 open Feliz
 open Feliz.Router
+open Mediatheca.Shared
 open Mediatheca.Client.Router
 open Mediatheca.Client.Types
 open Mediatheca.Client.Components
@@ -55,12 +56,75 @@ let private pageContent (model: Model) (dispatch: Msg -> unit) =
     | Not_found ->
         Pages.NotFound.Views.view ()
 
+let private jellyfinSyncIndicator (model: Model) =
+    if model.JellyfinSyncing then
+        Html.div [
+            prop.className "fixed top-3 right-3 z-50 flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-base-content/70"
+            prop.style [
+                style.backgroundColor "oklch(0.25 0.015 264 / 0.65)"
+                style.backdropFilter "blur(24px) saturate(1.2)"
+                style.border "1px solid oklch(0.80 0 0 / 0.15)"
+                style.boxShadow "inset 0 1px 0 0 oklch(100% 0 0 / 0.08)"
+            ]
+            prop.children [
+                Html.span [
+                    prop.className "loading loading-spinner loading-xs text-primary"
+                ]
+                Html.span [ prop.text "Syncing Jellyfin..." ]
+            ]
+        ]
+    else Html.none
+
+let private jellyfinSyncToast (model: Model) (dispatch: Msg -> unit) =
+    match model.ShowJellyfinSyncToast, model.JellyfinSyncResult with
+    | true, Some result ->
+        let parts =
+            [ if result.MoviesAdded > 0 then sprintf "%d movie%s" result.MoviesAdded (if result.MoviesAdded > 1 then "s" else "")
+              if result.EpisodesAdded > 0 then sprintf "%d episode%s" result.EpisodesAdded (if result.EpisodesAdded > 1 then "s" else "")
+              if result.MoviesAutoAdded > 0 then sprintf "%d movie%s auto-added" result.MoviesAutoAdded (if result.MoviesAutoAdded > 1 then "s" else "")
+              if result.SeriesAutoAdded > 0 then sprintf "%d series auto-added" result.SeriesAutoAdded ]
+        let summary = parts |> String.concat ", "
+        Html.div [
+            prop.className "fixed bottom-20 lg:bottom-4 right-4 z-50 flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-base-content shadow-xl max-w-sm"
+            prop.style [
+                style.backgroundColor "oklch(0.25 0.015 264 / 0.70)"
+                style.backdropFilter "blur(24px) saturate(1.2)"
+                style.border "1px solid oklch(0.80 0 0 / 0.15)"
+                style.boxShadow "inset 0 1px 0 0 oklch(100% 0 0 / 0.08)"
+            ]
+            prop.children [
+                Html.div [
+                    prop.className "flex-1"
+                    prop.children [
+                        Html.div [
+                            prop.className "font-medium text-primary mb-0.5"
+                            prop.text "Jellyfin synced"
+                        ]
+                        Html.div [
+                            prop.className "text-base-content/70"
+                            prop.text summary
+                        ]
+                    ]
+                ]
+                Html.button [
+                    prop.className "btn btn-ghost btn-xs btn-circle"
+                    prop.onClick (fun _ -> dispatch DismissJellyfinSyncToast)
+                    prop.children [
+                        Html.span [ prop.className "text-lg"; prop.text "\u00D7" ]
+                    ]
+                ]
+            ]
+        ]
+    | _ -> Html.none
+
 let view (model: Model) (dispatch: Msg -> unit) =
     React.router [
         router.onUrlChanged (Url_changed >> dispatch)
         router.children [
             KeyboardListener dispatch
             Layout.view model.CurrentPage (pageContent model dispatch)
+            jellyfinSyncIndicator model
+            jellyfinSyncToast model dispatch
             match model.SearchModal with
             | Some m -> SearchModal.view m (Search_modal_msg >> dispatch)
             | None -> ()

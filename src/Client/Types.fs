@@ -1,5 +1,6 @@
 module Mediatheca.Client.Types
 
+open Mediatheca.Shared
 open Mediatheca.Client.Router
 open Mediatheca.Client.Components
 
@@ -20,6 +21,10 @@ type Model = {
     SettingsModel: Pages.Settings.Types.Model
     StyleGuideModel: Pages.StyleGuide.Types.Model
     SearchModal: SearchModal.Model option
+    // Jellyfin Auto-Sync
+    JellyfinSyncing: bool
+    JellyfinSyncResult: JellyfinImportResult option
+    ShowJellyfinSyncToast: bool
 }
 
 type Msg =
@@ -40,3 +45,8 @@ type Msg =
     | Event_browser_msg of Pages.EventBrowser.Types.Msg
     | Settings_msg of Pages.Settings.Types.Msg
     | Styleguide_msg of Pages.StyleGuide.Types.Msg
+    // Jellyfin Auto-Sync
+    | TriggerJellyfinSync
+    | JellyfinSyncTriggered of JellyfinSyncTriggerResult
+    | JellyfinSyncStatusReceived of JellyfinSyncStatus
+    | DismissJellyfinSyncToast

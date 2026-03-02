@@ -65,11 +65,14 @@ let init () : Model * Cmd<Msg> =
       JellyfinScanResult = None
       IsImportingJellyfin = false
       JellyfinImportResult = None
+      PlaytimeSyncStatus = None
+      JellyfinLastSyncTime = None
+      SteamFamilyLastSync = None
       CinemarcoDbPath = ""
       CinemarcoImagesPath = ""
       IsImporting = false
       ImportResult = None },
-    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings ]
+    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync ]
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
@@ -452,6 +455,31 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Jellyfin_import_completed result ->
         { model with IsImportingJellyfin = false; JellyfinImportResult = Some result; JellyfinScanResult = None }, Cmd.none
+
+    // Sync Status
+    | Load_playtime_sync_status ->
+        model, Cmd.OfAsync.perform api.getPlaytimeSyncStatus () Playtime_sync_status_loaded
+
+    | Playtime_sync_status_loaded status ->
+        { model with PlaytimeSyncStatus = Some status }, Cmd.none
+
+    | Load_jellyfin_sync_status ->
+        model, Cmd.OfAsync.perform api.getJellyfinSyncStatus () Jellyfin_sync_status_loaded
+
+    | Jellyfin_sync_status_loaded status ->
+        let lastSync =
+            match status with
+            | SyncIdle lastTime -> lastTime
+            | SyncCompleted (_, lastTime) -> Some lastTime
+            | SyncFailed (_, lastTime) -> lastTime
+            | SyncInProgress -> model.JellyfinLastSyncTime
+        { model with JellyfinLastSyncTime = lastSync }, Cmd.none
+
+    | Load_steam_family_last_sync ->
+        model, Cmd.OfAsync.perform api.getSteamFamilyLastSync () Steam_family_last_sync_loaded
+
+    | Steam_family_last_sync_loaded lastSync ->
+        { model with SteamFamilyLastSync = lastSync }, Cmd.none
 
     | Cinemarco_db_path_changed value ->
         { model with CinemarcoDbPath = value; ImportResult = None }, Cmd.none

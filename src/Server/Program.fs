@@ -196,6 +196,9 @@ let main args =
 
     backfillDirectors()
 
+    // Initialize JellyfinSync (restore last sync time from DB)
+    JellyfinSync.initialize conn
+
     // Create API
     let api = Api.create conn httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig imageBasePath projectionHandlers
 
