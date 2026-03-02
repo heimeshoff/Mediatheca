@@ -62,9 +62,9 @@ let private jellyfinSyncIndicator (model: Model) =
             prop.className "fixed top-3 right-3 z-50 flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-base-content/70"
             prop.style [
                 style.backgroundColor "oklch(0.25 0.015 264 / 0.65)"
-                style.backdropFilter "blur(24px) saturate(1.2)"
-                style.border "1px solid oklch(0.80 0 0 / 0.15)"
-                style.boxShadow "inset 0 1px 0 0 oklch(100% 0 0 / 0.08)"
+                style.custom ("backdropFilter", "blur(24px) saturate(1.2)")
+                style.custom ("border", "1px solid oklch(0.80 0 0 / 0.15)")
+                style.custom ("boxShadow", "inset 0 1px 0 0 oklch(100% 0 0 / 0.08)")
             ]
             prop.children [
                 Html.span [
@@ -88,9 +88,9 @@ let private jellyfinSyncToast (model: Model) (dispatch: Msg -> unit) =
             prop.className "fixed bottom-20 lg:bottom-4 right-4 z-50 flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-base-content shadow-xl max-w-sm"
             prop.style [
                 style.backgroundColor "oklch(0.25 0.015 264 / 0.70)"
-                style.backdropFilter "blur(24px) saturate(1.2)"
-                style.border "1px solid oklch(0.80 0 0 / 0.15)"
-                style.boxShadow "inset 0 1px 0 0 oklch(100% 0 0 / 0.08)"
+                style.custom ("backdropFilter", "blur(24px) saturate(1.2)")
+                style.custom ("border", "1px solid oklch(0.80 0 0 / 0.15)")
+                style.custom ("boxShadow", "inset 0 1px 0 0 oklch(100% 0 0 / 0.08)")
             ]
             prop.children [
                 Html.div [
