@@ -1671,6 +1671,17 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                 ]
                                                             ]
                                                         | None -> ()
+                                                        // IPTorrents search button
+                                                        Html.a [
+                                                            prop.href $"https://iptorrents.com/t?q={System.Uri.EscapeDataString(series.Name)};o=seeders#torrents"
+                                                            prop.target "_blank"
+                                                            prop.rel "noopener noreferrer"
+                                                            prop.className "inline-flex items-center gap-2 bg-base-content/10 hover:bg-base-content/20 text-base-content/70 hover:text-base-content px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
+                                                            prop.children [
+                                                                Icons.magnifyingGlass ()
+                                                                Html.span [ prop.text "Search on IPTorrents" ]
+                                                            ]
+                                                        ]
                                                         // In Focus toggle
                                                         if series.InFocus then
                                                             Html.button [

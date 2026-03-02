@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-03-02 -- Task Completed: 038 - IPTorrents Search Button
+
+**Type:** Task Completion
+**Task:** 038 - IPTorrents Search Button
+**Summary:** Added IPTorrents search button to movie detail (when no Jellyfin ID) and series detail (always shown) pages. Uses muted pill style with magnifying glass icon, linking to iptorrents.com with URL-encoded title and sorted by seeders.
+**Files changed:** 3 files
+
+---
+
+## 2026-03-02 -- Task Started: 038 - IPTorrents Search Button
+
+**Type:** Task Start
+**Task:** 038 - IPTorrents Search Button
+**Milestone:** --
+
+---
+
+## 2026-03-02 -- Task Promoted: 038 - IPTorrents Search Button
+
+**Type:** Task Promotion
+**From:** backlog
+**To:** todo
+**Summary:** Pure client-side feature: show "Search on IPTorrents" button on movie/series detail pages when no Jellyfin play button exists. URL pre-fills title and sorts by seeders. Well-specified, ready to implement.
+
+---
+
 ## 2026-03-02 -- Task Completed: 037 - Jellyfin Auto-Sync on App Visit
 
 **Type:** Task Completion

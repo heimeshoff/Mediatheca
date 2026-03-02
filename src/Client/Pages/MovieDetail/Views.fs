@@ -995,7 +995,17 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                     Html.span [ prop.text "Play in Jellyfin" ]
                                                                 ]
                                                             ]
-                                                        | _ -> ()
+                                                        | _ ->
+                                                            Html.a [
+                                                                prop.href $"https://iptorrents.com/t?q={System.Uri.EscapeDataString(movie.Name)};o=seeders#torrents"
+                                                                prop.target "_blank"
+                                                                prop.rel "noopener noreferrer"
+                                                                prop.className "inline-flex items-center gap-2 bg-base-content/10 hover:bg-base-content/20 text-base-content/70 hover:text-base-content px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
+                                                                prop.children [
+                                                                    Icons.magnifyingGlass ()
+                                                                    Html.span [ prop.text "Search on IPTorrents" ]
+                                                                ]
+                                                            ]
                                                         // Trailer button
                                                         match model.TrailerKey with
                                                         | Some _ ->
