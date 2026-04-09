@@ -94,6 +94,14 @@ module PlaytimeTracker =
         ]
         |> Db.exec
 
+    let hasAnyPlaySessions (conn: SqliteConnection) (slug: string) : bool =
+        conn
+        |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_play_session WHERE game_slug = @slug"
+        |> Db.setParams [ "slug", SqlType.String slug ]
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "cnt")
+        |> Option.map (fun c -> c > 0)
+        |> Option.defaultValue false
+
     let getPlaySessionsForGame (conn: SqliteConnection) (slug: string) : PlaySessionDto list =
         conn
         |> Db.newCommand "SELECT game_slug, date, minutes_played FROM game_play_session WHERE game_slug = @slug ORDER BY date DESC"
@@ -298,6 +306,7 @@ module PlaytimeTracker =
         (getRawgConfig: unit -> Rawg.RawgConfig)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
+        (?effectiveDate: string)
         : Async<Result<PlaytimeSyncResult, string>> =
         async {
             try
@@ -309,7 +318,7 @@ module PlaytimeTracker =
                     let mutable sessionsRecorded = 0
                     let mutable snapshotsUpdated = 0
                     let mutable gamesCreated = 0
-                    let today = DateTime.UtcNow.ToString("yyyy-MM-dd")
+                    let today = defaultArg effectiveDate (DateTime.UtcNow.ToString("yyyy-MM-dd"))
 
                     for steamGame in recentGames do
                         let! slugResult = async {
@@ -342,8 +351,8 @@ module PlaytimeTracker =
                             match getLastSnapshot conn steamGame.AppId with
                             | None ->
                                 // First time seeing this game in the tracker
-                                if wasJustCreated && currentPlaytime > 0 then
-                                    // Newly created game with existing playtime — record an initial play session
+                                if currentPlaytime > 0 then
+                                    // Game with existing playtime but no snapshot — record an initial play session
                                     let sessionDate =
                                         match Steam.unixTimestampToDateString steamGame.RtimeLastPlayed with
                                         | Some d -> d
@@ -354,6 +363,16 @@ module PlaytimeTracker =
                                 saveSnapshot conn steamGame.AppId slug currentPlaytime
                                 snapshotsUpdated <- snapshotsUpdated + 1
                             | Some (lastTotal, lastUpdatedAt) ->
+                                // Reconciliation: if snapshot exists but no play sessions, backfill initial session
+                                if currentPlaytime > 0 && not (hasAnyPlaySessions conn slug) then
+                                    let sessionDate =
+                                        match Steam.unixTimestampToDateString steamGame.RtimeLastPlayed with
+                                        | Some d -> d
+                                        | None -> today
+                                    recordPlaySession conn slug steamGame.AppId sessionDate currentPlaytime
+                                    sessionsRecorded <- sessionsRecorded + 1
+                                    eprintfn "[PlaytimeTracker] Reconciled missing play session for %s (%d min)" slug currentPlaytime
+
                                 let delta = currentPlaytime - lastTotal
                                 if delta > 0 then
                                     // Determine session date
@@ -412,8 +431,9 @@ module PlaytimeTracker =
         let runSyncSafe () =
             async {
                 try
-                    eprintfn "[PlaytimeTracker] Starting daily playtime sync..."
-                    match! runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers with
+                    let yesterday = DateTime.UtcNow.AddDays(-1.0).ToString("yyyy-MM-dd")
+                    eprintfn "[PlaytimeTracker] Starting daily playtime sync (effective date: %s)..." yesterday
+                    match! runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers yesterday with
                     | Ok result ->
                         eprintfn "[PlaytimeTracker] Sync complete: %d sessions recorded, %d snapshots updated, %d games created" result.SessionsRecorded result.SnapshotsUpdated result.GamesCreated
                     | Error err ->
