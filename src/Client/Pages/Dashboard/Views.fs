@@ -1146,7 +1146,7 @@ let private playSessionSummaryStats (sessions: DashboardPlaySession list) =
 
 // ── Recently Played chart with summary stats ──
 
-let private gamesRecentlyPlayedChartWithStats (sessions: DashboardPlaySession list) =
+let private gamesRecentlyPlayedChartWithStats (sessions: DashboardPlaySession list) (isSyncing: bool) (dispatch: Msg -> unit) =
     let uniqueGames =
         sessions
         |> List.map (fun s -> s.GameSlug, (s.GameName, s.CoverRef))
@@ -1157,7 +1157,18 @@ let private gamesRecentlyPlayedChartWithStats (sessions: DashboardPlaySession li
         |> List.mapi (fun i (slug, _) -> slug, i % chartColors.Length)
         |> Map.ofList
 
-    sectionCardOverflow Icons.hourglass "Recently Played" [
+    sectionCardOverflowWithAction Icons.hourglass "Recently Played"
+        (Html.button [
+            prop.className (
+                "btn btn-ghost btn-xs btn-circle text-base-content/50 hover:text-primary transition-colors"
+                + (if isSyncing then " animate-spin" else "")
+            )
+            prop.disabled isSyncing
+            prop.onClick (fun _ -> dispatch TriggerPlaytimeSync)
+            prop.title "Sync playtime from Steam"
+            prop.children [ Icons.arrowPathSm () ]
+        ])
+        [
         // Game poster row
         if not (List.isEmpty uniqueGames) then
             Html.div [
@@ -1780,7 +1791,7 @@ let private activitySection (activityDays: DashboardActivityDay list) (breakdown
 
 // ── All Tab — 2-Column Grid Layout ──
 
-let private allTabView (data: DashboardAllTab) =
+let private allTabView (data: DashboardAllTab) (isSyncing: bool) (dispatch: Msg -> unit) =
     // Pick the first active (non-finished, non-abandoned) series for the hero spotlight
     let heroItem =
         data.SeriesNextUp
@@ -1824,7 +1835,7 @@ let private allTabView (data: DashboardAllTab) =
                         prop.className "lg:col-span-1 flex flex-col gap-4"
                         prop.children [
                             // 5. Games play activity chart (existing 14-day chart)
-                            gamesRecentlyPlayedChartWithStats data.PlaySessions
+                            gamesRecentlyPlayedChartWithStats data.PlaySessions isSyncing dispatch
 
                             // 6. Games In Focus — poster cards
                             gamesInFocusPosterSection data.GamesInFocus
@@ -4042,7 +4053,7 @@ let private perGameMonthlyPlayTimeChart (monthlyData: GameMonthlyPlayTime list) 
             ]
         ]
 
-let private gamesTabView (data: DashboardGamesTab) (achievementsState: AchievementsState) (isSyncing: bool) (dispatch: Msg -> unit) =
+let private gamesTabView (data: DashboardGamesTab) (achievementsState: AchievementsState) (dispatch: Msg -> unit) =
     Html.div [
         prop.className "flex flex-col gap-4"
         prop.children [
@@ -4056,18 +4067,7 @@ let private gamesTabView (data: DashboardGamesTab) (achievementsState: Achieveme
             Html.div [
                 prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
                 prop.children [
-                    sectionCardOverflowWithAction Icons.hourglass "Recently Played"
-                        (Html.button [
-                            prop.className (
-                                "btn btn-ghost btn-xs btn-circle text-base-content/50 hover:text-primary transition-colors"
-                                + (if isSyncing then " animate-spin" else "")
-                            )
-                            prop.disabled isSyncing
-                            prop.onClick (fun _ -> dispatch TriggerPlaytimeSync)
-                            prop.title "Sync playtime from Steam"
-                            prop.children [ Icons.arrowPathSm () ]
-                        ])
-                        [
+                    sectionCardOverflow Icons.hourglass "Recently Played" [
                             if List.isEmpty data.RecentlyPlayed then
                                 Html.div [
                                     prop.className "flex items-center justify-center py-8 text-base-content/40 text-sm"
@@ -4200,7 +4200,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         match model.ActiveTab with
                         | All ->
                             match model.AllTabData with
-                            | Some data -> allTabView data
+                            | Some data -> allTabView data model.IsSyncing dispatch
                             | None -> loadingView
                         | MoviesTab ->
                             match model.MoviesTabData with
@@ -4212,7 +4212,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             | None -> loadingView
                         | GamesTab ->
                             match model.GamesTabData with
-                            | Some data -> gamesTabView data model.Achievements model.IsSyncing dispatch
+                            | Some data -> gamesTabView data model.Achievements dispatch
                             | None -> loadingView
                 ]
             ]
