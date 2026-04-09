@@ -64,7 +64,7 @@ let friendIntegrationTests =
             let addEvent = Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None })
             EventStore.appendToStream conn streamId -1L [ addEvent ] |> ignore
 
-            let updateEvent = Friends.Serialization.toEventData (Friends.Friend_updated { Name = "Marco H."; ImageRef = Some "friends/marco.jpg" })
+            let updateEvent = Friends.Serialization.toEventData (Friends.Friend_updated { Name = "Marco H."; ImageRef = Some "friends/marco.jpg"; CropOffsetX = None; CropOffsetY = None; CropZoom = None })
             EventStore.appendToStream conn streamId 0L [ updateEvent ] |> ignore
 
             Projection.runProjection conn FriendProjection.handler

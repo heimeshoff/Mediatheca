@@ -2,6 +2,15 @@
 
 ---
 
+## 2026-04-09 -- Task Completed: 041 - Friend Image Drag-and-Drop Upload with Crop Editor
+
+**Type:** Task Completion
+**Task:** 041 - Friend Image Drag-and-Drop Upload with Crop Editor
+**Summary:** Added drag-and-drop image upload on friend avatar with glassmorphic crop modal (circular preview, drag-to-pan, scroll-to-zoom). Extended shared types, events, projection, and API with backward-compatible CropSettings. Built full client-side crop editor with visual drag-over feedback and re-crop button.
+**Files changed:** 8 files
+
+---
+
 ## 2026-04-09 -- Task Started: 041 - Friend Image Drag-and-Drop Upload with Crop Editor
 
 **Type:** Task Start

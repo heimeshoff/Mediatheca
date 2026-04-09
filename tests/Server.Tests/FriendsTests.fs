@@ -106,7 +106,7 @@ let friendsTests =
                 Expect.equal deserialized (Some event) "Should round-trip"
 
             testCase "Friend_updated round-trip" <| fun _ ->
-                let event = Friend_updated { Name = "Marco Updated"; ImageRef = None }
+                let event = Friend_updated { Name = "Marco Updated"; ImageRef = None; CropOffsetX = None; CropOffsetY = None; CropZoom = None }
                 let eventType, data = Serialization.serialize event
                 let deserialized = Serialization.deserialize eventType data
                 Expect.equal deserialized (Some event) "Should round-trip"

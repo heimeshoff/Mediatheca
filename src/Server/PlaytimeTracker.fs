@@ -306,7 +306,7 @@ module PlaytimeTracker =
         (getRawgConfig: unit -> Rawg.RawgConfig)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
-        (?effectiveDate: string)
+        (effectiveDate: string option)
         : Async<Result<PlaytimeSyncResult, string>> =
         async {
             try
@@ -433,7 +433,7 @@ module PlaytimeTracker =
                 try
                     let yesterday = DateTime.UtcNow.AddDays(-1.0).ToString("yyyy-MM-dd")
                     eprintfn "[PlaytimeTracker] Starting daily playtime sync (effective date: %s)..." yesterday
-                    match! runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers yesterday with
+                    match! runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers (Some yesterday) with
                     | Ok result ->
                         eprintfn "[PlaytimeTracker] Sync complete: %d sessions recorded, %d snapshots updated, %d games created" result.SessionsRecorded result.SnapshotsUpdated result.GamesCreated
                     | Error err ->
