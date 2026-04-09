@@ -12,6 +12,7 @@ node_modules/
 
 ## Build output
 deploy/
+!.claude/skills/deploy/
 
 ## SQLite
 *.db

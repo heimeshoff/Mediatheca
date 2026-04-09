@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-04-09 -- Task Completed: 040 - Deploy Skill (/deploy)
+
+**Type:** Task Completion
+**Task:** 040 - Deploy Skill (/deploy)
+**Summary:** Created /deploy slash command skill with 5-step pipeline (test, build, upload, deploy, cleanup) including abort-on-failure and progress reporting.
+**Files changed:** 2 files
+
+---
+
+## 2026-04-09 -- Task Started: 040 - Deploy Skill (/deploy)
+
+**Type:** Task Start
+**Task:** 040 - Deploy Skill (/deploy)
+**Milestone:** --
+
+---
+
+## 2026-04-09 -- Idea Captured: Deploy Skill (/deploy)
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/040-deploy-skill.md
+**Summary:** Create a /deploy slash command that automates the full test-build-upload-deploy-cleanup pipeline to the Linux production server via SSH.
+
+---
+
 ## 2026-04-09 -- Task Completed: 039 - Refresh Button on Recently Played Card
 
 **Type:** Task Completion
