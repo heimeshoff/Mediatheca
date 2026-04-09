@@ -1,5 +1,6 @@
 module Mediatheca.Client.Pages.FriendDetail.Views
 
+open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open Feliz.DaisyUI
@@ -209,6 +210,189 @@ let private watchedMediaSection (isCollapsed: bool) (onToggle: unit -> unit) (vi
             ]
         ]
 
+[<ReactComponent>]
+let private CropEditor (imageUrl: string) (initialOffset: float * float) (initialZoom: float) (onSave: float * float * float -> unit) (onClose: unit -> unit) =
+    let offsetX, setOffsetX = React.useState (fst initialOffset)
+    let offsetY, setOffsetY = React.useState (snd initialOffset)
+    let zoom, setZoom = React.useState initialZoom
+    let isDragging = React.useRef false
+    let lastPos = React.useRef (0.0, 0.0)
+
+    let handleMouseDown (e: Browser.Types.MouseEvent) =
+        e.preventDefault ()
+        isDragging.current <- true
+        lastPos.current <- (e.clientX, e.clientY)
+
+    let handleMouseMove (e: Browser.Types.MouseEvent) =
+        if isDragging.current then
+            let (lx, ly) = lastPos.current
+            let dx = e.clientX - lx
+            let dy = e.clientY - ly
+            lastPos.current <- (e.clientX, e.clientY)
+            setOffsetX (fun ox -> ox + dx / zoom)
+            setOffsetY (fun oy -> oy + dy / zoom)
+
+    let handleMouseUp _ =
+        isDragging.current <- false
+
+    let handleWheel (e: Browser.Types.WheelEvent) =
+        e.preventDefault ()
+        let delta = if e.deltaY < 0.0 then 0.1 else -0.1
+        setZoom (fun z -> max 0.5 (min 5.0 (z + delta)))
+
+    // Touch support
+    let lastTouchPos = React.useRef (0.0, 0.0)
+    let lastTouchDist = React.useRef 0.0
+
+    let handleTouchStart (e: Browser.Types.TouchEvent) =
+        e.preventDefault ()
+        let touches : obj = e?touches
+        let len : int = touches?length
+        if len = 1 then
+            let t0 : obj = touches?(0)
+            let cx : float = t0?clientX
+            let cy : float = t0?clientY
+            isDragging.current <- true
+            lastTouchPos.current <- (cx, cy)
+        elif len = 2 then
+            let t0 : obj = touches?(0)
+            let t1 : obj = touches?(1)
+            let x0 : float = t0?clientX
+            let y0 : float = t0?clientY
+            let x1 : float = t1?clientX
+            let y1 : float = t1?clientY
+            lastTouchDist.current <- sqrt ((x1 - x0) ** 2.0 + (y1 - y0) ** 2.0)
+
+    let handleTouchMove (e: Browser.Types.TouchEvent) =
+        e.preventDefault ()
+        let touches : obj = e?touches
+        let len : int = touches?length
+        if len = 1 && isDragging.current then
+            let t0 : obj = touches?(0)
+            let cx : float = t0?clientX
+            let cy : float = t0?clientY
+            let (lx, ly) = lastTouchPos.current
+            let dx = cx - lx
+            let dy = cy - ly
+            lastTouchPos.current <- (cx, cy)
+            setOffsetX (fun ox -> ox + dx / zoom)
+            setOffsetY (fun oy -> oy + dy / zoom)
+        elif len = 2 then
+            let t0 : obj = touches?(0)
+            let t1 : obj = touches?(1)
+            let x0 : float = t0?clientX
+            let y0 : float = t0?clientY
+            let x1 : float = t1?clientX
+            let y1 : float = t1?clientY
+            let dist = sqrt ((x1 - x0) ** 2.0 + (y1 - y0) ** 2.0)
+            if lastTouchDist.current > 0.0 then
+                let scale = dist / lastTouchDist.current
+                setZoom (fun z -> max 0.5 (min 5.0 (z * scale)))
+            lastTouchDist.current <- dist
+
+    let handleTouchEnd _ =
+        isDragging.current <- false
+        lastTouchDist.current <- 0.0
+
+    // Prevent default on wheel for the container
+    let containerRef = React.useRef<Browser.Types.HTMLElement option> None
+    React.useEffect (fun () ->
+        match containerRef.current with
+        | Some el ->
+            let handler : obj -> unit = fun e -> emitJsExpr e "$0.preventDefault()"
+            emitJsExpr (el, handler) "$0.addEventListener('wheel', $1, { passive: false })"
+            React.createDisposable (fun () ->
+                emitJsExpr (el, handler) "$0.removeEventListener('wheel', $1)")
+        | None -> React.createDisposable ignore
+    )
+
+    Html.div [
+        prop.className DesignSystem.modalContainer
+        prop.children [
+            Html.div [
+                prop.className DesignSystem.modalBackdrop
+                prop.onClick (fun _ -> onClose ())
+            ]
+            Html.div [
+                prop.className ("relative w-full max-w-md mx-4 flex flex-col " + DesignSystem.modalPanel)
+                prop.children [
+                    Html.div [
+                        prop.className "p-5 pb-3"
+                        prop.children [
+                            Html.div [
+                                prop.className "flex items-center justify-between mb-2"
+                                prop.children [
+                                    Html.h3 [
+                                        prop.className "font-bold text-lg font-display"
+                                        prop.text "Crop Image"
+                                    ]
+                                ]
+                            ]
+                            Html.p [
+                                prop.className "text-sm text-base-content/50"
+                                prop.text "Drag to pan, scroll to zoom"
+                            ]
+                        ]
+                    ]
+                    // Crop area
+                    Html.div [
+                        prop.className "flex justify-center px-5 pb-4"
+                        prop.children [
+                            Html.div [
+                                prop.ref (fun el -> containerRef.current <- (if isNull el then None else Some (unbox el)))
+                                prop.className "relative w-64 h-64 rounded-full overflow-hidden cursor-grab active:cursor-grabbing select-none ring-2 ring-primary/30"
+                                prop.style [
+                                    style.touchAction.none
+                                ]
+                                prop.onMouseDown (fun e -> handleMouseDown e)
+                                prop.onMouseMove (fun e -> handleMouseMove e)
+                                prop.onMouseUp handleMouseUp
+                                prop.onMouseLeave handleMouseUp
+                                prop.onWheel (fun e -> handleWheel e)
+                                prop.onTouchStart (fun e -> handleTouchStart e)
+                                prop.onTouchMove (fun e -> handleTouchMove e)
+                                prop.onTouchEnd (fun e -> handleTouchEnd e)
+                                prop.children [
+                                    Html.img [
+                                        prop.src imageUrl
+                                        prop.className "absolute pointer-events-none"
+                                        prop.draggable false
+                                        prop.style [
+                                            style.width (length.percent 100)
+                                            style.height (length.percent 100)
+                                            style.objectFit.cover
+                                            style.objectPosition $"{50.0 + offsetX}% {50.0 + offsetY}%"
+                                            style.transform $"scale({zoom})"
+                                            style.transformOrigin "center center"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                    // Footer
+                    Html.div [
+                        prop.className "flex justify-end gap-2 px-5 py-4 border-t border-base-content/10"
+                        prop.children [
+                            Daisy.button.button [
+                                button.ghost
+                                button.sm
+                                prop.onClick (fun _ -> onClose ())
+                                prop.text "Cancel"
+                            ]
+                            Daisy.button.button [
+                                button.primary
+                                button.sm
+                                prop.onClick (fun _ -> onSave (offsetX, offsetY, zoom))
+                                prop.text "Save"
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+
 let view (model: Model) (dispatch: Msg -> unit) =
     match model.IsLoading, model.Friend with
     | true, _ ->
@@ -277,28 +461,73 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 Html.div [
                                     prop.className "flex items-center gap-6"
                                     prop.children [
-                                        // Clickable avatar for image upload
-                                        Daisy.avatar [
+                                        // Avatar with drag-and-drop and crop display
+                                        Html.div [
+                                            prop.className "relative"
                                             prop.children [
-                                                Html.div [
-                                                    prop.className "w-24 h-24 rounded-full bg-base-300 ring-2 ring-base-300 cursor-pointer transition-all duration-300 hover:ring-primary/50"
-                                                    prop.onClick (fun _ ->
-                                                        let input = Browser.Dom.document.getElementById(fileInputId)
-                                                        if not (isNull input) then input.click())
+                                                Daisy.avatar [
                                                     prop.children [
-                                                        match friend.ImageRef with
-                                                        | Some ref ->
-                                                            Html.img [
-                                                                prop.src $"/images/{ref}"
-                                                                prop.alt friend.Name
+                                                        Html.div [
+                                                            prop.className (
+                                                                "w-24 h-24 rounded-full bg-base-300 ring-2 cursor-pointer transition-all duration-300 overflow-hidden"
+                                                                + (if model.IsDragOver then " ring-primary ring-4 scale-110" else " ring-base-300 hover:ring-primary/50"))
+                                                            prop.onClick (fun _ ->
+                                                                let input = Browser.Dom.document.getElementById(fileInputId)
+                                                                if not (isNull input) then input.click())
+                                                            prop.onDragOver (fun e ->
+                                                                e.preventDefault ()
+                                                                e.dataTransfer.dropEffect <- "copy"
+                                                                dispatch (Set_drag_over true))
+                                                            prop.onDragEnter (fun e ->
+                                                                e.preventDefault ()
+                                                                dispatch (Set_drag_over true))
+                                                            prop.onDragLeave (fun _ ->
+                                                                dispatch (Set_drag_over false))
+                                                            prop.onDrop (fun e ->
+                                                                e.preventDefault ()
+                                                                dispatch (Set_drag_over false)
+                                                                let files = e.dataTransfer.files
+                                                                if files.length > 0 then
+                                                                    let file = files.[0]
+                                                                    readFileAsBytes file (fun (bytes, filename) ->
+                                                                        dispatch (Upload_friend_image (bytes, filename))))
+                                                            prop.children [
+                                                                match friend.ImageRef with
+                                                                | Some ref ->
+                                                                    let cs = model.CropState
+                                                                    Html.img [
+                                                                        prop.src $"/images/{ref}"
+                                                                        prop.alt friend.Name
+                                                                        prop.className "w-full h-full object-cover"
+                                                                        prop.style [
+                                                                            style.objectPosition $"{50.0 + cs.OffsetX}% {50.0 + cs.OffsetY}%"
+                                                                            style.transform $"scale({cs.Zoom})"
+                                                                            style.transformOrigin "center center"
+                                                                        ]
+                                                                    ]
+                                                                | None ->
+                                                                    Html.div [
+                                                                        prop.className "flex items-center justify-center w-full h-full text-base-content/30"
+                                                                        prop.children [ Icons.friends () ]
+                                                                    ]
                                                             ]
-                                                        | None ->
-                                                            Html.div [
-                                                                prop.className "flex items-center justify-center w-full h-full text-base-content/30"
-                                                                prop.children [ Icons.friends () ]
-                                                            ]
+                                                        ]
                                                     ]
                                                 ]
+                                                // Re-crop button (only if image exists)
+                                                match friend.ImageRef with
+                                                | Some _ ->
+                                                    Html.button [
+                                                        prop.className "absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-base-200 border border-base-content/20 flex items-center justify-center text-xs hover:bg-primary hover:text-primary-content transition-colors"
+                                                        prop.title "Adjust crop"
+                                                        prop.onClick (fun e ->
+                                                            e.stopPropagation ()
+                                                            dispatch Open_crop_modal)
+                                                        prop.children [
+                                                            Icons.edit ()
+                                                        ]
+                                                    ]
+                                                | None -> ()
                                             ]
                                         ]
                                         Html.input [
@@ -381,5 +610,16 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 // Event History Modal
                 if model.ShowEventHistory then
                     EventHistoryModal.view $"Friend-{model.Slug}" (fun () -> dispatch Close_event_history)
+                // Crop Modal
+                if model.ShowCropModal then
+                    match friend.ImageRef with
+                    | Some ref ->
+                        CropEditor
+                            $"/images/{ref}"
+                            (model.CropState.OffsetX, model.CropState.OffsetY)
+                            model.CropState.Zoom
+                            (fun (x, y, z) -> dispatch (Update_crop (x, y, z)); dispatch Save_crop)
+                            (fun () -> dispatch Close_crop_modal)
+                    | None -> ()
             ]
         ]

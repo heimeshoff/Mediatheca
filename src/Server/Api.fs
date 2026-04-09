@@ -1977,6 +1977,22 @@ module Api =
                 | None -> return Error "Friend not found"
             }
 
+            saveFriendCropSettings = fun slug cropSettings -> async {
+                let sid = Friends.streamId slug
+                let result =
+                    executeCommand
+                        conn sid
+                        Friends.Serialization.fromStoredEvent
+                        Friends.reconstitute
+                        Friends.decide
+                        Friends.Serialization.toEventData
+                        (Friends.Update_crop_settings (cropSettings.OffsetX, cropSettings.OffsetY, cropSettings.Zoom))
+                        friendProjections
+                match result with
+                | Ok () -> return Ok ()
+                | Error e -> return Error e
+            }
+
             getTmdbApiKey = fun () -> async {
                 let key =
                     SettingsStore.getSetting conn "tmdb_api_key"

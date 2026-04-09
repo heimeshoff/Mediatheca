@@ -7,6 +7,12 @@ type EditForm = {
     ImageRef: string option
 }
 
+type CropState = {
+    OffsetX: float
+    OffsetY: float
+    Zoom: float
+}
+
 type Model = {
     Slug: string
     Friend: FriendDetail option
@@ -19,6 +25,9 @@ type Model = {
     ShowEventHistory: bool
     CollapsedSections: Set<string>
     SectionSettings: Map<string, ViewSettings>
+    ShowCropModal: bool
+    CropState: CropState
+    IsDragOver: bool
 }
 
 type Msg =
@@ -46,3 +55,9 @@ type Msg =
     | Settings_saved
     | Open_event_history
     | Close_event_history
+    | Open_crop_modal
+    | Close_crop_modal
+    | Update_crop of offsetX: float * offsetY: float * zoom: float
+    | Save_crop
+    | Crop_saved of Result<unit, string>
+    | Set_drag_over of bool

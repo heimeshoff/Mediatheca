@@ -14,6 +14,9 @@ module Friends =
     type Friend_updatedData = {
         Name: string
         ImageRef: string option
+        CropOffsetX: float option
+        CropOffsetY: float option
+        CropZoom: float option
     }
 
     // Events
@@ -28,6 +31,9 @@ module Friends =
     type ActiveFriend = {
         Name: string
         ImageRef: string option
+        CropOffsetX: float option
+        CropOffsetY: float option
+        CropZoom: float option
     }
 
     type FriendState =
@@ -40,6 +46,7 @@ module Friends =
     type FriendCommand =
         | Add_friend of name: string * imageRef: string option
         | Update_friend of name: string * imageRef: string option
+        | Update_crop_settings of cropOffsetX: float * cropOffsetY: float * cropZoom: float
         | Remove_friend
 
     // Evolve
@@ -47,9 +54,9 @@ module Friends =
     let evolve (state: FriendState) (event: FriendEvent) : FriendState =
         match state, event with
         | Not_created, Friend_added data ->
-            Active { Name = data.Name; ImageRef = data.ImageRef }
-        | Active _, Friend_updated data ->
-            Active { Name = data.Name; ImageRef = data.ImageRef }
+            Active { Name = data.Name; ImageRef = data.ImageRef; CropOffsetX = None; CropOffsetY = None; CropZoom = None }
+        | Active f, Friend_updated data ->
+            Active { Name = data.Name; ImageRef = data.ImageRef; CropOffsetX = data.CropOffsetX |> Option.orElse f.CropOffsetX; CropOffsetY = data.CropOffsetY |> Option.orElse f.CropOffsetY; CropZoom = data.CropZoom |> Option.orElse f.CropZoom }
         | Active _, Friend_removed -> Removed
         | _ -> state
 
@@ -65,8 +72,12 @@ module Friends =
         | Active _, Add_friend _ ->
             Error "Friend already exists"
         | Active _, Update_friend (name, imageRef) ->
-            Ok [ Friend_updated { Name = name; ImageRef = imageRef } ]
+            Ok [ Friend_updated { Name = name; ImageRef = imageRef; CropOffsetX = None; CropOffsetY = None; CropZoom = None } ]
+        | Active f, Update_crop_settings (x, y, zoom) ->
+            Ok [ Friend_updated { Name = f.Name; ImageRef = f.ImageRef; CropOffsetX = Some x; CropOffsetY = Some y; CropZoom = Some zoom } ]
         | Not_created, Update_friend _ ->
+            Error "Friend does not exist"
+        | Not_created, Update_crop_settings _ ->
             Error "Friend does not exist"
         | Active _, Remove_friend ->
             Ok [ Friend_removed ]
@@ -99,12 +110,18 @@ module Friends =
             Encode.object [
                 "name", Encode.string data.Name
                 "imageRef", Encode.option Encode.string data.ImageRef
+                "cropOffsetX", Encode.option Encode.float data.CropOffsetX
+                "cropOffsetY", Encode.option Encode.float data.CropOffsetY
+                "cropZoom", Encode.option Encode.float data.CropZoom
             ]
 
         let private decodeFriend_updatedData: Decoder<Friend_updatedData> =
             Decode.object (fun get -> {
                 Name = get.Required.Field "name" Decode.string
                 ImageRef = get.Optional.Field "imageRef" Decode.string
+                CropOffsetX = get.Optional.Field "cropOffsetX" Decode.float
+                CropOffsetY = get.Optional.Field "cropOffsetY" Decode.float
+                CropZoom = get.Optional.Field "cropZoom" Decode.float
             })
 
         let serialize (event: FriendEvent) : string * string =

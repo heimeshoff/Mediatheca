@@ -12,7 +12,10 @@ module FriendProjection =
             CREATE TABLE IF NOT EXISTS friend_list (
                 slug       TEXT PRIMARY KEY,
                 name       TEXT NOT NULL,
-                image_ref  TEXT
+                image_ref  TEXT,
+                crop_offset_x REAL,
+                crop_offset_y REAL,
+                crop_zoom     REAL
             );
         """
         |> Db.exec
@@ -46,12 +49,19 @@ module FriendProjection =
                 | Friends.Friend_updated data ->
                     conn
                     |> Db.newCommand """
-                        UPDATE friend_list SET name = @name, image_ref = @image_ref WHERE slug = @slug
+                        UPDATE friend_list SET name = @name, image_ref = @image_ref,
+                            crop_offset_x = COALESCE(@crop_offset_x, crop_offset_x),
+                            crop_offset_y = COALESCE(@crop_offset_y, crop_offset_y),
+                            crop_zoom = COALESCE(@crop_zoom, crop_zoom)
+                        WHERE slug = @slug
                     """
                     |> Db.setParams [
                         "slug", SqlType.String slug
                         "name", SqlType.String data.Name
                         "image_ref", match data.ImageRef with Some r -> SqlType.String r | None -> SqlType.Null
+                        "crop_offset_x", match data.CropOffsetX with Some v -> SqlType.Double v | None -> SqlType.Null
+                        "crop_offset_y", match data.CropOffsetY with Some v -> SqlType.Double v | None -> SqlType.Null
+                        "crop_zoom", match data.CropZoom with Some v -> SqlType.Double v | None -> SqlType.Null
                     ]
                     |> Db.exec
 
@@ -137,14 +147,27 @@ module FriendProjection =
                 else Some (rd.ReadString "image_ref") }
         )
 
+    let private readCropSettings (rd: IDataReader) : Mediatheca.Shared.CropSettings option =
+        let hasX = not (rd.IsDBNull(rd.GetOrdinal("crop_offset_x")))
+        let hasY = not (rd.IsDBNull(rd.GetOrdinal("crop_offset_y")))
+        let hasZ = not (rd.IsDBNull(rd.GetOrdinal("crop_zoom")))
+        if hasX && hasY && hasZ then
+            Some ({
+                OffsetX = rd.ReadDouble "crop_offset_x"
+                OffsetY = rd.ReadDouble "crop_offset_y"
+                Zoom = rd.ReadDouble "crop_zoom"
+            } : Mediatheca.Shared.CropSettings)
+        else None
+
     let getBySlug (conn: SqliteConnection) (slug: string) : Mediatheca.Shared.FriendDetail option =
         conn
-        |> Db.newCommand "SELECT slug, name, image_ref FROM friend_list WHERE slug = @slug"
+        |> Db.newCommand "SELECT slug, name, image_ref, crop_offset_x, crop_offset_y, crop_zoom FROM friend_list WHERE slug = @slug"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) ->
             { Mediatheca.Shared.FriendDetail.Slug = rd.ReadString "slug"
               Name = rd.ReadString "name"
               ImageRef =
                 if rd.IsDBNull(rd.GetOrdinal("image_ref")) then None
-                else Some (rd.ReadString "image_ref") }
+                else Some (rd.ReadString "image_ref")
+              CropSettings = readCropSettings rd }
         )

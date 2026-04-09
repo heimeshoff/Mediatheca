@@ -15,7 +15,10 @@ let init (slug: string) : Model * Cmd<Msg> =
       ShowRemoveConfirm = false
       ShowEventHistory = false
       CollapsedSections = Set.empty
-      SectionSettings = Map.empty },
+      SectionSettings = Map.empty
+      ShowCropModal = false
+      CropState = { OffsetX = 0.0; OffsetY = 0.0; Zoom = 1.0 }
+      IsDragOver = false },
     Cmd.ofMsg (Load_friend slug)
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
@@ -32,7 +35,14 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         ]
 
     | Friend_loaded friend ->
-        { model with Friend = friend; IsLoading = false }, Cmd.none
+        let cropState =
+            match friend with
+            | Some f ->
+                match f.CropSettings with
+                | Some cs -> { OffsetX = cs.OffsetX; OffsetY = cs.OffsetY; Zoom = cs.Zoom }
+                | None -> { OffsetX = 0.0; OffsetY = 0.0; Zoom = 1.0 }
+            | None -> { OffsetX = 0.0; OffsetY = 0.0; Zoom = 1.0 }
+        { model with Friend = friend; IsLoading = false; CropState = cropState }, Cmd.none
 
     | Friend_media_loaded media ->
         { model with FriendMedia = Some media }, Cmd.none
@@ -99,7 +109,11 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             (fun ex -> Image_uploaded (Error ex.Message))
 
     | Image_uploaded (Ok _) ->
-        model, Cmd.OfAsync.perform api.getFriend model.Slug Friend_loaded
+        { model with CropState = { OffsetX = 0.0; OffsetY = 0.0; Zoom = 1.0 } },
+        Cmd.batch [
+            Cmd.OfAsync.perform api.getFriend model.Slug Friend_loaded
+            Cmd.ofMsg Open_crop_modal
+        ]
 
     | Image_uploaded (Error err) ->
         { model with Error = Some err }, Cmd.none
@@ -164,3 +178,30 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Close_event_history ->
         { model with ShowEventHistory = false }, Cmd.none
+
+    | Open_crop_modal ->
+        { model with ShowCropModal = true }, Cmd.none
+
+    | Close_crop_modal ->
+        { model with ShowCropModal = false }, Cmd.none
+
+    | Update_crop (x, y, zoom) ->
+        { model with CropState = { OffsetX = x; OffsetY = y; Zoom = zoom } }, Cmd.none
+
+    | Save_crop ->
+        let cs = model.CropState
+        let cropSettings: Mediatheca.Shared.CropSettings = { OffsetX = cs.OffsetX; OffsetY = cs.OffsetY; Zoom = cs.Zoom }
+        { model with ShowCropModal = false },
+        Cmd.OfAsync.either
+            (fun () -> api.saveFriendCropSettings model.Slug cropSettings) ()
+            Crop_saved
+            (fun ex -> Crop_saved (Error ex.Message))
+
+    | Crop_saved (Ok ()) ->
+        model, Cmd.OfAsync.perform api.getFriend model.Slug Friend_loaded
+
+    | Crop_saved (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Set_drag_over isDragOver ->
+        { model with IsDragOver = isDragOver }, Cmd.none

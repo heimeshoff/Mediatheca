@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-04-09 -- Task Started: 041 - Friend Image Drag-and-Drop Upload with Crop Editor
+
+**Type:** Task Start
+**Task:** 041 - Friend Image Drag-and-Drop Upload with Crop Editor
+**Milestone:** --
+
+---
+
+## 2026-04-09 -- Idea Captured: Friend Image Drag-and-Drop Upload with Crop Editor
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/041-friend-image-drag-drop-crop.md
+**Summary:** Drag-and-drop image upload onto friend avatar with automatic circular crop modal. Crop settings (position, zoom) persist per friend via CSS-based rendering. Builds on existing upload API and drag-and-drop patterns.
+
+---
+
 ## 2026-04-09 -- Task Completed: 040 - Deploy Skill (/deploy)
 
 **Type:** Task Completion

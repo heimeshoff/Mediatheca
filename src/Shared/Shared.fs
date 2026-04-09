@@ -80,10 +80,17 @@ type FriendListItem = {
     ImageRef: string option
 }
 
+type CropSettings = {
+    OffsetX: float
+    OffsetY: float
+    Zoom: float
+}
+
 type FriendDetail = {
     Slug: string
     Name: string
     ImageRef: string option
+    CropSettings: CropSettings option
 }
 
 type FriendMediaItem = {
@@ -985,6 +992,7 @@ type IMediathecaApi = {
     getFriendMedia: string -> Async<FriendMedia>
     getFriends: unit -> Async<FriendListItem list>
     uploadFriendImage: string -> byte array -> string -> Async<Result<string, string>>
+    saveFriendCropSettings: string -> CropSettings -> Async<Result<unit, string>>
     // Watch Sessions
     recordWatchSession: string -> RecordWatchSessionRequest -> Async<Result<string, string>>
     updateWatchSessionDate: string -> string -> string -> Async<Result<unit, string>>
