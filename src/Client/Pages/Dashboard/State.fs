@@ -40,7 +40,8 @@ let init () : Model * Cmd<Msg> =
       SeriesTabData = None
       GamesTabData = None
       Achievements = AchievementsNotLoaded
-      IsLoading = true },
+      IsLoading = true
+      IsSyncing = false },
     Cmd.none
 
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
@@ -74,3 +75,19 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             { model with Achievements = AchievementsReady achievements }, Cmd.none
         | Error msg ->
             { model with Achievements = AchievementsError msg }, Cmd.none
+
+    | TriggerPlaytimeSync ->
+        let cmd =
+            Cmd.OfAsync.either
+                api.triggerPlaytimeSync ()
+                PlaytimeSyncCompleted
+                (fun ex -> PlaytimeSyncCompleted (Error ex.Message))
+        { model with IsSyncing = true }, cmd
+
+    | PlaytimeSyncCompleted _ ->
+        let refreshCmds =
+            Cmd.batch [
+                fetchTabData api GamesTab
+                fetchTabData api All
+            ]
+        { model with IsSyncing = false }, refreshCmds

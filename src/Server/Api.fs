@@ -3737,7 +3737,7 @@ module Api =
             }
 
             triggerPlaytimeSync = fun () ->
-                PlaytimeTracker.runSync conn httpClient getSteamConfig projectionHandlers
+                PlaytimeTracker.runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers
 
             // Steam Achievements
             getSteamRecentAchievements = fun () -> async {

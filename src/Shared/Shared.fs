@@ -812,6 +812,7 @@ type PlaytimeSummaryItem = {
 type PlaytimeSyncResult = {
     SessionsRecorded: int
     SnapshotsUpdated: int
+    GamesCreated: int
 }
 
 type PlaytimeSyncStatus = {

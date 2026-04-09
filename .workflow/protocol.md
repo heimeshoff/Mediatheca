@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-04-09 -- Task Completed: 039 - Refresh Button on Recently Played Card
+
+**Type:** Task Completion
+**Task:** 039 - Refresh Button on Recently Played Card
+**Summary:** Added refresh button to Recently Played card header. Triggers triggerPlaytimeSync, shows spinning animation while syncing, re-fetches both Games and All tab data on completion.
+**Files changed:** 4 files
+
+---
+
+## 2026-04-09 -- Task Started: 039 - Refresh Button on Recently Played Card
+
+**Type:** Task Start
+**Task:** 039 - Refresh Button on Recently Played Card
+**Milestone:** --
+
+---
+
+## 2026-04-09 -- Idea Captured: Refresh Button on Recently Played Card
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/039-refresh-button-recently-played.md
+**Summary:** Add a refresh button to the Recently Played card on the dashboard Games tab that triggers a Steam playtime sync and refreshes both Games and All tab data. Small task — client-side only, all backend APIs already exist.
+
+---
+
 ## 2026-03-02 -- Task Completed: 038 - IPTorrents Search Button
 
 **Type:** Task Completion

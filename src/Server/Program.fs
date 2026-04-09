@@ -238,7 +238,7 @@ let main args =
     app.UseGiraffe webApp
 
     // Start background playtime tracker
-    let _playtimeTimer = PlaytimeTracker.startBackgroundTimer conn httpClient getSteamConfig projectionHandlers
+    let _playtimeTimer = PlaytimeTracker.startBackgroundTimer conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers
 
     app.Run()
     0

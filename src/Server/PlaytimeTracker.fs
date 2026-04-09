@@ -6,9 +6,22 @@ open System.Net.Http
 open System.Threading
 open Microsoft.Data.Sqlite
 open Donald
+open System.Text.RegularExpressions
 open Mediatheca.Shared
 
 module PlaytimeTracker =
+
+    let private stripHtmlTags (html: string) =
+        if String.IsNullOrEmpty(html) then ""
+        else Regex.Replace(html, "<[^>]+>", "")
+
+    let private generateUniqueSlug (conn: SqliteConnection) (streamIdFn: string -> string) (baseSlug: string) : string =
+        let mutable slug = baseSlug
+        let mutable suffix = 2
+        while EventStore.getStreamPosition conn (streamIdFn slug) >= 0L do
+            slug <- sprintf "%s-%d" baseSlug suffix
+            suffix <- suffix + 1
+        slug
 
     // SQLite table initialization
 
@@ -201,10 +214,89 @@ module PlaytimeTracker =
 
     // Main sync logic
 
+    let private createGameFromSteam
+        (conn: SqliteConnection)
+        (httpClient: HttpClient)
+        (getRawgConfig: unit -> Rawg.RawgConfig)
+        (imageBasePath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (steamGame: SteamOwnedGame)
+        : Async<Result<string, string>> =
+        async {
+            try
+                let rawgConfig = getRawgConfig()
+                let! rawgResults =
+                    if not (String.IsNullOrWhiteSpace(rawgConfig.ApiKey)) then
+                        Rawg.searchGames httpClient rawgConfig steamGame.Name None
+                    else
+                        async { return [] }
+
+                let rawgMatch = rawgResults |> List.tryHead
+
+                let genres, rawgId, rawgRating, year =
+                    match rawgMatch with
+                    | Some r ->
+                        let rawgYear = r.Year |> Option.defaultValue 0
+                        r.Genres, Some r.RawgId, r.Rating, rawgYear
+                    | None ->
+                        [], None, None, 0
+
+                let! storeDetails = Steam.getSteamStoreDetails httpClient steamGame.AppId
+                let steamDescription, steamShortDescription, steamWebsiteUrl, steamCategories =
+                    match storeDetails with
+                    | Ok details ->
+                        let desc =
+                            if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
+                            elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
+                            else ""
+                        desc, details.ShortDescription, details.WebsiteUrl, details.Categories
+                    | Error _ -> "", "", None, []
+
+                let description =
+                    if steamDescription <> "" then steamDescription
+                    else ""
+
+                let baseSlug = Slug.gameSlug steamGame.Name (if year > 0 then year else 2000)
+                let slug = generateUniqueSlug conn Games.streamId baseSlug
+                let! coverRef = Steam.downloadSteamCover httpClient steamGame.AppId slug imageBasePath
+                let! backdropRef = Steam.downloadSteamBackdrop httpClient steamGame.AppId slug imageBasePath
+
+                let gameData: Games.GameAddedData = {
+                    Name = steamGame.Name
+                    Year = if year > 0 then year else 0
+                    Genres = genres
+                    Description = description
+                    ShortDescription = steamShortDescription
+                    WebsiteUrl = steamWebsiteUrl
+                    CoverRef = coverRef
+                    BackdropRef = backdropRef
+                    RawgId = rawgId
+                    RawgRating = rawgRating
+                }
+
+                let result = executeGameCommand conn slug (Games.Add_game gameData) projectionHandlers
+                match result with
+                | Ok () ->
+                    executeGameCommand conn slug (Games.Set_steam_app_id steamGame.AppId) projectionHandlers |> ignore
+                    if steamGame.PlaytimeMinutes > 0 then
+                        executeGameCommand conn slug (Games.Set_play_time steamGame.PlaytimeMinutes) projectionHandlers |> ignore
+                    for category in steamCategories do
+                        executeGameCommand conn slug (Games.Add_play_mode category) projectionHandlers |> ignore
+                    executeGameCommand conn slug (Games.Set_steam_last_played (Steam.unixTimestampToDateString steamGame.RtimeLastPlayed)) projectionHandlers |> ignore
+                    executeGameCommand conn slug Games.Mark_as_owned projectionHandlers |> ignore
+                    return Ok slug
+                | Error e ->
+                    return Error (sprintf "Failed to create '%s': %s" steamGame.Name e)
+            with ex ->
+                return Error (sprintf "Error creating '%s': %s" steamGame.Name ex.Message)
+        }
+
     let runSync
         (conn: SqliteConnection)
         (httpClient: HttpClient)
         (getSteamConfig: unit -> Steam.SteamConfig)
+        (getRawgConfig: unit -> Rawg.RawgConfig)
+        (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
         : Async<Result<PlaytimeSyncResult, string>> =
         async {
@@ -216,11 +308,35 @@ module PlaytimeTracker =
                     let! recentGames = Steam.getRecentlyPlayedGames httpClient steamConfig
                     let mutable sessionsRecorded = 0
                     let mutable snapshotsUpdated = 0
+                    let mutable gamesCreated = 0
                     let today = DateTime.UtcNow.ToString("yyyy-MM-dd")
 
                     for steamGame in recentGames do
-                        match GameProjection.findBySteamAppId conn steamGame.AppId with
-                        | None -> () // Game not in library, skip
+                        let! slugOpt = async {
+                            match GameProjection.findBySteamAppId conn steamGame.AppId with
+                            | Some slug -> return Some slug
+                            | None ->
+                                // Try to match by name
+                                match GameProjection.findByName conn steamGame.Name with
+                                | (slug, _) :: _ ->
+                                    // Found by name — link steam_app_id
+                                    executeGameCommand conn slug (Games.Set_steam_app_id steamGame.AppId) projectionHandlers |> ignore
+                                    return Some slug
+                                | [] ->
+                                    // Not in library — create new game
+                                    let! result = createGameFromSteam conn httpClient getRawgConfig imageBasePath projectionHandlers steamGame
+                                    match result with
+                                    | Ok slug ->
+                                        eprintfn "[PlaytimeTracker] Created new game: %s (%s)" steamGame.Name slug
+                                        gamesCreated <- gamesCreated + 1
+                                        return Some slug
+                                    | Error err ->
+                                        eprintfn "[PlaytimeTracker] %s" err
+                                        return None
+                        }
+
+                        match slugOpt with
+                        | None -> ()
                         | Some slug ->
                             let currentPlaytime = steamGame.PlaytimeMinutes
                             match getLastSnapshot conn steamGame.AppId with
@@ -262,6 +378,7 @@ module PlaytimeTracker =
                     return Ok {
                         SessionsRecorded = sessionsRecorded
                         SnapshotsUpdated = snapshotsUpdated
+                        GamesCreated = gamesCreated
                     }
             with ex ->
                 return Error (sprintf "Playtime sync failed: %s" ex.Message)
@@ -273,6 +390,8 @@ module PlaytimeTracker =
         (conn: SqliteConnection)
         (httpClient: HttpClient)
         (getSteamConfig: unit -> Steam.SteamConfig)
+        (getRawgConfig: unit -> Rawg.RawgConfig)
+        (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
         : Timer =
 
@@ -285,9 +404,9 @@ module PlaytimeTracker =
             async {
                 try
                     eprintfn "[PlaytimeTracker] Starting daily playtime sync..."
-                    match! runSync conn httpClient getSteamConfig projectionHandlers with
+                    match! runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers with
                     | Ok result ->
-                        eprintfn "[PlaytimeTracker] Sync complete: %d sessions recorded, %d snapshots updated" result.SessionsRecorded result.SnapshotsUpdated
+                        eprintfn "[PlaytimeTracker] Sync complete: %d sessions recorded, %d snapshots updated, %d games created" result.SessionsRecorded result.SnapshotsUpdated result.GamesCreated
                     | Error err ->
                         eprintfn "[PlaytimeTracker] Sync skipped: %s" err
                 with ex ->

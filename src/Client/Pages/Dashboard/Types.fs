@@ -22,6 +22,7 @@ type Model = {
     GamesTabData: DashboardGamesTab option
     Achievements: AchievementsState
     IsLoading: bool
+    IsSyncing: bool
 }
 
 type Msg =
@@ -32,3 +33,5 @@ type Msg =
     | GamesTabLoaded of DashboardGamesTab
     | TabLoadError of string
     | AchievementsLoaded of Result<SteamAchievement list, string>
+    | TriggerPlaytimeSync
+    | PlaytimeSyncCompleted of Result<PlaytimeSyncResult, string>

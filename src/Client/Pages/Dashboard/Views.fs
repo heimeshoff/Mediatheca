@@ -126,6 +126,34 @@ let private sectionCardOverflow (icon: unit -> ReactElement) (title: string) (ch
         ]
     ]
 
+/// Section card with overflow that includes an action button in the header
+let private sectionCardOverflowWithAction (icon: unit -> ReactElement) (title: string) (actionElement: ReactElement) (children: ReactElement list) =
+    Html.div [
+        prop.className (DesignSystem.glassCard + " p-4 " + DesignSystem.animateFadeInUp + " overflow-hidden")
+        prop.children [
+            Html.div [
+                prop.className "flex items-center gap-2 mb-3"
+                prop.children [
+                    Html.span [
+                        prop.className "text-primary/70"
+                        prop.children [ icon () ]
+                    ]
+                    Html.h2 [
+                        prop.className "text-lg font-display uppercase tracking-wider"
+                        prop.text title
+                    ]
+                    Html.div [
+                        prop.className "ml-auto"
+                        prop.children [ actionElement ]
+                    ]
+                ]
+            ]
+            Html.div [
+                prop.children children
+            ]
+        ]
+    ]
+
 // ── Section: Open (title + content, no card chrome) ──
 
 let private sectionOpen (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
@@ -4014,7 +4042,7 @@ let private perGameMonthlyPlayTimeChart (monthlyData: GameMonthlyPlayTime list) 
             ]
         ]
 
-let private gamesTabView (data: DashboardGamesTab) (achievementsState: AchievementsState) =
+let private gamesTabView (data: DashboardGamesTab) (achievementsState: AchievementsState) (isSyncing: bool) (dispatch: Msg -> unit) =
     Html.div [
         prop.className "flex flex-col gap-4"
         prop.children [
@@ -4028,21 +4056,32 @@ let private gamesTabView (data: DashboardGamesTab) (achievementsState: Achieveme
             Html.div [
                 prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
                 prop.children [
-                    sectionCardOverflow Icons.hourglass "Recently Played" [
-                        if List.isEmpty data.RecentlyPlayed then
-                            Html.div [
-                                prop.className "flex items-center justify-center py-8 text-base-content/40 text-sm"
-                                prop.text "No games played yet"
-                            ]
-                        else
-                            Html.div [
-                                prop.className "flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
-                                prop.children [
-                                    for item in data.RecentlyPlayed do
-                                        gameRecentlyPlayedPosterCard item
+                    sectionCardOverflowWithAction Icons.hourglass "Recently Played"
+                        (Html.button [
+                            prop.className (
+                                "btn btn-ghost btn-xs btn-circle text-base-content/50 hover:text-primary transition-colors"
+                                + (if isSyncing then " animate-spin" else "")
+                            )
+                            prop.disabled isSyncing
+                            prop.onClick (fun _ -> dispatch TriggerPlaytimeSync)
+                            prop.title "Sync playtime from Steam"
+                            prop.children [ Icons.arrowPathSm () ]
+                        ])
+                        [
+                            if List.isEmpty data.RecentlyPlayed then
+                                Html.div [
+                                    prop.className "flex items-center justify-center py-8 text-base-content/40 text-sm"
+                                    prop.text "No games played yet"
                                 ]
-                            ]
-                    ]
+                            else
+                                Html.div [
+                                    prop.className "flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                                    prop.children [
+                                        for item in data.RecentlyPlayed do
+                                            gameRecentlyPlayedPosterCard item
+                                    ]
+                                ]
+                        ]
                     sectionCardOverflow Icons.gamepad "Recently Added" [
                         if List.isEmpty data.RecentlyAdded then
                             Html.div [
@@ -4173,7 +4212,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             | None -> loadingView
                         | GamesTab ->
                             match model.GamesTabData with
-                            | Some data -> gamesTabView data model.Achievements
+                            | Some data -> gamesTabView data model.Achievements model.IsSyncing dispatch
                             | None -> loadingView
                 ]
             ]
