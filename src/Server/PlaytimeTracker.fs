@@ -312,16 +312,16 @@ module PlaytimeTracker =
                     let today = DateTime.UtcNow.ToString("yyyy-MM-dd")
 
                     for steamGame in recentGames do
-                        let! slugOpt = async {
+                        let! slugResult = async {
                             match GameProjection.findBySteamAppId conn steamGame.AppId with
-                            | Some slug -> return Some slug
+                            | Some slug -> return Some (slug, false)
                             | None ->
                                 // Try to match by name
                                 match GameProjection.findByName conn steamGame.Name with
                                 | (slug, _) :: _ ->
                                     // Found by name — link steam_app_id
                                     executeGameCommand conn slug (Games.Set_steam_app_id steamGame.AppId) projectionHandlers |> ignore
-                                    return Some slug
+                                    return Some (slug, false)
                                 | [] ->
                                     // Not in library — create new game
                                     let! result = createGameFromSteam conn httpClient getRawgConfig imageBasePath projectionHandlers steamGame
@@ -329,19 +329,28 @@ module PlaytimeTracker =
                                     | Ok slug ->
                                         eprintfn "[PlaytimeTracker] Created new game: %s (%s)" steamGame.Name slug
                                         gamesCreated <- gamesCreated + 1
-                                        return Some slug
+                                        return Some (slug, true)
                                     | Error err ->
                                         eprintfn "[PlaytimeTracker] %s" err
                                         return None
                         }
 
-                        match slugOpt with
+                        match slugResult with
                         | None -> ()
-                        | Some slug ->
+                        | Some (slug, wasJustCreated) ->
                             let currentPlaytime = steamGame.PlaytimeMinutes
                             match getLastSnapshot conn steamGame.AppId with
                             | None ->
-                                // First run — record baseline snapshot only, no phantom session
+                                // First time seeing this game in the tracker
+                                if wasJustCreated && currentPlaytime > 0 then
+                                    // Newly created game with existing playtime — record an initial play session
+                                    let sessionDate =
+                                        match Steam.unixTimestampToDateString steamGame.RtimeLastPlayed with
+                                        | Some d -> d
+                                        | None -> today
+                                    recordPlaySession conn slug steamGame.AppId sessionDate currentPlaytime
+                                    sessionsRecorded <- sessionsRecorded + 1
+                                // Save baseline snapshot
                                 saveSnapshot conn steamGame.AppId slug currentPlaytime
                                 snapshotsUpdated <- snapshotsUpdated + 1
                             | Some (lastTotal, lastUpdatedAt) ->
