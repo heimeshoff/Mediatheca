@@ -42,6 +42,8 @@ type Model = {
     // Remove
     ConfirmingRemove: bool
     ShowEventHistory: bool
+    IsRefreshing: bool
+    RefreshMessage: string option
     Error: string option
 }
 
@@ -133,3 +135,6 @@ type Msg =
     | Series_removed of Result<unit, string>
     | Open_event_history
     | Close_event_history
+    // Manual TMDB refresh
+    | Refresh_from_tmdb
+    | Refresh_from_tmdb_result of Result<unit, string>

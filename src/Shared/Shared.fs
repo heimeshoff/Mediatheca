@@ -510,6 +510,10 @@ type SeriesListItem = {
     NextUp: NextUpDto option
     IsAbandoned: bool
     InFocus: bool
+    /// Earliest future air date across this series (YYYY-MM-DD, local).
+    /// Only populated for returning / in-production series that have an
+    /// upcoming episode or season with a known air date.
+    NextAirDate: string option
 }
 
 type SeriesDetail = {
@@ -533,6 +537,25 @@ type SeriesDetail = {
     Seasons: SeasonDto list
     RewatchSessions: RewatchSessionDto list
     ContentBlocks: ContentBlockDto list
+    /// Earliest known future air date (episode air_date) for this series.
+    /// None if the series has no announced upcoming episode.
+    NextEpisodeAirDate: string option
+    /// Earliest known future air date for an entire season where no
+    /// individual episode air date is known yet. Used as a fallback when
+    /// NextEpisodeAirDate is None (e.g. TMDB has announced season 4 returns
+    /// on a date but no episodes posted yet).
+    NextSeasonAirDate: string option
+}
+
+type ReturningSoonItem = {
+    Slug: string
+    Name: string
+    PosterRef: string option
+    /// The earliest future air date (YYYY-MM-DD) associated with this series.
+    NextAirDate: string
+    /// True if the date came from a season air_date (less precise than an
+    /// episode air_date).
+    IsSeasonLevel: bool
 }
 
 // Series Request Types
@@ -701,6 +724,8 @@ type DashboardSeriesTab = {
     EpisodeActivity: DashboardEpisodeActivity list
     TopWatchedWith: DashboardSeriesWatchedWith list
     JellyfinServerUrl: string option
+    /// Up to 5 returning series sorted ascending by next air date.
+    ReturningSoon: ReturningSoonItem list
 }
 
 type DashboardGameStats = {
@@ -1055,6 +1080,8 @@ type IMediathecaApi = {
     removeSeriesRecommendation: string -> string -> Async<Result<unit, string>>
     addSeriesWantToWatchWith: string -> string -> Async<Result<unit, string>>
     removeSeriesWantToWatchWith: string -> string -> Async<Result<unit, string>>
+    /// Manually trigger a TMDB refresh for a single series.
+    refreshSeriesFromTmdb: string -> Async<Result<unit, string>>
     // Series Rewatch Sessions
     createRewatchSession: string -> CreateRewatchSessionRequest -> Async<Result<string, string>>
     removeRewatchSession: string -> string -> Async<Result<unit, string>>

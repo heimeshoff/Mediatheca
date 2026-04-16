@@ -88,6 +88,20 @@ module Series =
         Date: string
     }
 
+    /// Summary payload attached to Series_refreshed events. Captures what
+    /// changed during a TMDB refresh. All fields are optional for backward
+    /// compatibility with older persisted events.
+    type SeriesRefreshedData = {
+        /// UTC timestamp when the refresh was performed (ISO-8601).
+        RefreshedAt: string
+        /// Count of newly-added episodes (including unaired ones) this refresh.
+        NewEpisodeCount: int
+        /// The previous status, if it changed. None means no status transition.
+        PreviousStatus: string option
+        /// The new status, if it changed. None means no status transition.
+        NewStatus: string option
+    }
+
     // Events
 
     type SeriesEvent =
@@ -116,6 +130,7 @@ module Series =
         | Series_unabandoned
         | Series_in_focus_set
         | Series_in_focus_cleared
+        | Series_refreshed of SeriesRefreshedData
 
     // State
 
@@ -199,6 +214,7 @@ module Series =
         | Unabandon_series
         | Set_series_in_focus
         | Clear_series_in_focus
+        | Refresh_series_from_tmdb of SeriesRefreshedData
 
     // Evolve
 
@@ -356,6 +372,14 @@ module Series =
             Active { series with InFocus = true }
         | Active series, Series_in_focus_cleared ->
             Active { series with InFocus = false }
+        | Active series, Series_refreshed data ->
+            // Apply the post-refresh status to the aggregate so that subsequent
+            // decides see the new status. Projection handles all episode/season
+            // details separately — aggregate state does not need to track those
+            // for refreshes (they are only used at initial load).
+            match data.NewStatus with
+            | Some newStatus -> Active { series with Status = newStatus }
+            | None -> Active series
         | _ -> state
 
     let reconstitute (events: SeriesEvent list) : SeriesState =
@@ -490,6 +514,8 @@ module Series =
         | Active series, Clear_series_in_focus ->
             if series.InFocus then Ok [ Series_in_focus_cleared ]
             else Ok []
+        | Active _, Refresh_series_from_tmdb data ->
+            Ok [ Series_refreshed data ]
         | Removed, _ ->
             Error "Series has been removed"
         | Not_created, _ ->
@@ -673,6 +699,22 @@ module Series =
                 SeasonNumber = get.Required.Field "seasonNumber" Decode.int
             })
 
+        let private encodeSeriesRefreshedData (data: SeriesRefreshedData) =
+            Encode.object [
+                "refreshedAt", Encode.string data.RefreshedAt
+                "newEpisodeCount", Encode.int data.NewEpisodeCount
+                "previousStatus", Encode.option Encode.string data.PreviousStatus
+                "newStatus", Encode.option Encode.string data.NewStatus
+            ]
+
+        let private decodeSeriesRefreshedData: Decoder<SeriesRefreshedData> =
+            Decode.object (fun get -> {
+                RefreshedAt = get.Optional.Field "refreshedAt" Decode.string |> Option.defaultValue ""
+                NewEpisodeCount = get.Optional.Field "newEpisodeCount" Decode.int |> Option.defaultValue 0
+                PreviousStatus = get.Optional.Field "previousStatus" Decode.string
+                NewStatus = get.Optional.Field "newStatus" Decode.string
+            })
+
         let private encodeEpisodeWatchedDateChangedData (data: EpisodeWatchedDateChangedData) =
             Encode.object [
                 "rewatchId", Encode.string data.RewatchId
@@ -741,6 +783,8 @@ module Series =
                 "Series_in_focus_set", "{}"
             | Series_in_focus_cleared ->
                 "Series_in_focus_cleared", "{}"
+            | Series_refreshed data ->
+                "Series_refreshed", Encode.toString 0 (encodeSeriesRefreshedData data)
 
         let deserialize (eventType: string) (data: string) : SeriesEvent option =
             match eventType with
@@ -834,6 +878,10 @@ module Series =
                 Some Series_in_focus_set
             | "Series_in_focus_cleared" ->
                 Some Series_in_focus_cleared
+            | "Series_refreshed" ->
+                Decode.fromString decodeSeriesRefreshedData data
+                |> Result.toOption
+                |> Option.map Series_refreshed
             | _ -> None
 
         let toEventData (event: SeriesEvent) : EventStore.EventData =

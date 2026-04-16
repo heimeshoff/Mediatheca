@@ -3204,6 +3204,78 @@ let private seriesTabPosterCard (jellyfinServerUrl: string option) (item: Dashbo
         ]
     ]
 
+let private formatReturningDate (isoDate: string) : string =
+    let trimmed =
+        match isoDate.IndexOf('T') with
+        | -1 -> isoDate
+        | i -> isoDate.[..i-1]
+    match System.DateTime.TryParse(trimmed) with
+    | true, d -> d.ToString("MMM d")
+    | _ -> trimmed
+
+let private returningCountdown (isoDate: string) : string option =
+    let trimmed =
+        match isoDate.IndexOf('T') with
+        | -1 -> isoDate
+        | i -> isoDate.[..i-1]
+    match System.DateTime.TryParse(trimmed) with
+    | true, d ->
+        let days = (d.Date - System.DateTime.Today).Days
+        if days < 0 then None
+        elif days = 0 then Some "today"
+        elif days = 1 then Some "tomorrow"
+        else Some (sprintf "in %d days" days)
+    | _ -> None
+
+let private returningSoonCard (items: ReturningSoonItem list) =
+    if List.isEmpty items then
+        Html.none
+    else
+        sectionCard Icons.tv "Returning Soon" [
+            Html.div [
+                prop.className "flex flex-col gap-2"
+                prop.children [
+                    for item in items do
+                        Html.a [
+                            prop.href (Router.format ("series", item.Slug))
+                            prop.onClick (fun e ->
+                                e.preventDefault()
+                                Router.navigate ("series", item.Slug))
+                            prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
+                            prop.children [
+                                PosterCard.thumbnail item.PosterRef item.Name
+                                Html.div [
+                                    prop.className "flex-1 min-w-0"
+                                    prop.children [
+                                        Html.p [
+                                            prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                                            prop.text item.Name
+                                        ]
+                                        Html.div [
+                                            prop.className "flex items-center gap-1.5 text-xs text-base-content/50"
+                                            prop.children [
+                                                Html.span [
+                                                    prop.text (
+                                                        (if item.IsSeasonLevel then "Returns " else "Airs ")
+                                                        + formatReturningDate item.NextAirDate)
+                                                ]
+                                                match returningCountdown item.NextAirDate with
+                                                | Some countdown ->
+                                                    Html.span [
+                                                        prop.className "text-primary/70"
+                                                        prop.text (sprintf "(%s)" countdown)
+                                                    ]
+                                                | None -> ()
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                ]
+            ]
+        ]
+
 let private seriesTabView (data: DashboardSeriesTab) =
     // Filter out abandoned series from Next Up
     let nextUpItems = data.NextUp |> List.filter (fun s -> not s.IsAbandoned)
@@ -3224,6 +3296,10 @@ let private seriesTabView (data: DashboardSeriesTab) =
                         ]
                     ]
                 ]
+
+            // Returning Soon — up to 5 returning series sorted ascending by next air date
+            if not (List.isEmpty data.ReturningSoon) then
+                returningSoonCard data.ReturningSoon
 
             // Row 2: Recently Finished | Recently Abandoned (side-by-side)
             if not (List.isEmpty data.RecentlyFinished) || not (List.isEmpty data.RecentlyAbandoned) then

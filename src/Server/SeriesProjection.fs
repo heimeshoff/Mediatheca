@@ -639,6 +639,14 @@ module SeriesProjection =
                     |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.exec
 
+                | Series.Series_refreshed _ ->
+                    // Projection side-effects for a refresh are applied
+                    // directly by SeriesRefresh.applyToProjection before the
+                    // event is appended. This handler is a no-op here, but
+                    // during projection rebuilds (catch-up) we cannot
+                    // re-fetch TMDB — the previously-applied rows stay as-is.
+                    ()
+
     let handler: Projection.ProjectionHandler = {
         Name = "SeriesProjection"
         Handle = handleEvent
@@ -647,6 +655,56 @@ module SeriesProjection =
     }
 
     // Query functions
+
+    /// Today's date as YYYY-MM-DD, used for comparing with TMDB air dates.
+    /// TMDB air dates are date-only, no TZ — compute "today" in local time.
+    let private todayLocal () : string =
+        System.DateTime.Now.ToString("yyyy-MM-dd")
+
+    /// Get the earliest future episode air_date for a series (YYYY-MM-DD),
+    /// or None if no unaired episode is scheduled.
+    let private getNextEpisodeAirDate (conn: SqliteConnection) (slug: string) : string option =
+        let today = todayLocal()
+        conn
+        |> Db.newCommand """
+            SELECT air_date FROM series_episodes
+            WHERE series_slug = @slug AND air_date IS NOT NULL AND air_date >= @today
+            ORDER BY air_date
+            LIMIT 1
+        """
+        |> Db.setParams [ "slug", SqlType.String slug; "today", SqlType.String today ]
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "air_date")
+
+    /// Get the earliest future season air_date, excluding seasons that
+    /// already have individual episode air dates (those are covered by
+    /// getNextEpisodeAirDate).
+    let private getNextSeasonAirDate (conn: SqliteConnection) (slug: string) : string option =
+        let today = todayLocal()
+        conn
+        |> Db.newCommand """
+            SELECT s.air_date
+            FROM series_seasons s
+            WHERE s.series_slug = @slug
+              AND s.air_date IS NOT NULL
+              AND s.air_date >= @today
+              AND NOT EXISTS (
+                SELECT 1 FROM series_episodes e
+                WHERE e.series_slug = s.series_slug
+                  AND e.season_number = s.season_number
+                  AND e.air_date IS NOT NULL
+                  AND e.air_date >= @today
+              )
+            ORDER BY s.air_date
+            LIMIT 1
+        """
+        |> Db.setParams [ "slug", SqlType.String slug; "today", SqlType.String today ]
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "air_date")
+
+    /// Combined earliest future air date (episode preferred, falls back to season).
+    let private getNextAirDate (conn: SqliteConnection) (slug: string) : string option =
+        match getNextEpisodeAirDate conn slug with
+        | Some d -> Some d
+        | None -> getNextSeasonAirDate conn slug
 
     let private parseStatus (s: string) : Mediatheca.Shared.SeriesStatus =
         match s with
@@ -692,7 +750,8 @@ module SeriesProjection =
                         Mediatheca.Shared.NextUpDto.EpisodeNumber = rd.ReadInt32 "next_up_episode"
                         Mediatheca.Shared.NextUpDto.EpisodeName = rd.ReadString "next_up_title"
                     }
-            { Mediatheca.Shared.SeriesListItem.Slug = rd.ReadString "slug"
+            let slug = rd.ReadString "slug"
+            { Mediatheca.Shared.SeriesListItem.Slug = slug
               Name = rd.ReadString "name"
               Year = rd.ReadInt32 "year"
               PosterRef =
@@ -708,7 +767,8 @@ module SeriesProjection =
               WatchedEpisodeCount = rd.ReadInt32 "watched_episode_count"
               NextUp = nextUp
               IsAbandoned = rd.ReadInt32 "abandoned" = 1
-              InFocus = rd.ReadInt32 "in_focus" <> 0 }
+              InFocus = rd.ReadInt32 "in_focus" <> 0
+              NextAirDate = getNextAirDate conn slug }
         )
 
     let search (conn: SqliteConnection) (query: string) : Mediatheca.Shared.LibrarySearchResult list =
@@ -911,7 +971,9 @@ module SeriesProjection =
               WantToWatchWith = resolveFriendRefs conn wantToWatchWithSlugs
               Seasons = seasons
               RewatchSessions = rewatchSessions
-              ContentBlocks = ContentBlockProjection.getByMovie conn slug }
+              ContentBlocks = ContentBlockProjection.getByMovie conn slug
+              NextEpisodeAirDate = getNextEpisodeAirDate conn slug
+              NextSeasonAirDate = getNextSeasonAirDate conn slug }
         )
 
     let getRecentSeries (conn: SqliteConnection) (count: int) : Mediatheca.Shared.RecentSeriesItem list =
@@ -1130,7 +1192,8 @@ module SeriesProjection =
                         Mediatheca.Shared.NextUpDto.EpisodeNumber = rd.ReadInt32 "next_up_episode"
                         Mediatheca.Shared.NextUpDto.EpisodeName = rd.ReadString "next_up_title"
                     }
-            { Mediatheca.Shared.SeriesListItem.Slug = rd.ReadString "slug"
+            let slug = rd.ReadString "slug"
+            { Mediatheca.Shared.SeriesListItem.Slug = slug
               Name = rd.ReadString "name"
               Year = rd.ReadInt32 "year"
               PosterRef =
@@ -1146,7 +1209,8 @@ module SeriesProjection =
               WatchedEpisodeCount = rd.ReadInt32 "watched_episode_count"
               NextUp = nextUp
               IsAbandoned = rd.ReadInt32 "abandoned" = 1
-              InFocus = rd.ReadInt32 "in_focus" <> 0 }
+              InFocus = rd.ReadInt32 "in_focus" <> 0
+              NextAirDate = getNextAirDate conn slug }
         )
 
     let getRecentlyAbandoned (conn: SqliteConnection) : Mediatheca.Shared.SeriesListItem list =
@@ -1177,7 +1241,8 @@ module SeriesProjection =
                         Mediatheca.Shared.NextUpDto.EpisodeNumber = rd.ReadInt32 "next_up_episode"
                         Mediatheca.Shared.NextUpDto.EpisodeName = rd.ReadString "next_up_title"
                     }
-            { Mediatheca.Shared.SeriesListItem.Slug = rd.ReadString "slug"
+            let slug = rd.ReadString "slug"
+            { Mediatheca.Shared.SeriesListItem.Slug = slug
               Name = rd.ReadString "name"
               Year = rd.ReadInt32 "year"
               PosterRef =
@@ -1193,7 +1258,8 @@ module SeriesProjection =
               WatchedEpisodeCount = rd.ReadInt32 "watched_episode_count"
               NextUp = nextUp
               IsAbandoned = rd.ReadInt32 "abandoned" = 1
-              InFocus = rd.ReadInt32 "in_focus" <> 0 }
+              InFocus = rd.ReadInt32 "in_focus" <> 0
+              NextAirDate = getNextAirDate conn slug }
         )
 
     // Dashboard: Currently watching count (series with unwatched episodes, not abandoned)
@@ -1382,6 +1448,51 @@ module SeriesProjection =
         """
         |> Db.query (fun (rd: IDataReader) ->
             rd.ReadString "date", rd.ReadInt32 "count")
+
+    /// Dashboard: returning/in-production series with a known future air date
+    /// (episode air_date preferred, falls back to season air_date). Ordered
+    /// ascending by next air date. Limited to `limit` results.
+    let getReturningSoon (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.ReturningSoonItem list =
+        let today = todayLocal()
+        // Collect all candidate series with their earliest future date.
+        let candidates =
+            conn
+            |> Db.newCommand """
+                SELECT sl.slug, sl.name, sl.poster_ref
+                FROM series_list sl
+                JOIN series_detail sd ON sd.slug = sl.slug
+                WHERE sd.status IN ('Returning', 'InProduction') AND sl.abandoned = 0
+            """
+            |> Db.query (fun (rd: IDataReader) ->
+                rd.ReadString "slug",
+                rd.ReadString "name",
+                (if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
+                 else Some (rd.ReadString "poster_ref")))
+
+        candidates
+        |> List.choose (fun (slug, name, posterRef) ->
+            let epDate = getNextEpisodeAirDate conn slug
+            let seasonDate = getNextSeasonAirDate conn slug
+            match epDate, seasonDate with
+            | Some d, _ ->
+                Some ({
+                    Slug = slug
+                    Name = name
+                    PosterRef = posterRef
+                    NextAirDate = d
+                    IsSeasonLevel = false
+                } : Mediatheca.Shared.ReturningSoonItem)
+            | None, Some d ->
+                Some ({
+                    Slug = slug
+                    Name = name
+                    PosterRef = posterRef
+                    NextAirDate = d
+                    IsSeasonLevel = true
+                } : Mediatheca.Shared.ReturningSoonItem)
+            | None, None -> None)
+        |> List.sortBy (fun (item: Mediatheca.Shared.ReturningSoonItem) -> item.NextAirDate)
+        |> List.truncate limit
 
     // Cross-media: Monthly series minutes for last 12 months
     let getMonthlySeriesMinutes (conn: SqliteConnection) : (string * int) list =

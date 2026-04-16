@@ -237,8 +237,35 @@ let main args =
 
     app.UseGiraffe webApp
 
-    // Start background playtime tracker
-    let _playtimeTimer = PlaytimeTracker.startBackgroundTimer conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers
+    // Scheduled jobs: daily refresh at a configurable hour (defaults to 04:00 UTC)
+    let playtimeSyncHour =
+        SettingsStore.getSetting conn "playtime_sync_hour"
+        |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
+        |> Option.defaultValue 4
+
+    let seriesRefreshHour =
+        SettingsStore.getSetting conn "series_refresh_hour"
+        |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
+        |> Option.defaultValue 4
+
+    let scheduledJobs : ScheduledJobs.JobSpec list = [
+        { Name = "Steam playtime sync"
+          HourUtc = playtimeSyncHour
+          Run = fun () ->
+            async {
+                let yesterday = DateTime.UtcNow.AddDays(-1.0).ToString("yyyy-MM-dd")
+                match! PlaytimeTracker.runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers (Some yesterday) with
+                | Ok result ->
+                    eprintfn "[PlaytimeTracker] Sync complete: %d sessions recorded, %d snapshots updated, %d games created" result.SessionsRecorded result.SnapshotsUpdated result.GamesCreated
+                | Error err ->
+                    eprintfn "[PlaytimeTracker] Sync skipped: %s" err
+            } }
+        { Name = "Series TMDB refresh"
+          HourUtc = seriesRefreshHour
+          Run = fun () ->
+            SeriesRefresh.runNightlyJob conn httpClient getTmdbConfig imageBasePath projectionHandlers }
+    ]
+    let _scheduledJobTimers = ScheduledJobs.startAll scheduledJobs
 
     app.Run()
     0

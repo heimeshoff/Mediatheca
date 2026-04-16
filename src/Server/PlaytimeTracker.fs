@@ -412,55 +412,5 @@ module PlaytimeTracker =
                 return Error (sprintf "Playtime sync failed: %s" ex.Message)
         }
 
-    // Background timer
-
-    let startBackgroundTimer
-        (conn: SqliteConnection)
-        (httpClient: HttpClient)
-        (getSteamConfig: unit -> Steam.SteamConfig)
-        (getRawgConfig: unit -> Rawg.RawgConfig)
-        (imageBasePath: string)
-        (projectionHandlers: Projection.ProjectionHandler list)
-        : Timer =
-
-        let syncHour =
-            SettingsStore.getSetting conn "playtime_sync_hour"
-            |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
-            |> Option.defaultValue 4
-
-        let runSyncSafe () =
-            async {
-                try
-                    let yesterday = DateTime.UtcNow.AddDays(-1.0).ToString("yyyy-MM-dd")
-                    eprintfn "[PlaytimeTracker] Starting daily playtime sync (effective date: %s)..." yesterday
-                    match! runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers (Some yesterday) with
-                    | Ok result ->
-                        eprintfn "[PlaytimeTracker] Sync complete: %d sessions recorded, %d snapshots updated, %d games created" result.SessionsRecorded result.SnapshotsUpdated result.GamesCreated
-                    | Error err ->
-                        eprintfn "[PlaytimeTracker] Sync skipped: %s" err
-                with ex ->
-                    eprintfn "[PlaytimeTracker] Sync error: %s" ex.Message
-            }
-
-        let callback _ =
-            let now = DateTime.UtcNow
-            // Only run if it's within the sync hour (allows for timer drift)
-            // On first run (startup), always run
-            runSyncSafe () |> Async.StartImmediate
-
-        let timerCallback = new TimerCallback(callback)
-
-        // Calculate initial delay: run immediately on startup (1 second delay)
-        // Then schedule to repeat daily
-        let now = DateTime.UtcNow
-        let todaySync = DateTime(now.Year, now.Month, now.Day, syncHour, 0, 0, DateTimeKind.Utc)
-        let nextSync = if now > todaySync then todaySync.AddDays(1.0) else todaySync
-        let untilNext = nextSync - now
-
-        // First fire after 5 seconds (startup catch-up), then daily at sync hour
-        let initialDelay = TimeSpan.FromSeconds(5.0)
-        let dailyInterval = TimeSpan.FromHours(24.0)
-
-        eprintfn "[PlaytimeTracker] Background timer started. Next scheduled sync at %s UTC (in %.1f hours)" (nextSync.ToString("HH:mm")) untilNext.TotalHours
-
-        new Timer(timerCallback, null, initialDelay, dailyInterval)
+    // Note: background scheduling is now handled by the generic
+    // ScheduledJobs module registered from Program.fs.

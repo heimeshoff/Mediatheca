@@ -17,9 +17,22 @@ let private inFocusBadge =
         ]
     ]
 
+let private formatAirDate (isoDate: string) : string =
+    let trimmed =
+        match isoDate.IndexOf('T') with
+        | -1 -> isoDate
+        | i -> isoDate.[..i-1]
+    match System.DateTime.TryParse(trimmed) with
+    | true, d -> d.ToString("MMM d")
+    | _ -> trimmed
+
 let private seriesCard (series: SeriesListItem) =
     let progressText = $"{series.WatchedEpisodeCount}/{series.EpisodeCount} episodes"
     let isFinished = series.EpisodeCount > 0 && series.WatchedEpisodeCount >= series.EpisodeCount
+    let isReturning =
+        match series.Status with
+        | Returning | InProduction -> true
+        | _ -> false
     Html.a [
         prop.href (Router.format ("series", series.Slug))
         prop.onClick (fun e ->
@@ -86,6 +99,15 @@ let private seriesCard (series: SeriesListItem) =
                                 | None -> ()
                         ]
                     ]
+                    // Return date hint for returning series with a known future air date
+                    if isReturning && not series.IsAbandoned then
+                        match series.NextAirDate with
+                        | Some d ->
+                            Html.p [
+                                prop.className "text-[10px] text-primary/60 px-1 mt-0.5"
+                                prop.text $"Returns {formatAirDate d}"
+                            ]
+                        | None -> ()
                 ]
             ]
         ]

@@ -13,6 +13,24 @@ let private formatDateOnly (date: string) =
     | -1 -> date
     | i -> date.[..i-1]
 
+/// Days between today (local) and an ISO YYYY-MM-DD date. None if unparseable.
+let private daysUntil (isoDate: string) : int option =
+    let trimmed = formatDateOnly isoDate
+    match System.DateTime.TryParse(trimmed) with
+    | true, d ->
+        let today = System.DateTime.Today
+        Some ((d.Date - today).Days)
+    | _ -> None
+
+/// Pretty "in X days" / "today" / "tomorrow" suffix. Returns empty string
+/// when already past or not parseable.
+let private countdownLabel (isoDate: string) : string =
+    match daysUntil isoDate with
+    | Some 0 -> "today"
+    | Some 1 -> "tomorrow"
+    | Some n when n > 1 -> sprintf "in %d days" n
+    | _ -> ""
+
 // ── Helpers ──
 
 let private sectionHeader (title: string) =
@@ -1415,6 +1433,14 @@ let private overviewTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                             prop.text err
                         ]
                     | None -> ()
+                    // Refresh success message
+                    match model.RefreshMessage with
+                    | Some msg ->
+                        Daisy.alert [
+                            alert.success
+                            prop.text msg
+                        ]
+                    | None -> ()
                     // Abandon series
                     Html.div [
                         prop.className "pt-4"
@@ -1565,6 +1591,11 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             prop.className "absolute top-4 right-4 z-10 opacity-0 hover:opacity-100 transition-opacity"
                             prop.children [
                                 ActionMenu.heroView [
+                                    { Label = if model.IsRefreshing then "Refreshing..." else "Refresh from TMDB"
+                                      Icon = Some Icons.arrowPath
+                                      OnClick = fun () ->
+                                        if not model.IsRefreshing then dispatch Refresh_from_tmdb
+                                      IsDestructive = false }
                                     { Label = "Event Log"
                                       Icon = Some Icons.events
                                       OnClick = fun () -> dispatch Open_event_history
@@ -1633,6 +1664,27 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                 prop.text genre
                                                             ]
                                                         statusBadge series.Status
+                                                        // Next-air-date indicator (episode preferred, season fallback)
+                                                        match series.NextEpisodeAirDate, series.NextSeasonAirDate with
+                                                        | Some d, _ ->
+                                                            let suffix = countdownLabel d
+                                                            Html.span [
+                                                                prop.className "text-xs text-primary/80 font-medium"
+                                                                prop.text (
+                                                                    if suffix <> ""
+                                                                    then $"Next episode airs {formatDateOnly d} ({suffix})"
+                                                                    else $"Next episode airs {formatDateOnly d}")
+                                                            ]
+                                                        | None, Some d ->
+                                                            let suffix = countdownLabel d
+                                                            Html.span [
+                                                                prop.className "text-xs text-primary/80 font-medium"
+                                                                prop.text (
+                                                                    if suffix <> ""
+                                                                    then $"Returns {formatDateOnly d} ({suffix})"
+                                                                    else $"Returns {formatDateOnly d}")
+                                                            ]
+                                                        | None, None -> ()
                                                         HeroRating (series.TmdbRating, series.PersonalRating, model.IsRatingOpen, dispatch)
                                                     ]
                                                 ]

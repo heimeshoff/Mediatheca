@@ -1769,6 +1769,7 @@ module Api =
                 let monthlyActivity = SeriesProjection.getMonthlyEpisodeActivity conn
                 let episodeActivity = SeriesProjection.getEpisodeActivity conn
                 let topWatchedWith = SeriesProjection.getSeriesTopWatchedWith conn 5
+                let returningSoon = SeriesProjection.getReturningSoon conn 5
                 let jellyfinServerUrl = SettingsStore.getSetting conn "jellyfin_server_url"
                 return {
                     Mediatheca.Shared.DashboardSeriesTab.NextUp = nextUp
@@ -1776,6 +1777,7 @@ module Api =
                     RecentlyAbandoned = recentlyAbandoned
                     EpisodeActivity = episodeActivity
                     TopWatchedWith = topWatchedWith
+                    ReturningSoon = returningSoon
                     JellyfinServerUrl =
                         jellyfinServerUrl
                         |> Option.bind (fun s -> if System.String.IsNullOrWhiteSpace(s) then None else Some s)
@@ -2237,6 +2239,19 @@ module Api =
                         Series.Serialization.toEventData
                         (Series.Remove_want_to_watch_series_with friendSlug)
                         projectionHandlers
+            }
+
+            refreshSeriesFromTmdb = fun slug -> async {
+                let tmdbConfig = getTmdbConfig()
+                if System.String.IsNullOrWhiteSpace(tmdbConfig.ApiKey) then
+                    return Error "TMDB API key not configured"
+                else
+                    let! result =
+                        SeriesRefresh.refreshOne
+                            conn httpClient tmdbConfig imageBasePath projectionHandlers slug
+                    match result with
+                    | Ok _ -> return Ok ()
+                    | Error e -> return Error e
             }
 
             // Series Rewatch Sessions

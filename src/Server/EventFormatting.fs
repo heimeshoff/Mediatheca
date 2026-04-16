@@ -184,6 +184,18 @@ module EventFormatting =
             Some { Timestamp = ts; Label = "Marked as In Focus"; Details = [] }
         | "Series_in_focus_cleared" ->
             Some { Timestamp = ts; Label = "Removed from In Focus"; Details = [] }
+        | "Series_refreshed" ->
+            let newEpisodes = tryFieldInt "newEpisodeCount" data |> Option.defaultValue 0
+            let prevStatus = tryField "previousStatus" data
+            let newStatus = tryField "newStatus" data
+            let details =
+                [
+                    if newEpisodes > 0 then $"New episodes: {newEpisodes}"
+                    match prevStatus, newStatus with
+                    | Some p, Some n -> $"Status: {p} \u2192 {n}"
+                    | _ -> ()
+                ]
+            Some { Timestamp = ts; Label = "Refreshed from TMDB"; Details = details }
         | _ -> None
 
     let formatGameEvent (storedEvent: EventStore.StoredEvent) : EventHistoryEntry option =

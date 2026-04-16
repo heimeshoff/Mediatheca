@@ -34,6 +34,8 @@ let init (slug: string) : Model * Cmd<Msg> =
       SessionMenuOpen = None
       ConfirmingRemove = false
       ShowEventHistory = false
+      IsRefreshing = false
+      RefreshMessage = None
       Error = None },
     Cmd.batch [
         Cmd.ofMsg Load_detail
@@ -580,3 +582,18 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Close_event_history ->
         { model with ShowEventHistory = false }, Cmd.none
+
+    | Refresh_from_tmdb ->
+        { model with IsRefreshing = true; RefreshMessage = None; Error = None },
+        Cmd.OfAsync.either
+            (fun () -> api.refreshSeriesFromTmdb model.Slug)
+            ()
+            Refresh_from_tmdb_result
+            (fun ex -> Refresh_from_tmdb_result (Error ex.Message))
+
+    | Refresh_from_tmdb_result (Ok ()) ->
+        { model with IsRefreshing = false; RefreshMessage = Some "Refreshed from TMDB." },
+        Cmd.ofMsg Load_detail
+
+    | Refresh_from_tmdb_result (Error err) ->
+        { model with IsRefreshing = false; Error = Some $"Refresh failed: {err}" }, Cmd.none

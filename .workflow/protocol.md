@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-04-16 -- Task Completed: 042 - Series Episode Refresh Sync
+
+**Type:** Task Completion
+**Task:** 042 - Series Episode Refresh Sync (Upcoming & New Episode Awareness)
+**Summary:** Added a generic nightly `ScheduledJobs` runner (Steam sync migrated onto it) and a TMDB series refresh job emitting a `Series_refreshed` event. Manual "Refresh from TMDB" action surfaced on series detail; next-episode countdown on detail page, return-date on library cards, and a new glassmorphic "Returning Soon" dashboard card.
+**Files changed:** 15 files
+
+---
+
+## 2026-04-16 -- Batch Started: [042]
+
+**Type:** Batch Start
+**Tasks:** 042 - Series Episode Refresh Sync (Upcoming & New Episode Awareness)
+**Mode:** Parallel (batch of 1)
+
+---
+
+## 2026-04-16 -- Idea Captured: Series Episode Refresh Sync (Upcoming & New Episode Awareness)
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/042-series-episode-refresh-sync.md
+**Summary:** Nightly scheduled refresh of returning/in-production TV series via TMDB, plus manual refresh from series detail context menu. Surfaces next-episode air dates and countdowns on the series detail page, library cards, and a new "Returning Soon" list card on the TV series dashboard. Generalizes the existing daily Steam-playtime timer into a system-wide scheduled-job runner so future nightly jobs can register into it. Newly-aired episodes repopulate existing Next Up sections quietly — no separate notifications.
+
+---
+
 ## 2026-04-09 -- Task Completed: 041 - Friend Image Drag-and-Drop Upload with Crop Editor
 
 **Type:** Task Completion
