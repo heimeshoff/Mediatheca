@@ -515,7 +515,8 @@ module Series =
             if series.InFocus then Ok [ Series_in_focus_cleared ]
             else Ok []
         | Active _, Refresh_series_from_tmdb data ->
-            Ok [ Series_refreshed data ]
+            if data.NewEpisodeCount = 0 && data.NewStatus.IsNone then Ok []
+            else Ok [ Series_refreshed data ]
         | Removed, _ ->
             Error "Series has been removed"
         | Not_created, _ ->
