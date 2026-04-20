@@ -10,7 +10,7 @@ open Browser.Types
 // work with this component — we set them as `src` directly and skip hls.js.
 
 [<ReactComponent>]
-let view (url: string) (className: string) (handleError: unit -> unit) =
+let view (url: string) (className: string) (poster: string) (handleError: unit -> unit) =
     let videoRef = React.useRef<HTMLElement option> None
 
     React.useEffect((fun () ->
@@ -57,5 +57,6 @@ let view (url: string) (className: string) (handleError: unit -> unit) =
         prop.controls true
         prop.autoPlay true
         prop.preload.metadata
+        prop.poster poster
         prop.custom ("onError", (fun (_: obj) -> handleError ()))
     ]

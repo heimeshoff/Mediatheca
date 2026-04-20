@@ -993,89 +993,14 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         // Tab content
                         match model.ActiveTab with
                         | Overview ->
-                            // Trailer gallery (full-width, above two-column layout)
                             let visibleTrailers =
                                 model.Trailers
                                 |> List.filter (fun t -> not (Set.contains t.VideoUrl model.FailedTrailerUrls))
-                            if not (List.isEmpty visibleTrailers) then
-                                Html.section [
-                                    prop.className "mb-10"
-                                    prop.children [
-                                        sectionHeader "Trailers"
-                                        Html.div [
-                                            prop.className "flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-4 px-4 lg:mx-0 lg:px-0"
-                                            prop.children [
-                                                for trailer in visibleTrailers do
-                                                    let isPlaying =
-                                                        model.PlayingTrailerUrl = Some trailer.VideoUrl
-                                                    Html.div [
-                                                        prop.key trailer.VideoUrl
-                                                        prop.className "relative flex-none w-60 md:w-80 aspect-video rounded-xl overflow-hidden snap-start glass-card group/trailer"
-                                                        prop.children [
-                                                            if isPlaying then
-                                                                // Inline HLS-capable video player
-                                                                Mediatheca.Client.Components.HlsVideo.view
-                                                                    trailer.VideoUrl
-                                                                    "absolute inset-0 w-full h-full object-cover bg-black"
-                                                                    (fun () -> dispatch (Trailer_errored trailer.VideoUrl))
-                                                                // Close button
-                                                                Html.button [
-                                                                    prop.className "absolute top-2 right-2 z-10 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center text-lg leading-none cursor-pointer"
-                                                                    prop.onClick (fun e ->
-                                                                        e.stopPropagation()
-                                                                        dispatch Stop_trailer_inline)
-                                                                    prop.text "\u00D7"
-                                                                ]
-                                                            else
-                                                                // Thumbnail card
-                                                                Html.button [
-                                                                    prop.className "absolute inset-0 w-full h-full text-left cursor-pointer"
-                                                                    prop.onClick (fun _ ->
-                                                                        dispatch (Play_trailer_inline trailer.VideoUrl))
-                                                                    prop.children [
-                                                                        // Thumbnail or solid placeholder
-                                                                        match trailer.ThumbnailUrl with
-                                                                        | Some thumb ->
-                                                                            Html.img [
-                                                                                prop.className "absolute inset-0 w-full h-full object-cover"
-                                                                                prop.src thumb
-                                                                                prop.alt (trailer.Title |> Option.defaultValue "Trailer")
-                                                                                prop.custom ("loading", "lazy")
-                                                                            ]
-                                                                        | None ->
-                                                                            Html.div [
-                                                                                prop.className "absolute inset-0 bg-base-300"
-                                                                            ]
-                                                                        // Dark overlay for hover + legibility
-                                                                        Html.div [
-                                                                            prop.className "absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/10 group-hover/trailer:from-black/80 transition-colors"
-                                                                        ]
-                                                                        // Centered play button
-                                                                        Html.div [
-                                                                            prop.className "absolute inset-0 flex items-center justify-center"
-                                                                            prop.children [
-                                                                                Html.span [
-                                                                                    prop.className "w-14 h-14 rounded-full bg-white/90 group-hover/trailer:bg-white text-black flex items-center justify-center transition-colors shadow-lg [&>svg]:w-7 [&>svg]:h-7 [&>svg]:ml-0.5"
-                                                                                    prop.children [ Icons.play () ]
-                                                                                ]
-                                                                            ]
-                                                                        ]
-                                                                        // Optional title
-                                                                        match trailer.Title with
-                                                                        | Some title when not (System.String.IsNullOrWhiteSpace title) ->
-                                                                            Html.div [
-                                                                                prop.className "absolute bottom-0 inset-x-0 px-3 py-2 text-xs font-semibold text-white/90 truncate"
-                                                                                prop.text title
-                                                                            ]
-                                                                        | _ -> ()
-                                                                    ]
-                                                                ]
-                                                        ]
-                                                    ]
-                                            ]
-                                        ]
-                                    ]
-                                ]
+                            let selectedTrailer =
+                                match model.PlayingTrailerUrl with
+                                | Some url ->
+                                    visibleTrailers |> List.tryFind (fun t -> t.VideoUrl = url)
+                                | None -> None
                             Html.div [
                                 prop.className "grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10"
                                 prop.children [
@@ -1083,6 +1008,73 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                     Html.div [
                                         prop.className "lg:col-span-8 space-y-10"
                                         prop.children [
+                                            // Trailers: video port on top, thumbnail strip below
+                                            if not (List.isEmpty visibleTrailers) then
+                                                Html.section [
+                                                    prop.children [
+                                                        sectionHeader "Trailers"
+                                                        // Main video port
+                                                        Html.div [
+                                                            prop.className "relative w-full aspect-video rounded-xl overflow-hidden glass-card mb-4"
+                                                            prop.children [
+                                                                match selectedTrailer with
+                                                                | Some trailer ->
+                                                                    Mediatheca.Client.Components.HlsVideo.view
+                                                                        trailer.VideoUrl
+                                                                        "absolute inset-0 w-full h-full object-contain bg-black"
+                                                                        (trailer.ThumbnailUrl |> Option.defaultValue "")
+                                                                        (fun () -> dispatch (Trailer_errored trailer.VideoUrl))
+                                                                | None -> ()
+                                                            ]
+                                                        ]
+                                                        // Thumbnail strip
+                                                        Html.div [
+                                                            prop.className "flex gap-3 overflow-x-auto pb-2"
+                                                            prop.children [
+                                                                for trailer in visibleTrailers do
+                                                                    let isSelected =
+                                                                        model.PlayingTrailerUrl = Some trailer.VideoUrl
+                                                                    Html.button [
+                                                                        prop.key trailer.VideoUrl
+                                                                        prop.className (
+                                                                            "relative flex-none w-40 aspect-video rounded-lg overflow-hidden cursor-pointer transition-all group/thumb "
+                                                                            + (if isSelected then "ring-2 ring-primary ring-offset-2 ring-offset-base-300"
+                                                                               else "opacity-70 hover:opacity-100"))
+                                                                        prop.title (trailer.Title |> Option.defaultValue "Trailer")
+                                                                        prop.onClick (fun _ ->
+                                                                            dispatch (Play_trailer_inline trailer.VideoUrl))
+                                                                        prop.children [
+                                                                            match trailer.ThumbnailUrl with
+                                                                            | Some thumb ->
+                                                                                Html.img [
+                                                                                    prop.className "absolute inset-0 w-full h-full object-cover"
+                                                                                    prop.src thumb
+                                                                                    prop.alt (trailer.Title |> Option.defaultValue "Trailer")
+                                                                                    prop.custom ("loading", "lazy")
+                                                                                ]
+                                                                            | None ->
+                                                                                Html.div [
+                                                                                    prop.className "absolute inset-0 bg-base-300"
+                                                                                ]
+                                                                            if not isSelected then
+                                                                                Html.div [
+                                                                                    prop.className "absolute inset-0 bg-gradient-to-t from-black/60 to-black/10 group-hover/thumb:from-black/40"
+                                                                                ]
+                                                                                Html.div [
+                                                                                    prop.className "absolute inset-0 flex items-center justify-center"
+                                                                                    prop.children [
+                                                                                        Html.span [
+                                                                                            prop.className "w-9 h-9 rounded-full bg-white/85 group-hover/thumb:bg-white text-black flex items-center justify-center shadow [&>svg]:w-4 [&>svg]:h-4 [&>svg]:ml-0.5"
+                                                                                            prop.children [ Icons.play () ]
+                                                                                        ]
+                                                                                    ]
+                                                                                ]
+                                                                        ]
+                                                                    ]
+                                                            ]
+                                                        ]
+                                                    ]
+                                                ]
                                             // Catalogs
                                             Html.div [
                                                 prop.className "flex flex-wrap items-center gap-2"
@@ -1744,6 +1736,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                         Mediatheca.Client.Components.HlsVideo.view
                                             trailerInfo.VideoUrl
                                             "w-full h-full rounded-xl"
+                                            (trailerInfo.ThumbnailUrl |> Option.defaultValue "")
                                             (fun () -> dispatch Close_trailer)
                                         // Close button
                                         Html.button [

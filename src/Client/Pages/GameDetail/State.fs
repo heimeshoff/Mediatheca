@@ -502,7 +502,14 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             Trailers_failed
 
     | Trailers_loaded trailers ->
-        { model with Trailers = trailers; IsLoadingTrailers = false }, Cmd.none
+        let defaultSelected =
+            trailers
+            |> List.tryHead
+            |> Option.map (fun t -> t.VideoUrl)
+        { model with
+            Trailers = trailers
+            IsLoadingTrailers = false
+            PlayingTrailerUrl = defaultSelected }, Cmd.none
 
     | Trailers_failed _ ->
         { model with Trailers = []; IsLoadingTrailers = false }, Cmd.none
@@ -514,13 +521,17 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with PlayingTrailerUrl = None }, Cmd.none
 
     | Trailer_errored url ->
-        let newPlaying =
+        let newFailed = Set.add url model.FailedTrailerUrls
+        let newSelected =
             match model.PlayingTrailerUrl with
-            | Some playing when playing = url -> None
+            | Some playing when playing = url ->
+                model.Trailers
+                |> List.tryFind (fun t -> not (Set.contains t.VideoUrl newFailed))
+                |> Option.map (fun t -> t.VideoUrl)
             | other -> other
         { model with
-            FailedTrailerUrls = Set.add url model.FailedTrailerUrls
-            PlayingTrailerUrl = newPlaying }, Cmd.none
+            FailedTrailerUrls = newFailed
+            PlayingTrailerUrl = newSelected }, Cmd.none
 
     | Open_event_history ->
         { model with ShowEventHistory = true }, Cmd.none
