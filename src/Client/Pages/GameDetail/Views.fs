@@ -1013,24 +1013,11 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         prop.className "relative flex-none w-60 md:w-80 aspect-video rounded-xl overflow-hidden snap-start glass-card group/trailer"
                                                         prop.children [
                                                             if isPlaying then
-                                                                // Inline video player
-                                                                Html.video [
-                                                                    prop.className "absolute inset-0 w-full h-full object-cover bg-black"
-                                                                    prop.controls true
-                                                                    prop.autoPlay true
-                                                                    prop.preload.metadata
-                                                                    prop.onError (fun _ ->
-                                                                        dispatch (Trailer_errored trailer.VideoUrl))
-                                                                    prop.children [
-                                                                        Html.source [
-                                                                            prop.src trailer.VideoUrl
-                                                                            prop.type' (
-                                                                                if trailer.VideoUrl.Contains(".webm") then "video/webm"
-                                                                                else "video/mp4"
-                                                                            )
-                                                                        ]
-                                                                    ]
-                                                                ]
+                                                                // Inline HLS-capable video player
+                                                                Mediatheca.Client.Components.HlsVideo.view
+                                                                    trailer.VideoUrl
+                                                                    "absolute inset-0 w-full h-full object-cover bg-black"
+                                                                    (fun () -> dispatch (Trailer_errored trailer.VideoUrl))
                                                                 // Close button
                                                                 Html.button [
                                                                     prop.className "absolute top-2 right-2 z-10 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center text-lg leading-none cursor-pointer"
@@ -1754,20 +1741,10 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 Html.div [
                                     prop.className "relative w-full max-w-4xl mx-4 aspect-video"
                                     prop.children [
-                                        Html.video [
-                                            prop.className "w-full h-full rounded-xl"
-                                            prop.controls true
-                                            prop.autoPlay true
-                                            prop.children [
-                                                Html.source [
-                                                    prop.src trailerInfo.VideoUrl
-                                                    prop.type' (
-                                                        if trailerInfo.VideoUrl.Contains(".webm") then "video/webm"
-                                                        else "video/mp4"
-                                                    )
-                                                ]
-                                            ]
-                                        ]
+                                        Mediatheca.Client.Components.HlsVideo.view
+                                            trailerInfo.VideoUrl
+                                            "w-full h-full rounded-xl"
+                                            (fun () -> dispatch Close_trailer)
                                         // Close button
                                         Html.button [
                                             prop.className "absolute -top-10 right-0 text-white/70 hover:text-white text-2xl font-bold cursor-pointer"

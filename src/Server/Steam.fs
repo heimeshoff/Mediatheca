@@ -511,58 +511,32 @@ module Steam =
         }
 
     // Steam Store trailer types and decoders
-
-    type SteamMovieUrls = {
-        Quality480: string option
-        QualityMax: string option
-    }
+    //
+    // Steam's appdetails API returns movies[] as streaming manifests only:
+    // `hls_h264` (.m3u8), `dash_h264` (.mpd), `dash_av1` (.mpd). The old
+    // mp4/webm direct-URL fields are gone. We pass the HLS URL to the client
+    // and let hls.js (or Safari native) handle playback.
 
     type SteamMovie = {
         Id: int
         Name: string
         Thumbnail: string option
-        Mp4: SteamMovieUrls
-        Webm: SteamMovieUrls
+        HlsH264: string option
         Highlight: bool
     }
-
-    let private decodeMovieUrls: Decoder<SteamMovieUrls> =
-        Decode.object (fun get -> {
-            Quality480 = get.Optional.Field "480" Decode.string
-            QualityMax = get.Optional.Field "max" Decode.string
-        })
 
     let private decodeSteamMovie: Decoder<SteamMovie> =
         Decode.object (fun get -> {
             Id = get.Required.Field "id" Decode.int
             Name = get.Optional.Field "name" Decode.string |> Option.defaultValue ""
             Thumbnail = get.Optional.Field "thumbnail" Decode.string
-            Mp4 = get.Optional.Field "mp4" decodeMovieUrls |> Option.defaultValue { Quality480 = None; QualityMax = None }
-            Webm = get.Optional.Field "webm" decodeMovieUrls |> Option.defaultValue { Quality480 = None; QualityMax = None }
+            HlsH264 = get.Optional.Field "hls_h264" Decode.string
             Highlight = get.Optional.Field "highlight" Decode.bool |> Option.defaultValue false
         })
 
-    let private decodeStoreMovies: Decoder<SteamMovie list> =
-        Decode.object (fun get ->
-            let appEntry = get.Required.At [] (Decode.object (fun get2 ->
-                let success = get2.Required.Field "success" Decode.bool
-                if success then
-                    get2.Optional.At [ "data"; "movies" ] (Decode.list decodeSteamMovie) |> Option.defaultValue []
-                else
-                    []))
-            appEntry
-        )
-
     let private movieToTrailerInfo (m: SteamMovie) : Mediatheca.Shared.GameTrailerInfo option =
-        // Prefer mp4.max, then mp4.480, then webm.max, then webm.480
-        let videoUrl =
-            m.Mp4.QualityMax
-            |> Option.orElse m.Mp4.Quality480
-            |> Option.orElse m.Webm.QualityMax
-            |> Option.orElse m.Webm.Quality480
-        match videoUrl with
+        match m.HlsH264 with
         | Some url ->
-            // Ensure HTTPS
             let secureUrl = url.Replace("http://", "https://")
             let secureThumb =
                 m.Thumbnail
