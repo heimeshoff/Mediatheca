@@ -553,6 +553,27 @@ module Steam =
             appEntry
         )
 
+    let private movieToTrailerInfo (m: SteamMovie) : Mediatheca.Shared.GameTrailerInfo option =
+        // Prefer mp4.max, then mp4.480, then webm.max, then webm.480
+        let videoUrl =
+            m.Mp4.QualityMax
+            |> Option.orElse m.Mp4.Quality480
+            |> Option.orElse m.Webm.QualityMax
+            |> Option.orElse m.Webm.Quality480
+        match videoUrl with
+        | Some url ->
+            // Ensure HTTPS
+            let secureUrl = url.Replace("http://", "https://")
+            let secureThumb =
+                m.Thumbnail
+                |> Option.map (fun t -> t.Replace("http://", "https://"))
+            Some {
+                Mediatheca.Shared.GameTrailerInfo.VideoUrl = secureUrl
+                ThumbnailUrl = secureThumb
+                Title = if System.String.IsNullOrWhiteSpace(m.Name) then None else Some m.Name
+            }
+        | None -> None
+
     let getSteamStoreTrailer (httpClient: HttpClient) (appId: int) : Async<Mediatheca.Shared.GameTrailerInfo option> =
         async {
             try
@@ -576,26 +597,40 @@ module Steam =
                             |> List.tryFind (fun m -> m.Highlight)
                             |> Option.orElse (List.tryHead movies)
                         match trailer with
-                        | Some t ->
-                            // Prefer mp4.max, then mp4.480, then webm.max, then webm.480
-                            let videoUrl =
-                                t.Mp4.QualityMax
-                                |> Option.orElse t.Mp4.Quality480
-                                |> Option.orElse t.Webm.QualityMax
-                                |> Option.orElse t.Webm.Quality480
-                            match videoUrl with
-                            | Some url ->
-                                // Ensure HTTPS
-                                let secureUrl = url.Replace("http://", "https://")
-                                return Some {
-                                    Mediatheca.Shared.GameTrailerInfo.VideoUrl = secureUrl
-                                    ThumbnailUrl = t.Thumbnail
-                                    Title = if System.String.IsNullOrWhiteSpace(t.Name) then None else Some t.Name
-                                }
-                            | None -> return None
+                        | Some t -> return movieToTrailerInfo t
                         | None -> return None
                     | _ -> return None
                 | Error _ -> return None
             with _ ->
                 return None
+        }
+
+    /// Returns all trailers for a Steam app, highlight-first, then the rest in API order.
+    let getSteamStoreTrailers (httpClient: HttpClient) (appId: int) : Async<Mediatheca.Shared.GameTrailerInfo list> =
+        async {
+            try
+                let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d" appId
+                let! json = fetchJson httpClient url
+                let appIdKey = string appId
+                match Decode.fromString (Decode.dict (Decode.object (fun get ->
+                    let success = get.Required.Field "success" Decode.bool
+                    if success then
+                        get.Optional.At [ "data"; "movies" ] (Decode.list decodeSteamMovie) |> Option.defaultValue []
+                    else
+                        []
+                ))) json with
+                | Ok dict ->
+                    match dict.TryGetValue(appIdKey) with
+                    | true, movies when not (List.isEmpty movies) ->
+                        // Highlight first, then remaining in original order
+                        let highlights = movies |> List.filter (fun m -> m.Highlight)
+                        let rest = movies |> List.filter (fun m -> not m.Highlight)
+                        let ordered = highlights @ rest
+                        return
+                            ordered
+                            |> List.choose movieToTrailerInfo
+                    | _ -> return []
+                | Error _ -> return []
+            with _ ->
+                return []
         }

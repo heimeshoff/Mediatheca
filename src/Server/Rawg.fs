@@ -322,6 +322,23 @@ module Rawg =
             Results = get.Required.Field "results" (Decode.list decodeTrailerResult)
         })
 
+    let private rawgResultToTrailerInfo (r: RawgTrailerResult) : Mediatheca.Shared.GameTrailerInfo option =
+        let videoUrl =
+            r.Data.Max
+            |> Option.orElse r.Data.The480
+        match videoUrl with
+        | Some url ->
+            let secureUrl = url.Replace("http://", "https://")
+            let secureThumb =
+                r.Preview
+                |> Option.map (fun t -> t.Replace("http://", "https://"))
+            Some {
+                Mediatheca.Shared.GameTrailerInfo.VideoUrl = secureUrl
+                ThumbnailUrl = secureThumb
+                Title = if System.String.IsNullOrWhiteSpace(r.Name) then None else Some r.Name
+            }
+        | None -> None
+
     let getGameTrailers (httpClient: HttpClient) (config: RawgConfig) (rawgId: int) : Async<Mediatheca.Shared.GameTrailerInfo option> =
         async {
             if System.String.IsNullOrWhiteSpace(config.ApiKey) then return None
@@ -332,21 +349,27 @@ module Rawg =
                     match Decode.fromString decodeTrailersResponse json with
                     | Ok response ->
                         match response.Results |> List.tryHead with
-                        | Some trailer ->
-                            let videoUrl =
-                                trailer.Data.Max
-                                |> Option.orElse trailer.Data.The480
-                            match videoUrl with
-                            | Some url ->
-                                return Some {
-                                    Mediatheca.Shared.GameTrailerInfo.VideoUrl = url
-                                    ThumbnailUrl = trailer.Preview
-                                    Title = if System.String.IsNullOrWhiteSpace(trailer.Name) then None else Some trailer.Name
-                                }
-                            | None -> return None
+                        | Some trailer -> return rawgResultToTrailerInfo trailer
                         | None -> return None
                     | Error _ -> return None
                 with _ -> return None
+        }
+
+    /// Returns all RAWG trailers for a game in API order.
+    let getGameTrailersAll (httpClient: HttpClient) (config: RawgConfig) (rawgId: int) : Async<Mediatheca.Shared.GameTrailerInfo list> =
+        async {
+            if System.String.IsNullOrWhiteSpace(config.ApiKey) then return []
+            else
+                try
+                    let url = $"https://api.rawg.io/api/games/{rawgId}/movies?key={config.ApiKey}"
+                    let! json = fetchJson httpClient url
+                    match Decode.fromString decodeTrailersResponse json with
+                    | Ok response ->
+                        return
+                            response.Results
+                            |> List.choose rawgResultToTrailerInfo
+                    | Error _ -> return []
+                with _ -> return []
         }
 
     let downloadGameImages (httpClient: HttpClient) (slug: string) (backgroundImage: string option) (backgroundImageAdditional: string option) (imageBasePath: string) : Async<string option * string option> =

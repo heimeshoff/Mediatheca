@@ -2980,6 +2980,36 @@ module Api =
                     return None
             }
 
+            getGameTrailers = fun slug -> async {
+                try
+                    match GameProjection.getBySlug conn slug with
+                    | None -> return []
+                    | Some game ->
+                        let! steamTrailers = async {
+                            match game.SteamAppId with
+                            | Some appId -> return! Steam.getSteamStoreTrailers httpClient appId
+                            | None -> return []
+                        }
+                        let! rawgTrailers = async {
+                            match game.RawgId with
+                            | Some rawgId ->
+                                let rawgConfig = getRawgConfig()
+                                return! Rawg.getGameTrailersAll httpClient rawgConfig rawgId
+                            | None -> return []
+                        }
+                        // Deduplicate by VideoUrl, Steam wins
+                        let steamUrls =
+                            steamTrailers
+                            |> List.map (fun t -> t.VideoUrl)
+                            |> Set.ofList
+                        let dedupedRawg =
+                            rawgTrailers
+                            |> List.filter (fun t -> not (Set.contains t.VideoUrl steamUrls))
+                        return steamTrailers @ dedupedRawg
+                with _ ->
+                    return []
+            }
+
             // Games Settings
             getRawgApiKey = fun () -> async {
                 let key =

@@ -32,6 +32,10 @@ let init (slug: string) : Model * Cmd<Msg> =
       TrailerInfo = None
       ShowTrailer = false
       IsLoadingTrailer = false
+      Trailers = []
+      IsLoadingTrailers = false
+      PlayingTrailerUrl = None
+      FailedTrailerUrls = Set.empty
       ShowEventHistory = false
       Error = None },
     Cmd.batch [
@@ -102,6 +106,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             match game with
             | Some g ->
                 [ Cmd.ofMsg Load_trailer
+                  Cmd.ofMsg Load_trailers
                   if g.HltbHours.IsNone then Cmd.ofMsg Fetch_hltb ]
             | None -> []
         { model with Game = game; IsLoading = false }, Cmd.batch cmds
@@ -487,6 +492,35 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Close_trailer ->
         { model with ShowTrailer = false }, Cmd.none
+
+    | Load_trailers ->
+        { model with IsLoadingTrailers = true },
+        Cmd.OfAsync.either
+            (fun () -> api.getGameTrailers model.Slug)
+            ()
+            Trailers_loaded
+            Trailers_failed
+
+    | Trailers_loaded trailers ->
+        { model with Trailers = trailers; IsLoadingTrailers = false }, Cmd.none
+
+    | Trailers_failed _ ->
+        { model with Trailers = []; IsLoadingTrailers = false }, Cmd.none
+
+    | Play_trailer_inline url ->
+        { model with PlayingTrailerUrl = Some url }, Cmd.none
+
+    | Stop_trailer_inline ->
+        { model with PlayingTrailerUrl = None }, Cmd.none
+
+    | Trailer_errored url ->
+        let newPlaying =
+            match model.PlayingTrailerUrl with
+            | Some playing when playing = url -> None
+            | other -> other
+        { model with
+            FailedTrailerUrls = Set.add url model.FailedTrailerUrls
+            PlayingTrailerUrl = newPlaying }, Cmd.none
 
     | Open_event_history ->
         { model with ShowEventHistory = true }, Cmd.none

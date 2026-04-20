@@ -993,6 +993,102 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         // Tab content
                         match model.ActiveTab with
                         | Overview ->
+                            // Trailer gallery (full-width, above two-column layout)
+                            let visibleTrailers =
+                                model.Trailers
+                                |> List.filter (fun t -> not (Set.contains t.VideoUrl model.FailedTrailerUrls))
+                            if not (List.isEmpty visibleTrailers) then
+                                Html.section [
+                                    prop.className "mb-10"
+                                    prop.children [
+                                        sectionHeader "Trailers"
+                                        Html.div [
+                                            prop.className "flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-4 px-4 lg:mx-0 lg:px-0"
+                                            prop.children [
+                                                for trailer in visibleTrailers do
+                                                    let isPlaying =
+                                                        model.PlayingTrailerUrl = Some trailer.VideoUrl
+                                                    Html.div [
+                                                        prop.key trailer.VideoUrl
+                                                        prop.className "relative flex-none w-60 md:w-80 aspect-video rounded-xl overflow-hidden snap-start glass-card group/trailer"
+                                                        prop.children [
+                                                            if isPlaying then
+                                                                // Inline video player
+                                                                Html.video [
+                                                                    prop.className "absolute inset-0 w-full h-full object-cover bg-black"
+                                                                    prop.controls true
+                                                                    prop.autoPlay true
+                                                                    prop.preload.metadata
+                                                                    prop.onError (fun _ ->
+                                                                        dispatch (Trailer_errored trailer.VideoUrl))
+                                                                    prop.children [
+                                                                        Html.source [
+                                                                            prop.src trailer.VideoUrl
+                                                                            prop.type' (
+                                                                                if trailer.VideoUrl.Contains(".webm") then "video/webm"
+                                                                                else "video/mp4"
+                                                                            )
+                                                                        ]
+                                                                    ]
+                                                                ]
+                                                                // Close button
+                                                                Html.button [
+                                                                    prop.className "absolute top-2 right-2 z-10 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center text-lg leading-none cursor-pointer"
+                                                                    prop.onClick (fun e ->
+                                                                        e.stopPropagation()
+                                                                        dispatch Stop_trailer_inline)
+                                                                    prop.text "\u00D7"
+                                                                ]
+                                                            else
+                                                                // Thumbnail card
+                                                                Html.button [
+                                                                    prop.className "absolute inset-0 w-full h-full text-left cursor-pointer"
+                                                                    prop.onClick (fun _ ->
+                                                                        dispatch (Play_trailer_inline trailer.VideoUrl))
+                                                                    prop.children [
+                                                                        // Thumbnail or solid placeholder
+                                                                        match trailer.ThumbnailUrl with
+                                                                        | Some thumb ->
+                                                                            Html.img [
+                                                                                prop.className "absolute inset-0 w-full h-full object-cover"
+                                                                                prop.src thumb
+                                                                                prop.alt (trailer.Title |> Option.defaultValue "Trailer")
+                                                                                prop.custom ("loading", "lazy")
+                                                                            ]
+                                                                        | None ->
+                                                                            Html.div [
+                                                                                prop.className "absolute inset-0 bg-base-300"
+                                                                            ]
+                                                                        // Dark overlay for hover + legibility
+                                                                        Html.div [
+                                                                            prop.className "absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/10 group-hover/trailer:from-black/80 transition-colors"
+                                                                        ]
+                                                                        // Centered play button
+                                                                        Html.div [
+                                                                            prop.className "absolute inset-0 flex items-center justify-center"
+                                                                            prop.children [
+                                                                                Html.span [
+                                                                                    prop.className "w-14 h-14 rounded-full bg-white/90 group-hover/trailer:bg-white text-black flex items-center justify-center transition-colors shadow-lg [&>svg]:w-7 [&>svg]:h-7 [&>svg]:ml-0.5"
+                                                                                    prop.children [ Icons.play () ]
+                                                                                ]
+                                                                            ]
+                                                                        ]
+                                                                        // Optional title
+                                                                        match trailer.Title with
+                                                                        | Some title when not (System.String.IsNullOrWhiteSpace title) ->
+                                                                            Html.div [
+                                                                                prop.className "absolute bottom-0 inset-x-0 px-3 py-2 text-xs font-semibold text-white/90 truncate"
+                                                                                prop.text title
+                                                                            ]
+                                                                        | _ -> ()
+                                                                    ]
+                                                                ]
+                                                        ]
+                                                    ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
                             Html.div [
                                 prop.className "grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10"
                                 prop.children [

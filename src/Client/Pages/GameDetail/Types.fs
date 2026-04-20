@@ -39,6 +39,10 @@ type Model = {
     TrailerInfo: GameTrailerInfo option
     ShowTrailer: bool
     IsLoadingTrailer: bool
+    Trailers: GameTrailerInfo list
+    IsLoadingTrailers: bool
+    PlayingTrailerUrl: string option
+    FailedTrailerUrls: Set<string>
     ShowEventHistory: bool
     Error: string option
 }
@@ -112,5 +116,11 @@ type Msg =
     | Trailer_loaded of GameTrailerInfo option
     | Open_trailer
     | Close_trailer
+    | Load_trailers
+    | Trailers_loaded of GameTrailerInfo list
+    | Trailers_failed of exn
+    | Play_trailer_inline of string
+    | Stop_trailer_inline
+    | Trailer_errored of string
     | Open_event_history
     | Close_event_history

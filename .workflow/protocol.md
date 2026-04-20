@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-04-20 12:33 -- Task Completed: 043 - Game Trailer Gallery in Overview
+
+**Type:** Task Completion
+**Task:** 043 - Game Trailer Gallery in Overview
+**Summary:** Added a full-width scroll-snap trailer gallery to the GameDetail Overview. New `getGameTrailers` endpoint returns all Steam + RAWG trailers; glassmorphic cards show thumbnail + play icon, swap to inline `<video>` on click with one-at-a-time playback and silent failure. Build passes, 233 tests green.
+**Files changed:** 7 files
+
+---
+
+## 2026-04-20 12:26 -- Batch Started: [043]
+
+**Type:** Batch Start
+**Tasks:** 043 - Game Trailer Gallery in Overview
+**Mode:** Parallel (batch of 1)
+
+---
+
+## 2026-04-20 -- Idea Captured: Game Trailer Gallery in Overview
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/043-game-trailer-gallery.md
+**Summary:** Full-width scrollable gallery of all Steam/RAWG trailers above the two-column Overview on the game detail page. Streams from CDN (no local download), click-to-play thumbnails (no autoplay), individual trailers hidden if `<video>` errors. Extends task 018's single-trailer infrastructure with a new `getGameTrailers` (plural) endpoint.
+
+---
+
 ## 2026-04-16 -- Task Completed: 042 - Series Episode Refresh Sync
 
 **Type:** Task Completion

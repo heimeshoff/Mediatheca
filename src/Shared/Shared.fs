@@ -1131,6 +1131,7 @@ type IMediathecaApi = {
     getGameImageCandidates: string -> Async<GameImageCandidate list>
     selectGameImage: string -> string -> string -> Async<Result<unit, string>>
     getGameTrailer: string -> Async<GameTrailerInfo option>
+    getGameTrailers: string -> Async<GameTrailerInfo list>
     // Games Settings
     getRawgApiKey: unit -> Async<string>
     setRawgApiKey: string -> Async<Result<unit, string>>
