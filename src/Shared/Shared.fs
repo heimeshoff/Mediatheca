@@ -825,6 +825,16 @@ type SteamFamilyImportProgress = {
     Action: string
 }
 
+/// Candidate for attaching a Steam App ID to a game that was added without one.
+/// Returned by `searchSteamForGame` and rendered by the client's candidate picker.
+type SteamSearchResult = {
+    AppId: int
+    Name: string
+    ReleaseYear: int option
+    HeaderImageUrl: string option
+    Score: float
+}
+
 // Playtime Tracking
 
 type PlaySessionDto = {
@@ -1149,6 +1159,9 @@ type IMediathecaApi = {
     setSteamFamilyMembers: SteamFamilyMember list -> Async<Result<unit, string>>
     fetchSteamFamilyMembers: unit -> Async<Result<SteamFamilyMember list, string>>
     importSteamFamily: unit -> Async<Result<SteamFamilyImportResult, string>>
+    // Steam Attach (Connect with Steam)
+    searchSteamForGame: string -> Async<SteamSearchResult list>
+    attachSteamToGame: string * int -> Async<Result<unit, string>>
     // Jellyfin Integration
     getJellyfinServerUrl: unit -> Async<string>
     setJellyfinServerUrl: string -> Async<Result<unit, string>>

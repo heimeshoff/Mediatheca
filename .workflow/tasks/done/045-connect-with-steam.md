@@ -188,3 +188,40 @@ Show a small spinner while `Searching` / `Attaching`. For `Failed msg`, show an 
 - Watch for non-game AppIDs in the app list — Steam tools, soundtracks, dedicated servers, and DLC all live in the same namespace. Filter by fetching the Store details for the top candidate and checking `type = "game"` before auto-attaching. Ambiguous picker results can skip this check since the user visually disambiguates.
 - The auto-attach during Add Game must not delay the handler meaningfully — cap the Steam search + attach round-trip, and if it takes too long, fail open (skip the attach, return the created game).
 - Watch for games with identical names across different years (remakes, reboots). The year boost is the main defense; without a year in the AddGameRequest, fall back to ambiguous → user-picks on manual Connect.
+
+## Work Log
+
+### 2026-04-20 13:51 -- Work Completed
+
+**What was done:**
+- Added `SteamSearchResult` shared DTO and two new `IMediathecaApi` endpoints: `searchSteamForGame` and `attachSteamToGame`
+- Implemented `Steam.searchSteamByName` in `src/Server/Steam.fs` backed by `ISteamApps/GetAppList/v2`: full-list fetch + in-memory cache with 24h TTL (guarded by `lock`), strong name normalization (lowercase, strip ™/®/©, punctuation, collapse whitespace, drop edition suffixes like "Definitive Edition", "Game of the Year Edition", "Deluxe Edition", etc.), exact-match / substring / token-set (Jaccard) ranking, and an optional year boost via a per-session Steam Store meta cache (fetched for top 3 candidates only)
+- Non-game types ("dlc", "music", "tool") are filtered out for candidates whose Store meta was fetched; unknown types pass through
+- Candidates scoring `>= 0.7` are kept; the client state logic treats `>= 0.95` with a `0.05` gap over the runner-up as high-confidence auto-attach, everything else goes to the picker
+- Added `attachSteamToGameCore` helper in `src/Server/Api.fs` that emits the same events as the Steam library import path: `Set_steam_app_id`, plus `Set_description` / `Set_short_description` / `Set_website_url` / `Add_play_mode` only when the current projected field is empty/missing — avoids overwriting user edits
+- Wired the helper into both the manual `attachSteamToGame` endpoint and the `addGame` handler's auto-attach step (runs only when `RawgId` is present; all failures are caught and logged via `printfn`, never surfacing to the user)
+- Client: added `ConnectSteamState` DU + five new `Msg` variants (`Connect_steam_requested`, `Steam_search_completed`, `Steam_candidate_chosen`, `Steam_attach_completed`, `Connect_steam_dismissed`) to `Types.fs`; added corresponding update handlers to `State.fs` that re-dispatch `Load_game` on successful attach to refresh the detail page
+- UI: added `connectSteamButton` (rendered inside the Links glassCard, replaces the previous `| None -> ()` branch) and `ConnectSteamPicker` React component rendered at the root of the `view` function (outside any glassCard) to avoid the `backdrop-filter` nesting bug called out in CLAUDE.md. Picker uses `rating-dropdown` glassmorphism, shows header image / name / year per candidate, and a "Choose" button. Failure state shows inline error with a Dismiss button.
+
+**Acceptance criteria status:**
+- [x] Game detail page with `SteamAppId = None` shows a "Connect with Steam" button in the Links section, styled consistently with the other link buttons — Verified via code review (reuses the HLTB button's class shape with muted `text-base-content/50` to signal "not yet linked", gamepad icon from `Icons.gamepad`)
+- [x] Clicking Connect with a clear single match attaches Steam data and refreshes the page — `State.fs` auto-dispatches `Steam_candidate_chosen` when `Score >= 0.95` (either single result or top-with-gap) and re-dispatches `Load_game` on success
+- [x] Clicking Connect with multiple candidates opens a glassmorphic picker — `ConnectSteamPicker` renders as `rating-dropdown` at view root (avoids nested backdrop-filter), anchored to the Connect button via `getElementById` + `getBoundingClientRect`
+- [x] Clicking Connect with no match shows an inline "No Steam match found" message with a Dismiss button — handled in `State.fs` for empty candidate list, rendered by the Failed arm of `connectSteamButton`
+- [x] After attaching Steam, the trailer gallery populates with Steam trailers — `Steam_attach_completed Ok` dispatches `Load_game` which reloads detail and re-fetches trailers (`getGameTrailers` picks up the new `SteamAppId`)
+- [x] Adding a new game via Add Game with a clear Steam match results in `SteamAppId` populated on the created game — `addGame` handler in `Api.fs` now runs `Steam.searchSteamByName` + `attachSteamToGameCore` synchronously when `RawgId.IsSome` and the top result passes the 0.95 / 0.05-gap threshold
+- [x] Adding a game with no confident match still succeeds; `SteamAppId` stays None; no error surfaces — only the `top :: _ when top.Score >= 0.95` pattern triggers attach; other cases fall through
+- [x] Adding when Steam API is unreachable still succeeds — all auto-attach work is wrapped in try/with that swallows exceptions to `printfn`
+- [x] `searchSteamByName` caches the Steam app list; first call fetches, subsequent calls hit cache — `getAppList` uses a 24h TTL `lock`-guarded mutable cache, first call logs "Fetching Steam app list (cache miss)..."
+- [x] `attachSteamToGame` emits the same events as the Steam library import path — `attachSteamToGameCore` mirrors the import flow from `Api.fs` lines ~3154-3181, and only emits the optional events when the projected value is empty
+- [x] `npm run build` succeeds — verified, Fable compiles cleanly, only the pre-existing chunk-size warning
+- [x] `npm test` passes all tests — all 233 tests pass
+- [x] Design check — Picker uses `rating-dropdown` glassmorphism, rendered as a sibling to (not child of) the Links glassCard; no nested backdrop-filter; button styling matches other Links entries; DesignSystem-consistent `text-base-content/*` opacity hierarchy
+
+**Files changed:**
+- `src/Shared/Shared.fs` — added `SteamSearchResult` DTO and `searchSteamForGame` / `attachSteamToGame` endpoints to `IMediathecaApi`
+- `src/Server/Steam.fs` — added `searchSteamByName` with app-list cache, name normalizer, fuzzy ranker, and year-boosted Store meta fetch
+- `src/Server/Api.fs` — added `attachSteamToGameCore` helper, wired auto-attach into `addGame`, added `searchSteamForGame` and `attachSteamToGame` endpoints
+- `src/Client/Pages/GameDetail/Types.fs` — added `ConnectSteamState` DU, `ConnectSteamState` field on `Model`, and five new `Msg` variants
+- `src/Client/Pages/GameDetail/State.fs` — initialized `ConnectSteamState = Idle`, added handlers for all five new messages
+- `src/Client/Pages/GameDetail/Views.fs` — added `connectSteamButton` (in Links section) and `ConnectSteamPicker` React component (at view root), replaced `| None -> ()` branch for Steam link

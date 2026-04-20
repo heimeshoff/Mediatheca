@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-04-20 13:52 -- Task Completed: 045 - Connect with Steam (manual button + auto-attach on Add Game)
+
+**Type:** Task Completion
+**Task:** 045 - Connect with Steam (manual button + auto-attach on Add Game)
+**Summary:** Implemented end-to-end: Steam name-search with cached app list + fuzzy matching + year boost; reusable attach helper emitting the same events as Steam library import; auto-attach during Add Game on high-confidence match; glassmorphic candidate picker rendered at view root to avoid nested backdrop-filter. Build succeeded; 233 tests pass.
+**Files changed:** 6 files
+
+---
+
+## 2026-04-20 13:40 -- Batch Started: [045]
+
+**Type:** Batch Start
+**Tasks:** 045 - Connect with Steam (manual button + auto-attach on Add Game)
+**Mode:** Parallel (batch of 1)
+
+---
+
 ## 2026-04-20 13:40 -- Task Completed: 044 - Game Trailer Header Cleanup & Single-Trailer UX
 
 **Type:** Task Completion

@@ -927,6 +927,89 @@ module Api =
                 return Error $"Jellyfin import failed: {ex.Message}"
         }
 
+    /// Attaches a Steam App ID to an existing game by fetching Store details
+    /// and emitting the same events the Steam library import uses:
+    /// `Set_steam_app_id`, optionally `Set_description` / `Set_short_description`
+    /// / `Set_website_url` / `Add_play_mode`. Only emits the optional events
+    /// when the current game's corresponding field is empty / missing so we
+    /// don't overwrite user edits.
+    let private attachSteamToGameCore
+        (conn: SqliteConnection)
+        (httpClient: HttpClient)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (slug: string)
+        (appId: int)
+        : Async<Result<unit, string>> =
+        async {
+            let! storeDetails = Steam.getSteamStoreDetails httpClient appId
+            match storeDetails with
+            | Error e -> return Error (sprintf "Steam lookup failed: %s" e)
+            | Ok details ->
+                let sid = Games.streamId slug
+                // Current projected state (to avoid overwriting user edits)
+                let current = GameProjection.getBySlug conn slug
+                match current with
+                | None -> return Error (sprintf "Game '%s' not found" slug)
+                | Some game ->
+                    // 1. Set steam_app_id
+                    executeCommand conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Set_steam_app_id appId)
+                        projectionHandlers |> ignore
+
+                    // 2. Description — only if the current one is empty
+                    if System.String.IsNullOrWhiteSpace(game.Description) then
+                        let desc =
+                            if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
+                            elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
+                            else ""
+                        if desc <> "" then
+                            executeCommand conn sid
+                                Games.Serialization.fromStoredEvent
+                                Games.reconstitute
+                                Games.decide
+                                Games.Serialization.toEventData
+                                (Games.Set_description desc)
+                                projectionHandlers |> ignore
+
+                    // 3. Short description — only if empty
+                    if System.String.IsNullOrWhiteSpace(game.ShortDescription) && details.ShortDescription <> "" then
+                        executeCommand conn sid
+                            Games.Serialization.fromStoredEvent
+                            Games.reconstitute
+                            Games.decide
+                            Games.Serialization.toEventData
+                            (Games.Set_short_description details.ShortDescription)
+                            projectionHandlers |> ignore
+
+                    // 4. Website URL — only if currently missing
+                    if game.WebsiteUrl.IsNone && details.WebsiteUrl.IsSome then
+                        executeCommand conn sid
+                            Games.Serialization.fromStoredEvent
+                            Games.reconstitute
+                            Games.decide
+                            Games.Serialization.toEventData
+                            (Games.Set_website_url details.WebsiteUrl)
+                            projectionHandlers |> ignore
+
+                    // 5. Play modes — append any the current game doesn't already have
+                    let existingModes = Set.ofList game.PlayModes
+                    for category in details.Categories do
+                        if not (Set.contains category existingModes) then
+                            executeCommand conn sid
+                                Games.Serialization.fromStoredEvent
+                                Games.reconstitute
+                                Games.decide
+                                Games.Serialization.toEventData
+                                (Games.Add_play_mode category)
+                                projectionHandlers |> ignore
+
+                    return Ok ()
+        }
+
     let create
         (conn: SqliteConnection)
         (httpClient: HttpClient)
@@ -2568,7 +2651,26 @@ module Api =
 
                     match result with
                     | Error e -> return Error e
-                    | Ok () -> return Ok slug
+                    | Ok () ->
+                        // Auto-attach Steam for RAWG-sourced games with a clear match.
+                        // Best-effort: any failure (Steam down, no match, ambiguous) is
+                        // swallowed — the user can still click Connect later.
+                        if request.RawgId.IsSome then
+                            try
+                                let! candidates = Steam.searchSteamByName httpClient request.Name (Some request.Year)
+                                match candidates with
+                                | top :: rest when top.Score >= 0.95 ->
+                                    let unambiguous =
+                                        match rest with
+                                        | next :: _ -> (top.Score - next.Score) >= 0.05
+                                        | [] -> true
+                                    if unambiguous then
+                                        let! _ = attachSteamToGameCore conn httpClient projectionHandlers slug top.AppId
+                                        ()
+                                | _ -> ()
+                            with ex ->
+                                printfn "[addGame] Steam auto-attach failed for '%s': %s" slug ex.Message
+                        return Ok slug
                 with ex ->
                     return Error $"Failed to add game: {ex.Message}"
             }
@@ -3529,6 +3631,23 @@ module Api =
 
             importSteamFamily = fun () -> async {
                 return! runSteamFamilyImport conn httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers (fun _ -> ())
+            }
+
+            // Connect with Steam (manual attach)
+            searchSteamForGame = fun slug -> async {
+                match GameProjection.getBySlug conn slug with
+                | None -> return []
+                | Some game ->
+                    try
+                        let yearOpt = if game.Year > 0 then Some game.Year else None
+                        return! Steam.searchSteamByName httpClient game.Name yearOpt
+                    with ex ->
+                        printfn "[searchSteamForGame] Failed for '%s': %s" slug ex.Message
+                        return []
+            }
+
+            attachSteamToGame = fun (slug, appId) -> async {
+                return! attachSteamToGameCore conn httpClient projectionHandlers slug appId
             }
 
             // Jellyfin Integration

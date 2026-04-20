@@ -34,6 +34,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       PlayingTrailerUrl = None
       FailedTrailerUrls = Set.empty
       ShowEventHistory = false
+      ConnectSteamState = Idle
       Error = None },
     Cmd.batch [
         Cmd.ofMsg (Load_game slug)
@@ -517,3 +518,42 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Close_event_history ->
         { model with ShowEventHistory = false }, Cmd.none
+
+    | Connect_steam_requested ->
+        { model with ConnectSteamState = Searching },
+        Cmd.OfAsync.either
+            (fun () -> api.searchSteamForGame model.Slug)
+            ()
+            Steam_search_completed
+            (fun _ -> Steam_search_completed [])
+
+    | Steam_search_completed candidates ->
+        match candidates with
+        | [] ->
+            { model with ConnectSteamState = Failed "No Steam match found" }, Cmd.none
+        | [ single ] when single.Score >= 0.95 ->
+            { model with ConnectSteamState = Attaching single.AppId },
+            Cmd.ofMsg (Steam_candidate_chosen single.AppId)
+        | top :: next :: _ when top.Score >= 0.95 && (top.Score - next.Score) >= 0.05 ->
+            { model with ConnectSteamState = Attaching top.AppId },
+            Cmd.ofMsg (Steam_candidate_chosen top.AppId)
+        | _ ->
+            { model with ConnectSteamState = ShowingCandidates candidates }, Cmd.none
+
+    | Steam_candidate_chosen appId ->
+        { model with ConnectSteamState = Attaching appId },
+        Cmd.OfAsync.either
+            (fun () -> api.attachSteamToGame (model.Slug, appId))
+            ()
+            Steam_attach_completed
+            (fun ex -> Steam_attach_completed (Error ex.Message))
+
+    | Steam_attach_completed (Ok ()) ->
+        { model with ConnectSteamState = Idle },
+        Cmd.ofMsg (Load_game model.Slug)
+
+    | Steam_attach_completed (Error msg) ->
+        { model with ConnectSteamState = Failed msg }, Cmd.none
+
+    | Connect_steam_dismissed ->
+        { model with ConnectSteamState = Idle }, Cmd.none

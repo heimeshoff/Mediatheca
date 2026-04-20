@@ -11,6 +11,13 @@ type FriendPickerKind =
 
 type ImagePickerKind = Cover_picker | Backdrop_picker
 
+type ConnectSteamState =
+    | Idle
+    | Searching
+    | ShowingCandidates of SteamSearchResult list
+    | Attaching of int
+    | Failed of string
+
 type Model = {
     Slug: string
     Game: GameDetail option
@@ -41,6 +48,7 @@ type Model = {
     PlayingTrailerUrl: string option
     FailedTrailerUrls: Set<string>
     ShowEventHistory: bool
+    ConnectSteamState: ConnectSteamState
     Error: string option
 }
 
@@ -117,3 +125,8 @@ type Msg =
     | Trailer_errored of string
     | Open_event_history
     | Close_event_history
+    | Connect_steam_requested
+    | Steam_search_completed of SteamSearchResult list
+    | Steam_candidate_chosen of int
+    | Steam_attach_completed of Result<unit, string>
+    | Connect_steam_dismissed
