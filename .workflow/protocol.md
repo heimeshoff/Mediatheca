@@ -2,6 +2,41 @@
 
 ---
 
+## 2026-04-20 13:40 -- Task Completed: 044 - Game Trailer Header Cleanup & Single-Trailer UX
+
+**Type:** Task Completion
+**Task:** 044 - Game Trailer Header Cleanup & Single-Trailer UX
+**Summary:** Hid the thumbnail strip when a game has only one trailer, removed the hero Play Trailer button + spinner + full-screen modal, and cleaned up the related model/msg/state plus the now-unused `getGameTrailer` endpoint. Build succeeded; 233 tests pass.
+**Files changed:** 5 files
+
+---
+
+## 2026-04-20 13:35 -- Batch Started: [044]
+
+**Type:** Batch Start
+**Tasks:** 044 - Game Trailer Header Cleanup & Single-Trailer UX
+**Mode:** Parallel (batch of 1; 045 deferred due to file conflicts with 044 on GameDetail/Shared.fs/Api.fs)
+
+---
+
+## 2026-04-20 13:33 -- Idea Captured: Connect with Steam (manual button + auto-attach on Add Game)
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/045-connect-with-steam.md
+**Summary:** Add a "Connect with Steam" button on the Game Detail page when a game has no Steam link, and auto-attach Steam data after RAWG import in Add Game. Steam search via GetAppList + fuzzy name/year match. Auto-attach only on high-confidence single match (score ≥ 0.95, no near-tie); manual button shows a glassmorphic candidate picker when ambiguous. Unlocks Steam trailers and descriptions for RAWG-only games.
+
+---
+
+## 2026-04-20 13:27 -- Idea Captured: Game Trailer Header Cleanup & Single-Trailer UX
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/044-game-trailer-header-cleanup.md
+**Summary:** Polish task 043: skip the thumbnail strip when a game has only one trailer, remove the "Play Trailer" button from the hero header, and clean up the now-dead modal + its state/messages and the singular `getGameTrailer` API endpoint.
+
+---
+
 ## 2026-04-20 12:33 -- Task Completed: 043 - Game Trailer Gallery in Overview
 
 **Type:** Task Completion
