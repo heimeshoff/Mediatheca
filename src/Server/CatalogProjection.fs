@@ -128,10 +128,12 @@ module CatalogProjection =
 
     // Query functions
 
-    let getEntriesByMovieSlug (conn: SqliteConnection) (movieSlug: string) : (string * string) list =
+    // Note: column is named `movie_slug` for historical reasons but stores any media slug
+    // (movie, series, game, book). This lookup is generic across all media types.
+    let getEntriesByMediaSlug (conn: SqliteConnection) (mediaSlug: string) : (string * string) list =
         conn
         |> Db.newCommand "SELECT catalog_slug, entry_id FROM catalog_entries WHERE movie_slug = @movie_slug"
-        |> Db.setParams [ "movie_slug", SqlType.String movieSlug ]
+        |> Db.setParams [ "movie_slug", SqlType.String mediaSlug ]
         |> Db.query (fun (rd: IDataReader) ->
             (rd.ReadString "catalog_slug", rd.ReadString "entry_id"))
 

@@ -988,6 +988,37 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 ]
                             ]
                         ]
+                        // Remove-game confirmation popover (anchored under the action menu)
+                        if model.ConfirmingRemove then
+                            Html.div [
+                                prop.className "absolute top-16 right-4 z-[250] rating-dropdown p-4"
+                                prop.style [ style.minWidth 260 ]
+                                prop.children [
+                                    Html.p [
+                                        prop.className "text-sm font-semibold text-error mb-3"
+                                        prop.text "Remove this game?"
+                                    ]
+                                    Html.div [
+                                        prop.className "flex gap-2"
+                                        prop.children [
+                                            Daisy.button.button [
+                                                button.error
+                                                button.sm
+                                                prop.className "flex-1"
+                                                prop.onClick (fun _ -> dispatch Remove_game)
+                                                prop.text "Yes, remove"
+                                            ]
+                                            Daisy.button.button [
+                                                button.ghost
+                                                button.sm
+                                                prop.className "flex-1"
+                                                prop.onClick (fun _ -> dispatch Cancel_remove_game)
+                                                prop.text "Cancel"
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
                         // Hero content at bottom
                         Html.div [
                             prop.className "relative h-full flex items-end pb-6 lg:pb-8 px-4 lg:px-8"
@@ -1646,41 +1677,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     prop.text err
                                                 ]
                                             | None -> ()
-                                            // Remove game confirmation (triggered by ActionMenu)
-                                            if model.ConfirmingRemove then
-                                                Html.div [
-                                                    prop.className "pt-4"
-                                                    prop.children [
-                                                        Html.div [
-                                                            prop.className "bg-error/10 border border-error/30 rounded-xl p-4 space-y-3"
-                                                            prop.children [
-                                                                Html.p [
-                                                                    prop.className "text-sm font-semibold text-error"
-                                                                    prop.text "Are you sure you want to remove this game?"
-                                                                ]
-                                                                Html.div [
-                                                                    prop.className "flex gap-2"
-                                                                    prop.children [
-                                                                        Daisy.button.button [
-                                                                            button.error
-                                                                            button.sm
-                                                                            prop.className "flex-1"
-                                                                            prop.onClick (fun _ -> dispatch Remove_game)
-                                                                            prop.text "Yes, remove"
-                                                                        ]
-                                                                        Daisy.button.button [
-                                                                            button.ghost
-                                                                            button.sm
-                                                                            prop.className "flex-1"
-                                                                            prop.onClick (fun _ -> dispatch Cancel_remove_game)
-                                                                            prop.text "Cancel"
-                                                                        ]
-                                                                    ]
-                                                                ]
-                                                            ]
-                                                        ]
-                                                    ]
-                                                ]
                                         ]
                                     ]
                                 ]

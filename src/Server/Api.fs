@@ -1055,7 +1055,7 @@ module Api =
                 match result with
                 | Ok () ->
                     // Remove catalog entries referencing this movie
-                    let catalogEntries = CatalogProjection.getEntriesByMovieSlug conn slug
+                    let catalogEntries = CatalogProjection.getEntriesByMediaSlug conn slug
                     for (catalogSlug, entryId) in catalogEntries do
                         let catalogSid = Catalogs.streamId catalogSlug
                         executeCommand
@@ -2185,7 +2185,7 @@ module Api =
                 match result with
                 | Ok () ->
                     // Remove catalog entries referencing this series
-                    let catalogEntries = CatalogProjection.getEntriesByMovieSlug conn slug
+                    let catalogEntries = CatalogProjection.getEntriesByMediaSlug conn slug
                     for (catalogSlug, entryId) in catalogEntries do
                         let catalogSid = Catalogs.streamId catalogSlug
                         executeCommand
@@ -2689,7 +2689,7 @@ module Api =
                 match result with
                 | Ok () ->
                     // Remove catalog entries referencing this game
-                    let catalogEntries = CatalogProjection.getEntriesByMovieSlug conn slug
+                    let catalogEntries = CatalogProjection.getEntriesByMediaSlug conn slug
                     for (catalogSlug, entryId) in catalogEntries do
                         let catalogSid = Catalogs.streamId catalogSlug
                         executeCommand

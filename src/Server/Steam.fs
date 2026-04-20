@@ -609,41 +609,37 @@ module Steam =
                 return []
         }
 
-    // ── Steam name search (GetAppList + fuzzy match) ──
+    // ── Steam name search (SteamCommunity SearchApps + fuzzy rescore) ──
     //
-    // Valve's ISteamApps/GetAppList/v2 returns the full public Steam app list
-    // (~200k entries, ~10 MB). We fetch it once with a 24h TTL, normalize the
-    // names, and run exact / substring / token-set matching to find candidates
-    // for games that were added without a Steam link.
+    // Valve retired the old `ISteamApps/GetAppList/v2` full-list endpoint, so
+    // we use the SteamCommunity storefront search at
+    // `steamcommunity.com/actions/SearchApps/<query>` — it returns up to ~10
+    // fuzzy-matched app records with `appid`, `name`, `icon`, `logo`.
     //
-    // Non-game AppIDs (soundtracks, tools, DLC, dedicated servers) live in the
-    // same namespace — callers disambiguate by either checking Store details'
-    // `type = "game"` (for auto-attach) or relying on user visual selection
-    // (for the picker).
+    // We re-score those candidates locally (exact / substring / token-set) to
+    // compute a confidence score (0.0 .. 1.0) that callers can branch on for
+    // auto-attach vs. picker. Non-game AppIDs (soundtracks, tools, DLC) are
+    // filtered out by fetching Store meta for the top candidates.
 
-    type SteamAppListEntry = { AppId: int; Name: string }
+    type SteamAppSearchEntry = { AppId: int; Name: string; Icon: string option }
 
-    let private decodeAppListEntry: Decoder<SteamAppListEntry> =
+    // SearchApps returns `appid` as a STRING (unlike most Steam APIs which
+    // return it as an int). Handle both just in case.
+    let private decodeAppIdField: Decoder<int> =
+        Decode.oneOf [
+            Decode.int
+            Decode.string |> Decode.andThen (fun s ->
+                match System.Int32.TryParse(s) with
+                | true, v -> Decode.succeed v
+                | _ -> Decode.fail (sprintf "Invalid appid string: %s" s))
+        ]
+
+    let private decodeAppSearchEntry: Decoder<SteamAppSearchEntry> =
         Decode.object (fun get -> {
-            AppId = get.Required.Field "appid" Decode.int
+            AppId = get.Required.Field "appid" decodeAppIdField
             Name = get.Optional.Field "name" Decode.string |> Option.defaultValue ""
+            Icon = get.Optional.Field "icon" Decode.string
         })
-
-    let private decodeAppListResponse: Decoder<SteamAppListEntry list> =
-        Decode.object (fun get ->
-            let applist = get.Required.Field "applist" (Decode.object (fun get2 ->
-                get2.Optional.Field "apps" (Decode.list decodeAppListEntry) |> Option.defaultValue []
-            ))
-            applist
-        )
-
-    // Cache: loaded-at UTC time + the normalized-name index. The index maps a
-    // normalized name to all (appId, originalName) pairs that share it (Steam
-    // has many duplicate names — e.g. soundtrack/demo/game sharing a title).
-    let private appListCacheLock = obj()
-    let mutable private appListCache:
-        (System.DateTime * Map<string, (int * string) list> * Map<int, string>) option = None
-    let private appListCacheTtl = System.TimeSpan.FromHours(24.0)
 
     // Per-session cache of Store details (release_date / type) used for year
     // boost and type filtering during search. Separate from the full-response
@@ -705,56 +701,21 @@ module Steam =
             let union = Set.union a b |> Set.count |> float
             if union = 0.0 then 0.0 else inter / union
 
-    let private loadAppList (httpClient: HttpClient) : Async<Map<string, (int * string) list> * Map<int, string>> =
+    let private searchApps (httpClient: HttpClient) (query: string) : Async<SteamAppSearchEntry list> =
         async {
-            // GetAppList is ~10 MB; fetch once and keep in memory.
-            let url = "https://api.steampowered.com/ISteamApps/GetAppList/v2/"
-            let! json = fetchJson httpClient url
-            match Decode.fromString decodeAppListResponse json with
-            | Ok entries ->
-                // De-duplicate by (appId, name) — the API occasionally repeats
-                // the same pair — and filter out blank names.
-                let cleaned =
-                    entries
-                    |> List.filter (fun e -> not (System.String.IsNullOrWhiteSpace(e.Name)))
-                let normalizedIndex =
-                    cleaned
-                    |> List.fold (fun acc e ->
-                        let key = normalizeName e.Name
-                        if key = "" then acc
-                        else
-                            let prior = Map.tryFind key acc |> Option.defaultValue []
-                            // Avoid duplicate (appId, name) in the bucket
-                            if prior |> List.exists (fun (id, _) -> id = e.AppId) then acc
-                            else Map.add key ((e.AppId, e.Name) :: prior) acc
-                    ) Map.empty
-                let byAppId =
-                    cleaned
-                    |> List.fold (fun acc e ->
-                        if Map.containsKey e.AppId acc then acc
-                        else Map.add e.AppId e.Name acc
-                    ) Map.empty
-                return normalizedIndex, byAppId
-            | Error _ -> return Map.empty, Map.empty
-        }
-
-    let private getAppList (httpClient: HttpClient) : Async<Map<string, (int * string) list> * Map<int, string>> =
-        async {
-            let cached =
-                lock appListCacheLock (fun () ->
-                    match appListCache with
-                    | Some (loadedAt, idx, byId) when System.DateTime.UtcNow - loadedAt < appListCacheTtl ->
-                        Some (idx, byId)
-                    | _ -> None)
-            match cached with
-            | Some (idx, byId) -> return idx, byId
-            | None ->
-                printfn "[SteamSearch] Fetching Steam app list (cache miss)..."
-                let! idx, byId = loadAppList httpClient
-                lock appListCacheLock (fun () ->
-                    appListCache <- Some (System.DateTime.UtcNow, idx, byId))
-                printfn "[SteamSearch] Cached %d normalized-name buckets" (Map.count idx)
-                return idx, byId
+            try
+                let url =
+                    sprintf "https://steamcommunity.com/actions/SearchApps/%s"
+                        (System.Uri.EscapeDataString query)
+                let! json = fetchJson httpClient url
+                match Decode.fromString (Decode.list decodeAppSearchEntry) json with
+                | Ok entries -> return entries |> List.filter (fun e -> not (System.String.IsNullOrWhiteSpace(e.Name)))
+                | Error e ->
+                    printfn "[SteamSearch] Failed to parse SearchApps response for '%s': %s" query e
+                    return []
+            with ex ->
+                printfn "[SteamSearch] SearchApps request failed for '%s': %s" query ex.Message
+                return []
         }
 
     let private tryParseReleaseYear (releaseDate: string) : int option =
@@ -804,9 +765,9 @@ module Steam =
                 with _ -> return None
         }
 
-    /// Searches the Steam app list for candidates matching `query` (optionally
-    /// boosted by `year`). Returns up to 5 candidates scored 0.0 .. 1.0. Callers
-    /// interpret scores:
+    /// Searches Steam for candidates matching `query` (optionally boosted by
+    /// `year`). Returns up to 5 candidates scored 0.0 .. 1.0. Callers interpret
+    /// scores:
     ///   - `>= 0.95` high confidence (auto-attach)
     ///   - `0.7 .. 0.95` ambiguous (user picks)
     ///   - `< 0.7` filtered out
@@ -815,86 +776,73 @@ module Steam =
             let qNorm = normalizeName query
             if qNorm = "" then return []
             else
-                let! index, _byAppId = getAppList httpClient
+                let! entries = searchApps httpClient query
                 let qTokens = tokenize qNorm
 
-                // Step 1: gather candidate pool with initial scores.
-                // Use a dictionary keyed by appId so duplicates collapse to
-                // their best score.
-                let candidates = System.Collections.Generic.Dictionary<int, string * float>()
-                let push (appId: int) (name: string) (score: float) =
-                    match candidates.TryGetValue(appId) with
-                    | true, (_, existing) when existing >= score -> ()
-                    | _ -> candidates.[appId] <- (name, score)
-
-                // 1a. Exact normalized match — score 1.0.
-                match Map.tryFind qNorm index with
-                | Some hits ->
-                    for (appId, name) in hits do push appId name 1.0
-                | None -> ()
-
-                // 1b. Substring + token-set — scan index. Bail early once we
-                // have plenty of strong matches to keep the cost linear.
-                for KeyValue(key, hits) in index do
-                    if key <> qNorm then
+                let scoreEntry (e: SteamAppSearchEntry) : float =
+                    let k = normalizeName e.Name
+                    if k = "" then 0.0
+                    elif k = qNorm then 1.0
+                    else
                         let substringScore =
-                            if key.Contains(qNorm) then
-                                let ratio = float qNorm.Length / float key.Length
+                            if k.Contains(qNorm) then
+                                let ratio = float qNorm.Length / float k.Length
                                 0.75 + 0.15 * ratio  // 0.75 .. 0.9
-                            elif qNorm.Contains(key) && key.Length >= 4 then
-                                let ratio = float key.Length / float qNorm.Length
+                            elif qNorm.Contains(k) && k.Length >= 4 then
+                                let ratio = float k.Length / float qNorm.Length
                                 0.70 + 0.15 * ratio
                             else 0.0
-
                         let tokenScore =
                             if substringScore = 0.0 then
-                                let kTokens = tokenize key
+                                let kTokens = tokenize k
                                 let j = jaccard qTokens kTokens
                                 if j >= 0.5 then 0.6 + 0.3 * j  // up to 0.9
                                 else 0.0
                             else 0.0
+                        max substringScore tokenScore
 
-                        let score = max substringScore tokenScore
-                        if score >= 0.6 then
-                            for (appId, name) in hits do push appId name score
+                // Dedupe by appId, keeping best score.
+                let byAppId = System.Collections.Generic.Dictionary<int, string * string option * float>()
+                for e in entries do
+                    let s = scoreEntry e
+                    match byAppId.TryGetValue(e.AppId) with
+                    | true, (_, _, existing) when existing >= s -> ()
+                    | _ -> byAppId.[e.AppId] <- (e.Name, e.Icon, s)
 
-                // Step 2: take top N by score *before* fetching Store meta
-                // (year boost + type filter). We cap at ~8 to keep the fan-out
-                // tight but give us headroom if some fail the type check.
                 let preRanked =
-                    candidates
+                    byAppId
                     |> Seq.map (fun kv ->
-                        let (name, score) = kv.Value
-                        kv.Key, name, score)
-                    |> Seq.sortByDescending (fun (_, _, s) -> s)
+                        let (name, icon, score) = kv.Value
+                        kv.Key, name, icon, score)
+                    |> Seq.sortByDescending (fun (_, _, _, s) -> s)
                     |> Seq.truncate 8
                     |> List.ofSeq
 
-                // Step 3: for the top 3, fetch Store meta for year boost and
-                // type filtering (skip non-"game" results).
+                // For the top 3, fetch Store meta for year boost + type filter.
                 let! withMeta =
                     preRanked
-                    |> List.mapi (fun i (appId, name, score) ->
+                    |> List.mapi (fun i (appId, name, icon, score) ->
                         async {
                             if i < 3 then
                                 let! meta = fetchStoreMeta httpClient appId
-                                return appId, name, score, meta
+                                return appId, name, icon, score, meta
                             else
-                                return appId, name, score, None
+                                return appId, name, icon, score, None
                         })
                     |> Async.Parallel
 
                 let adjusted =
                     withMeta
                     |> Array.toList
-                    |> List.choose (fun (appId, name, score, metaOpt) ->
-                        // Filter out non-games we know about. Unknown (no meta
-                        // fetched) stays in — we can't be sure.
+                    |> List.choose (fun (appId, name, icon, score, metaOpt) ->
                         match metaOpt with
                         | Some m when m.Type <> "" && m.Type <> "game" -> None
                         | _ ->
                             let yearFromMeta = metaOpt |> Option.bind (fun m -> m.ReleaseYear)
-                            let headerImage = metaOpt |> Option.bind (fun m -> m.HeaderImage)
+                            let headerImage =
+                                metaOpt
+                                |> Option.bind (fun m -> m.HeaderImage)
+                                |> Option.orElse icon
                             let boostedScore =
                                 match year, yearFromMeta with
                                 | Some y, Some cy ->
