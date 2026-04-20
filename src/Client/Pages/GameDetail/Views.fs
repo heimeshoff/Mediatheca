@@ -1027,9 +1027,9 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                 | None -> ()
                                                             ]
                                                         ]
-                                                        // Thumbnail strip
+                                                        // Thumbnail strip (padding accommodates selected thumb's ring box-shadow)
                                                         Html.div [
-                                                            prop.className "flex gap-3 overflow-x-auto pb-2"
+                                                            prop.className "flex gap-3 overflow-x-auto p-1.5 pb-3 -m-1.5"
                                                             prop.children [
                                                                 for trailer in visibleTrailers do
                                                                     let isSelected =
