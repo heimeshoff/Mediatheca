@@ -19,6 +19,16 @@ module FriendProjection =
             );
         """
         |> Db.exec
+        // Idempotent migration for existing databases
+        try
+            conn |> Db.newCommand "ALTER TABLE friend_list ADD COLUMN crop_offset_x REAL" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "ALTER TABLE friend_list ADD COLUMN crop_offset_y REAL" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "ALTER TABLE friend_list ADD COLUMN crop_zoom REAL" |> Db.exec
+        with _ -> ()
 
     let private dropTables (conn: SqliteConnection) : unit =
         conn

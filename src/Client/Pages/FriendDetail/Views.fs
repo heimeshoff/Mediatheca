@@ -212,9 +212,9 @@ let private watchedMediaSection (isCollapsed: bool) (onToggle: unit -> unit) (vi
 
 [<ReactComponent>]
 let private CropEditor (imageUrl: string) (initialOffset: float * float) (initialZoom: float) (onSave: float * float * float -> unit) (onClose: unit -> unit) =
-    let offsetX, setOffsetX = React.useState (fst initialOffset)
-    let offsetY, setOffsetY = React.useState (snd initialOffset)
-    let zoom, setZoom = React.useState initialZoom
+    let offsetX, setOffsetX = React.useStateWithUpdater (fst initialOffset)
+    let offsetY, setOffsetY = React.useStateWithUpdater (snd initialOffset)
+    let zoom, setZoom = React.useStateWithUpdater initialZoom
     let isDragging = React.useRef false
     let lastPos = React.useRef (0.0, 0.0)
 
@@ -342,7 +342,7 @@ let private CropEditor (imageUrl: string) (initialOffset: float * float) (initia
                                 prop.ref (fun el -> containerRef.current <- (if isNull el then None else Some (unbox el)))
                                 prop.className "relative w-64 h-64 rounded-full overflow-hidden cursor-grab active:cursor-grabbing select-none ring-2 ring-primary/30"
                                 prop.style [
-                                    style.touchAction.none
+                                    style.custom ("touchAction", "none")
                                 ]
                                 prop.onMouseDown (fun e -> handleMouseDown e)
                                 prop.onMouseMove (fun e -> handleMouseMove e)
@@ -361,9 +361,9 @@ let private CropEditor (imageUrl: string) (initialOffset: float * float) (initia
                                             style.width (length.percent 100)
                                             style.height (length.percent 100)
                                             style.objectFit.cover
-                                            style.objectPosition $"{50.0 + offsetX}% {50.0 + offsetY}%"
-                                            style.transform $"scale({zoom})"
-                                            style.transformOrigin "center center"
+                                            style.custom ("objectPosition", sprintf "%f%% %f%%" (50.0 + offsetX) (50.0 + offsetY))
+                                            style.custom ("transform", $"scale({zoom})")
+                                            style.custom ("transformOrigin", "center center")
                                         ]
                                     ]
                                 ]
@@ -500,9 +500,9 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                         prop.alt friend.Name
                                                                         prop.className "w-full h-full object-cover"
                                                                         prop.style [
-                                                                            style.objectPosition $"{50.0 + cs.OffsetX}% {50.0 + cs.OffsetY}%"
-                                                                            style.transform $"scale({cs.Zoom})"
-                                                                            style.transformOrigin "center center"
+                                                                            style.custom ("objectPosition", sprintf "%f%% %f%%" (50.0 + cs.OffsetX) (50.0 + cs.OffsetY))
+                                                                            style.custom ("transform", $"scale({cs.Zoom})")
+                                                                            style.custom ("transformOrigin", "center center")
                                                                         ]
                                                                     ]
                                                                 | None ->
