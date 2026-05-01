@@ -416,13 +416,19 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             Cmd.map Styleguide_msg childCmd
         | Dashboard ->
             let childModel, childCmd = Pages.Dashboard.State.init ()
-            // Apply pending tab from a Go_back fallback, if any
-            let childModel, tabCmd =
+            // Determine the active tab on Dashboard re-entry:
+            //   PendingDashboardTab takes priority (Go_back empty-stack fallback).
+            //   Otherwise preserve the previously active tab so the back button
+            //   from a detail page returns to the same tab the item was opened from.
+            let activeTab =
                 match model.PendingDashboardTab with
-                | Some tab ->
-                    { childModel with ActiveTab = tab },
-                    Cmd.ofMsg (Dashboard_msg (Pages.Dashboard.Types.SwitchTab tab))
-                | None -> childModel, Cmd.none
+                | Some tab -> tab
+                | None -> model.DashboardModel.ActiveTab
+            let childModel = { childModel with ActiveTab = activeTab }
+            let tabCmd =
+                match activeTab with
+                | Pages.Dashboard.Types.All -> Cmd.none
+                | _ -> Cmd.ofMsg (Dashboard_msg (Pages.Dashboard.Types.SwitchTab activeTab))
             { model with DashboardModel = childModel; PendingDashboardTab = None },
             Cmd.batch [
                 Cmd.map Dashboard_msg childCmd
