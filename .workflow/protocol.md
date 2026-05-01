@@ -2,6 +2,42 @@
 
 ---
 
+## 2026-05-01 12:34 -- Idea Captured: Manual Refresh Controls for Steam Link & HLTB Data
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/049-manual-refresh-controls-steam-and-hltb.md
+**Summary:** On the Game Detail page, expose two user-controlled refresh affordances. (1) Steam re-link: surface the existing Connect-with-Steam search/picker flow as a small refresh icon next to the Steam Store link, so games already linked to a Steam App ID can be re-matched (e.g. fixing a wrong auto-attach). Reuses existing `searchSteamForGame` / `attachSteamToGame` endpoints; `attachSteamToGameCore` already preserves user-edited descriptions. (2) HLTB refresh: add an always-visible refresh icon to the HLTB card header (today the fetch button only appears when no data exists). Reuses the existing `Fetch_hltb` flow which already overwrites via `Set_hltb_hours`. One small tweak in `State.fs` so a refresh-with-no-data response doesn't erase existing bars. Frontend-only — no backend changes.
+
+---
+
+## 2026-05-01 -- Idea Captured: Remove `Playing` Status; Auto-Promote to `InFocus` on Steam Play
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/048-remove-playing-status-and-auto-focus-on-steam-play.md
+**Summary:** Collapse the redundant `Playing` game status into `InFocus`, with legacy events/rows mapped on read and a one-time `UPDATE` to migrate existing data. During the scheduled Steam sync, any game with a newly recorded play session is auto-promoted to `InFocus` if not already there — including `Completed`, `Abandoned`, and `Dismissed` games (replays surface back on the dashboard). Promotion only fires when a session is actually recorded (not on bare `rtime_last_played` refreshes). New sync-result counter `GamesPromotedToFocus` is logged per run.
+
+---
+
+## 2026-05-01 -- Idea Captured: Date Pickers Persist on Enter or Blur, Not on Change
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/047-date-picker-commit-on-enter-or-blur.md
+**Summary:** Native `<input type="date">` editors on TV episodes and movie watch sessions currently dispatch save+close on every onChange, so typing a partial digit (e.g. `0`) clears the field and unmounts the editor. Fix: hold draft in local React state, persist only on Enter or blur outside, keep Escape as cancel. Apply across episodes, movie sessions, and the upcoming play-session editor (task 046).
+
+---
+
+## 2026-05-01 -- Idea Captured: Editable Play Sessions on Game Detail
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/046-editable-play-sessions.md
+**Summary:** Make the Play History list on the Game Detail page fully editable — add/edit/delete sessions (date + minutes), merge on date collision, recompute the game's total playtime from session sum after every change. Steam delta sync remains unchanged (already cannot subtract; manual rows don't interfere).
+
+---
+
 ## 2026-04-20 13:52 -- Task Completed: 045 - Connect with Steam (manual button + auto-attach on Add Game)
 
 **Type:** Task Completion
