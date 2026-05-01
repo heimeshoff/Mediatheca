@@ -1,6 +1,6 @@
 # Task 049: Manual Refresh Controls for Steam Link & HLTB Data
 
-**Status:** Todo
+**Status:** Done
 **Size:** Small
 **Created:** 2026-05-01
 **Milestone:** --
@@ -141,3 +141,33 @@ When data is present, drop the bottom "Fetch from HowLongToBeat" button entirely
 - Inline HLTB error display next to the card (user is fine with the top-level banner).
 - Manual override of the auto-attach branch when the user explicitly clicks "refresh" on a linked game (could force the picker to always show; deferred unless the auto-re-attach turns out to be confusing).
 - HLTB manual search/picker (we still rely on `HowLongToBeat.searchGame` picking the top match by name — no UI to disambiguate). If the wrong-game-matched problem is common enough later, file as a follow-up task.
+
+## Work Log
+
+### 2026-05-01 13:11 -- Work Completed
+
+**What was done:**
+- Steam re-link: extended the Links section so when `game.SteamAppId.IsSome`, the Steam Store link is rendered alongside a small ghost-circle refresh icon button (`Icons.arrowPathSm`). The button dispatches the existing `Connect_steam_requested` flow, spins while Searching/Attaching, and shares the `connectSteamTriggerId` wrapper so `ConnectSteamPicker` anchors to it. The existing `Failed` error/dismiss UI is preserved in the linked-state branch as well. Unlinked state continues to use the existing `connectSteamButton` unchanged.
+- HLTB refresh: refactored the HowLongToBeat card header into a flex row with the title on the left and a small refresh icon button on the right. Header button is always visible regardless of whether `HltbHours` is `Some` or `None`, dispatches `Fetch_hltb`, spins via `animate-spin` and is disabled while `HltbFetching = true`. Replaced the body's standalone "Fetch from HowLongToBeat" CTA with an italic "Click refresh to fetch from HowLongToBeat" prompt; the spinner / no-data text branches still render appropriately.
+- State.fs `Hltb_fetched (Ok None)`: now only sets `HltbNoData = true` when `model.Game.HltbHours.IsNone`, so a refresh on a previously-linked game that returns no new data preserves the existing bars instead of wiping them.
+
+**Acceptance criteria status:**
+- [x] Steam re-link button visible when `SteamAppId.IsSome` -- new `arrowPathSm` ghost-circle button rendered alongside the Steam Store link.
+- [x] Re-link triggers `Connect_steam_requested` and uses the existing picker -- shares `connectSteamTriggerId` wrapper so `ConnectSteamPicker` (anchored via `getElementById`) finds it whether linked or not.
+- [x] Choosing a candidate calls `attachSteamToGame` -- unchanged existing flow, no new messages.
+- [x] After successful re-link page reloads via `Load_game` -- unchanged existing handler at State.fs:657-659.
+- [x] Failure path uses existing `Failed msg` UI -- linked-state branch renders the same Dismiss-able error block.
+- [x] No backend changes -- only `Views.fs` and `State.fs` touched on the client.
+- [x] HLTB header refresh button always visible -- rendered in `flex items-center justify-between` header regardless of `HltbHours` state.
+- [x] Click dispatches `Fetch_hltb` -- existing handler reused; overwrites via `Set_hltb_hours`.
+- [x] Spinning icon + disabled while fetching -- `animate-spin` class + `prop.disabled model.HltbFetching`.
+- [x] `Hltb_fetched (Ok None)` after refresh keeps existing bars -- `HltbNoData` now gated on `model.Game.HltbHours.IsNone`.
+- [x] Error path uses top-level banner -- unchanged.
+- [x] No backend changes -- confirmed.
+- [x] `npm run build` succeeds -- Fable compiles clean (built in 32.16s).
+- [x] `npm test` passes -- 255 tests passed, 0 failed.
+- [x] Design check -- both buttons use the same `btn btn-ghost btn-xs btn-circle text-base-content/50 hover:text-primary transition-colors` + `animate-spin` pattern as the Dashboard "Recently Played" refresh from Task 039.
+
+**Files changed:**
+- src/Client/Pages/GameDetail/Views.fs -- Added Steam re-link icon button next to Steam Store link in linked state; refactored HLTB card header to include always-visible refresh icon; replaced bottom Fetch-button with subtle prompt text.
+- src/Client/Pages/GameDetail/State.fs -- `Hltb_fetched (Ok None)` now only flips `HltbNoData` when the loaded game had no prior hours.

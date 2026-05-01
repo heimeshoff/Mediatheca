@@ -567,7 +567,14 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
 
     | Hltb_fetched (Ok None) ->
-        { model with HltbFetching = false; HltbNoData = true }, Cmd.none
+        // Only show "no data" when the game never had HLTB hours to begin with.
+        // If a refresh on a previously-linked game returns None, keep the
+        // existing bars on screen rather than wiping them.
+        let hadHours =
+            match model.Game with
+            | Some g -> g.HltbHours.IsSome
+            | None -> false
+        { model with HltbFetching = false; HltbNoData = not hadHours }, Cmd.none
 
     | Hltb_fetched (Error err) ->
         { model with HltbFetching = false; Error = Some err }, Cmd.none

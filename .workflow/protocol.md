@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-05-01 13:14 -- Task Completed: 049 - Manual Refresh Controls for Steam Link & HLTB Data
+
+**Type:** Task Completion
+**Task:** 049 - Manual Refresh Controls for Steam Link & HLTB Data
+**Summary:** Added a Steam re-link refresh icon next to the Steam Store link (reuses the existing Connect-with-Steam picker so a wrong auto-attach can be corrected) and an always-visible HLTB refresh button in the HowLongToBeat card header. Adjusted `Hltb_fetched (Ok None)` so a refresh returning no data doesn't wipe existing bars. Build clean, 255 tests pass.
+**Files changed:** 3 files
+
+---
+
+## 2026-05-01 13:10 -- Batch Started: [049]
+
+**Type:** Batch Start
+**Tasks:** 049 - Manual Refresh Controls for Steam Link & HLTB Data
+**Mode:** Parallel (batch of 1; 050 deferred — also touches GameDetail/Views.fs)
+
+---
+
 ## 2026-05-01 13:08 -- Task Completed: 048 - Remove `Playing` Status; Auto-Promote to `InFocus` on Steam Play
 
 **Type:** Task Completion

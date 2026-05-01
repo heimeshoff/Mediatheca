@@ -1314,15 +1314,56 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     prop.children [
                                                         match game.SteamAppId with
                                                         | Some appId ->
-                                                            Html.a [
-                                                                prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-content/5 transition-colors text-sm font-medium text-base-content/70 hover:text-primary"
-                                                                prop.href $"https://store.steampowered.com/app/{appId}/"
-                                                                prop.target "_blank"
-                                                                prop.rel "noopener noreferrer"
+                                                            // Linked state: Steam Store link + small refresh button to re-run
+                                                            // the search and pick a different App ID. Both share the
+                                                            // connectSteamTriggerId so the picker popover anchors here.
+                                                            let isBusy =
+                                                                match model.ConnectSteamState with
+                                                                | Searching | Attaching _ -> true
+                                                                | _ -> false
+                                                            Html.div [
+                                                                prop.id connectSteamTriggerId
                                                                 prop.children [
-                                                                    Icons.gamepad ()
-                                                                    Html.span [ prop.text "Steam Store" ]
-                                                                    Html.span [ prop.className "ml-auto text-base-content/30"; prop.children [ Icons.externalLink () ] ]
+                                                                    Html.div [
+                                                                        prop.className "flex items-center gap-1"
+                                                                        prop.children [
+                                                                            Html.a [
+                                                                                prop.className "flex-1 flex items-center gap-3 p-2 rounded-lg hover:bg-base-content/5 transition-colors text-sm font-medium text-base-content/70 hover:text-primary"
+                                                                                prop.href $"https://store.steampowered.com/app/{appId}/"
+                                                                                prop.target "_blank"
+                                                                                prop.rel "noopener noreferrer"
+                                                                                prop.children [
+                                                                                    Icons.gamepad ()
+                                                                                    Html.span [ prop.text "Steam Store" ]
+                                                                                    Html.span [ prop.className "ml-auto text-base-content/30"; prop.children [ Icons.externalLink () ] ]
+                                                                                ]
+                                                                            ]
+                                                                            Html.button [
+                                                                                prop.className (
+                                                                                    "btn btn-ghost btn-xs btn-circle text-base-content/50 hover:text-primary transition-colors"
+                                                                                    + (if isBusy then " animate-spin" else "")
+                                                                                )
+                                                                                prop.disabled isBusy
+                                                                                prop.title "Re-link to a different Steam title"
+                                                                                prop.onClick (fun _ -> dispatch Connect_steam_requested)
+                                                                                prop.children [ Icons.arrowPathSm () ]
+                                                                            ]
+                                                                        ]
+                                                                    ]
+                                                                    match model.ConnectSteamState with
+                                                                    | Failed err ->
+                                                                        Html.div [
+                                                                            prop.className "mt-2 flex items-start gap-2 text-xs text-error/80 px-2"
+                                                                            prop.children [
+                                                                                Html.span [ prop.className "flex-1"; prop.text err ]
+                                                                                Html.button [
+                                                                                    prop.className "text-base-content/50 hover:text-base-content underline"
+                                                                                    prop.onClick (fun _ -> dispatch Connect_steam_dismissed)
+                                                                                    prop.text "Dismiss"
+                                                                                ]
+                                                                            ]
+                                                                        ]
+                                                                    | _ -> ()
                                                                 ]
                                                             ]
                                                         | None ->
@@ -1357,11 +1398,26 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             ]
                                             // HowLongToBeat
                                             glassCard [
-                                                Html.h3 [
-                                                    prop.className "text-lg font-bold mb-4 flex items-center gap-2"
+                                                Html.div [
+                                                    prop.className "flex items-center justify-between mb-4"
                                                     prop.children [
-                                                        Icons.hourglass ()
-                                                        Html.text "HowLongToBeat"
+                                                        Html.h3 [
+                                                            prop.className "text-lg font-bold flex items-center gap-2"
+                                                            prop.children [
+                                                                Icons.hourglass ()
+                                                                Html.text "HowLongToBeat"
+                                                            ]
+                                                        ]
+                                                        Html.button [
+                                                            prop.className (
+                                                                "btn btn-ghost btn-xs btn-circle text-base-content/50 hover:text-primary transition-colors"
+                                                                + (if model.HltbFetching then " animate-spin" else "")
+                                                            )
+                                                            prop.disabled model.HltbFetching
+                                                            prop.title "Refresh HowLongToBeat data"
+                                                            prop.onClick (fun _ -> dispatch Fetch_hltb)
+                                                            prop.children [ Icons.arrowPathSm () ]
+                                                        ]
                                                     ]
                                                 ]
                                                 match game.HltbHours with
@@ -1412,12 +1468,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         ]
                                                     ]
                                                 | None ->
-                                                    if model.HltbNoData then
-                                                        Html.p [
-                                                            prop.className "text-sm text-base-content/40 italic"
-                                                            prop.text "No HLTB data available for this game"
-                                                        ]
-                                                    elif model.HltbFetching then
+                                                    if model.HltbFetching then
                                                         Html.div [
                                                             prop.className "flex items-center gap-2"
                                                             prop.children [
@@ -1428,14 +1479,15 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                                 ]
                                                             ]
                                                         ]
+                                                    elif model.HltbNoData then
+                                                        Html.p [
+                                                            prop.className "text-sm text-base-content/40 italic"
+                                                            prop.text "No HLTB data available for this game"
+                                                        ]
                                                     else
-                                                        Html.button [
-                                                            prop.className "btn btn-sm btn-outline btn-primary gap-2"
-                                                            prop.onClick (fun _ -> dispatch Fetch_hltb)
-                                                            prop.children [
-                                                                Icons.hourglass ()
-                                                                Html.text "Fetch from HowLongToBeat"
-                                                            ]
+                                                        Html.p [
+                                                            prop.className "text-sm text-base-content/40 italic"
+                                                            prop.text "Click refresh to fetch from HowLongToBeat"
                                                         ]
                                             ]
                                             // Play History
