@@ -176,7 +176,7 @@ module Steam =
     let unixTimestampToDateString (timestamp: int) : string option =
         if timestamp = 0 then None
         else
-            let dt = System.DateTimeOffset.UnixEpoch.AddSeconds(float timestamp).UtcDateTime
+            let dt = System.DateTimeOffset.UnixEpoch.AddSeconds(float timestamp).LocalDateTime
             Some (dt.ToString("yyyy-MM-dd"))
 
     // HTTP helper

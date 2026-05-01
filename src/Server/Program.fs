@@ -237,7 +237,7 @@ let main args =
 
     app.UseGiraffe webApp
 
-    // Scheduled jobs: daily refresh at a configurable hour (defaults to 04:00 UTC)
+    // Scheduled jobs: daily refresh at a configurable local-time hour (defaults to 04:00 local)
     let playtimeSyncHour =
         SettingsStore.getSetting conn "playtime_sync_hour"
         |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
@@ -250,18 +250,26 @@ let main args =
 
     let scheduledJobs : ScheduledJobs.JobSpec list = [
         { Name = "Steam playtime sync"
-          HourUtc = playtimeSyncHour
+          Hour = playtimeSyncHour
           Run = fun () ->
             async {
-                let yesterday = DateTime.UtcNow.AddDays(-1.0).ToString("yyyy-MM-dd")
-                match! PlaytimeTracker.runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers (Some yesterday) with
+                // Day boundary is playtimeSyncHour local: a startup catch-up firing before
+                // today's cutover still belongs to yesterday's bucket; firing at/after, today's.
+                let now = DateTime.Now
+                let cutoverToday = DateTime(now.Year, now.Month, now.Day, playtimeSyncHour, 0, 0, DateTimeKind.Local)
+                let effectiveDate =
+                    if now < cutoverToday then
+                        Some (now.AddDays(-1.0).ToString("yyyy-MM-dd"))
+                    else
+                        None
+                match! PlaytimeTracker.runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers effectiveDate with
                 | Ok result ->
                     eprintfn "[PlaytimeTracker] Sync complete: %d sessions recorded, %d snapshots updated, %d games created" result.SessionsRecorded result.SnapshotsUpdated result.GamesCreated
                 | Error err ->
                     eprintfn "[PlaytimeTracker] Sync skipped: %s" err
             } }
         { Name = "Series TMDB refresh"
-          HourUtc = seriesRefreshHour
+          Hour = seriesRefreshHour
           Run = fun () ->
             SeriesRefresh.runNightlyJob conn httpClient getTmdbConfig imageBasePath projectionHandlers }
     ]

@@ -141,7 +141,7 @@ module PlaytimeTracker =
     // Dashboard play sessions (cross-game, last N days)
 
     let getDashboardPlaySessions (conn: SqliteConnection) (days: int) : DashboardPlaySession list =
-        let fromDate = DateTime.UtcNow.AddDays(float -days).ToString("yyyy-MM-dd")
+        let fromDate = DateTime.Now.AddDays(float -days).ToString("yyyy-MM-dd")
         conn
         |> Db.newCommand """
             SELECT ps.game_slug,
@@ -180,8 +180,8 @@ module PlaytimeTracker =
             && not (String.IsNullOrWhiteSpace steamId.Value)
         let nextSync =
             if isEnabled then
-                let now = DateTime.UtcNow
-                let todaySync = DateTime(now.Year, now.Month, now.Day, syncHour, 0, 0, DateTimeKind.Utc)
+                let now = DateTime.Now
+                let todaySync = DateTime(now.Year, now.Month, now.Day, syncHour, 0, 0, DateTimeKind.Local)
                 let next = if now > todaySync then todaySync.AddDays(1.0) else todaySync
                 Some (next.ToString("o"))
             else None
@@ -318,7 +318,7 @@ module PlaytimeTracker =
                     let mutable sessionsRecorded = 0
                     let mutable snapshotsUpdated = 0
                     let mutable gamesCreated = 0
-                    let today = defaultArg effectiveDate (DateTime.UtcNow.ToString("yyyy-MM-dd"))
+                    let today = defaultArg effectiveDate (DateTime.Now.ToString("yyyy-MM-dd"))
 
                     for steamGame in recentGames do
                         let! slugResult = async {

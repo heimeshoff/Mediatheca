@@ -31,7 +31,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+RUN apt-get update && apt-get install -y --no-install-recommends curl tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=server-build /app/publish ./

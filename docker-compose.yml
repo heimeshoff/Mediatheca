@@ -13,6 +13,7 @@ services:
       - ASPNETCORE_URLS=http://+:5000
       - ASPNETCORE_ENVIRONMENT=Production
       - DATA_DIR=/app/data
+      - TZ=${TZ:-Europe/Berlin}
       - TMDB_API_KEY=${TMDB_API_KEY}
       - RAWG_API_KEY=${RAWG_API_KEY}
       - STEAM_API_KEY=${STEAM_API_KEY}
