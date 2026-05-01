@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-05-01 12:55 -- Task Completed: 046 - Editable Play Sessions on Game Detail
+
+**Type:** Task Completion
+**Task:** 046 - Editable Play Sessions on Game Detail
+**Summary:** End-to-end editable Play History on Game Detail: extended `PlaySessionDto` with `Id` + `Source`, added validated CRUD API (add-merge on date collision, edit-with-collision-merge, delete) that recomputes `TotalPlayTimeMinutes` from session sum, wired the inline editor + glassmorphic delete confirmation, added 12 Expecto tests. Build clean, 245 tests pass.
+**Files changed:** 8 files
+
+---
+
+## 2026-05-01 -- Idea Captured: Remove detail-page back buttons
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/050-remove-detail-page-back-buttons.md
+**Summary:** Remove the in-page "← Back" buttons from MovieDetail, SeriesDetail, GameDetail, and FriendDetail. The browser back button is sufficient and the in-page version always wrongly navigates to the section list. Error-state recovery links and the CatalogDetail breadcrumb are kept.
+
+---
+
+## 2026-05-01 13:00 -- Batch Started: [046, 047]
+
+**Type:** Batch Start
+**Tasks:** 046 - Editable Play Sessions on Game Detail, 047 - Date Pickers Persist on Enter or Blur, Not on Change
+**Mode:** Parallel (batch of 2; 048 and 049 deferred — both touch GameDetail/Views.fs which 046 also touches)
+
+---
+
 ## 2026-05-01 12:34 -- Idea Captured: Manual Refresh Controls for Steam Link & HLTB Data
 
 **Type:** Idea Capture

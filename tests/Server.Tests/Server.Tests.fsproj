@@ -16,6 +16,7 @@
     <Compile Include="FriendIntegrationTests.fs" />
     <Compile Include="SeriesTests.fs" />
     <Compile Include="GamesTests.fs" />
+    <Compile Include="PlaytimeTrackerTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

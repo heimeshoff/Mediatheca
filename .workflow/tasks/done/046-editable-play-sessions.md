@@ -208,3 +208,41 @@ Add Expecto tests in `tests/Server.Tests/` covering:
 - Validation duplication (client + server) is intentional: the client gives instant feedback, the server is the source of truth and protects against direct API misuse.
 - Recomputing `TotalPlayTimeMinutes` from `SUM(minutes_played)` is the correct invariant once manual sessions exist. After this change, the Steam sync's `Set_play_time currentPlaytime` call (which sets total to Steam's reported total) will conflict with manual sessions — instead, after Steam writes its delta session, also call `recomputeAndPublishTotal` so the projection reflects manual + Steam combined. Update `PlaytimeTracker.runSync` accordingly.
 - Future enhancement (out of scope): per-session note field. Date + minutes is sufficient for v1.
+
+## Work Log
+
+### 2026-05-01 12:55 -- Work Completed
+
+**What was done:**
+- Extended `PlaySessionDto` with `Id: int64` and `Source: PlaySessionSource` (`SteamSync` | `Manual`); the `Source` is derived from `steam_app_id` (0 = manual sentinel, no schema change).
+- Added CRUD helpers and validated public-facing API in `PlaytimeTracker.fs`: `upsertManualPlaySession`, `updatePlaySession` (with merge-on-collision), `deletePlaySession`, `recomputeAndPublishTotal`, plus the `*Api` wrappers that validate inputs (date format, future date, minutes 1-1440), recompute SUM and emit `Games.Set_play_time`.
+- Wired three new Fable.Remoting endpoints (`addManualPlaySession`, `updatePlaySession`, `deletePlaySession`) in `IMediathecaApi` and `Api.fs`.
+- Updated `runSync` to call `recomputeAndPublishTotal` after writing a Steam delta session, so manual sessions are preserved alongside Steam totals.
+- Frontend: added `PlaySessionEditState` (Idle/Adding/Editing/Saving/Failed) and `PendingDelete` to GameDetail `Model`; added 12 messages and update cases in State.fs covering the full add/edit/delete flow with optimistic UI and re-fetch of game total.
+- Replaced the read-only Play History card with an editable version: header "+" button, hover-revealed edit/pencil + delete/trash per row, inline date+minutes editor for adding/editing, "manual" badge for non-Steam sessions, and a sibling-rendered glassmorphic delete confirmation modal (per CLAUDE.md backdrop-filter gotcha).
+- Added 12 Expecto tests in `tests/Server.Tests/PlaytimeTrackerTests.fs` covering insert, merge-on-add, edit-with-collision-merge, edit-without-collision, delete (incl. no-op), validation errors, total invariant after multi-op, and Steam delta + manual interaction.
+
+**Acceptance criteria status:**
+- [x] Play History shows Add button and per-row edit/delete icons -- verified via `Views.fs` markup
+- [x] Adding via inline editor (default = today) creates a session and increases total -- covered by `addManualPlaySessionApi` test
+- [x] Adding for an existing date merges minutes -- covered by "Adding a manual session for an existing date merges minutes" test
+- [x] Editing changes date and/or minutes; total recomputes -- covered by "Editing a session changes date and minutes" test
+- [x] Editing to a colliding date merges into the other row -- covered by "Editing a session with a colliding date merges into the other row" test
+- [x] Delete opens glassmorphic confirm; confirm removes and decreases total; cancel leaves untouched -- modal is rendered as sibling, dispatches `Delete_session_confirmed`/`Delete_session_cancelled`; backend behavior covered by delete tests
+- [x] Manual sessions show "manual" badge -- conditional render on `session.Source = Manual`
+- [x] Game with no Steam history can still add a manual session -- card visibility uses `not isEmpty || editState <> EditIdle`
+- [x] Validation errors are surfaced inline; Save disabled while invalid -- both client (`validateDraft`) and server (`parseSessionDate`/`validateMinutes`) enforce; `saveDisabled` gates the button
+- [x] Steam sync still works with manual sessions present -- "Manual sessions do not interfere with Steam delta tracking" test verifies the snapshot is unaffected and the next delta is added on top of manual sessions
+- [x] `npm run build` succeeds -- production build passes (32.86s)
+- [x] `npm test` passes all tests -- 245/245 passing (12 new tests added)
+- [x] Design check: glassmorphic modal rendered as sibling (no nested `backdrop-filter`); `rating-dropdown` glass class reused; `Icons.edit ()` from existing icon set; trash uses inline svg of the same trash path
+
+**Files changed:**
+- `src/Shared/Shared.fs` -- Added `PlaySessionSource` DU, extended `PlaySessionDto` with `Id` + `Source`, declared 3 new API methods
+- `src/Server/PlaytimeTracker.fs` -- Added `getPlaySessionById`, `upsertManualPlaySession`, `updatePlaySession`, `deletePlaySession`, `recomputeAndPublishTotal`, validation helpers, `addManualPlaySessionApi`/`updatePlaySessionApi`/`deletePlaySessionApi`; updated SELECT to expose `id` and `steam_app_id`; updated `runSync` to call `recomputeAndPublishTotal`
+- `src/Server/Api.fs` -- Wired `addManualPlaySession`, `updatePlaySession`, `deletePlaySession` endpoints
+- `src/Client/Pages/GameDetail/Types.fs` -- Added `PlaySessionDraft`, `PlaySessionEditState` types; added `PlaySessionEditState`/`PendingDelete` model fields and 12 messages
+- `src/Client/Pages/GameDetail/State.fs` -- Initialized new model fields; implemented update cases for add/edit/delete flow including local validation
+- `src/Client/Pages/GameDetail/Views.fs` -- Replaced read-only Play History card with editable version (Add button, hover edit/delete icons, inline draft editor, manual badge); added glassmorphic delete confirmation modal as sibling
+- `tests/Server.Tests/PlaytimeTrackerTests.fs` -- New file with 12 Expecto tests
+- `tests/Server.Tests/Server.Tests.fsproj` -- Registered new test file

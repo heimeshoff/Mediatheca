@@ -18,6 +18,18 @@ type ConnectSteamState =
     | Attaching of int
     | Failed of string
 
+type PlaySessionDraft = {
+    Date: string         // yyyy-MM-dd
+    MinutesText: string  // raw input — parse on save
+}
+
+type PlaySessionEditState =
+    | EditIdle
+    | Adding of draft: PlaySessionDraft
+    | Editing of id: int64 * draft: PlaySessionDraft
+    | Saving
+    | EditFailed of string
+
 type Model = {
     Slug: string
     Game: GameDetail option
@@ -41,6 +53,8 @@ type Model = {
     ImageVersion: int
     ActiveTab: GameTab
     PlaySessions: PlaySessionDto list
+    PlaySessionEditState: PlaySessionEditState
+    PendingDelete: int64 option
     HltbFetching: bool
     HltbNoData: bool
     Trailers: GameTrailerInfo list
@@ -114,6 +128,17 @@ type Msg =
     | Cancel_remove_game
     | Remove_game
     | Play_sessions_loaded of PlaySessionDto list
+    | Add_session_clicked
+    | Edit_session_clicked of PlaySessionDto
+    | Session_draft_date_changed of string
+    | Session_draft_minutes_changed of string
+    | Session_draft_save
+    | Session_draft_cancel
+    | Session_save_completed of Result<PlaySessionDto, string>
+    | Delete_session_requested of int64
+    | Delete_session_confirmed
+    | Delete_session_cancelled
+    | Delete_session_completed of Result<unit, string>
     | Fetch_hltb
     | Hltb_fetched of Result<float option, string>
     | Game_removed of Result<unit, string>

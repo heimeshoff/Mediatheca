@@ -79,6 +79,11 @@ module PlaytimeTracker =
 
     // Play session CRUD
 
+    // Sentinel for manual sessions: steam_app_id = 0 means "not from Steam".
+    // Avoids a schema migration; only the DTO mapping (Source field) depends on this convention.
+    [<Literal>]
+    let private ManualSteamAppId = 0
+
     let recordPlaySession (conn: SqliteConnection) (slug: string) (steamAppId: int) (date: string) (minutesPlayed: int) : unit =
         conn
         |> Db.newCommand """
@@ -102,14 +107,240 @@ module PlaytimeTracker =
         |> Option.map (fun c -> c > 0)
         |> Option.defaultValue false
 
+    let private toPlaySessionDto (rd: IDataReader) : PlaySessionDto =
+        let appId = rd.ReadInt32 "steam_app_id"
+        let source = if appId = ManualSteamAppId then Manual else SteamSync
+        { Id = rd.ReadInt64 "id"
+          GameSlug = rd.ReadString "game_slug"
+          Date = rd.ReadString "date"
+          MinutesPlayed = rd.ReadInt32 "minutes_played"
+          Source = source }
+
     let getPlaySessionsForGame (conn: SqliteConnection) (slug: string) : PlaySessionDto list =
         conn
-        |> Db.newCommand "SELECT game_slug, date, minutes_played FROM game_play_session WHERE game_slug = @slug ORDER BY date DESC"
+        |> Db.newCommand "SELECT id, game_slug, date, minutes_played, steam_app_id FROM game_play_session WHERE game_slug = @slug ORDER BY date DESC"
         |> Db.setParams [ "slug", SqlType.String slug ]
-        |> Db.query (fun (rd: IDataReader) ->
-            { PlaySessionDto.GameSlug = rd.ReadString "game_slug"
-              Date = rd.ReadString "date"
-              MinutesPlayed = rd.ReadInt32 "minutes_played" })
+        |> Db.query toPlaySessionDto
+
+    let getPlaySessionById (conn: SqliteConnection) (sessionId: int64) : PlaySessionDto option =
+        conn
+        |> Db.newCommand "SELECT id, game_slug, date, minutes_played, steam_app_id FROM game_play_session WHERE id = @id"
+        |> Db.setParams [ "id", SqlType.Int64 sessionId ]
+        |> Db.querySingle toPlaySessionDto
+
+    // Validation helpers for manual sessions
+
+    let private parseSessionDate (date: string) : Result<DateTime, string> =
+        let parsed, dt =
+            DateTime.TryParseExact(
+                date,
+                "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None)
+        if not parsed then Error "Date must be in yyyy-MM-dd format"
+        else
+            let today = DateTime.Now.Date
+            if dt.Date > today then Error "Date cannot be in the future"
+            else Ok dt
+
+    let private validateMinutes (minutes: int) : Result<unit, string> =
+        if minutes <= 0 then Error "Minutes must be greater than 0"
+        elif minutes > 24 * 60 then Error "A single session cannot exceed 24 hours (1440 minutes)"
+        else Ok ()
+
+    let private getTotalMinutesForGame (conn: SqliteConnection) (slug: string) : int =
+        conn
+        |> Db.newCommand "SELECT COALESCE(SUM(minutes_played), 0) as total FROM game_play_session WHERE game_slug = @slug"
+        |> Db.setParams [ "slug", SqlType.String slug ]
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "total")
+        |> Option.defaultValue 0
+
+    /// Add OR merge: if (slug, date) already exists, sum minutes into the existing row.
+    /// Returns (id, totalMinutesForThatDate).
+    let upsertManualPlaySession
+        (conn: SqliteConnection)
+        (slug: string)
+        (date: string)
+        (minutesPlayed: int)
+        : (int64 * int) =
+        // Check if a row already exists for (slug, date)
+        let existing =
+            conn
+            |> Db.newCommand "SELECT id, minutes_played FROM game_play_session WHERE game_slug = @slug AND date = @date"
+            |> Db.setParams [
+                "slug", SqlType.String slug
+                "date", SqlType.String date
+            ]
+            |> Db.querySingle (fun (rd: IDataReader) ->
+                rd.ReadInt64 "id", rd.ReadInt32 "minutes_played")
+        match existing with
+        | Some (id, current) ->
+            let newTotal = current + minutesPlayed
+            conn
+            |> Db.newCommand "UPDATE game_play_session SET minutes_played = @minutes WHERE id = @id"
+            |> Db.setParams [
+                "minutes", SqlType.Int32 newTotal
+                "id", SqlType.Int64 id
+            ]
+            |> Db.exec
+            id, newTotal
+        | None ->
+            conn
+            |> Db.newCommand """
+                INSERT INTO game_play_session (game_slug, steam_app_id, date, minutes_played, created_at)
+                VALUES (@slug, @app_id, @date, @minutes, @now)
+            """
+            |> Db.setParams [
+                "slug", SqlType.String slug
+                "app_id", SqlType.Int32 ManualSteamAppId
+                "date", SqlType.String date
+                "minutes", SqlType.Int32 minutesPlayed
+                "now", SqlType.String (DateTime.UtcNow.ToString("o"))
+            ]
+            |> Db.exec
+            let newId =
+                conn
+                |> Db.newCommand "SELECT last_insert_rowid() as id"
+                |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt64 "id")
+                |> Option.defaultValue 0L
+            newId, minutesPlayed
+
+    /// Edit an existing session by id. If newDate collides with another existing session
+    /// for the same game, MERGE (sum minutes into the other row, delete this one).
+    /// Returns the resulting session id.
+    let updatePlaySession
+        (conn: SqliteConnection)
+        (sessionId: int64)
+        (newDate: string)
+        (newMinutes: int)
+        : Result<int64, string> =
+        match getPlaySessionById conn sessionId with
+        | None -> Error "Play session not found"
+        | Some existing ->
+            // Look for a different row with the same (slug, newDate)
+            let collision =
+                conn
+                |> Db.newCommand """
+                    SELECT id, minutes_played FROM game_play_session
+                    WHERE game_slug = @slug AND date = @date AND id <> @id
+                """
+                |> Db.setParams [
+                    "slug", SqlType.String existing.GameSlug
+                    "date", SqlType.String newDate
+                    "id", SqlType.Int64 sessionId
+                ]
+                |> Db.querySingle (fun (rd: IDataReader) ->
+                    rd.ReadInt64 "id", rd.ReadInt32 "minutes_played")
+            match collision with
+            | Some (otherId, otherMinutes) ->
+                // Merge: add new minutes into the other row, delete this one
+                let merged = otherMinutes + newMinutes
+                conn
+                |> Db.newCommand "UPDATE game_play_session SET minutes_played = @minutes WHERE id = @id"
+                |> Db.setParams [
+                    "minutes", SqlType.Int32 merged
+                    "id", SqlType.Int64 otherId
+                ]
+                |> Db.exec
+                conn
+                |> Db.newCommand "DELETE FROM game_play_session WHERE id = @id"
+                |> Db.setParams [ "id", SqlType.Int64 sessionId ]
+                |> Db.exec
+                Ok otherId
+            | None ->
+                conn
+                |> Db.newCommand "UPDATE game_play_session SET date = @date, minutes_played = @minutes WHERE id = @id"
+                |> Db.setParams [
+                    "date", SqlType.String newDate
+                    "minutes", SqlType.Int32 newMinutes
+                    "id", SqlType.Int64 sessionId
+                ]
+                |> Db.exec
+                Ok sessionId
+
+    /// Delete by id. No-op if the id doesn't exist (returns Ok ()).
+    let deletePlaySession
+        (conn: SqliteConnection)
+        (sessionId: int64)
+        : Result<unit, string> =
+        conn
+        |> Db.newCommand "DELETE FROM game_play_session WHERE id = @id"
+        |> Db.setParams [ "id", SqlType.Int64 sessionId ]
+        |> Db.exec
+        Ok ()
+
+    /// Recompute SUM(minutes_played) for the game and emit Games.Set_play_time.
+    let recomputeAndPublishTotal
+        (conn: SqliteConnection)
+        (slug: string)
+        (executeGameCommand: string -> Games.GameCommand -> Result<unit, string>)
+        : unit =
+        let total = getTotalMinutesForGame conn slug
+        executeGameCommand slug (Games.Set_play_time total) |> ignore
+
+    // Public-facing manual session API: validate inputs, mutate, recompute total.
+
+    let addManualPlaySessionApi
+        (conn: SqliteConnection)
+        (slug: string)
+        (date: string)
+        (minutesPlayed: int)
+        (executeGameCommand: string -> Games.GameCommand -> Result<unit, string>)
+        : Result<PlaySessionDto, string> =
+        match parseSessionDate date with
+        | Error e -> Error e
+        | Ok _ ->
+            match validateMinutes minutesPlayed with
+            | Error e -> Error e
+            | Ok () ->
+                match GameProjection.getBySlug conn slug with
+                | None -> Error "Game not found"
+                | Some _ ->
+                    let id, _ = upsertManualPlaySession conn slug date minutesPlayed
+                    recomputeAndPublishTotal conn slug executeGameCommand
+                    match getPlaySessionById conn id with
+                    | Some dto -> Ok dto
+                    | None -> Error "Failed to retrieve session after insert"
+
+    let updatePlaySessionApi
+        (conn: SqliteConnection)
+        (sessionId: int64)
+        (newDate: string)
+        (newMinutes: int)
+        (executeGameCommand: string -> Games.GameCommand -> Result<unit, string>)
+        : Result<PlaySessionDto, string> =
+        match parseSessionDate newDate with
+        | Error e -> Error e
+        | Ok _ ->
+            match validateMinutes newMinutes with
+            | Error e -> Error e
+            | Ok () ->
+                match getPlaySessionById conn sessionId with
+                | None -> Error "Play session not found"
+                | Some existing ->
+                    match updatePlaySession conn sessionId newDate newMinutes with
+                    | Error e -> Error e
+                    | Ok resultId ->
+                        recomputeAndPublishTotal conn existing.GameSlug executeGameCommand
+                        match getPlaySessionById conn resultId with
+                        | Some dto -> Ok dto
+                        | None -> Error "Failed to retrieve session after update"
+
+    let deletePlaySessionApi
+        (conn: SqliteConnection)
+        (sessionId: int64)
+        (executeGameCommand: string -> Games.GameCommand -> Result<unit, string>)
+        : Result<unit, string> =
+        let slugOpt =
+            getPlaySessionById conn sessionId
+            |> Option.map (fun s -> s.GameSlug)
+        match deletePlaySession conn sessionId with
+        | Error e -> Error e
+        | Ok () ->
+            match slugOpt with
+            | Some slug -> recomputeAndPublishTotal conn slug executeGameCommand
+            | None -> ()
+            Ok ()
 
     let getPlaytimeSummary (conn: SqliteConnection) (fromDate: string) (toDate: string) : PlaytimeSummaryItem list =
         conn
@@ -393,8 +624,11 @@ module PlaytimeTracker =
                                     recordPlaySession conn slug steamGame.AppId sessionDate delta
                                     sessionsRecorded <- sessionsRecorded + 1
 
-                                    // Update game entity's TotalPlayTimeMinutes via event store
-                                    executeGameCommand conn slug (Games.Set_play_time currentPlaytime) projectionHandlers |> ignore
+                                    // Update game entity's TotalPlayTimeMinutes via event store.
+                                    // Recompute from SUM(minutes_played) so manual sessions are preserved
+                                    // alongside Steam-reported totals.
+                                    let runCmd s c = executeGameCommand conn s c projectionHandlers
+                                    recomputeAndPublishTotal conn slug runCmd
 
                                 // Always update snapshot
                                 saveSnapshot conn steamGame.AppId slug currentPlaytime

@@ -27,6 +27,8 @@ let init (slug: string) : Model * Cmd<Msg> =
       ImageVersion = 0
       ActiveTab = Overview
       PlaySessions = []
+      PlaySessionEditState = EditIdle
+      PendingDelete = None
       HltbFetching = false
       HltbNoData = false
       Trailers = []
@@ -447,6 +449,110 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Play_sessions_loaded sessions ->
         { model with PlaySessions = sessions }, Cmd.none
+
+    | Add_session_clicked ->
+        let today = System.DateTime.Now.ToString("yyyy-MM-dd")
+        { model with
+            PlaySessionEditState = Adding { Date = today; MinutesText = "" } },
+        Cmd.none
+
+    | Edit_session_clicked session ->
+        { model with
+            PlaySessionEditState =
+                Editing (session.Id, { Date = session.Date; MinutesText = string session.MinutesPlayed }) },
+        Cmd.none
+
+    | Session_draft_date_changed newDate ->
+        let newState =
+            match model.PlaySessionEditState with
+            | Adding draft -> Adding { draft with Date = newDate }
+            | Editing (id, draft) -> Editing (id, { draft with Date = newDate })
+            | other -> other
+        { model with PlaySessionEditState = newState }, Cmd.none
+
+    | Session_draft_minutes_changed newMinutes ->
+        let newState =
+            match model.PlaySessionEditState with
+            | Adding draft -> Adding { draft with MinutesText = newMinutes }
+            | Editing (id, draft) -> Editing (id, { draft with MinutesText = newMinutes })
+            | other -> other
+        { model with PlaySessionEditState = newState }, Cmd.none
+
+    | Session_draft_save ->
+        let validateDraft (draft: PlaySessionDraft) =
+            if System.String.IsNullOrWhiteSpace(draft.Date) then
+                Error "Date is required"
+            else
+                match System.Int32.TryParse(draft.MinutesText) with
+                | true, m when m > 0 && m <= 24 * 60 -> Ok (draft.Date, m)
+                | true, _ -> Error "Minutes must be between 1 and 1440"
+                | _ -> Error "Minutes must be a number"
+
+        match model.PlaySessionEditState with
+        | Adding draft ->
+            match validateDraft draft with
+            | Error e ->
+                { model with PlaySessionEditState = EditFailed e }, Cmd.none
+            | Ok (date, minutes) ->
+                { model with PlaySessionEditState = Saving },
+                Cmd.OfAsync.either
+                    (fun () -> api.addManualPlaySession (model.Slug, date, minutes))
+                    ()
+                    Session_save_completed
+                    (fun ex -> Session_save_completed (Error ex.Message))
+        | Editing (id, draft) ->
+            match validateDraft draft with
+            | Error e ->
+                { model with PlaySessionEditState = EditFailed e }, Cmd.none
+            | Ok (date, minutes) ->
+                { model with PlaySessionEditState = Saving },
+                Cmd.OfAsync.either
+                    (fun () -> api.updatePlaySession (id, date, minutes))
+                    ()
+                    Session_save_completed
+                    (fun ex -> Session_save_completed (Error ex.Message))
+        | _ -> model, Cmd.none
+
+    | Session_draft_cancel ->
+        { model with PlaySessionEditState = EditIdle }, Cmd.none
+
+    | Session_save_completed (Ok _dto) ->
+        // Re-load sessions and game to refresh totals.
+        { model with PlaySessionEditState = EditIdle },
+        Cmd.batch [
+            Cmd.OfAsync.perform api.getGamePlaySessions model.Slug Play_sessions_loaded
+            Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
+        ]
+
+    | Session_save_completed (Error err) ->
+        { model with PlaySessionEditState = EditFailed err }, Cmd.none
+
+    | Delete_session_requested id ->
+        { model with PendingDelete = Some id }, Cmd.none
+
+    | Delete_session_cancelled ->
+        { model with PendingDelete = None }, Cmd.none
+
+    | Delete_session_confirmed ->
+        match model.PendingDelete with
+        | Some id ->
+            model,
+            Cmd.OfAsync.either
+                (fun () -> api.deletePlaySession id)
+                ()
+                Delete_session_completed
+                (fun ex -> Delete_session_completed (Error ex.Message))
+        | None -> model, Cmd.none
+
+    | Delete_session_completed (Ok ()) ->
+        { model with PendingDelete = None },
+        Cmd.batch [
+            Cmd.OfAsync.perform api.getGamePlaySessions model.Slug Play_sessions_loaded
+            Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
+        ]
+
+    | Delete_session_completed (Error err) ->
+        { model with PendingDelete = None; Error = Some err }, Cmd.none
 
     | Fetch_hltb ->
         { model with HltbFetching = true; HltbNoData = false },

@@ -3884,6 +3884,42 @@ module Api =
                 return PlaytimeTracker.getPlaySessionsForGame conn slug
             }
 
+            addManualPlaySession = fun (slug, date, minutes) -> async {
+                let runCmd s c =
+                    executeCommand conn (Games.streamId s)
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        c
+                        projectionHandlers
+                return PlaytimeTracker.addManualPlaySessionApi conn slug date minutes runCmd
+            }
+
+            updatePlaySession = fun (sessionId, newDate, newMinutes) -> async {
+                let runCmd s c =
+                    executeCommand conn (Games.streamId s)
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        c
+                        projectionHandlers
+                return PlaytimeTracker.updatePlaySessionApi conn sessionId newDate newMinutes runCmd
+            }
+
+            deletePlaySession = fun sessionId -> async {
+                let runCmd s c =
+                    executeCommand conn (Games.streamId s)
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        c
+                        projectionHandlers
+                return PlaytimeTracker.deletePlaySessionApi conn sessionId runCmd
+            }
+
             getPlaytimeSummary = fun fromDate toDate -> async {
                 return PlaytimeTracker.getPlaytimeSummary conn fromDate toDate
             }

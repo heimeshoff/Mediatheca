@@ -1441,29 +1441,226 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         ]
                                             ]
                                             // Play History
-                                            if not (List.isEmpty model.PlaySessions) then
+                                            let editState = model.PlaySessionEditState
+                                            let isCardVisible =
+                                                not (List.isEmpty model.PlaySessions) || editState <> EditIdle
+                                            if isCardVisible then
+                                                let editingId =
+                                                    match editState with
+                                                    | Editing (id, _) -> Some id
+                                                    | _ -> None
+                                                let isSaving = editState = Saving
+                                                let validateDraft (draft: PlaySessionDraft) =
+                                                    if System.String.IsNullOrWhiteSpace(draft.Date) then false
+                                                    else
+                                                        match System.Int32.TryParse(draft.MinutesText) with
+                                                        | true, m -> m > 0 && m <= 24 * 60
+                                                        | _ -> false
+                                                let renderDraftEditor (draft: PlaySessionDraft) =
+                                                    let saveDisabled = isSaving || not (validateDraft draft)
+                                                    Html.div [
+                                                        prop.className "py-2 border-b border-base-content/5 last:border-0"
+                                                        prop.children [
+                                                            Html.div [
+                                                                prop.className "flex items-center gap-2 flex-wrap"
+                                                                prop.children [
+                                                                    Html.input [
+                                                                        prop.type' "date"
+                                                                        prop.className "input input-xs input-bordered bg-base-100/50"
+                                                                        prop.value draft.Date
+                                                                        prop.onChange (fun (v: string) -> dispatch (Session_draft_date_changed v))
+                                                                    ]
+                                                                    Html.input [
+                                                                        prop.type' "number"
+                                                                        prop.placeholder "min"
+                                                                        prop.className "input input-xs input-bordered bg-base-100/50 w-20"
+                                                                        prop.value draft.MinutesText
+                                                                        prop.min 1
+                                                                        prop.max (24 * 60)
+                                                                        prop.onChange (fun (v: string) -> dispatch (Session_draft_minutes_changed v))
+                                                                    ]
+                                                                    Daisy.button.button [
+                                                                        button.primary
+                                                                        button.xs
+                                                                        prop.disabled saveDisabled
+                                                                        prop.onClick (fun _ -> dispatch Session_draft_save)
+                                                                        prop.text "Save"
+                                                                    ]
+                                                                    Daisy.button.button [
+                                                                        button.ghost
+                                                                        button.xs
+                                                                        prop.disabled isSaving
+                                                                        prop.onClick (fun _ -> dispatch Session_draft_cancel)
+                                                                        prop.text "Cancel"
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                            match editState with
+                                                            | EditFailed err ->
+                                                                Html.p [
+                                                                    prop.className "text-xs text-error mt-1"
+                                                                    prop.text err
+                                                                ]
+                                                            | _ -> ()
+                                                        ]
+                                                    ]
                                                 glassCard [
-                                                    Html.h3 [ prop.className "text-lg font-bold mb-4"; prop.text "Play History" ]
+                                                    Html.div [
+                                                        prop.className "flex items-center justify-between mb-4"
+                                                        prop.children [
+                                                            Html.h3 [ prop.className "text-lg font-bold"; prop.text "Play History" ]
+                                                            match editState with
+                                                            | EditIdle | EditFailed _ ->
+                                                                Html.button [
+                                                                    prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold cursor-pointer"
+                                                                    prop.title "Add play session"
+                                                                    prop.onClick (fun _ -> dispatch Add_session_clicked)
+                                                                    prop.text "+"
+                                                                ]
+                                                            | _ -> ()
+                                                        ]
+                                                    ]
                                                     Html.div [
                                                         prop.className "space-y-2"
                                                         prop.children [
+                                                            // Inline editor for "Adding" appears at the top
+                                                            match editState with
+                                                            | Adding draft -> renderDraftEditor draft
+                                                            | _ -> ()
                                                             for session in model.PlaySessions |> List.truncate 10 do
-                                                                Html.div [
-                                                                    prop.className "flex items-center justify-between py-1.5 border-b border-base-content/5 last:border-0"
-                                                                    prop.children [
-                                                                        Html.span [
-                                                                            prop.className "text-sm text-base-content/60"
-                                                                            prop.text session.Date
+                                                                if Some session.Id = editingId then
+                                                                    match editState with
+                                                                    | Editing (_, draft) -> renderDraftEditor draft
+                                                                    | _ -> ()
+                                                                else
+                                                                    Html.div [
+                                                                        prop.className "flex items-center justify-between py-1.5 border-b border-base-content/5 last:border-0 group"
+                                                                        prop.children [
+                                                                            Html.div [
+                                                                                prop.className "flex items-center gap-2"
+                                                                                prop.children [
+                                                                                    Html.span [
+                                                                                        prop.className "text-sm text-base-content/60"
+                                                                                        prop.text session.Date
+                                                                                    ]
+                                                                                    if session.Source = Manual then
+                                                                                        Html.span [
+                                                                                            prop.className "text-[10px] uppercase tracking-wider text-base-content/40 border border-base-content/15 rounded px-1.5 py-0.5"
+                                                                                            prop.text "manual"
+                                                                                        ]
+                                                                                ]
+                                                                            ]
+                                                                            Html.div [
+                                                                                prop.className "flex items-center gap-2"
+                                                                                prop.children [
+                                                                                    Html.span [
+                                                                                        prop.className "text-sm font-semibold text-primary"
+                                                                                        prop.text (formatPlayTime session.MinutesPlayed)
+                                                                                    ]
+                                                                                    Html.div [
+                                                                                        prop.className "flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                                        prop.children [
+                                                                                            Html.button [
+                                                                                                prop.className "p-1 rounded hover:bg-base-content/10 text-base-content/60 hover:text-base-content cursor-pointer"
+                                                                                                prop.title "Edit session"
+                                                                                                prop.onClick (fun _ -> dispatch (Edit_session_clicked session))
+                                                                                                prop.children [ Icons.edit () ]
+                                                                                            ]
+                                                                                            Html.button [
+                                                                                                prop.className "p-1 rounded hover:bg-error/15 text-base-content/60 hover:text-error cursor-pointer"
+                                                                                                prop.title "Delete session"
+                                                                                                prop.onClick (fun _ -> dispatch (Delete_session_requested session.Id))
+                                                                                                prop.children [
+                                                                                                    Svg.svg [
+                                                                                                        svg.className "w-4 h-4"
+                                                                                                        svg.fill "none"
+                                                                                                        svg.viewBox (0, 0, 24, 24)
+                                                                                                        svg.stroke "currentColor"
+                                                                                                        svg.custom ("strokeWidth", 1.5)
+                                                                                                        svg.children [
+                                                                                                            Svg.path [
+                                                                                                                svg.custom ("strokeLinecap", "round")
+                                                                                                                svg.custom ("strokeLinejoin", "round")
+                                                                                                                svg.d "m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                                                                                                            ]
+                                                                                                        ]
+                                                                                                    ]
+                                                                                                ]
+                                                                                            ]
+                                                                                        ]
+                                                                                    ]
+                                                                                ]
+                                                                            ]
                                                                         ]
-                                                                        Html.span [
-                                                                            prop.className "text-sm font-semibold text-primary"
-                                                                            prop.text (formatPlayTime session.MinutesPlayed)
+                                                                    ]
+                                                        ]
+                                                    ]
+                                                    // Inline error from EditFailed when not currently in a draft
+                                                    match editState with
+                                                    | EditFailed err when editingId.IsNone ->
+                                                        Html.p [
+                                                            prop.className "text-xs text-error mt-2"
+                                                            prop.text err
+                                                        ]
+                                                    | _ -> ()
+                                                ]
+
+                                            // Delete confirmation modal (glassmorphic, sibling of any blurred parent)
+                                            match model.PendingDelete with
+                                            | Some pendingId ->
+                                                let pendingSession =
+                                                    model.PlaySessions
+                                                    |> List.tryFind (fun s -> s.Id = pendingId)
+                                                Html.div [
+                                                    prop.className "fixed inset-0 z-[300] flex items-center justify-center p-4"
+                                                    prop.onClick (fun _ -> dispatch Delete_session_cancelled)
+                                                    prop.onKeyDown (fun e ->
+                                                        if e.key = "Escape" then dispatch Delete_session_cancelled)
+                                                    prop.children [
+                                                        // Dim backdrop
+                                                        Html.div [
+                                                            prop.className "absolute inset-0 bg-base-300/40"
+                                                        ]
+                                                        // Glassmorphic dialog
+                                                        Html.div [
+                                                            prop.className "relative rating-dropdown p-6 max-w-sm w-full"
+                                                            prop.onClick (fun e -> e.stopPropagation())
+                                                            prop.children [
+                                                                Html.h3 [
+                                                                    prop.className "text-lg font-bold text-error mb-2"
+                                                                    prop.text "Delete this play session?"
+                                                                ]
+                                                                match pendingSession with
+                                                                | Some s ->
+                                                                    Html.p [
+                                                                        prop.className "text-sm text-base-content/70 mb-4"
+                                                                        prop.text $"{s.Date} · {formatPlayTime s.MinutesPlayed}"
+                                                                    ]
+                                                                | None -> ()
+                                                                Html.div [
+                                                                    prop.className "flex gap-2"
+                                                                    prop.children [
+                                                                        Daisy.button.button [
+                                                                            button.error
+                                                                            button.sm
+                                                                            prop.className "flex-1"
+                                                                            prop.onClick (fun _ -> dispatch Delete_session_confirmed)
+                                                                            prop.text "Delete"
+                                                                        ]
+                                                                        Daisy.button.button [
+                                                                            button.ghost
+                                                                            button.sm
+                                                                            prop.className "flex-1"
+                                                                            prop.onClick (fun _ -> dispatch Delete_session_cancelled)
+                                                                            prop.text "Cancel"
                                                                         ]
                                                                     ]
                                                                 ]
+                                                            ]
                                                         ]
                                                     ]
                                                 ]
+                                            | None -> ()
 
                                             // Friends (consolidated)
                                             let hasOwnership = game.IsOwnedByMe || not (List.isEmpty game.FamilyOwners)

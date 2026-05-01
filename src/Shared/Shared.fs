@@ -837,10 +837,16 @@ type SteamSearchResult = {
 
 // Playtime Tracking
 
+type PlaySessionSource =
+    | SteamSync
+    | Manual
+
 type PlaySessionDto = {
+    Id: int64
     GameSlug: string
     Date: string
     MinutesPlayed: int
+    Source: PlaySessionSource
 }
 
 type PlaytimeSummaryItem = {
@@ -1184,6 +1190,9 @@ type IMediathecaApi = {
     saveCollapsedSections: string -> string list -> Async<unit>
     // Playtime Tracking
     getGamePlaySessions: string -> Async<PlaySessionDto list>
+    addManualPlaySession: string * string * int -> Async<Result<PlaySessionDto, string>>
+    updatePlaySession: int64 * string * int -> Async<Result<PlaySessionDto, string>>
+    deletePlaySession: int64 -> Async<Result<unit, string>>
     getPlaytimeSummary: string -> string -> Async<PlaytimeSummaryItem list>
     getPlaytimeSyncStatus: unit -> Async<PlaytimeSyncStatus>
     triggerPlaytimeSync: unit -> Async<Result<PlaytimeSyncResult, string>>
