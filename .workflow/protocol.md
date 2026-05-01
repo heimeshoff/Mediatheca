@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-05-01 13:08 -- Task Completed: 048 - Remove `Playing` Status; Auto-Promote to `InFocus` on Steam Play
+
+**Type:** Task Completion
+**Task:** 048 - Remove `Playing` Status; Auto-Promote to `InFocus` on Steam Play
+**Summary:** Dropped the `Playing` case from `GameStatus` (legacy `"Playing"` payloads decode to `InFocus`; one-time DB migration converts existing rows). Added `promoteToInFocusIfNeeded` helper invoked whenever a play session is recorded — wired into all three Steam-sync branches AND the manual add/edit endpoints from task 046. New `GamesPromotedToFocus` counter surfaces in the startup-sync log line. Build clean, 255 tests pass (10 new).
+**Files changed:** 12 files
+
+---
+
+## 2026-05-01 -- Idea Refined: Track Navigation History for Detail-Page Back Buttons
+
+**Type:** Idea Refinement
+**Idea:** tasks/todo/050-back-button-navigation-history.md (renamed from 050-remove-detail-page-back-buttons.md)
+**Status:** Todo (rewritten)
+**Summary:** Flipped 050 from "remove the in-page back buttons" to "keep them and make them work properly." Adds a navigation history stack in the root Elmish model that records every URL change; the back button pops the stack to return to the actual previous page (any prior scene — friend detail, catalog detail, search, etc.). Empty-stack fallback: Movie/Series/Game detail → Dashboard with the matching tab active; Friend detail → Friend list. Size bumped Small → Medium.
+
+---
+
+## 2026-05-01 13:00 -- Batch Started: [048]
+
+**Type:** Batch Start
+**Tasks:** 048 - Remove `Playing` Status; Auto-Promote to `InFocus` on Steam Play
+**Mode:** Parallel (batch of 1; 049 and 050 deferred — both touch GameDetail/Views.fs which 048 also touches, and they conflict with each other on the same file)
+
+---
+
 ## 2026-05-01 12:56 -- Task Completed: 047 - Date Pickers Persist on Enter or Blur, Not on Change
 
 **Type:** Task Completion

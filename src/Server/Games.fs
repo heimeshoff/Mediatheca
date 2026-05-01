@@ -342,7 +342,6 @@ module Games =
             match status with
             | Backlog -> "Backlog"
             | InFocus -> "InFocus"
-            | Playing -> "Playing"
             | Completed -> "Completed"
             | Abandoned -> "Abandoned"
             | OnHold -> "OnHold"
@@ -352,7 +351,7 @@ module Games =
             match s with
             | "Backlog" -> Backlog
             | "InFocus" -> InFocus
-            | "Playing" -> Playing
+            | "Playing" -> InFocus  // legacy — folded into InFocus by task 048
             | "Completed" -> Completed
             | "Abandoned" -> Abandoned
             | "OnHold" -> OnHold

@@ -264,7 +264,7 @@ let main args =
                         None
                 match! PlaytimeTracker.runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers effectiveDate with
                 | Ok result ->
-                    eprintfn "[PlaytimeTracker] Sync complete: %d sessions recorded, %d snapshots updated, %d games created" result.SessionsRecorded result.SnapshotsUpdated result.GamesCreated
+                    eprintfn "[PlaytimeTracker] Sync complete: %d sessions, %d snapshots, %d games created, %d promoted to focus" result.SessionsRecorded result.SnapshotsUpdated result.GamesCreated result.GamesPromotedToFocus
                 | Error err ->
                     eprintfn "[PlaytimeTracker] Sync skipped: %s" err
             } }

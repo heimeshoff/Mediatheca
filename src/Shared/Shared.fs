@@ -608,7 +608,6 @@ type UpdateEpisodeWatchedDateRequest = {
 type GameStatus =
     | Backlog
     | InFocus
-    | Playing
     | Completed
     | Abandoned
     | OnHold
@@ -861,6 +860,7 @@ type PlaytimeSyncResult = {
     SessionsRecorded: int
     SnapshotsUpdated: int
     GamesCreated: int
+    GamesPromotedToFocus: int
 }
 
 type PlaytimeSyncStatus = {

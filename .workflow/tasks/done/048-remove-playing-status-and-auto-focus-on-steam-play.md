@@ -137,3 +137,47 @@ Add to the existing playtime-tracker test fixture (or create one if none exists 
 - **Why also promote `Completed` / `Abandoned`**: per the user's intent, "in focus" should reflect what they're *currently engaged with*. If a finished game is being replayed, surfacing it on the dashboard is the right behavior. The user can always move it back manually if they don't want it there.
 - **Manual play sessions** (task 046) — when that lands, `recordPlaySession` will also be called from the manual-add endpoint. The auto-promote helper should be invoked there too, for consistency. Worth noting in 046's PR if 048 lands first; otherwise 046 should pull the helper into a shared spot.
 - **Out of scope**: any UI affordance to opt-out of auto-promotion. If this becomes annoying we'll add a per-game toggle later.
+
+## Work Log
+
+### 2026-05-01 13:05 -- Work Completed
+
+**What was done:**
+- Removed `Playing` from `GameStatus` DU in `src/Shared/Shared.fs`.
+- Updated codec pairs in `src/Server/Games.fs` and `src/Server/GameProjection.fs`: removed `Playing` from encoders; left `Playing -> InFocus` legacy mapping in decoders so historical events / projection rows still load.
+- Added a one-time idempotent migration in `GameProjection.createTables` that runs `UPDATE game_list/game_detail SET status='InFocus' WHERE status='Playing'`.
+- Replaced the two `WHERE status = 'Playing'` queries (in `Api.fs` `gamesInProgress` and `GameProjection.getActiveGamesCount`) with `WHERE status = 'InFocus'`.
+- Added `EventFormatting.formatGameStatus` legacy mapping `"Playing" -> "In Focus"`.
+- Added `GameProjection.getGameStatus` (lightweight slug -> status lookup).
+- Added `PlaytimeTracker.promoteToInFocusIfNeeded` helper that emits `Change_status InFocus` only when the current status differs (returns `bool` so the caller can count promotions).
+- Wired the helper into all three `runSync` branches that record sessions (first-snapshot, reconciliation backfill, delta-positive) and into the manual-add and edit endpoints (`addManualPlaySessionApi`, `updatePlaySessionApi`) per task note re. task 046.
+- Added `GamesPromotedToFocus: int` to `PlaytimeSyncResult` and updated the `Program.fs` startup-sync log line: `Sync complete: %d sessions, %d snapshots, %d games created, %d promoted to focus`.
+- Frontend: removed `Playing` from status-name maps, color/badge maps, and `allStatuses` lists in `Games/Views.fs`, `GameDetail/Views.fs`, and `Dashboard/Views.fs`.
+- Tests: replaced `Playing` references in `GamesTests.fs` with `OnHold`/`Completed` so transition coverage remains; added a regression test asserting that the legacy `{"status":"Playing"}` payload deserializes to `Game_status_changed InFocus`. Added a new `PlaytimeTracker auto-promote to InFocus` test list covering the full matrix (Backlog, Completed, Abandoned, OnHold, Dismissed all promote; already-InFocus stays put with no extra event; manual sessions also promote and skip when already InFocus).
+
+**Acceptance criteria status:**
+- [x] `GameStatus` no longer contains `Playing` -- DU updated; `npm run build` succeeds with 0 errors / 0 warnings.
+- [x] Legacy `"Playing"` deserializes to `InFocus` -- new test `Legacy 'Playing' status payload deserializes to InFocus` passes.
+- [x] One-time `UPDATE game_list SET status='InFocus' WHERE status='Playing'` runs on startup -- added in `GameProjection.createTables`, idempotent, runs every startup as part of projection table init (also covers `game_detail`).
+- [x] Status pickers no longer offer `Playing` -- removed from `Games/Views.fs allStatuses` and `GameDetail/Views.fs allStatuses`.
+- [x] Dashboard "in-progress" stat now driven by `status='InFocus'` -- updated both `Api.fs` and `GameProjection.getActiveGamesCount` queries.
+- [x] Steam-sync new playtime promotes Backlog/Completed/Abandoned/OnHold/Dismissed games to InFocus -- helper called from all three session-recording branches; covered by new test matrix.
+- [x] Already-InFocus game does NOT emit redundant `Game_status_changed` -- helper short-circuits on `Some InFocus`; covered by `Already-InFocus game emits no Game_status_changed event...` test.
+- [x] Sync where only `rtime_last_played` changed (no delta) does not change status -- helper is only called inside `if delta > 0`, `if currentPlaytime > 0` branches, never in the metadata-only path.
+- [x] `Program.fs` log line reports games promoted to focus -- updated.
+- [x] All tests pass -- 255 tests pass, 0 failed.
+- [x] Design check / no dead branches -- F# compiler exhaustiveness would have surfaced any leftover `Playing` arm; build is clean.
+
+**Files changed:**
+- `src/Shared/Shared.fs` -- removed `Playing` case from `GameStatus`; added `GamesPromotedToFocus: int` to `PlaytimeSyncResult`.
+- `src/Server/Games.fs` -- removed `Playing` from `encodeGameStatus`; mapped `"Playing" -> InFocus` in `decodeGameStatus` (legacy compat).
+- `src/Server/GameProjection.fs` -- same encoder/decoder change; added one-time migration for `game_list`/`game_detail`; added `getGameStatus`; switched `getActiveGamesCount` to `'InFocus'`.
+- `src/Server/PlaytimeTracker.fs` -- added `promoteToInFocusIfNeeded`; called it from all three `runSync` session-recording branches and from the manual add/edit endpoints; added `GamesPromotedToFocus` counter and field.
+- `src/Server/EventFormatting.fs` -- mapped legacy `"Playing"` to display string `"In Focus"`.
+- `src/Server/Api.fs` -- `gamesInProgress` query now filters on `'InFocus'`.
+- `src/Server/Program.fs` -- updated sync log line to include `%d promoted to focus`.
+- `src/Client/Pages/Games/Views.fs` -- removed `Playing` from `statusLabel`, `statusTextClass`, `allStatuses`.
+- `src/Client/Pages/GameDetail/Views.fs` -- removed `Playing` from `statusBadgeClass`, `statusLabel`, `allStatuses`.
+- `src/Client/Pages/Dashboard/Views.fs` -- removed `"Playing" -> "bg-info"` arm from `gameStatusColors`.
+- `tests/Server.Tests/GamesTests.fs` -- replaced `Playing` test targets with `OnHold` / `Completed`; added regression test for legacy `"Playing"` payload deserialization.
+- `tests/Server.Tests/PlaytimeTrackerTests.fs` -- added `PlaytimeTracker auto-promote to InFocus` test list (8 cases) covering the full status promotion matrix and the manual-session paths.

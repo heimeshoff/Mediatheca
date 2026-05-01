@@ -40,7 +40,7 @@ module EventFormatting =
         match status with
         | "Backlog" -> "Backlog"
         | "InFocus" -> "In Focus"
-        | "Playing" -> "Playing"
+        | "Playing" -> "In Focus"  // legacy — folded into InFocus by task 048
         | "Completed" -> "Completed"
         | "Abandoned" -> "Abandoned"
         | "OnHold" -> "On Hold"

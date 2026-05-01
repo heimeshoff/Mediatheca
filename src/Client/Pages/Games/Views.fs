@@ -12,7 +12,6 @@ let private statusLabel (status: GameStatus) =
     match status with
     | Backlog -> "Backlog"
     | InFocus -> "In Focus"
-    | Playing -> "Playing"
     | Completed -> "Completed"
     | Abandoned -> "Abandoned"
     | OnHold -> "On Hold"
@@ -31,7 +30,6 @@ let private statusTextClass (status: GameStatus) =
     match status with
     | Backlog -> "text-base-content/50"
     | InFocus -> "text-info"
-    | Playing -> "text-primary"
     | Completed -> "text-success"
     | Abandoned -> "text-error"
     | OnHold -> "text-warning"
@@ -100,7 +98,7 @@ let private gameCard (game: GameListItem) =
     ]
 
 let private statusFilterBadges (currentFilter: GameStatus option) (dispatch: Msg -> unit) =
-    let allStatuses = [ Backlog; InFocus; Playing; Completed; Abandoned; OnHold; Dismissed ]
+    let allStatuses = [ Backlog; InFocus; Completed; Abandoned; OnHold; Dismissed ]
     Html.div [
         prop.className "flex flex-wrap gap-2"
         prop.children [

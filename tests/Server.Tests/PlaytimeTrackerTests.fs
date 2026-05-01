@@ -71,6 +71,19 @@ let private countSessions (conn: SqliteConnection) (slug: string) : int =
     |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
     |> Option.defaultValue 0
 
+let private setStatus (conn: SqliteConnection) (slug: string) (status: GameStatus) =
+    runCmd conn slug (Games.Change_status status) |> ignore
+
+let private getStatus (conn: SqliteConnection) (slug: string) : GameStatus option =
+    GameProjection.getGameStatus conn slug
+
+/// Count Game_status_changed events recorded for a slug.
+let private countStatusChangeEvents (conn: SqliteConnection) (slug: string) : int =
+    let streamId = Games.streamId slug
+    EventStore.readStream conn streamId
+    |> List.filter (fun e -> e.EventType = "Game_status_changed")
+    |> List.length
+
 [<Tests>]
 let playtimeTrackerTests =
     testList "PlaytimeTracker manual sessions" [
@@ -254,4 +267,102 @@ let playtimeTrackerTests =
 
             // Total = 100 (first steam) + 50 (manual) + 30 (delta) = 180
             Expect.equal (getTotalFromProjection conn gameSlug) 180 "Manual + Steam delta combined correctly"
+    ]
+
+[<Tests>]
+let promoteToInFocusTests =
+    // Task 048: any newly recorded play session promotes the game to InFocus,
+    // regardless of prior status (Backlog, OnHold, Completed, Abandoned, Dismissed all qualify).
+    // Already-InFocus games are skipped to avoid emitting redundant events.
+    testList "PlaytimeTracker auto-promote to InFocus" [
+
+        testCase "Backlog game with new playtime is promoted to InFocus" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            // Default status is Backlog
+            Expect.equal (getStatus conn gameSlug) (Some Backlog) "Starts in Backlog"
+
+            let promoted = PlaytimeTracker.promoteToInFocusIfNeeded conn gameSlug (runCmd conn)
+
+            Expect.isTrue promoted "Should report promotion"
+            Expect.equal (getStatus conn gameSlug) (Some InFocus) "Status now InFocus"
+
+        testCase "Completed game with new playtime is promoted to InFocus" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            setStatus conn gameSlug Completed
+            Expect.equal (getStatus conn gameSlug) (Some Completed) "Starts in Completed"
+
+            let promoted = PlaytimeTracker.promoteToInFocusIfNeeded conn gameSlug (runCmd conn)
+
+            Expect.isTrue promoted "Should report promotion (replaying a finished game)"
+            Expect.equal (getStatus conn gameSlug) (Some InFocus) "Status now InFocus"
+
+        testCase "Abandoned game is promoted to InFocus on new play" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            setStatus conn gameSlug Abandoned
+            let promoted = PlaytimeTracker.promoteToInFocusIfNeeded conn gameSlug (runCmd conn)
+            Expect.isTrue promoted "Should report promotion"
+            Expect.equal (getStatus conn gameSlug) (Some InFocus) "Status now InFocus"
+
+        testCase "OnHold game is promoted to InFocus on new play" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            setStatus conn gameSlug OnHold
+            let promoted = PlaytimeTracker.promoteToInFocusIfNeeded conn gameSlug (runCmd conn)
+            Expect.isTrue promoted "Should report promotion"
+            Expect.equal (getStatus conn gameSlug) (Some InFocus) "Status now InFocus"
+
+        testCase "Dismissed game is promoted to InFocus on new play" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            setStatus conn gameSlug Dismissed
+            let promoted = PlaytimeTracker.promoteToInFocusIfNeeded conn gameSlug (runCmd conn)
+            Expect.isTrue promoted "Should report promotion"
+            Expect.equal (getStatus conn gameSlug) (Some InFocus) "Status now InFocus"
+
+        testCase "Already-InFocus game emits no Game_status_changed event and reports no promotion" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            setStatus conn gameSlug InFocus
+            let beforeCount = countStatusChangeEvents conn gameSlug
+            let promoted = PlaytimeTracker.promoteToInFocusIfNeeded conn gameSlug (runCmd conn)
+            let afterCount = countStatusChangeEvents conn gameSlug
+            Expect.isFalse promoted "Should NOT report promotion"
+            Expect.equal afterCount beforeCount "No additional Game_status_changed events"
+            Expect.equal (getStatus conn gameSlug) (Some InFocus) "Still InFocus"
+
+        testCase "Manual session for a Backlog game promotes to InFocus" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            // Default Backlog
+            let result =
+                PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-01" 60 (runCmd conn)
+            match result with
+            | Ok _ -> Expect.equal (getStatus conn gameSlug) (Some InFocus) "Manual session promotes to InFocus"
+            | Error e -> failtest $"Expected Ok, got: {e}"
+
+        testCase "Manual session for an InFocus game does not emit a redundant status event" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            setStatus conn gameSlug InFocus
+            let before = countStatusChangeEvents conn gameSlug
+            PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-01" 60 (runCmd conn) |> ignore
+            let after = countStatusChangeEvents conn gameSlug
+            Expect.equal after before "No new Game_status_changed event emitted"
+
+        testCase "Manual session edit on a Completed game promotes to InFocus" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            // Add a session first while still in Backlog (which itself promotes to InFocus),
+            // then move to Completed, then edit the session — should re-promote.
+            let added = PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-01" 60 (runCmd conn)
+            setStatus conn gameSlug Completed
+            Expect.equal (getStatus conn gameSlug) (Some Completed) "Now Completed"
+            match added with
+            | Ok dto ->
+                PlaytimeTracker.updatePlaySessionApi conn dto.Id "2024-06-02" 90 (runCmd conn) |> ignore
+                Expect.equal (getStatus conn gameSlug) (Some InFocus) "Edit promotes back to InFocus"
+            | Error e -> failtest $"Setup failed: {e}"
     ]

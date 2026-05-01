@@ -66,6 +66,13 @@ module GameProjection =
         try
             conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN hltb_completionist_hours REAL" |> Db.exec
         with _ -> ()
+        // Task 048: collapse legacy 'Playing' status into 'InFocus'. Idempotent.
+        try
+            conn |> Db.newCommand "UPDATE game_list SET status = 'InFocus' WHERE status = 'Playing'" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "UPDATE game_detail SET status = 'InFocus' WHERE status = 'Playing'" |> Db.exec
+        with _ -> ()
 
     let private dropTables (conn: SqliteConnection) : unit =
         conn
@@ -79,7 +86,6 @@ module GameProjection =
         match status with
         | Backlog -> "Backlog"
         | InFocus -> "InFocus"
-        | Playing -> "Playing"
         | Completed -> "Completed"
         | Abandoned -> "Abandoned"
         | OnHold -> "OnHold"
@@ -89,7 +95,7 @@ module GameProjection =
         match s with
         | "Backlog" -> Backlog
         | "InFocus" -> InFocus
-        | "Playing" -> Playing
+        | "Playing" -> InFocus  // legacy — folded into InFocus by task 048
         | "Completed" -> Completed
         | "Abandoned" -> Abandoned
         | "OnHold" -> OnHold
@@ -498,6 +504,14 @@ module GameProjection =
               ContentBlocks = ContentBlockProjection.getForMovieDetail conn slug }
         )
 
+    /// Lightweight status lookup — used by Steam sync to check whether a game already is InFocus
+    /// before emitting a redundant Game_status_changed event.
+    let getGameStatus (conn: SqliteConnection) (slug: string) : GameStatus option =
+        conn
+        |> Db.newCommand "SELECT status FROM game_list WHERE slug = @slug"
+        |> Db.setParams [ "slug", SqlType.String slug ]
+        |> Db.querySingle (fun (rd: IDataReader) -> parseGameStatus (rd.ReadString "status"))
+
     let getGamesRecommendedByFriend (conn: SqliteConnection) (friendSlug: string) : FriendMediaItem list =
         let pattern = sprintf "%%\"%s\"%%" friendSlug
         conn
@@ -886,7 +900,7 @@ module GameProjection =
     // Cross-media: Active games count (currently playing)
     let getActiveGamesCount (conn: SqliteConnection) : int =
         conn
-        |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list WHERE status = 'Playing'"
+        |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list WHERE status = 'InFocus'"
         |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
         |> Option.defaultValue 0
 

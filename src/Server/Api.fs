@@ -1898,7 +1898,7 @@ module Api =
                     |> Option.defaultValue 0
                 let gamesInProgress =
                     conn
-                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list WHERE status = 'Playing'"
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list WHERE status = 'InFocus'"
                     |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
                     |> Option.defaultValue 0
                 let backlogSize =

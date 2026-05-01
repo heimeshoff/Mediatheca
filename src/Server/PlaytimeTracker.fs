@@ -278,6 +278,22 @@ module PlaytimeTracker =
         let total = getTotalMinutesForGame conn slug
         executeGameCommand slug (Games.Set_play_time total) |> ignore
 
+    /// If the game's status is anything other than InFocus, emit Change_status InFocus.
+    /// Returns true if the helper actually emitted the event.
+    /// Task 048: any new play activity (Steam sync OR manual session) bumps the game back into focus,
+    /// regardless of prior status (Backlog, OnHold, Completed, Abandoned, Dismissed all get pulled in).
+    let promoteToInFocusIfNeeded
+        (conn: SqliteConnection)
+        (slug: string)
+        (executeGameCommand: string -> Games.GameCommand -> Result<unit, string>)
+        : bool =
+        match GameProjection.getGameStatus conn slug with
+        | Some InFocus -> false
+        | Some _ | None ->
+            match executeGameCommand slug (Games.Change_status InFocus) with
+            | Ok () -> true
+            | Error _ -> false
+
     // Public-facing manual session API: validate inputs, mutate, recompute total.
 
     let addManualPlaySessionApi
@@ -298,6 +314,8 @@ module PlaytimeTracker =
                 | Some _ ->
                     let id, _ = upsertManualPlaySession conn slug date minutesPlayed
                     recomputeAndPublishTotal conn slug executeGameCommand
+                    // Task 048: a recorded session also bumps the game into focus.
+                    promoteToInFocusIfNeeded conn slug executeGameCommand |> ignore
                     match getPlaySessionById conn id with
                     | Some dto -> Ok dto
                     | None -> Error "Failed to retrieve session after insert"
@@ -322,6 +340,8 @@ module PlaytimeTracker =
                     | Error e -> Error e
                     | Ok resultId ->
                         recomputeAndPublishTotal conn existing.GameSlug executeGameCommand
+                        // Task 048: a recorded session also bumps the game into focus.
+                        promoteToInFocusIfNeeded conn existing.GameSlug executeGameCommand |> ignore
                         match getPlaySessionById conn resultId with
                         | Some dto -> Ok dto
                         | None -> Error "Failed to retrieve session after update"
@@ -549,7 +569,15 @@ module PlaytimeTracker =
                     let mutable sessionsRecorded = 0
                     let mutable snapshotsUpdated = 0
                     let mutable gamesCreated = 0
+                    let mutable gamesPromotedToFocus = 0
                     let today = defaultArg effectiveDate (DateTime.Now.ToString("yyyy-MM-dd"))
+
+                    // Task 048: any new play activity flips the game's status to InFocus
+                    // (skipped when already InFocus to avoid redundant events).
+                    let runCmdAll s c = executeGameCommand conn s c projectionHandlers
+                    let promote slug =
+                        if promoteToInFocusIfNeeded conn slug runCmdAll then
+                            gamesPromotedToFocus <- gamesPromotedToFocus + 1
 
                     for steamGame in recentGames do
                         let! slugResult = async {
@@ -590,6 +618,7 @@ module PlaytimeTracker =
                                         | None -> today
                                     recordPlaySession conn slug steamGame.AppId sessionDate currentPlaytime
                                     sessionsRecorded <- sessionsRecorded + 1
+                                    promote slug
                                 // Save baseline snapshot
                                 saveSnapshot conn steamGame.AppId slug currentPlaytime
                                 snapshotsUpdated <- snapshotsUpdated + 1
@@ -602,6 +631,7 @@ module PlaytimeTracker =
                                         | None -> today
                                     recordPlaySession conn slug steamGame.AppId sessionDate currentPlaytime
                                     sessionsRecorded <- sessionsRecorded + 1
+                                    promote slug
                                     eprintfn "[PlaytimeTracker] Reconciled missing play session for %s (%d min)" slug currentPlaytime
 
                                 let delta = currentPlaytime - lastTotal
@@ -627,8 +657,8 @@ module PlaytimeTracker =
                                     // Update game entity's TotalPlayTimeMinutes via event store.
                                     // Recompute from SUM(minutes_played) so manual sessions are preserved
                                     // alongside Steam-reported totals.
-                                    let runCmd s c = executeGameCommand conn s c projectionHandlers
-                                    recomputeAndPublishTotal conn slug runCmd
+                                    recomputeAndPublishTotal conn slug runCmdAll
+                                    promote slug
 
                                 // Always update snapshot
                                 saveSnapshot conn steamGame.AppId slug currentPlaytime
@@ -641,6 +671,7 @@ module PlaytimeTracker =
                         SessionsRecorded = sessionsRecorded
                         SnapshotsUpdated = snapshotsUpdated
                         GamesCreated = gamesCreated
+                        GamesPromotedToFocus = gamesPromotedToFocus
                     }
             with ex ->
                 return Error (sprintf "Playtime sync failed: %s" ex.Message)

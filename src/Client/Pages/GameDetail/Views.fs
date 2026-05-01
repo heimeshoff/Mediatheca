@@ -66,7 +66,6 @@ let private statusBadgeClass (status: GameStatus) =
     match status with
     | Backlog -> "badge-ghost"
     | InFocus -> "badge-info"
-    | Playing -> "badge-primary"
     | Completed -> "badge-success"
     | Abandoned -> "badge-error"
     | OnHold -> "badge-warning"
@@ -76,7 +75,6 @@ let private statusLabel (status: GameStatus) =
     match status with
     | Backlog -> "Backlog"
     | InFocus -> "In Focus"
-    | Playing -> "Playing"
     | Completed -> "Completed"
     | Abandoned -> "Abandoned"
     | OnHold -> "On Hold"
@@ -286,7 +284,7 @@ let private HeroRating (rawgRating: float option, personalRating: int option, is
 let private HeroStatus (currentStatus: GameStatus, isOpen: bool, dispatch: Msg -> unit) =
     let triggerRef = React.useElementRef()
     let pos, setPos = React.useState {| top = 0.0; left = 0.0 |}
-    let allStatuses = [ Backlog; InFocus; Playing; Completed; Abandoned; OnHold; Dismissed ]
+    let allStatuses = [ Backlog; InFocus; Completed; Abandoned; OnHold; Dismissed ]
 
     React.useEffect ((fun () ->
         if isOpen then

@@ -3432,7 +3432,6 @@ let private gameStatusColors (status: string) =
     match status with
     | "Backlog" -> "bg-base-content/30"
     | "InFocus" -> "bg-warning"
-    | "Playing" -> "bg-info"
     | "Completed" -> "bg-success"
     | "Abandoned" -> "bg-error"
     | "OnHold" -> "bg-base-content/50"

@@ -87,13 +87,13 @@ let gameTests =
             | Ok _ -> failtest "Expected error"
 
         testCase "Changing game status" <| fun _ ->
-            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Change_status Playing)
+            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Change_status OnHold)
             match result with
             | Ok events ->
                 Expect.equal (List.length events) 1 "Should produce one event"
                 let state = applyEvents ([ Game_added_to_library sampleGameData ] @ events)
                 match state with
-                | Active game -> Expect.equal game.Status Playing "Status should be Playing"
+                | Active game -> Expect.equal game.Status OnHold "Status should be OnHold"
                 | _ -> failtest "Expected Active state"
             | Error e -> failtest $"Expected success but got: {e}"
 
@@ -108,16 +108,16 @@ let gameTests =
                 | _ -> failtest "Expected Active state"
             | Error e -> failtest $"Expected success but got: {e}"
 
-        testCase "Transition InFocus to Playing" <| fun _ ->
+        testCase "Transition InFocus to Completed" <| fun _ ->
             let result = givenWhenThen
                             [ Game_added_to_library sampleGameData; Game_status_changed InFocus ]
-                            (Change_status Playing)
+                            (Change_status Completed)
             match result with
             | Ok events ->
                 Expect.equal (List.length events) 1 "Should produce one event"
                 let state = applyEvents ([ Game_added_to_library sampleGameData; Game_status_changed InFocus ] @ events)
                 match state with
-                | Active game -> Expect.equal game.Status Playing "Status should be Playing"
+                | Active game -> Expect.equal game.Status Completed "Status should be Completed"
                 | _ -> failtest "Expected Active state"
             | Error e -> failtest $"Expected success but got: {e}"
 
@@ -384,7 +384,7 @@ let gameTests =
                 Replace_cover "x"
                 Replace_backdrop "x"
                 Set_personal_rating (Some 3)
-                Change_status Playing
+                Change_status OnHold
                 Set_hltb_hours (Some 10.0, None, None)
                 Add_family_owner "marco"
                 Remove_family_owner "marco"
@@ -435,10 +435,17 @@ let gameSerializationTests =
             Expect.equal deserialized (Some event) "Should round-trip"
 
         testCase "Game_status_changed round-trips" <| fun _ ->
-            let event = Game_status_changed Playing
+            let event = Game_status_changed OnHold
             let eventType, data = Serialization.serialize event
             let deserialized = Serialization.deserialize eventType data
             Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Legacy 'Playing' status payload deserializes to InFocus" <| fun _ ->
+            // Task 048: the Playing case was removed from GameStatus; events / projection rows
+            // that still contain the literal string "Playing" must fold into InFocus on read.
+            let legacyData = """{"status":"Playing"}"""
+            let deserialized = Serialization.deserialize "Game_status_changed" legacyData
+            Expect.equal deserialized (Some (Game_status_changed InFocus)) "Legacy Playing should map to InFocus"
 
         testCase "Game_status_changed InFocus round-trips" <| fun _ ->
             let event = Game_status_changed InFocus
@@ -521,7 +528,6 @@ let gameSerializationTests =
                 Game_backdrop_replaced "backdrops/new.jpg"
                 Game_personal_rating_set (Some 4)
                 Game_personal_rating_set None
-                Game_status_changed Playing
                 Game_status_changed InFocus
                 Game_status_changed Completed
                 Game_status_changed Abandoned
