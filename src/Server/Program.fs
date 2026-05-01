@@ -224,7 +224,16 @@ let main args =
     if Directory.Exists(staticPath) then
         let fileProvider = new PhysicalFileProvider(staticPath)
         app.UseDefaultFiles(DefaultFilesOptions(FileProvider = fileProvider)) |> ignore
-        app.UseStaticFiles(StaticFileOptions(FileProvider = fileProvider)) |> ignore
+        // Register .webmanifest so the PWA manifest is served as application/manifest+json.
+        // (.js, .png are already mapped by the default provider.)
+        let contentTypeProvider = FileExtensionContentTypeProvider()
+        contentTypeProvider.Mappings[".webmanifest"] <- "application/manifest+json"
+        app.UseStaticFiles(
+            StaticFileOptions(
+                FileProvider = fileProvider,
+                ContentTypeProvider = contentTypeProvider
+            )
+        ) |> ignore
 
     // Serve images from /images path
     if Directory.Exists(imageBasePath) then
