@@ -393,7 +393,7 @@ let private CropEditor (imageUrl: string) (initialOffset: float * float) (initia
         ]
     ]
 
-let view (model: Model) (dispatch: Msg -> unit) =
+let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
     match model.IsLoading, model.Friend with
     | true, _ ->
         Html.div [
@@ -430,8 +430,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         Daisy.button.button [
                             button.ghost
                             button.sm
-                            prop.onClick (fun _ ->
-                                emitJsStatement () "window.history.back()")
+                            prop.onClick (fun _ -> onBack ())
                             prop.text "< Back"
                         ]
                     ]

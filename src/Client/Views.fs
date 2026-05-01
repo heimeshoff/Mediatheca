@@ -30,19 +30,19 @@ let private pageContent (model: Model) (dispatch: Msg -> unit) =
     | Movie_list ->
         Pages.Movies.Views.view model.MovieListModel (Movie_list_msg >> dispatch)
     | Movie_detail _ ->
-        Pages.MovieDetail.Views.view model.MovieDetailModel (Movie_detail_msg >> dispatch)
+        Pages.MovieDetail.Views.view model.MovieDetailModel (Movie_detail_msg >> dispatch) (fun () -> dispatch Go_back)
     | Series_list ->
         Pages.Series.Views.view model.SeriesListModel (Series_list_msg >> dispatch)
     | Series_detail _ ->
-        Pages.SeriesDetail.Views.view model.SeriesDetailModel (Series_detail_msg >> dispatch)
+        Pages.SeriesDetail.Views.view model.SeriesDetailModel (Series_detail_msg >> dispatch) (fun () -> dispatch Go_back)
     | Game_list ->
         Pages.Games.Views.view model.GameListModel (Game_list_msg >> dispatch)
     | Game_detail _ ->
-        Pages.GameDetail.Views.view model.GameDetailModel (Game_detail_msg >> dispatch)
+        Pages.GameDetail.Views.view model.GameDetailModel (Game_detail_msg >> dispatch) (fun () -> dispatch Go_back)
     | Friend_list ->
         Pages.Friends.Views.view model.FriendListModel (Friend_list_msg >> dispatch)
     | Friend_detail _ ->
-        Pages.FriendDetail.Views.view model.FriendDetailModel (Friend_detail_msg >> dispatch)
+        Pages.FriendDetail.Views.view model.FriendDetailModel (Friend_detail_msg >> dispatch) (fun () -> dispatch Go_back)
     | Catalog_list ->
         Pages.Catalogs.Views.view model.CatalogListModel (Catalog_list_msg >> dispatch)
     | Catalog_detail _ ->

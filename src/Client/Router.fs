@@ -56,6 +56,24 @@ module Route =
         | Styleguide -> Router.format "styleguide"
         | Not_found -> Router.format "not-found"
 
+    let navigateTo (page: Page) =
+        match page with
+        | Dashboard -> Router.navigate ""
+        | Movie_list -> Router.navigate "movies"
+        | Movie_detail slug -> Router.navigate ("movies", slug)
+        | Series_list -> Router.navigate "series"
+        | Series_detail slug -> Router.navigate ("series", slug)
+        | Game_list -> Router.navigate "games"
+        | Game_detail slug -> Router.navigate ("games", slug)
+        | Friend_list -> Router.navigate "friends"
+        | Friend_detail slug -> Router.navigate ("friends", slug)
+        | Catalog_list -> Router.navigate "catalogs"
+        | Catalog_detail slug -> Router.navigate ("catalogs", slug)
+        | Event_browser -> Router.navigate "events"
+        | Settings -> Router.navigate "settings"
+        | Styleguide -> Router.navigate "styleguide"
+        | Not_found -> Router.navigate "not-found"
+
     let isMoviesSection (page: Page) =
         match page with
         | Movie_list | Movie_detail _ -> true

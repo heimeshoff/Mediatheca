@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-05-01 13:22 -- Task Completed: 050 - Track Navigation History So Detail-Page Back Buttons Return to the Previous Page
+
+**Type:** Task Completion
+**Task:** 050 - Track Navigation History So Detail-Page Back Buttons Return to the Previous Page
+**Summary:** Added a deduped, capped `NavigationHistory` stack in the root Elmish model + `Go_back` Msg + `onBack` callback threaded into all four detail views. Empty-stack fallback navigates Movie/Series/Game detail to Dashboard with the right tab active (via `PendingDashboardTab` field, chosen over a URL query param so it survives the `Dashboard.State.init ()` reset on URL change); Friend detail falls back to the Friend list. Build clean, 255 tests pass.
+**Files changed:** 8 files
+
+---
+
+## 2026-05-01 13:25 -- Idea Captured: Dashboard Hero — Backdrop With Episode Still Inset
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/051-dashboard-hero-backdrop-with-episode-still-inset.md
+**Summary:** Dashboard hero spotlight currently shows the next episode's still full-bleed, which looks soft at hero size. Flip to use the series backdrop as the full-bleed background with the episode still as a medium thumbnail inset in the bottom-right (above the title block), no glassmorphism. Fall back to whichever single image exists when only one is available.
+
+---
+
+## 2026-05-01 13:15 -- Batch Started: [050]
+
+**Type:** Batch Start
+**Tasks:** 050 - Track Navigation History So Detail-Page Back Buttons Return to the Previous Page
+**Mode:** Parallel (batch of 1; final task in todo)
+
+---
+
 ## 2026-05-01 13:14 -- Task Completed: 049 - Manual Refresh Controls for Steam Link & HLTB Data
 
 **Type:** Task Completion

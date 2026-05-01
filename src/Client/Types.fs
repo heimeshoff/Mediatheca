@@ -6,6 +6,9 @@ open Mediatheca.Client.Components
 
 type Model = {
     CurrentPage: Page
+    NavigationHistory: Page list
+    SuppressNextHistoryPush: bool
+    PendingDashboardTab: Pages.Dashboard.Types.DashboardTab option
     DashboardModel: Pages.Dashboard.Types.Model
     MovieListModel: Pages.Movies.Types.Model
     MovieDetailModel: Pages.MovieDetail.Types.Model
@@ -29,6 +32,7 @@ type Model = {
 
 type Msg =
     | Url_changed of string list
+    | Go_back
     | Open_search_modal
     | Search_modal_msg of SearchModal.Msg
     | Dashboard_msg of Pages.Dashboard.Types.Msg

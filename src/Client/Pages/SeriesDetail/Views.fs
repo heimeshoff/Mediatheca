@@ -1514,7 +1514,7 @@ let private tabBar (series: SeriesDetail) (activeTab: SeriesTab) (dispatch: Msg 
 
 // ── Main View ──
 
-let view (model: Model) (dispatch: Msg -> unit) =
+let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
     match model.IsLoading, model.Detail with
     | true, _ ->
         Html.div [
@@ -1572,7 +1572,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                     button.ghost
                                     button.sm
                                     prop.className "text-base-content backdrop-blur-sm bg-base-300/30"
-                                    prop.onClick (fun _ -> Router.navigate "series")
+                                    prop.onClick (fun _ -> onBack ())
                                     prop.text "\u2190 Back"
                                 ]
                             ]

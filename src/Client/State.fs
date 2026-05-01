@@ -29,6 +29,9 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
 
     let model = {
         CurrentPage = Dashboard
+        NavigationHistory = []
+        SuppressNextHistoryPush = false
+        PendingDashboardTab = None
         DashboardModel = dashboardModel
         MovieListModel = movieListModel
         MovieDetailModel = movieDetailModel
@@ -335,11 +338,29 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
         | SearchModal.Hover_clear ->
             { model with SearchModal = Some { searchModel with HoverTarget = None; HoverPreview = SearchModal.NotHovering } }, Cmd.none
 
+let private maxHistory = 20
+
+let private pushHistory (prev: Page) (history: Page list) : Page list =
+    // Skip pushing duplicates (e.g., re-renders or query-only changes)
+    match history with
+    | head :: _ when head = prev -> history |> List.truncate maxHistory
+    | _ -> (prev :: history) |> List.truncate maxHistory
+
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
     | Url_changed segments ->
         let page = Route.parseUrl segments
-        let model = { model with CurrentPage = page }
+        let prevPage = model.CurrentPage
+        // Skip pushing onto the stack when the new page equals the current page,
+        // when the previous page was Not_found, or when Go_back triggered this nav.
+        let newHistory =
+            if model.SuppressNextHistoryPush then model.NavigationHistory
+            elif page = prevPage then model.NavigationHistory
+            else
+                match prevPage with
+                | Not_found -> model.NavigationHistory
+                | _ -> pushHistory prevPage model.NavigationHistory
+        let model = { model with CurrentPage = page; NavigationHistory = newHistory; SuppressNextHistoryPush = false }
         match page with
         | Movie_list ->
             let childModel, childCmd = Pages.Movies.State.init ()
@@ -395,7 +416,14 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             Cmd.map Styleguide_msg childCmd
         | Dashboard ->
             let childModel, childCmd = Pages.Dashboard.State.init ()
-            { model with DashboardModel = childModel },
+            // Apply pending tab from a Go_back fallback, if any
+            let childModel, tabCmd =
+                match model.PendingDashboardTab with
+                | Some tab ->
+                    { childModel with ActiveTab = tab },
+                    Cmd.ofMsg (Dashboard_msg (Pages.Dashboard.Types.SwitchTab tab))
+                | None -> childModel, Cmd.none
+            { model with DashboardModel = childModel; PendingDashboardTab = None },
             Cmd.batch [
                 Cmd.map Dashboard_msg childCmd
                 Cmd.OfAsync.either
@@ -404,8 +432,35 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                     (fun ex -> Dashboard_msg (Pages.Dashboard.Types.TabLoadError ex.Message))
                 // Re-trigger Jellyfin auto-sync on dashboard visit (server enforces 5-min cooldown)
                 Cmd.OfAsync.perform api.triggerJellyfinSync () JellyfinSyncTriggered
+                tabCmd
             ]
         | _ -> model, Cmd.none
+
+    | Go_back ->
+        match model.NavigationHistory with
+        | head :: tail ->
+            // Pop head and navigate there. Suppress the next push so we don't
+            // re-add the page we're leaving onto the stack.
+            { model with NavigationHistory = tail; SuppressNextHistoryPush = true },
+            Cmd.ofEffect (fun _ -> Route.navigateTo head)
+        | [] ->
+            // Empty stack fallback based on the page we're leaving
+            match model.CurrentPage with
+            | Movie_detail _ ->
+                { model with PendingDashboardTab = Some Pages.Dashboard.Types.MoviesTab; SuppressNextHistoryPush = true },
+                Cmd.ofEffect (fun _ -> Route.navigateTo Dashboard)
+            | Series_detail _ ->
+                { model with PendingDashboardTab = Some Pages.Dashboard.Types.SeriesTab; SuppressNextHistoryPush = true },
+                Cmd.ofEffect (fun _ -> Route.navigateTo Dashboard)
+            | Game_detail _ ->
+                { model with PendingDashboardTab = Some Pages.Dashboard.Types.GamesTab; SuppressNextHistoryPush = true },
+                Cmd.ofEffect (fun _ -> Route.navigateTo Dashboard)
+            | Friend_detail _ ->
+                { model with SuppressNextHistoryPush = true },
+                Cmd.ofEffect (fun _ -> Route.navigateTo Friend_list)
+            | _ ->
+                { model with SuppressNextHistoryPush = true },
+                Cmd.ofEffect (fun _ -> Route.navigateTo Dashboard)
 
     | Open_search_modal ->
         { model with SearchModal = Some (SearchModal.initWithGames model.MovieListModel.Movies model.SeriesListModel.Series model.GameListModel.Games) }, Cmd.none
