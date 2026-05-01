@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-05-01 13:25 -- Task Completed: 051 - Dashboard Hero — Use Series Backdrop as Background, Episode Still as Inset
+
+**Type:** Task Completion
+**Task:** 051 - Dashboard Hero — Use Series Backdrop as Background, Episode Still as Inset
+**Summary:** Dashboard hero now picks the high-res series backdrop as the full-bleed canvas and renders the lower-res episode still as a plain (non-glassmorphic) inset thumbnail in the bottom-right above the title block. All four availability cases (both / backdrop-only / still-only / neither) handled. Build clean, 255 tests pass.
+**Files changed:** 1 file
+
+---
+
+## 2026-05-01 13:23 -- Batch Started: [051]
+
+**Type:** Batch Start
+**Tasks:** 051 - Dashboard Hero — Use Series Backdrop as Background, Episode Still as Inset
+**Mode:** Parallel (batch of 1; only task in todo)
+
+---
+
 ## 2026-05-01 13:22 -- Task Completed: 050 - Track Navigation History So Detail-Page Back Buttons Return to the Previous Page
 
 **Type:** Task Completion

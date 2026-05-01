@@ -909,10 +909,14 @@ let private gamesRecentlyPlayedChart (sessions: DashboardPlaySession list) =
 // ── Hero Episode Spotlight (top of left column) ──
 
 let private heroSpotlight (jellyfinServerUrl: string option) (item: DashboardSeriesNextUp) =
-    let imageRef =
-        match item.EpisodeStillRef with
-        | Some stillRef -> Some stillRef
-        | None -> item.BackdropRef
+    // Prefer the series backdrop (typically 1920×1080+) for the hero canvas; show the
+    // episode still as a smaller inset so the user still sees what's next.
+    let backgroundRef, insetRef =
+        match item.BackdropRef, item.EpisodeStillRef with
+        | Some backdrop, Some still -> Some backdrop, Some still
+        | Some backdrop, None -> Some backdrop, None
+        | None, Some still -> Some still, None
+        | None, None -> None, None
     Html.a [
         prop.href (Router.format ("series", item.Slug))
         prop.onClick (fun e ->
@@ -925,7 +929,7 @@ let private heroSpotlight (jellyfinServerUrl: string option) (item: DashboardSer
             Html.div [
                 prop.className "relative w-full aspect-[21/9] sm:aspect-[2.5/1]"
                 prop.children [
-                    match imageRef with
+                    match backgroundRef with
                     | Some ref ->
                         Html.img [
                             prop.src $"/images/{ref}"
@@ -941,6 +945,23 @@ let private heroSpotlight (jellyfinServerUrl: string option) (item: DashboardSer
                     Html.div [
                         prop.className "absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"
                     ]
+
+                    // Episode still inset (only when both backdrop + still exist).
+                    // Sits above the bottom title block, below Jellyfin play & In Focus indicator.
+                    // Plain rendering — no glassmorphism per task spec.
+                    match insetRef with
+                    | Some still ->
+                        Html.div [
+                            prop.className "absolute bottom-24 sm:bottom-28 right-4 sm:right-6 w-44 sm:w-56 aspect-video rounded-lg overflow-hidden border border-white/10 shadow-lg z-[5]"
+                            prop.children [
+                                Html.img [
+                                    prop.src $"/images/{still}"
+                                    prop.alt $"S{item.NextUpSeason}E{item.NextUpEpisode}"
+                                    prop.className "w-full h-full object-cover"
+                                ]
+                            ]
+                        ]
+                    | None -> ()
 
                     // Content overlay at bottom
                     Html.div [
