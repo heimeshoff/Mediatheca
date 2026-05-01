@@ -42,6 +42,8 @@ module HowLongToBeat =
         type ApiData = {
             SearchEndpoint: string
             AuthToken: string
+            HpKey: string
+            HpVal: string
             CachedAt: DateTime
         }
 
@@ -58,11 +60,13 @@ module HowLongToBeat =
                     None
             )
 
-        let set (endpoint: string) (token: string) =
+        let set (endpoint: string) (token: string) (hpKey: string) (hpVal: string) =
             lock lockObj (fun () ->
                 cached <- Some {
                     SearchEndpoint = endpoint
                     AuthToken = token
+                    HpKey = hpKey
+                    HpVal = hpVal
                     CachedAt = DateTime.UtcNow
                 }
             )
@@ -137,12 +141,33 @@ module HowLongToBeat =
 
     // ─── Step 2: Obtain auth token ───────────────────────────────────────
 
-    let private decodeToken: Decoder<string> =
-        Decode.object (fun get ->
-            get.Required.Field "token" Decode.string
+    type private InitResponse = {
+        Token: string
+        HpKey: string
+        HpVal: string
+    }
+
+    /// Decode the /init response. HLTB returns at minimum `token` plus a
+    /// pair of fields whose names contain "key" and "val" respectively
+    /// (currently `hpKey` / `hpVal`). Match the field names with a
+    /// case-insensitive substring search so a future rename doesn't break
+    /// us — this mirrors what the howlongtobeatpy reference library does.
+    let private decodeInitResponse: Decoder<InitResponse> =
+        Decode.keyValuePairs Decode.string
+        |> Decode.andThen (fun pairs ->
+            let tryField predicate =
+                pairs
+                |> List.tryFind (fun (k, _) -> predicate (k.ToLowerInvariant()))
+                |> Option.map snd
+            match tryField (fun k -> k = "token"), tryField (fun k -> k.Contains("key")), tryField (fun k -> k.Contains("val")) with
+            | Some token, Some hpKey, Some hpVal ->
+                Decode.succeed { Token = token; HpKey = hpKey; HpVal = hpVal }
+            | None, _, _ -> Decode.fail "Missing 'token' field in /init response"
+            | _, None, _ -> Decode.fail "Missing key-bearing field in /init response (expected something like 'hpKey')"
+            | _, _, None -> Decode.fail "Missing val-bearing field in /init response (expected something like 'hpVal')"
         )
 
-    let private fetchAuthToken (httpClient: HttpClient) (searchEndpoint: string) : Async<Result<string, string>> =
+    let private fetchAuthToken (httpClient: HttpClient) (searchEndpoint: string) : Async<Result<InitResponse, string>> =
         async {
             let timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
             let url = sprintf "%s%s/init?t=%d" baseUrl searchEndpoint timestamp
@@ -156,10 +181,10 @@ module HowLongToBeat =
                 let! response = httpClient.SendAsync(request, cts.Token) |> Async.AwaitTask
                 if response.IsSuccessStatusCode then
                     let! json = response.Content.ReadAsStringAsync() |> Async.AwaitTask
-                    match Decode.fromString decodeToken json with
-                    | Ok token ->
+                    match Decode.fromString decodeInitResponse json with
+                    | Ok init ->
                         printfn "[HLTB] Auth token obtained successfully"
-                        return Ok token
+                        return Ok init
                     | Error e ->
                         return Error (sprintf "Failed to parse auth token response: %s" e)
                 else
@@ -170,10 +195,25 @@ module HowLongToBeat =
 
     // ─── Step 3: Search ──────────────────────────────────────────────────
 
-    let private buildSearchBody (gameName: string) : string =
+    /// Same delimiters used by `jaccardSimilarity` below — keep these in sync so the
+    /// tokens we ask HLTB to AND-match are the same tokens we score against.
+    /// Without this, "Starcom: Unknown Space" sends "Starcom:" as a literal search
+    /// term (colon attached), which never matches anything in HLTB's index.
+    let private searchDelimiters =
+        [| ' '; '\t'; '-'; ':'; '\''; '('; ')' |]
+
+    let private jsonEscape (s: string) : string =
+        s.Replace("\\", "\\\\").Replace("\"", "\\\"")
+
+    /// Build the search payload. `hpKey` / `hpVal` come from the /init
+    /// response and HLTB requires them as both headers AND a top-level
+    /// body field where the field name is `hpKey`'s value and its value
+    /// is `hpVal`'s value (e.g. `"ign_3a47fa48": "293c43bc7424b6c3"`).
+    /// Without the body field, the API returns 403 even with correct headers.
+    let private buildSearchBody (gameName: string) (hpKey: string) (hpVal: string) : string =
         let terms =
-            gameName.Split([| ' '; '\t' |], StringSplitOptions.RemoveEmptyEntries)
-            |> Array.map (fun t -> sprintf "\"%s\"" (t.Replace("\"", "\\\"")))
+            gameName.Split(searchDelimiters, StringSplitOptions.RemoveEmptyEntries)
+            |> Array.map (fun t -> sprintf "\"%s\"" (jsonEscape t))
             |> String.concat ", "
 
         let sb = StringBuilder()
@@ -198,7 +238,8 @@ module HowLongToBeat =
         sb.Append("\"sort\":0,") |> ignore
         sb.Append("\"randomizer\":0") |> ignore
         sb.Append("},") |> ignore
-        sb.Append("\"useCache\":true") |> ignore
+        sb.Append("\"useCache\":true,") |> ignore
+        sb.AppendFormat("\"{0}\":\"{1}\"", jsonEscape hpKey, jsonEscape hpVal) |> ignore
         sb.Append("}") |> ignore
         sb.ToString()
 
@@ -241,7 +282,7 @@ module HowLongToBeat =
     /// Jaccard similarity between two strings, tokenized by whitespace.
     let private jaccardSimilarity (a: string) (b: string) : float =
         let tokenize (s: string) =
-            s.ToLowerInvariant().Split([| ' '; '\t'; '-'; ':'; '\''; '(' ; ')' |], StringSplitOptions.RemoveEmptyEntries)
+            s.ToLowerInvariant().Split(searchDelimiters, StringSplitOptions.RemoveEmptyEntries)
             |> Set.ofArray
         let setA = tokenize a
         let setB = tokenize b
@@ -277,11 +318,11 @@ module HowLongToBeat =
 
     // ─── API data initialization ─────────────────────────────────────────
 
-    let private getApiData (httpClient: HttpClient) : Async<Result<{| Endpoint: string; Token: string |}, string>> =
+    let private getApiData (httpClient: HttpClient) : Async<Result<{| Endpoint: string; Token: string; HpKey: string; HpVal: string |}, string>> =
         async {
             match ApiDataCache.tryGet() with
             | Some cached ->
-                return Ok {| Endpoint = cached.SearchEndpoint; Token = cached.AuthToken |}
+                return Ok {| Endpoint = cached.SearchEndpoint; Token = cached.AuthToken; HpKey = cached.HpKey; HpVal = cached.HpVal |}
             | None ->
                 let! endpointResult = discoverSearchEndpoint httpClient
                 let endpoint =
@@ -289,29 +330,31 @@ module HowLongToBeat =
                     | Ok ep -> ep
                     | Error e ->
                         printfn "[HLTB] WARNING: Endpoint discovery failed: %s" e
-                        printfn "[HLTB] Trying fallback endpoint /api/finder"
-                        "/api/finder"
+                        printfn "[HLTB] Trying fallback endpoint /api/find"
+                        "/api/find"
                 match! fetchAuthToken httpClient endpoint with
-                | Ok token ->
-                    ApiDataCache.set endpoint token
-                    return Ok {| Endpoint = endpoint; Token = token |}
+                | Ok init ->
+                    ApiDataCache.set endpoint init.Token init.HpKey init.HpVal
+                    return Ok {| Endpoint = endpoint; Token = init.Token; HpKey = init.HpKey; HpVal = init.HpVal |}
                 | Error tokenErr ->
                     return Error (sprintf "Auth token fetch failed: %s" tokenErr)
         }
 
     // ─── Execute search request ──────────────────────────────────────────
 
-    let private executeSearch (httpClient: HttpClient) (endpoint: string) (token: string) (gameName: string) : Async<Result<HltbSearchResult list, int>> =
+    let private executeSearch (httpClient: HttpClient) (endpoint: string) (token: string) (hpKey: string) (hpVal: string) (gameName: string) : Async<Result<HltbSearchResult list, int>> =
         async {
             try
                 let url = sprintf "%s%s" baseUrl endpoint
-                let body = buildSearchBody gameName
+                let body = buildSearchBody gameName hpKey hpVal
                 use request = new HttpRequestMessage(HttpMethod.Post, url)
                 request.Content <- new StringContent(body, Encoding.UTF8, "application/json")
                 request.Headers.Add("User-Agent", userAgent)
                 request.Headers.Add("Referer", sprintf "%s/" baseUrl)
                 request.Headers.Add("Origin", baseUrl)
                 request.Headers.Add("x-auth-token", token)
+                request.Headers.Add("x-hp-key", hpKey)
+                request.Headers.Add("x-hp-val", hpVal)
                 let cts = new Threading.CancellationTokenSource(requestTimeoutMs)
                 let! response = httpClient.SendAsync(request, cts.Token) |> Async.AwaitTask
                 let statusCode = int response.StatusCode
@@ -344,7 +387,7 @@ module HowLongToBeat =
                         printfn "[HLTB] Failed to get API data: %s" e
                         return None
                     | Ok apiData ->
-                        match! executeSearch httpClient apiData.Endpoint apiData.Token gameName with
+                        match! executeSearch httpClient apiData.Endpoint apiData.Token apiData.HpKey apiData.HpVal gameName with
                         | Ok results ->
                             let best = selectBestMatch gameName results
                             return best |> Option.map (fun r -> {
@@ -367,7 +410,7 @@ module HowLongToBeat =
                                 printfn "[HLTB] Retry failed to get API data: %s" e
                                 return None
                             | Ok retryData ->
-                                match! executeSearch httpClient retryData.Endpoint retryData.Token gameName with
+                                match! executeSearch httpClient retryData.Endpoint retryData.Token retryData.HpKey retryData.HpVal gameName with
                                 | Ok results ->
                                     let best = selectBestMatch gameName results
                                     return best |> Option.map (fun r -> {
