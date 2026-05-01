@@ -770,20 +770,11 @@ let private episodeCard
                                     prop.className "absolute top-full left-1/2 -translate-x-1/2 -mt-4 whitespace-nowrap"
                                     prop.children [
                                         if isEditingDate then
-                                            Daisy.input [
-                                                prop.className ("w-36 border-base-content/15 " + DesignSystem.glassCard)
-                                                input.xs
-                                                prop.type' "date"
-                                                prop.autoFocus true
-                                                prop.value (episode.WatchedDate |> Option.defaultValue "" |> fun d -> if d.Length > 10 then d.Substring(0, 10) else d)
-                                                prop.onChange (fun (v: string) ->
-                                                    dispatch (Update_episode_date (seasonNumber, episode.EpisodeNumber, v)))
-                                                prop.onBlur (fun _ ->
-                                                    dispatch Cancel_edit_episode_date)
-                                                prop.onKeyDown (fun e ->
-                                                    if e.key = "Escape" then
-                                                        dispatch Cancel_edit_episode_date)
-                                            ]
+                                            EditableDateInput.EditableDateInput
+                                                (episode.WatchedDate |> Option.defaultValue "")
+                                                ("input-xs w-36 border-base-content/15 " + DesignSystem.glassCard)
+                                                (fun v -> dispatch (Update_episode_date (seasonNumber, episode.EpisodeNumber, v)))
+                                                (fun () -> dispatch Cancel_edit_episode_date)
                                         else
                                             Html.span [
                                                 prop.className "text-[10px] text-base-content/40 cursor-pointer hover:text-primary transition-colors"

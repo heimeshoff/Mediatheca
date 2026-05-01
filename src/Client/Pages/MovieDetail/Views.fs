@@ -726,20 +726,11 @@ let private friendsCard (movie: MovieDetail) (model: Model) (dispatch: Msg -> un
                                                             prop.className "flex items-center gap-2 mb-1"
                                                             prop.children [
                                                                 if model.EditingSessionDate = Some session.SessionId then
-                                                                    Daisy.input [
-                                                                        prop.className "w-36"
-                                                                        input.sm
-                                                                        prop.type' "date"
-                                                                        prop.autoFocus true
-                                                                        prop.value (if session.Date.Length > 10 then session.Date.Substring(0, 10) else session.Date)
-                                                                        prop.onChange (fun (v: string) ->
-                                                                            dispatch (Update_session_date (session.SessionId, v)))
-                                                                        prop.onBlur (fun _ ->
-                                                                            dispatch (Update_session_date (session.SessionId, session.Date)))
-                                                                        prop.onKeyDown (fun e ->
-                                                                            if e.key = "Escape" then
-                                                                                dispatch (Update_session_date (session.SessionId, session.Date)))
-                                                                    ]
+                                                                    EditableDateInput.EditableDateInput
+                                                                        session.Date
+                                                                        "input-sm w-36"
+                                                                        (fun v -> dispatch (Update_session_date (session.SessionId, v)))
+                                                                        (fun () -> dispatch Cancel_edit_session_date)
                                                                 else
                                                                     Html.span [
                                                                         prop.className "text-xs font-bold text-base-content/40 uppercase tracking-tight cursor-pointer hover:text-primary transition-colors"

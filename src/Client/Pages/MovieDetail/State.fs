@@ -112,6 +112,9 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Edit_session_date sessionId ->
         { model with EditingSessionDate = Some sessionId }, Cmd.none
 
+    | Cancel_edit_session_date ->
+        { model with EditingSessionDate = None }, Cmd.none
+
     | Update_session_date (sessionId, date) ->
         { model with EditingSessionDate = None },
         Cmd.OfAsync.perform (fun () -> api.updateWatchSessionDate model.Slug sessionId date) () Command_result

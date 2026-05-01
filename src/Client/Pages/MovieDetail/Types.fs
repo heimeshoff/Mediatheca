@@ -46,6 +46,7 @@ type Msg =
     | Record_quick_session
     | Quick_session_recorded of Result<string, string>
     | Edit_session_date of sessionId: string
+    | Cancel_edit_session_date
     | Update_session_date of sessionId: string * date: string
     | Add_friend_to_session of sessionId: string * friendSlug: string
     | Remove_friend_from_session of sessionId: string * friendSlug: string

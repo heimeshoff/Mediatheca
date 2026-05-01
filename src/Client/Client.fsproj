@@ -12,6 +12,7 @@
     <Compile Include="Components\FriendPill.fs" />
     <Compile Include="Components\PageContainer.fs" />
     <Compile Include="Components\ContentBlockEditor.fs" />
+    <Compile Include="Components\EditableDateInput.fs" />
     <Compile Include="Components\ModalPanel.fs" />
     <Compile Include="Components\PosterCard.fs" />
     <Compile Include="Components\EntryList.fs" />

@@ -2,6 +2,15 @@
 
 ---
 
+## 2026-05-01 12:56 -- Task Completed: 047 - Date Pickers Persist on Enter or Blur, Not on Change
+
+**Type:** Task Completion
+**Task:** 047 - Date Pickers Persist on Enter or Blur, Not on Change
+**Summary:** New reusable `EditableDateInput` Feliz component holds the draft in local React state and only commits on Enter or blur (Escape cancels, invalid/empty drafts close silently). Wired into the SeriesDetail episode-date editor and the MovieDetail watch-session editor; new `Cancel_edit_session_date` message added so MovieDetail can close without an API call. Build clean.
+**Files changed:** 6 files
+
+---
+
 ## 2026-05-01 12:55 -- Task Completed: 046 - Editable Play Sessions on Game Detail
 
 **Type:** Task Completion

@@ -106,3 +106,37 @@ The `Cancel_edit_episode_date` / equivalent cancel message stays — `onCancel` 
 - The native `<input type="date">` does not emit `change` for partial typed values — it only fires when the input's internal value transitions to a complete valid date or an empty string. So the local draft really only needs to capture two states (full date or empty); we never see "2026-05" in the draft. That's fine: the validation rule `draft.Length = 10` covers it.
 - One subtle point on `onBlur`: when focus moves into the browser's calendar dropdown, the input itself remains the focused element (the dropdown is part of the input's shadow DOM in Chromium). So `onBlur` only fires when focus actually leaves the input — clicks within the dropdown won't trigger an unwanted commit.
 - This task does not change any server logic, DTOs, or persisted data shape. It's a client-only behavioural fix.
+
+## Work Log
+
+### 2026-05-01 12:46 -- Work Completed
+
+**What was done:**
+- Created new shared `EditableDateInput` Feliz function component (`src/Client/Components/EditableDateInput.fs`) implementing Option A: `React.useState` holds the local draft, `onChange` only updates the draft, `Enter` and `onBlur` commit (only when the draft is a complete `yyyy-MM-dd` and differs from the original) or cancel, `Escape` cancels. Caller passes initial value, extra DaisyUI/className string, `onCommit` and `onCancel` callbacks.
+- Registered the new component in `src/Client/Client.fsproj` between `ContentBlockEditor.fs` and `ModalPanel.fs`.
+- Replaced the inline `Daisy.input` block in `src/Client/Pages/SeriesDetail/Views.fs` with `EditableDateInput.EditableDateInput`, preserving the `input-xs w-36` size and the `DesignSystem.glassCard` border styling.
+- Replaced the inline `Daisy.input` block in `src/Client/Pages/MovieDetail/Views.fs` with `EditableDateInput.EditableDateInput`, preserving the `input-sm w-36` styling.
+- Added a dedicated `Cancel_edit_session_date` message to `MovieDetail/Types.fs` and a corresponding case in `MovieDetail/State.fs` (closes the editor without firing an API call). Previously the only "cancel" path was dispatching `Update_session_date` with the unchanged date, which still hit the server.
+- Verified the new component handles the "blur into native calendar dropdown" subtlety: `onBlur` only fires when focus leaves the input element (the picker dropdown lives in the input's shadow DOM), so picker clicks update the draft via `onChange` but do not auto-commit.
+
+**Acceptance criteria status:**
+- [x] Episode date editor stays open while typing -- new component drafts on `onChange`, never dispatches `Update_episode_date` until commit.
+- [x] Enter on episode editor with valid date persists -- `commitOrCancel` calls `onCommit` when `draft.Length = 10 && draft <> initial`.
+- [x] Click outside episode editor with valid date persists -- `prop.onBlur` calls `commitOrCancel`.
+- [x] Escape on episode editor cancels -- `prop.onKeyDown` matches `"Escape"` and calls `onCancel` (existing `Cancel_edit_episode_date`).
+- [x] Invalid/empty draft on Enter/blur closes silently -- `commitOrCancel` falls through to `onCancel` when draft length != 10 or unchanged. No API call fired.
+- [x] Same four behaviours hold for movie watch session date -- same component used; new `Cancel_edit_session_date` wired through.
+- [x] Picker click does not auto-commit -- `onChange` only updates draft state; commit gated on Enter/blur.
+- [x] No regression in `Update_episode_date` / `Update_session_date` flow -- commit callbacks dispatch the existing messages, which still trigger the same server calls + reload.
+- [x] `npm run build` succeeds -- 34s clean Fable+Vite build, only the pre-existing chunk-size warning.
+- [x] `npm test` -- N/A for this client-only change. The test runner currently fails to compile because task 046 (concurrent) is mid-edit on `src/Server/PlaytimeTracker.fs` and `src/Server/Api.fs` (errors: missing `Id` on `PlaySessionDto`, missing `addManualPlaySession` impl on `IMediathecaApi`). Both files are out-of-scope for this task and unrelated to the client behaviour change. The Fable build (`npm run build`) is a complete type/transform check for the client surface touched here and passes.
+- [x] Design check -- Series editor still uses `input-xs` + `DesignSystem.glassCard` border; Movies editor still uses default DaisyUI `input-sm`. Styling is unchanged.
+- [x] Cross-link with task 046 -- task 046's play-session date input should adopt `EditableDateInput.EditableDateInput` from `Components/EditableDateInput.fs` for consistency.
+
+**Files changed:**
+- `src/Client/Components/EditableDateInput.fs` -- NEW. Reusable inline date editor with Enter/blur commit + Escape cancel.
+- `src/Client/Client.fsproj` -- Registered `Components\EditableDateInput.fs` in the compile order.
+- `src/Client/Pages/SeriesDetail/Views.fs` -- Replaced inline `Daisy.input` block (~14 lines) with single `EditableDateInput.EditableDateInput` call.
+- `src/Client/Pages/MovieDetail/Views.fs` -- Same swap for the watch-session date editor.
+- `src/Client/Pages/MovieDetail/Types.fs` -- Added `Cancel_edit_session_date` message.
+- `src/Client/Pages/MovieDetail/State.fs` -- Handler clears `EditingSessionDate` without firing an API call.
