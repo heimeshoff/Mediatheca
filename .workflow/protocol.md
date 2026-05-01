@@ -2,6 +2,50 @@
 
 ---
 
+## 2026-05-01 15:31 -- Task Completed: 054 - Dashboard Hero — Move Episode Still Inset to Top-Left
+
+**Type:** Task Completion
+**Task:** 054 - Dashboard Hero — Move Episode Still Inset to Top-Left
+**Summary:** Moved the dashboard hero episode-still inset from bottom-right to top-left and suppressed the "In Focus" glow indicator when the inset is rendered (they shared the top-left corner).
+**Files changed:** 1 file (plus task file move)
+
+---
+
+## 2026-05-01 15:31 -- Task Completed: 053 - Make Mediatheca Installable as a PWA on Mobile
+
+**Type:** Task Completion
+**Task:** 053 - Make Mediatheca Installable as a PWA on Mobile
+**Summary:** Added a minimum-viable PWA setup — manifest, no-op service worker, three PNG icons generated from the Mediatheca play-circle glyph (with sRGB-converted dim-theme colours), HTML wiring, and a Giraffe `.webmanifest` MIME mapping.
+**Files changed:** 7 files (plus icon-generation script and task file move)
+
+---
+
+## 2026-05-01 15:27 -- Batch Started: [053, 054]
+
+**Type:** Batch Start
+**Tasks:** 053 - Make Mediatheca Installable as a PWA on Mobile, 054 - Dashboard Hero — Move Episode Still Inset to Top-Left
+**Mode:** Parallel (batch of 2)
+
+---
+
+## 2026-05-01 15:23 -- Idea Captured: Dashboard Hero — Move Episode Still Inset to Top-Left
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/054-dashboard-hero-episode-still-top-left.md
+**Summary:** Move the episode-still inset on the dashboard hero from `bottom-right` to `top-left`. Title block stays anchored at the bottom. Hide the "In Focus" glow indicator (also at top-left) whenever the inset is rendered to avoid the corner collision. Same size, same plain (no-glass) treatment.
+
+---
+
+## 2026-05-01 14:00 -- Idea Captured: Make Mediatheca Installable as a PWA on Mobile
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/053-installable-pwa-manifest.md
+**Summary:** Add the minimum-viable PWA setup so Chrome on Android shows the Install prompt and Mediatheca launches standalone from the home screen. Manual setup (manifest + tiny no-op service worker + icon set generated from the existing play-circle glyph on the dim theme) — no vite-plugin-pwa, no offline caching, no iOS support.
+
+---
+
 ## 2026-05-01 13:25 -- Task Completed: 051 - Dashboard Hero — Use Series Backdrop as Background, Episode Still as Inset
 
 **Type:** Task Completion
