@@ -947,12 +947,12 @@ let private heroSpotlight (jellyfinServerUrl: string option) (item: DashboardSer
                     ]
 
                     // Episode still inset (only when both backdrop + still exist).
-                    // Sits above the bottom title block, below Jellyfin play & In Focus indicator.
+                    // Sits in the top-left corner; the In Focus indicator is suppressed when this is shown.
                     // Plain rendering — no glassmorphism per task spec.
                     match insetRef with
                     | Some still ->
                         Html.div [
-                            prop.className "absolute bottom-24 sm:bottom-28 right-4 sm:right-6 w-44 sm:w-56 aspect-video rounded-lg overflow-hidden border border-white/10 shadow-lg z-[5]"
+                            prop.className "absolute top-4 left-4 sm:top-6 sm:left-6 w-44 sm:w-56 aspect-video rounded-lg overflow-hidden border border-white/10 shadow-lg z-[5]"
                             prop.children [
                                 Html.img [
                                     prop.src $"/images/{still}"
@@ -1012,8 +1012,8 @@ let private heroSpotlight (jellyfinServerUrl: string option) (item: DashboardSer
                         ]
                     | _ -> ()
 
-                    // In Focus glow indicator
-                    if item.InFocus then
+                    // In Focus glow indicator — hidden when an inset is shown (they share top-left).
+                    if item.InFocus && insetRef.IsNone then
                         Html.div [
                             prop.className "absolute top-3 left-3 z-10"
                             prop.children [
