@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-05-02 -- Task Completed: 055 - Poster Hover Zoom — Stop Visual Clipping at Container Edges
+
+**Type:** Task Completion
+**Task:** 055 - Poster Hover Zoom — Stop Visual Clipping at Container Edges
+**Summary:** Replaced `pb-2` with `py-2 px-2` on all 10 horizontal poster rails in Dashboard/Views.fs and added `p-1` to the SearchModal poster grid so hover scale-up is no longer clipped at scroll-container edges. Build (32.38s) and all 255 tests pass.
+**Files changed:** 2 files
+
+---
+
+## 2026-05-02 -- Task Started: 055 - Poster Hover Zoom — Stop Visual Clipping at Container Edges
+
+**Type:** Task Start
+**Task:** 055 - Poster Hover Zoom — Stop Visual Clipping at Container Edges
+**Milestone:** --
+
+---
+
+## 2026-05-02 -- Idea Captured: Poster Hover Zoom — Stop Visual Clipping at Container Edges
+
+**Type:** Idea Capture
+**Mode:** Deep
+**Filed to:** tasks/todo/055-poster-hover-zoom-not-clipped.md
+**Summary:** Poster cards on dashboard rails and the SearchModal grid scale on hover, but the growth is clipped at the parent's overflow boundary (rails use `overflow-x-auto` which forces both axes to clip; modal grid sits inside `overflow-y-auto` scroll container). Fix is small CSS-padding tweak on each rail and the modal grid so the scale fits inside the scrollable viewport.
+
+---
+
 ## 2026-05-01 15:31 -- Task Completed: 054 - Dashboard Hero — Move Episode Still Inset to Top-Left
 
 **Type:** Task Completion

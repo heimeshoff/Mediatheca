@@ -673,7 +673,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
 
     let renderGrid (children: ReactElement list) =
         Html.div [
-            prop.className "grid grid-cols-4 gap-3"
+            prop.className "grid grid-cols-4 gap-3 p-1"
             prop.children children
         ]
 
