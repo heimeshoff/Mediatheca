@@ -367,7 +367,7 @@ let private seriesNextUpScroller (jellyfinServerUrl: string option) (items: Dash
     else
         sectionCardOverflow Icons.tv "Next Up" [
             Html.div [
-                prop.className "flex gap-3 overflow-x-auto py-2 px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                prop.className "flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
                 prop.children [
                     for item in items do
                         seriesPosterCard jellyfinServerUrl item
@@ -479,7 +479,7 @@ let private moviesToWatchPosterSection (jellyfinServerUrl: string option) (items
     else
         sectionOpen Icons.movie "Movies to Watch" [
             Html.div [
-                prop.className "flex gap-3 overflow-x-auto py-2 px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                prop.className "flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
                 prop.children [
                     for item in items do
                         movieToWatchPosterCard jellyfinServerUrl item
@@ -1036,7 +1036,7 @@ let private seriesNextUpOpenScroller (jellyfinServerUrl: string option) (items: 
     else
         sectionOpen Icons.tv "Next Up" [
             Html.div [
-                prop.className "flex gap-3 overflow-x-auto py-2 px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                prop.className "flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
                 prop.children [
                     for item in items do
                         seriesPosterCard jellyfinServerUrl item
@@ -2428,7 +2428,7 @@ let private moviesTabView (data: DashboardMoviesTab) =
                             ]
                         else
                             Html.div [
-                                prop.className "flex gap-3 overflow-x-auto py-2 px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                                prop.className "flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
                                 prop.children [
                                     for item in data.RecentlyWatched do
                                         recentlyWatchedPosterCard item
@@ -2466,7 +2466,7 @@ let private moviesTabView (data: DashboardMoviesTab) =
             if not (List.isEmpty data.MoviesToWatch) then
                 sectionCardOverflow Icons.movie "Movies to Watch" [
                     Html.div [
-                        prop.className "flex gap-3 overflow-x-auto py-2 px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                        prop.className "flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
                         prop.children [
                             for item in data.MoviesToWatch do
                                 movieToWatchPosterCard data.JellyfinServerUrl item
@@ -3310,7 +3310,7 @@ let private seriesTabView (data: DashboardSeriesTab) =
             if not (List.isEmpty nextUpItems) then
                 sectionCardOverflow Icons.tv "Next Up" [
                     Html.div [
-                        prop.className "flex gap-3 overflow-x-auto py-2 px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                        prop.className "flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
                         prop.children [
                             for item in nextUpItems do
                                 seriesTabPosterCard data.JellyfinServerUrl item
@@ -4171,7 +4171,7 @@ let private gamesTabView (data: DashboardGamesTab) (achievementsState: Achieveme
                                 ]
                             else
                                 Html.div [
-                                    prop.className "flex gap-3 overflow-x-auto py-2 px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                                    prop.className "flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
                                     prop.children [
                                         for item in data.RecentlyPlayed do
                                             gameRecentlyPlayedPosterCard item
@@ -4186,7 +4186,7 @@ let private gamesTabView (data: DashboardGamesTab) (achievementsState: Achieveme
                             ]
                         else
                             Html.div [
-                                prop.className "flex gap-3 overflow-x-auto py-2 px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
+                                prop.className "flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
                                 prop.children [
                                     for item in data.RecentlyAdded do
                                         gameRecentlyAddedPosterCard item
