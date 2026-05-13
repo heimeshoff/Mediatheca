@@ -57,7 +57,20 @@ module Api =
             suffix <- suffix + 1
         slug
 
-    let private addMovieToLibrary
+    let private tryFindSlugByTmdbId (conn: SqliteConnection) (table: string) (tmdbId: int) : string option =
+        // Active entries only — Series_removed/Movie_removed deletes the row from the *_detail table.
+        conn
+        |> Db.newCommand (sprintf "SELECT slug FROM %s WHERE tmdb_id = @tmdb_id LIMIT 1" table)
+        |> Db.setParams [ "tmdb_id", SqlType.Int32 tmdbId ]
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "slug")
+
+    let private tryFindMovieSlugByTmdbId (conn: SqliteConnection) (tmdbId: int) : string option =
+        tryFindSlugByTmdbId conn "movie_detail" tmdbId
+
+    let private tryFindSeriesSlugByTmdbId (conn: SqliteConnection) (tmdbId: int) : string option =
+        tryFindSlugByTmdbId conn "series_detail" tmdbId
+
+    let private addMovieToLibraryImpl
         (conn: SqliteConnection)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
@@ -171,7 +184,23 @@ module Api =
                 return Error $"Failed to add movie: {ex.Message}"
         }
 
-    let private addSeriesToLibrary
+    /// Public entry point for adding a movie. Short-circuits when the TMDB id is already in the
+    /// library — avoids the 20-second TMDB-fetch race that previously let parallel callers
+    /// (Jellyfin auto-sync vs. manual add) create duplicate slugs for the same title.
+    let private addMovieToLibrary
+        (conn: SqliteConnection)
+        (httpClient: HttpClient)
+        (getTmdbConfig: unit -> Tmdb.TmdbConfig)
+        (imageBasePath: string)
+        (movieProjections: Projection.ProjectionHandler list)
+        (tmdbId: int)
+        : Async<Result<string, string>> = async {
+            match tryFindMovieSlugByTmdbId conn tmdbId with
+            | Some existing -> return Ok existing
+            | None -> return! addMovieToLibraryImpl conn httpClient getTmdbConfig imageBasePath movieProjections tmdbId
+        }
+
+    let private addSeriesToLibraryImpl
         (conn: SqliteConnection)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
@@ -303,6 +332,22 @@ module Api =
                         return Ok slug
             with ex ->
                 return Error $"Failed to add series: {ex.Message}"
+        }
+
+    /// Public entry point for adding a series. Short-circuits when the TMDB id is already in the
+    /// library — avoids the ~20-second TMDB-fetch race that previously let parallel callers
+    /// (Jellyfin auto-sync vs. manual add) create duplicate slugs for the same title.
+    let private addSeriesToLibrary
+        (conn: SqliteConnection)
+        (httpClient: HttpClient)
+        (getTmdbConfig: unit -> Tmdb.TmdbConfig)
+        (imageBasePath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (tmdbId: int)
+        : Async<Result<string, string>> = async {
+            match tryFindSeriesSlugByTmdbId conn tmdbId with
+            | Some existing -> return Ok existing
+            | None -> return! addSeriesToLibraryImpl conn httpClient getTmdbConfig imageBasePath projectionHandlers tmdbId
         }
 
     let runSteamFamilyImport
@@ -2586,91 +2631,115 @@ module Api =
                 try
                     let year = request.Year
                     let baseSlug = Slug.gameSlug request.Name year
-                    let slug = generateUniqueSlug conn Games.streamId baseSlug
-                    let sid = Games.streamId slug
 
-                    // If we have a RAWG ID, fetch full details for description + download images
-                    let! description, coverRef, backdropRef =
-                        match request.RawgId with
-                        | Some rawgId ->
-                            async {
-                                let rawgConfig = getRawgConfig()
-                                // Fetch full game details (includes description)
-                                let! details =
-                                    async {
-                                        try
-                                            let! d = Rawg.getGameDetails httpClient rawgConfig rawgId
-                                            return Some d
-                                        with _ -> return None
-                                    }
+                    // Duplicate check: by RAWG id, then by exact case-insensitive name.
+                    // Skipped when the caller has already confirmed they want a duplicate.
+                    let existing =
+                        if request.SkipDuplicateCheck then None
+                        else
+                            let byRawg =
+                                match request.RawgId with
+                                | Some rawgId -> GameProjection.findByRawgId conn rawgId
+                                | None -> None
+                            match byRawg with
+                            | Some _ -> byRawg
+                            | None ->
+                                match GameProjection.findByName conn request.Name with
+                                | (existingSlug, _) :: _ ->
+                                    match GameProjection.getBySlug conn existingSlug with
+                                    | Some g -> Some (existingSlug, g.Name)
+                                    | None -> Some (existingSlug, request.Name)
+                                | [] -> None
 
-                                let desc =
-                                    match details with
-                                    | Some d when d.DescriptionRaw <> "" -> d.DescriptionRaw
-                                    | _ -> request.Description
+                    match existing with
+                    | Some (existingSlug, existingName) ->
+                        return Ok (Duplicate_found (existingSlug, existingName))
+                    | None ->
+                        let slug = generateUniqueSlug conn Games.streamId baseSlug
+                        let sid = Games.streamId slug
 
-                                // Download images locally
-                                let bgImage =
-                                    match details with
-                                    | Some d -> d.BackgroundImage |> Option.orElse request.CoverRef
-                                    | None -> request.CoverRef
+                        // If we have a RAWG ID, fetch full details for description + download images
+                        let! description, coverRef, backdropRef =
+                            match request.RawgId with
+                            | Some rawgId ->
+                                async {
+                                    let rawgConfig = getRawgConfig()
+                                    // Fetch full game details (includes description)
+                                    let! details =
+                                        async {
+                                            try
+                                                let! d = Rawg.getGameDetails httpClient rawgConfig rawgId
+                                                return Some d
+                                            with _ -> return None
+                                        }
 
-                                let bgImageAdditional =
-                                    match details with
-                                    | Some d -> d.BackgroundImageAdditional
-                                    | None -> None
+                                    let desc =
+                                        match details with
+                                        | Some d when d.DescriptionRaw <> "" -> d.DescriptionRaw
+                                        | _ -> request.Description
 
-                                let! coverRef, backdropRef = Rawg.downloadGameImages httpClient slug bgImage bgImageAdditional imageBasePath
-                                return desc, coverRef, backdropRef
-                            }
-                        | None ->
-                            async { return request.Description, request.CoverRef, request.BackdropRef }
+                                    // Download images locally
+                                    let bgImage =
+                                        match details with
+                                        | Some d -> d.BackgroundImage |> Option.orElse request.CoverRef
+                                        | None -> request.CoverRef
 
-                    let gameData: Games.GameAddedData = {
-                        Name = request.Name
-                        Year = year
-                        Genres = request.Genres
-                        Description = description
-                        ShortDescription = ""
-                        WebsiteUrl = None
-                        CoverRef = coverRef
-                        BackdropRef = backdropRef
-                        RawgId = request.RawgId
-                        RawgRating = request.RawgRating
-                    }
+                                    let bgImageAdditional =
+                                        match details with
+                                        | Some d -> d.BackgroundImageAdditional
+                                        | None -> None
 
-                    let result =
-                        executeCommand
-                            conn sid
-                            Games.Serialization.fromStoredEvent
-                            Games.reconstitute
-                            Games.decide
-                            Games.Serialization.toEventData
-                            (Games.Add_game gameData)
-                            projectionHandlers
+                                    let! coverRef, backdropRef = Rawg.downloadGameImages httpClient slug bgImage bgImageAdditional imageBasePath
+                                    return desc, coverRef, backdropRef
+                                }
+                            | None ->
+                                async { return request.Description, request.CoverRef, request.BackdropRef }
 
-                    match result with
-                    | Error e -> return Error e
-                    | Ok () ->
-                        // Auto-attach Steam for RAWG-sourced games with a clear match.
-                        // Best-effort: any failure (Steam down, no match, ambiguous) is
-                        // swallowed — the user can still click Connect later.
-                        if request.RawgId.IsSome then
-                            try
-                                let! candidates = Steam.searchSteamByName httpClient request.Name (Some request.Year)
-                                match candidates with
-                                | top :: rest when top.Score >= 0.95 ->
-                                    let unambiguous =
-                                        match rest with
-                                        | next :: _ -> (top.Score - next.Score) >= 0.05
-                                        | [] -> true
-                                    if unambiguous then
-                                        let! _ = attachSteamToGameCore conn httpClient projectionHandlers slug top.AppId
-                                        ()
-                                | _ -> ()
-                            with ex ->
-                                printfn "[addGame] Steam auto-attach failed for '%s': %s" slug ex.Message
-                        return Ok slug
+                        let gameData: Games.GameAddedData = {
+                            Name = request.Name
+                            Year = year
+                            Genres = request.Genres
+                            Description = description
+                            ShortDescription = ""
+                            WebsiteUrl = None
+                            CoverRef = coverRef
+                            BackdropRef = backdropRef
+                            RawgId = request.RawgId
+                            RawgRating = request.RawgRating
+                        }
+
+                        let result =
+                            executeCommand
+                                conn sid
+                                Games.Serialization.fromStoredEvent
+                                Games.reconstitute
+                                Games.decide
+                                Games.Serialization.toEventData
+                                (Games.Add_game gameData)
+                                projectionHandlers
+
+                        match result with
+                        | Error e -> return Error e
+                        | Ok () ->
+                            // Auto-attach Steam for RAWG-sourced games with a clear match.
+                            // Best-effort: any failure (Steam down, no match, ambiguous) is
+                            // swallowed — the user can still click Connect later.
+                            if request.RawgId.IsSome then
+                                try
+                                    let! candidates = Steam.searchSteamByName httpClient request.Name (Some request.Year)
+                                    match candidates with
+                                    | top :: rest when top.Score >= 0.95 ->
+                                        let unambiguous =
+                                            match rest with
+                                            | next :: _ -> (top.Score - next.Score) >= 0.05
+                                            | [] -> true
+                                        if unambiguous then
+                                            let! _ = attachSteamToGameCore conn httpClient projectionHandlers slug top.AppId
+                                            ()
+                                    | _ -> ()
+                                with ex ->
+                                    printfn "[addGame] Steam auto-attach failed for '%s': %s" slug ex.Message
+                            return Ok (Created slug)
                 with ex ->
                     return Error $"Failed to add game: {ex.Message}"
             }
@@ -3648,6 +3717,47 @@ module Api =
 
             attachSteamToGame = fun (slug, appId) -> async {
                 return! attachSteamToGameCore conn httpClient projectionHandlers slug appId
+            }
+
+            searchRawgForGame = fun slug -> async {
+                match GameProjection.getBySlug conn slug with
+                | None -> return []
+                | Some game ->
+                    let rawgConfig = getRawgConfig()
+                    if System.String.IsNullOrWhiteSpace(rawgConfig.ApiKey) then return []
+                    else
+                        try
+                            let yearOpt = if game.Year > 0 then Some game.Year else None
+                            return! Rawg.searchGames httpClient rawgConfig game.Name yearOpt
+                        with ex ->
+                            printfn "[searchRawgForGame] Failed for '%s': %s" slug ex.Message
+                            return []
+            }
+
+            attachRawgToGame = fun (slug, rawgId) -> async {
+                let rawgConfig = getRawgConfig()
+                if System.String.IsNullOrWhiteSpace(rawgConfig.ApiKey) then
+                    return Error "RAWG API key not configured"
+                else
+                    try
+                        let! details = Rawg.getGameDetails httpClient rawgConfig rawgId
+                        let sid = Games.streamId slug
+                        let ratingOpt =
+                            match details.Rating with
+                            | Some r when r > 0.0 -> Some r
+                            | _ -> None
+                        return
+                            executeCommand
+                                conn sid
+                                Games.Serialization.fromStoredEvent
+                                Games.reconstitute
+                                Games.decide
+                                Games.Serialization.toEventData
+                                (Games.Set_rawg_id (rawgId, ratingOpt))
+                                projectionHandlers
+                            |> Result.map ignore
+                    with ex ->
+                        return Error (sprintf "RAWG lookup failed: %s" ex.Message)
             }
 
             // Jellyfin Integration

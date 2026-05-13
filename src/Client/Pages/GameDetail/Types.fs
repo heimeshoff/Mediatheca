@@ -18,6 +18,13 @@ type ConnectSteamState =
     | Attaching of int
     | Failed of string
 
+type ConnectRawgState =
+    | RawgIdle
+    | RawgSearching
+    | RawgShowingCandidates of RawgSearchResult list
+    | RawgAttaching of int
+    | RawgFailed of string
+
 type PlaySessionDraft = {
     Date: string         // yyyy-MM-dd
     MinutesText: string  // raw input — parse on save
@@ -63,6 +70,7 @@ type Model = {
     FailedTrailerUrls: Set<string>
     ShowEventHistory: bool
     ConnectSteamState: ConnectSteamState
+    ConnectRawgState: ConnectRawgState
     Error: string option
 }
 
@@ -155,3 +163,8 @@ type Msg =
     | Steam_candidate_chosen of int
     | Steam_attach_completed of Result<unit, string>
     | Connect_steam_dismissed
+    | Relink_rawg_requested
+    | Rawg_search_completed of RawgSearchResult list
+    | Rawg_candidate_chosen of int
+    | Rawg_attach_completed of Result<unit, string>
+    | Relink_rawg_dismissed

@@ -674,7 +674,12 @@ type AddGameRequest = {
     BackdropRef: string option
     RawgId: int option
     RawgRating: float option
+    SkipDuplicateCheck: bool
 }
+
+type AddGameOutcome =
+    | Created of slug: string
+    | Duplicate_found of existingSlug: string * existingName: string
 
 // Dashboard Tabs (continued — types that reference MovieListItem / SeriesListItem / GameListItem)
 
@@ -1119,7 +1124,7 @@ type IMediathecaApi = {
     getCatalogsForSeries: string -> Async<CatalogRef list>
     // Games
     searchRawgGames: string * int option -> Async<RawgSearchResult list>
-    addGame: AddGameRequest -> Async<Result<string, string>>
+    addGame: AddGameRequest -> Async<Result<AddGameOutcome, string>>
     removeGame: string -> Async<Result<unit, string>>
     getGames: unit -> Async<GameListItem list>
     getGameDetail: string -> Async<GameDetail option>
@@ -1168,6 +1173,9 @@ type IMediathecaApi = {
     // Steam Attach (Connect with Steam)
     searchSteamForGame: string -> Async<SteamSearchResult list>
     attachSteamToGame: string * int -> Async<Result<unit, string>>
+    // RAWG Re-link (correct a wrong RAWG association)
+    searchRawgForGame: string -> Async<RawgSearchResult list>
+    attachRawgToGame: string * int -> Async<Result<unit, string>>
     // Jellyfin Integration
     getJellyfinServerUrl: unit -> Async<string>
     setJellyfinServerUrl: string -> Async<Result<unit, string>>

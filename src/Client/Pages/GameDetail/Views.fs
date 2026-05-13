@@ -753,144 +753,101 @@ let private CatalogManager
 
     ModalPanel.viewCustom "Add to Catalog" onClose headerExtra content []
 
-// Stable DOM id the ConnectSteamPicker uses to anchor itself to the
-// Connect button. Kept in one place so button + picker stay in sync.
-let private connectSteamTriggerId = "connect-steam-trigger"
-
-/// Button rendered inside the Links section. The picker popover is NOT nested
-/// here — it's rendered at the top level of `view` to avoid the
-/// `backdrop-filter` nesting bug (Links uses `glassCard` which has blur).
-let private connectSteamButton (connectState: ConnectSteamState) (dispatch: Msg -> unit) =
-    let buttonClass =
-        "flex items-center gap-3 p-2 rounded-lg hover:bg-base-content/5 transition-colors text-sm font-medium text-base-content/50 hover:text-primary w-full text-left"
-    Html.div [
-        prop.id connectSteamTriggerId
-        prop.children [
-            match connectState with
-            | Searching ->
-                Html.button [
-                    prop.disabled true
-                    prop.className buttonClass
-                    prop.children [
-                        Icons.gamepad ()
-                        Html.span [ prop.text "Searching Steam…" ]
-                        Html.span [ prop.className "ml-auto loading loading-spinner loading-xs text-base-content/40" ]
-                    ]
-                ]
-            | Attaching _ ->
-                Html.button [
-                    prop.disabled true
-                    prop.className buttonClass
-                    prop.children [
-                        Icons.gamepad ()
-                        Html.span [ prop.text "Attaching…" ]
-                        Html.span [ prop.className "ml-auto loading loading-spinner loading-xs text-base-content/40" ]
-                    ]
-                ]
-            | _ ->
-                Html.button [
-                    prop.className buttonClass
-                    prop.onClick (fun _ -> dispatch Connect_steam_requested)
-                    prop.children [
-                        Icons.gamepad ()
-                        Html.span [ prop.text "Connect with Steam" ]
-                    ]
-                ]
-            match connectState with
-            | Failed err ->
-                Html.div [
-                    prop.className "mt-2 flex items-start gap-2 text-xs text-error/80 px-2"
-                    prop.children [
-                        Html.span [ prop.className "flex-1"; prop.text err ]
-                        Html.button [
-                            prop.className "text-base-content/50 hover:text-base-content underline"
-                            prop.onClick (fun _ -> dispatch Connect_steam_dismissed)
-                            prop.text "Dismiss"
-                        ]
-                    ]
-                ]
-            | _ -> ()
-        ]
-    ]
-
-/// Glassmorphic popover listing Steam candidates. Rendered at the root of
-/// `view` (outside any `glassCard` / `backdrop-filter` ancestor) so its own
-/// `rating-dropdown` blur is applied against the page, not against the parent
-/// card — see CLAUDE.md "nested backdrop-filter" gotcha.
-[<ReactComponent>]
+/// Centered modal listing Steam candidates so the user can pick the matching
+/// title. Triggered from the Maintenance menu (see kebab in hero).
 let private ConnectSteamPicker (candidates: SteamSearchResult list, dispatch: Msg -> unit) =
-    let pos, setPos = React.useState {| top = 0.0; left = 0.0; width = 0.0 |}
-
-    React.useEffect ((fun () ->
-        let doc = Browser.Dom.document
-        let el = doc.getElementById connectSteamTriggerId
-        if not (isNull el) then
-            let rect = el.getBoundingClientRect()
-            setPos {| top = rect.bottom + 8.0; left = rect.left; width = rect.width |}
-    ), [||])
-
-    let popoverMinWidth = max 320.0 pos.width
-
-    Html.div [
-        prop.children [
-            // Full-screen catcher — click outside to dismiss
-            Html.div [
-                prop.className "fixed inset-0 z-[200]"
-                prop.onClick (fun _ -> dispatch Connect_steam_dismissed)
-            ]
-            Html.div [
-                prop.className "fixed z-[201] rating-dropdown p-2"
-                prop.style [
-                    style.top (int pos.top)
-                    style.left (int pos.left)
-                    style.minWidth (length.px (int popoverMinWidth))
-                    style.maxWidth (length.px 420)
-                ]
-                prop.children [
+    let content = [
+        Html.div [
+            prop.className "space-y-2"
+            prop.children [
+                for c in candidates do
                     Html.div [
-                        prop.className "px-2 py-1 text-[11px] uppercase tracking-wider text-base-content/50 font-semibold"
-                        prop.text "Choose the matching Steam title"
-                    ]
-                    for c in candidates do
-                        Html.div [
-                            prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-content/5 transition-colors"
-                            prop.children [
-                                match c.HeaderImageUrl with
-                                | Some url ->
-                                    Html.img [
-                                        prop.src url
-                                        prop.alt c.Name
-                                        prop.className "w-20 h-10 object-cover rounded flex-shrink-0 bg-base-300"
-                                    ]
-                                | None ->
-                                    Html.div [
-                                        prop.className "w-20 h-10 rounded flex-shrink-0 bg-base-300 flex items-center justify-center text-base-content/30"
-                                        prop.children [ Icons.gamepad () ]
-                                    ]
-                                Html.div [
-                                    prop.className "flex-1 min-w-0"
-                                    prop.children [
-                                        Html.div [ prop.className "text-sm font-medium truncate"; prop.text c.Name ]
-                                        Html.div [
-                                            prop.className "text-xs text-base-content/50"
-                                            prop.text (
-                                                match c.ReleaseYear with
-                                                | Some y -> sprintf "%d" y
-                                                | None -> "Unknown year")
-                                        ]
-                                    ]
+                        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-content/5 transition-colors"
+                        prop.children [
+                            match c.HeaderImageUrl with
+                            | Some url ->
+                                Html.img [
+                                    prop.src url
+                                    prop.alt c.Name
+                                    prop.className "w-20 h-10 object-cover rounded flex-shrink-0 bg-base-300"
                                 ]
-                                Html.button [
-                                    prop.className "btn btn-xs btn-primary"
-                                    prop.onClick (fun _ -> dispatch (Steam_candidate_chosen c.AppId))
-                                    prop.text "Choose"
+                            | None ->
+                                Html.div [
+                                    prop.className "w-20 h-10 rounded flex-shrink-0 bg-base-300 flex items-center justify-center text-base-content/30"
+                                    prop.children [ Icons.gamepad () ]
+                                ]
+                            Html.div [
+                                prop.className "flex-1 min-w-0"
+                                prop.children [
+                                    Html.div [ prop.className "text-sm font-medium truncate"; prop.text c.Name ]
+                                    Html.div [
+                                        prop.className "text-xs text-base-content/50"
+                                        prop.text (
+                                            match c.ReleaseYear with
+                                            | Some y -> sprintf "%d" y
+                                            | None -> "Unknown year")
+                                    ]
                                 ]
                             ]
+                            Html.button [
+                                prop.className "btn btn-xs btn-primary"
+                                prop.onClick (fun _ -> dispatch (Steam_candidate_chosen c.AppId))
+                                prop.text "Choose"
+                            ]
                         ]
-                ]
+                    ]
             ]
         ]
     ]
+    ModalPanel.view "Choose the matching Steam title" (fun () -> dispatch Connect_steam_dismissed) content
+
+/// Centered modal listing RAWG candidates for re-linking when the wrong RAWG
+/// entry was picked at import time.
+let private ConnectRawgPicker (candidates: RawgSearchResult list, dispatch: Msg -> unit) =
+    let content = [
+        Html.div [
+            prop.className "space-y-2"
+            prop.children [
+                for c in candidates do
+                    Html.div [
+                        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-content/5 transition-colors"
+                        prop.children [
+                            match c.BackgroundImage with
+                            | Some url ->
+                                Html.img [
+                                    prop.src url
+                                    prop.alt c.Name
+                                    prop.className "w-20 h-10 object-cover rounded flex-shrink-0 bg-base-300"
+                                ]
+                            | None ->
+                                Html.div [
+                                    prop.className "w-20 h-10 rounded flex-shrink-0 bg-base-300 flex items-center justify-center text-base-content/30"
+                                    prop.children [ Icons.gamepad () ]
+                                ]
+                            Html.div [
+                                prop.className "flex-1 min-w-0"
+                                prop.children [
+                                    Html.div [ prop.className "text-sm font-medium truncate"; prop.text c.Name ]
+                                    Html.div [
+                                        prop.className "text-xs text-base-content/50"
+                                        prop.text (
+                                            match c.Year with
+                                            | Some y -> sprintf "%d" y
+                                            | None -> "Unknown year")
+                                    ]
+                                ]
+                            ]
+                            Html.button [
+                                prop.className "btn btn-xs btn-primary"
+                                prop.onClick (fun _ -> dispatch (Rawg_candidate_chosen c.RawgId))
+                                prop.text "Choose"
+                            ]
+                        ]
+                    ]
+            ]
+        ]
+    ]
+    ModalPanel.view "Choose the matching RAWG entry" (fun () -> dispatch Relink_rawg_dismissed) content
 
 let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
     match model.IsLoading, model.Game with
@@ -974,15 +931,44 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                     prop.onClick (fun _ -> dispatch (Open_image_picker Backdrop_picker))
                                     prop.text "Change backdrop"
                                 ]
-                                ActionMenu.heroView [
-                                    { Label = "Event Log"
-                                      Icon = Some Icons.events
-                                      OnClick = fun () -> dispatch Open_event_history
-                                      IsDestructive = false }
-                                    { Label = "Remove Game"
-                                      Icon = Some Icons.trash
-                                      OnClick = fun () -> dispatch Confirm_remove_game
-                                      IsDestructive = true }
+                                let rawgBusy =
+                                    match model.ConnectRawgState with
+                                    | RawgSearching | RawgAttaching _ -> true
+                                    | _ -> false
+                                let steamBusy =
+                                    match model.ConnectSteamState with
+                                    | Searching | Attaching _ -> true
+                                    | _ -> false
+                                ActionMenu.heroViewSections [
+                                    { Label = None
+                                      Items =
+                                        [ { Label = "Event Log"
+                                            Icon = Some Icons.events
+                                            OnClick = fun () -> dispatch Open_event_history
+                                            IsDestructive = false } ] }
+                                    { Label = Some "Maintenance"
+                                      Items =
+                                        [ { Label =
+                                              if rawgBusy then "Searching RAWG…"
+                                              else "Re-link RAWG"
+                                            Icon = Some Icons.arrowPathSm
+                                            OnClick =
+                                              if rawgBusy then (fun () -> ())
+                                              else (fun () -> dispatch Relink_rawg_requested)
+                                            IsDestructive = false }
+                                          { Label =
+                                              if steamBusy then "Searching Steam…"
+                                              elif game.SteamAppId.IsSome then "Re-link Steam"
+                                              else "Connect with Steam"
+                                            Icon = Some Icons.gamepad
+                                            OnClick =
+                                              if steamBusy then (fun () -> ())
+                                              else (fun () -> dispatch Connect_steam_requested)
+                                            IsDestructive = false }
+                                          { Label = "Remove Game"
+                                            Icon = Some Icons.trash
+                                            OnClick = fun () -> dispatch Confirm_remove_game
+                                            IsDestructive = true } ] }
                                 ]
                             ]
                         ]
@@ -1314,60 +1300,18 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                     prop.children [
                                                         match game.SteamAppId with
                                                         | Some appId ->
-                                                            // Linked state: Steam Store link + small refresh button to re-run
-                                                            // the search and pick a different App ID. Both share the
-                                                            // connectSteamTriggerId so the picker popover anchors here.
-                                                            let isBusy =
-                                                                match model.ConnectSteamState with
-                                                                | Searching | Attaching _ -> true
-                                                                | _ -> false
-                                                            Html.div [
-                                                                prop.id connectSteamTriggerId
+                                                            Html.a [
+                                                                prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-content/5 transition-colors text-sm font-medium text-base-content/70 hover:text-primary"
+                                                                prop.href $"https://store.steampowered.com/app/{appId}/"
+                                                                prop.target "_blank"
+                                                                prop.rel "noopener noreferrer"
                                                                 prop.children [
-                                                                    Html.div [
-                                                                        prop.className "flex items-center gap-1"
-                                                                        prop.children [
-                                                                            Html.a [
-                                                                                prop.className "flex-1 flex items-center gap-3 p-2 rounded-lg hover:bg-base-content/5 transition-colors text-sm font-medium text-base-content/70 hover:text-primary"
-                                                                                prop.href $"https://store.steampowered.com/app/{appId}/"
-                                                                                prop.target "_blank"
-                                                                                prop.rel "noopener noreferrer"
-                                                                                prop.children [
-                                                                                    Icons.gamepad ()
-                                                                                    Html.span [ prop.text "Steam Store" ]
-                                                                                    Html.span [ prop.className "ml-auto text-base-content/30"; prop.children [ Icons.externalLink () ] ]
-                                                                                ]
-                                                                            ]
-                                                                            Html.button [
-                                                                                prop.className (
-                                                                                    "btn btn-ghost btn-xs btn-circle text-base-content/50 hover:text-primary transition-colors"
-                                                                                    + (if isBusy then " animate-spin" else "")
-                                                                                )
-                                                                                prop.disabled isBusy
-                                                                                prop.title "Re-link to a different Steam title"
-                                                                                prop.onClick (fun _ -> dispatch Connect_steam_requested)
-                                                                                prop.children [ Icons.arrowPathSm () ]
-                                                                            ]
-                                                                        ]
-                                                                    ]
-                                                                    match model.ConnectSteamState with
-                                                                    | Failed err ->
-                                                                        Html.div [
-                                                                            prop.className "mt-2 flex items-start gap-2 text-xs text-error/80 px-2"
-                                                                            prop.children [
-                                                                                Html.span [ prop.className "flex-1"; prop.text err ]
-                                                                                Html.button [
-                                                                                    prop.className "text-base-content/50 hover:text-base-content underline"
-                                                                                    prop.onClick (fun _ -> dispatch Connect_steam_dismissed)
-                                                                                    prop.text "Dismiss"
-                                                                                ]
-                                                                            ]
-                                                                        ]
-                                                                    | _ -> ()
+                                                                    Icons.gamepad ()
+                                                                    Html.span [ prop.text "Steam Store" ]
+                                                                    Html.span [ prop.className "ml-auto text-base-content/30"; prop.children [ Icons.externalLink () ] ]
                                                                 ]
                                                             ]
-                                                        | None ->
-                                                            connectSteamButton model.ConnectSteamState dispatch
+                                                        | None -> ()
                                                         match game.WebsiteUrl with
                                                         | Some url ->
                                                             Html.a [
@@ -2089,5 +2033,48 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                 | ShowingCandidates candidates ->
                     ConnectSteamPicker (candidates, dispatch)
                 | _ -> ()
+                match model.ConnectRawgState with
+                | RawgShowingCandidates candidates ->
+                    ConnectRawgPicker (candidates, dispatch)
+                | _ -> ()
+                // Toast for Steam/RAWG re-link errors (the inline error display
+                // in the Links section was removed when the buttons moved to
+                // the Maintenance menu, so surface failures here instead).
+                let maintenanceError =
+                    match model.ConnectSteamState, model.ConnectRawgState with
+                    | Failed err, _ -> Some ("Steam", err, fun () -> dispatch Connect_steam_dismissed)
+                    | _, RawgFailed err -> Some ("RAWG", err, fun () -> dispatch Relink_rawg_dismissed)
+                    | _ -> None
+                match maintenanceError with
+                | Some (source, err, dismiss) ->
+                    Html.div [
+                        prop.className "fixed bottom-6 right-6 z-[300] rating-dropdown p-4 max-w-sm"
+                        prop.children [
+                            Html.div [
+                                prop.className "flex items-start gap-3"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "flex-1"
+                                        prop.children [
+                                            Html.div [
+                                                prop.className "text-xs uppercase tracking-wider text-error/80 font-semibold mb-1"
+                                                prop.text (sprintf "%s re-link failed" source)
+                                            ]
+                                            Html.div [
+                                                prop.className "text-sm text-base-content/80"
+                                                prop.text err
+                                            ]
+                                        ]
+                                    ]
+                                    Html.button [
+                                        prop.className "text-base-content/50 hover:text-base-content text-sm"
+                                        prop.onClick (fun _ -> dismiss ())
+                                        prop.text "Dismiss"
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                | None -> ()
             ]
         ]

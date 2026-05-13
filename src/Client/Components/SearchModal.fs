@@ -35,6 +35,7 @@ type Model = {
     HoverPreview: HoverPreviewState
     HoverVersion: int
     PreviewCache: Map<string, HoverPreviewState>
+    DuplicatePrompt: (string * string * AddGameRequest) option
 }
 
 type Msg =
@@ -48,6 +49,9 @@ type Msg =
     | Import of tmdbId: int * MediaType
     | Import_rawg of RawgSearchResult
     | Import_completed of Result<string * MediaType, string>
+    | Duplicate_prompt_show of existingSlug: string * existingName: string * request: AddGameRequest
+    | Duplicate_prompt_cancel
+    | Duplicate_prompt_force_add
     | Navigate_to of slug: string * MediaType
     | Hover_start of key: string * version: int
     | Hover_preview_tmdb_loaded of key: string * TmdbPreviewData option
@@ -57,25 +61,6 @@ type Msg =
     | Hover_preview_library_game_loaded of key: string * GameDetail option
     | Hover_clear
     | Close
-
-let init (movies: MovieListItem list) (series: SeriesListItem list) : Model = {
-    Query = ""
-    LibraryMovies = movies
-    LibrarySeries = series
-    LibraryGames = []
-    TmdbResults = []
-    RawgResults = []
-    IsSearchingTmdb = false
-    IsSearchingRawg = false
-    IsImporting = false
-    Error = None
-    SearchVersion = 0
-    ActiveTab = Library
-    HoverTarget = None
-    HoverPreview = NotHovering
-    HoverVersion = 0
-    PreviewCache = Map.empty
-}
 
 let initWithGames (movies: MovieListItem list) (series: SeriesListItem list) (games: GameListItem list) : Model = {
     Query = ""
@@ -94,6 +79,7 @@ let initWithGames (movies: MovieListItem list) (series: SeriesListItem list) (ga
     HoverPreview = NotHovering
     HoverVersion = 0
     PreviewCache = Map.empty
+    DuplicatePrompt = None
 }
 
 let filterLibrary (query: string) (movies: MovieListItem list) (series: SeriesListItem list) (games: GameListItem list) : LibrarySearchResult list =
@@ -882,15 +868,51 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             prop.text err
                                         ]
                                     | None -> ()
-                                    if model.IsImporting then
+                                    match model.DuplicatePrompt with
+                                    | Some (existingSlug, existingName, _request) ->
                                         Html.div [
-                                            prop.className "flex justify-center py-8"
+                                            prop.className "py-6"
                                             prop.children [
-                                                Daisy.loading [ loading.spinner; loading.lg ]
+                                                Html.p [
+                                                    prop.className "text-base-content/80 mb-2"
+                                                    prop.text (sprintf "“%s” is already in your library." existingName)
+                                                ]
+                                                Html.p [
+                                                    prop.className "text-base-content/50 text-sm mb-5"
+                                                    prop.text "Open the existing entry, or add this as a separate one anyway?"
+                                                ]
+                                                Html.div [
+                                                    prop.className "flex gap-2"
+                                                    prop.children [
+                                                        Html.button [
+                                                            prop.className "btn btn-primary"
+                                                            prop.onClick (fun _ -> dispatch (Navigate_to (existingSlug, MediaType.Game)))
+                                                            prop.text "Open existing"
+                                                        ]
+                                                        Html.button [
+                                                            prop.className "btn btn-ghost"
+                                                            prop.onClick (fun _ -> dispatch Duplicate_prompt_force_add)
+                                                            prop.text "Add as duplicate"
+                                                        ]
+                                                        Html.button [
+                                                            prop.className "btn btn-ghost ml-auto"
+                                                            prop.onClick (fun _ -> dispatch Duplicate_prompt_cancel)
+                                                            prop.text "Cancel"
+                                                        ]
+                                                    ]
+                                                ]
                                             ]
                                         ]
-                                    else
-                                        renderTabContent ()
+                                    | None ->
+                                        if model.IsImporting then
+                                            Html.div [
+                                                prop.className "flex justify-center py-8"
+                                                prop.children [
+                                                    Daisy.loading [ loading.spinner; loading.lg ]
+                                                ]
+                                            ]
+                                        else
+                                            renderTabContent ()
                                 ]
                             ]
                             // Keyboard hints footer

@@ -37,6 +37,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       FailedTrailerUrls = Set.empty
       ShowEventHistory = false
       ConnectSteamState = Idle
+      ConnectRawgState = RawgIdle
       Error = None },
     Cmd.batch [
         Cmd.ofMsg (Load_game slug)
@@ -670,3 +671,39 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Connect_steam_dismissed ->
         { model with ConnectSteamState = Idle }, Cmd.none
+
+    | Relink_rawg_requested ->
+        { model with ConnectRawgState = RawgSearching },
+        Cmd.OfAsync.either
+            (fun () -> api.searchRawgForGame model.Slug)
+            ()
+            Rawg_search_completed
+            (fun _ -> Rawg_search_completed [])
+
+    | Rawg_search_completed candidates ->
+        match candidates with
+        | [] ->
+            { model with ConnectRawgState = RawgFailed "No RAWG match found" }, Cmd.none
+        | _ ->
+            { model with ConnectRawgState = RawgShowingCandidates candidates }, Cmd.none
+
+    | Rawg_candidate_chosen rawgId ->
+        { model with ConnectRawgState = RawgAttaching rawgId },
+        Cmd.OfAsync.either
+            (fun () -> api.attachRawgToGame (model.Slug, rawgId))
+            ()
+            Rawg_attach_completed
+            (fun ex -> Rawg_attach_completed (Error ex.Message))
+
+    | Rawg_attach_completed (Ok ()) ->
+        // Bump ImageVersion so any cached cover URLs refresh, and reload game.
+        { model with
+            ConnectRawgState = RawgIdle
+            ImageVersion = model.ImageVersion + 1 },
+        Cmd.ofMsg (Load_game model.Slug)
+
+    | Rawg_attach_completed (Error msg) ->
+        { model with ConnectRawgState = RawgFailed msg }, Cmd.none
+
+    | Relink_rawg_dismissed ->
+        { model with ConnectRawgState = RawgIdle }, Cmd.none

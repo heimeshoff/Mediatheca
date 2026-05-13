@@ -208,13 +208,21 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                 BackdropRef = rawgResult.BackgroundImage
                 RawgId = Some rawgResult.RawgId
                 RawgRating = rawgResult.Rating
+                SkipDuplicateCheck = false
             }
             let importCmd =
                 Cmd.OfAsync.either
                     api.addGame request
-                    (fun result -> Search_modal_msg (SearchModal.Import_completed (result |> Result.map (fun slug -> slug, MediaType.Game))))
+                    (fun result ->
+                        match result with
+                        | Ok (Created slug) ->
+                            Search_modal_msg (SearchModal.Import_completed (Ok (slug, MediaType.Game)))
+                        | Ok (Duplicate_found (existingSlug, existingName)) ->
+                            Search_modal_msg (SearchModal.Duplicate_prompt_show (existingSlug, existingName, request))
+                        | Error e ->
+                            Search_modal_msg (SearchModal.Import_completed (Error e)))
                     (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
-            { model with SearchModal = Some { searchModel with IsImporting = true; Error = None } }, importCmd
+            { model with SearchModal = Some { searchModel with IsImporting = true; Error = None; DuplicatePrompt = None } }, importCmd
 
         | SearchModal.Import_completed result ->
             match result with
@@ -234,6 +242,32 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                 ]
             | Error err ->
                 { model with SearchModal = Some { searchModel with Error = Some err; IsImporting = false } }, Cmd.none
+
+        | SearchModal.Duplicate_prompt_show (existingSlug, existingName, request) ->
+            { model with SearchModal = Some { searchModel with IsImporting = false; DuplicatePrompt = Some (existingSlug, existingName, request) } }, Cmd.none
+
+        | SearchModal.Duplicate_prompt_cancel ->
+            { model with SearchModal = Some { searchModel with DuplicatePrompt = None } }, Cmd.none
+
+        | SearchModal.Duplicate_prompt_force_add ->
+            match searchModel.DuplicatePrompt with
+            | None -> model, Cmd.none
+            | Some (_existingSlug, _existingName, originalRequest) ->
+                let forceRequest = { originalRequest with SkipDuplicateCheck = true }
+                let importCmd =
+                    Cmd.OfAsync.either
+                        api.addGame forceRequest
+                        (fun result ->
+                            match result with
+                            | Ok (Created slug) ->
+                                Search_modal_msg (SearchModal.Import_completed (Ok (slug, MediaType.Game)))
+                            | Ok (Duplicate_found _) ->
+                                // Shouldn't happen with SkipDuplicateCheck=true, but treat as a regular error
+                                Search_modal_msg (SearchModal.Import_completed (Error "Unexpected duplicate response"))
+                            | Error e ->
+                                Search_modal_msg (SearchModal.Import_completed (Error e)))
+                        (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
+                { model with SearchModal = Some { searchModel with IsImporting = true; Error = None; DuplicatePrompt = None } }, importCmd
 
         | SearchModal.Navigate_to (slug, mediaType) ->
             let navSegments =
@@ -512,7 +546,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Game_list_msg childMsg ->
         match childMsg with
         | Pages.Games.Types.Open_search_modal ->
-            { model with SearchModal = Some (SearchModal.init model.MovieListModel.Movies model.SeriesListModel.Series) }, Cmd.none
+            { model with SearchModal = Some (SearchModal.initWithGames model.MovieListModel.Movies model.SeriesListModel.Series model.GameListModel.Games) }, Cmd.none
         | _ ->
             let childModel, childCmd = Pages.Games.State.update api childMsg model.GameListModel
             { model with GameListModel = childModel }, Cmd.map Game_list_msg childCmd

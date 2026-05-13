@@ -275,6 +275,23 @@ module GameProjection =
                 | Games.Game_played_with_removed friendSlug ->
                     updateJsonList conn "game_detail" "played_with" slug false friendSlug
 
+                | Games.Game_rawg_id_set (rawgId, rawgRating) ->
+                    conn
+                    |> Db.newCommand "UPDATE game_list SET rawg_rating = @rawg_rating WHERE slug = @slug"
+                    |> Db.setParams [
+                        "slug", SqlType.String slug
+                        "rawg_rating", match rawgRating with Some r -> SqlType.Double r | None -> SqlType.Null
+                    ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE game_detail SET rawg_id = @rawg_id, rawg_rating = @rawg_rating WHERE slug = @slug"
+                    |> Db.setParams [
+                        "slug", SqlType.String slug
+                        "rawg_id", SqlType.Int32 rawgId
+                        "rawg_rating", match rawgRating with Some r -> SqlType.Double r | None -> SqlType.Null
+                    ]
+                    |> Db.exec
+
                 | Games.Game_steam_app_id_set steamAppId ->
                     conn
                     |> Db.newCommand "UPDATE game_list SET steam_app_id = @steam_app_id WHERE slug = @slug"
@@ -585,6 +602,12 @@ module GameProjection =
             if rd.IsDBNull(rd.GetOrdinal("steam_app_id")) then None
             else Some (rd.ReadInt32 "steam_app_id")
         )
+
+    let findByRawgId (conn: SqliteConnection) (rawgId: int) : (string * string) option =
+        conn
+        |> Db.newCommand "SELECT slug, name FROM game_detail WHERE rawg_id = @rawg_id LIMIT 1"
+        |> Db.setParams [ "rawg_id", SqlType.Int32 rawgId ]
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "slug", rd.ReadString "name")
 
     // Dashboard queries
 

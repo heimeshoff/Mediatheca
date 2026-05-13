@@ -52,6 +52,7 @@ module Games =
         | Game_steam_last_played_set of lastPlayed: string option
         | Game_marked_as_owned
         | Game_ownership_removed
+        | Game_rawg_id_set of rawgId: int * rawgRating: float option
 
     // State
 
@@ -118,6 +119,7 @@ module Games =
         | Set_steam_last_played of lastPlayed: string option
         | Mark_as_owned
         | Remove_ownership
+        | Set_rawg_id of rawgId: int * rawgRating: float option
 
     // Evolve
 
@@ -204,6 +206,8 @@ module Games =
             Active { game with IsOwnedByMe = true }
         | Active game, Game_ownership_removed ->
             Active { game with IsOwnedByMe = false }
+        | Active game, Game_rawg_id_set (rawgId, rawgRating) ->
+            Active { game with RawgId = Some rawgId; RawgRating = rawgRating }
         | _ -> state
 
     let reconstitute (events: GameEvent list) : GameState =
@@ -297,6 +301,9 @@ module Games =
             if game.IsOwnedByMe then Ok [] else Ok [ Game_marked_as_owned ]
         | Active game, Remove_ownership ->
             if game.IsOwnedByMe then Ok [ Game_ownership_removed ] else Ok []
+        | Active game, Set_rawg_id (rawgId, rawgRating) ->
+            if game.RawgId = Some rawgId && game.RawgRating = rawgRating then Ok []
+            else Ok [ Game_rawg_id_set (rawgId, rawgRating) ]
         | Removed, _ ->
             Error "Game has been removed"
         | Not_created, _ ->
@@ -422,6 +429,11 @@ module Games =
                 "Game_marked_as_owned", "{}"
             | Game_ownership_removed ->
                 "Game_ownership_removed", "{}"
+            | Game_rawg_id_set (rawgId, rawgRating) ->
+                "Game_rawg_id_set", Encode.toString 0 (Encode.object [
+                    "rawgId", Encode.int rawgId
+                    "rawgRating", Encode.option Encode.float rawgRating
+                ])
 
         let deserialize (eventType: string) (data: string) : GameEvent option =
             match eventType with
@@ -540,6 +552,14 @@ module Games =
                 Some Game_marked_as_owned
             | "Game_ownership_removed" ->
                 Some Game_ownership_removed
+            | "Game_rawg_id_set" ->
+                Decode.fromString (Decode.object (fun get ->
+                    let rawgId = get.Required.Field "rawgId" Decode.int
+                    let rawgRating = get.Optional.Field "rawgRating" Decode.float
+                    (rawgId, rawgRating)
+                )) data
+                |> Result.toOption
+                |> Option.map Game_rawg_id_set
             | _ -> None
 
         let toEventData (event: GameEvent) : EventStore.EventData =

@@ -110,6 +110,17 @@ module SeriesProjection =
             |> Db.exec
         with _ -> () // Column already exists
 
+        // Backstop for the duplicate-add race in Api.addSeriesToLibrary: enforce one row per
+        // tmdb_id in the projection. Naturally partial — Series_removed_from_library deletes
+        // the row, so removed series do not occupy the index. Wrapped in try because legacy
+        // databases may still contain duplicates that pre-date this constraint.
+        try
+            conn
+            |> Db.newCommand "CREATE UNIQUE INDEX IF NOT EXISTS idx_series_detail_tmdb_id ON series_detail(tmdb_id)"
+            |> Db.exec
+        with ex ->
+            eprintfn "[SeriesProjection] Could not create UNIQUE index on series_detail.tmdb_id (likely duplicate rows present): %s" ex.Message
+
     let private dropTables (conn: SqliteConnection) : unit =
         conn
         |> Db.newCommand """
@@ -204,92 +215,108 @@ module SeriesProjection =
             | Some seriesEvent ->
                 match seriesEvent with
                 | Series.Series_added_to_library data ->
-                    let genresJson = data.Genres |> List.map Encode.string |> Encode.list |> Encode.toString 0
-                    let totalEpisodes =
-                        data.Seasons |> List.sumBy (fun s -> s.Episodes.Length)
-                    conn
-                    |> Db.newCommand """
-                        INSERT OR REPLACE INTO series_list (slug, name, year, poster_ref, genres, tmdb_rating, status, season_count, episode_count, watched_episode_count)
-                        VALUES (@slug, @name, @year, @poster_ref, @genres, @tmdb_rating, @status, @season_count, @episode_count, 0)
-                    """
-                    |> Db.setParams [
-                        "slug", SqlType.String slug
-                        "name", SqlType.String data.Name
-                        "year", SqlType.Int32 data.Year
-                        "poster_ref", match data.PosterRef with Some r -> SqlType.String r | None -> SqlType.Null
-                        "genres", SqlType.String genresJson
-                        "tmdb_rating", match data.TmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null
-                        "status", SqlType.String data.Status
-                        "season_count", SqlType.Int32 (List.length data.Seasons)
-                        "episode_count", SqlType.Int32 totalEpisodes
-                    ]
-                    |> Db.exec
-
-                    conn
-                    |> Db.newCommand """
-                        INSERT OR REPLACE INTO series_detail (slug, name, year, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, episode_runtime, status, recommended_by, want_to_watch_with)
-                        VALUES (@slug, @name, @year, @overview, @genres, @poster_ref, @backdrop_ref, @tmdb_id, @tmdb_rating, @episode_runtime, @status, '[]', '[]')
-                    """
-                    |> Db.setParams [
-                        "slug", SqlType.String slug
-                        "name", SqlType.String data.Name
-                        "year", SqlType.Int32 data.Year
-                        "overview", SqlType.String data.Overview
-                        "genres", SqlType.String genresJson
-                        "poster_ref", match data.PosterRef with Some r -> SqlType.String r | None -> SqlType.Null
-                        "backdrop_ref", match data.BackdropRef with Some r -> SqlType.String r | None -> SqlType.Null
-                        "tmdb_id", SqlType.Int32 data.TmdbId
-                        "tmdb_rating", match data.TmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null
-                        "episode_runtime", match data.EpisodeRuntime with Some r -> SqlType.Int32 r | None -> SqlType.Null
-                        "status", SqlType.String data.Status
-                    ]
-                    |> Db.exec
-
-                    // Insert all seasons and episodes
-                    for season in data.Seasons do
+                    // Backstop against the duplicate-add race: if some other slug already holds
+                    // this tmdb_id in the read model, treat this event as a ghost and skip all
+                    // table writes. The aggregate lookups in Api.addSeriesToLibrary should make
+                    // this unreachable in practice.
+                    let conflictingSlug =
+                        conn
+                        |> Db.newCommand "SELECT slug FROM series_detail WHERE tmdb_id = @tmdb_id AND slug <> @slug LIMIT 1"
+                        |> Db.setParams [
+                            "tmdb_id", SqlType.Int32 data.TmdbId
+                            "slug", SqlType.String slug
+                        ]
+                        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "slug")
+                    match conflictingSlug with
+                    | Some other ->
+                        eprintfn "[SeriesProjection] Skipping Series_added_to_library for '%s' — tmdb_id %d already held by '%s'" slug data.TmdbId other
+                    | None ->
+                        let genresJson = data.Genres |> List.map Encode.string |> Encode.list |> Encode.toString 0
+                        let totalEpisodes =
+                            data.Seasons |> List.sumBy (fun s -> s.Episodes.Length)
                         conn
                         |> Db.newCommand """
-                            INSERT OR REPLACE INTO series_seasons (series_slug, season_number, name, overview, poster_ref, air_date, episode_count)
-                            VALUES (@series_slug, @season_number, @name, @overview, @poster_ref, @air_date, @episode_count)
+                            INSERT OR REPLACE INTO series_list (slug, name, year, poster_ref, genres, tmdb_rating, status, season_count, episode_count, watched_episode_count)
+                            VALUES (@slug, @name, @year, @poster_ref, @genres, @tmdb_rating, @status, @season_count, @episode_count, 0)
                         """
                         |> Db.setParams [
-                            "series_slug", SqlType.String slug
-                            "season_number", SqlType.Int32 season.SeasonNumber
-                            "name", SqlType.String season.Name
-                            "overview", SqlType.String season.Overview
-                            "poster_ref", match season.PosterRef with Some r -> SqlType.String r | None -> SqlType.Null
-                            "air_date", match season.AirDate with Some d -> SqlType.String d | None -> SqlType.Null
-                            "episode_count", SqlType.Int32 (List.length season.Episodes)
+                            "slug", SqlType.String slug
+                            "name", SqlType.String data.Name
+                            "year", SqlType.Int32 data.Year
+                            "poster_ref", match data.PosterRef with Some r -> SqlType.String r | None -> SqlType.Null
+                            "genres", SqlType.String genresJson
+                            "tmdb_rating", match data.TmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null
+                            "status", SqlType.String data.Status
+                            "season_count", SqlType.Int32 (List.length data.Seasons)
+                            "episode_count", SqlType.Int32 totalEpisodes
                         ]
                         |> Db.exec
 
-                        for episode in season.Episodes do
+                        conn
+                        |> Db.newCommand """
+                            INSERT OR REPLACE INTO series_detail (slug, name, year, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, episode_runtime, status, recommended_by, want_to_watch_with)
+                            VALUES (@slug, @name, @year, @overview, @genres, @poster_ref, @backdrop_ref, @tmdb_id, @tmdb_rating, @episode_runtime, @status, '[]', '[]')
+                        """
+                        |> Db.setParams [
+                            "slug", SqlType.String slug
+                            "name", SqlType.String data.Name
+                            "year", SqlType.Int32 data.Year
+                            "overview", SqlType.String data.Overview
+                            "genres", SqlType.String genresJson
+                            "poster_ref", match data.PosterRef with Some r -> SqlType.String r | None -> SqlType.Null
+                            "backdrop_ref", match data.BackdropRef with Some r -> SqlType.String r | None -> SqlType.Null
+                            "tmdb_id", SqlType.Int32 data.TmdbId
+                            "tmdb_rating", match data.TmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null
+                            "episode_runtime", match data.EpisodeRuntime with Some r -> SqlType.Int32 r | None -> SqlType.Null
+                            "status", SqlType.String data.Status
+                        ]
+                        |> Db.exec
+
+                        // Insert all seasons and episodes
+                        for season in data.Seasons do
                             conn
                             |> Db.newCommand """
-                                INSERT OR REPLACE INTO series_episodes (series_slug, season_number, episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating)
-                                VALUES (@series_slug, @season_number, @episode_number, @name, @overview, @runtime, @air_date, @still_ref, @tmdb_rating)
+                                INSERT OR REPLACE INTO series_seasons (series_slug, season_number, name, overview, poster_ref, air_date, episode_count)
+                                VALUES (@series_slug, @season_number, @name, @overview, @poster_ref, @air_date, @episode_count)
                             """
                             |> Db.setParams [
                                 "series_slug", SqlType.String slug
                                 "season_number", SqlType.Int32 season.SeasonNumber
-                                "episode_number", SqlType.Int32 episode.EpisodeNumber
-                                "name", SqlType.String episode.Name
-                                "overview", SqlType.String episode.Overview
-                                "runtime", match episode.Runtime with Some r -> SqlType.Int32 r | None -> SqlType.Null
-                                "air_date", match episode.AirDate with Some d -> SqlType.String d | None -> SqlType.Null
-                                "still_ref", match episode.StillRef with Some r -> SqlType.String r | None -> SqlType.Null
-                                "tmdb_rating", match episode.TmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null
+                                "name", SqlType.String season.Name
+                                "overview", SqlType.String season.Overview
+                                "poster_ref", match season.PosterRef with Some r -> SqlType.String r | None -> SqlType.Null
+                                "air_date", match season.AirDate with Some d -> SqlType.String d | None -> SqlType.Null
+                                "episode_count", SqlType.Int32 (List.length season.Episodes)
                             ]
                             |> Db.exec
 
-                    // Create default rewatch session
-                    conn
-                    |> Db.newCommand """
-                        INSERT OR REPLACE INTO series_rewatch_sessions (rewatch_id, series_slug, name, is_default, friends)
-                        VALUES ('default', @series_slug, NULL, 1, '[]')
-                    """
-                    |> Db.setParams [ "series_slug", SqlType.String slug ]
-                    |> Db.exec
+                            for episode in season.Episodes do
+                                conn
+                                |> Db.newCommand """
+                                    INSERT OR REPLACE INTO series_episodes (series_slug, season_number, episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating)
+                                    VALUES (@series_slug, @season_number, @episode_number, @name, @overview, @runtime, @air_date, @still_ref, @tmdb_rating)
+                                """
+                                |> Db.setParams [
+                                    "series_slug", SqlType.String slug
+                                    "season_number", SqlType.Int32 season.SeasonNumber
+                                    "episode_number", SqlType.Int32 episode.EpisodeNumber
+                                    "name", SqlType.String episode.Name
+                                    "overview", SqlType.String episode.Overview
+                                    "runtime", match episode.Runtime with Some r -> SqlType.Int32 r | None -> SqlType.Null
+                                    "air_date", match episode.AirDate with Some d -> SqlType.String d | None -> SqlType.Null
+                                    "still_ref", match episode.StillRef with Some r -> SqlType.String r | None -> SqlType.Null
+                                    "tmdb_rating", match episode.TmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null
+                                ]
+                                |> Db.exec
+
+                        // Create default rewatch session
+                        conn
+                        |> Db.newCommand """
+                            INSERT OR REPLACE INTO series_rewatch_sessions (rewatch_id, series_slug, name, is_default, friends)
+                            VALUES ('default', @series_slug, NULL, 1, '[]')
+                        """
+                        |> Db.setParams [ "series_slug", SqlType.String slug ]
+                        |> Db.exec
 
                 | Series.Series_removed_from_library ->
                     conn

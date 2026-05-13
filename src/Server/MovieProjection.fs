@@ -81,6 +81,17 @@ module MovieProjection =
             |> Db.exec
         with _ -> () // Column already exists
 
+        // Backstop for the duplicate-add race in Api.addMovieToLibrary: enforce one row per
+        // tmdb_id in the projection. Naturally partial — Movie_removed_from_library deletes
+        // the row, so removed movies do not occupy the index. Wrapped in try because legacy
+        // databases may still contain duplicates that pre-date this constraint.
+        try
+            conn
+            |> Db.newCommand "CREATE UNIQUE INDEX IF NOT EXISTS idx_movie_detail_tmdb_id ON movie_detail(tmdb_id)"
+            |> Db.exec
+        with ex ->
+            eprintfn "[MovieProjection] Could not create UNIQUE index on movie_detail.tmdb_id (likely duplicate rows present): %s" ex.Message
+
     let private dropTables (conn: SqliteConnection) : unit =
         conn
         |> Db.newCommand """
@@ -99,40 +110,56 @@ module MovieProjection =
             | Some movieEvent ->
                 match movieEvent with
                 | Movies.Movie_added_to_library data ->
-                    let genresJson = data.Genres |> List.map Encode.string |> Encode.list |> Encode.toString 0
-                    conn
-                    |> Db.newCommand """
-                        INSERT OR REPLACE INTO movie_list (slug, name, year, poster_ref, genres, tmdb_rating)
-                        VALUES (@slug, @name, @year, @poster_ref, @genres, @tmdb_rating)
-                    """
-                    |> Db.setParams [
-                        "slug", SqlType.String slug
-                        "name", SqlType.String data.Name
-                        "year", SqlType.Int32 data.Year
-                        "poster_ref", match data.PosterRef with Some r -> SqlType.String r | None -> SqlType.Null
-                        "genres", SqlType.String genresJson
-                        "tmdb_rating", match data.TmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null
-                    ]
-                    |> Db.exec
+                    // Backstop against the duplicate-add race: if some other slug already holds
+                    // this tmdb_id in the read model, treat this event as a ghost and skip the
+                    // table writes. The aggregate lookups in Api.addMovieToLibrary should make
+                    // this unreachable in practice.
+                    let conflictingSlug =
+                        conn
+                        |> Db.newCommand "SELECT slug FROM movie_detail WHERE tmdb_id = @tmdb_id AND slug <> @slug LIMIT 1"
+                        |> Db.setParams [
+                            "tmdb_id", SqlType.Int32 data.TmdbId
+                            "slug", SqlType.String slug
+                        ]
+                        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "slug")
+                    match conflictingSlug with
+                    | Some other ->
+                        eprintfn "[MovieProjection] Skipping Movie_added_to_library for '%s' — tmdb_id %d already held by '%s'" slug data.TmdbId other
+                    | None ->
+                        let genresJson = data.Genres |> List.map Encode.string |> Encode.list |> Encode.toString 0
+                        conn
+                        |> Db.newCommand """
+                            INSERT OR REPLACE INTO movie_list (slug, name, year, poster_ref, genres, tmdb_rating)
+                            VALUES (@slug, @name, @year, @poster_ref, @genres, @tmdb_rating)
+                        """
+                        |> Db.setParams [
+                            "slug", SqlType.String slug
+                            "name", SqlType.String data.Name
+                            "year", SqlType.Int32 data.Year
+                            "poster_ref", match data.PosterRef with Some r -> SqlType.String r | None -> SqlType.Null
+                            "genres", SqlType.String genresJson
+                            "tmdb_rating", match data.TmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null
+                        ]
+                        |> Db.exec
 
-                    conn
-                    |> Db.newCommand """
-                        INSERT OR REPLACE INTO movie_detail (slug, name, year, runtime, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, recommended_by, want_to_watch_with)
-                        VALUES (@slug, @name, @year, @runtime, @overview, @genres, @poster_ref, @backdrop_ref, @tmdb_id, @tmdb_rating, '[]', '[]')
-                    """
-                    |> Db.setParams [
-                        "slug", SqlType.String slug
-                        "name", SqlType.String data.Name
-                        "year", SqlType.Int32 data.Year
-                        "runtime", match data.Runtime with Some r -> SqlType.Int32 r | None -> SqlType.Null
-                        "overview", SqlType.String data.Overview
-                        "genres", SqlType.String genresJson
-                        "poster_ref", match data.PosterRef with Some r -> SqlType.String r | None -> SqlType.Null
-                        "backdrop_ref", match data.BackdropRef with Some r -> SqlType.String r | None -> SqlType.Null
-                        "tmdb_id", SqlType.Int32 data.TmdbId
-                        "tmdb_rating", match data.TmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null
-                    ]
-                    |> Db.exec
+                        conn
+                        |> Db.newCommand """
+                            INSERT OR REPLACE INTO movie_detail (slug, name, year, runtime, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, recommended_by, want_to_watch_with)
+                            VALUES (@slug, @name, @year, @runtime, @overview, @genres, @poster_ref, @backdrop_ref, @tmdb_id, @tmdb_rating, '[]', '[]')
+                        """
+                        |> Db.setParams [
+                            "slug", SqlType.String slug
+                            "name", SqlType.String data.Name
+                            "year", SqlType.Int32 data.Year
+                            "runtime", match data.Runtime with Some r -> SqlType.Int32 r | None -> SqlType.Null
+                            "overview", SqlType.String data.Overview
+                            "genres", SqlType.String genresJson
+                            "poster_ref", match data.PosterRef with Some r -> SqlType.String r | None -> SqlType.Null
+                            "backdrop_ref", match data.BackdropRef with Some r -> SqlType.String r | None -> SqlType.Null
+                            "tmdb_id", SqlType.Int32 data.TmdbId
+                            "tmdb_rating", match data.TmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null
+                        ]
+                        |> Db.exec
 
                 | Movies.Movie_removed_from_library ->
                     conn
