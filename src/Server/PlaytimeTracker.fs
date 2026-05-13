@@ -23,6 +23,25 @@ module PlaytimeTracker =
             suffix <- suffix + 1
         slug
 
+    let private getSyncHour (conn: SqliteConnection) : int =
+        SettingsStore.getSetting conn "playtime_sync_hour"
+        |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
+        |> Option.defaultValue 4
+
+    // Day boundary is (syncHour + 30 minutes) local — so the scheduled 04:00 sync
+    // (and any late-firing within 30 min of it) attributes to yesterday's bucket,
+    // and a late-night session that ends at 00:30 falls into the previous gaming day.
+    let private gamingDayGraceMinutes = 30.0
+
+    let private toGamingDay (syncHour: int) (dt: DateTime) : string =
+        dt.AddHours(float -syncHour).AddMinutes(-gamingDayGraceMinutes).ToString("yyyy-MM-dd")
+
+    let private unixTimestampToGamingDay (syncHour: int) (timestamp: int) : string option =
+        if timestamp = 0 then None
+        else
+            let dt = DateTimeOffset.UnixEpoch.AddSeconds(float timestamp).LocalDateTime
+            Some (toGamingDay syncHour dt)
+
     // SQLite table initialization
 
     let initialize (conn: SqliteConnection) : unit =
@@ -419,10 +438,7 @@ module PlaytimeTracker =
 
     let getSyncStatus (conn: SqliteConnection) : PlaytimeSyncStatus =
         let lastSync = SettingsStore.getSetting conn "playtime_last_sync"
-        let syncHour =
-            SettingsStore.getSetting conn "playtime_sync_hour"
-            |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
-            |> Option.defaultValue 4
+        let syncHour = getSyncHour conn
         let steamKey = SettingsStore.getSetting conn "steam_api_key"
         let steamId = SettingsStore.getSetting conn "steam_id"
         let isEnabled =
@@ -570,7 +586,10 @@ module PlaytimeTracker =
                     let mutable snapshotsUpdated = 0
                     let mutable gamesCreated = 0
                     let mutable gamesPromotedToFocus = 0
-                    let today = defaultArg effectiveDate (DateTime.Now.ToString("yyyy-MM-dd"))
+                    // Gaming-day boundary is (syncHour + 30 min) — so the daily 04:00 sync
+                    // (and late-night sessions ending after midnight) attribute to yesterday.
+                    let syncHour = getSyncHour conn
+                    let today = defaultArg effectiveDate (toGamingDay syncHour DateTime.Now)
 
                     // Task 048: any new play activity flips the game's status to InFocus
                     // (skipped when already InFocus to avoid redundant events).
@@ -613,7 +632,7 @@ module PlaytimeTracker =
                                 if currentPlaytime > 0 then
                                     // Game with existing playtime but no snapshot — record an initial play session
                                     let sessionDate =
-                                        match Steam.unixTimestampToDateString steamGame.RtimeLastPlayed with
+                                        match unixTimestampToGamingDay syncHour steamGame.RtimeLastPlayed with
                                         | Some d -> d
                                         | None -> today
                                     recordPlaySession conn slug steamGame.AppId sessionDate currentPlaytime
@@ -626,7 +645,7 @@ module PlaytimeTracker =
                                 // Reconciliation: if snapshot exists but no play sessions, backfill initial session
                                 if currentPlaytime > 0 && not (hasAnyPlaySessions conn slug) then
                                     let sessionDate =
-                                        match Steam.unixTimestampToDateString steamGame.RtimeLastPlayed with
+                                        match unixTimestampToGamingDay syncHour steamGame.RtimeLastPlayed with
                                         | Some d -> d
                                         | None -> today
                                     recordPlaySession conn slug steamGame.AppId sessionDate currentPlaytime
@@ -645,7 +664,7 @@ module PlaytimeTracker =
                                             today
                                         elif lastDate < today then
                                             // Missed days — use rtime_last_played from Steam if available
-                                            match Steam.unixTimestampToDateString steamGame.RtimeLastPlayed with
+                                            match unixTimestampToGamingDay syncHour steamGame.RtimeLastPlayed with
                                             | Some d -> d
                                             | None -> today
                                         else

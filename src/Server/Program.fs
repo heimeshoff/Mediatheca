@@ -262,16 +262,9 @@ let main args =
           Hour = playtimeSyncHour
           Run = fun () ->
             async {
-                // Day boundary is playtimeSyncHour local: a startup catch-up firing before
-                // today's cutover still belongs to yesterday's bucket; firing at/after, today's.
-                let now = DateTime.Now
-                let cutoverToday = DateTime(now.Year, now.Month, now.Day, playtimeSyncHour, 0, 0, DateTimeKind.Local)
-                let effectiveDate =
-                    if now < cutoverToday then
-                        Some (now.AddDays(-1.0).ToString("yyyy-MM-dd"))
-                    else
-                        None
-                match! PlaytimeTracker.runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers effectiveDate with
+                // PlaytimeTracker computes the gaming-day internally (boundary at syncHour + 30 min),
+                // so a 04:00 scheduled fire and an early-morning catch-up both attribute to yesterday.
+                match! PlaytimeTracker.runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers None with
                 | Ok result ->
                     eprintfn "[PlaytimeTracker] Sync complete: %d sessions, %d snapshots, %d games created, %d promoted to focus" result.SessionsRecorded result.SnapshotsUpdated result.GamesCreated result.GamesPromotedToFocus
                 | Error err ->
