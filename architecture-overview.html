@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mediatheca · Architecture overview · Event sourcing &amp; data flow</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2029;
+    --panel-2: #232a35;
+    --border: #2c3543;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+
+    /* Pattern colours */
+    --es: #f0a070;          /* event stream */
+    --proj: #b48ead;        /* projection */
+    --sql: #8fbcbb;         /* read model table */
+    --api: #a3be8c;         /* api */
+    --ui: #88c0d0;          /* frontend */
+    --direct: #ebcb8b;      /* db-direct store */
+    --raw: #bf616a;         /* raw event view */
+    --ext: #6a737d;         /* external */
+  }
+
+  html, body { background: var(--bg); color: var(--text); margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+    line-height: 1.55;
+    padding: 36px 28px 80px;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+
+  h1 { font-family: "Oswald", sans-serif; font-weight: 600; letter-spacing: 0.5px; margin: 0 0 6px; font-size: 2.1rem; }
+  h2 { font-family: "Oswald", sans-serif; font-weight: 500; margin: 56px 0 14px; font-size: 1.4rem; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  h3 { font-family: "Oswald", sans-serif; font-weight: 500; margin: 28px 0 10px; font-size: 1.05rem; color: var(--accent); }
+  .sub { color: var(--muted); margin: 0 0 22px; }
+
+  /* Legend */
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin: 22px 0 36px;
+  }
+  .legend-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .legend-card .badge {
+    display: inline-block;
+    width: 10px; height: 10px; border-radius: 50%;
+    margin-right: 8px; vertical-align: middle;
+  }
+  .legend-card h4 { margin: 0 0 6px; font-size: 0.95rem; }
+  .legend-card p { margin: 0; font-size: 0.85rem; color: var(--muted); }
+
+  /* Flow rendering */
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    margin: 10px 0 18px;
+  }
+  .node {
+    display: flex;
+    flex-direction: column;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    min-width: 145px;
+    max-width: 220px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset;
+  }
+  .node .label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .node .name { font-weight: 600; font-size: 0.92rem; }
+  .node .meta { font-size: 0.76rem; color: var(--muted); margin-top: 4px; font-family: ui-monospace, "JetBrains Mono", Menlo, monospace; }
+
+  .node.es     { border-color: var(--es);    box-shadow: inset 3px 0 0 var(--es); }
+  .node.proj   { border-color: var(--proj);  box-shadow: inset 3px 0 0 var(--proj); }
+  .node.sql    { border-color: var(--sql);   box-shadow: inset 3px 0 0 var(--sql); }
+  .node.api    { border-color: var(--api);   box-shadow: inset 3px 0 0 var(--api); }
+  .node.ui     { border-color: var(--ui);    box-shadow: inset 3px 0 0 var(--ui); }
+  .node.direct { border-color: var(--direct);box-shadow: inset 3px 0 0 var(--direct); }
+  .node.raw    { border-color: var(--raw);   box-shadow: inset 3px 0 0 var(--raw); }
+  .node.ext    { border-color: var(--ext);   box-shadow: inset 3px 0 0 var(--ext); }
+
+  .arrow {
+    flex: 0 0 auto;
+    padding: 0 8px;
+    color: var(--muted);
+    font-size: 1.2rem;
+    user-select: none;
+  }
+
+  /* Section intro */
+  .intro {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 10px 16px;
+    border-radius: 8px;
+    margin: 0 0 18px;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+  .intro b { color: var(--text); }
+  code {
+    font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+    background: rgba(255,255,255,0.06);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.85em;
+  }
+
+  /* Top-level diagram */
+  .toplevel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px;
+    margin-bottom: 32px;
+  }
+  .toplevel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    align-items: stretch;
+    margin-top: 10px;
+  }
+  .col {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .col h4 { margin: 0 0 8px; font-size: 0.95rem; }
+  .col ul { padding-left: 18px; margin: 6px 0; font-size: 0.88rem; color: var(--muted); }
+  .col li { margin: 3px 0; }
+  .col .badge {
+    display: inline-block;
+    width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 7px; vertical-align: middle;
+  }
+
+  footer { margin-top: 64px; color: var(--muted); font-size: 0.8rem; border-top: 1px solid var(--border); padding-top: 16px; }
+  footer code { background: transparent; }
+</style>
+</head>
+<body>
+
+<h1>Mediatheca — data flow architecture</h1>
+<p class="sub">How information moves from write-side events to the frontend, grouped by bounded context. Generated from the source under <code>src/Server/</code> and <code>src/Shared/Shared.fs</code>.</p>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-card">
+    <h4><span class="badge" style="background:var(--es)"></span>Pattern A · Full CQRS</h4>
+    <p>Append-only events → SQL projection (read model) → query → frontend. Used by every domain aggregate.</p>
+  </div>
+  <div class="legend-card">
+    <h4><span class="badge" style="background:var(--raw)"></span>Pattern B · Event log as view</h4>
+    <p>Frontend reads the raw <code>events</code> table directly. No projection step.</p>
+  </div>
+  <div class="legend-card">
+    <h4><span class="badge" style="background:var(--direct)"></span>Pattern C · Database as source of truth</h4>
+    <p>Plain CRUD against a SQL table or filesystem. Never event-sourced.</p>
+  </div>
+</div>
+
+<!-- Top-level summary -->
+<div class="toplevel">
+  <h3 style="margin-top:0">At a glance</h3>
+  <p class="sub" style="margin:0 0 4px">SQLite holds three different things: an append-only <code>events</code> table, a set of projected read-model tables, and a set of plain CRUD tables. Every domain mutation runs through <code>Api.executeCommand</code>: read stream → reconstitute aggregate → <code>decide</code> → append → catch up projections.</p>
+  <div class="toplevel-grid">
+    <div class="col">
+      <h4><span class="badge" style="background:var(--es)"></span>Event-sourced (Pattern A)</h4>
+      <ul>
+        <li>Movies — <code>Movie-{slug}</code></li>
+        <li>Friends — <code>Friend-{slug}</code></li>
+        <li>Series — <code>Series-{slug}</code></li>
+        <li>Games — <code>Game-{slug}</code></li>
+        <li>Catalogs — <code>Catalog-{slug}</code></li>
+        <li>Content blocks — <code>ContentBlocks-{movie}</code></li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4><span class="badge" style="background:var(--raw)"></span>Event log views (Pattern B)</h4>
+      <ul>
+        <li>Event Browser page</li>
+        <li>Dashboard “Recent Activity” widget</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4><span class="badge" style="background:var(--direct)"></span>DB-direct (Pattern C)</h4>
+      <ul>
+        <li>Settings (<code>SettingsStore</code>)</li>
+        <li>Cast / crew (<code>CastStore</code>)</li>
+        <li>Jellyfin mappings (<code>JellyfinStore</code>)</li>
+        <li>Steam playtime (<code>PlaytimeTracker</code>)</li>
+        <li>Image files (<code>ImageStore</code>, filesystem)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- =========================================== -->
+<h2>Pattern A · Event-sourced bounded contexts</h2>
+<div class="intro">Every aggregate follows the same shape — events are appended to <code>events</code> (one stream per aggregate id), <code>Projection.runProjection</code> reads from a checkpoint and updates the read-model tables, and the Fable.Remoting API queries those tables. The frontend never sees raw events on these flows.</div>
+
+<!-- Movies -->
+<h3>Movies <span style="color:var(--muted);font-weight:400;font-size:0.85rem">— src/Server/Movies.fs · MovieProjection.fs</span></h3>
+<div class="flow">
+  <div class="node es"><span class="label">Event stream</span><span class="name">Movie-{slug}</span><span class="meta">Movie_added · Watch_session_recorded · Personal_rating_set · Movie_in_focus_set · …</span></div>
+  <div class="arrow">→</div>
+  <div class="node proj"><span class="label">Projection</span><span class="name">MovieProjection</span><span class="meta">handler · checkpointed</span></div>
+  <div class="arrow">→</div>
+  <div class="node sql"><span class="label">Read model</span><span class="name">SQLite tables</span><span class="meta">movie_list, movie_detail, watch_sessions</span></div>
+  <div class="arrow">→</div>
+  <div class="node api"><span class="label">API</span><span class="name">IMediathecaApi</span><span class="meta">getMovies · getMovieDetail · search · dashboard*</span></div>
+  <div class="arrow">→</div>
+  <div class="node ui"><span class="label">Frontend</span><span class="name">Movies, MovieDetail, Dashboard</span></div>
+</div>
+
+<!-- Friends -->
+<h3>Friends <span style="color:var(--muted);font-weight:400;font-size:0.85rem">— src/Server/Friends.fs · FriendProjection.fs</span></h3>
+<div class="flow">
+  <div class="node es"><span class="label">Event stream</span><span class="name">Friend-{slug}</span><span class="meta">Friend_added · Friend_updated · Friend_removed</span></div>
+  <div class="arrow">→</div>
+  <div class="node proj"><span class="label">Projection</span><span class="name">FriendProjection</span><span class="meta">also scrubs friend slugs from movie_detail &amp; watch_sessions on removal</span></div>
+  <div class="arrow">→</div>
+  <div class="node sql"><span class="label">Read model</span><span class="name">friend_list</span></div>
+  <div class="arrow">→</div>
+  <div class="node api"><span class="label">API</span><span class="name">getFriends · getFriendDetail</span></div>
+  <div class="arrow">→</div>
+  <div class="node ui"><span class="label">Frontend</span><span class="name">Friends, FriendDetail</span></div>
+</div>
+
+<!-- Series -->
+<h3>Series <span style="color:var(--muted);font-weight:400;font-size:0.85rem">— src/Server/Series.fs · SeriesProjection.fs</span></h3>
+<div class="flow">
+  <div class="node es"><span class="label">Event stream</span><span class="name">Series-{slug}</span><span class="meta">Series_added · Episode_watched · Rewatch_session_created · Series_abandoned · Series_in_focus_set · …</span></div>
+  <div class="arrow">→</div>
+  <div class="node proj"><span class="label">Projection</span><span class="name">SeriesProjection</span><span class="meta">rebuilt at boot</span></div>
+  <div class="arrow">→</div>
+  <div class="node sql"><span class="label">Read model</span><span class="name">SQLite tables</span><span class="meta">series_list, series_detail, series_seasons, series_episodes, series_rewatches, episode_watches</span></div>
+  <div class="arrow">→</div>
+  <div class="node api"><span class="label">API</span><span class="name">getSeries · getSeriesDetail · dashboard*</span></div>
+  <div class="arrow">→</div>
+  <div class="node ui"><span class="label">Frontend</span><span class="name">Series, SeriesDetail</span></div>
+</div>
+
+<!-- Games -->
+<h3>Games <span style="color:var(--muted);font-weight:400;font-size:0.85rem">— src/Server/Games.fs · GameProjection.fs</span></h3>
+<div class="flow">
+  <div class="node es"><span class="label">Event stream</span><span class="name">Game-{slug}</span><span class="meta">Game_added · Game_status_changed · Game_play_time_set · Game_recommended_by · Game_hltb_hours_set · …</span></div>
+  <div class="arrow">→</div>
+  <div class="node proj"><span class="label">Projection</span><span class="name">GameProjection</span><span class="meta">rebuilt at boot</span></div>
+  <div class="arrow">→</div>
+  <div class="node sql"><span class="label">Read model</span><span class="name">SQLite tables</span><span class="meta">game_list, game_detail</span></div>
+  <div class="arrow">→</div>
+  <div class="node api"><span class="label">API</span><span class="name">getGames · getGameDetail · dashboard*</span></div>
+  <div class="arrow">→</div>
+  <div class="node ui"><span class="label">Frontend</span><span class="name">Games, GameDetail</span></div>
+</div>
+
+<!-- Catalogs -->
+<h3>Catalogs <span style="color:var(--muted);font-weight:400;font-size:0.85rem">— src/Server/Catalogs.fs · CatalogProjection.fs</span></h3>
+<div class="flow">
+  <div class="node es"><span class="label">Event stream</span><span class="name">Catalog-{slug}</span><span class="meta">Catalog_created · Entry_added · Entries_reordered · …</span></div>
+  <div class="arrow">→</div>
+  <div class="node proj"><span class="label">Projection</span><span class="name">CatalogProjection</span></div>
+  <div class="arrow">→</div>
+  <div class="node sql"><span class="label">Read model</span><span class="name">catalog_list, catalog_entries</span></div>
+  <div class="arrow">→</div>
+  <div class="node api"><span class="label">API</span><span class="name">getCatalogs · getCatalogDetail</span></div>
+  <div class="arrow">→</div>
+  <div class="node ui"><span class="label">Frontend</span><span class="name">Catalogs, CatalogDetail</span></div>
+</div>
+
+<!-- Content Blocks -->
+<h3>Content blocks <span style="color:var(--muted);font-weight:400;font-size:0.85rem">— src/Server/ContentBlocks.fs · ContentBlockProjection.fs</span></h3>
+<div class="flow">
+  <div class="node es"><span class="label">Event stream</span><span class="name">ContentBlocks-{movie}</span><span class="meta">Content_block_added · Content_blocks_reordered · Content_blocks_row_grouped · …</span></div>
+  <div class="arrow">→</div>
+  <div class="node proj"><span class="label">Projection</span><span class="name">ContentBlockProjection</span></div>
+  <div class="arrow">→</div>
+  <div class="node sql"><span class="label">Read model</span><span class="name">content_blocks</span></div>
+  <div class="arrow">→</div>
+  <div class="node api"><span class="label">API</span><span class="name">embedded via MovieProjection.getBySlug</span></div>
+  <div class="arrow">→</div>
+  <div class="node ui"><span class="label">Frontend</span><span class="name">MovieDetail (per-session blocks)</span></div>
+</div>
+
+<!-- =========================================== -->
+<h2>Pattern B · Event log surfaced as a view</h2>
+<div class="intro">A handful of UI surfaces don't go through a projection at all — they read directly out of the <b>append-only <code>events</code></b> table that <code>EventStore</code> writes. There's no read model for these views; the event log itself is the view.</div>
+
+<h3>Event Browser <span style="color:var(--muted);font-weight:400;font-size:0.85rem">— /events page</span></h3>
+<div class="flow">
+  <div class="node es"><span class="label">Append-only log</span><span class="name">events table</span><span class="meta">stream_id, event_type, data, timestamp</span></div>
+  <div class="arrow">→</div>
+  <div class="node raw"><span class="label">Direct read</span><span class="name">EventStore.queryEvents / getDistinctStreams / getDistinctEventTypes</span><span class="meta">no projection</span></div>
+  <div class="arrow">→</div>
+  <div class="node api"><span class="label">API</span><span class="name">getEvents · getEventStreams · getEventTypes</span></div>
+  <div class="arrow">→</div>
+  <div class="node ui"><span class="label">Frontend</span><span class="name">EventBrowser</span></div>
+</div>
+
+<h3>Dashboard · Recent Activity <span style="color:var(--muted);font-weight:400;font-size:0.85rem">— widget on the Dashboard</span></h3>
+<div class="flow">
+  <div class="node es"><span class="label">Append-only log</span><span class="name">events table</span></div>
+  <div class="arrow">→</div>
+  <div class="node raw"><span class="label">Direct read</span><span class="name">EventStore.getRecentEvents</span><span class="meta">last N events, formatted inline by event type</span></div>
+  <div class="arrow">→</div>
+  <div class="node api"><span class="label">API</span><span class="name">getRecentActivity</span></div>
+  <div class="arrow">→</div>
+  <div class="node ui"><span class="label">Frontend</span><span class="name">Dashboard</span></div>
+</div>
+
+<!-- =========================================== -->
+<h2>Pattern C · Database as source of truth</h2>
+<div class="intro">Some data is genuinely <b>not</b> domain-event material — it's either external metadata (cast lists, Jellyfin item IDs), user configuration (API keys), or high-frequency telemetry (Steam playtime snapshots). These stores live in their own SQLite tables and never go through the event log.</div>
+
+<h3>Settings <span style="color:var(--muted);font-weight:400;font-size:0.85rem">— src/Server/SettingsStore.fs</span></h3>
+<div class="flow">
+  <div class="node ext"><span class="label">Input</span><span class="name">User form · env vars</span><span class="meta">TMDB_API_KEY, STEAM_*, jellyfin_*</span></div>
+  <div class="arrow">→</div>
+  <div class="node direct"><span class="label">Direct CRUD</span><span class="name">settings table</span><span class="meta">key/value/updated_at</span></div>
+  <div class="arrow">→</div>
+  <div class="node api"><span class="label">API</span><span class="name">getSettings · saveSettings</span></div>
+  <div class="arrow">→</div>
+  <div class="node ui"><span class="label">Frontend</span><span class="name">Settings page</span></div>
+</div>
+
+<h3>Cast &amp; crew <span style="color:var(--muted);font-weight:400;font-size:0.85rem">— src/Server/CastStore.fs</span></h3>
+<div class="flow">
+  <div class="node ext"><span class="label">External</span><span class="name">TMDB credits</span></div>
+  <div class="arrow">→</div>
+  <div class="node direct"><span class="label">Direct CRUD</span><span class="name">cast_members, movie_cast, series_cast, movie_crew</span><span class="meta">upsertCastMember · addMovieCast · …</span></div>
+  <div class="arrow">→</div>
+  <div class="node api"><span class="label">API (joined in)</span><span class="name">MovieProjection.getBySlug / SeriesProjection.getBySlug</span><span class="meta">also Dashboard top-actors/directors</span></div>
+  <div class="arrow">→</div>
+  <div class="node ui"><span class="label">Frontend</span><span class="name">MovieDetail · SeriesDetail · Dashboard</span></div>
+</div>
+
+<h3>Jellyfin item IDs <span style="color:var(--muted);font-weight:400;font-size:0.85rem">— src/Server/JellyfinStore.fs</span></h3>
+<div class="flow">
+  <div class="node ext"><span class="label">External</span><span class="name">Jellyfin server</span></div>
+  <div class="arrow">→</div>
+  <div class="node direct"><span class="label">Direct CRUD</span><span class="name">jellyfin_movie · jellyfin_series · jellyfin_episode</span><span class="meta">setMovieJellyfinId · getMovieJellyfinId · …</span></div>
+  <div class="arrow">→</div>
+  <div class="node api"><span class="label">API (joined in)</span><span class="name">embedded in MovieDetail / SeriesDetail</span></div>
+  <div class="arrow">→</div>
+  <div class="node ui"><span class="label">Frontend</span><span class="name">“Play” links on detail pages</span></div>
+</div>
+
+<h3>Steam playtime <span style="color:var(--muted);font-weight:400;font-size:0.85rem">— src/Server/PlaytimeTracker.fs</span></h3>
+<div class="intro" style="border-left-color: var(--direct)">Slightly special: the nightly Steam sync writes <b>both</b> domain events (<code>Game_play_time_set</code> on the Game stream) <b>and</b> per-day session rows directly to its own tables. Charts read the session rows, the Game aggregate reads the events.</div>
+<div class="flow">
+  <div class="node ext"><span class="label">External</span><span class="name">Steam Web API · ScheduledJobs nightly</span></div>
+  <div class="arrow">→</div>
+  <div class="node direct"><span class="label">Direct CRUD</span><span class="name">steam_playtime_snapshot · game_play_session</span><span class="meta">per-day minute deltas, no event log</span></div>
+  <div class="arrow">→</div>
+  <div class="node api"><span class="label">API</span><span class="name">Dashboard play-time charts (daily/monthly)</span></div>
+  <div class="arrow">→</div>
+  <div class="node ui"><span class="label">Frontend</span><span class="name">Dashboard · GameDetail</span></div>
+</div>
+
+<h3>Image files <span style="color:var(--muted);font-weight:400;font-size:0.85rem">— src/Server/ImageStore.fs</span></h3>
+<div class="flow">
+  <div class="node ext"><span class="label">External</span><span class="name">TMDB / RAWG image URLs</span></div>
+  <div class="arrow">→</div>
+  <div class="node direct"><span class="label">Direct write</span><span class="name">Filesystem under DATA_DIR/images</span><span class="meta">poster_ref / backdrop_ref strings stored in projections</span></div>
+  <div class="arrow">→</div>
+  <div class="node api"><span class="label">Static</span><span class="name">ASP.NET static files at /images</span></div>
+  <div class="arrow">→</div>
+  <div class="node ui"><span class="label">Frontend</span><span class="name">&lt;img&gt; tags everywhere</span></div>
+</div>
+
+<!-- =========================================== -->
+<h2>Cross-cutting notes</h2>
+<div class="intro">
+  <b>Command path.</b> Every write goes through <code>Api.executeCommand</code> in <code>src/Server/Api.fs</code>: it reads the stream with <code>EventStore.readStream</code>, reconstitutes state via <code>evolve</code>, calls <code>decide</code>, appends new events with optimistic-concurrency, then calls <code>Projection.runProjection</code> for each handler so read models stay in sync before the response returns.<br><br>
+  <b>Boot sequence (<code>Program.fs</code>).</b> Tables are created, <code>SeriesProjection</code> and <code>GameProjection</code> are <i>rebuilt from zero</i>, then all six projections run a catch-up pass. <code>CastStore</code>, <code>JellyfinStore</code>, <code>PlaytimeTracker</code>, <code>SettingsStore</code> initialise their own (non-event-sourced) tables on the side.<br><br>
+  <b>Dashboard.</b> It's the most mixed page — most widgets hit the read-model tables (movie_detail, watch_sessions, game_play_session), but the <i>Recent Activity</i> widget reads raw events.
+</div>
+
+<footer>
+  Built from <code>src/Server/*.fs</code>, <code>src/Shared/Shared.fs</code>. Patterns identified by inspecting each module's stream IDs, projection handlers, and direct table CRUD. Open this file in a browser; it is self-contained (no external assets).
+</footer>
+
+</body>
+</html>

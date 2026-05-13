@@ -39,7 +39,8 @@ Personal media library app (movies, series, games, books) built with full-stack 
   - `Types.fs|State.fs|Views.fs` - Root MVU (delegates to child pages via Cmd.map)
   - `App.fs` - Entry point only (CSS import, API proxy, Program.mkProgram)
 - `tests/Server.Tests/` - Expecto tests
-- `.planning/` - PROJECT.md, ROADMAP.md, REQUIREMENTS.md, STATE.md
+- `.agenthoff/` - Workflow state managed by the `agenthoff` plugin: `vision.md`, `context-map.md`, `contexts/<bc>/{backlog,todo,doing,done}/` tasks, `knowledge/{protocol,roadmap}.md`, `knowledge/research/`
+- `.workflow.archived/` - Historical record of pre-agenthoff tasks (read-only; do not write here)
 
 ## Conventions
 

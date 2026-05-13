@@ -1,0 +1,45 @@
+# Integration
+
+## Purpose
+**Adapters to external systems.** Translates external shapes (TMDB / RAWG / Steam / HLTB / Jellyfin / Cinemarco) into commands the core BCs accept, and runs scheduled sync jobs that pull external state on a cadence. The anticorruption layer that keeps core BCs free of HTTP and vendor JSON.
+
+## Classification
+**generic** — Boring plumbing where boring choices are correct.
+
+## Actors
+External services (TMDB API, RAWG API, Steam Web API, HLTB scraping, Jellyfin server, Cinemarco) and the single user (triggering manual refresh / sync actions).
+
+## Ubiquitous language
+
+- **Adapter** — module that owns one external system (`Tmdb.fs`, `Rawg.fs`, `Steam.fs`, `HowLongToBeat.fs`, `Jellyfin.fs`, `CinemarcoImport.fs`). Translates DTOs ↔ domain language.
+- **External id** — TMDB id, RAWG id, Steam appId, Jellyfin item id. Stored on core aggregates so adapters can re-sync.
+- **Import** — one-time pull of items from an external source into core BCs (e.g. Cinemarco favorites become Movies + a Catalog).
+- **Sync** — scheduled, repeating pull (e.g. Jellyfin watched state, Steam library + play time).
+- **Refresh** — user-triggered re-fetch of a single item's metadata (e.g. "refresh this series from TMDB").
+- **Scheduled job** — recurring task scheduled by `ScheduledJobs.fs` (Jellyfin auto-sync per task 037, Series episode refresh per task 042, etc.).
+
+## Aggregates
+
+No domain aggregates. The closest things to internal state are the **scheduled-job registry** and per-adapter caches; both are infrastructure, not aggregates.
+
+## Key events
+
+Integration **does not own its own event stream**. It emits *commands* into the core BCs (`Add_movie_to_library`, `Refresh_series_from_tmdb`, `Set_play_time`, `Set_hltb_hours`, …). The resulting events live in the core BC's stream.
+
+## Key commands
+
+Adapters call into the core BCs; they don't expose their own command bus to the outside. User-facing commands here are operational: "Sync now", "Refresh from TMDB", "Connect with Steam" (per task 045).
+
+## Relationships with other contexts
+
+- **Upstream of (via anticorruption):** Movies, Series, Games. Adapters translate external DTOs into core commands.
+- **Operational dependency:** Administration (settings — API keys, sync cadence — live there; see `SettingsStore.fs`).
+
+## Frontend gate
+
+Frontend tasks in this BC (sync UI, "connect with Steam" flows, refresh buttons) **must** `depends_on` the design-system styleguide task. See [[design-system]].
+
+## Open questions
+
+- How to expose adapter failures back to the UI consistently — currently varies per adapter.
+- Whether to standardize on a single "refresh queue" pattern across adapters or keep them bespoke.
