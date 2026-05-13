@@ -14,13 +14,13 @@ tags: [foundation, gate]
 
 ## Why
 
-The design system already exists in the running app — glassmorphism rules in `CLAUDE.md`, tokens in `index.css`, a live `src/Client/Pages/StyleGuide` page — but there is no single canonical reviewable artifact. The agenthoff styleguide gate requires that every frontend task in any BC `depends_on` a concrete styleguide task; without a formalized document, the gate is fuzzy.
+The design system already exists in the running app — glassmorphism rules in `CLAUDE.md`, tokens in `index.css`, a live `src/Client/Pages/StyleGuide` page — but there is no single canonical reviewable artifact. The agentheim styleguide gate requires that every frontend task in any BC `depends_on` a concrete styleguide task; without a formalized document, the gate is fuzzy.
 
 This task produces that artifact: a single `styleguide.md` that consolidates the existing rules and component patterns and serves as the gate's source of truth for future frontend captures.
 
 ## What
 
-Produce `.agenthoff/contexts/design-system/styleguide.md` covering:
+Produce `.agentheim/contexts/design-system/styleguide.md` covering:
 
 1. **Tokens** — colors, spacing scale, radii, opacities (read from `index.css` and the `dim` theme block).
 2. **Typography** — Oswald / Inter pairing, sizing scale, semantic mapping (display / heading / body / mono).
@@ -33,7 +33,7 @@ The document references existing code; it does not duplicate it. Where a pattern
 
 ## Acceptance criteria
 
-- [ ] `.agenthoff/contexts/design-system/styleguide.md` exists with the six sections above.
+- [ ] `.agentheim/contexts/design-system/styleguide.md` exists with the six sections above.
 - [ ] Every recurring component pattern visible on the live StyleGuide page is documented with a file+line code reference.
 - [ ] The glassmorphism spec and the backdrop-filter gotcha are reproduced verbatim from CLAUDE.md (or CLAUDE.md is updated to point at the styleguide as the source of truth — pick one).
 - [ ] The design-system README's "existing assets" section is updated to point at the new `styleguide.md` as the canonical artifact.

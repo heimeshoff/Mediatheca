@@ -5,12 +5,12 @@ Newest entries on top.
 
 ---
 
-## 2026-05-12 -- Brainstorm: Formalize bounded contexts for agenthoff migration
+## 2026-05-12 -- Brainstorm: Formalize bounded contexts for agentheim migration
 
 **Type:** Brainstorm
 **Outcome:** vision extended (BCs + context map + foundation ADRs backfilled)
 **BCs identified:** movies, series, games, journal, friends, curation, intelligence, integration, administration, design-system
-**Summary:** Vision was locked; extension session formalized ten bounded contexts grounded in the existing code (Movies/Series/Games as sibling core BCs, Journal + Intelligence as read-side BCs, Friends/Curation/design-system as supporting, Integration/Administration as generic). Produced `.agenthoff/context-map.md` and a README per BC capturing ubiquitous language drawn from the event/command DUs.
+**Summary:** Vision was locked; extension session formalized ten bounded contexts grounded in the existing code (Movies/Series/Games as sibling core BCs, Journal + Intelligence as read-side BCs, Friends/Curation/design-system as supporting, Integration/Administration as generic). Produced `.agentheim/context-map.md` and a README per BC capturing ubiquitous language drawn from the event/command DUs.
 **ADRs written:** 0001 (F# fullstack), 0002 (event sourcing + CQRS), 0003 (SQLite persistence), 0004 (Fable.Remoting), 0005 (Elmish MVU), 0006 (Tailwind+DaisyUI+glassmorphism), 0007 (single-user, no auth), 0008 (ten BCs)
 **Foundation tasks emitted:** decision tasks skipped — ADRs backfilled directly for the mature project. Walking-skeleton spike skipped — the app already runs end-to-end. Styleguide: design-system-001-formalize-styleguide emitted to gate future frontend tasks.
 
