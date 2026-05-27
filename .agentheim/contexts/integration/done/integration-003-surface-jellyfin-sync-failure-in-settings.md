@@ -1,11 +1,11 @@
 ---
 id: integration-003
 title: Surface the persisted Jellyfin sync failure in the Settings UI
-status: todo
+status: done
 type: feature
 context: integration
 created: 2026-05-27
-completed:
+completed: 2026-05-27
 commit:
 depends_on: [design-system-001]
 blocks: []
@@ -90,3 +90,30 @@ discarded. So this is *not* a pure render task. Two changes:
   server persists `jellyfin_last_sync_result` across restarts.
 </content>
 </invoke>
+
+## Outcome
+
+The persisted Jellyfin `SyncFailed` result is now surfaced in Settings → Jellyfin.
+
+- `Settings/Types.fs` — added `JellyfinSyncStatus: JellyfinSyncStatus option` to the
+  `Model`, beside `JellyfinLastSyncTime`.
+- `Settings/State.fs` — `Jellyfin_sync_status_loaded` now retains the full status
+  (`JellyfinSyncStatus = Some status`) instead of discarding the `SyncFailed` error
+  message; `JellyfinLastSyncTime` still populated as before. Model init sets the new
+  field to `None`.
+- `Settings/Views.fs` — added `syncFailurePanel`/`jellyfinSyncStatusView` helpers and
+  rendered them in `jellyfinDetail` right after the last-sync label. Only `SyncFailed`
+  produces visible output (a glassmorphic error-accented panel using
+  `DesignSystem.glassCard`, showing the persisted error string verbatim plus the
+  failed-run time, gracefully handling `lastTime = None`). `SyncCompleted` /
+  `SyncInProgress` / `SyncIdle` render nothing new — no regression. Added
+  `open Mediatheca.Shared` so the DU/cases resolve.
+
+No new API method (server side shipped in integration-001 / ADR 0010). `npm run build`
+clean. No ADR: reusing the styleguide `glassCard` with an error accent is the obvious
+glassmorphism-conformant choice, no surprising alternative was rejected.
+
+Verification note: this is a frontend-only change and the project has no UI test
+infrastructure (Expecto covers the server only). Verified via clean Fable compile
+(`npm run build`); the failure-panel rendering was exercised by reasoning against the
+`JellyfinSyncStatus` DU shape rather than an automated UI test.

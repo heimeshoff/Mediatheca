@@ -2,6 +2,7 @@ module Mediatheca.Client.Pages.Settings.Views
 
 open Feliz
 open Feliz.DaisyUI
+open Mediatheca.Shared
 open Mediatheca.Client.Pages.Settings.Types
 open Mediatheca.Client.Components
 open Mediatheca.Client
@@ -46,6 +47,50 @@ let private feedbackAlert (result: Result<string, string> option) =
     | Some (Ok msg) -> Daisy.alert [ alert.success; prop.className "mb-2"; prop.text msg ]
     | Some (Error msg) -> Daisy.alert [ alert.error; prop.className "mb-2"; prop.text msg ]
     | None -> Html.none
+
+/// Glassmorphic failure panel for a persisted SyncFailed status.
+/// Surfaces the persisted error message (already includes per-item counts)
+/// plus the last-run time when present. Uses the styleguide glass panel
+/// (DesignSystem.glassCard) with an error accent — never an opaque box.
+let private syncFailurePanel (error: string) (lastTime: string option) =
+    Html.div [
+        prop.className (DesignSystem.glassCard + " border-error/40 bg-error/10 p-4 mb-4")
+        prop.children [
+            Html.div [
+                prop.className "flex items-center gap-2 mb-1"
+                prop.children [
+                    Html.span [
+                        prop.className "font-display uppercase tracking-wider text-sm text-error"
+                        prop.text "Last sync failed"
+                    ]
+                ]
+            ]
+            Html.p [
+                prop.className "text-sm text-base-content/80 whitespace-pre-wrap break-words"
+                prop.text error
+            ]
+            match lastTime with
+            | Some isoTime ->
+                Html.span [
+                    prop.className (DesignSystem.mutedText + " block mt-2")
+                    prop.title isoTime
+                    prop.text (sprintf "Failed run: %s" (formatRelativeTime isoTime))
+                ]
+            | None ->
+                Html.span [
+                    prop.className (DesignSystem.mutedText + " block mt-2")
+                    prop.text "No previous successful sync recorded"
+                ]
+        ]
+    ]
+
+/// Renders the Jellyfin sync status: only SyncFailed produces visible output
+/// (the new failure surfacing). All other states defer to the existing
+/// last-synced label and stay visually unchanged.
+let private jellyfinSyncStatusView (status: JellyfinSyncStatus option) =
+    match status with
+    | Some (SyncFailed (error, lastTime)) -> syncFailurePanel error lastTime
+    | _ -> Html.none
 
 // ── Integration Card Wrapper ──
 
@@ -1000,6 +1045,8 @@ let private jellyfinDetail (model: Model) (dispatch: Msg -> unit) =
                     lastSyncLabel model.JellyfinLastSyncTime
                 ]
             ]
+
+            jellyfinSyncStatusView model.JellyfinSyncStatus
 
             Html.p [
                 prop.className "text-base-content/70 mb-4 text-sm"

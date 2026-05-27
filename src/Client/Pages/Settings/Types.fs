@@ -62,6 +62,7 @@ type Model = {
     // Sync Status
     PlaytimeSyncStatus: PlaytimeSyncStatus option
     JellyfinLastSyncTime: string option
+    JellyfinSyncStatus: JellyfinSyncStatus option
     SteamFamilyLastSync: string option
     // Cinemarco Import
     CinemarcoDbPath: string

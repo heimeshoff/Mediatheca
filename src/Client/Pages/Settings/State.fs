@@ -67,6 +67,7 @@ let init () : Model * Cmd<Msg> =
       JellyfinImportResult = None
       PlaytimeSyncStatus = None
       JellyfinLastSyncTime = None
+      JellyfinSyncStatus = None
       SteamFamilyLastSync = None
       CinemarcoDbPath = ""
       CinemarcoImagesPath = ""
@@ -473,7 +474,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             | SyncCompleted (_, lastTime) -> Some lastTime
             | SyncFailed (_, lastTime) -> lastTime
             | SyncInProgress -> model.JellyfinLastSyncTime
-        { model with JellyfinLastSyncTime = lastSync }, Cmd.none
+        { model with JellyfinLastSyncTime = lastSync; JellyfinSyncStatus = Some status }, Cmd.none
 
     | Load_steam_family_last_sync ->
         model, Cmd.OfAsync.perform api.getSteamFamilyLastSync () Steam_family_last_sync_loaded
