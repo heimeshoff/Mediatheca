@@ -11,15 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 2
+- **Todo:** 0
 - **Doing:** 0
-- **Done:** 1
+- **Done:** 3
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **design-system-002** -- Point design-check skill's "Source of Truth" at styleguide.md -- `todo/design-system-002-pointer-design-check-styleguide.md`
-- **design-system-003** -- Add ActionMenu specimen to the live StyleGuide page -- `todo/design-system-003-actionmenu-styleguide-specimen.md`
+<!-- no tasks in todo -->
 <!-- todo-list:end -->
 
 ### Doing
@@ -29,6 +28,8 @@ research touching this BC, and concept synthesis pages.
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **design-system-003** -- Add ActionMenu specimen to the live StyleGuide page -- `done/design-system-003-actionmenu-styleguide-specimen.md`
+- **design-system-002** -- Point design-check skill's "Source of Truth" at styleguide.md -- `done/design-system-002-pointer-design-check-styleguide.md`
 - **design-system-001** -- Formalize the existing styleguide as a reviewable document -- `done/design-system-001-formalize-styleguide.md`
 <!-- done-list:end -->
 

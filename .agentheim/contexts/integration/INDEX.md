@@ -11,15 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 2
+- **Todo:** 0
 - **Doing:** 0
-- **Done:** 1
+- **Done:** 3
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **integration-003** -- Surface the persisted Jellyfin sync failure in the Settings UI -- `feature` -- `todo/integration-003-surface-jellyfin-sync-failure-in-settings.md`
-- **integration-002** -- Re-authenticate Jellyfin and retry once on a 401/403 during sync -- `bug` -- `todo/integration-002-jellyfin-reauth-on-401.md`
+<!-- no tasks in todo -->
 <!-- todo-list:end -->
 
 ### Doing
@@ -29,6 +28,8 @@ research touching this BC, and concept synthesis pages.
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **integration-003** -- Surface the persisted Jellyfin sync failure in the Settings UI -- `feature` -- `done/integration-003-surface-jellyfin-sync-failure-in-settings.md`
+- **integration-002** -- Re-authenticate Jellyfin and retry once on a 401/403 during sync -- `bug` -- `done/integration-002-jellyfin-reauth-on-401.md`
 - **integration-001** -- Jellyfin sync silently stopped writing episode watch history -- `bug` -- `done/integration-001-jellyfin-sync-silently-stopped.md`
 <!-- done-list:end -->
 
@@ -40,6 +41,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0011** -- Jellyfin self-heals a rejected token via a pure re-auth-and-retry orchestration -- 2026-05-27 -- `knowledge/decisions/0011-jellyfin-reauth-on-401.md`
 - **0010** -- Jellyfin sync persists its last result and isolates per-item faults -- 2026-05-27 -- `knowledge/decisions/0010-jellyfin-sync-observability-fault-isolation.md`
 <!-- adr-local:end -->
 

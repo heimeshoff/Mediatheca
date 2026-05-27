@@ -6,7 +6,7 @@ type: feature
 context: design-system
 created: 2026-05-27
 completed: 2026-05-27
-commit:
+commit: 0d61e34
 depends_on: [design-system-001]
 blocks: []
 tags: [design-system, ui]

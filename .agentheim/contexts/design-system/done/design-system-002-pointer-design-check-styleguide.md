@@ -6,7 +6,7 @@ type: chore
 context: design-system
 created: 2026-05-27
 completed: 2026-05-27
-commit:
+commit: d335ab7
 depends_on: [design-system-001]
 blocks: []
 tags: [design-system, docs]

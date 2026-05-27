@@ -6,7 +6,7 @@ type: bug
 context: integration
 created: 2026-05-27
 completed: 2026-05-27
-commit:
+commit: 72bb9a5
 depends_on: []
 blocks: []
 tags: [jellyfin, sync, auth, robustness]

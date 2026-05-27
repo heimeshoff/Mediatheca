@@ -5,6 +5,86 @@ Newest entries on top.
 
 ---
 
+## 2026-05-27 -- Work session ended
+
+**Type:** Work / Session end
+**Completed:** 4 (first-try PASS: 4, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Commits:** 4 (plus 1 bookkeeping commit)
+**Note:** Two parallel batches of 2. Batch 1: integration-002 (Jellyfin re-auth on 401/403, ADR 0011) + design-system-002 (design-check Source of Truth → styleguide.md). Batch 2: integration-003 (surface Jellyfin SyncFailed in Settings UI) + design-system-003 (ActionMenu specimen on live StyleGuide page). Both batches split per-BC to avoid two workers touching the same BC README. All four passed verification on the first try.
+
+---
+
+## 2026-05-27 -- Task verified and completed: design-system-003 - Add ActionMenu specimen to the live StyleGuide page
+
+**Type:** Work / Task completion
+**Task:** design-system-003 - Add ActionMenu specimen to the live StyleGuide page
+**Summary:** Added an interactive ActionMenu specimen (view / heroView / heroViewSections, with real ActionMenuItem/ActionMenuSection records) to the Components section of the live StyleGuide page and updated styleguide.md § 4 to point at it (Views.fs:1191-1283), closing finding F-2.
+**Verification:** PASS (iteration 1) — npm run build clean.
+**Commit:** 0d61e34
+**Files changed:** 2
+**Tests added:** 0 (frontend specimen)
+**ADRs written:** none
+
+---
+
+## 2026-05-27 -- Task verified and completed: integration-003 - Surface the persisted Jellyfin sync failure in the Settings UI
+
+**Type:** Work / Task completion
+**Task:** integration-003 - Surface the persisted Jellyfin sync failure in the Settings UI
+**Summary:** The persisted Jellyfin SyncFailed result is now surfaced in Settings → Jellyfin as a glassmorphic error panel (DesignSystem.glassCard + error tint) showing the persisted error message and failed-run time; the Settings model retains the full JellyfinSyncStatus instead of dropping all but the timestamp. Closes the integration-001/ADR 0010 frontend follow-up.
+**Verification:** PASS (iteration 1) — npm run build clean; glassmorphism gate satisfied.
+**Commit:** 5b9921d
+**Files changed:** 3
+**Tests added:** 0 (frontend view)
+**ADRs written:** none
+
+---
+
+## 2026-05-27 -- Batch started: [integration-003, design-system-003]
+
+**Type:** Work / Batch start
+**Tasks:** integration-003 - Surface the persisted Jellyfin sync failure in the Settings UI, design-system-003 - Add ActionMenu specimen to the live StyleGuide page
+**Parallel:** yes (2 workers)
+
+---
+
+## 2026-05-27 -- Task verified and completed: design-system-002 - Point design-check's Source of Truth at styleguide.md
+
+**Type:** Work / Task completion
+**Task:** design-system-002 - Point design-check skill's "Source of Truth" at styleguide.md
+**Summary:** The design-check skill's "Source of Truth" now names styleguide.md as the canonical design-system doc for intent and the frontend gate; index.css/DesignSystem.fs remain authoritative for concrete values. No rule category semantics changed.
+**Verification:** PASS (iteration 1)
+**Commit:** d335ab7
+**Files changed:** 1
+**Tests added:** 0 (docs-only chore)
+**ADRs written:** none
+
+---
+
+## 2026-05-27 -- Task verified and completed: integration-002 - Re-authenticate Jellyfin and retry once on a 401/403
+
+**Type:** Work / Task completion
+**Task:** integration-002 - Re-authenticate Jellyfin and retry once on a 401/403 during sync
+**Summary:** Jellyfin sync now self-heals a rejected token — a 401/403 on any fetch triggers exactly one re-auth with the stored credentials, persists the fresh token, and retries once; a second rejection, failed re-auth, or missing credentials surface a clear "re-authentication" SyncFailed instead of looping. `fetchJsonWithAuth` now returns FetchError instead of throwing on EnsureSuccessStatusCode.
+**Verification:** PASS (iteration 1) — 265 tests green, build clean, non-vacuous 401-then-200 regression test confirmed.
+**Commit:** 72bb9a5
+**Files changed:** 6
+**Tests added:** 1 (JellyfinReauthTests.fs: 401-then-200 re-auth, 401-twice no-loop, missing/failed credentials)
+**ADRs written:** 0011-jellyfin-reauth-on-401.md
+
+---
+
+## 2026-05-27 -- Batch started: [integration-002, design-system-002]
+
+**Type:** Work / Batch start
+**Tasks:** integration-002 - Re-authenticate Jellyfin and retry once on a 401/403 during sync, design-system-002 - Point design-check skill's "Source of Truth" at styleguide.md
+**Parallel:** yes (2 workers)
+
+---
+
 ## 2026-05-27 -- Model / Promoted: design-system-002, design-system-003, integration-002
 
 **Type:** Model / Promote

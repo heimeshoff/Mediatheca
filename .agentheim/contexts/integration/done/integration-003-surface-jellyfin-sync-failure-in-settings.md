@@ -6,7 +6,7 @@ type: feature
 context: integration
 created: 2026-05-27
 completed: 2026-05-27
-commit:
+commit: 5b9921d
 depends_on: [design-system-001]
 blocks: []
 tags: [jellyfin, sync, settings, frontend]
