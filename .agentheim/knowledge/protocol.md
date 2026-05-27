@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-05-27 -- Model / Promoted: design-system-002, design-system-003, integration-002
+
+**Type:** Model / Promote
+**BC:** design-system, integration
+**From → To:** backlog → todo (all three)
+**Summary:** Promoted the three remaining backlog items as-is — each had concrete acceptance criteria, clear scope, and satisfied dependencies. design-system-002 (point design-check at styleguide) and design-system-003 (ActionMenu specimen on StyleGuide page) both `depends_on: [design-system-001]`, which is signed off. integration-002 (Jellyfin re-auth on 401/403) has no deps; noted as preventive robustness hardening — auth currently works, so it is the lowest-priority of the queued tasks, with one small implementation choice (how to thread re-auth through `fetchJsonWithAuth`, which currently uses `EnsureSuccessStatusCode`) left to the worker.
+
+---
+
 ## 2026-05-27 -- Model / Refined + Promoted: integration-003 - Surface the persisted Jellyfin sync failure in the Settings UI
 
 **Type:** Model / Refine + Promote

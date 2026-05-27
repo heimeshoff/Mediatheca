@@ -10,15 +10,16 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 2
-- **Todo:** 0
+- **Backlog:** 0
+- **Todo:** 2
 - **Doing:** 0
 - **Done:** 1
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-<!-- no tasks in todo -->
+- **design-system-002** -- Point design-check skill's "Source of Truth" at styleguide.md -- `todo/design-system-002-pointer-design-check-styleguide.md`
+- **design-system-003** -- Add ActionMenu specimen to the live StyleGuide page -- `todo/design-system-003-actionmenu-styleguide-specimen.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -33,8 +34,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **design-system-002** -- Point design-check skill's "Source of Truth" at styleguide.md -- `backlog/design-system-002-pointer-design-check-styleguide.md`
-- **design-system-003** -- Add ActionMenu specimen to the live StyleGuide page -- `backlog/design-system-003-actionmenu-styleguide-specimen.md`
+<!-- no tasks in backlog -->
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC

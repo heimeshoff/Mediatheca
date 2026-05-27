@@ -1,7 +1,7 @@
 ---
 id: design-system-002
 title: Point design-check skill's "Source of Truth" at styleguide.md
-status: backlog
+status: todo
 type: chore
 context: design-system
 created: 2026-05-27

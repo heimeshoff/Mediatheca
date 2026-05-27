@@ -1,7 +1,7 @@
 ---
 id: integration-002
 title: Re-authenticate Jellyfin and retry once on a 401/403 during sync
-status: backlog
+status: todo
 type: bug
 context: integration
 created: 2026-05-27
