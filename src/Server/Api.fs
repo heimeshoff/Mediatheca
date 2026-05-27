@@ -734,6 +734,13 @@ module Api =
                 if System.String.IsNullOrWhiteSpace(config.AccessToken) || System.String.IsNullOrWhiteSpace(config.UserId) then
                     return Error "Jellyfin not configured. Please test the connection first."
                 else
+                    // Persist a fresh token/user after a self-healing re-auth (integration-002),
+                    // and refresh the in-flight config so subsequent fetches in this run use it.
+                    let mutable config = config
+                    let persistAuth (auth: Jellyfin.JellyfinAuthResult) =
+                        SettingsStore.setSetting conn "jellyfin_user_id" auth.UserId
+                        SettingsStore.setSetting conn "jellyfin_access_token" auth.AccessToken
+                        config <- { config with UserId = auth.UserId; AccessToken = auth.AccessToken }
                     let movieProjections = projectionHandlers
                     let mutable moviesAdded = 0
                     let mutable episodesAdded = 0
@@ -743,7 +750,7 @@ module Api =
                     let mutable errors: string list = []
 
                     // --- Movie watch sync (REQ-304) ---
-                    let! moviesResult = Jellyfin.getMovies httpClient config.ServerUrl config.UserId config.AccessToken
+                    let! moviesResult = Jellyfin.getMoviesWithReauth httpClient config persistAuth
                     match moviesResult with
                     | Error e -> errors <- errors @ [sprintf "Failed to fetch Jellyfin movies: %s" e]
                     | Ok jellyfinMovies ->
@@ -851,7 +858,7 @@ module Api =
                             | _ -> itemsSkipped <- itemsSkipped + 1
 
                     // --- Series episode watch sync (REQ-305) ---
-                    let! seriesResult = Jellyfin.getSeries httpClient config.ServerUrl config.UserId config.AccessToken
+                    let! seriesResult = Jellyfin.getSeriesWithReauth httpClient config persistAuth
                     match seriesResult with
                     | Error e -> errors <- errors @ [sprintf "Failed to fetch Jellyfin series: %s" e]
                     | Ok jellyfinSeries ->
@@ -896,7 +903,7 @@ module Api =
                                     // Persist series Jellyfin ID
                                     JellyfinStore.setSeriesJellyfinId conn slug seriesItem.Id
                                     // Fetch and persist episode Jellyfin IDs
-                                    let! episodesForIds = Jellyfin.getEpisodes httpClient config.ServerUrl config.UserId config.AccessToken seriesItem.Id
+                                    let! episodesForIds = Jellyfin.getEpisodesWithReauth httpClient config persistAuth seriesItem.Id
                                     match episodesForIds with
                                     | Ok eps ->
                                         for ep in eps do
@@ -924,7 +931,7 @@ module Api =
                             | Some tid ->
                                 match Map.tryFind tid seriesByTmdbId with
                                 | Some (slug, _name) ->
-                                    let! episodesResult = Jellyfin.getEpisodes httpClient config.ServerUrl config.UserId config.AccessToken seriesItem.Id
+                                    let! episodesResult = Jellyfin.getEpisodesWithReauth httpClient config persistAuth seriesItem.Id
                                     match episodesResult with
                                     | Error e -> errors <- errors @ [sprintf "Series '%s' episodes: %s" slug e]
                                     | Ok episodes -> seriesBatch <- seriesBatch @ [ (slug, episodes) ]
@@ -3802,9 +3809,16 @@ module Api =
                     if System.String.IsNullOrWhiteSpace(config.AccessToken) || System.String.IsNullOrWhiteSpace(config.UserId) then
                         return Error "Jellyfin not configured. Please test the connection first."
                     else
+                        // Persist a fresh token/user after a self-healing re-auth (integration-002),
+                        // and refresh the in-flight config so subsequent fetches use it.
+                        let mutable config = config
+                        let persistAuth (auth: Jellyfin.JellyfinAuthResult) =
+                            SettingsStore.setSetting conn "jellyfin_user_id" auth.UserId
+                            SettingsStore.setSetting conn "jellyfin_access_token" auth.AccessToken
+                            config <- { config with UserId = auth.UserId; AccessToken = auth.AccessToken }
                         // Fetch movies and series from Jellyfin
-                        let! moviesResult = Jellyfin.getMovies httpClient config.ServerUrl config.UserId config.AccessToken
-                        let! seriesResult = Jellyfin.getSeries httpClient config.ServerUrl config.UserId config.AccessToken
+                        let! moviesResult = Jellyfin.getMoviesWithReauth httpClient config persistAuth
+                        let! seriesResult = Jellyfin.getSeriesWithReauth httpClient config persistAuth
                         match moviesResult, seriesResult with
                         | Error e, _ -> return Error (sprintf "Failed to fetch movies: %s" e)
                         | _, Error e -> return Error (sprintf "Failed to fetch series: %s" e)
@@ -3913,7 +3927,7 @@ module Api =
                                 JellyfinStore.setSeriesJellyfinId conn m.MediathecaSlug m.JellyfinItem.JellyfinId
 
                                 // Fetch episodes from Jellyfin for this series
-                                let! episodesResult = Jellyfin.getEpisodes httpClient config.ServerUrl config.UserId config.AccessToken m.JellyfinItem.JellyfinId
+                                let! episodesResult = Jellyfin.getEpisodesWithReauth httpClient config persistAuth m.JellyfinItem.JellyfinId
                                 match episodesResult with
                                 | Ok episodes ->
                                     for ep in episodes do

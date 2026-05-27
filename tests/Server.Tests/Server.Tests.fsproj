@@ -18,6 +18,7 @@
     <Compile Include="GamesTests.fs" />
     <Compile Include="PlaytimeTrackerTests.fs" />
     <Compile Include="JellyfinImportTests.fs" />
+    <Compile Include="JellyfinReauthTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

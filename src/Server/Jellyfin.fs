@@ -112,14 +112,73 @@ module Jellyfin =
     let private authHeaderNoToken =
         "MediaBrowser Client=\"Mediatheca\", Device=\"Server\", DeviceId=\"mediatheca-server\", Version=\"1.0\""
 
-    let private fetchJsonWithAuth (httpClient: HttpClient) (url: string) (token: string) : Async<string> =
+    /// A failed Jellyfin fetch, distinguishing a rejected token (401/403 — the
+    /// re-auth trigger, integration-002) from any other failure. Keeping these
+    /// apart lets the orchestration decide whether to re-authenticate or to
+    /// surface the error unchanged.
+    type FetchError =
+        | Unauthorized
+        | OtherFailure of string
+
+    /// GET the URL with the given token. A 401/403 returns `Error Unauthorized`
+    /// instead of throwing (the previous `EnsureSuccessStatusCode` threw on every
+    /// non-success), so the caller can decide to re-authenticate and retry.
+    let private fetchJsonWithAuth (httpClient: HttpClient) (url: string) (token: string) : Async<Result<string, FetchError>> =
         async {
-            use request = new HttpRequestMessage(HttpMethod.Get, url)
-            request.Headers.Add("Authorization", authHeader token)
-            let! response = httpClient.SendAsync(request) |> Async.AwaitTask
-            response.EnsureSuccessStatusCode() |> ignore
-            let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
-            return body
+            try
+                use request = new HttpRequestMessage(HttpMethod.Get, url)
+                request.Headers.Add("Authorization", authHeader token)
+                let! response = httpClient.SendAsync(request) |> Async.AwaitTask
+                let status = int response.StatusCode
+                if status = 401 || status = 403 then
+                    return Error Unauthorized
+                elif not response.IsSuccessStatusCode then
+                    return Error (OtherFailure (sprintf "HTTP %d" status))
+                else
+                    let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+                    return Ok body
+            with ex ->
+                return Error (OtherFailure ex.Message)
+        }
+
+    /// Run a token-consuming fetch with an exactly-once re-auth-and-retry policy
+    /// (integration-002, ADR 0010 follow-up).
+    ///
+    /// - Runs `fetch` with `token`.
+    /// - On `Error Unauthorized` (a rejected token), calls `reauthenticate` once.
+    ///   On success it persists the fresh token via `persist` and retries `fetch`
+    ///   exactly once with the new token; a *second* `Unauthorized` is reported as
+    ///   a failure, never looped.
+    /// - If `reauthenticate` fails (rejected credentials, or none stored — the
+    ///   caller signals that via its `Error` message), the original request is NOT
+    ///   retried and a clear "re-authentication" failure is returned.
+    /// - Any non-auth fetch error is passed straight through.
+    ///
+    /// Pure orchestration over injected effects, so it is unit-testable with plain
+    /// lambdas (same pattern as JellyfinImport.syncSeriesWatchHistory).
+    let withReauthRetry
+        (token: string)
+        (fetch: string -> Async<Result<'a, FetchError>>)
+        (reauthenticate: unit -> Async<Result<JellyfinAuthResult, string>>)
+        (persist: JellyfinAuthResult -> unit)
+        : Async<Result<'a, string>> =
+        async {
+            let! first = fetch token
+            match first with
+            | Ok value -> return Ok value
+            | Error (OtherFailure msg) -> return Error msg
+            | Error Unauthorized ->
+                let! reauth = reauthenticate ()
+                match reauth with
+                | Error e -> return Error (sprintf "Jellyfin re-authentication failed: %s" e)
+                | Ok auth ->
+                    persist auth
+                    let! retry = fetch auth.AccessToken
+                    match retry with
+                    | Ok value -> return Ok value
+                    | Error (OtherFailure msg) -> return Error msg
+                    | Error Unauthorized ->
+                        return Error "Jellyfin rejected the token again after re-authentication; aborting (no retry loop)"
         }
 
     // Public API functions
@@ -144,16 +203,36 @@ module Jellyfin =
                 return Error (sprintf "Failed to connect to Jellyfin: %s" ex.Message)
         }
 
+    /// Low-level fetch that preserves the `FetchError` (so a 401/403 stays
+    /// distinguishable for re-auth). A decode failure is an `OtherFailure`.
+    let private fetchLibraryItems (httpClient: HttpClient) (serverUrl: string) (userId: string) (token: string) (itemTypes: string) : Async<Result<JellyfinBaseItem list, FetchError>> =
+        async {
+            let url = sprintf "%s/Users/%s/Items?IncludeItemTypes=%s&Recursive=true&Fields=ProviderIds,Overview,Genres,PremiereDate&enableUserData=true&Limit=10000" (serverUrl.TrimEnd('/')) userId itemTypes
+            let! json = fetchJsonWithAuth httpClient url token
+            match json with
+            | Error e -> return Error e
+            | Ok body ->
+                match Decode.fromString decodeItemsResponse body with
+                | Ok response -> return Ok response.Items
+                | Error e -> return Error (OtherFailure (sprintf "Failed to parse library response: %s" e))
+        }
+
+    let private fetchEpisodeItems (httpClient: HttpClient) (serverUrl: string) (userId: string) (token: string) (seriesId: string) : Async<Result<JellyfinBaseItem list, FetchError>> =
+        async {
+            let url = sprintf "%s/Shows/%s/Episodes?userId=%s&Fields=ProviderIds&enableUserData=true&Limit=10000" (serverUrl.TrimEnd('/')) seriesId userId
+            let! json = fetchJsonWithAuth httpClient url token
+            match json with
+            | Error e -> return Error e
+            | Ok body ->
+                match Decode.fromString decodeItemsResponse body with
+                | Ok response -> return Ok response.Items
+                | Error e -> return Error (OtherFailure (sprintf "Failed to parse episodes response: %s" e))
+        }
+
     let getLibraryItems (httpClient: HttpClient) (serverUrl: string) (userId: string) (token: string) (itemTypes: string) : Async<Result<JellyfinBaseItem list, string>> =
         async {
-            try
-                let url = sprintf "%s/Users/%s/Items?IncludeItemTypes=%s&Recursive=true&Fields=ProviderIds,Overview,Genres,PremiereDate&enableUserData=true&Limit=10000" (serverUrl.TrimEnd('/')) userId itemTypes
-                let! json = fetchJsonWithAuth httpClient url token
-                match Decode.fromString decodeItemsResponse json with
-                | Ok response -> return Ok response.Items
-                | Error e -> return Error (sprintf "Failed to parse library response: %s" e)
-            with ex ->
-                return Error (sprintf "Failed to fetch library: %s" ex.Message)
+            let! result = fetchLibraryItems httpClient serverUrl userId token itemTypes
+            return result |> Result.mapError (function Unauthorized -> "Unauthorized (HTTP 401/403)" | OtherFailure m -> m)
         }
 
     let getMovies (httpClient: HttpClient) (serverUrl: string) (userId: string) (token: string) : Async<Result<JellyfinBaseItem list, string>> =
@@ -164,12 +243,42 @@ module Jellyfin =
 
     let getEpisodes (httpClient: HttpClient) (serverUrl: string) (userId: string) (token: string) (seriesId: string) : Async<Result<JellyfinBaseItem list, string>> =
         async {
-            try
-                let url = sprintf "%s/Shows/%s/Episodes?userId=%s&Fields=ProviderIds&enableUserData=true&Limit=10000" (serverUrl.TrimEnd('/')) seriesId userId
-                let! json = fetchJsonWithAuth httpClient url token
-                match Decode.fromString decodeItemsResponse json with
-                | Ok response -> return Ok response.Items
-                | Error e -> return Error (sprintf "Failed to parse episodes response: %s" e)
-            with ex ->
-                return Error (sprintf "Failed to fetch episodes: %s" ex.Message)
+            let! result = fetchEpisodeItems httpClient serverUrl userId token seriesId
+            return result |> Result.mapError (function Unauthorized -> "Unauthorized (HTTP 401/403)" | OtherFailure m -> m)
         }
+
+    /// Build the re-auth thunk used by `withReauthRetry`. Returns a clear
+    /// "re-authentication required" error when no credentials are stored, so a
+    /// rejected token surfaces a meaningful `SyncFailed` rather than an opaque
+    /// HTTP error (integration-002 acceptance criterion 3).
+    let private reauthThunk (httpClient: HttpClient) (config: JellyfinConfig) : unit -> Async<Result<JellyfinAuthResult, string>> =
+        fun () -> async {
+            if System.String.IsNullOrWhiteSpace(config.Username) || System.String.IsNullOrWhiteSpace(config.Password) then
+                return Error "re-authentication required: Jellyfin username/password not configured"
+            else
+                return! authenticate httpClient config.ServerUrl config.Username config.Password
+        }
+
+    /// Self-healing library fetch: on a 401/403 it re-authenticates once with the
+    /// stored credentials, persists the fresh token via `persistAuth`, and retries
+    /// once (integration-002). `config.AccessToken` / `config.UserId` are the
+    /// starting token/user.
+    let getLibraryItemsWithReauth (httpClient: HttpClient) (config: JellyfinConfig) (persistAuth: JellyfinAuthResult -> unit) (itemTypes: string) : Async<Result<JellyfinBaseItem list, string>> =
+        withReauthRetry
+            config.AccessToken
+            (fun token -> fetchLibraryItems httpClient config.ServerUrl config.UserId token itemTypes)
+            (reauthThunk httpClient config)
+            persistAuth
+
+    let getMoviesWithReauth (httpClient: HttpClient) (config: JellyfinConfig) (persistAuth: JellyfinAuthResult -> unit) : Async<Result<JellyfinBaseItem list, string>> =
+        getLibraryItemsWithReauth httpClient config persistAuth "Movie"
+
+    let getSeriesWithReauth (httpClient: HttpClient) (config: JellyfinConfig) (persistAuth: JellyfinAuthResult -> unit) : Async<Result<JellyfinBaseItem list, string>> =
+        getLibraryItemsWithReauth httpClient config persistAuth "Series"
+
+    let getEpisodesWithReauth (httpClient: HttpClient) (config: JellyfinConfig) (persistAuth: JellyfinAuthResult -> unit) (seriesId: string) : Async<Result<JellyfinBaseItem list, string>> =
+        withReauthRetry
+            config.AccessToken
+            (fun token -> fetchEpisodeItems httpClient config.ServerUrl config.UserId token seriesId)
+            (reauthThunk httpClient config)
+            persistAuth
