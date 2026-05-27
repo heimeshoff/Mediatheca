@@ -1187,6 +1187,99 @@ let private componentsSection () =
                     ]
                 ]
             ]
+
+            // ── ActionMenu ──
+            subheading "ActionMenu"
+
+            Html.p [
+                prop.className DesignSystem.secondaryText
+                prop.text "Trigger-and-dropdown action menu (kebab menus, hero action buttons). The dropdown is a glassmorphic overlay (rating-dropdown, per the Glassmorphism section). The dropdown renders as a SIBLING of the trigger button -- never a child -- so its backdrop-filter blurs the page behind it rather than the trigger. Click a trigger below to open its menu."
+
+            ]
+
+            Html.div [
+                prop.className "grid grid-cols-1 md:grid-cols-3 gap-6 mt-4 max-w-4xl"
+                prop.children [
+                    // view -- kebab menu
+                    Html.div [
+                        prop.className "flex flex-col gap-3"
+                        prop.children [
+                            Html.div [
+                                prop.className "flex items-center justify-center p-6 rounded-lg bg-base-200/30 border border-base-content/5 min-h-[120px]"
+                                prop.children [
+                                    ActionMenu.view [
+                                        { Label = "Edit"; Icon = None; OnClick = (fun () -> ()); IsDestructive = false }
+                                        { Label = "Share"; Icon = None; OnClick = (fun () -> ()); IsDestructive = false }
+                                        { Label = "Delete"; Icon = Some Icons.trash; OnClick = (fun () -> ()); IsDestructive = true }
+                                    ]
+                                ]
+                            ]
+                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "ActionMenu.view items" ]
+                            Html.span [ prop.className DesignSystem.faintText; prop.text "Kebab menu -- small ghost trigger, plain item list" ]
+                        ]
+                    ]
+
+                    // heroView -- glass trigger
+                    Html.div [
+                        prop.className "flex flex-col gap-3"
+                        prop.children [
+                            Html.div [
+                                prop.className "flex items-center justify-center p-6 rounded-lg bg-base-200/30 border border-base-content/5 min-h-[120px]"
+                                prop.children [
+                                    ActionMenu.heroView [
+                                        { Label = "Change backdrop"; Icon = None; OnClick = (fun () -> ()); IsDestructive = false }
+                                        { Label = "Edit details"; Icon = None; OnClick = (fun () -> ()); IsDestructive = false }
+                                        { Label = "Remove from library"; Icon = Some Icons.trash; OnClick = (fun () -> ()); IsDestructive = true }
+                                    ]
+                                ]
+                            ]
+                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "ActionMenu.heroView items" ]
+                            Html.span [ prop.className DesignSystem.faintText; prop.text "Hero-positioned -- larger glass trigger for detail headers" ]
+                        ]
+                    ]
+
+                    // heroViewSections -- labelled sections
+                    Html.div [
+                        prop.className "flex flex-col gap-3"
+                        prop.children [
+                            Html.div [
+                                prop.className "flex items-center justify-center p-6 rounded-lg bg-base-200/30 border border-base-content/5 min-h-[120px]"
+                                prop.children [
+                                    ActionMenu.heroViewSections [
+                                        { Label = Some "Manage"
+                                          Items = [
+                                            { Label = "Edit details"; Icon = None; OnClick = (fun () -> ()); IsDestructive = false }
+                                            { Label = "Change backdrop"; Icon = None; OnClick = (fun () -> ()); IsDestructive = false } ] }
+                                        { Label = Some "Danger zone"
+                                          Items = [
+                                            { Label = "Remove from library"; Icon = Some Icons.trash; OnClick = (fun () -> ()); IsDestructive = true } ] }
+                                    ]
+                                ]
+                            ]
+                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "ActionMenu.heroViewSections sections" ]
+                            Html.span [ prop.className DesignSystem.faintText; prop.text "Labelled, divider-separated sections" ]
+                        ]
+                    ]
+                ]
+            ]
+
+            Html.div [
+                prop.className "mt-3 flex flex-col gap-2 max-w-3xl"
+                prop.children [
+                    Html.code [
+                        prop.className "text-xs font-mono text-base-content/60 bg-base-300/30 p-2 rounded block"
+                        prop.text "ActionMenuItem = { Label: string; Icon: (unit -> ReactElement) option; OnClick: unit -> unit; IsDestructive: bool }"
+                    ]
+                    Html.code [
+                        prop.className "text-xs font-mono text-base-content/60 bg-base-300/30 p-2 rounded block"
+                        prop.text "ActionMenuSection = { Label: string option; Items: ActionMenuItem list }"
+                    ]
+                    Html.p [
+                        prop.className DesignSystem.faintText
+                        prop.text "Source: Components/ActionMenu.fs (view :60, heroView :147, heroViewSections :208). Destructive items render in error color; click-outside and the backdrop overlay close the menu."
+                    ]
+                ]
+            ]
         ]
     ]
 

@@ -160,7 +160,7 @@ Covered in § 3. Live demos: `Views.fs:592-737`.
 **Use:** displaying friend references. Three variants. **Component:** `FriendPill.view friend` (badge, `Components/FriendPill.fs:8`), `viewWithRemove friend onRemove` (with X, `:25`), `viewInline friend` (text link, `:49`). **Live:** `Views.fs:1004-1061`.
 
 ### ActionMenu
-**Use:** contextual action menus / dropdowns (kebab menus, hero action buttons). Glassmorphic per § 3. **Component:** `ActionMenu.view items` (`Components/ActionMenu.fs:60`), `heroView` (`:147`), `heroViewSections` (`:208`). Not yet demoed on the live page — *finding F-2, see § 7.*
+**Use:** contextual action menus / dropdowns (kebab menus, hero action buttons). Glassmorphic per § 3; the dropdown renders as a sibling of the trigger (never a child) to avoid the nested `backdrop-filter` gotcha. **Component:** `ActionMenu.view items` (`Components/ActionMenu.fs:60`), `heroView` (`:147`), `heroViewSections` (`:208`). **Live:** `Views.fs:1191-1283`.
 
 ### Icons
 **Use:** Heroicons-based SVGs. Standard `w-6 h-6`; small variants `w-4 h-4` (`recommendedBy`, `play`); brand `Icons.mediatheca` `w-8 h-8`. **Component:** `Components/Icons.fs`. **Live (catalog of available icons):** `Views.fs:1063-1139`.
