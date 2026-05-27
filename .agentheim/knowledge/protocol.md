@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-05-27 -- Live verification: integration-001 Jellyfin sync confirmed working
+
+**Type:** Work / Live verification
+**Task:** integration-001 - Jellyfin sync silently stopped writing episode watch history
+**Result:** User ran a live sync against the Jellyfin server and confirmed it worked — the previously-missing episode watch history now flows into Mediatheca. Criteria 2 & 4 (live end-to-end verification) satisfied. integration-001 is fully closed; all acceptance criteria met.
+
+---
+
 ## 2026-05-27 -- Sign-off: design-system-001 styleguide approved
 
 **Type:** Work / Human gate
