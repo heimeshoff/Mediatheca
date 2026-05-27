@@ -39,14 +39,14 @@ When the styleguide changes (new token, new pattern, retired pattern), the chang
 
 ## Existing assets (mature project)
 
-The design system already exists in the running app:
-- `index.css` — token definitions, dim theme, `.glass-card`, `.rating-dropdown`, etc.
-- `CLAUDE.md` § "Conventions" and "Gotchas" — the glassmorphism rules and backdrop-filter nesting trap.
-- `src/Client/DesignSystem.fs` (if present) — shared Feliz components.
-- `src/Client/Pages/StyleGuide` — live reference.
-- The `design-check` skill — audits code against the system.
+The **canonical, reviewable artifact** is [`styleguide.md`](styleguide.md) (produced by `design-system-001`). It consolidates the sources below and is the source of truth for the frontend task gate. Read it first.
 
-The first task in this BC's backlog (formalize-styleguide) consolidates these into a single reviewable `styleguide.md` so the gate has a canonical artifact.
+Underlying sources it formalizes:
+- `src/Client/index.css` — token definitions, dim theme, `.glass-card`, `.rating-dropdown`, etc. (authoritative for *values*).
+- `src/Client/DesignSystem.fs` — typed Feliz/Tailwind class compositions used by components.
+- `src/Client/Pages/StyleGuide` — the live, in-app reference page.
+- `CLAUDE.md` § "Conventions" and "Gotchas" — glassmorphism rule + backdrop-filter trap (reproduced verbatim in `styleguide.md`; `CLAUDE.md` now points at the styleguide as canonical — ADR 0009).
+- The `design-check` skill (`.claude/skills/design-check/`) — audits code against the system.
 
 ## Open questions
 

@@ -1,11 +1,11 @@
 ---
 id: design-system-001
 title: Formalize the existing styleguide as a reviewable document
-status: todo
+status: done
 type: feature
 context: design-system
 created: 2026-05-12
-completed:
+completed: 2026-05-27
 commit:
 depends_on: []
 blocks: []
@@ -44,3 +44,22 @@ The document references existing code; it does not duplicate it. Where a pattern
 - The `design-check` skill already encodes parts of these rules — cross-check that its checks align with the formalized doc. Any drift between them is a finding for this task.
 - Do not attempt to *change* the design system in this task. Just formalize what exists. Refactors / additions get their own backlog items.
 - After this task is done, the `model` skill captures any new frontend task with `depends_on: [design-system-001]` automatically (per the gate rule documented in each frontend-bearing BC's README).
+
+## Outcome
+
+Produced `.agentheim/contexts/design-system/styleguide.md` — the canonical, reviewable design-system artifact — with all six required sections: tokens (from `index.css`), typography, glassmorphism rules (spec + backdrop-filter gotcha reproduced verbatim from `CLAUDE.md`), component patterns (every recurring pattern on the live StyleGuide page, each with file+line references into `DesignSystem.fs` / `Components/` / `StyleGuide/Views.fs`), theme, and the review/gate process.
+
+Criterion-3 source-of-truth question resolved by **reproducing verbatim AND pointing**: the glassmorphism rule and gotcha stay in `CLAUDE.md` (critical onboarding) with a new pointer line to the styleguide as canonical. Recorded in ADR 0009 (`0009-styleguide-canonical-artifact.md`).
+
+design-check cross-check (criterion note) done: rules align across all 9 categories. Two drift findings raised as backlog items — F-1 `design-system-002` (point design-check's "Source of Truth" at styleguide.md) and F-2 `design-system-003` (ActionMenu has no live-page specimen).
+
+Updated the design-system README "Existing assets" section to make `styleguide.md` the canonical artifact.
+
+**Criterion 5 (human sign-off) is pending** — only the user can sign off. The document is ready for review; the gate does not open for promoting frontend tasks to `todo/` until sign-off is recorded in the closing protocol entry.
+
+Key files:
+- `.agentheim/contexts/design-system/styleguide.md` (new)
+- `.agentheim/knowledge/decisions/0009-styleguide-canonical-artifact.md` (new)
+- `CLAUDE.md` (pointer added)
+- `.agentheim/contexts/design-system/README.md` (existing-assets section)
+- `.agentheim/contexts/design-system/backlog/design-system-002-*.md`, `design-system-003-*.md` (new)
