@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-05-27 -- Model / Refined + Promoted: integration-003 - Surface the persisted Jellyfin sync failure in the Settings UI
+
+**Type:** Model / Refine + Promote
+**BC:** integration
+**From → To:** backlog → todo
+**Summary:** Grounded the task in the actual code. Confirmed the server side (getJellyfinSyncStatus + persisted result) already ships from integration-001 and the status already reaches the client. Found the real gap: the `Jellyfin_sync_status_loaded` handler (Settings/State.fs:469-476) discards the `SyncFailed` error message, keeping only the timestamp — so the task needs a model field to retain the full `JellyfinSyncStatus` plus a failure panel in `jellyfinDetail` (Settings/Views.fs:994), not a pure render. Added concrete file+line references, the DU shape (`SyncFailed of error: string * lastSyncTime: string option`), the glassmorphism gate criterion, and a build-clean criterion. Frontend gate dependency (design-system-001) already satisfied — signed off today — so promoted to todo.
+
+---
+
 ## 2026-05-27 -- Live verification: integration-001 Jellyfin sync confirmed working
 
 **Type:** Work / Live verification

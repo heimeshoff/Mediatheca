@@ -10,15 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 2
-- **Todo:** 0
+- **Backlog:** 1
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 1
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-<!-- no tasks in todo -->
+- **integration-003** -- Surface the persisted Jellyfin sync failure in the Settings UI -- `feature` -- `todo/integration-003-surface-jellyfin-sync-failure-in-settings.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -34,7 +34,6 @@ research touching this BC, and concept synthesis pages.
 ### Backlog
 <!-- backlog-list:start -->
 - **integration-002** -- Re-authenticate Jellyfin and retry once on a 401/403 during sync -- `bug` -- `backlog/integration-002-jellyfin-reauth-on-401.md`
-- **integration-003** -- Surface the persisted Jellyfin sync failure in the Settings UI -- `feature` -- `backlog/integration-003-surface-jellyfin-sync-failure-in-settings.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
