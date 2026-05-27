@@ -12,7 +12,7 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 0
+- **Doing:** 1
 - **Done:** 0
 <!-- task-counts:end -->
 
@@ -23,7 +23,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-<!-- no tasks in doing -->
+- **integration-001** -- Jellyfin sync silently stopped writing episode watch history -- `bug` -- `doing/integration-001-jellyfin-sync-silently-stopped.md`
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)

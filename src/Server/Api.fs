@@ -908,7 +908,14 @@ module Api =
                                 | None -> ()
                             | None -> ()
 
-                        // Phase 2: Sync watch history
+                        // Phase 2: Sync watch history.
+                        // Fetch episodes for every matched series into a batch first
+                        // (isolating fetch errors per series), then delegate the write
+                        // loop to JellyfinImport.syncSeriesWatchHistory, which isolates
+                        // a fault on one series/episode so it cannot abort the rest of
+                        // the run (integration-001). The previous structure let a single
+                        // SqliteException escape executeCommand and abort everything.
+                        let mutable seriesBatch: (string * Jellyfin.JellyfinBaseItem list) list = []
                         for seriesItem in jellyfinSeries do
                             let tmdbId =
                                 seriesItem.ProviderIds.Tmdb
@@ -917,47 +924,38 @@ module Api =
                             | Some tid ->
                                 match Map.tryFind tid seriesByTmdbId with
                                 | Some (slug, _name) ->
-                                    // Fetch episodes from Jellyfin for this series
                                     let! episodesResult = Jellyfin.getEpisodes httpClient config.ServerUrl config.UserId config.AccessToken seriesItem.Id
                                     match episodesResult with
                                     | Error e -> errors <- errors @ [sprintf "Series '%s' episodes: %s" slug e]
-                                    | Ok episodes ->
-                                        // Get the actual default rewatch session (may have been changed by user)
-                                        let defaultRewatchId = SeriesProjection.getDefaultRewatchId conn slug
-                                        let alreadyWatched = SeriesProjection.getWatchedEpisodesForSession conn slug defaultRewatchId
-                                        for ep in episodes do
-                                            let epPlayed = ep.UserData |> Option.map (fun ud -> ud.Played) |> Option.defaultValue false
-                                            match epPlayed, ep.ParentIndexNumber, ep.IndexNumber with
-                                            | true, Some seasonNum, Some epNum ->
-                                                if alreadyWatched |> Set.contains (seasonNum, epNum) then
-                                                    itemsSkipped <- itemsSkipped + 1
-                                                else
-                                                    let watchDate =
-                                                        ep.UserData
-                                                        |> Option.bind (fun ud -> ud.LastPlayedDate)
-                                                        |> Option.map (fun d -> d.Substring(0, min 10 d.Length))
-                                                        |> Option.defaultValue (System.DateTime.UtcNow.ToString("yyyy-MM-dd"))
-                                                    let sid = Series.streamId slug
-                                                    let result =
-                                                        executeCommand
-                                                            conn sid
-                                                            Series.Serialization.fromStoredEvent
-                                                            Series.reconstitute
-                                                            Series.decide
-                                                            Series.Serialization.toEventData
-                                                            (Series.Mark_episode_watched {
-                                                                RewatchId = defaultRewatchId
-                                                                SeasonNumber = seasonNum
-                                                                EpisodeNumber = epNum
-                                                                Date = watchDate
-                                                            })
-                                                            projectionHandlers
-                                                    match result with
-                                                    | Ok () -> episodesAdded <- episodesAdded + 1
-                                                    | Error e -> errors <- errors @ [sprintf "Series '%s' S%02dE%02d: %s" slug seasonNum epNum e]
-                                            | _ -> itemsSkipped <- itemsSkipped + 1
+                                    | Ok episodes -> seriesBatch <- seriesBatch @ [ (slug, episodes) ]
                                 | None -> ()
                             | None -> ()
+
+                        let writeEpisode (slug: string) (defaultRewatchId: string) (seasonNum: int) (epNum: int) (watchDate: string) : Result<unit, string> =
+                            let sid = Series.streamId slug
+                            executeCommand
+                                conn sid
+                                Series.Serialization.fromStoredEvent
+                                Series.reconstitute
+                                Series.decide
+                                Series.Serialization.toEventData
+                                (Series.Mark_episode_watched {
+                                    RewatchId = defaultRewatchId
+                                    SeasonNumber = seasonNum
+                                    EpisodeNumber = epNum
+                                    Date = watchDate
+                                })
+                                projectionHandlers
+
+                        let watchSync =
+                            JellyfinImport.syncSeriesWatchHistory
+                                seriesBatch
+                                (SeriesProjection.getDefaultRewatchId conn)
+                                (SeriesProjection.getWatchedEpisodesForSession conn)
+                                writeEpisode
+                        episodesAdded <- episodesAdded + watchSync.EpisodesAdded
+                        itemsSkipped <- itemsSkipped + watchSync.ItemsSkipped
+                        errors <- errors @ watchSync.Errors
 
                     let importResult: JellyfinImportResult = {
                         MoviesAdded = moviesAdded
@@ -967,7 +965,19 @@ module Api =
                         ItemsSkipped = itemsSkipped
                         Errors = errors
                     }
-                    return Ok importResult
+                    // Surface partial failure (integration-001): if any item errored
+                    // the run is NOT a clean success — report it as Error so the sync
+                    // status becomes SyncFailed instead of a silent SyncCompleted. The
+                    // counts are folded into the message so the persisted failure still
+                    // shows what *did* get written before/around the failures.
+                    if List.isEmpty errors then
+                        return Ok importResult
+                    else
+                        let summary =
+                            sprintf "Jellyfin sync completed with %d error(s) (%d movies, %d episodes added; %d skipped):\n%s"
+                                (List.length errors) moviesAdded episodesAdded itemsSkipped
+                                (errors |> String.concat "\n")
+                        return Error summary
             with ex ->
                 return Error $"Jellyfin import failed: {ex.Message}"
         }

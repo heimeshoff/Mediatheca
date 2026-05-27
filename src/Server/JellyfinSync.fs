@@ -3,6 +3,7 @@ namespace Mediatheca.Server
 open System
 open System.Net.Http
 open Microsoft.Data.Sqlite
+open Thoth.Json.Net
 open Mediatheca.Shared
 
 module JellyfinSync =
@@ -15,13 +16,58 @@ module JellyfinSync =
 
     let private cooldownMinutes = 5.0
 
-    /// Initialize last sync time from persisted setting (call at startup)
+    // Persisted-result key. The last sync RESULT (counts + error list, or the
+    // failure message) is persisted alongside the timestamp so that a silent
+    // breakage is no longer invisible across restarts (integration-001).
+    let private lastResultKey = "jellyfin_last_sync_result"
+
+    // Result is persisted as JSON: {"ok": <result>} or {"error": "<msg>"}.
+    let private encodeResult (result: Result<JellyfinImportResult, string>) : string =
+        match result with
+        | Ok r ->
+            Encode.object [
+                "ok", Encode.object [
+                    "moviesAdded", Encode.int r.MoviesAdded
+                    "episodesAdded", Encode.int r.EpisodesAdded
+                    "moviesAutoAdded", Encode.int r.MoviesAutoAdded
+                    "seriesAutoAdded", Encode.int r.SeriesAutoAdded
+                    "itemsSkipped", Encode.int r.ItemsSkipped
+                    "errors", Encode.list (r.Errors |> List.map Encode.string)
+                ]
+            ]
+            |> Encode.toString 0
+        | Error e ->
+            Encode.object [ "error", Encode.string e ] |> Encode.toString 0
+
+    let private decodeImportResult: Decoder<JellyfinImportResult> =
+        Decode.object (fun get -> {
+            MoviesAdded = get.Optional.Field "moviesAdded" Decode.int |> Option.defaultValue 0
+            EpisodesAdded = get.Optional.Field "episodesAdded" Decode.int |> Option.defaultValue 0
+            MoviesAutoAdded = get.Optional.Field "moviesAutoAdded" Decode.int |> Option.defaultValue 0
+            SeriesAutoAdded = get.Optional.Field "seriesAutoAdded" Decode.int |> Option.defaultValue 0
+            ItemsSkipped = get.Optional.Field "itemsSkipped" Decode.int |> Option.defaultValue 0
+            Errors = get.Optional.Field "errors" (Decode.list Decode.string) |> Option.defaultValue []
+        })
+
+    let private decodeResult: Decoder<Result<JellyfinImportResult, string>> =
+        Decode.oneOf [
+            Decode.field "error" Decode.string |> Decode.map Error
+            Decode.field "ok" decodeImportResult |> Decode.map Ok
+        ]
+
+    /// Initialize last sync time + last result from persisted settings (call at startup)
     let initialize (conn: SqliteConnection) : unit =
         match SettingsStore.getSetting conn "jellyfin_last_sync" with
         | Some iso ->
             match DateTimeOffset.TryParse(iso) with
             | true, dto -> lastSyncTime <- Some dto.UtcDateTime
             | _ -> ()
+        | None -> ()
+        match SettingsStore.getSetting conn lastResultKey with
+        | Some json ->
+            match Decode.fromString decodeResult json with
+            | Ok result -> lastSyncResult <- Some result
+            | Error _ -> ()
         | None -> ()
 
     /// Get current sync status
@@ -75,8 +121,11 @@ module JellyfinSync =
                                         syncInProgress <- false
                                         lastSyncTime <- Some DateTime.UtcNow
                                         lastSyncResult <- Some result
-                                        // Persist last sync time
+                                        // Persist last sync time AND the result (counts +
+                                        // error list / failure message) so a breakage is
+                                        // visible across restarts, not just in memory.
                                         SettingsStore.setSetting conn "jellyfin_last_sync" (DateTime.UtcNow.ToString("o"))
+                                        SettingsStore.setSetting conn lastResultKey (encodeResult result)
                                     )
                                     match result with
                                     | Ok r ->
@@ -88,6 +137,7 @@ module JellyfinSync =
                                     lock syncLock (fun () ->
                                         syncInProgress <- false
                                         lastSyncResult <- Some (Error ex.Message)
+                                        SettingsStore.setSetting conn lastResultKey (encodeResult (Error ex.Message))
                                     )
                                     eprintfn "[JellyfinSync] Sync error: %s" ex.Message
                             }

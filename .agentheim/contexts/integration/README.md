@@ -14,9 +14,9 @@ External services (TMDB API, RAWG API, Steam Web API, HLTB scraping, Jellyfin se
 - **Adapter** — module that owns one external system (`Tmdb.fs`, `Rawg.fs`, `Steam.fs`, `HowLongToBeat.fs`, `Jellyfin.fs`, `CinemarcoImport.fs`). Translates DTOs ↔ domain language.
 - **External id** — TMDB id, RAWG id, Steam appId, Jellyfin item id. Stored on core aggregates so adapters can re-sync.
 - **Import** — one-time pull of items from an external source into core BCs (e.g. Cinemarco favorites become Movies + a Catalog).
-- **Sync** — scheduled, repeating pull (e.g. Jellyfin watched state, Steam library + play time).
+- **Sync** — repeating pull of external state. Two cadences exist: **scheduled** syncs run on a server timer (`ScheduledJobs.fs`: Steam library + play time, Series TMDB refresh), while the **Jellyfin** sync is *client-initiated* — triggered when the SPA loads, gated by a 5-minute cooldown and an in-progress lock in `JellyfinSync.fs` (not a `ScheduledJobs` job). The sync's last **result** (counts + error list / failure message) is persisted via `SettingsStore` so a breakage is visible across restarts, and any per-item failure surfaces as `JellyfinSyncStatus.SyncFailed` (integration-001).
 - **Refresh** — user-triggered re-fetch of a single item's metadata (e.g. "refresh this series from TMDB").
-- **Scheduled job** — recurring task scheduled by `ScheduledJobs.fs` (Jellyfin auto-sync per task 037, Series episode refresh per task 042, etc.).
+- **Scheduled job** — recurring task scheduled by `ScheduledJobs.fs` (Steam playtime, Series episode/TMDB refresh per task 042, etc.). Note: Jellyfin auto-sync (task 037) is *not* a scheduled job — it is client-init triggered with a cooldown.
 
 ## Aggregates
 
