@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-05-27 -- Sign-off: design-system-001 styleguide approved
+
+**Type:** Work / Human gate
+**Task:** design-system-001 - Formalize the existing styleguide as a reviewable document
+**Sign-off:** User signed off on `.agentheim/contexts/design-system/styleguide.md` — criterion 5 satisfied. The frontend gate is now OPEN: frontend tasks in any BC may be promoted to `todo/` with `depends_on: [design-system-001]`.
+
+---
+
 ## 2026-05-27 14:12 -- Work session ended
 
 **Type:** Work / Session end
