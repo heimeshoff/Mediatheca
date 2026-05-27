@@ -6,11 +6,11 @@ type: bug
 context: integration
 created: 2026-05-27
 completed: 2026-05-27
-commit:
+commit: f5cd371
 depends_on: []
 blocks: []
 tags: [jellyfin, sync, observability, watch-history, series]
-related_adrs: []
+related_adrs: [0010]
 related_research: []
 prior_art: []
 ---

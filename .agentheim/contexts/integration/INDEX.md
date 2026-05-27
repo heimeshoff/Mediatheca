@@ -10,10 +10,10 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 2
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 0
+- **Doing:** 0
+- **Done:** 1
 <!-- task-counts:end -->
 
 ### Todo
@@ -23,23 +23,24 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **integration-001** -- Jellyfin sync silently stopped writing episode watch history -- `bug` -- `doing/integration-001-jellyfin-sync-silently-stopped.md`
+<!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
-<!-- no tasks in done -->
+- **integration-001** -- Jellyfin sync silently stopped writing episode watch history -- `bug` -- `done/integration-001-jellyfin-sync-silently-stopped.md`
 <!-- done-list:end -->
 
 ### Backlog
 <!-- backlog-list:start -->
-<!-- no tasks in backlog -->
+- **integration-002** -- Re-authenticate Jellyfin and retry once on a 401/403 during sync -- `bug` -- `backlog/integration-002-jellyfin-reauth-on-401.md`
+- **integration-003** -- Surface the persisted Jellyfin sync failure in the Settings UI -- `feature` -- `backlog/integration-003-surface-jellyfin-sync-failure-in-settings.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
-<!-- no ADRs scoped to this BC -->
+- **0010** -- Jellyfin sync persists its last result and isolates per-item faults -- 2026-05-27 -- `knowledge/decisions/0010-jellyfin-sync-observability-fault-isolation.md`
 <!-- adr-local:end -->
 
 ## Research touching this BC

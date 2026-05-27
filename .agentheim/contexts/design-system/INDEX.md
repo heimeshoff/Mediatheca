@@ -10,10 +10,10 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 2
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 0
+- **Doing:** 0
+- **Done:** 1
 <!-- task-counts:end -->
 
 ### Todo
@@ -23,23 +23,24 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **design-system-001** -- Formalize the existing styleguide as a reviewable document -- `doing/design-system-001-formalize-styleguide.md`
+<!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
-<!-- no tasks in done -->
+- **design-system-001** -- Formalize the existing styleguide as a reviewable document -- `done/design-system-001-formalize-styleguide.md`
 <!-- done-list:end -->
 
 ### Backlog
 <!-- backlog-list:start -->
-<!-- no tasks in backlog -->
+- **design-system-002** -- Point design-check skill's "Source of Truth" at styleguide.md -- `backlog/design-system-002-pointer-design-check-styleguide.md`
+- **design-system-003** -- Add ActionMenu specimen to the live StyleGuide page -- `backlog/design-system-003-actionmenu-styleguide-specimen.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
-<!-- no ADRs scoped to this BC -->
+- **0009** -- styleguide.md is the canonical design-system artifact; CLAUDE.md points at it -- 2026-05-27 -- `knowledge/decisions/0009-styleguide-canonical-artifact.md`
 <!-- adr-local:end -->
 
 ## Research touching this BC

@@ -5,6 +5,80 @@ Newest entries on top.
 
 ---
 
+## 2026-05-27 14:12 -- Work session ended
+
+**Type:** Work / Session end
+**Completed:** 2 (first-try PASS: 2, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Commits:** 2 (plus 1 bookkeeping commit)
+**Note:** design-system-001 is implementation-complete but its criterion 5 (human sign-off on styleguide.md) is still pending — awaiting user review before any frontend task may be promoted to todo. integration-001 criteria 2 & 4 (live end-to-end Jellyfin verification) are pending — no live server access during the run.
+
+---
+
+## 2026-05-27 14:10 -- Task verified and completed: integration-001 - Jellyfin sync silently stopped writing episode watch history
+
+**Type:** Work / Task completion
+**Task:** integration-001 - Jellyfin sync silently stopped writing episode watch history
+**Summary:** Made the Jellyfin sync observable (last result — counts + error list / failure message — persisted via SettingsStore, survives restart, reachable as SyncFailed) and fixed the structural failure mode by extracting series Phase 2 into the fault-isolating `JellyfinImport.syncSeriesWatchHistory` so one throwing series/episode no longer aborts the run.
+**Verification:** PASS (iteration 1) — 259 tests green, build clean, non-vacuous regression test confirmed.
+**Commit:** f5cd371
+**Files changed:** 7
+**Tests added:** 1 regression test (fault in one series → others still written + run reports failure)
+**ADRs written:** 0010-jellyfin-sync-observability-fault-isolation.md
+**Pending:** criteria 2 & 4 (live end-to-end verification against the Jellyfin server) — no live access this run.
+
+---
+
+## 2026-05-27 14:08 -- Task verified and completed: design-system-001 - Formalize the existing styleguide as a reviewable document
+
+**Type:** Work / Task completion
+**Task:** design-system-001 - Formalize the existing styleguide as a reviewable document
+**Summary:** Formalized the design system into a single canonical, reviewable `styleguide.md` (tokens, typography, glassmorphism, component patterns, theme, review process) and resolved the source-of-truth question via verbatim-plus-pointer (ADR 0009); CLAUDE.md and the BC README now point at the styleguide as canonical.
+**Verification:** PASS (iteration 1) — six sections present, file+line refs spot-checked and resolve, glassmorphism reproduced verbatim, design-check drift captured as backlog items.
+**Commit:** 8b6f284
+**Files changed:** 6
+**Tests added:** 0 (documentation task)
+**ADRs written:** 0009-styleguide-canonical-artifact.md
+**Sign-off:** criterion 5 (human review of styleguide.md) PENDING — frontend gate stays closed until the user signs off.
+
+---
+
+## 2026-05-27 14:00 -- Batch started: [design-system-001, integration-001]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-001 - Formalize the existing styleguide as a reviewable document, integration-001 - Jellyfin sync silently stopped writing episode watch history
+**Parallel:** yes (2 workers)
+
+---
+
+## 2026-05-27 13:25 -- Model / Promoted: integration-001 - Jellyfin sync silently stopped writing episode watch history
+
+**Type:** Model / Promote
+**BC:** integration
+**From → To:** backlog → todo
+
+---
+
+## 2026-05-27 13:20 -- Model / Refined: integration-001 - Jellyfin sync silently stopped writing episode watch history
+
+**Type:** Model / Refine
+**BC:** integration
+**Status after:** backlog
+**Summary:** Ran a live read-only diagnosis against the Jellyfin server (token from backup DB, temp creds deleted after). Disproved the "expired token" hypothesis — token valid, server reachable, movies fully synced. Confirmed the real failure is series-only: The Boys S5E5–E6 (played 2026-05-26) and Gen V S2E4–E8 (played 2026-05-21) are missing despite a sync running today and all write-preconditions being met (TMDB match, episodes exist, not deduped, no episode guard in `Mark_episode_watched`). Concluded the import aborts/errors partway through series Phase 2 and the failure is invisible because `runJellyfinImport` returns Ok-with-errors and `JellyfinSync` persists only the timestamp. Rewrote the task as observability-first-then-fix, downgraded the re-auth concern to a latent follow-up.
+
+---
+
+## 2026-05-27 13:00 -- Model / Captured: integration-001 - Jellyfin sync silently stopped writing watch history
+
+**Type:** Model / Capture
+**BC:** integration
+**Filed to:** backlog
+**Summary:** Jellyfin auto-sync keeps running (last_sync today) but has written no movie watch sessions since 2026-05-01 and no episode-watched events since 2026-05-13. Investigation of the backup DB + code identified two structural weaknesses: (1) the access token is never re-authenticated on rejection — only `testJellyfinConnection` ever writes it; (2) `runJellyfinImport` returns Ok with zero counts even when both library fetches fail, and `jellyfin_last_sync` is persisted regardless of outcome, hiding the failure. Captured with a diagnose-then-harden acceptance set; exact trigger still needs confirming against the live server.
+
+---
+
 ## 2026-05-12 -- Brainstorm: Formalize bounded contexts for agentheim migration
 
 **Type:** Brainstorm

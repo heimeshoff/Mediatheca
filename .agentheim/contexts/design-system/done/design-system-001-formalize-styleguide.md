@@ -6,10 +6,11 @@ type: feature
 context: design-system
 created: 2026-05-12
 completed: 2026-05-27
-commit:
+commit: 8b6f284
 depends_on: []
 blocks: []
 tags: [foundation, gate]
+related_adrs: [0009]
 ---
 
 ## Why
