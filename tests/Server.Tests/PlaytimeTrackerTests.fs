@@ -267,6 +267,36 @@ let playtimeTrackerTests =
 
             // Total = 100 (first steam) + 50 (manual) + 30 (delta) = 180
             Expect.equal (getTotalFromProjection conn gameSlug) 180 "Manual + Steam delta combined correctly"
+
+        testCase "Same-day Steam delta merges into the existing session row instead of being dropped" <| fun _ ->
+            // Regression for integration-004: two Steam syncs that both attribute to the same gaming day
+            // must sum into the existing row, not silently drop the second delta on UNIQUE(game_slug, date).
+            // Simulates:
+            //   Day D evening: sync records 100 min for date D, snapshot 100 -> 200.
+            //   Day D late-night: user plays 60 more min; Steam total now 260.
+            //   Day D+1 morning: sync delta=+60 attributed to date D (via rtime_last_played) —
+            //   must merge into the existing row, not be ignored.
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            let steamAppId = 1001
+            let day = "2024-06-20"
+
+            // Seed first sync: row exists for day D with 100 minutes, snapshot at 200.
+            PlaytimeTracker.recordPlaySession conn gameSlug steamAppId day 100
+            PlaytimeTracker.saveSnapshot conn steamAppId gameSlug 200
+            PlaytimeTracker.recomputeAndPublishTotal conn gameSlug (runCmd conn)
+            Expect.equal (getTotalFromProjection conn gameSlug) 100 "Sanity: after first session, total = 100"
+
+            // Second Steam sync attributes a +60 delta to the same gaming day D.
+            PlaytimeTracker.recordPlaySession conn gameSlug steamAppId day 60
+            PlaytimeTracker.recomputeAndPublishTotal conn gameSlug (runCmd conn)
+
+            // The single row for day D must now read 160 min (100 + 60).
+            let sessions = PlaytimeTracker.getPlaySessionsForGame conn gameSlug
+            let dayRows = sessions |> List.filter (fun s -> s.Date = day)
+            Expect.equal (List.length dayRows) 1 "Still exactly one row for the gaming day"
+            Expect.equal (List.head dayRows).MinutesPlayed 160 "Same-day delta is summed, not dropped"
+            Expect.equal (getTotalFromProjection conn gameSlug) 160 "Projection total reflects merged minutes"
     ]
 
 [<Tests>]

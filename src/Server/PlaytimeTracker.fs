@@ -104,10 +104,18 @@ module PlaytimeTracker =
     let private ManualSteamAppId = 0
 
     let recordPlaySession (conn: SqliteConnection) (slug: string) (steamAppId: int) (date: string) (minutesPlayed: int) : unit =
+        // ON CONFLICT(game_slug, date) DO UPDATE: when a session row already exists for the same
+        // (game_slug, date) — e.g. two Steam syncs in the same gaming day, where the second one is
+        // attributed to the previous day via rtime_last_played — sum the new minutes into the existing
+        // row instead of silently dropping the delta. Mirrors `upsertManualPlaySession`. Fixes
+        // integration-004. steam_app_id is intentionally not overwritten so a pre-existing Manual row
+        // (app_id=0) merging in a Steam delta stays labelled Manual in toPlaySessionDto.
         conn
         |> Db.newCommand """
-            INSERT OR IGNORE INTO game_play_session (game_slug, steam_app_id, date, minutes_played, created_at)
+            INSERT INTO game_play_session (game_slug, steam_app_id, date, minutes_played, created_at)
             VALUES (@slug, @app_id, @date, @minutes, @now)
+            ON CONFLICT(game_slug, date) DO UPDATE SET
+                minutes_played = minutes_played + excluded.minutes_played
         """
         |> Db.setParams [
             "slug", SqlType.String slug
