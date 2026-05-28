@@ -6,7 +6,7 @@ type: bug
 context: integration
 created: 2026-05-28
 completed: 2026-05-28
-commit:
+commit: 009c156
 depends_on: []
 blocks: []
 tags: [steam, sync, playtime, games]

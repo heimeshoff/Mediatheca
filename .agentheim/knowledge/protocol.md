@@ -5,6 +5,48 @@ Newest entries on top.
 
 ---
 
+## 2026-05-28 -- Work session ended
+
+**Type:** Work / Session end
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Commits:** 1 (plus 1 bookkeeping commit)
+**Note:** Single-task batch — integration-004 (Steam same-day delta merge-on-conflict, regression test). 266/265 tests green. No ADR (one-line SQL semantic change mirrors existing `upsertManualPlaySession` pattern).
+
+---
+
+## 2026-05-28 -- Task verified and completed: integration-004 - Steam playtime sync silently drops same-day deltas
+
+**Type:** Work / Task completion
+**Task:** integration-004 - Steam playtime sync silently drops same-day deltas
+**Summary:** Steam playtime sync no longer drops same-day deltas — `PlaytimeTracker.recordPlaySession` now merges minutes into the existing `(game_slug, date)` row via `ON CONFLICT DO UPDATE` instead of `INSERT OR IGNORE`, so two syncs that both land on the same gaming day (e.g. late-night session attributed via `rtime_last_played`) sum correctly and the projection total stays truthful.
+**Verification:** PASS (iteration 1) — 266 tests green (was 265), one new regression test exercising the conflict path.
+**Commit:** 009c156
+**Files changed:** 2
+**Tests added:** 1 (PlaytimeTrackerTests.fs: "Same-day Steam delta merges into the existing session row instead of being dropped")
+**ADRs written:** none
+
+---
+
+## 2026-05-28 -- Batch started: [integration-004]
+
+**Type:** Work / Batch start
+**Tasks:** integration-004 - Steam playtime sync silently drops same-day deltas
+**Parallel:** no (1 worker)
+
+---
+
+## 2026-05-28 -- Model / Captured: integration-004 - Steam playtime sync silently drops same-day deltas
+
+**Type:** Model / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** Bug filed straight to `todo/` — root cause and one-line fix already in hand. `runSync` correctly attributes a late-night session to the previous gaming day via `rtime_last_played`, but `recordPlaySession` uses `INSERT OR IGNORE` against `UNIQUE(game_slug, date)` (`src/Server/PlaytimeTracker.fs:108`), so a second same-day sync silently drops the delta and the minutes are lost forever (next sync sees delta=0). Fix: switch to `ON CONFLICT(game_slug, date) DO UPDATE SET minutes_played = minutes_played + excluded.minutes_played`, mirroring `upsertManualPlaySession`. All three call sites are safe with merge-on-conflict (initial-snapshot and reconciliation paths verified in acceptance criteria). Regression gap: existing "Manual sessions do not interfere with Steam delta tracking" test uses different dates per call, so the conflict path is uncovered — new test required.
+
+---
+
 ## 2026-05-27 -- Work session ended
 
 **Type:** Work / Session end
