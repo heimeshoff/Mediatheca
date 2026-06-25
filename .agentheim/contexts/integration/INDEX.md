@@ -10,15 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 2
-- **Todo:** 0
+- **Backlog:** 1
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 4
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-<!-- no tasks in todo -->
+- **integration-005** -- Spike — fallback metadata source when TMDB lags on new seasons -- `spike` -- `todo/integration-005-fallback-metadata-source-spike.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -36,7 +36,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **integration-005** -- Spike — fallback metadata source when TMDB lags on new seasons -- `spike` -- `backlog/integration-005-fallback-metadata-source-spike.md`
 - **integration-006** -- Nightly series refresh skips Ended series, so a TMDB-added season is never auto-picked-up -- `bug` -- `backlog/integration-006-nightly-refresh-skips-ended-series.md`
 <!-- backlog-list:end -->
 
@@ -50,7 +49,7 @@ research touching this BC, and concept synthesis pages.
 ## Research touching this BC
 
 <!-- research-local:start -->
-<!-- no research touching this BC -->
+- **tv-series-metadata-fallback-sources** -- TheTVDB vs Trakt vs Jellyfin-as-source as a fallback when TMDB lags on a new season; recommends Jellyfin-as-source supplementing TMDB -- 2026-06-26 -- `knowledge/research/tv-series-metadata-fallback-sources-2026-06-26.md`
 <!-- research-local:end -->
 
 ## Concepts (opt-in synthesis pages)

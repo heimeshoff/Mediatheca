@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-06-26 00:16 -- Modeling / Refined: integration-005 - Spike — fallback metadata source when TMDB lags on new seasons
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** todo
+**Summary:** Ran the spike's research during refinement (user chose "run it now", even comparison across TheTVDB / Trakt / Jellyfin, OMDb demoted to a one-line dismissal). All four acceptance criteria are satisfied by the resulting report, so the spike is resolved and promoted to `todo/`. **Recommendation: Jellyfin-as-source supplementing (not replacing) TMDB** — materialize a missing season/episode from the already-integrated Jellyfin adapter when the sync reports a row the TMDB projection lacks; no new external dependency, no numbering remap. Trakt disqualified (sources from TMDB, inherits its lag); TheTVDB is the better raw source but costs a net-new adapter + subscription/PIN auth. Folded report slug into `related_research`; added a Resolution section and a provider-config caveat for the follow-up implementation task.
+**Split into:** none
+**ADRs written:** none
+
+---
+
+## 2026-06-26 00:16 -- Research: TV-series metadata fallback sources (TheTVDB vs Trakt vs Jellyfin)
+
+**Type:** Research
+**Requested by:** model
+**Report:** knowledge/research/tv-series-metadata-fallback-sources-2026-06-26.md
+**Review:** PASS (iteration 2) — iteration 1 FAILed on a contradicted claim ("Jellyfin's default TV scraper is TheTVDB"; corrected to "TheTVDB is an optional plugin, TMDB is Jellyfin's default", provider-provenance flagged ⚠️ UNVERIFIED), re-verified clean on iteration 2.
+**Summary:**
+- Jellyfin-as-source recommended as a TMDB *supplement* — targets the exact failure mode (the missing season is always one the user is watching, hence already in Jellyfin), reuses the existing adapter with no new key/dependency, and needs no numbering remap.
+- Trakt disqualified: sources most TV info from TMDB (~24h refresh), so it inherits TMDB's lag.
+- TheTVDB is the strongest raw TV source but costs a net-new adapter + subscription/PIN auth + attribution + Aired-Order pinning; revisit only for titles not in Jellyfin.
+
+---
+
 ## 2026-06-25 14:00 -- Modeling / Captured: integration-005 + integration-006 — TMDB season-gap mitigation
 
 **Type:** Modeling / Capture
