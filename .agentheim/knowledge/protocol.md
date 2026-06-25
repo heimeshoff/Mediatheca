@@ -5,6 +5,37 @@ Newest entries on top.
 
 ---
 
+## 2026-06-26 09:30 -- Modeling / Refined: integration-006 - Nightly series refresh skips Ended series, so a TMDB-added season is never auto-picked-up
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** todo
+**Summary:** Pinned the one open design point (re-check cadence for `Ended` series) and promoted to `todo/`. Decided **activity-gated**: an `Ended` series re-enters the nightly candidate set only when it carries a recency signal — `in_focus = 1` or watched within 180 days — reusing existing `in_focus` + the `MAX(series_episode_progress.watched_date)` subquery (no schema migration), so the candidate set stays bounded and the TMDB rate budget is preserved. Chosen over a staleness window (needs a new `last_refreshed` projection column) and a separate slower schedule (second `ScheduledJobs` entry, still re-fetches the whole finished library). Implementation is a single `WHERE`-clause change in `getRefreshCandidates` (`SeriesRefresh.fs:316`); acceptance criteria now cover positive + negative candidate paths and throttle preservation. Decision kept inline (no ADR — reversible single-filter heuristic in a generic BC). Independent of integration-005 but composes with it.
+**Split into:** none
+**ADRs written:** none
+
+---
+
+## 2026-06-26 09:05 -- Task verified and completed: integration-005 - Spike — fallback metadata source when TMDB lags on new seasons
+
+**Type:** Work / Task completion
+**Task:** integration-005 - Spike — fallback metadata source when TMDB lags on new seasons
+**Summary:** Verified the spike's deliverable — the research report satisfies all four acceptance criteria (TheTVDB/Trakt/Jellyfin comparison with OMDb dismissed, explicit recommendation of Jellyfin-as-source supplementing TMDB, direct field mapping onto RefreshFetchResult/SeasonImportData/EpisodeImportData, and a follow-up sizing note). Cited code mechanisms confirmed real against SeriesRefresh.fs/Jellyfin.fs. No code by design; spike closed out.
+**Verification:** PASS (iteration 1)
+**Files changed:** 0 (research-only spike; task-file move only)
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
+## 2026-06-26 09:00 -- Batch started: [integration-005]
+
+**Type:** Work / Batch start
+**Tasks:** integration-005 - Spike — fallback metadata source when TMDB lags on new seasons
+**Parallel:** no (1 worker)
+
+---
+
 ## 2026-06-26 00:16 -- Modeling / Refined: integration-005 - Spike — fallback metadata source when TMDB lags on new seasons
 
 **Type:** Modeling / Refine
