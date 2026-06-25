@@ -5,6 +5,18 @@ Newest entries on top.
 
 ---
 
+## 2026-06-26 10:00 -- Work session ended
+
+**Type:** Work / Session end
+**Completed:** 2 (first-try PASS: 2, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Commits:** 3 (integration-005 closeout file move, integration-006 fix, this session-end line)
+**Note:** integration-005 (fallback-source spike) closed out — research deliverable verified against all 4 acceptance criteria, no code by design. integration-006 (nightly refresh skips Ended series) fixed — activity-gated candidate filter, 5 new tests, suite 271 green. A concurrent `modeling` session committed (fdb14cb, integration-006 refine→todo) mid-batch and swept up the 005 INDEX/protocol edits that were staged at the time; the 005 task-file move was then landed separately (c1190ed) to restore board↔INDEX consistency. integration-006 was promoted to todo by that same concurrent session and picked up automatically in the next scan, per the loop's design.
+
+---
+
 ## 2026-06-26 09:55 -- Task verified and completed: integration-006 - Nightly series refresh skips Ended series, so a TMDB-added season is never auto-picked-up
 
 **Type:** Work / Task completion
