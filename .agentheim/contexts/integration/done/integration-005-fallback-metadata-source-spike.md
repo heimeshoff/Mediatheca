@@ -1,11 +1,11 @@
 ---
 id: integration-005
 title: Spike — fallback metadata source when TMDB lags on new seasons
-status: todo
+status: done
 type: spike
 context: integration
 created: 2026-06-25
-completed:
+completed: 2026-06-26
 depends_on: []
 blocks: []
 tags: [tmdb, metadata, series, sync, fallback, tvdb, trakt, jellyfin]
