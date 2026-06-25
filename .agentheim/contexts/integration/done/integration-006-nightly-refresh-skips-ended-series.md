@@ -1,7 +1,8 @@
 ---
 id: integration-006
 title: Nightly series refresh skips Ended series, so a TMDB-added season is never auto-picked-up
-status: todo
+status: done
+completed: 2026-06-26
 type: bug
 context: integration
 created: 2026-06-25
@@ -92,3 +93,23 @@ the `in_focus` signal are tunable knobs, not invariants.
 - The cadence decision was kept inline (Why/What above) rather than promoted to an ADR: it
   is a single reversible candidate-filter heuristic in a generic BC, with no cross-cutting
   or persistence impact.
+
+## Outcome
+
+Implemented the activity-gated candidate filter exactly as the refinement sketch specified.
+`SeriesRefresh.getRefreshCandidates` (`src/Server/SeriesRefresh.fs`) now selects, in addition
+to `Returning` / `InProduction`, any `Ended` series that is `in_focus = 1` or whose
+`MAX(series_episode_progress.watched_date)` is `>= date('now', '-180 days')`. A NULL MAX (no
+watch history) fails the lexical ISO-string comparison, so a finished show with no engagement
+stays excluded — the candidate set stays bounded. The nightly throttle (`Async.Sleep 500`) is
+untouched.
+
+Tests: added `tests/Server.Tests/SeriesRefreshTests.fs` (registered in the `.fsproj`) with 5
+cases exercising both paths against an in-memory SQLite projection — Returning/InProduction
+always included; Ended+in_focus and Ended+recent-watch included; Ended-cold and
+Ended-watched-200-days-ago excluded. Full suite green at 271 tests.
+
+Key files:
+- `src/Server/SeriesRefresh.fs` — the WHERE-clause change in `getRefreshCandidates`
+- `tests/Server.Tests/SeriesRefreshTests.fs` — new tests
+- `tests/Server.Tests/Server.Tests.fsproj` — compile entry for the new test file

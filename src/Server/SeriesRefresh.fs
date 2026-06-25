@@ -309,11 +309,30 @@ module SeriesRefresh =
                             return Ok refreshData
         }
 
-    /// Return all series slugs that are candidates for nightly refresh
-    /// (status = Returning or InProduction).
+    /// Return all series slugs that are candidates for nightly refresh.
+    ///
+    /// Always includes still-running series (status Returning / InProduction).
+    /// Additionally, an Ended series re-enters the candidate set when it carries
+    /// a *recency signal* — it is in_focus, or its most recent watch
+    /// (MAX(series_episode_progress.watched_date)) falls within the last 180 days.
+    /// This activity gate lets a TMDB-added season on a show the user is actually
+    /// engaged with get auto-discovered, without re-fetching a whole library of
+    /// genuinely-finished shows every night. Dates are ISO strings, so the lexical
+    /// comparison against date('now', '-180 days') is correct; a NULL MAX (no watch
+    /// history) simply fails the comparison and the show stays excluded.
     let getRefreshCandidates (conn: SqliteConnection) : string list =
         conn
-        |> Db.newCommand "SELECT slug FROM series_detail WHERE status IN ('Returning', 'InProduction') ORDER BY slug"
+        |> Db.newCommand
+            """
+            SELECT slug FROM series_detail sd
+            WHERE status IN ('Returning', 'InProduction')
+               OR (status = 'Ended' AND (
+                     in_focus = 1
+                     OR (SELECT MAX(watched_date) FROM series_episode_progress
+                         WHERE series_slug = sd.slug) >= date('now', '-180 days')
+                  ))
+            ORDER BY slug
+            """
         |> Db.query (fun (rd: IDataReader) -> rd.ReadString "slug")
 
     /// Run the nightly refresh: iterate every refresh candidate and refresh

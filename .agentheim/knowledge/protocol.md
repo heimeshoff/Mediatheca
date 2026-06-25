@@ -5,6 +5,26 @@ Newest entries on top.
 
 ---
 
+## 2026-06-26 09:55 -- Task verified and completed: integration-006 - Nightly series refresh skips Ended series, so a TMDB-added season is never auto-picked-up
+
+**Type:** Work / Task completion
+**Task:** integration-006 - Nightly series refresh skips Ended series, so a TMDB-added season is never auto-picked-up
+**Summary:** `getRefreshCandidates` is now activity-gated — an `Ended` series re-enters the nightly TMDB-refresh candidate set when it is `in_focus` or was watched within the last 180 days (single `WHERE`-clause change, no schema migration), so a TMDB-added season on an engaged-with show is auto-discovered while a cold finished library stays excluded. The `Async.Sleep 500` throttle is untouched.
+**Verification:** PASS (iteration 1) — full suite 271 passed / 0 failed (was 266); 5 new `SeriesRefresh.getRefreshCandidates` tests (3 positive, 2 negative) execute and pass. Candidate path confirmed wired to the scheduled nightly job (Program.fs).
+**Files changed:** 3
+**Tests added:** 5 (new SeriesRefreshTests.fs)
+**ADRs written:** none (cadence heuristic kept inline per refinement decision)
+
+---
+
+## 2026-06-26 09:40 -- Batch started: [integration-006]
+
+**Type:** Work / Batch start
+**Tasks:** integration-006 - Nightly series refresh skips Ended series, so a TMDB-added season is never auto-picked-up
+**Parallel:** no (1 worker)
+
+---
+
 ## 2026-06-26 09:30 -- Modeling / Refined: integration-006 - Nightly series refresh skips Ended series, so a TMDB-added season is never auto-picked-up
 
 **Type:** Modeling / Refine
