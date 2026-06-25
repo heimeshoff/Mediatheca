@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 2
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 4
@@ -36,7 +36,8 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-<!-- no tasks in backlog -->
+- **integration-005** -- Spike — fallback metadata source when TMDB lags on new seasons -- `spike` -- `backlog/integration-005-fallback-metadata-source-spike.md`
+- **integration-006** -- Nightly series refresh skips Ended series, so a TMDB-added season is never auto-picked-up -- `bug` -- `backlog/integration-006-nightly-refresh-skips-ended-series.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC

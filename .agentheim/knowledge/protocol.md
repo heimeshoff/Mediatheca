@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-06-25 14:00 -- Modeling / Captured: integration-005 + integration-006 — TMDB season-gap mitigation
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** backlog (both)
+**Summary:** *Interview with the Vampire* S3 is airing (visible on IMDb / the user's Jellyfin) but TMDB still lists only 2 seasons, and the app is fully TMDB-bound for series metadata. Captured two siblings: **integration-005** (spike — compare TheTVDB / Trakt / OMDb / Jellyfin-as-source as a fallback when TMDB lags, recommend a direction; user chose "research first") and **integration-006** (bug — the nightly refresh's `Returning/InProduction` candidate filter excludes `Ended` series, so a TMDB-added season is never auto-discovered, only via manual refresh). Independent of each other; same "TMDB didn't deliver" origin.
+
+---
+
 ## 2026-05-28 -- Work session ended
 
 **Type:** Work / Session end
