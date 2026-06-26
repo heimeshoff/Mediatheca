@@ -5,6 +5,18 @@ Newest entries on top.
 
 ---
 
+## 2026-06-26 12:35 -- Work session ended
+
+**Type:** Work / Session end
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Commits:** 1 (integration-m4k7p; this session-end line committed separately)
+**Note:** integration-m4k7p (materialize missing season/episode from Jellyfin) shipped — projection-column provenance (`source TEXT DEFAULT 'tmdb'`) on series_seasons/series_episodes, a fault-isolated materialization pass before the watch-history sync, an `EpisodeDto.MetadataPending` badge, and ADR 0012 (TMDB-authoritative, Jellyfin self-healing supplement). Suite 278 green (7 new). Created backlog item integration-007 (fetch Jellyfin stills on materialize) — stills were deferred from v1 per the task's scope note. Concept candidate surfaced: **jellyfin-as-self-healing-metadata-supplement** across integration-005/006/m4k7p + ADR 0012.
+
+---
+
 ## 2026-06-26 12:30 -- Task verified and completed: integration-m4k7p - Materialize a missing season/episode from Jellyfin when TMDB lacks it
 
 **Type:** Work / Task completion
