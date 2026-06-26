@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-06-26 11:00 -- Modeling / Captured: integration-m4k7p - Materialize a missing season/episode from Jellyfin when TMDB lacks it
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** backlog
+**Summary:** Diagnosed why Interview with the Vampire S3 (three episodes present on Jellyfin) never appeared: the app sources episode metadata only from TMDB, which still lists two seasons; the Jellyfin sync only records watch history for existing episodes and never materializes new season/episode metadata. integration-006 fixed only candidate selection; the real fix (Jellyfin-as-source) was decided in the integration-005 spike but never captured. Captured that deferred implementation task.
+
+---
+
 ## 2026-06-26 10:00 -- Work session ended
 
 **Type:** Work / Session end
