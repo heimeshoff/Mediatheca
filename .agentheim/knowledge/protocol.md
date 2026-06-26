@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-06-26 11:30 -- Modeling / Refined: integration-m4k7p - Materialize a missing season/episode from Jellyfin when TMDB lacks it
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** todo
+**Summary:** Resolved the three open refinement points against the real code (via orchestrator). **Provenance = a `source TEXT DEFAULT 'tmdb'` column on `series_episodes`/`series_seasons`, NOT a new event** — episode metadata is already a projection-only cache (`Series.evolve` ignores episode detail; `SeriesRefresh.refreshOne` writes via `applyToProjection`), so materialization mirrors that and tags `source='jellyfin'`. **Dedup/enrichment key = the existing PK `(slug, season, episode)`**; the "pending" flag clears for free because TMDB's `INSERT OR REPLACE` omits `source` and SQLite resets it to the default on enrichment — no second code path, no duplicate. User chose a **subtle "metadata pending" badge**, making this frontend-bearing → added `depends_on: [design-system-001]` (gate satisfied; styleguide is done) and traced the badge path column→read-model→`EpisodeDto.MetadataPending`→`SeriesDetail` render. Present-vs-played widening is free (Api already fetches the full episode batch). Key gotcha pinned: a materialized episode needs a synthetic `series_seasons` row or it orphans. Rewrote all 6 acceptance criteria to concrete/testable. **No split** (single vertical slice, size M). Promoted to `todo/`.
+**Split into:** none
+**ADRs written:** none (a short `scope: integration` ADR on TMDB-authoritative precedence + the enrichment mechanism is flagged to be written during work; `work` will backlink it)
+
+---
+
 ## 2026-06-26 11:00 -- Modeling / Captured: integration-m4k7p - Materialize a missing season/episode from Jellyfin when TMDB lacks it
 
 **Type:** Modeling / Capture
