@@ -457,6 +457,11 @@ type EpisodeDto = {
     TmdbRating: float option
     IsWatched: bool
     WatchedDate: string option
+    /// True while this episode's metadata was materialized from Jellyfin and TMDB
+    /// has not yet enriched it (integration-m4k7p). Drives the "metadata pending"
+    /// badge. A semantic flag, not the raw provider string — the client carries no
+    /// provider knowledge.
+    MetadataPending: bool
 }
 
 type SeasonDto = {

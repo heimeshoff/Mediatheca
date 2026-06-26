@@ -1,15 +1,15 @@
 ---
 id: integration-m4k7p
 title: Materialize a missing season/episode from Jellyfin when TMDB lacks it
-status: todo
+status: done
 type: feature
 context: integration
 created: 2026-06-26
-completed:
+completed: 2026-06-26
 depends_on: [design-system-001]
 blocks: []
 tags: [jellyfin, tmdb, series, sync, metadata, fallback, materialize, season]
-related_adrs: []
+related_adrs: [0012]
 related_research: [tv-series-metadata-fallback-sources-2026-06-26]
 prior_art: [integration-005, integration-006]
 ---
@@ -166,3 +166,36 @@ resolved against the real code during refinement (2026-06-26).
   exists; this task covers the window (possibly permanent) where TMDB never delivers it.
 - **Frontend gate:** badge work `depends_on` the design-system styleguide (`design-system-001`,
   already done — gate satisfied).
+
+## Outcome
+
+The Jellyfin sync now materializes season/episode metadata for anything the TMDB-fed
+projection lacks, keeping TMDB authoritative. Episodes present on the user's Jellyfin server
+but missing from TMDB (e.g. *Interview with the Vampire* S3) now appear in the app, each
+showing a subtle "metadata pending" badge until TMDB enriches them.
+
+Implementation:
+- **Provenance column, no new event.** Added `source TEXT NOT NULL DEFAULT 'tmdb'` to
+  `series_episodes` and `series_seasons` (CREATE + try/ALTER migration). The Jellyfin pass
+  writes `'jellyfin'`; TMDB's `INSERT OR REPLACE` omits `source` and resets it to the default,
+  so enrichment clears the badge for free with no duplicate row and watch progress preserved.
+  Decision recorded in ADR 0012.
+- **Pure, fault-isolated core:** `JellyfinImport.materializeMissingEpisodes` (injected-effect,
+  per-series + per-episode isolation, best-effort still fetch, not gated on `Played`). Wired
+  into `Api.runJellyfinImport` Phase 2 **before** the watch-history sync. Synthetic number-only
+  season rows are upserted first so episodes are not orphaned by the season-iterating read.
+- **Read/badge path:** `EpisodeDto.MetadataPending` (semantic bool derived from `source`) in
+  Shared + `SeriesProjection.getBySlug`; subtle styleguide-governed badge in
+  `SeriesDetail/Views.fs`.
+- **Jellyfin adapter:** decoder widened with `PremiereDate` + `PrimaryImageTag`,
+  `fetchEpisodeItems` `Fields=` query widened to carry overview/runtime/premiere.
+
+Stills deferred to backlog **integration-007** (seam present, v1 returns NULL).
+
+Tests: `tests/Server.Tests/JellyfinMaterializeTests.fs` (7 cases covering criteria a–e plus
+fault isolation and still-degradation). Full suite green at 278; `npm run build` green.
+
+Key files: `src/Server/Jellyfin.fs`, `src/Server/JellyfinImport.fs`,
+`src/Server/SeriesProjection.fs`, `src/Server/Api.fs`, `src/Shared/Shared.fs`,
+`src/Client/Pages/SeriesDetail/Views.fs`,
+`.agentheim/knowledge/decisions/0012-jellyfin-materializes-missing-seasons-as-projection-supplement.md`.

@@ -938,6 +938,28 @@ module Api =
                                 | None -> ()
                             | None -> ()
 
+                        // Materialize season/episode metadata for anything Jellyfin holds
+                        // that TMDB has not (yet) published (integration-m4k7p). MUST run
+                        // before the watch-history sync below so the row exists when
+                        // Mark_episode_watched recomputes progress / next-up. TMDB stays
+                        // authoritative: rows are tagged source='jellyfin' and a later TMDB
+                        // refresh enriches them in place. Still images are deferred to a
+                        // follow-up (integration-007) — best-effort fetch returns None for now,
+                        // so materialized stills are NULL until TMDB enriches.
+                        let materializeResult =
+                            JellyfinImport.materializeMissingEpisodes
+                                seriesBatch
+                                (SeriesProjection.getExistingEpisodeKeys conn)
+                                (SeriesProjection.getExistingSeasonNumbers conn)
+                                (fun _slug _season _ep _jellyfinId -> None)
+                                (fun slug seasonNum ->
+                                    try SeriesProjection.materializeSeason conn slug seasonNum; Ok ()
+                                    with ex -> Error ex.Message)
+                                (fun slug ep ->
+                                    try SeriesProjection.materializeEpisode conn slug ep; Ok ()
+                                    with ex -> Error ex.Message)
+                        errors <- errors @ materializeResult.Errors
+
                         let writeEpisode (slug: string) (defaultRewatchId: string) (seasonNum: int) (epNum: int) (watchDate: string) : Result<unit, string> =
                             let sid = Series.streamId slug
                             executeCommand

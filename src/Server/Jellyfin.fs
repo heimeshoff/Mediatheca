@@ -44,6 +44,10 @@ module Jellyfin =
         SeriesId: string option
         IndexNumber: int option
         ParentIndexNumber: int option
+        // Materialization (integration-m4k7p): air date + primary image tag so a
+        // season/episode the TMDB-fed projection lacks can be built from Jellyfin.
+        PremiereDate: string option
+        PrimaryImageTag: string option
     }
 
     type JellyfinItemsResponse = {
@@ -89,6 +93,10 @@ module Jellyfin =
             SeriesId = get.Optional.Field "SeriesId" Decode.string
             IndexNumber = get.Optional.Field "IndexNumber" Decode.int
             ParentIndexNumber = get.Optional.Field "ParentIndexNumber" Decode.int
+            PremiereDate = get.Optional.Field "PremiereDate" Decode.string
+            PrimaryImageTag =
+                get.Optional.Field "ImageTags" (Decode.object (fun g -> g.Optional.Field "Primary" Decode.string))
+                |> Option.bind id
         })
 
     let private decodeItemsResponse: Decoder<JellyfinItemsResponse> =
@@ -219,7 +227,7 @@ module Jellyfin =
 
     let private fetchEpisodeItems (httpClient: HttpClient) (serverUrl: string) (userId: string) (token: string) (seriesId: string) : Async<Result<JellyfinBaseItem list, FetchError>> =
         async {
-            let url = sprintf "%s/Shows/%s/Episodes?userId=%s&Fields=ProviderIds&enableUserData=true&Limit=10000" (serverUrl.TrimEnd('/')) seriesId userId
+            let url = sprintf "%s/Shows/%s/Episodes?userId=%s&Fields=ProviderIds,Overview,RunTimeTicks,PremiereDate&enableUserData=true&Limit=10000" (serverUrl.TrimEnd('/')) seriesId userId
             let! json = fetchJsonWithAuth httpClient url token
             match json with
             | Error e -> return Error e

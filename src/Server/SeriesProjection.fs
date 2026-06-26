@@ -55,6 +55,7 @@ module SeriesProjection =
                 poster_ref TEXT,
                 air_date TEXT,
                 episode_count INTEGER NOT NULL DEFAULT 0,
+                source TEXT NOT NULL DEFAULT 'tmdb',
                 PRIMARY KEY (series_slug, season_number)
             );
 
@@ -68,6 +69,7 @@ module SeriesProjection =
                 air_date TEXT,
                 still_ref TEXT,
                 tmdb_rating REAL,
+                source TEXT NOT NULL DEFAULT 'tmdb',
                 PRIMARY KEY (series_slug, season_number, episode_number)
             );
 
@@ -107,6 +109,22 @@ module SeriesProjection =
         try
             conn
             |> Db.newCommand "ALTER TABLE series_detail ADD COLUMN jellyfin_id TEXT"
+            |> Db.exec
+        with _ -> () // Column already exists
+
+        // Migration (integration-m4k7p): provenance column on season/episode rows.
+        // TMDB writes leave the 'tmdb' default; the Jellyfin materialization pass
+        // writes explicit 'jellyfin'. A later TMDB refresh's INSERT OR REPLACE omits
+        // `source`, so SQLite resets it to the default — enrichment clears the
+        // "metadata pending" flag for free, no second code path.
+        try
+            conn
+            |> Db.newCommand "ALTER TABLE series_episodes ADD COLUMN source TEXT NOT NULL DEFAULT 'tmdb'"
+            |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn
+            |> Db.newCommand "ALTER TABLE series_seasons ADD COLUMN source TEXT NOT NULL DEFAULT 'tmdb'"
             |> Db.exec
         with _ -> () // Column already exists
 
@@ -877,7 +895,7 @@ module SeriesProjection =
                     // Get episodes for this season
                     let episodes =
                         conn
-                        |> Db.newCommand "SELECT episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating FROM series_episodes WHERE series_slug = @slug AND season_number = @season_number ORDER BY episode_number"
+                        |> Db.newCommand "SELECT episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating, source FROM series_episodes WHERE series_slug = @slug AND season_number = @season_number ORDER BY episode_number"
                         |> Db.setParams [ "slug", SqlType.String slug; "season_number", SqlType.Int32 seasonNumber ]
                         |> Db.query (fun (rd3: IDataReader) ->
                             let epNum = rd3.ReadInt32 "episode_number"
@@ -898,7 +916,8 @@ module SeriesProjection =
                                 if rd3.IsDBNull(rd3.GetOrdinal("tmdb_rating")) then None
                                 else Some (rd3.ReadDouble "tmdb_rating")
                               Mediatheca.Shared.EpisodeDto.IsWatched = watchInfo.IsSome
-                              Mediatheca.Shared.EpisodeDto.WatchedDate = watchInfo |> Option.bind id }
+                              Mediatheca.Shared.EpisodeDto.WatchedDate = watchInfo |> Option.bind id
+                              Mediatheca.Shared.EpisodeDto.MetadataPending = (rd3.ReadString "source" = "jellyfin") }
                         )
                     let watchedCount =
                         episodes |> List.filter (fun e -> e.IsWatched) |> List.length
@@ -1099,6 +1118,64 @@ module SeriesProjection =
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "rewatch_id")
         |> Option.defaultValue "default"
+
+    // Jellyfin materialization (integration-m4k7p) -----------------------------
+    // Projection-level supplement: when Jellyfin holds a season/episode TMDB has
+    // not yet published, fill the gap from Jellyfin data and tag it source='jellyfin'.
+    // TMDB stays authoritative — its INSERT OR REPLACE later resets `source` to the
+    // 'tmdb' default and enriches in place (see SeriesRefresh.applyToProjection).
+
+    /// (season, episode) keys currently in the projection for a series.
+    let getExistingEpisodeKeys (conn: SqliteConnection) (slug: string) : Set<int * int> =
+        conn
+        |> Db.newCommand "SELECT season_number, episode_number FROM series_episodes WHERE series_slug = @slug"
+        |> Db.setParams [ "slug", SqlType.String slug ]
+        |> Db.query (fun (rd: IDataReader) -> rd.ReadInt32 "season_number", rd.ReadInt32 "episode_number")
+        |> Set.ofList
+
+    /// Season numbers currently in the projection for a series.
+    let getExistingSeasonNumbers (conn: SqliteConnection) (slug: string) : Set<int> =
+        conn
+        |> Db.newCommand "SELECT season_number FROM series_seasons WHERE series_slug = @slug"
+        |> Db.setParams [ "slug", SqlType.String slug ]
+        |> Db.query (fun (rd: IDataReader) -> rd.ReadInt32 "season_number")
+        |> Set.ofList
+
+    /// Insert a synthetic, number-only season row sourced from Jellyfin. INSERT OR
+    /// IGNORE so a real TMDB season is never clobbered. Without this row the detail
+    /// read (which iterates series_seasons) would orphan the episode.
+    let materializeSeason (conn: SqliteConnection) (slug: string) (seasonNumber: int) : unit =
+        conn
+        |> Db.newCommand """
+            INSERT OR IGNORE INTO series_seasons (series_slug, season_number, name, overview, poster_ref, air_date, episode_count, source)
+            VALUES (@series_slug, @season_number, @name, '', NULL, NULL, 0, 'jellyfin')
+        """
+        |> Db.setParams [
+            "series_slug", SqlType.String slug
+            "season_number", SqlType.Int32 seasonNumber
+            "name", SqlType.String (sprintf "Season %d" seasonNumber)
+        ]
+        |> Db.exec
+
+    /// Insert an episode row sourced from Jellyfin. INSERT OR IGNORE so a TMDB row
+    /// (the authoritative source) is never overwritten by Jellyfin data.
+    let materializeEpisode (conn: SqliteConnection) (slug: string) (ep: JellyfinImport.MaterializedEpisode) : unit =
+        conn
+        |> Db.newCommand """
+            INSERT OR IGNORE INTO series_episodes (series_slug, season_number, episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating, source)
+            VALUES (@series_slug, @season_number, @episode_number, @name, @overview, @runtime, @air_date, @still_ref, NULL, 'jellyfin')
+        """
+        |> Db.setParams [
+            "series_slug", SqlType.String slug
+            "season_number", SqlType.Int32 ep.SeasonNumber
+            "episode_number", SqlType.Int32 ep.EpisodeNumber
+            "name", SqlType.String ep.Name
+            "overview", SqlType.String ep.Overview
+            "runtime", (match ep.Runtime with Some r -> SqlType.Int32 r | None -> SqlType.Null)
+            "air_date", (match ep.AirDate with Some d -> SqlType.String d | None -> SqlType.Null)
+            "still_ref", (match ep.StillRef with Some r -> SqlType.String r | None -> SqlType.Null)
+        ]
+        |> Db.exec
 
     // Dashboard queries
 

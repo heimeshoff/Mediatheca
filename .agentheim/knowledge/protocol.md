@@ -5,6 +5,26 @@ Newest entries on top.
 
 ---
 
+## 2026-06-26 12:30 -- Task verified and completed: integration-m4k7p - Materialize a missing season/episode from Jellyfin when TMDB lacks it
+
+**Type:** Work / Task completion
+**Task:** integration-m4k7p - Materialize a missing season/episode from Jellyfin when TMDB lacks it
+**Summary:** The Jellyfin sync now materializes season/episode metadata for anything TMDB lacks (tagged `source='jellyfin'`, shown with a subtle "metadata pending" badge), keeping TMDB authoritative so its later `INSERT OR REPLACE` refresh enriches the rows in place and clears the badge for free.
+**Verification:** PASS (iteration 1) — full suite 278 passed / 0 failed (was 271); 7 new tests across `JellyfinMaterializeTests.fs` cover criteria a–e plus two fault-isolation cases; client Fable build green.
+**Files changed:** 12
+**Tests added:** 7
+**ADRs written:** 0012-jellyfin-materializes-missing-seasons-as-projection-supplement.md (scope: integration)
+
+---
+
+## 2026-06-26 12:00 -- Batch started: [integration-m4k7p]
+
+**Type:** Work / Batch start
+**Tasks:** integration-m4k7p - Materialize a missing season/episode from Jellyfin when TMDB lacks it
+**Parallel:** no (1 worker)
+
+---
+
 ## 2026-06-26 11:30 -- Modeling / Refined: integration-m4k7p - Materialize a missing season/episode from Jellyfin when TMDB lacks it
 
 **Type:** Modeling / Refine

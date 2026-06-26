@@ -29,6 +29,8 @@ let private mkEpisode (season: int) (episode: int) (played: bool) : JellyfinBase
     SeriesId = None
     IndexNumber = Some episode
     ParentIndexNumber = Some season
+    PremiereDate = None
+    PrimaryImageTag = None
 }
 
 [<Tests>]

@@ -674,6 +674,14 @@ let private episodeCard
                                             prop.text $"{r}m"
                                         ]
                                     | None -> ()
+                                    // Materialized from Jellyfin; TMDB has not enriched it yet
+                                    // (integration-m4k7p). Subtle, muted badge per styleguide.
+                                    if episode.MetadataPending then
+                                        Html.span [
+                                            prop.className "text-[10px] font-medium uppercase tracking-wider text-warning/70 border border-warning/30 rounded px-1.5 py-px"
+                                            prop.title "Sourced from Jellyfin — richer details arrive when TMDB adds this episode"
+                                            prop.text "metadata pending"
+                                        ]
                                 ]
                             ]
                             Html.h4 [
