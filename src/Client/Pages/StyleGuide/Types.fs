@@ -8,6 +8,7 @@ type Section =
     | Glassmorphism
     | Animations
     | Components
+    | VelvetLobbyPatterns
     | ContentBlocks
     | ContentZone
     | EntryList

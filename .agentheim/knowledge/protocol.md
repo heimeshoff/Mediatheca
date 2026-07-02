@@ -5,6 +5,27 @@ Newest entries on top.
 
 ---
 
+## 2026-07-02 18:51 -- Task verified and completed: design-system-h3q8n - Velvet Lobby re-skin — component patterns & motion
+
+**Type:** Work / Task completion
+**Task:** design-system-h3q8n - Velvet Lobby re-skin — component patterns & motion
+**Summary:** Shipped the Velvet Lobby § 1.3–1.6 tokens (spacing/radii/shadows/animation incl. `--sweep` + the gold-leaf sweep `@keyframes`), the velvet-card (§ 3.1) and media-chrome-glass (§ 3.3) surfaces, and nine component patterns plus three motion primitives (gold-leaf sweep In-focus-only, 400ms leave-transition, 200ms cross-fade) as typed Feliz compositions in `DesignSystem.fs`, with live StyleGuide specimens and `styleguide.md`/README kept in lockstep. Overlay glass (§ 3.2, ADR-0006) left untouched.
+**Duration:** ~17m (worker ~12m + verify ~2m; dispatch 18:34 → verdict 18:51)
+**Verification:** PASS (iteration 1)
+**Files changed:** 6 (+1 new games backlog item)
+**Tests added:** 0 (presentational token/CSS/typed-view layer — no assertable pure logic, no frontend unit-test suite; verified via clean `npm run build`, `✓ built in 38.73s`)
+**ADRs written:** none
+
+---
+
+## 2026-07-02 18:34 -- Batch started: [design-system-h3q8n]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-h3q8n - Velvet Lobby re-skin — component patterns & motion
+**Parallel:** no (1 worker)
+
+---
+
 ## 2026-07-02 19:20 -- Modeling / Refined: design-system-h3q8n - Velvet Lobby re-skin — component patterns & motion
 
 **Type:** Modeling / Refine

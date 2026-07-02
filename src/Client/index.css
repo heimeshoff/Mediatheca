@@ -35,26 +35,15 @@
     --glass-highlight-opacity: 0.08;
     --glass-shadow-opacity: 0.6;
 
-    /* Spacing scale */
+    /* Spacing scale (legacy, pre-Velvet-Lobby) */
     --space-page-mobile: 1rem;
     --space-page-desktop: 1.5rem;
-    --space-gap-compact: 0.5rem;
-    --space-gap-standard: 0.75rem;
     --space-gap-loose: 1rem;
 
-    /* Border radius */
-    --radius-card: 1rem;
+    /* Border radius (legacy, pre-Velvet-Lobby) */
     --radius-button: 0.5rem;
-    --radius-avatar: 9999px;
-    --radius-poster: 0.375rem;
 
-    /* Animation durations */
-    --duration-fast: 0.15s;
-    --duration-normal: 0.25s;
-    --duration-slow: 0.4s;
-
-    /* Shadows */
-    --shadow-card: 0 4px 12px -2px oklch(0% 0 0 / 0.3);
+    /* Shadows (legacy, pre-Velvet-Lobby, still used by .poster-shadow etc.) */
     --shadow-card-hover: 0 12px 24px -8px oklch(0% 0 0 / 0.3), 0 0 0 1px oklch(100% 0 0 / 0.05);
     --shadow-dropdown: inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 12px 40px -8px oklch(0% 0 0 / 0.6);
     --shadow-poster: 0 4px 12px -2px oklch(0% 0 0 / 0.5), 0 0 0 1px oklch(100% 0 0 / 0.05);
@@ -66,6 +55,34 @@
     --text-hierarchy-secondary: 0.7;
     --text-hierarchy-muted: 0.5;
     --text-hierarchy-faint: 0.4;
+
+    /* Velvet Lobby spacing (styleguide.md § 1.3) */
+    --space-page: 2rem;
+    --space-section: 1.625rem;
+    --space-card: 1.125rem;
+    --space-gap-compact: 0.5rem;
+    --space-gap-standard: 0.75rem;
+
+    /* Velvet Lobby border radii (styleguide.md § 1.4) */
+    --radius-card: 0.625rem;
+    --radius-panel: 0.5rem;
+    --radius-pill: 999px;
+    --radius-poster: 0.125rem;
+    --radius-avatar: 9999px;
+
+    /* Velvet Lobby shadows & elevation (styleguide.md § 1.5) — elevation is
+       shadow + a `line`-colored ring, not translucency. */
+    --shadow-hero: 0 20px 44px -18px oklch(0 0 0 / 0.85), 0 0 0 1px oklch(0.34 0.04 30);
+    --shadow-card: 0 0 0 1px oklch(0.30 0.03 26);
+    --shadow-filmstrip: 0 16px 36px -18px oklch(0 0 0 / 0.9);
+    --ring-active: inset 2px 0 0 oklch(0.80 0.12 82);
+
+    /* Velvet Lobby animation (styleguide.md § 1.6 + Motion) */
+    --duration-fast: 0.15s;
+    --duration-normal: 0.25s;
+    --duration-slow: 0.4s;      /* leave-transition (fade + collapse) */
+    --duration-crossfade: 0.2s; /* cross-fade (e.g. dashboard tab swap) */
+    --sweep: 3.2s linear infinite;
 }
 
 /* Velvet Lobby retires uppercase as the default heading treatment — Instrument
@@ -165,6 +182,167 @@ h1, h2, h3, h4, h5, h6 {
 .stagger-grid > *:nth-child(10) { animation-delay: 360ms; }
 .stagger-grid > *:nth-child(11) { animation-delay: 400ms; }
 .stagger-grid > *:nth-child(12) { animation-delay: 440ms; }
+
+/* ── Velvet Lobby component patterns (design-system-h3q8n) ──
+   styleguide.md § 3.1 (velvet card), § 3.3 (media-chrome glass), § 4
+   (component patterns) and the Motion subsection. Consumed by the typed
+   Feliz compositions in DesignSystem.fs — see that file for the F# side. */
+
+/* § 3.1 — velvet card: solid, non-overlay page/card surface. Background +
+   line-ring elevation, no blur/translucency (distinct from § 3.2 overlay
+   glass, which is unchanged — ADR-0006). */
+.velvet-card {
+    background: var(--color-base-100);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+}
+.velvet-card-hero {
+    box-shadow: var(--shadow-hero);
+}
+
+/* § 3.3 — media chrome: a narrower glass variant for small controls floating
+   directly over artwork. An ADDITION alongside § 3.2's mandatory overlay
+   glass, not a replacement — dropdowns/modals/popovers stay full-spec. */
+.media-chrome-glass {
+    background: oklch(0.14 0.025 20 / 0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid oklch(1 0 0 / 0.15);
+    border-radius: var(--radius-pill);
+}
+
+/* Motion: the gold-leaf sweep (§ 1.6, § 4 Status badges, § 4 Motion) — the one
+   animated ornament, reserved for "In focus" surfaces only. Moves a 5-stop
+   gold gradient across background-position on a 200%-wide background. */
+@keyframes gold-leaf-sweep {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+.gold-sweep {
+    background-image: linear-gradient(
+        90deg,
+        oklch(0.68 0.10 80) 0%,
+        oklch(0.80 0.12 82) 25%,
+        oklch(0.88 0.11 88) 50%,
+        oklch(0.80 0.12 82) 75%,
+        oklch(0.68 0.10 80) 100%
+    );
+    background-size: 200% 100%;
+    animation: gold-leaf-sweep var(--sweep);
+}
+
+/* § 4 Status badges — pill, uppercase, 0.14em tracking. One hue per lifecycle
+   state; "In focus" is the only variant that also carries .gold-sweep. */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-pill);
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    border: 1px solid transparent;
+    background: transparent;
+}
+.status-badge-backlog   { color: oklch(0.62 0.02 40); border-color: oklch(0.36 0.03 30); }
+.status-badge-in-focus  { color: oklch(0.16 0.024 82); }
+.status-badge-playing   { color: oklch(0.80 0.12 82); border-color: oklch(0.50 0.08 82); }
+.status-badge-completed { color: oklch(0.70 0.10 150); border-color: oklch(0.45 0.07 150); }
+.status-badge-abandoned { color: oklch(0.62 0.09 25); border-color: oklch(0.42 0.07 25); }
+.status-badge-on-hold   { color: oklch(0.65 0.06 240); border-color: oklch(0.42 0.05 240); }
+
+/* § 4 Progress meters — segmented (film-frame, per-episode) and continuous
+   (time/percent, gold-gradient fill). */
+.progress-segmented {
+    display: flex;
+    gap: 0.25rem;
+}
+.progress-segment {
+    flex: 1;
+    height: 0.25rem;
+    border-radius: var(--radius-poster);
+    background: oklch(0.32 0.03 30);
+}
+.progress-segment-filled {
+    background: var(--color-gold);
+}
+.progress-continuous {
+    height: 0.375rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-line);
+    overflow: hidden;
+}
+.progress-continuous-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, oklch(0.68 0.10 80), oklch(0.85 0.11 86));
+}
+
+/* § 4 Movies filmstrip — black well with sprocket-hole perforation strips
+   top & bottom. */
+.filmstrip {
+    position: relative;
+    background: #000;
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-filmstrip);
+    padding: 14px 0.5rem;
+    overflow: hidden;
+}
+.filmstrip::before,
+.filmstrip::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 10px;
+    background: repeating-linear-gradient(90deg, transparent 0 7px, oklch(0.3 0.01 60) 7px 15px, transparent 15px 22px);
+}
+.filmstrip::before { top: 0; }
+.filmstrip::after { bottom: 0; }
+
+/* § 4 Section header — hairline rule that fades out. */
+.section-rule {
+    height: 1px;
+    flex: 1 1 auto;
+    background: linear-gradient(90deg, oklch(0.34 0.04 30), transparent);
+}
+
+/* § 4 Poster grid — the gold-frame "In focus" treatment, the visual sibling
+   of the In-focus badge. */
+.in-focus-frame {
+    box-shadow: 0 0 0 2px var(--color-gold), var(--shadow-card);
+    border-radius: var(--radius-card);
+}
+
+/* § 4 Recently-played list — hairline row separators. */
+.list-row {
+    border-bottom: 1px solid var(--color-line);
+}
+.list-row:last-child {
+    border-bottom: none;
+}
+
+/* Motion primitives (owned here as vocabulary; BCs decide where they fire):
+   leave-transition — 400ms ease-out fade + collapse for items leaving a list.
+   Apply .leave-transition always; toggle -leaving right before unmount. */
+.leave-transition {
+    transition: opacity var(--duration-slow) ease-out, max-height var(--duration-slow) ease-out, margin var(--duration-slow) ease-out;
+    overflow: hidden;
+}
+.leave-transition-leaving {
+    opacity: 0;
+    max-height: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* cross-fade — 200ms, e.g. dashboard tab-panel swaps. */
+.cross-fade {
+    transition: opacity var(--duration-crossfade) ease-in-out;
+}
 
 /* ── Card hover effect ── */
 .card-hover {

@@ -1,5 +1,7 @@
 module Mediatheca.Client.DesignSystem
 
+open Feliz
+
 // Design system composition helpers.
 // Components should use these instead of hardcoding class strings.
 // CSS custom properties (--glass-*, --space-*, etc.) are defined in index.css.
@@ -170,3 +172,330 @@ let modalContainer = "fixed inset-0 z-50 flex justify-center items-start pt-[10v
 
 /// Modal panel (the actual dialog box)
 let modalPanel = glassOverlay + " overflow-hidden animate-fade-in"
+
+// ─────────────────────────────────────────────────────────────────────────
+// Velvet Lobby component patterns (design-system-h3q8n)
+// Typed Feliz compositions for styleguide.md § 3.1, § 3.3, § 4 and Motion.
+// Reference the § 1.3-1.6 tokens (spacing/radii/shadows/animation) by name
+// via the CSS classes minted in index.css — no hardcoded oklch here.
+// ─────────────────────────────────────────────────────────────────────────
+
+// ── Surfaces (§ 3.1 velvet card, § 3.3 media-chrome glass) ──
+
+/// Solid, non-overlay card surface — "velvet card" (§ 3.1). Replaces
+/// `.glass-card` for page/card chrome: `surface` background + `line` ring,
+/// no blur/translucency. Never use for floating overlays — those stay glass
+/// per § 3.2 (ADR-0006, unchanged).
+let velvetCard = "velvet-card"
+
+/// Velvet card with the elevated hero shadow (cover art, hero panels).
+let velvetCardHero = "velvet-card velvet-card-hero"
+
+/// Narrower glass for small controls floating directly over artwork (§ 3.3)
+/// — e.g. a "Change artwork" pill, a play button on a backdrop. An ADDITION
+/// alongside § 3.2's mandatory overlay glass, not a replacement.
+let mediaChromeGlass = "media-chrome-glass"
+
+// ── Motion primitives (§ 1.6, § 4 Motion) — vocabulary only. Design-system
+// owns the keyframes/helpers; BCs decide *where* they fire. ──
+
+/// The gold-leaf foil sweep (~3.2s linear infinite, `--sweep`) — the one
+/// animated ornament in the system. Reserved for "In focus" surfaces only
+/// (the status badge, and any other In-focus-flagged surface); do not spread
+/// it to ordinary elements.
+let goldLeafSweep = "gold-sweep"
+
+/// Leave-transition primitive (400ms ease-out fade + collapse, `--duration-slow`)
+/// for items leaving a list/queue. Apply this class always; add
+/// `leaveTransitionLeaving` right before the item unmounts. *Where* it fires
+/// (e.g. a queue item being removed) is BC behavior, not owned here.
+let leaveTransition = "leave-transition"
+
+/// Modifier that triggers the leave-transition's collapsed/faded state.
+let leaveTransitionLeaving = "leave-transition leave-transition-leaving"
+
+/// Cross-fade primitive (200ms, `--duration-crossfade`) — e.g. a dashboard
+/// tab-panel swap. *Where* it fires is BC behavior, not owned here.
+let crossFade = "cross-fade"
+
+// ── Status badges (§ 4 Status badges) ──
+
+/// The six-state lifecycle vocabulary the status-badge pattern renders.
+/// Generic to the pattern — not `Shared.GameStatus` (which has no `Playing`
+/// state and adds `Dismissed`). Mapping a BC's real status enum onto this
+/// vocabulary (or vice versa) is a BC-level concern; see the design-system
+/// BC README for the discrepancy this surfaced.
+type LifecycleStatus =
+    | Backlog
+    | InFocus
+    | Playing
+    | Completed
+    | Abandoned
+    | OnHold
+
+let private statusBadgeClass (status: LifecycleStatus) =
+    match status with
+    | Backlog -> "status-badge status-badge-backlog"
+    | InFocus -> "status-badge status-badge-in-focus " + goldLeafSweep
+    | Playing -> "status-badge status-badge-playing"
+    | Completed -> "status-badge status-badge-completed"
+    | Abandoned -> "status-badge status-badge-abandoned"
+    | OnHold -> "status-badge status-badge-on-hold"
+
+let private statusBadgeLabel (status: LifecycleStatus) =
+    match status with
+    | Backlog -> "Backlog"
+    | InFocus -> "In focus"
+    | Playing -> "Playing"
+    | Completed -> "Completed"
+    | Abandoned -> "Abandoned"
+    | OnHold -> "On hold"
+
+/// Status badge pill (§ 4 Status badges) — uppercase, `0.14em` tracking, one
+/// hue per lifecycle state. "In focus" is the only variant that animates.
+let statusBadge (status: LifecycleStatus) : ReactElement =
+    Html.span [
+        prop.className (statusBadgeClass status)
+        prop.text (statusBadgeLabel status)
+    ]
+
+// ── Progress meters (§ 4 Progress meters, two kinds) ──
+
+/// Segmented ("film-frame") progress — one bar per episode. `filled` bars
+/// render gold, the remaining `total - filled` render `line`-empty.
+let progressSegmented (filled: int) (total: int) : ReactElement =
+    Html.div [
+        prop.className "progress-segmented"
+        prop.children [
+            for i in 1 .. (max total 1) do
+                Html.div [
+                    prop.key (string i)
+                    prop.className ("progress-segment" + (if i <= filled then " progress-segment-filled" else ""))
+                ]
+        ]
+    ]
+
+/// Continuous progress — single track with a gold-gradient fill. `fraction`
+/// is clamped to 0.0-1.0. For time/percent quantities (play time, HLTB).
+let progressContinuous (fraction: float) : ReactElement =
+    let pct = System.Math.Clamp(fraction, 0.0, 1.0) * 100.0
+    Html.div [
+        prop.className "progress-continuous"
+        prop.children [
+            Html.div [
+                prop.className "progress-continuous-fill"
+                prop.style [ style.width (length.percent pct) ]
+            ]
+        ]
+    ]
+
+// ── Star rating (§ 4 Star rating) ──
+
+/// Five gold stars. `value` is 1-5 (0 = unset). Tap a star to set; tap the
+/// currently-set star again to clear — aligns with the rating-dropdown's
+/// existing clear affordance. Controlled: caller owns state via `onChange`.
+let starRating (value: int) (onChange: int -> unit) : ReactElement =
+    Html.div [
+        prop.className "flex items-center gap-1"
+        prop.children [
+            for i in 1 .. 5 do
+                Html.button [
+                    prop.key (string i)
+                    prop.type' "button"
+                    prop.className ("text-lg leading-none transition-colors " + (if i <= value then "text-gold" else "text-line"))
+                    prop.text "★"
+                    prop.onClick (fun _ -> onChange (if i = value then 0 else i))
+                ]
+        ]
+    ]
+
+// ── Section header (§ 4 Section header) ──
+
+/// The editorial section-header signature — italic serif title + optional
+/// uppercase eyebrow kicker + a hairline fade rule + an optional right-aligned
+/// gold "All N ->" link. Distinct from the plain `sectionHeader` type-scale
+/// string above (this is the full structural pattern).
+let sectionHeaderPattern (title: string) (eyebrowText: string option) (link: (string * (unit -> unit)) option) : ReactElement =
+    Html.div [
+        prop.className "flex flex-col gap-1"
+        prop.children [
+            match eyebrowText with
+            | Some e -> Html.span [ prop.className eyebrow; prop.text e ]
+            | None -> ()
+            Html.div [
+                prop.className "flex items-center gap-4"
+                prop.children [
+                    Html.h2 [ prop.className sectionHeader; prop.text title ]
+                    Html.div [ prop.className "section-rule" ]
+                    match link with
+                    | Some (label, onClickHandler) ->
+                        Html.button [
+                            prop.type' "button"
+                            prop.className "text-gold text-sm font-sans whitespace-nowrap hover:underline"
+                            prop.text label
+                            prop.onClick (fun _ -> onClickHandler ())
+                        ]
+                    | None -> ()
+                ]
+            ]
+        ]
+    ]
+
+// ── List row (§ 4 Recently-played list) ──
+
+/// Recently-played style row — thumb, title, mono timestamp/duration,
+/// hairline separators (`.list-row` handles the bottom hairline).
+let listRow (thumb: ReactElement) (title: string) (meta: string) : ReactElement =
+    Html.div [
+        prop.className "list-row flex items-center gap-3 py-3"
+        prop.children [
+            thumb
+            Html.span [ prop.className (bodyText + " flex-1 truncate"); prop.text title ]
+            Html.span [ prop.className dataText; prop.text meta ]
+        ]
+    ]
+
+// ── In-focus poster frame (§ 4 Poster grid) ──
+
+/// Wraps any poster/card element with the reusable gold-frame "In focus"
+/// treatment — the visual sibling of the "In focus" status badge. Every BC's
+/// poster grid should render In-focus items through this wrapper.
+let inFocusFrame (child: ReactElement) : ReactElement =
+    Html.div [
+        prop.className "in-focus-frame relative"
+        prop.children [ child ]
+    ]
+
+// ── Movies filmstrip (§ 4 Movies filmstrip) ──
+
+type FilmstripItem = {
+    PosterRef: string option
+    Title: string
+    Meta: string
+}
+
+/// Filmstrip movie row — black sprocket-holed well with poster tiles inside,
+/// captions (title + meta, e.g. runtime/"rec. by") beneath the strip.
+let filmstripRow (items: FilmstripItem list) : ReactElement =
+    Html.div [
+        prop.className "flex flex-col gap-2"
+        prop.children [
+            Html.div [
+                prop.className "filmstrip flex gap-2"
+                prop.children [
+                    for item in items do
+                        Html.div [
+                            prop.key item.Title
+                            prop.className "aspect-[2/3] w-16 rounded-[var(--radius-poster)] bg-base-300 overflow-hidden flex-shrink-0"
+                            prop.children [
+                                match item.PosterRef with
+                                | Some ref ->
+                                    Html.img [
+                                        prop.src $"/images/{ref}"
+                                        prop.alt item.Title
+                                        prop.className "w-full h-full object-cover"
+                                    ]
+                                | None ->
+                                    Html.div [ prop.className "w-full h-full bg-gradient-to-br from-base-300 to-base-200" ]
+                            ]
+                        ]
+                ]
+            ]
+            Html.div [
+                prop.className "flex gap-2"
+                prop.children [
+                    for item in items do
+                        Html.div [
+                            prop.key (item.Title + "-caption")
+                            prop.className "w-16 flex flex-col gap-0.5"
+                            prop.children [
+                                Html.span [ prop.className (cardTitle + " text-xs truncate"); prop.text item.Title ]
+                                Html.span [ prop.className faintText; prop.text item.Meta ]
+                            ]
+                        ]
+                ]
+            ]
+        ]
+    ]
+
+// ── Secondary media card (§ 4 Secondary series/entity card) ──
+
+type SecondaryCardProps = {
+    Title: string
+    NextLabel: string
+    ProgressFilled: int
+    ProgressTotal: int
+}
+
+/// Compact poster-top card — serif title, "Next: SxEy" line, segmented
+/// mini-progress. Velvet card with the standard `--shadow-card`.
+let secondaryMediaCard (props: SecondaryCardProps) : ReactElement =
+    Html.div [
+        prop.className (velvetCard + " p-3 flex flex-col gap-2 w-40")
+        prop.children [
+            Html.h3 [ prop.className cardTitle; prop.text props.Title ]
+            Html.p [ prop.className mutedText; prop.text props.NextLabel ]
+            progressSegmented props.ProgressFilled props.ProgressTotal
+        ]
+    ]
+
+// ── Cinematic hero card (§ 4 TV "Next up" hero) ──
+
+type HeroCardProps = {
+    Title: string
+    InFocus: bool
+    WatchedWith: string list
+    ProgressFilled: int
+    ProgressTotal: int
+    Rating: int
+    OnRatingChange: int -> unit
+    OnWatchClick: unit -> unit
+}
+
+/// The cinematic hero card — backdrop gradient panel (velvet-card-hero) with
+/// the In-focus badge top-left, serif title, overlapping watched-with avatar
+/// stack, segmented episode progress, star rating, and the gold "Watch" pill.
+let heroCard (props: HeroCardProps) : ReactElement =
+    Html.div [
+        prop.className (velvetCardHero + " relative overflow-hidden p-5 flex flex-col justify-end gap-3 min-h-[220px]")
+        prop.children [
+            if props.InFocus then
+                statusBadge InFocus
+                |> fun badge ->
+                    Html.div [
+                        prop.className "absolute top-4 left-4"
+                        prop.children [ badge ]
+                    ]
+            Html.div [
+                prop.className "flex flex-col gap-2"
+                prop.children [
+                    Html.h3 [ prop.className pageTitle; prop.text props.Title ]
+                    if not props.WatchedWith.IsEmpty then
+                        Html.div [
+                            prop.className "flex items-center -space-x-3"
+                            prop.children [
+                                for initial in props.WatchedWith do
+                                    Html.div [
+                                        prop.key initial
+                                        prop.className "w-8 h-8 rounded-full ring-2 ring-base-100 bg-line flex items-center justify-center text-xs font-sans text-ink-secondary"
+                                        prop.text initial
+                                    ]
+                            ]
+                        ]
+                    progressSegmented props.ProgressFilled props.ProgressTotal
+                    Html.div [
+                        prop.className "flex items-center justify-between mt-1"
+                        prop.children [
+                            starRating props.Rating props.OnRatingChange
+                            Html.button [
+                                prop.type' "button"
+                                prop.className "bg-gold text-primary-content rounded-full px-4 py-2 text-sm font-sans font-semibold"
+                                prop.text "▶ Watch"
+                                prop.onClick (fun _ -> props.OnWatchClick ())
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]

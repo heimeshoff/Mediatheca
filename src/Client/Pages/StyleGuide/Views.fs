@@ -1382,6 +1382,235 @@ let private componentsSection () =
         ]
     ]
 
+// ── Section: Velvet Lobby patterns (design-system-h3q8n) ──
+// The re-skinned recurring patterns from the design brief's 3a/3b/3c/3d
+// boards: typed Feliz compositions in DesignSystem.fs, specimens here.
+
+[<ReactComponent>]
+let private velvetLobbyPatternsSection () =
+    let rating, setRating = React.useState 3
+    let heroRating, setHeroRating = React.useState 4
+
+    Html.div [
+        prop.className "flex flex-col gap-6"
+        prop.children [
+            sectionTitle "Velvet Lobby Patterns"
+
+            decision "The recurring component patterns from the Velvet Lobby re-skin (design brief turn 3, options 3a dashboard / 3b game detail / 3c movies grid), re-expressed as typed Feliz compositions in DesignSystem.fs (not inline in pages) so every BC's frontend conforms to the same shapes. Tokens: styleguide.md § 1.3-1.6 (spacing/radii/shadows/animation, incl. the gold-leaf sweep). Surfaces: § 3.1 velvet card, § 3.3 media-chrome glass."
+
+            // ── Velvet card & media-chrome glass ──
+            subheading "Surfaces — Velvet Card & Media-Chrome Glass"
+
+            Html.div [
+                prop.className "grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 max-w-3xl"
+                prop.children [
+                    specimen "Solid, non-overlay page/card surface (§ 3.1). surface background + line-ring elevation, no blur." "DesignSystem.velvetCard"
+                        (Html.div [
+                            prop.className (DesignSystem.velvetCard + " p-4")
+                            prop.children [ Html.p [ prop.className DesignSystem.bodyText; prop.text "Velvet card" ] ]
+                        ])
+                    specimen "Narrower glass (blur 6px) for small controls over artwork (§ 3.3) — addition alongside the mandatory overlay glass (§ 3.2), not a replacement." "DesignSystem.mediaChromeGlass"
+                        (Html.div [
+                            prop.className "relative h-20 rounded-lg bg-gradient-to-br from-primary/30 to-base-300 flex items-center justify-center"
+                            prop.children [
+                                Html.div [
+                                    prop.className (DesignSystem.mediaChromeGlass + " px-3 py-1.5 text-xs font-sans text-base-content")
+                                    prop.text "Change artwork"
+                                ]
+                            ]
+                        ])
+                ]
+            ]
+
+            // ── Status badges ──
+            subheading "Status Badges"
+
+            Html.p [
+                prop.className DesignSystem.secondaryText
+                prop.text "The game lifecycle mapped to the palette. \"In focus\" is the only variant that animates (gold-leaf sweep) — the sweep is reserved for this state only."
+            ]
+
+            Html.div [
+                prop.className "flex flex-wrap gap-3 mt-4"
+                prop.children [
+                    DesignSystem.statusBadge DesignSystem.Backlog
+                    DesignSystem.statusBadge DesignSystem.InFocus
+                    DesignSystem.statusBadge DesignSystem.Playing
+                    DesignSystem.statusBadge DesignSystem.Completed
+                    DesignSystem.statusBadge DesignSystem.Abandoned
+                    DesignSystem.statusBadge DesignSystem.OnHold
+                ]
+            ]
+
+            Html.div [
+                prop.className "mt-3 flex flex-col gap-1"
+                prop.children [
+                    Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "DesignSystem.statusBadge DesignSystem.InFocus" ]
+                    Html.p [
+                        prop.className DesignSystem.faintText
+                        prop.text "DesignSystem.LifecycleStatus is the pattern's own vocabulary (Backlog/InFocus/Playing/Completed/Abandoned/OnHold) -- not Shared.GameStatus, which has no Playing state and adds Dismissed. See the design-system BC README for the discrepancy this surfaced."
+                    ]
+                ]
+            ]
+
+            // ── Progress meters ──
+            subheading "Progress Meters"
+
+            Html.p [
+                prop.className DesignSystem.secondaryText
+                prop.text "Segmented (film-frame, one bar per episode) for countable units; continuous (gold-gradient fill) for time/percent."
+            ]
+
+            Html.div [
+                prop.className "flex flex-col gap-4 mt-4 max-w-md"
+                prop.children [
+                    Html.div [
+                        prop.className "flex flex-col gap-1"
+                        prop.children [
+                            DesignSystem.progressSegmented 3 6
+                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "DesignSystem.progressSegmented 3 6" ]
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "flex flex-col gap-1"
+                        prop.children [
+                            DesignSystem.progressContinuous 0.53
+                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "DesignSystem.progressContinuous 0.53" ]
+                        ]
+                    ]
+                ]
+            ]
+
+            // ── Star rating ──
+            subheading "Star Rating"
+
+            Html.div [
+                prop.className "flex items-center gap-4 mt-4"
+                prop.children [
+                    DesignSystem.starRating rating setRating
+                    Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text (sprintf "value = %d" rating) ]
+                ]
+            ]
+            Html.p [
+                prop.className (DesignSystem.faintText + " mt-2")
+                prop.text "DesignSystem.starRating value onChange -- tap a star to set, tap the current value again to clear."
+            ]
+
+            // ── Section header pattern ──
+            subheading "Section Header"
+
+            Html.div [
+                prop.className "mt-4 max-w-2xl"
+                prop.children [
+                    DesignSystem.sectionHeaderPattern "In focus" (Some "Continuing") (Some ("All 12 →", fun () -> ()))
+                ]
+            ]
+            Html.code [
+                prop.className "text-xs font-mono text-primary/70 mt-2 block"
+                prop.text "DesignSystem.sectionHeaderPattern title eyebrow link"
+            ]
+
+            // ── List row ──
+            subheading "List Row"
+
+            Html.div [
+                prop.className "flex flex-col mt-4 max-w-md rounded-lg bg-base-200/20 px-3"
+                prop.children [
+                    DesignSystem.listRow (PosterCard.thumbnail None "Recently played") "Marvel's Spider-Man 2" "yesterday · 2.4h"
+                    DesignSystem.listRow (PosterCard.thumbnail None "Recently played") "Baldur's Gate 3" "3 days ago · 1.1h"
+                ]
+            ]
+            Html.code [
+                prop.className "text-xs font-mono text-primary/70 mt-2 block"
+                prop.text "DesignSystem.listRow thumb title meta"
+            ]
+
+            // ── In-focus poster frame ──
+            subheading "In-Focus Poster Frame"
+
+            Html.div [
+                prop.className "flex gap-4 mt-4 max-w-xs"
+                prop.children [
+                    DesignSystem.inFocusFrame (PosterCard.view "dune-part-two-2024" "Dune: Part Two" 2024 None None)
+                    PosterCard.view "the-matrix-1999" "The Matrix" 1999 None None
+                ]
+            ]
+            Html.p [
+                prop.className (DesignSystem.faintText + " mt-2")
+                prop.text "DesignSystem.inFocusFrame child -- wraps any poster/card element with the gold-frame In-focus treatment, the visual sibling of the In-focus badge (left has the frame, right does not)."
+            ]
+
+            // ── Movies filmstrip ──
+            subheading "Movies Filmstrip"
+
+            Html.div [
+                prop.className "mt-4 max-w-2xl"
+                prop.children [
+                    DesignSystem.filmstripRow [
+                        { PosterRef = None; Title = "Alien"; Meta = "1h57 · rec. by Mara" }
+                        { PosterRef = None; Title = "Blade Runner"; Meta = "1h57" }
+                        { PosterRef = None; Title = "Dune"; Meta = "2h35 · rec. by Alex" }
+                    ]
+                ]
+            ]
+            Html.code [
+                prop.className "text-xs font-mono text-primary/70 mt-2 block"
+                prop.text "DesignSystem.filmstripRow [ { PosterRef; Title; Meta } ]"
+            ]
+
+            // ── Secondary media card ──
+            subheading "Secondary Media Card"
+
+            Html.div [
+                prop.className "flex gap-4 mt-4"
+                prop.children [
+                    DesignSystem.secondaryMediaCard { Title = "Loki"; NextLabel = "Next: S2 E3 · 44 min"; ProgressFilled = 2; ProgressTotal = 12 }
+                ]
+            ]
+            Html.code [
+                prop.className "text-xs font-mono text-primary/70 mt-2 block"
+                prop.text "DesignSystem.secondaryMediaCard { Title; NextLabel; ProgressFilled; ProgressTotal }"
+            ]
+
+            // ── Cinematic hero card ──
+            subheading "Cinematic Hero Card"
+
+            Html.div [
+                prop.className "mt-4 max-w-xl"
+                prop.children [
+                    DesignSystem.heroCard {
+                        Title = "Severance"
+                        InFocus = true
+                        WatchedWith = [ "M"; "A" ]
+                        ProgressFilled = 4
+                        ProgressTotal = 9
+                        Rating = heroRating
+                        OnRatingChange = setHeroRating
+                        OnWatchClick = fun () -> ()
+                    }
+                ]
+            ]
+            Html.code [
+                prop.className "text-xs font-mono text-primary/70 mt-2 block"
+                prop.text "DesignSystem.heroCard { Title; InFocus; WatchedWith; ProgressFilled; ProgressTotal; Rating; OnRatingChange; OnWatchClick }"
+            ]
+
+            // ── Motion ──
+            subheading "Motion"
+
+            decision "Design-system owns the motion VOCABULARY, not its application. Three primitives are encoded once: the gold-leaf sweep (goldLeafSweep, reserved for In-focus surfaces only -- see Status Badges and the Cinematic Hero Card above), the leave-transition (leaveTransition / leaveTransitionLeaving, 400ms ease-out fade + collapse, for items leaving a queue), and the cross-fade (crossFade, 200ms, for e.g. dashboard tab-panel swaps). BCs decide WHERE the leave-transition and cross-fade fire -- that wiring is out of scope here. The spotlight gradient is static and never animated -- a rule, not a helper."
+
+            Html.div [
+                prop.className "flex flex-col gap-2 mt-3 max-w-2xl"
+                prop.children [
+                    Html.code [ prop.className "text-xs font-mono text-primary/70 block"; prop.text "DesignSystem.goldLeafSweep    (\"gold-sweep\", ~3.2s linear infinite)" ]
+                    Html.code [ prop.className "text-xs font-mono text-primary/70 block"; prop.text "DesignSystem.leaveTransition / .leaveTransitionLeaving (400ms ease-out)" ]
+                    Html.code [ prop.className "text-xs font-mono text-primary/70 block"; prop.text "DesignSystem.crossFade         (200ms)" ]
+                ]
+            ]
+        ]
+    ]
+
 // ── Section: Content Blocks ──
 
 [<ReactComponent>]
@@ -1987,6 +2216,7 @@ let private sectionNav (activeSection: Section) (dispatch: Msg -> unit) =
         Glassmorphism, "Glassmorphism"
         Animations, "Animations"
         Components, "Components"
+        VelvetLobbyPatterns, "Velvet Lobby Patterns"
         ContentBlocks, "Content Blocks"
         ContentZone, "Content Zone"
         EntryList, "Entry List"
@@ -2014,6 +2244,7 @@ let private sectionContent (section: Section) =
     | Glassmorphism -> glassmorphismSection ()
     | Animations -> animationsSection ()
     | Components -> componentsSection ()
+    | VelvetLobbyPatterns -> velvetLobbyPatternsSection ()
     | ContentBlocks -> contentBlocksSection ()
     | ContentZone -> contentZoneSection ()
     | EntryList -> entryListSection ()

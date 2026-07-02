@@ -1,7 +1,7 @@
 ---
 id: design-system-h3q8n
 title: Velvet Lobby re-skin — component patterns & motion
-status: todo
+status: done
 type: feature
 context: design-system
 created: 2026-07-02
@@ -11,7 +11,7 @@ tags: [styleguide, components, patterns, motion, re-skin, velvet-lobby]
 related_adrs: [0006, 0009]
 related_research: []
 prior_art: [design-system-001, design-system-003]
-completed:
+completed: 2026-07-02
 ---
 
 ## Why
@@ -57,14 +57,14 @@ foundation task [[design-system-r7k2m]] shipped only the palette / type / glass-
 
 ## Acceptance criteria
 
-- [ ] The **§ 1.3–1.6 tokens** (spacing, radii, shadows/elevation, animation incl. `--sweep` and the gold-leaf sweep `@keyframes`) are ported into `index.css` — these were carved out of [[design-system-r7k2m]] into this task and are the named values the components reference.
-- [ ] The **velvet card** (§ 3.1 — solid, non-overlay `surface`+`line`-ring surface) and the **media-chrome glass** (§ 3.3 — `blur(6px)` over artwork) treatments exist (typed `DesignSystem.fs` helper + CSS), distinct from the mandatory overlay glass (§ 3.2, unchanged — ADR-0006).
-- [ ] Each pattern above exists as a **typed Feliz composition in `DesignSystem.fs`** (not inline in the page), referencing foundation tokens from [[design-system-r7k2m]] and the newly-ported § 1.3–1.6 tokens by name — no hardcoded oklch.
-- [ ] The in-app StyleGuide page (`src/Client/Pages/StyleGuide`) shows a live specimen of each pattern: hero card, filmstrip row, secondary card, In-focus poster frame, all six status badges, both progress styles, star rating, section header, list row.
-- [ ] Status badges cover the full game lifecycle (Backlog → InFocus → Playing → Completed / Abandoned / OnHold) with the palette mapping above; "In focus" is the only badge that animates.
-- [ ] Motion **primitives** are encoded once (keyframes / helpers for the gold-leaf sweep, the 400ms leave-transition, the 200ms cross-fade) and documented; the gold-leaf sweep appears on In-focus surfaces only. Wiring these into queue-leave / tab-change behavior is explicitly **not** in this task.
-- [ ] `styleguide.md` gains a "Component patterns" section documenting each pattern with its token references, plus a "Motion" subsection stating the vocabulary + the In-focus-only sweep discipline + the static-spotlight rule.
-- [ ] `npm run build` compiles clean; specimens render on the StyleGuide route without console errors.
+- [x] The **§ 1.3–1.6 tokens** (spacing, radii, shadows/elevation, animation incl. `--sweep` and the gold-leaf sweep `@keyframes`) are ported into `index.css` — these were carved out of [[design-system-r7k2m]] into this task and are the named values the components reference.
+- [x] The **velvet card** (§ 3.1 — solid, non-overlay `surface`+`line`-ring surface) and the **media-chrome glass** (§ 3.3 — `blur(6px)` over artwork) treatments exist (typed `DesignSystem.fs` helper + CSS), distinct from the mandatory overlay glass (§ 3.2, unchanged — ADR-0006).
+- [x] Each pattern above exists as a **typed Feliz composition in `DesignSystem.fs`** (not inline in the page), referencing foundation tokens from [[design-system-r7k2m]] and the newly-ported § 1.3–1.6 tokens by name — no hardcoded oklch.
+- [x] The in-app StyleGuide page (`src/Client/Pages/StyleGuide`) shows a live specimen of each pattern: hero card, filmstrip row, secondary card, In-focus poster frame, all six status badges, both progress styles, star rating, section header, list row.
+- [x] Status badges cover the full game lifecycle (Backlog → InFocus → Playing → Completed / Abandoned / OnHold) with the palette mapping above; "In focus" is the only badge that animates.
+- [x] Motion **primitives** are encoded once (keyframes / helpers for the gold-leaf sweep, the 400ms leave-transition, the 200ms cross-fade) and documented; the gold-leaf sweep appears on In-focus surfaces only. Wiring these into queue-leave / tab-change behavior is explicitly **not** in this task.
+- [x] `styleguide.md` gains a "Component patterns" section documenting each pattern with its token references, plus a "Motion" subsection stating the vocabulary + the In-focus-only sweep discipline + the static-spotlight rule.
+- [x] `npm run build` compiles clean; specimens render on the StyleGuide route without console errors.
 
 ## Notes
 
@@ -77,3 +77,36 @@ foundation task [[design-system-r7k2m]] shipped only the palette / type / glass-
 - Existing `design-system-003` added an ActionMenu specimen to the StyleGuide page — follow that specimen pattern for the new ones (prior art), and treat its typed-composition style as the template for the `DesignSystem.fs` entries.
 - Depends on the foundation task purely for tokens/type; can be refined in parallel but **must not be promoted ahead of [[design-system-r7k2m]]**. The two gating open decisions (glassmorphism coexistence vs ADR-0006; theme replace-in-place vs new name) live on r7k2m — this task inherits whatever r7k2m resolves and needs no separate decision on them.
 - Game-detail-specific chrome (Overview/Journal tabs, HLTB tiers, session history) shown in 3b is BC-level UI (games/journal), not a design-system pattern — capture those separately in their BCs if wanted; this task only owns the reusable patterns.
+
+## Outcome
+
+Shipped the § 1.3–1.6 tokens, the velvet-card (§ 3.1) and media-chrome-glass (§ 3.3) surfaces,
+and nine component patterns (hero card, secondary media card, movies filmstrip, In-focus poster
+frame, six-state status badges, segmented + continuous progress, star rating, section-header
+pattern, list row) plus three motion primitives (gold-leaf sweep, leave-transition, cross-fade)
+as typed Feliz compositions in `src/Client/DesignSystem.fs`, backed by CSS in
+`src/Client/index.css`. All render as live, interactive specimens in a new "Velvet Lobby
+Patterns" section on the StyleGuide page (`velvetLobbyPatternsSection`,
+`src/Client/Pages/StyleGuide/Views.fs`, `VelvetLobbyPatterns` case added to
+`Pages/StyleGuide/Types.fs`). `styleguide.md` §§ 0, 1.3–1.6, 3.1, 3.3, 4, 7 and the Sign-off
+section updated in lockstep to reflect implementation status, token/file references, and the
+Motion subsection (vocabulary + In-focus-only-sweep discipline + static-spotlight rule).
+
+Sidebar nav, top bar, lifecycle stepper, detail-page panels (HLTB tiers/play history/friends),
+avatars, and game row remain documented target only (§ 4) — out of this task's acceptance
+criteria, left as future design-system backlog items (noted in styleguide.md § 7).
+
+Discovered mid-task: `Shared.GameStatus` (Games BC) has no `Playing` state and instead has
+`Dismissed`, while the design brief's status-badge lifecycle (and this task's
+`DesignSystem.LifecycleStatus`) has `Playing` and no `Dismissed`. Kept `LifecycleStatus` as the
+pattern's own generic vocabulary rather than reusing/mutating `Shared.GameStatus` (cross-BC,
+out of scope for design-system) — filed
+`.agentheim/contexts/games/backlog/games-status-vocabulary-reconcile.md` for Games BC to decide
+the reconciliation and wire the real pages.
+
+`npm run build` compiles clean (Fable + Tailwind, no warnings beyond the pre-existing DaisyUI
+`@property` CSS-optimizer notice, unrelated to this task).
+
+Key files: `src/Client/index.css`, `src/Client/DesignSystem.fs`,
+`src/Client/Pages/StyleGuide/Types.fs`, `src/Client/Pages/StyleGuide/Views.fs`,
+`.agentheim/contexts/design-system/styleguide.md`, `.agentheim/contexts/design-system/README.md`.

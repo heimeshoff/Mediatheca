@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 0
@@ -33,7 +33,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-<!-- no tasks in backlog -->
+- **games-status-vocabulary-reconcile** -- Reconcile GameStatus with the design system's LifecycleStatus vocabulary -- `backlog/games-status-vocabulary-reconcile.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
