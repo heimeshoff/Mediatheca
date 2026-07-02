@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-02 18:10 -- Modeling / Refined: design-system-h3q8n - Velvet Lobby re-skin — component patterns & motion
+
+**Type:** Modeling / Refine
+**BC:** design-system
+**Status after:** backlog
+**Summary:** Sharpened the component-patterns task's own shape (its two gating decisions live on the [[design-system-r7k2m]] foundation, not here). Three refinement calls, recommended defaults applied while the user was away: (1) **not split** — kept as one cohesive component pass; (2) **code home = typed compositions in `DesignSystem.fs`, not inline** — resolves the BC README's standing open question and follows the design-system-003 ActionMenu prior art; (3) **motion = primitives only** — design-system owns the keyframes/helpers/discipline (gold-leaf sweep reserved for In-focus, 400ms leave-transition, 200ms cross-fade), while *where* queue-leave and tab cross-fade fire is dashboard/tab BC wiring, carved out like the 3b game-detail chrome. Also surfaced and codified the **In-focus poster gold-frame (3c)** as an explicit reusable pattern (was only implied), and rewrote all acceptance criteria to concrete/testable. Stays in `backlog/` — must not promote ahead of r7k2m.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-07-02 17:39 -- Modeling / Captured: design-system-r7k2m + design-system-h3q8n - Velvet Lobby re-skin
 
 **Type:** Modeling / Capture
