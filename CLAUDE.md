@@ -25,7 +25,7 @@ Personal media library app (movies, series, games, books) built with full-stack 
 - **DDD Bounded Contexts**: Movies, Journal, Friends, Curation, Intelligence, Integration, Administration
 - API routes: `/api/{TypeName}/{MethodName}` via Fable.Remoting
 - Shared API contract: `IMediathecaApi` in src/Shared/Shared.fs
-- DB file: `mediatheca.db` in server's AppContext.BaseDirectory
+- DB file: `mediatheca.db` in the data dir — `DATA_DIR` env var if set, else `~/app/mediatheca/` (on Windows dev: `C:\Users\<user>\app\mediatheca\`). Holds both event store and projections; WAL sidecars and an `images/` cache sit alongside it. See `src/Server/Program.fs`.
 - SQLite pragmas: WAL mode, NORMAL sync, FK enabled, 5s busy timeout
 
 ## Project Structure
