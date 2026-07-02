@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-07-02 17:39 -- Modeling / Captured: design-system-r7k2m + design-system-h3q8n - Velvet Lobby re-skin
+
+**Type:** Modeling / Capture
+**BC:** design-system
+**Filed to:** backlog
+**Summary:** Captured a wholesale re-skin of the styleguide (the frontend gate) to the cinematic **Velvet Lobby** direction from the "Mediatheca design brief" Claude Design project (`c19616ce-…`, read via `DesignSync`). User chose Velvet Lobby (warm burgundy + gold) with variant 3a as the reference, split into two tasks: **design-system-r7k2m** (tokens & type foundation — replaces Oswald/Inter with Instrument Serif + Instrument Sans + Spline Sans Mono, swaps the dim palette for the 3d system-board oklch tokens, updates index.css `@theme` + DesignSystem.fs + StyleGuide page + styleguide.md) and **design-system-h3q8n** (component patterns & motion — hero card, filmstrip row, lifecycle status badges, segmented/continuous progress, star rating, gold-leaf sweep; depends on the foundation). Both backlog pending two open decisions (glassmorphism coexistence vs ADR-0006; theme replace-in-place vs new name).
+
+---
+
 ## 2026-06-26 12:35 -- Work session ended
 
 **Type:** Work / Session end

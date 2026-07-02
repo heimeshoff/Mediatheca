@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 2
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 3
@@ -35,7 +35,8 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-<!-- no tasks in backlog -->
+- **design-system-r7k2m** -- Velvet Lobby re-skin — tokens & type foundation -- `backlog/design-system-r7k2m-velvet-lobby-tokens-type-foundation.md`
+- **design-system-h3q8n** -- Velvet Lobby re-skin — component patterns & motion -- `backlog/design-system-h3q8n-velvet-lobby-component-patterns.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
