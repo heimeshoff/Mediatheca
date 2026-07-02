@@ -5,6 +5,21 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~22m (first Batch started → now)
+**Completed:** 1 (first-try PASS: 0, re-dispatched: 1, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** design-system-t4b9k: 2
+**Commits:** 1 (design-system-t4b9k task commit; this session-end line committed separately)
+**Carry-over:** none — working tree clean
+**Note:** design-system-t4b9k (layered sidebar nav) shipped. Worker's first pass was substantively correct — verifier caught one defect (the new ADR-0013 was missing its YAML frontmatter, which the index step reads `scope:` from), FAILed iteration 1, re-dispatched a scoped frontmatter-only fix, PASSed iteration 2. Reworked `Components/Sidebar.fs` into top/bottom nav groups (Events/Settings pinned via `mt-auto`), replaced the flat `bg-primary/10`/`.nav-glow` active state with a raised **ivory** active-tab layer (`--color-nav-active-bg` `oklch(0.94 0.02 75)`, dark-burgundy ink, gold icon) joined to the rail/content boundary by a concave corner-notch (two radial-gradient corner masks) — an explicit user override of the design brief's burgundy fill, pinned in ADR-0013. New tokens in `index.css`, typed `navItemClass`/`navItemActiveIconClass`/`navGroupTop`/`navGroupBottom` in `DesignSystem.fs`, live StyleGuide specimen, `styleguide.md` §§ 0/4/7 + README in lockstep. Clean `npm run build`. The design-system `todo/` is now empty and the whole board is quiescent. No new backlog items, no concept candidates surfaced this run. The full-redesign human sign-off flagged in styleguide.md's Sign-off section (running-app review of tokens/typography/patterns/now-sidebar) remains open — a good next step for the user.
+
+---
+
 ## 2026-07-03 -- Task verified and completed: design-system-t4b9k - Layered sidebar nav — ivory active tab, curved-corner boundary
 
 **Type:** Work / Task completion
