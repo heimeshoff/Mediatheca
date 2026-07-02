@@ -1,7 +1,7 @@
 ---
 id: design-system-r7k2m
 title: Velvet Lobby re-skin — tokens & type foundation
-status: backlog
+status: todo
 type: feature
 context: design-system
 created: 2026-07-02
@@ -54,7 +54,7 @@ The main region carries a static `radial-gradient(90% 42% at 50% -4%, oklch(.30 
 ## Acceptance criteria
 
 - [ ] `src/Client/index.css` `@theme` block: `--font-display` → Instrument Serif, `--font-sans` → Instrument Sans, and a new `--font-mono` → Spline Sans Mono; Google Fonts `<link>` (or import) updated to load all three, Oswald/Inter removed.
-- [ ] Palette tokens (`bg`, `surface`, `line`, `gold`, `spotlight`, `ink` + muted text steps) expressed as Tailwind 4 `@theme` / DaisyUI theme values using the oklch values above; the `dim` theme's neutral graphite palette is replaced (decide replace-in-place vs new theme name — see Notes).
+- [ ] Palette tokens (`bg`, `surface`, `line`, `gold`, `spotlight`, `ink` + muted text steps) expressed as Tailwind 4 `@theme` / DaisyUI theme values using the oklch values above; the `dim` theme's neutral graphite palette is **replaced in place** — the theme keeps the name `dim` and `data-theme="dim"` stays on `<html>` (resolved — see Notes), so no page's theme attribute changes.
 - [ ] `DesignSystem.fs` typed class compositions updated so the new font roles and surface/line/accent tokens are referenced by name, not hardcoded.
 - [ ] The in-app StyleGuide page (`src/Client/Pages/StyleGuide`) renders the new palette swatches (with oklch labels), the three-typeface type scale, and the italic-serif section-header voice.
 - [ ] `styleguide.md` (canonical, ADR-0009) updated: token table, typography section, and theme description reflect Velvet Lobby; the doc remains the source of truth for the gate.
@@ -64,8 +64,8 @@ The main region carries a static `radial-gradient(90% 42% at 50% -4%, oklch(.30 
 ## Notes
 
 - **Reference:** Claude Design project `c19616ce-55b9-482a-8146-5d13f0fe6484`, file *Mediatheca Directions.dc.html*. Turn 3 (Velvet Lobby full hi-fi set), option **3a** (desktop dashboard) is the chosen reference; **3d** is the token/system board this task implements. Read via the `DesignSync` tool (`get_file`), not WebFetch (the `/design/` URL 403s).
-- **Open decision — glassmorphism coexistence.** The brief is almost entirely solid cinematic surfaces + gradients and shows no overlays, yet ADR-0006 mandates glassmorphism for every dropdown/modal/popover. Resolve during refinement: keep the glass rule but re-parameterize its tint to the new palette (recommended — least disruptive), or amend ADR-0006. This is the main thing gating promotion to `todo/`.
-- **Open decision — theme replace vs. add.** Overwrite the `dim` theme values in place (keeps `data-theme="dim"` everywhere) or introduce a new theme name (e.g. `velvet`) and switch the `<html>` attribute. Replace-in-place is simpler and avoids touching every page; new-name is cleaner if a light mode or the cool "Modern recolor" variant (turn 4) might later coexist.
+- **Resolved (2026-07-02) — glassmorphism coexistence → keep the rule, re-tint.** ADR-0006's mandatory glassmorphism stays in force; the re-skin only re-parameterizes the glass *tint* (`.glass-card`, `.rating-dropdown`) to the burgundy/gold palette. No ADR-0006 amendment, no relaxation of the "no fully-opaque overlay" rule — lowest blast radius (ADR-0006 is `scope: global` and `design-check` enforces it across every BC). The brief's solid cinematic surfaces are *page/card* backgrounds, not floating overlays, so there's no genuine conflict. Reflected in the glassmorphism acceptance criterion. *(Default applied while user away — re-confirm if desired; amending ADR-0006 to allow solid structural panels remains a possible later decision task.)*
+- **Resolved (2026-07-02) — theme replace vs. add → replace `dim` in place.** Overwrite the `dim` theme's values with the Velvet Lobby oklch tokens; keep the name `dim` and `data-theme="dim"` on `<html>`. Simplest, touches no page's theme attribute. *(Default applied while user away — re-confirm if desired.)* The trade-off: no coexisting-theme path without a later rename — acceptable because a light mode and the cool "Modern recolor" variant (turn 4) are both out of scope for v1 (recorded in the "Deferred variant" note below and the BC README's light-theme open question). If either is later wanted, a follow-up task introduces a named theme then.
 - **Deferred variant.** Turn 4 offered a cool "Modern recolor" (graphite hue 260 + electric-lime/amber accent). Not chosen; recorded here in case a second theme is wanted later. The brief's "try next" also floats a cyan accent and a light-mode pass — out of scope for this task.
 - **Accessibility check** during work: gold text (`.80 .12 82`) on burgundy `bg` and on `surface`, plus muted text steps, should meet contrast for their sizes.
 - Component patterns (hero card, filmstrip row, segmented progress, status badges, gold-leaf sweep, star rating) are **not** in this task — they are [[design-system-h3q8n]], which depends on these tokens.

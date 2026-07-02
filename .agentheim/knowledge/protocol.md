@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-02 18:40 -- Modeling / Refined: design-system-r7k2m - Velvet Lobby re-skin — tokens & type foundation
+
+**Type:** Modeling / Refine
+**BC:** design-system
+**Status after:** todo
+**Summary:** Resolved the two open decisions that were gating promotion (recommended defaults applied while user away — flagged for re-confirm). (1) **Glassmorphism → keep ADR-0006's mandatory glass, re-tint only** — the re-skin re-parameterizes the glass tint (`.glass-card`, `.rating-dropdown`) to burgundy/gold; no ADR amendment, no relaxation of the no-opaque-overlay rule (lowest blast radius — ADR-0006 is `scope: global` and enforced by `design-check`); the brief's solid surfaces are page/card backgrounds, not floating overlays, so no genuine conflict. (2) **Theme → replace `dim` in place** — overwrite the dim palette with Velvet Lobby oklch tokens, keep the name `dim` and `data-theme="dim"`; touches no page attribute; a named theme is deferred until light-mode or the cool "Modern recolor" variant is actually wanted. Rewrote the two Notes bullets from open→resolved, updated the palette + glass acceptance criteria, and **promoted to `todo/`**. Sibling [[design-system-h3q8n]] inherits both resolutions and stays in backlog (must not promote ahead of this foundation).
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-07-02 18:10 -- Modeling / Refined: design-system-h3q8n - Velvet Lobby re-skin — component patterns & motion
 
 **Type:** Modeling / Refine

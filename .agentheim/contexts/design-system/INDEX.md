@@ -10,15 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 2
-- **Todo:** 0
+- **Backlog:** 1
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 3
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-<!-- no tasks in todo -->
+- **design-system-r7k2m** -- Velvet Lobby re-skin — tokens & type foundation -- `todo/design-system-r7k2m-velvet-lobby-tokens-type-foundation.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -35,7 +35,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **design-system-r7k2m** -- Velvet Lobby re-skin — tokens & type foundation -- `backlog/design-system-r7k2m-velvet-lobby-tokens-type-foundation.md`
 - **design-system-h3q8n** -- Velvet Lobby re-skin — component patterns & motion -- `backlog/design-system-h3q8n-velvet-lobby-component-patterns.md`
 <!-- backlog-list:end -->
 
