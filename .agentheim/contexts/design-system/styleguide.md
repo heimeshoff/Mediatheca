@@ -1,209 +1,276 @@
-# Mediatheca Styleguide
+# Mediatheca Styleguide — "Velvet Lobby"
 
-> **Status:** Awaiting human sign-off (design-system-001, criterion 5).
+> **Status:** Tokens & type foundation **shipped** (design-system-r7k2m: palette, typography, glass re-tint). Component patterns (§ 4) **not yet implemented** — tracked as design-system-h3q8n. Adopted from the *Mediatheca design brief* (Claude Design), turn 3, option **3a** — the "Velvet Lobby" desktop dashboard. The two gating decisions below (glassmorphism coexistence, theme replace-in-place) were applied as recommended defaults while the user was away and are **flagged for re-confirm**; full human sign-off on the redesign is still open.
 > **Role:** Canonical, reviewable artifact for the design-system gate. Every frontend / UI task in any BC `depends_on` this document.
-> **Scope:** This document *formalizes what already exists* in the running app. It does not change the design system. New tokens, new patterns, and retired patterns each go through the design-system backlog (see § 6).
+> **Scope:** This document describes the design system as it exists after the token + type foundation migration. `src/Client/index.css` (`@theme` + the `dim` theme's `@plugin "daisyui/theme"` block) and `src/Client/DesignSystem.fs` are authoritative for the *implemented* values (tokens, typography, glass tint); this document stays authoritative for **intent and the gate**. Component patterns (§ 4) remain **target/not-yet-shipped** — those still route through this doc's migration checklist (§ 7) via design-system-h3q8n. New tokens and patterns beyond what is captured here still route through the design-system backlog (see § 6).
 
-This styleguide consolidates three pre-existing sources into one reviewable place:
+The design direction in one line: **a warm cinematic editorial** — velvet-black surfaces, ivory serif titles, and a single **gold** accent used like foil, with cinema motifs (film-frame progress, sprocket-hole filmstrips, marquee "In focus" sweep) as the recurring ornament. Tagline: *"Where entertainment lives."*
 
-- `src/Client/index.css` — CSS custom properties (tokens), the `dim` theme, and named utility classes.
-- `src/Client/DesignSystem.fs` — typed F# compositions of Tailwind/DaisyUI classes that components reference instead of hardcoding strings.
-- `src/Client/Pages/StyleGuide/Views.fs` — the live, in-app reference page rendering every pattern in situ.
+**Source of truth for values:** the design brief's own system board (turn 3, "tokens & component patterns — maps to Tailwind 4 `@theme`") is reproduced faithfully below. `src/Client/index.css` (`@theme` + tokens, the `dim` theme) and `src/Client/DesignSystem.fs` (typed class compositions) are authoritative for the *implemented* values; this document stays authoritative for **intent and the gate**.
 
-It references code by file + line; it does not duplicate it. When this doc and the code disagree, **the code is authoritative for values; this doc is authoritative for intent and the gate.** Drift between them is a finding (see § 7 cross-check).
+---
+
+## 0. Migration status (read first)
+
+Tokens and typography have landed; component patterns have not.
+
+| Concern | Status | Detail |
+|---|---|---|
+| Base surface | **Shipped** | `dim` theme replaced in place: `base-200` = `bg` `oklch(0.16 0.028 20)`, `base-100` = `surface` `oklch(0.20 0.03 22)`, `base-300` = deep sidebar-rail `oklch(0.14 0.025 20)` |
+| Primary accent | **Shipped** | `primary` = **Gold** `oklch(0.80 0.12 82)` (was cyan-green); `secondary`/`accent` are duller/brighter gold variants, not a second hue |
+| Display font | **Shipped** | **Instrument Serif** (mixed case; italic = section-header voice), replacing Oswald |
+| Body font | **Shipped** | **Instrument Sans**, replacing Inter |
+| Data font | **Shipped** | **Spline Sans Mono** — new role, no legacy equivalent |
+| Heading treatment | **Shipped** | Global forced `uppercase` + `0.05em` tracking on h1–h6 removed; uppercase now applied explicitly, reserved for **eyebrow labels** only |
+| Text hierarchy (4 ink levels) | **Shipped** | Literal oklch steps (`--color-ink-secondary/-muted/-faint`) replace opacity-on-`base-content` |
+| Overlay glassmorphism (dropdowns, modals, popovers) | **Shipped (re-tinted)** | ADR-0006's mandatory glass rule is **unchanged and unrelaxed** — `.glass-card` / `.rating-dropdown` re-tinted to the burgundy/gold palette, same opacity/blur/border spec |
+| Velvet card (solid page/card surfaces) | **Not yet implemented** | § 3.1's solid, non-overlay card treatment is component-pattern work — design-system-h3q8n |
+| Component patterns (§ 4: sidebar, filmstrip, progress meters, badges, gold-leaf sweep, etc.) | **Not yet implemented** | design-system-h3q8n, depends on this task's tokens |
+
+`design-check` (`.claude/skills/design-check/references/design-rules.md`) still encodes some legacy rules (forced-uppercase heading violation, "cyan/orange/pink" semantic color description) — re-authoring it is tracked in § 7 and is out of scope for the token/type task; treat this document, not `design-check`, as canonical where they disagree in the interim.
 
 ---
 
 ## 1. Tokens
 
-Two layers (see `StyleGuide/Views.fs:86-155`, the "Two-Layer Architecture" overview):
+### 1.1 Palette (`oklch`) — from the brief's system board
 
-- **Layer 1 — CSS custom properties** in `index.css:9-54` (`:root`). The primitive values.
-- **Layer 2 — F# `DesignSystem` helpers** in `DesignSystem.fs`. Typed class compositions; components reference these.
+Six primitives carry the whole system. All colors are OKLch (perceptually uniform; lets posters/backdrops pop against the dark base).
 
-### Glass effect tokens (`index.css:11-21`)
-
-| Token | Value | Meaning |
+| Token | Value | Role |
 |---|---|---|
-| `--glass-bg-opacity-light` | `0.55` | Lightest overlay (least important / most see-through) |
-| `--glass-bg-opacity-medium` | `0.60` | `.glass-card`, `.rating-dropdown` background base |
-| `--glass-bg-opacity-heavy` | `0.70` | Modals / important overlays |
-| `--glass-blur-subtle` | `12px` | `.glass-card`, `glassSubtle` |
-| `--glass-blur-standard` | `24px` | `glassCard`, `.rating-dropdown` |
-| `--glass-blur-heavy` | `40px` | Reserved (heaviest) |
-| `--glass-saturate` | `1.2` | Saturation boost on backdrop-filter |
-| `--glass-border-opacity` | `0.15` | Overlay border (`base-content/15`) |
-| `--glass-highlight-opacity` | `0.08` | Top-edge inset highlight |
-| `--glass-shadow-opacity` | `0.6` | Drop-shadow alpha |
+| `bg` | `oklch(0.16 0.028 20)` | App background — velvet black |
+| `surface` | `oklch(0.20 0.03 22)` | Cards, panels, raised chrome |
+| `line` | `oklch(0.32 0.04 28)` | Hairline borders, dividers, empty progress track |
+| `gold` | `oklch(0.80 0.12 82)` | The accent — CTAs, active state, rating, "In focus" foil |
+| `spotlight` | `oklch(0.30 0.06 30)` | Burgundy radial glow behind the main content |
+| `ink` | `oklch(0.93 0.012 60)` | Primary text — warm ivory |
 
-### Spacing scale (`index.css:23-28`)
+**Implemented (design-system-r7k2m):** `bg`/`surface`/`ink`/`gold` are carried by the `dim` DaisyUI theme's `base-200`/`base-100`/`base-content`/`primary` slots (replaced in place in `src/Client/index.css`'s `@plugin "daisyui/theme"` block — the theme keeps the name `dim`, `data-theme="dim"` stays on `<html>`). `line` and `spotlight` have no DaisyUI-semantic slot and are minted directly as `--color-line` / `--color-spotlight` in the `@theme` block. `secondary` = the "fill gradient start" derived gold (`oklch(0.68 0.10 80)`), `accent` = the "bright foil sweep end" derived gold (`oklch(0.88 0.11 88)`) — both gold-family, per the accent-discipline rule (§ 5), not a second brand hue. `neutral` = `line`.
 
-| Token | Value | F# helper | Use |
-|---|---|---|---|
-| `--space-page-mobile` | `1rem` | `pagePadding` (`p-4`) | Mobile page padding |
-| `--space-page-desktop` | `1.5rem` | `pagePadding` (`lg:p-6`) | Desktop page padding |
-| `--space-gap-compact` | `0.5rem` | `gapCompact` (`gap-2`) | Tight lists, inline groups |
-| `--space-gap-standard` | `0.75rem` | `gapStandard` (`gap-3`) | Grids, card lists, default |
-| `--space-gap-loose` | `1rem` | `gapLoose` (`gap-4`) | Section breaks |
+**Derived surfaces & accents** (used in 3a/3b, compose from the primitives — mint a token only if reused):
 
-### Border radii (`index.css:30-34`)
+| Purpose | Value | Status |
+|---|---|---|
+| Sidebar rail (deeper than `bg`) | `oklch(0.14 0.025 20)` | Shipped — `base-300` |
+| Active nav surface | `oklch(0.22 0.035 25)` | Not yet implemented (component pattern, h3q8n) |
+| Gold — bright end of foil sweep | `oklch(0.88 0.11 88)` | Shipped — `accent` |
+| Gold — fill gradient start | `oklch(0.68 0.10 80)` | Shipped — `secondary` |
+| Avatar (self, gold-tinted) | bg `oklch(0.34 0.05 25)`, text `oklch(0.85 0.08 82)` | Not yet implemented (component pattern, h3q8n) |
 
-| Token | Value | Tailwind | Use |
-|---|---|---|---|
-| `--radius-card` | `1rem` | `rounded-xl` | Cards |
-| `--radius-button` | `0.5rem` | `rounded-lg` | Buttons, pills |
-| `--radius-avatar` | `9999px` | `rounded-full` | Avatars |
-| `--radius-poster` | `0.375rem` | `rounded-md` | Posters |
+### 1.2 Text hierarchy (four ink levels)
 
-### Animation durations (`index.css:36-39`)
+Text opacity is expressed as OKLch lightness steps on the warm-neutral hue, **not** alpha on `ink`. These four are the only legal levels for text content (the `design-check` "four-value hierarchy" rule carries over, retargeted to these values):
+
+| Level | Value | Use |
+|---|---|---|
+| Primary | `oklch(0.93 0.012 60)` (`ink`) | Titles, key figures |
+| Secondary | `oklch(0.74 0.015 45)` | Body copy, descriptions |
+| Muted | `oklch(0.62 0.02 40)` | Metadata, inactive nav, captions |
+| Faint | `oklch(0.52 0.04 45)` | Eyebrow tagline, placeholders, watermarks |
+
+Mono watermarks over imagery use `oklch(1 0 0 / 0.4)` (white at 40%) rather than an ink step, since they sit on unpredictable artwork.
+
+**Implemented:** `ink` = `base-content`; secondary/muted/faint are minted as `--color-ink-secondary` / `--color-ink-muted` / `--color-ink-faint` in `index.css`'s `@theme` block (`text-ink-secondary` etc.), and consumed by `DesignSystem.secondaryText` / `.mutedText` (alias `.metaText`) / `.faintText`.
+
+> **Not yet implemented (§ 1.3–1.6 below):** spacing, radii, shadows, and animation tokens (including the gold-leaf sweep keyframes) are documented target values from the 3a/3d board, mapped conceptually to the existing scale, but **not** ported into `index.css`'s `:root` block by this task — that lands with the component-pattern work (design-system-h3q8n), which needs them to build the hero card, filmstrip, progress meters, and gold-leaf sweep. This task shipped only the palette (§ 1.1), text hierarchy (§ 1.2), typography (§ 2), and the glass re-tint (§ 3.4).
+
+### 1.3 Spacing (target — not yet implemented, see note above)
+
+Content rhythm from 3a: page gutter `32px`, section stack `26px`, card interior `14–18px`, tight inline groups `6–12px`. Map to the existing scale on migration:
 
 | Token | Value | Use |
 |---|---|---|
-| `--duration-fast` | `0.15s` | Dropdowns, state changes |
-| `--duration-normal` | `0.25s` | Hover effects |
-| `--duration-slow` | `0.4s` | Page loads, stagger grids |
+| `--space-page` | `2rem` (`p-8`, desktop) | Main content gutter |
+| `--space-section` | `1.625rem` (`gap-[26px]`) | Between dashboard sections |
+| `--space-card` | `1rem`–`1.125rem` | Card interior padding |
+| `--space-gap-compact` | `0.5rem` (`gap-2`) | Inline groups, list rows |
+| `--space-gap-standard` | `0.75rem` (`gap-3`) | Card grids |
 
-### Shadows (`index.css:41-46`)
+### 1.4 Border radii (target — not yet implemented, see § 1.3 note)
 
-`--shadow-card`, `--shadow-card-hover`, `--shadow-dropdown` (includes the inset highlight), `--shadow-poster`, `--shadow-poster-hover`. Elevated elements (modals, dropdowns, cards, posters) carry a shadow; flat content does not.
-
-### Typography tokens (`index.css:48-53`)
-
-- `--tracking-heading: 0.05em` — applied to all `h1`–`h6` automatically (`index.css:56-60`).
-- Text-hierarchy opacities: primary `1`, secondary `0.7`, muted `0.5`, faint `0.4`. These four values are the **only** legal opacities for text content (enforced by `design-check` rule 3).
-
----
-
-## 2. Typography
-
-Live reference: `StyleGuide/Views.fs:159-280`.
-
-- **Display font:** Oswald (`font-display`), used for **all** headings — always `uppercase` with `0.05em` tracking. Auto-applied to `h1`–`h6` via `index.css:56-60`; use the explicit class when rendering heading-like text on non-heading elements.
-- **Body font:** Inter (`font-sans`), the default — body text, labels, buttons. Normal case.
-
-Both loaded from Google Fonts; declared in `index.css:4-7` (`@theme`).
-
-### Semantic type scale (`DesignSystem.fs:21-45`)
-
-| Helper | Semantic role | Composition |
+| Token | Value | Use |
 |---|---|---|
-| `pageTitle` | h1 / page heading | `text-4xl font-display uppercase tracking-wider text-gradient-primary` |
-| `sectionHeader` | h2 / section heading | `text-2xl font-display uppercase tracking-wider` |
-| `cardTitle` | h3 / card heading | `text-lg font-display uppercase tracking-wider` |
-| `subtitle` | secondary heading / label | `text-sm font-display uppercase tracking-wider` |
-| `bodyText` | body / paragraph | `text-base text-base-content` |
-| `secondaryText` | descriptions, metadata (70%) | `text-sm text-base-content/70` |
-| `mutedText` | timestamps, labels (50%) | `text-xs text-base-content/50` |
-| `faintText` | placeholders, hints (40%) | `text-xs text-base-content/40` |
+| `--radius-card` | `0.625rem` (`10px`) | Cards, panels, hero, backdrop |
+| `--radius-panel` | `0.5rem` (`8px`) | Nav items, link rows, small chips |
+| `--radius-pill` | `999px` | Badges, status pills, search field, CTA |
+| `--radius-poster` | `0.125rem` (`2px`) | Filmstrip posters (tight, print-like) |
+| `--radius-avatar` | `9999px` | Avatars |
 
-**Decision (from the live page, `Views.fs:275-278`):** condensed display font (Oswald) + clean sans (Inter) creates hierarchy without decoration. Rejected: single font (monotone), serif (too formal for a media app).
+### 1.5 Shadows & elevation (target — not yet implemented, see § 1.3 note)
+
+Elevation is carried by **shadow + a `line`-colored ring**, not by translucency.
+
+| Token | Value | Use |
+|---|---|---|
+| `--shadow-hero` | `0 20px 44px -18px oklch(0 0 0 / 0.85), 0 0 0 1px oklch(0.34 0.04 30)` | Hero, cover art |
+| `--shadow-card` | `0 0 0 1px oklch(0.30 0.03 26)` | Standard velvet card (ring only) |
+| `--shadow-filmstrip` | `0 16px 36px -18px oklch(0 0 0 / 0.9)` | Black filmstrip well |
+| `--ring-active` | `inset 2px 0 0 oklch(0.80 0.12 82)` | Gold left-edge on active nav item |
+
+### 1.6 Animation (target — not yet implemented, see § 1.3 note)
+
+| Token | Value | Use |
+|---|---|---|
+| `--duration-fast` | `0.15s` | State changes, hover |
+| `--duration-normal` | `0.25s` | Card lift, transitions |
+| `--sweep` | `3.2s linear infinite` | Gold-leaf foil sweep on "In focus" |
+
+The signature motion is the **gold-leaf sweep** (`@keyframes` moving `background-position` from `200% 0` → `-200% 0` across a 5-stop gold gradient on `background-size:200% 100%`). Reserved for the "In focus" badge/state only — it is the one animated ornament; do not spread it to ordinary elements. **Not implemented by design-system-r7k2m** — component-pattern work, deferred to design-system-h3q8n along with the rest of § 4.
 
 ---
 
-## 3. Glassmorphism rules
+## 2. Typography — Implemented (design-system-r7k2m)
 
-This is the project's load-bearing overlay style. The spec below is reproduced **verbatim** from `CLAUDE.md` § "Conventions" so the styleguide is self-contained for review. `CLAUDE.md` now points at this document as the canonical artifact (see § 7 and ADR 0009).
+Three families, each with one job (from the system board's "Type" specimen). Loaded via `@fontsource` npm packages (self-hosted `importSideEffects` calls in `src/Client/App.fs`, the same pattern the legacy Oswald/Inter fonts used) — not an external Google Fonts `<link>`.
 
-### The overlay spec (verbatim from CLAUDE.md § Conventions)
+| Family | Role | Notes |
+|---|---|---|
+| **Instrument Serif** | Display & titles | Page/section/card headings, hero & entity names. **Mixed case.** Italic is the "section voice" — used for section titles ("*Next up*", "*In focus*") and the word "*theca*" in the wordmark. |
+| **Instrument Sans** | Body, labels, UI | Default. Weights 400–700. Buttons, nav, metadata, form controls. |
+| **Spline Sans Mono** | Data | Dates, durations, counts, timecodes, HLTB hours, oklch specimens. Often `UPPERCASE` with letter-spacing for tabular labels. |
 
-> **Glassmorphism for all overlays**: Every dropdown, popover, modal, and floating panel MUST use glassmorphism — semi-transparent background (`/0.55`–`/0.70` opacity), `backdrop-filter: blur(24px) saturate(1.2)`, subtle border (`oklch(… / 0.15)`), and `inset 0 1px 0 0 oklch(100% 0 0 / 0.08)` highlight. Never use fully opaque backgrounds on overlays. See `.rating-dropdown` and `.glass-card` in `index.css` for reference.
+### Semantic type scale — implemented `DesignSystem.fs` helpers
 
-### The backdrop-filter nesting gotcha (verbatim from CLAUDE.md § Gotchas)
+| Helper | Role | Composition (as shipped) |
+|---|---|---|
+| `pageTitle` | Hero / entity name | Instrument Serif, `text-4xl md:text-5xl`, `leading-none`, ink |
+| `sectionHeader` | Section heading | Instrument Serif **italic**, `text-2xl`, ink |
+| `cardTitle` | Card / entity heading | Instrument Serif, `text-lg`, ink |
+| `eyebrow` (alias: `subtitle`, kept for existing call sites) | Category / label above a section | Instrument Sans, `text-xs`, `uppercase`, `tracking-[0.18em]`, ink-muted |
+| `bodyText` | Paragraph / description | Instrument Sans, `text-sm`, `leading-relaxed`, ink (full strength) |
+| `secondaryText` | Descriptions, metadata | Instrument Sans, `text-sm`, ink-secondary |
+| `mutedText` (alias: `metaText`) | Timestamps, labels, metadata | Instrument Sans, `text-xs`, ink-muted |
+| `faintText` | Placeholders, hints | Instrument Sans, `text-xs`, ink-faint |
+| `dataText` | Dates, durations, counts, ids | Spline Sans Mono, `text-xs`, ink-muted |
 
-> **`backdrop-filter` breaks on nested elements**: If a parent has `backdrop-filter` (e.g. `backdrop-blur-sm`), any child's `backdrop-filter` will only blur the parent's content, not the page behind it. Fix: render glassmorphic dropdowns/popovers as **siblings** to the blurred parent, not children. Wrap both in a plain `position: relative` container without `backdrop-filter`.
+The shipped helper set keeps the codebase's existing four-tier ladder (`bodyText` > `secondaryText` > `mutedText` > `faintText`, used across ~40 call sites app-wide) rather than fully renaming to the brief's abstract role names; `eyebrow`/`metaText`/`dataText` are added as the brief's literal names (aliases where a legacy helper already covers the role) so both vocabularies resolve to the same implementation.
 
-Correct sibling pattern (from `design-check/references/design-rules.md:38-47`):
+**Decision:** serif display (Instrument Serif, with italic as a distinct "voice") + clean sans body + mono for data creates an *editorial programme* feel — the library reads like a cinema listing, not a dashboard. **Uppercase is retired as the heading treatment** (it was Oswald's job — the global forced-uppercase CSS rule on h1–h6 was removed); uppercase now signals only an **eyebrow/data label**. Rejected: condensed all-caps headings (too utilitarian for the velvet direction).
 
-```fsharp
-Html.div [
-    prop.className "relative"  // wrapper: NO backdrop-filter
-    prop.children [
-        Html.div [ prop.className "glassCard ..." ]                  // panel with blur
-        Html.div [ prop.className "absolute z-50 rating-dropdown" ]  // dropdown with its own blur
-    ]
-]
-```
+---
 
-### Glass levels (`DesignSystem.fs:9-19`; live demos `Views.fs:592-737`)
+## 3. Surfaces & overlays
 
-| Helper | Opacity / blur | Use case | Reference |
-|---|---|---|---|
-| `glassCard` | `/0.55`, `blur-[24px]`, `saturate-[1.2]`, `border-base-content/15` | Sidebar panels, detail cards | `DesignSystem.fs:10` |
-| `glassOverlay` | `/0.70`, `blur-xl` | Modals, important overlays | `DesignSystem.fs:13` |
-| `glassSubtle` | `/0.50`, `blur-sm` | Inline panels, content blocks | `DesignSystem.fs:16` |
-| `glassDropdown` (`.rating-dropdown`) | `/0.65`, `blur(24px) saturate(1.2)`, inset highlight | Dropdowns, action menus | `DesignSystem.fs:19`, `index.css:269-281` |
+**Resolved (2026-07-02, design-system-r7k2m):** ADR-0006's mandatory glassmorphism rule for overlays is **kept in full force, only re-tinted** — it is *not* demoted or relaxed. The brief's solid "velvet" surfaces (§ 3.1) apply to **page/card backgrounds**, which are not overlays, so there is no genuine conflict. *(Default applied while the user was away — flagged for re-confirm; amending ADR-0006 to allow solid structural panels remains a possible later decision task, see the task's Notes.)*
 
-Lighter opacity = more see-through = less important. Never fully opaque on a floating element.
+### 3.1 Velvet card — solid page/card surfaces (target, not yet implemented)
+
+The primary container that will replace `.glass-card` for **non-overlay** page/card chrome (component-pattern work — design-system-h3q8n; not implemented by the token/type foundation task):
+
+- Background: `surface` (`oklch(0.20 0.03 22)`)
+- Border/elevation: a `line`-colored `1px` ring (`--shadow-card`); heroes add the drop-shadow (`--shadow-hero`)
+- Radius: `--radius-card` (`10px`)
+- No blur, no translucency.
+
+Rationale: the velvet direction gets its depth from **layered opaque darks + hairlines + shadow**, and lets artwork (posters, backdrops) provide the color and light. Translucent panels would mud the poster-driven palette. This governs **cards, panels, and page chrome** — never floating overlays, which stay glass per § 3.2.
+
+### 3.2 Overlays — glassmorphism stays mandatory, re-tinted (shipped)
+
+Every dropdown, popover, modal, and floating panel **MUST** still use glassmorphism, unchanged from ADR-0006: semi-transparent background (`/0.55`–`/0.70` opacity), `backdrop-filter: blur(24px) saturate(1.2)`, subtle border (`oklch(… / 0.15)`), and the `inset 0 1px 0 0 oklch(100% 0 0 / 0.08)` highlight. Never fully opaque. This is reproduced verbatim in `CLAUDE.md` (ADR-0009).
+
+Velvet Lobby re-tints the **color**, not the rule:
+
+| Class | Background | Border |
+|---|---|---|
+| `.glass-card` | `oklch(0.20 0.03 22 / 0.6)` (`surface`) | `oklch(0.93 0.012 60 / 0.08)` (`ink`) |
+| `.rating-dropdown` | `oklch(0.14 0.025 20 / 0.65)` (deep sidebar-rail tone) | `oklch(0.93 0.012 60 / 0.15)` (`ink`) |
+
+`.rating-dropdown-item` hover/active states move from the legacy primary-green tint to gold: hover `oklch(0.80 0.12 82 / 0.1)`, active fill `oklch(0.80 0.12 82 / 0.15)` with a matching `/0.2` border. `DesignSystem.glassOverlay` / `.glassSubtle` (which compose `bg-base-100/*` rather than a raw color) re-tint automatically once `base-100` = `surface` in the `dim` theme — no F# changes needed for those two.
+
+### 3.3 Media chrome — a narrower glass variant for controls over artwork (target, not yet implemented)
+
+The brief additionally calls for a *narrower* glass spec for small controls floating directly over artwork ("Change artwork" pill, video play button on a backdrop, 3b) — subtler than the standard overlay glass so the image reads through:
+- Background: `oklch(0.14 0.025 20 / 0.6)`
+- `backdrop-filter: blur(6px)` (subtle — enough to legibilize, not frost)
+- Border: `oklch(1 0 0 / 0.15)`
+
+This is an **addition alongside**, not a replacement for, § 3.2's mandatory overlay glass — dropdowns/modals/popovers still use the full spec. Not implemented by this task; component-pattern work (design-system-h3q8n).
+
+### 3.4 The `backdrop-filter` nesting gotcha (still applies wherever glass is used)
+
+> If a parent has `backdrop-filter`, a child's `backdrop-filter` blurs only the parent's content, not the page behind it. Render glass chrome as a **sibling** of the blurred element, wrapped in a plain `position: relative` container without `backdrop-filter`.
 
 ---
 
 ## 4. Component patterns
 
-Every pattern visible on the live StyleGuide page, with its anatomy and a code reference. The live page section order is fixed in `StyleGuide/Types.fs:3-13` and `Views.fs:1789-1827`.
+Anatomy of every recurring pattern in the 3a dashboard (plus the sibling 3b detail / 3c grid the same system produces). These are the specs the migrated `Components/**` and the live `StyleGuide` page must render.
 
-### Glass card / overlay / subtle / dropdown
-Covered in § 3. Live demos: `Views.fs:592-737`.
+### Sidebar nav (desktop rail)
+Deep rail (`oklch(0.14 0.025 20)`), `216px`, `line` right border. Wordmark at top: "Media" + italic gold "*theca*", with the faint uppercase tagline beneath. Primary items (Tonight ◆ / Movies / TV Series / Games / Friends / Catalogs) then a bottom group (Events / Settings / avatar + name). **Active item** = `surface` background + `--ring-active` (inset gold left edge) + gold glyph; inactive = muted ink, no fill.
 
-### Pill button (filter / tag toggle)
-**Use:** filter bars, nav tabs, tag selection, the styleguide's own section nav. **Anatomy:** active = `bg-primary/15 text-primary border-primary/30`; inactive = transparent, hover reveals. **Helper:** `DesignSystem.pill isActive` (`DesignSystem.fs:74-81`). **Live:** `Views.fs:1142-1189`.
+### Top bar
+Section tabs (All / Movies / TV Series / Games) as an underline nav — active tab carries a `2px` gold bottom-border; inactive muted. Right-aligned **search pill**: `surface` fill, `line` border, `--radius-pill`, `⌕` glyph + "Search your library…" placeholder.
 
-### PosterCard (grid)
-**Use:** movie/media grid pages. 2:3 aspect-ratio poster, hover shine + lift, info overlay; renders as a link to detail. **Anatomy:** `poster-card` > `poster-image-container poster-shadow` > `poster-image` + `poster-shine` overlay (CSS `index.css:158-208`). **Component:** `PosterCard.view slug name year posterRef ratingBadge` (`Components/PosterCard.fs:9`); route variant `viewForRoute` (`:62`). **Live:** `Views.fs:896-946`.
+### Section header
+The editorial signature, used above every section: **Instrument Serif italic title** ("*Next up*", "*In focus*", "*Recently played*") + an **eyebrow** category label (uppercase, letter-spaced, muted) + a **hairline rule** that fades out (`linear-gradient(90deg, oklch(0.34 0.04 30), transparent)`), optionally a right-aligned gold "All 12 →" link.
 
-### PosterCard thumbnail
-**Use:** list/row layouts (Dashboard, FriendDetail, CatalogDetail, EntryList list mode). **Component:** `PosterCard.thumbnail posterRef alt` (`Components/PosterCard.fs:114`). **Live:** `Views.fs:949-966`.
+### TV "Next up" hero
+Backdrop gradient panel (velvet card, `--shadow-hero`) → **In focus** gold-sweep badge top-left, mono "backdrop · tmdb" watermark bottom-right → serif entity title + overlapping **friend avatars** ("with Mara & Alex") → episode meta line → **segmented episode progress** (film-frame bars, § 4 "Progress") + rating + gold **▶ Watch** pill.
 
-### ModalPanel
-**Use:** dialogs covering the viewport (cannot render inline). Glassmorphism overlay, backdrop-click closes. **Anatomy:** `DesignSystem.modalContainer` (`fixed inset-0 z-50`) + `DesignSystem.modalPanel` (`glassOverlay + animate-fade-in`) (`DesignSystem.fs:151-158`). **Component:** `ModalPanel.view title onClose content` (`Components/ModalPanel.fs:51`), `viewWithFooter` (`:54`), `viewCustom` (`:6`). **Live:** `Views.fs:969-1002`.
+### Secondary series / entity card
+Backdrop thumb with top-fade, serif title, "Next: S2 E3 · 44 min" meta, segmented mini-progress, "2/12 episodes" count. Velvet card, `--shadow-card`.
 
-### FriendPill
-**Use:** displaying friend references. Three variants. **Component:** `FriendPill.view friend` (badge, `Components/FriendPill.fs:8`), `viewWithRemove friend onRemove` (with X, `:25`), `viewInline friend` (text link, `:49`). **Live:** `Views.fs:1004-1061`.
+### Movies filmstrip
+The cinema motif: a **black (`#000`) well** with **sprocket-hole** strips top and bottom (`repeating-linear-gradient(90deg, transparent 0 7px, oklch(0.3 0.01 60) 7px 15px, transparent 15px 22px)`), a row of poster tiles (`--radius-poster`, `2px`) inside, and captions (title + runtime + "rec. by / with") beneath the strip. Carries `--shadow-filmstrip`.
 
-### ActionMenu
-**Use:** contextual action menus / dropdowns (kebab menus, hero action buttons). Glassmorphic per § 3; the dropdown renders as a sibling of the trigger (never a child) to avoid the nested `backdrop-filter` gotcha. **Component:** `ActionMenu.view items` (`Components/ActionMenu.fs:60`), `heroView` (`:147`), `heroViewSections` (`:208`). **Live:** `Views.fs:1191-1283`.
+### Game row
+Horizontal velvet card: capsule thumbnail + title + **HLTB progress bar** (continuous, gold gradient fill) with mono "18h / ~34h" + a **status pill** (§ Status badges).
 
-### Icons
-**Use:** Heroicons-based SVGs. Standard `w-6 h-6`; small variants `w-4 h-4` (`recommendedBy`, `play`); brand `Icons.mediatheca` `w-8 h-8`. **Component:** `Components/Icons.fs`. **Live (catalog of available icons):** `Views.fs:1063-1139`.
+### Recently-played list
+Divider-separated rows (`line` bottom border): small thumb + title (+ "· with Alex") + right-aligned mono "yesterday · 2.4h".
 
-### Card hover / poster hover
-**Use:** lift-on-hover affordance. `cardHover` = `card-hover rounded-xl` (`DesignSystem.fs:67`, CSS `index.css:148-156`); poster hover = scale + shine via `.poster-card:hover` (`index.css:167-208`). **Live:** `Views.fs:823-876`.
+### Status badges (lifecycle)
+Pill badges, uppercase, letter-spaced. Each state has its own hue:
 
-### Entrance animations & stagger grid
-`animateFadeIn`, `animateFadeInUp`, `animateScaleIn`, `staggerGrid` (`DesignSystem.fs:86-95`; CSS keyframes `index.css:98-145`). Durations 0.15s–0.4s; stagger adds 40ms per child. **Live:** `Views.fs:741-821`.
+| State | Text / border |
+|---|---|
+| Backlog | `oklch(0.62 0.02 40)` / `oklch(0.36 0.03 30)` (muted outline) |
+| ✦ In focus | dark ink on the **animated gold-leaf sweep** gradient (filled) |
+| Playing | `oklch(0.80 0.12 82)` / `oklch(0.50 0.08 82)` (gold outline) |
+| Completed | `oklch(0.70 0.10 150)` / `oklch(0.45 0.07 150)` (green) |
+| Abandoned | `oklch(0.62 0.09 25)` / `oklch(0.42 0.07 25)` (red) |
+| On hold | `oklch(0.65 0.06 240)` / `oklch(0.42 0.05 240)` (blue) |
 
-### Grids
-`movieGrid`, `movieGridMedium`, `statsGrid`, `cardGrid` (`DesignSystem.fs:114-123`). Responsive; never jump more than one column between adjacent breakpoints.
+### Progress meters (two kinds)
+- **Segmented** ("film-frame") — one bar per episode; filled = `gold`, empty = `oklch(0.32 0.03 30)`. For countable units (episodes).
+- **Continuous** — single track (`line`) with a gold-gradient fill (`linear-gradient(90deg, oklch(0.68 0.1 80), oklch(0.85 0.11 86))`). For time/percent (play time, HLTB).
 
-### Sidebar nav item
-`navItemClass isActive` = `nav-glow` + active/inactive (`DesignSystem.fs:131-142`; CSS glow `index.css:210-229`). Used by `Components/Sidebar.fs`.
+### Star rating
+Five stars; filled = `gold`, empty = `oklch(0.36 0.03 30)`; optional mono numeric ("4.2"). Interaction: **tap to set, tap again to clear.**
 
-### ContentBlockEditor (Content Blocks)
-**Use:** rich notes attached to movies. Inline-edit blocks (text/quote/callout/code/image), markdown-style `[text](url)` links, smart-paste, drag-to-reorder. No card chrome — blocks read as plain text. **Component:** `ContentBlockEditor.view blocks onAdd onUpdate onRemove onChangeType onReorder onUploadScreenshot onGroupBlocks onUngroupBlock` (`Components/ContentBlockEditor.fs:373`). **Live:** `Views.fs:1245-1388`.
+### Lifecycle stepper (detail pages)
+Horizontal Backlog → In focus → Playing → Completed with connector rules; the current stage renders as the filled gold-sweep pill, past stages as solid dots, future stages as hollow ringed dots.
 
-### Content Zone (RowPair drag layout)
-**Use:** Notion-like two-column grouping of content blocks via left/right drop zones; gap-based reordering with green indicator lines. Same `ContentBlockEditor.view` with `onGroupBlocks`/`onUngroupBlock` supplied. **Live:** `Views.fs:1472-1602`.
+### Detail-page panels (3b)
+Right-column velvet cards: **HLTB tiers** (labeled bars — Main story / Main+extra / My time [gold] / Completionist), **Play history** (mono date + duration rows, `+` add affordance), **Friends** (Owned by / Recommended by / Played with — avatars, "since JUN 20", dashed "pending" badge). Left column: cover art (`--shadow-hero`) + external-link rows (Steam / Website / HLTB). Trailers: 16:9 player + a thumbnail strip, active thumb ringed in gold.
 
-### EntryList (gallery / list database view)
-**Use:** switchable Gallery (poster grid) / List (detail rows) view of media entries; layout toggle is local React state. **Component:** `EntryList.view props` (`Components/EntryList.fs:205`); `EntryItem` = Slug / Name / Year / PosterRef / Rating / RoutePrefix; caller supplies `RenderListRow`. **Live:** `Views.fs:1686-1785`.
+### Poster grid (3c list page)
+Poster-grid list page with filter pills; **"In focus" items get the gold frame** (a gold ring/border marking them out from the grid).
+
+### Avatars
+Circular, initial-based, per-person hue. Self = gold-tinted (`oklch(0.34 0.05 25)` / gold text). Groups overlap (`-11px` margin) with a `2px` `surface`-colored ring separating them.
 
 ---
 
-## 5. Theme
+## 5. Theme & color usage
 
-- **Single theme:** `dim`, a custom DaisyUI 5 dark theme defined in `index.css:62-95` via `@plugin "daisyui/theme"`. Selected by `data-theme="dim"` on `<html>`. No light theme today (open question — see README).
-- **Color space:** OKLch throughout, for perceptually uniform vibrancy. Dark base lets posters/backdrops pop.
-- **Semantic colors:** `primary` (cyan-green, CTAs/nav highlights), `secondary` (orange, social/friends), `accent` (magenta, attention), plus `info` / `success` / `warning` / `error`. Live swatches: `Views.fs:298-446`.
+- **Single dark theme**, velvet-black based. (A light theme remains an open question — the whole direction is built for dark.)
+- **Color space:** OKLch throughout.
+- **Accent discipline:** there is **one** accent — gold — and it is spent sparingly, "like foil." Gold marks: the active/CTA, the current lifecycle state, ratings, "In focus", and the wordmark's italic. Everything else is velvet + ink. Resist adding a second accent hue; lifecycle **status** colors (green/red/blue) are functional signals, not brand accents, and appear only on status badges.
+- **Artwork is the color.** Posters and backdrops supply the vivid hues; the chrome stays neutral so the media pops. The burgundy `spotlight` is the only ambient tint — a soft radial behind the main column.
 
 ### How to add a token
-1. Add the CSS custom property to `:root` in `index.css` (or to the `dim` theme block if it is a theme color).
-2. If components will reference it, add a typed `DesignSystem.fs` helper that composes the corresponding Tailwind/DaisyUI class — components must not hardcode the raw value.
-3. Add a specimen to the relevant `StyleGuide/Views.fs` section so the live page stays complete.
+1. Add the value to `@theme` / `:root` in `index.css` (theme color → the theme block).
+2. If components reference it, add a typed `DesignSystem.fs` helper composing the Tailwind class — components never hardcode raw values.
+3. Add a specimen to the live `StyleGuide/Views.fs`.
 4. Update this document and route the change through the design-system backlog (§ 6).
 
-### When NOT to introduce a new token
-- A semantic DaisyUI color (`primary`, `base-content`, …) already expresses the intent — use it with opacity rather than a new hue.
-- The value is a one-off; prefer composing from the existing scale (spacing, radii, durations) over minting a new primitive.
-- Text opacity outside `{1.0, 0.7, 0.5, 0.4}` — not allowed; map to the nearest hierarchy level instead.
+### When NOT to add a token
+- One of the six primitives (or a documented derived value) already expresses it — compose, don't mint.
+- You want a second brand accent — you don't; gold is the accent.
+- A text opacity outside the four ink levels (§ 1.2) — map to the nearest level.
 
 ---
 
@@ -211,26 +278,36 @@ Covered in § 3. Live demos: `Views.fs:592-737`.
 
 This document is the design-system **gate artifact**.
 
-- **The gate (load-bearing):** every frontend / UI task in any BC must declare `depends_on: [design-system-001-formalize-styleguide]`. The `model` skill applies this automatically per the gate rule in each frontend-bearing BC's README. The user signs off on this styleguide before any such task is promoted to `todo/`.
-- **Changing the design system** (new token, new pattern, retired pattern) is never an inline edit during feature work. It is its own design-system backlog item, so the gate stays meaningful. Implementation tasks *conform* to the styleguide; they do not extend it.
-- **Keeping it honest:** when a design-system change lands, update (a) `index.css` / `DesignSystem.fs`, (b) the live `StyleGuide` page, (c) this document, and (d) the `design-check` skill rules — in lockstep. Any divergence among the four is a finding for the next design-system task.
-- **`design-check`** (`.claude/skills/design-check/`) is the automated companion: run it on changed `src/Client/**/*.fs|*.css` to audit conformance to the rules formalized here.
+- **The gate:** every frontend / UI task in any BC declares `depends_on: [design-system-001-formalize-styleguide]`. The user signs off on this styleguide before such tasks promote to `todo/`. **This revision is a redesign — sign-off here also authorizes the code migration (§ 0) as its own design-system backlog item.**
+- **Changing the design system** (new token/pattern, retired pattern) is never an inline edit during feature work — it is its own design-system backlog item, so the gate stays meaningful. Implementation tasks *conform*; they do not extend.
+- **Keeping it honest:** when a design-system change lands, update in lockstep (a) `index.css` / `DesignSystem.fs`, (b) the live `StyleGuide` page, (c) this document, (d) the `design-check` rules. Divergence among the four is a finding.
+- **`design-check`** audits conformance. Some of its rules currently encode the **legacy** system (forced-uppercase headings, "cyan/orange/pink" color description) and must be re-authored — tracked in § 7, out of scope for the token/type task. Its glassmorphism rule (§ 1 of `design-rules.md`) is still accurate and needs no change.
 
 ---
 
-## 7. design-check cross-check (criterion: drift is a finding)
+## 7. Migration checklist (supersedes the old drift cross-check)
 
-Cross-checked this document against `.claude/skills/design-check/references/design-rules.md` and `SKILL.md`. The encoded rules and this doc align on: glassmorphism overlay spec and the four glass helpers (rule 1 / § 3); backdrop-filter nesting (rule 2 / § 3); typography fonts + the four-value text hierarchy (rule 3 / § 2); `dim` theme + OKLch + semantic colors, no hardcoded hex/rgb (rule 4 / § 5); responsive grids and `pagePadding` (rule 5 / § 4); animation durations 0.15–0.4s and standard classes (rule 6 / § 4); shadow token system (rule 7 / § 1); DaisyUI 5 Feliz DSL usage (rule 8); preferring `DesignSystem.fs` helpers (rule 9 / § 4).
+The redesign is not fully shipped until these are done in lockstep. Track remaining items as design-system backlog items under this gate.
 
-**Findings (drift to resolve in follow-up design-system backlog items, not in this formalization task):**
+**Shipped (design-system-r7k2m):**
+- [x] **Palette tokens** — `dim` theme's `base-100/200/300`, `base-content`, `primary/secondary/accent`, `neutral`, `info/success/warning/error` replaced in place with the Velvet Lobby palette (§ 1.1); `--color-line` / `--color-spotlight` minted directly; theme keeps the name `dim`, `data-theme="dim"` stays on `<html>`.
+- [x] **Text hierarchy** — `--color-ink-secondary` / `--color-ink-muted` / `--color-ink-faint` minted as literal oklch steps (§ 1.2), replacing opacity-on-`base-content`.
+- [x] **Fonts** — swapped Oswald/Inter for Instrument Serif + Instrument Sans + Spline Sans Mono (`@fontsource` packages); retargeted `@theme` font tokens (added `--font-mono`); removed the global forced-uppercase/tracking rule on h1–h6.
+- [x] **`DesignSystem.fs`** — retargeted the type-scale helpers (§ 2: `pageTitle`, `sectionHeader`, `cardTitle`, `eyebrow`/`subtitle`, `bodyText`, `secondaryText`, `mutedText`/`metaText`, `faintText`) and added the new `dataText` (mono) helper. Glass helpers (`glassCard`, `glassOverlay`, `glassSubtle`, `glassDropdown`) were **not** replaced — overlays stay glass per § 3.2, re-tinted via the underlying CSS/theme change, no F# signature change needed.
+- [x] **Glassmorphism re-tint** — `.glass-card` / `.rating-dropdown` (and their item hover/active states) re-tinted to the burgundy/gold palette in `index.css`; ADR-0006's rule unchanged (§ 3.2).
+- [x] **Live StyleGuide page** — Typography section shows the three-typeface scale, the italic-voice specimen, and the new `dataText` role; Colors section shows the six Velvet Lobby primitives and the four ink-hierarchy steps with literal oklch labels.
 
-- **F-1 — Source-of-truth wording.** `design-rules.md:3-7` lists `index.css` and `DesignSystem.fs` as "source of truth" but predates this `styleguide.md`. Now that this is the canonical reviewable artifact, the skill's "Source of Truth" section should add a pointer to `styleguide.md`. Captured as `design-system-002`.
-- **F-2 — ActionMenu not on the live page.** `Components/ActionMenu.fs` is a real, glassmorphic, recurring overlay pattern (kebab/hero menus) but has no specimen in `StyleGuide/Views.fs`. The live page is meant to render every recurring pattern. Captured as `design-system-003`.
-
-Neither finding blocks the gate; both are documentation/coverage debt, queued in the design-system backlog.
+**Not yet implemented (design-system-h3q8n, depends on this task):**
+- [ ] **Spacing / radii / shadows / animation tokens** (§ 1.3–1.6), including the gold-leaf sweep keyframes.
+- [ ] **Velvet card** (§ 3.1) — solid, non-overlay page/card surfaces (`.glass-card`'s replacement for non-overlay chrome) and the narrower media-chrome glass variant (§ 3.3).
+- [ ] **Components** — Sidebar, PosterCard (gold-frame "In focus" variant), section headers with hairline rule, status badges, progress meters, lifecycle stepper, filmstrip, friends panels (§ 4).
+- [ ] **Live StyleGuide page** — render the § 4 component patterns once they exist.
+- [ ] **`design-check`** — re-author `references/design-rules.md`: retarget typography rules (serif display, no forced uppercase, mono data role), retarget the color/token rule descriptions to the velvet palette. The glassmorphism rule itself needs no change.
+- [ ] **`CLAUDE.md`** — the Fonts line was updated to the three Velvet Lobby families as part of this task; the glassmorphism rule was left untouched (correct — it didn't change). Revisit once § 4 component patterns land, in case new conventions need capturing there.
 
 ---
 
 ## Sign-off
 
-- [ ] **Human review (criterion 5):** the user has read and signed off on this styleguide. Sign-off is recorded as a one-line note in the protocol entry that closes `design-system-001`. Until then, this document is *ready for review* but the gate is not yet open for promoting frontend tasks to `todo/`.
+- [x] **Token & type foundation implemented** (design-system-r7k2m, 2026-07-02): palette, text hierarchy, typography, and the glassmorphism re-tint are shipped in code (`index.css`, `DesignSystem.fs`, `App.fs`) and reflected here. `npm run build` compiles clean.
+- [ ] **Human review — full redesign sign-off:** the two gating decisions (glassmorphism coexistence, theme replace-in-place) were resolved with recommended defaults while the user was away and are **flagged for re-confirm**. The user has not yet reviewed the shipped tokens/typography in the running app, nor signed off on the still-pending § 4 component patterns. Until then, treat this as *implemented pending confirmation*, not a fully closed gate.

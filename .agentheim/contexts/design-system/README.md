@@ -12,12 +12,13 @@ Single user, in a developer role.
 ## Ubiquitous language
 
 - **Token** — a primitive design value (color, spacing, radius, opacity). Defined in `index.css` under the `dim` theme.
-- **Theme** — currently a single dark theme called `dim`, selected by `data-theme="dim"` on `<html>` via DaisyUI 5's `@plugin "daisyui/theme"`.
-- **Glassmorphism** — the project's mandatory overlay style: semi-transparent background (0.55–0.70 opacity), `backdrop-filter: blur(24px) saturate(1.2)`, subtle border, top-edge highlight. Used by every dropdown, popover, modal, floating panel.
-- **Surface** — any element rendered above the page; surfaces follow glassmorphism rules.
+- **Theme** — currently a single dark theme called `dim`, selected by `data-theme="dim"` on `<html>` via DaisyUI 5's `@plugin "daisyui/theme"`. Palette replaced in place (2026-07-02, design-system-r7k2m) with the "Velvet Lobby" burgundy-black/gold palette — the theme keeps the name `dim`.
+- **Glassmorphism** — the project's mandatory overlay style: semi-transparent background (0.55–0.70 opacity), `backdrop-filter: blur(24px) saturate(1.2)`, subtle border, top-edge highlight. Used by every dropdown, popover, modal, floating panel. Re-tinted to burgundy/gold (`.glass-card`, `.rating-dropdown`) alongside the Velvet Lobby palette; the rule itself is unchanged (ADR-0006).
+- **Surface** — any element rendered above the page; surfaces follow glassmorphism rules. Non-overlay page/card surfaces are trending toward a solid "velvet card" treatment (see styleguide.md § 3.1) — not yet implemented (design-system-h3q8n).
 - **Component pattern** — a recurring Feliz / DaisyUI combination (e.g. the rating dropdown, the catalog card, the rail of posters).
 - **StyleGuide page** — the live, in-app reference at `src/Client/Pages/StyleGuide` rendering every component pattern in situ.
-- **Typography** — Oswald (`font-display`, headings) + Inter (`font-sans`, body), loaded from Google Fonts.
+- **Typography ("Velvet Lobby")** — Instrument Serif (`font-display`, display & titles, mixed case; *italic* is the section-header/wordmark voice) + Instrument Sans (`font-sans`, body/UI) + Spline Sans Mono (`font-mono`, dates/durations/counts/ids), loaded via self-hosted `@fontsource` packages. Replaced Oswald/Inter in place (2026-07-02, design-system-r7k2m); the forced-uppercase heading rule was retired — uppercase now signals only an eyebrow/data label.
+- **Ink hierarchy** — four literal oklch text-color steps (`ink`, `ink-secondary`, `ink-muted`, `ink-faint`), minted as named Tailwind tokens in `index.css` and consumed via `DesignSystem.fs`'s `bodyText`/`secondaryText`/`mutedText`(`metaText`)/`faintText`. Replaces the legacy opacity-on-`base-content` approach.
 
 ## Aggregates
 

@@ -2,8 +2,23 @@
 @plugin "daisyui";
 
 @theme {
-    --font-sans: "Inter", sans-serif;
-    --font-display: "Oswald", sans-serif;
+    /* Velvet Lobby type foundation — Instrument Serif (display/italic voice),
+       Instrument Sans (body/UI), Spline Sans Mono (data). Loaded via
+       @fontsource imports in App.fs (see importSideEffects calls). */
+    --font-display: "Instrument Serif", serif;
+    --font-sans: "Instrument Sans", sans-serif;
+    --font-mono: "Spline Sans Mono", monospace;
+
+    /* Velvet Lobby primitives without a direct DaisyUI semantic slot.
+       bg/surface/ink/gold are also carried by the "dim" theme's base-200,
+       base-100, base-content and primary slots below (source of truth:
+       styleguide.md § 1.1-1.2). */
+    --color-line: oklch(0.32 0.04 28);
+    --color-spotlight: oklch(0.30 0.06 30);
+    --color-gold: oklch(0.80 0.12 82);
+    --color-ink-secondary: oklch(0.74 0.015 45);
+    --color-ink-muted: oklch(0.62 0.02 40);
+    --color-ink-faint: oklch(0.52 0.04 45);
 }
 
 /* ── Design Tokens ── */
@@ -53,37 +68,44 @@
     --text-hierarchy-faint: 0.4;
 }
 
+/* Velvet Lobby retires uppercase as the default heading treatment — Instrument
+   Serif reads mixed-case; uppercase now signals only an eyebrow/data label
+   (applied explicitly where needed, not inherited by every heading tag). */
 h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
 }
 
+/* Velvet Lobby — burgundy-black + gold-foil palette, replacing the legacy
+   graphite/cyan-green tokens in place. Theme keeps the name "dim" and
+   data-theme="dim" stays on <html>; only the values changed (see
+   .agentheim/contexts/design-system/styleguide.md § 1.1-1.2 for the source
+   palette and the *-content contrast-pair derivation: L/5, C/5, same hue). */
 @plugin "daisyui/theme" {
     name: "dim";
     default: false;
     prefersdark: false;
     color-scheme: "dark";
-    --color-base-100: oklch(30.857% 0.023 264.149);
-    --color-base-200: oklch(28.036% 0.019 264.182);
-    --color-base-300: oklch(26.346% 0.018 262.177);
-    --color-base-content: oklch(82.901% 0.031 222.959);
-    --color-primary: oklch(86.133% 0.141 139.549);
-    --color-primary-content: oklch(17.226% 0.028 139.549);
-    --color-secondary: oklch(73.375% 0.165 35.353);
-    --color-secondary-content: oklch(14.675% 0.033 35.353);
-    --color-accent: oklch(74.229% 0.133 311.379);
-    --color-accent-content: oklch(14.845% 0.026 311.379);
-    --color-neutral: oklch(24.731% 0.02 264.094);
-    --color-neutral-content: oklch(82.901% 0.031 222.959);
-    --color-info: oklch(86.078% 0.142 206.182);
-    --color-info-content: oklch(17.215% 0.028 206.182);
-    --color-success: oklch(86.171% 0.142 166.534);
-    --color-success-content: oklch(17.234% 0.028 166.534);
-    --color-warning: oklch(86.163% 0.142 94.818);
-    --color-warning-content: oklch(17.232% 0.028 94.818);
-    --color-error: oklch(82.418% 0.099 33.756);
-    --color-error-content: oklch(16.483% 0.019 33.756);
+    /* base-300 (deepest — sidebar rail) < base-200 (bg) < base-100 (surface) */
+    --color-base-100: oklch(0.20 0.03 22);
+    --color-base-200: oklch(0.16 0.028 20);
+    --color-base-300: oklch(0.14 0.025 20);
+    --color-base-content: oklch(0.93 0.012 60);
+    --color-primary: oklch(0.80 0.12 82);
+    --color-primary-content: oklch(0.16 0.024 82);
+    --color-secondary: oklch(0.68 0.10 80);
+    --color-secondary-content: oklch(0.136 0.02 80);
+    --color-accent: oklch(0.88 0.11 88);
+    --color-accent-content: oklch(0.176 0.022 88);
+    --color-neutral: oklch(0.32 0.04 28);
+    --color-neutral-content: oklch(0.93 0.012 60);
+    --color-info: oklch(0.65 0.06 240);
+    --color-info-content: oklch(0.13 0.012 240);
+    --color-success: oklch(0.70 0.10 150);
+    --color-success-content: oklch(0.14 0.02 150);
+    --color-warning: oklch(0.78 0.14 70);
+    --color-warning-content: oklch(0.156 0.028 70);
+    --color-error: oklch(0.62 0.09 25);
+    --color-error-content: oklch(0.124 0.018 25);
     --radius-selector: 1rem;
     --radius-field: 0.5rem;
     --radius-box: 1rem;
@@ -255,9 +277,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .glass-card {
-    background: oklch(30.857% 0.023 264.149 / 0.6);
+    background: oklch(0.20 0.03 22 / 0.6);
     backdrop-filter: blur(12px);
-    border: 1px solid oklch(100% 0 0 / 0.08);
+    border: 1px solid oklch(0.93 0.012 60 / 0.08);
 }
 
 /* ── Rating dropdown ── */
@@ -267,10 +289,10 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .rating-dropdown {
-    background: oklch(26.346% 0.018 262.177 / 0.65);
+    background: oklch(0.14 0.025 20 / 0.65);
     backdrop-filter: blur(24px) saturate(1.2);
     -webkit-backdrop-filter: blur(24px) saturate(1.2);
-    border: 1px solid oklch(82.901% 0.031 222.959 / 0.15);
+    border: 1px solid oklch(0.93 0.012 60 / 0.15);
     border-radius: 0.75rem;
     padding: 0.5rem;
     min-width: 220px;
@@ -289,30 +311,30 @@ h1, h2, h3, h4, h5, h6 {
     border-radius: 0.5rem;
     background: transparent;
     border: none;
-    color: oklch(82.901% 0.031 222.959);
+    color: oklch(0.93 0.012 60);
     cursor: pointer;
     transition: all 0.15s ease;
     text-align: left;
 }
 
 .rating-dropdown-item:hover {
-    background: oklch(86.133% 0.141 139.549 / 0.1);
+    background: oklch(0.80 0.12 82 / 0.1);
 }
 
 .rating-dropdown-item-active {
-    background: oklch(86.133% 0.141 139.549 / 0.15);
-    border: 1px solid oklch(86.133% 0.141 139.549 / 0.2);
+    background: oklch(0.80 0.12 82 / 0.15);
+    border: 1px solid oklch(0.80 0.12 82 / 0.2);
 }
 
 .rating-dropdown-item-clear {
     margin-top: 0.25rem;
     padding-top: 0.625rem;
-    border-top: 1px solid oklch(82.901% 0.031 222.959 / 0.1);
+    border-top: 1px solid oklch(0.93 0.012 60 / 0.1);
     border-radius: 0 0 0.5rem 0.5rem;
 }
 
 .rating-dropdown-item-clear:hover {
-    background: oklch(100% 0 0 / 0.05);
+    background: oklch(0.93 0.012 60 / 0.05);
 }
 
 /* ── Stat card subtle glow ── */

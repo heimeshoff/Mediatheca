@@ -162,20 +162,44 @@ let private typographySection () =
         prop.children [
             sectionTitle "Typography"
 
-            decision "Two font families define the visual identity. Oswald (font-display) for all headings -- always uppercase with 0.05em tracking for a cinematic, poster-like feel. Inter (font-sans) for body text, labels, and buttons -- clean and highly legible at all sizes."
+            decision "Three families, each with one job -- the \"Velvet Lobby\" editorial programme. Instrument Serif (font-display) for display & titles, mixed case; its italic cut is the signature \"voice\" for section headers and the theca wordmark. Instrument Sans (font-sans) for body, labels, and UI. Spline Sans Mono (font-mono) is the new \"data\" typeface -- dates, durations, counts, ids."
+
+            subheading "The Italic Voice"
+
+            Html.div [
+                prop.className "flex flex-col gap-2 p-5 rounded-lg bg-base-200/30 border border-base-content/5 max-w-xl"
+                prop.children [
+                    Html.h2 [
+                        prop.className DesignSystem.sectionHeader
+                        prop.text "Next up"
+                    ]
+                    Html.p [
+                        prop.className DesignSystem.eyebrow
+                        prop.text "Continue watching"
+                    ]
+                    Html.p [
+                        prop.className (DesignSystem.secondaryText + " mt-2")
+                        prop.text "Section headers (\"Next up\", \"In focus\", \"Recently played\") and the \"theca\" half of the wordmark always render in Instrument Serif italic -- the one recurring editorial flourish. Everything else stays upright."
+                    ]
+                    Html.code [
+                        prop.className "text-xs font-mono text-primary/70 mt-1"
+                        prop.text "DesignSystem.sectionHeader -- font-display italic"
+                    ]
+                ]
+            ]
 
             subheading "Type Scale"
 
             Html.div [
                 prop.className "flex flex-col gap-3"
                 prop.children [
-                    specimen "Page title -- large gradient heading" "DesignSystem.pageTitle" (
+                    specimen "Page title -- hero / entity name" "DesignSystem.pageTitle" (
                         Html.h1 [
                             prop.className DesignSystem.pageTitle
                             prop.text "Page Title"
                         ]
                     )
-                    specimen "Section header -- h2 with accent bar convention" "DesignSystem.sectionHeader" (
+                    specimen "Section header -- the italic serif voice" "DesignSystem.sectionHeader" (
                         Html.h2 [
                             prop.className DesignSystem.sectionHeader
                             prop.text "Section Header"
@@ -187,34 +211,40 @@ let private typographySection () =
                             prop.text "Card Title"
                         ]
                     )
-                    specimen "Subtitle -- secondary heading / label" "DesignSystem.subtitle" (
+                    specimen "Eyebrow -- category label above a section (alias: subtitle)" "DesignSystem.eyebrow" (
                         Html.span [
-                            prop.className DesignSystem.subtitle
-                            prop.text "Subtitle Text"
+                            prop.className DesignSystem.eyebrow
+                            prop.text "Eyebrow Label"
                         ]
                     )
-                    specimen "Body text -- default readable text" "DesignSystem.bodyText" (
+                    specimen "Body text -- default readable text (secondary ink)" "DesignSystem.bodyText" (
                         Html.p [
                             prop.className DesignSystem.bodyText
-                            prop.text "Body text used for paragraphs and general content. Inter at base size with full opacity."
+                            prop.text "Body text used for paragraphs and general content. Instrument Sans at full-strength ink."
                         ]
                     )
-                    specimen "Secondary text -- descriptions, metadata (70% opacity)" "DesignSystem.secondaryText" (
+                    specimen "Secondary text -- descriptions, metadata (ink-secondary step)" "DesignSystem.secondaryText" (
                         Html.p [
                             prop.className DesignSystem.secondaryText
                             prop.text "Secondary text for descriptions, metadata, and supporting information."
                         ]
                     )
-                    specimen "Muted text -- timestamps, labels (50% opacity)" "DesignSystem.mutedText" (
+                    specimen "Muted text -- timestamps, labels (ink-muted step, alias: metaText)" "DesignSystem.mutedText" (
                         Html.p [
                             prop.className DesignSystem.mutedText
                             prop.text "Muted text for timestamps, labels, and tertiary information."
                         ]
                     )
-                    specimen "Faint text -- placeholders, hints (40% opacity)" "DesignSystem.faintText" (
+                    specimen "Faint text -- placeholders, hints (ink-faint step)" "DesignSystem.faintText" (
                         Html.p [
                             prop.className DesignSystem.faintText
                             prop.text "Faint text for placeholders, hints, and the lowest-priority information."
+                        ]
+                    )
+                    specimen "Data text -- dates, durations, counts, ids (new mono role)" "DesignSystem.dataText" (
+                        Html.p [
+                            prop.className DesignSystem.dataText
+                            prop.text "2026-07-02 · 44 MIN · #A1B2C3"
                         ]
                     )
                 ]
@@ -223,26 +253,26 @@ let private typographySection () =
             subheading "Font Families"
 
             Html.div [
-                prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
+                prop.className "grid grid-cols-1 md:grid-cols-3 gap-4"
                 prop.children [
                     Html.div [
                         prop.className "p-5 rounded-lg bg-base-200/30 border border-base-content/5"
                         prop.children [
                             Html.p [
-                                prop.className "text-3xl font-display uppercase tracking-wider mb-2"
-                                prop.text "Oswald"
+                                prop.className "text-3xl font-display italic mb-2"
+                                prop.text "Instrument Serif"
                             ]
                             Html.p [
-                                prop.className "font-display uppercase tracking-wider text-base-content/70 text-sm"
-                                prop.text "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                prop.className "font-display text-base-content/70 text-sm"
+                                prop.text "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz"
                             ]
                             Html.p [
-                                prop.className "font-display uppercase tracking-wider text-base-content/70 text-sm"
+                                prop.className "font-display text-base-content/70 text-sm"
                                 prop.text "0123456789"
                             ]
                             Html.code [
                                 prop.className "block mt-3 text-xs font-mono text-primary/70"
-                                prop.text "font-display / uppercase / tracking-wider"
+                                prop.text "font-display -- display, titles; italic = section voice"
                             ]
                         ]
                     ]
@@ -251,7 +281,7 @@ let private typographySection () =
                         prop.children [
                             Html.p [
                                 prop.className "text-3xl font-sans mb-2"
-                                prop.text "Inter"
+                                prop.text "Instrument Sans"
                             ]
                             Html.p [
                                 prop.className "font-sans text-base-content/70 text-sm"
@@ -263,7 +293,28 @@ let private typographySection () =
                             ]
                             Html.code [
                                 prop.className "block mt-3 text-xs font-mono text-primary/70"
-                                prop.text "font-sans / normal case / body text, labels, buttons"
+                                prop.text "font-sans -- body, labels, UI (weights 400-700)"
+                            ]
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "p-5 rounded-lg bg-base-200/30 border border-base-content/5"
+                        prop.children [
+                            Html.p [
+                                prop.className "text-3xl font-mono mb-2"
+                                prop.text "Spline Mono"
+                            ]
+                            Html.p [
+                                prop.className "font-mono text-base-content/70 text-sm"
+                                prop.text "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                            ]
+                            Html.p [
+                                prop.className "font-mono text-base-content/70 text-sm"
+                                prop.text "0123456789"
+                            ]
+                            Html.code [
+                                prop.className "block mt-3 text-xs font-mono text-primary/70"
+                                prop.text "font-mono -- data: dates, durations, counts, ids"
                             ]
                         ]
                     ]
@@ -274,8 +325,8 @@ let private typographySection () =
 
             decisionBox
                 "Font Pairing"
-                "Oswald (headings, always uppercase + tracking 0.05em) and Inter (body, labels, buttons). The contrast between a condensed display font and a clean sans-serif creates visual hierarchy without extra decoration."
-                "Using a single font for everything (too monotone, no hierarchy). Serif fonts (too formal for a media/entertainment app)."
+                "Instrument Serif (display, mixed case, italic = section voice) + Instrument Sans (body, labels, UI) + Spline Sans Mono (data). The contrast between an editorial serif, a clean sans body, and a tabular mono for data creates hierarchy without shouting -- the library reads like a cinema listing, not a dashboard."
+                "A single font for everything (too monotone, no hierarchy). Condensed all-caps display headings, the previous Oswald treatment (too utilitarian for the velvet direction)."
         ]
     ]
 
@@ -295,13 +346,51 @@ let private colorSwatch (name: string) (bgClass: string) (textClass: string) =
         ]
     ]
 
+/// A palette swatch labeled with its literal oklch value (Velvet Lobby primitives).
+let private oklchSwatch (name: string) (oklchLabel: string) (bgClass: string) =
+    Html.div [
+        prop.className "flex flex-col items-center gap-2"
+        prop.children [
+            Html.div [
+                prop.className (bgClass + " w-20 h-20 rounded-xl border border-base-content/10 shadow-sm")
+            ]
+            Html.span [
+                prop.className "text-xs font-sans text-base-content/70"
+                prop.text name
+            ]
+            Html.span [
+                prop.className "text-[10px] font-mono text-ink-faint"
+                prop.text oklchLabel
+            ]
+        ]
+    ]
+
 let private colorsSection () =
     Html.div [
         prop.className "flex flex-col gap-6"
         prop.children [
             sectionTitle "Colors"
 
-            decision "The \"dim\" dark theme was chosen because dark backgrounds let movie posters and backdrops visually pop. All colors use the oklch color space for perceptually uniform, vibrant results."
+            decision "\"Velvet Lobby\": velvet-black surfaces, ivory-serif ink, and a single gold accent used like foil. All colors use the oklch color space for perceptually uniform, vibrant results against the dark base -- and to let posters/backdrops carry the vivid hues."
+
+            subheading "Velvet Lobby Primitives"
+
+            Html.div [
+                prop.className "flex flex-wrap gap-4"
+                prop.children [
+                    oklchSwatch "bg" "oklch(0.16 0.028 20)" "bg-base-200"
+                    oklchSwatch "surface" "oklch(0.20 0.03 22)" "bg-base-100"
+                    oklchSwatch "line" "oklch(0.32 0.04 28)" "bg-line"
+                    oklchSwatch "gold" "oklch(0.80 0.12 82)" "bg-gold"
+                    oklchSwatch "spotlight" "oklch(0.30 0.06 30)" "bg-spotlight"
+                    oklchSwatch "ink" "oklch(0.93 0.012 60)" "bg-base-content"
+                ]
+            ]
+
+            Html.p [
+                prop.className (DesignSystem.faintText + " max-w-2xl")
+                prop.text "bg/surface/ink/gold are carried by the \"dim\" DaisyUI theme's base-200/base-100/base-content/primary slots (replaced in place); line and spotlight are minted directly as --color-line / --color-spotlight since they have no DaisyUI-semantic equivalent."
+            ]
 
             subheading "Base Colors"
 
@@ -345,7 +434,7 @@ let private colorsSection () =
                                 ]
                             ]
                             Html.span [ prop.className "text-xs font-mono text-primary"; prop.text "primary" ]
-                            Html.span [ prop.className "text-xs text-base-content/40"; prop.text "cyan-green / CTAs" ]
+                            Html.span [ prop.className "text-xs text-base-content/40"; prop.text "gold / the accent, foil" ]
                         ]
                     ]
                     Html.div [
@@ -361,7 +450,7 @@ let private colorsSection () =
                                 ]
                             ]
                             Html.span [ prop.className "text-xs font-mono text-secondary"; prop.text "secondary" ]
-                            Html.span [ prop.className "text-xs text-base-content/40"; prop.text "orange / social" ]
+                            Html.span [ prop.className "text-xs text-base-content/40"; prop.text "dull gold / low-emphasis" ]
                         ]
                     ]
                     Html.div [
@@ -377,7 +466,7 @@ let private colorsSection () =
                                 ]
                             ]
                             Html.span [ prop.className "text-xs font-mono text-accent"; prop.text "accent" ]
-                            Html.span [ prop.className "text-xs text-base-content/40"; prop.text "magenta / attention" ]
+                            Html.span [ prop.className "text-xs text-base-content/40"; prop.text "bright gold / foil-sweep end" ]
                         ]
                     ]
                 ]
@@ -395,6 +484,11 @@ let private colorsSection () =
                 ]
             ]
 
+            Html.p [
+                prop.className (DesignSystem.faintText + " max-w-2xl")
+                prop.text "Lifecycle status colors (info=on hold, success=completed, warning, error=abandoned) are functional signals, not brand accents -- gold stays the only accent."
+            ]
+
             subheading "Text Hierarchy"
 
             Html.div [
@@ -403,45 +497,50 @@ let private colorsSection () =
                     Html.div [
                         prop.className "flex items-center justify-between"
                         prop.children [
-                            Html.span [ prop.className "text-base text-base-content"; prop.text "Primary text -- full opacity" ]
-                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "text-base-content (100%)" ]
+                            Html.span [ prop.className "text-base text-base-content"; prop.text "Primary -- ink" ]
+                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "text-base-content -- oklch(0.93 0.012 60)" ]
                         ]
                     ]
                     Html.div [
                         prop.className "flex items-center justify-between"
                         prop.children [
-                            Html.span [ prop.className "text-base text-base-content/70"; prop.text "Secondary text -- 70% opacity" ]
-                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "text-base-content/70" ]
+                            Html.span [ prop.className "text-base text-ink-secondary"; prop.text "Secondary -- ink-secondary" ]
+                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "text-ink-secondary -- oklch(0.74 0.015 45)" ]
                         ]
                     ]
                     Html.div [
                         prop.className "flex items-center justify-between"
                         prop.children [
-                            Html.span [ prop.className "text-base text-base-content/50"; prop.text "Muted text -- 50% opacity" ]
-                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "text-base-content/50" ]
+                            Html.span [ prop.className "text-base text-ink-muted"; prop.text "Muted -- ink-muted" ]
+                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "text-ink-muted -- oklch(0.62 0.02 40)" ]
                         ]
                     ]
                     Html.div [
                         prop.className "flex items-center justify-between"
                         prop.children [
-                            Html.span [ prop.className "text-base text-base-content/40"; prop.text "Faint text -- 40% opacity" ]
-                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "text-base-content/40" ]
+                            Html.span [ prop.className "text-base text-ink-faint"; prop.text "Faint -- ink-faint" ]
+                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "text-ink-faint -- oklch(0.52 0.04 45)" ]
                         ]
                     ]
                 ]
+            ]
+
+            Html.p [
+                prop.className (DesignSystem.faintText + " max-w-2xl")
+                prop.text "These four steps are literal oklch lightness values on the warm-neutral hue, not alpha applied to ink -- the only legal text-hierarchy levels (styleguide.md § 1.2)."
             ]
 
             subheading "Decisions"
 
             decisionBox
                 "Dark Theme"
-                "\"dim\" dark theme -- dark backgrounds let movie posters and backdrops stand out. oklch color space for precise, perceptually uniform colors."
+                "\"dim\" theme, replaced in place with the Velvet Lobby palette -- dark, warm burgundy-black backgrounds let movie posters and backdrops stand out. oklch color space for precise, perceptually uniform colors."
                 "Light themes (washed-out poster images, poor contrast for media-heavy UI). sRGB hex values (inconsistent perceived brightness across hues)."
 
             decisionBox
                 "Semantic Color Mapping"
-                "primary=cyan-green for CTAs and navigation highlights. secondary=orange for social features (friends, recommendations). accent=magenta for attention-grabbing elements."
-                "Monochromatic palette (too austere). Red as primary (too aggressive for a personal library app)."
+                "primary=gold, the single brand accent, spent sparingly like foil (CTAs, active state, ratings, \"In focus\"). secondary/accent are duller/brighter gold variants for lower/higher emphasis within the same hue family -- never a second brand hue. Lifecycle status colors (info/success/warning/error) stay functional signals only."
+                "A second brand accent hue (breaks the \"gold is the only accent\" discipline). Monochromatic palette (too austere). Red as primary (too aggressive for a personal library app)."
         ]
     ]
 
@@ -595,7 +694,7 @@ let private glassmorphismSection () =
         prop.children [
             sectionTitle "Glassmorphism"
 
-            decision "Every overlay in Mediatheca uses glassmorphism -- semi-transparent backgrounds with backdrop blur. This creates depth and context, letting the underlying content remain visible while focusing attention on the overlay."
+            decision "Every overlay in Mediatheca uses glassmorphism -- semi-transparent backgrounds with backdrop blur. This creates depth and context, letting the underlying content remain visible while focusing attention on the overlay. Velvet Lobby re-tints the glass to the burgundy/gold palette (.glass-card, .rating-dropdown) but keeps the rule in full force -- ADR-0006 is unchanged, no fully-opaque overlay is introduced. Solid \"velvet card\" surfaces are page/card backgrounds, not floating overlays, so there's no conflict."
 
             subheading "Glass Levels"
 

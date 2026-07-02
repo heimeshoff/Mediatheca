@@ -18,31 +18,45 @@ let glassSubtle = "bg-base-100/50 backdrop-blur-sm"
 /// Glassmorphism dropdown (rating dropdown, action menus)
 let glassDropdown = "rating-dropdown"
 
-// ── Typography ──
+// ── Typography (Velvet Lobby: Instrument Serif / Instrument Sans / Spline Sans Mono) ──
+// Four ink levels are minted as literal oklch steps in index.css (--color-ink-*),
+// not opacity fractions of base-content — see styleguide.md § 1.2.
 
-/// Page title (h1) — large gradient text
-let pageTitle = "text-4xl font-display uppercase tracking-wider text-gradient-primary"
+/// Page title (h1) — hero / entity name. Instrument Serif, mixed case, tight leading.
+let pageTitle = "text-4xl md:text-5xl font-display leading-none text-base-content"
 
-/// Section header (h2) — with accent bar convention
-let sectionHeader = "text-2xl font-display uppercase tracking-wider"
+/// Section header (h2) — the editorial "voice". Instrument Serif *italic* —
+/// used for section titles ("Next up", "In focus") and the "theca" wordmark.
+let sectionHeader = "text-2xl font-display italic text-base-content"
 
-/// Card title (h3)
-let cardTitle = "text-lg font-display uppercase tracking-wider"
+/// Card title (h3) — Instrument Serif, mixed case.
+let cardTitle = "text-lg font-display text-base-content"
 
-/// Subtitle / secondary heading
-let subtitle = "text-sm font-display uppercase tracking-wider"
+/// Eyebrow — category/label above a section. Instrument Sans, small caps-style
+/// uppercase with wide tracking. Also exported as `subtitle` for existing call sites.
+let eyebrow = "text-xs font-sans uppercase tracking-[0.18em] text-ink-muted"
 
-/// Body text
-let bodyText = "text-base text-base-content"
+/// Subtitle / secondary heading — alias of `eyebrow` (legacy name, same role).
+let subtitle = eyebrow
 
-/// Secondary text (descriptions, metadata)
-let secondaryText = "text-sm text-base-content/70"
+/// Body text — Instrument Sans, relaxed leading, full-strength ink.
+let bodyText = "text-sm font-sans leading-relaxed text-base-content"
 
-/// Muted text (timestamps, labels)
-let mutedText = "text-xs text-base-content/50"
+/// Secondary text (descriptions, metadata) — ink-secondary step.
+let secondaryText = "text-sm font-sans text-ink-secondary"
 
-/// Faint text (placeholders, hints)
-let faintText = "text-xs text-base-content/40"
+/// Muted text (timestamps, labels) — ink-muted step. Also exported as `metaText`.
+let mutedText = "text-xs font-sans text-ink-muted"
+
+/// Metadata text — alias of `mutedText` (matches the styleguide's semantic scale).
+let metaText = mutedText
+
+/// Faint text (placeholders, hints) — ink-faint step, the lowest-priority level.
+let faintText = "text-xs font-sans text-ink-faint"
+
+/// Data text — Spline Sans Mono. Dates, durations, counts, timecodes, ids.
+/// The "data" typeface: a new role with no legacy equivalent.
+let dataText = "text-xs font-mono text-ink-muted"
 
 // ── Layout ──
 

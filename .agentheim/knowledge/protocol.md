@@ -5,6 +5,27 @@ Newest entries on top.
 
 ---
 
+## 2026-07-02 19:05 -- Task verified and completed: design-system-r7k2m - Velvet Lobby re-skin — tokens & type foundation
+
+**Type:** Work / Task completion
+**Task:** design-system-r7k2m - Velvet Lobby re-skin — tokens & type foundation
+**Summary:** Shipped the Velvet Lobby token + type foundation — replaced the `dim` theme's palette in place with the burgundy-black/gold oklch tokens, swapped Oswald/Inter for Instrument Serif/Instrument Sans/Spline Sans Mono (self-hosted `@fontsource`), retargeted `DesignSystem.fs`'s type helpers and the StyleGuide page, and re-tinted `.glass-card`/`.rating-dropdown` while keeping ADR-0006's mandatory overlay-glass rule fully in force. `styleguide.md` reconciled as the gate source of truth.
+**Duration:** ~19m (worker ~17m + verify ~2m)
+**Verification:** PASS (iteration 1)
+**Files changed:** 9
+**Tests added:** 0 (presentational token/CSS/markdown/view layer — no assertable pure logic, no unit-test suite; verified via clean `npm run build`, Fable + Tailwind)
+**ADRs written:** none
+
+---
+
+## 2026-07-02 18:45 -- Batch started: [design-system-r7k2m]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-r7k2m - Velvet Lobby re-skin — tokens & type foundation
+**Parallel:** no (1 worker)
+
+---
+
 ## 2026-07-02 18:40 -- Modeling / Refined: design-system-r7k2m - Velvet Lobby re-skin — tokens & type foundation
 
 **Type:** Modeling / Refine

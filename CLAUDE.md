@@ -44,7 +44,7 @@ Personal media library app (movies, series, games, books) built with full-stack 
 
 ## Conventions
 
-- Fonts: Oswald (`font-display`, headings) and Inter (`font-sans`, body) via Google Fonts
+- Fonts ("Velvet Lobby"): Instrument Serif (`font-display`, headings — mixed case; *italic* is the section-header/wordmark voice), Instrument Sans (`font-sans`, body/UI), Spline Sans Mono (`font-mono`, dates/durations/counts/ids) — all via self-hosted `@fontsource` packages
 - Theme: custom "dim" dark theme in `index.css` via `@plugin "daisyui/theme"`, selected by `data-theme="dim"` on `<html>`
 - **Glassmorphism for all overlays**: Every dropdown, popover, modal, and floating panel MUST use glassmorphism — semi-transparent background (`/0.55`–`/0.70` opacity), `backdrop-filter: blur(24px) saturate(1.2)`, subtle border (`oklch(… / 0.15)`), and `inset 0 1px 0 0 oklch(100% 0 0 / 0.08)` highlight. Never use fully opaque backgrounds on overlays. See `.rating-dropdown` and `.glass-card` in `index.css` for reference.
 - **Design system canonical artifact:** the full styleguide (tokens, typography, glassmorphism, component patterns, theme, review process) lives at `.agentheim/contexts/design-system/styleguide.md`. The glassmorphism rule above and the `backdrop-filter` gotcha below are reproduced there verbatim; the styleguide is the source of truth for design-system intent and the frontend task gate (ADR 0009).

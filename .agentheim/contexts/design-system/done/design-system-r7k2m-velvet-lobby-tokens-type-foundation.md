@@ -1,11 +1,11 @@
 ---
 id: design-system-r7k2m
 title: Velvet Lobby re-skin — tokens & type foundation
-status: todo
+status: done
 type: feature
 context: design-system
 created: 2026-07-02
-completed:
+completed: 2026-07-02
 depends_on: []
 blocks: [design-system-h3q8n]
 tags: [styleguide, tokens, typography, theme, re-skin, velvet-lobby]
@@ -53,13 +53,13 @@ The main region carries a static `radial-gradient(90% 42% at 50% -4%, oklch(.30 
 
 ## Acceptance criteria
 
-- [ ] `src/Client/index.css` `@theme` block: `--font-display` → Instrument Serif, `--font-sans` → Instrument Sans, and a new `--font-mono` → Spline Sans Mono; Google Fonts `<link>` (or import) updated to load all three, Oswald/Inter removed.
-- [ ] Palette tokens (`bg`, `surface`, `line`, `gold`, `spotlight`, `ink` + muted text steps) expressed as Tailwind 4 `@theme` / DaisyUI theme values using the oklch values above; the `dim` theme's neutral graphite palette is **replaced in place** — the theme keeps the name `dim` and `data-theme="dim"` stays on `<html>` (resolved — see Notes), so no page's theme attribute changes.
-- [ ] `DesignSystem.fs` typed class compositions updated so the new font roles and surface/line/accent tokens are referenced by name, not hardcoded.
-- [ ] The in-app StyleGuide page (`src/Client/Pages/StyleGuide`) renders the new palette swatches (with oklch labels), the three-typeface type scale, and the italic-serif section-header voice.
-- [ ] `styleguide.md` (canonical, ADR-0009) updated: token table, typography section, and theme description reflect Velvet Lobby; the doc remains the source of truth for the gate.
-- [ ] Glassmorphism overlays (ADR-0006) re-tinted to the burgundy/gold palette and still pass the glass rule (`.glass-card`, `.rating-dropdown` reference the new tokens); no fully-opaque overlays introduced.
-- [ ] `npm run build` compiles clean (Fable + Tailwind), app boots with the new theme applied via `data-theme`.
+- [x] `src/Client/index.css` `@theme` block: `--font-display` → Instrument Serif, `--font-sans` → Instrument Sans, and a new `--font-mono` → Spline Sans Mono; Google Fonts `<link>` (or import) updated to load all three, Oswald/Inter removed.
+- [x] Palette tokens (`bg`, `surface`, `line`, `gold`, `spotlight`, `ink` + muted text steps) expressed as Tailwind 4 `@theme` / DaisyUI theme values using the oklch values above; the `dim` theme's neutral graphite palette is **replaced in place** — the theme keeps the name `dim` and `data-theme="dim"` stays on `<html>` (resolved — see Notes), so no page's theme attribute changes.
+- [x] `DesignSystem.fs` typed class compositions updated so the new font roles and surface/line/accent tokens are referenced by name, not hardcoded.
+- [x] The in-app StyleGuide page (`src/Client/Pages/StyleGuide`) renders the new palette swatches (with oklch labels), the three-typeface type scale, and the italic-serif section-header voice.
+- [x] `styleguide.md` (canonical, ADR-0009) updated: token table, typography section, and theme description reflect Velvet Lobby; the doc remains the source of truth for the gate.
+- [x] Glassmorphism overlays (ADR-0006) re-tinted to the burgundy/gold palette and still pass the glass rule (`.glass-card`, `.rating-dropdown` reference the new tokens); no fully-opaque overlays introduced.
+- [x] `npm run build` compiles clean (Fable + Tailwind), app boots with the new theme applied via `data-theme`.
 
 ## Notes
 
@@ -69,3 +69,9 @@ The main region carries a static `radial-gradient(90% 42% at 50% -4%, oklch(.30 
 - **Deferred variant.** Turn 4 offered a cool "Modern recolor" (graphite hue 260 + electric-lime/amber accent). Not chosen; recorded here in case a second theme is wanted later. The brief's "try next" also floats a cyan accent and a light-mode pass — out of scope for this task.
 - **Accessibility check** during work: gold text (`.80 .12 82`) on burgundy `bg` and on `surface`, plus muted text steps, should meet contrast for their sizes.
 - Component patterns (hero card, filmstrip row, segmented progress, status badges, gold-leaf sweep, star rating) are **not** in this task — they are [[design-system-h3q8n]], which depends on these tokens.
+
+## Outcome
+
+Shipped the Velvet Lobby token + type foundation. The `dim` DaisyUI theme was replaced **in place** (name/`data-theme` unchanged) with the burgundy-black/gold palette (`base-100/200/300` = surface/bg/deep-rail, `base-content` = ink, `primary/secondary/accent` = gold family, `neutral` = line); `--color-line` and `--color-spotlight` were minted directly since they have no DaisyUI slot; the four ink-hierarchy steps became literal oklch tokens (`--color-ink-secondary/-muted/-faint`) instead of opacity fractions. Fonts swapped Oswald/Inter → Instrument Serif / Instrument Sans / Spline Sans Mono via `@fontsource` packages (`App.fs`, `package.json`); the global forced-uppercase heading rule was removed from `index.css`. `DesignSystem.fs`'s type-scale helpers were retargeted to the new fonts/ink tokens, keeping the existing `bodyText`/`secondaryText`/`mutedText`/`faintText` ladder while adding the brief's literal role names (`eyebrow`, `metaText`, `dataText`) as aliases. `.glass-card` and `.rating-dropdown` (including item hover/active states) were re-tinted to the burgundy/gold palette — ADR-0006's mandatory glassmorphism rule for overlays was kept in full force, not relaxed; `glassOverlay`/`glassSubtle` re-tint automatically via the `base-100` change. The StyleGuide page's Typography section now shows the three-typeface scale, an explicit italic-voice specimen, and the new `dataText` role; the Colors section adds an oklch-labeled "Velvet Lobby Primitives" swatch set and an oklch-labeled ink-hierarchy table. `styleguide.md` was reconciled with the shipped code — most importantly § 3 was corrected: the pre-existing draft had described overlays (dropdowns/modals) converting to solid "velvet" surfaces, which conflicted with the resolved gating decision and ADR-0006; it now correctly states overlays stay mandatory glass (re-tinted) while only page/card backgrounds trend toward a solid "velvet card" (deferred, not implemented, tracked under design-system-h3q8n). Spacing/radii/shadow/animation tokens and all § 4 component patterns remain explicitly out of scope and marked "target — not yet implemented." `npm run build` compiles clean (Fable + Tailwind); confirmed the new utility classes (`bg-gold`, `text-ink-secondary`, `bg-line`, italic) are present in the generated CSS.
+
+Key files: `src/Client/index.css`, `src/Client/App.fs`, `src/Client/DesignSystem.fs`, `src/Client/Pages/StyleGuide/Views.fs`, `package.json`, `.agentheim/contexts/design-system/styleguide.md`, `.agentheim/contexts/design-system/README.md`, `CLAUDE.md`.
