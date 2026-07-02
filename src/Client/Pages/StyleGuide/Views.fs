@@ -1422,6 +1422,58 @@ let private velvetLobbyPatternsSection () =
                 ]
             ]
 
+            // ── Sidebar nav (layered rail, ivory active tab) ──
+            subheading "Sidebar Nav"
+
+            decision "The desktop rail (§ 4 Sidebar nav — design-system-t4b9k): a top group of primary destinations and a bottom group (Events/Settings) pinned via mt-auto. The active item is its own raised ivory layer — not a highlight on the flat rail — with dark-burgundy ink and a gold icon, joined to the rail/content boundary by a concave corner-notch (see ADR-0013)."
+
+            Html.div [
+                prop.className "mt-4 max-w-[220px] rounded-lg overflow-hidden bg-base-200/80 border border-base-300/50 p-3"
+                prop.children [
+                    Html.ul [
+                        prop.className DesignSystem.navGroupTop
+                        prop.children [
+                            Html.li [
+                                Html.div [
+                                    prop.className (DesignSystem.navItem + " " + DesignSystem.navItemActive)
+                                    prop.children [
+                                        Html.span [ prop.className DesignSystem.navItemActiveIconClass; prop.children [ Icons.dashboard () ] ]
+                                        Html.span [ prop.text "Dashboard" ]
+                                    ]
+                                ]
+                            ]
+                            Html.li [
+                                Html.div [
+                                    prop.className (DesignSystem.navItem + " " + DesignSystem.navItemInactive)
+                                    prop.children [ Icons.movie (); Html.span [ prop.text "Movies" ] ]
+                                ]
+                            ]
+                            Html.li [
+                                Html.div [
+                                    prop.className (DesignSystem.navItem + " " + DesignSystem.navItemInactive)
+                                    prop.children [ Icons.tv (); Html.span [ prop.text "TV Series" ] ]
+                                ]
+                            ]
+                        ]
+                    ]
+                    Html.ul [
+                        prop.className DesignSystem.navGroupBottom
+                        prop.children [
+                            Html.li [
+                                Html.div [
+                                    prop.className (DesignSystem.navItem + " " + DesignSystem.navItemInactive)
+                                    prop.children [ Icons.settings (); Html.span [ prop.text "Settings" ] ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+            Html.code [
+                prop.className "text-xs font-mono text-primary/70 mt-2 block"
+                prop.text "DesignSystem.navItemClass isActive, navItemActiveIconClass, navGroupTop, navGroupBottom -- see Components/Sidebar.fs"
+            ]
+
             // ── Status badges ──
             subheading "Status Badges"
 

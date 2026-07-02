@@ -1,15 +1,15 @@
 ---
 id: design-system-t4b9k
 title: Layered sidebar nav — ivory active tab, curved-corner boundary
-status: todo
+status: done
 type: feature
 context: design-system
 created: 2026-07-02
-completed:
+completed: 2026-07-03
 depends_on: []
 blocks: []
 tags: [navigation, sidebar, glassmorphism, layout]
-related_adrs: [0009]
+related_adrs: [0009, 0013]
 related_research: []
 prior_art: [design-system-h3q8n]
 ---
@@ -108,3 +108,33 @@ direction, with the three specifics the user called out on top of it:
   (per the BC README). It self-gates — no external `depends_on`.
 - Mobile uses `BottomNav.fs`, not this rail — out of scope unless the design doc's
   mobile direction (2c) is explicitly pulled in later.
+
+## Outcome
+Reworked `Components/Sidebar.fs` into a top group (Dashboard/Movies/TV
+Series/Games/Catalogs/Friends) and a bottom group (Events/Settings) pinned
+via `mt-auto`. The active item now renders as its own raised ivory layer
+(`--color-nav-active-bg` `oklch(0.94 0.02 75)`) with dark-burgundy ink
+(`--color-nav-active-ink`) and a gold icon (`--color-nav-active-icon`),
+joined to the rail/content boundary by a concave corner-notch (two
+radial-gradient corner masks, `--nav-notch-size`) instead of a straight
+border — the old `.nav-glow` left-edge bar is retired. New tokens/CSS in
+`src/Client/index.css`; new `DesignSystem.navItemClass`/`navItemActiveIconClass`/
+`navGroupTop`/`navGroupBottom` in `src/Client/DesignSystem.fs`; live specimen
+added to the "Velvet Lobby Patterns" § Sidebar Nav in
+`src/Client/Pages/StyleGuide/Views.fs`. `styleguide.md` §§ 0, 1.1, 4, 7,
+Sign-off, and the top status banner updated in lockstep; design-system
+README's ubiquitous-language list updated. The palette override (ivory, not
+the design doc's burgundy fill) and the corner-notch technique are recorded
+in ADR-0013 (`.agentheim/knowledge/decisions/0013-sidebar-nav-ivory-tab-and-corner-notch.md`).
+`npm run build` compiles clean.
+
+## Verifier note (iteration 1)
+
+**REASONS:**
+- `.agentheim/knowledge/decisions/0013-sidebar-nav-ivory-tab-and-corner-notch.md:1` — the ADR has no YAML frontmatter block. It opens directly with the `# ADR 0013:` heading, whereas the repo's ADR convention (see 0006 and 0009) mandates a `---` frontmatter carrying id, title, scope, status, date (plus supersedes/superseded_by/related_tasks/related_research). Fails the "frontmatter is well-formed (id, title, status, scope, date)" check.
+
+**SUGGESTED_FIX:** Prepend the standard ADR YAML frontmatter to 0013 (id: 0013, title, scope: design-system, status: accepted, date: 2026-07-03, supersedes: [], superseded_by: [], related_tasks: [], related_research: []), matching the format of ADR 0006/0009. No code changes needed; the ADR body (Context/Decision/Consequences) is complete and non-trivial.
+
+**ITERATION_HINT:** likely-fixable
+
+_(Everything else passed: ivory/ink/icon oklch tokens match exactly, top/bottom split with `mt-auto` present, concave corner-notch via radial-gradient masks implemented, old `.nav-glow`/`bg-primary/10` fully retired, canonical artifacts in lockstep, `npm run build` clean.)_

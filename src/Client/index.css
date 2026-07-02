@@ -77,6 +77,16 @@
     --shadow-filmstrip: 0 16px 36px -18px oklch(0 0 0 / 0.9);
     --ring-active: inset 2px 0 0 oklch(0.80 0.12 82);
 
+    /* Sidebar nav — layered active tab (styleguide.md § 4 Sidebar nav,
+       design-system-t4b9k). Warm ivory placard, dark-burgundy ink, gold icon —
+       in the gold family, not literal white (see ADR-0013). */
+    --color-nav-active-bg: oklch(0.94 0.02 75);
+    --color-nav-active-ink: oklch(0.20 0.03 25);
+    --color-nav-active-icon: oklch(0.55 0.16 55);
+    --radius-nav-tab: 1rem;
+    --nav-notch-size: 1rem;
+    --shadow-nav-active: 0 6px 16px -6px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(0.20 0.03 25 / 0.08);
+
     /* Velvet Lobby animation (styleguide.md § 1.6 + Motion) */
     --duration-fast: 0.15s;
     --duration-normal: 0.25s;
@@ -407,25 +417,56 @@ h1, h2, h3, h4, h5, h6 {
     opacity: 1;
 }
 
-/* ── Sidebar nav item glow ── */
-.nav-glow {
+/* ── Sidebar nav — layered rail, ivory active tab (styleguide.md § 4 Sidebar
+   nav, design-system-t4b9k). Supersedes the old left-edge glow bar: the
+   active item is now its own raised ivory layer, not a highlight on the
+   flat rail surface. ── */
+.nav-item {
     position: relative;
     transition: background-color 0.2s ease, color 0.2s ease;
 }
-.nav-glow::before {
+
+.nav-item-active {
+    background: var(--color-nav-active-bg);
+    color: var(--color-nav-active-ink);
+    border-radius: var(--radius-nav-tab);
+    box-shadow: var(--shadow-nav-active);
+    /* Bleed past the rail's inner gutter (--space-gap-standard, matches the
+       nav container's px-3) so the tab's right edge sits flush against the
+       rail/content boundary — the concave notches below curve that boundary
+       around the tab's corners (ADR-0013). */
+    margin-right: calc(-1 * var(--space-gap-standard));
+    padding-right: calc(var(--space-gap-standard) + var(--space-card));
+}
+
+/* Icon sits in gold, distinct from the ink-colored label — the label span
+   inherits `color` from .nav-item-active (currentColor), this override wins
+   for the icon's own currentColor stroke/fill. */
+.nav-item-active-icon {
+    color: var(--color-nav-active-icon);
+}
+
+/* Concave corner masks — "the content panel's edge sweeps around the tab."
+   Each notch is a small square painted in the page/rail tone
+   (--color-base-300) with a hard-edged radial gradient cut from the corner
+   nearest the tab, revealing the rail underneath and forming the curve that
+   joins the straight boundary above/below to the tab's own rounded corner. */
+.nav-item-active::before,
+.nav-item-active::after {
     content: '';
     position: absolute;
-    left: 0;
-    top: 25%;
-    bottom: 25%;
-    width: 3px;
-    border-radius: 0 3px 3px 0;
-    background: oklch(0.80 0.12 82); /* gold (was cyan-green) */
-    opacity: 0;
-    transition: opacity 0.2s ease;
+    right: 0;
+    width: var(--nav-notch-size);
+    height: var(--nav-notch-size);
+    pointer-events: none;
 }
-.nav-glow.active::before {
-    opacity: 1;
+.nav-item-active::before {
+    top: calc(-1 * var(--nav-notch-size));
+    background: radial-gradient(circle at bottom right, transparent var(--nav-notch-size), var(--color-base-300) var(--nav-notch-size));
+}
+.nav-item-active::after {
+    bottom: calc(-1 * var(--nav-notch-size));
+    background: radial-gradient(circle at top right, transparent var(--nav-notch-size), var(--color-base-300) var(--nav-notch-size));
 }
 
 /* ── Gradient text ── */

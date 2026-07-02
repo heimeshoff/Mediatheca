@@ -142,13 +142,16 @@ let cardGrid = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl
 let contentGridLeft = "lg:col-span-8"
 let contentGridRight = "lg:col-span-4"
 
-// ── Navigation ──
+// ── Navigation (§ 4 Sidebar nav — layered rail, design-system-t4b9k) ──
 
-/// Sidebar nav item (base classes)
-let navItem = "nav-glow flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200"
+/// Sidebar nav item (base classes) — layout only. Active/inactive layers on
+/// top via `navItemActive` / `navItemInactive`.
+let navItem = "nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium"
 
-/// Nav item active state
-let navItemActive = "active bg-primary/10 text-primary"
+/// Nav item active state — the ivory "lit lobby placard" layer: raised ivory
+/// surface, dark-burgundy ink, gold icon (via `navItemActiveIconClass`), and
+/// the concave corner-notch boundary against the rail/content edge.
+let navItemActive = "nav-item-active"
 
 /// Nav item inactive state
 let navItemInactive = "text-base-content/70 hover:text-base-content hover:bg-base-300/50"
@@ -156,6 +159,16 @@ let navItemInactive = "text-base-content/70 hover:text-base-content hover:bg-bas
 /// Nav item helper — returns full class string based on active state
 let navItemClass isActive =
     navItem + " " + (if isActive then navItemActive else navItemInactive)
+
+/// Wraps a nav item's icon when active — flips it to gold, distinct from the
+/// ink-colored label. Apply only to the active item's icon wrapper.
+let navItemActiveIconClass = "nav-item-active-icon"
+
+/// Top nav group — primary destinations, stacked at the top of the rail.
+let navGroupTop = "flex flex-col gap-1"
+
+/// Bottom nav group — pinned to the foot of the rail via `margin-top: auto`.
+let navGroupBottom = "flex flex-col gap-1 mt-auto"
 
 // ── Stat Cards ──
 

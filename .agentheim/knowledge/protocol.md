@@ -5,6 +5,38 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 -- Task verified and completed: design-system-t4b9k - Layered sidebar nav — ivory active tab, curved-corner boundary
+
+**Type:** Work / Task completion
+**Task:** design-system-t4b9k - Layered sidebar nav — ivory active tab, curved-corner boundary
+**Summary:** Reworked the desktop rail into a top/bottom grouped nav (`mt-auto` bottom pin) with a raised **ivory** active-tab layer (dark-burgundy ink, gold icon) joined to the rail/content boundary by a concave corner-notch (two radial-gradient corner masks); retired the old `.nav-glow` left-edge bar and `bg-primary/10` active state. New tokens in `index.css`, typed helpers in `DesignSystem.fs`, live StyleGuide specimen, styleguide/README in lockstep (ADR-0013).
+**Duration:** ~15m (dispatch → verdict, incl. 1 re-dispatch for ADR frontmatter)
+**Verification:** PASS (iteration 2)
+**Files changed:** 7
+**Tests added:** 0
+**ADRs written:** 0013
+
+---
+
+## 2026-07-03 -- Verification failed: design-system-t4b9k - Layered sidebar nav — ivory active tab, curved-corner boundary
+
+**Type:** Work / Verification failure
+**Task:** design-system-t4b9k - Layered sidebar nav — ivory active tab, curved-corner boundary
+**Iteration:** 1 of 3
+**Reasons:** new ADR 0013 is missing its YAML frontmatter block (id/title/scope/status/date) — breaks the ADR indexing convention (cf. 0006/0009). All code criteria passed (ivory/ink/icon tokens exact, top/bottom `mt-auto` split, concave corner-notch, `.nav-glow`/`bg-primary/10` retired, lockstep artifacts, clean `npm run build`).
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
+## 2026-07-03 -- Batch started: [design-system-t4b9k]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-t4b9k - Layered sidebar nav — ivory active tab, curved-corner boundary
+**Parallel:** no (1 worker)
+
+---
+
 ## 2026-07-03 -- Modeling / Refined: design-system-t4b9k - Layered sidebar nav — ivory active tab, curved-corner boundary
 
 **Type:** Modeling / Refine

@@ -14,16 +14,44 @@ type NavItem = {
     Href: string
 }
 
-let private navItems = [
+// Top group: primary destinations. Bottom group: pinned to the foot of the
+// rail via `mt-auto` (styleguide.md § 4 Sidebar nav — design-system-t4b9k).
+let private topNavItems = [
     { Label = "Dashboard"; Page = Dashboard; IsActive = (fun p -> p = Dashboard); Icon = Icons.dashboard; Href = Router.format "" }
     { Label = "Movies"; Page = Movie_list; IsActive = Route.isMoviesSection; Icon = Icons.movie; Href = Router.format "movies" }
     { Label = "TV Series"; Page = Series_list; IsActive = Route.isSeriesSection; Icon = Icons.tv; Href = Router.format "series" }
     { Label = "Games"; Page = Game_list; IsActive = Route.isGamesSection; Icon = Icons.gamepad; Href = Router.format "games" }
     { Label = "Catalogs"; Page = Catalog_list; IsActive = Route.isCatalogsSection; Icon = Icons.catalog; Href = Router.format "catalogs" }
     { Label = "Friends"; Page = Friend_list; IsActive = Route.isFriendsSection; Icon = Icons.friends; Href = Router.format "friends" }
+]
+
+let private bottomNavItems = [
     { Label = "Events"; Page = Event_browser; IsActive = (fun p -> p = Event_browser); Icon = Icons.events; Href = Router.format "events" }
     { Label = "Settings"; Page = Settings; IsActive = (fun p -> p = Settings); Icon = Icons.settings; Href = Router.format "settings" }
 ]
+
+let private navItem (currentPage: Page) (item: NavItem) =
+    let isActive = item.IsActive currentPage
+    Html.li [
+        prop.key item.Label
+        prop.children [
+            Html.a [
+                prop.className (DesignSystem.navItemClass isActive)
+                prop.href item.Href
+                prop.onClick (fun e ->
+                    e.preventDefault()
+                    Router.navigate item.Href
+                )
+                prop.children [
+                    Html.span [
+                        prop.className (if isActive then DesignSystem.navItemActiveIconClass else "")
+                        prop.children [ item.Icon() ]
+                    ]
+                    Html.span [ prop.text item.Label ]
+                ]
+            ]
+        ]
+    ]
 
 let view (currentPage: Page) =
     Html.aside [
@@ -47,30 +75,18 @@ let view (currentPage: Page) =
                     ]
                 ]
             ]
-            // Navigation
+            // Navigation — top group (primary destinations) + bottom group
+            // (Events/Settings, pinned via mt-auto).
             Html.nav [
-                prop.className "flex-1 px-3 py-4"
+                prop.className "flex-1 flex flex-col px-3 py-4"
                 prop.children [
                     Html.ul [
-                        prop.className "flex flex-col gap-1"
-                        prop.children [
-                            for item in navItems do
-                                let isActive = item.IsActive currentPage
-                                Html.li [
-                                    Html.a [
-                                        prop.className (DesignSystem.navItemClass isActive)
-                                        prop.href item.Href
-                                        prop.onClick (fun e ->
-                                            e.preventDefault()
-                                            Router.navigate item.Href
-                                        )
-                                        prop.children [
-                                            item.Icon()
-                                            Html.span [ prop.text item.Label ]
-                                        ]
-                                    ]
-                                ]
-                        ]
+                        prop.className DesignSystem.navGroupTop
+                        prop.children [ for item in topNavItems do navItem currentPage item ]
+                    ]
+                    Html.ul [
+                        prop.className DesignSystem.navGroupBottom
+                        prop.children [ for item in bottomNavItems do navItem currentPage item ]
                     ]
                 ]
             ]
