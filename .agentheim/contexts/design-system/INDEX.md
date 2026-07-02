@@ -10,15 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
-- **Todo:** 0
+- **Backlog:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 5
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-<!-- no tasks in todo -->
+- **design-system-t4b9k** -- Layered sidebar nav — ivory active tab, curved-corner boundary -- `todo/design-system-t4b9k-layered-sidebar-nav.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -37,7 +37,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **design-system-t4b9k** -- Layered sidebar nav — white active tab, curved-corner boundary -- `backlog/design-system-t4b9k-layered-sidebar-nav.md`
+<!-- no tasks in backlog -->
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC

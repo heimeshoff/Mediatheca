@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 -- Modeling / Refined: design-system-t4b9k - Layered sidebar nav — ivory active tab, curved-corner boundary
+
+**Type:** Modeling / Refine
+**BC:** design-system
+**Status after:** todo
+**Summary:** Resolved the gating palette tension with the user present. Grounded against the captured design doc via DesignSync: dir 3a's Velvet Lobby active item is actually a *burgundy* raised layer (`oklch(0.22 0.035 25)` + gold `inset 2px 0 0` bar), **not** white — the white-tab ask came only from the pasted reference image. User confirmed the active tab lands as a warm **ivory** surface (`oklch(0.94 0.02 75)`, gold family) with dark-burgundy ink + gold icon — in-palette, not literal `#fff`. Curved/inverted-corner boundary stays a single in-task worker spike (technique chosen at build time, ADR only if non-obvious) — no split, no v1 descope. Task title, What point 2, and the active-tab acceptance criterion updated to ivory; palette-tension Note flipped to RESOLVED. Both gating unknowns closed → **promoted to `todo/`**.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-07-02 19:20 -- Modeling / Captured: design-system-t4b9k - Layered sidebar nav — white active tab, curved-corner boundary
 
 **Type:** Modeling / Capture
