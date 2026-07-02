@@ -420,7 +420,7 @@ h1, h2, h3, h4, h5, h6 {
     bottom: 25%;
     width: 3px;
     border-radius: 0 3px 3px 0;
-    background: oklch(86.133% 0.141 139.549);
+    background: oklch(0.80 0.12 82); /* gold (was cyan-green) */
     opacity: 0;
     transition: opacity 0.2s ease;
 }
@@ -429,8 +429,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ── Gradient text ── */
+/* Velvet Lobby gold foil — accent (bright foil end) → gold (primary). Was cyan-green. */
 .text-gradient-primary {
-    background: linear-gradient(135deg, oklch(86.133% 0.141 139.549), oklch(86.078% 0.142 206.182));
+    background: linear-gradient(135deg, oklch(0.88 0.11 88), oklch(0.80 0.12 82));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -525,6 +526,6 @@ h1, h2, h3, h4, h5, h6 {
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: radial-gradient(circle at 30% 30%, oklch(86.133% 0.141 139.549 / 0.08), transparent 60%);
+    background: radial-gradient(circle at 30% 30%, oklch(0.80 0.12 82 / 0.08), transparent 60%); /* gold (was cyan-green) */
     pointer-events: none;
 }

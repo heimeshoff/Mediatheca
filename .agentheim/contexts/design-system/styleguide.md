@@ -18,6 +18,8 @@ Tokens and typography have landed; component patterns have not.
 |---|---|---|
 | Base surface | **Shipped** | `dim` theme replaced in place: `base-200` = `bg` `oklch(0.16 0.028 20)`, `base-100` = `surface` `oklch(0.20 0.03 22)`, `base-300` = deep sidebar-rail `oklch(0.14 0.025 20)` |
 | Primary accent | **Shipped** | `primary` = **Gold** `oklch(0.80 0.12 82)` (was cyan-green); `secondary`/`accent` are duller/brighter gold variants, not a second hue |
+| Brand gradient & glows (`.text-gradient-primary`, `.nav-glow`, `.stat-glow`) | **Shipped** | Retargeted from the legacy cyan-green→cyan gradient to a **gold foil** gradient (`oklch(0.88 0.11 88)` → `oklch(0.80 0.12 82)`); nav active-edge and stat-card radial glow now gold. Closes a cyan-green leftover the r7k2m token pass missed — every `font-display text-gradient-primary` page title (Movies/Series/Games/Friends/Catalogs/Events/CatalogDetail) now reads gold |
+| App wordmark (sidebar) | **Shipped** | `Components/Sidebar.fs` — "Media" (Instrument Serif, ink) + italic gold "*theca*"; brief 3a treatment, replacing the uppercase cyan-green gradient wordmark (tagline omitted) |
 | Display font | **Shipped** | **Instrument Serif** (mixed case; italic = section-header voice), replacing Oswald |
 | Body font | **Shipped** | **Instrument Sans**, replacing Inter |
 | Data font | **Shipped** | **Spline Sans Mono** — new role, no legacy equivalent |
@@ -207,8 +209,8 @@ Anatomy of every recurring pattern in the 3a dashboard (plus the sibling 3b deta
 
 **Implementation status (design-system-h3q8n):** the patterns below marked **Implemented** exist as typed Feliz compositions in `src/Client/DesignSystem.fs`, backed by CSS in `src/Client/index.css`, with a live specimen in `src/Client/Pages/StyleGuide/Views.fs`'s "Velvet Lobby Patterns" section (`velvetLobbyPatternsSection`). Patterns marked **Not yet implemented** remain documented target only — future design-system backlog items; this task's acceptance criteria scoped it to the hero card, filmstrip, secondary card, In-focus poster frame, status badges, progress meters, star rating, section header, and list row.
 
-### Sidebar nav (desktop rail) — *not yet implemented*
-Deep rail (`oklch(0.14 0.025 20)`), `216px`, `line` right border. Wordmark at top: "Media" + italic gold "*theca*", with the faint uppercase tagline beneath. Primary items (Tonight ◆ / Movies / TV Series / Games / Friends / Catalogs) then a bottom group (Events / Settings / avatar + name). **Active item** = `surface` background + `--ring-active` (inset gold left edge) + gold glyph; inactive = muted ink, no fill.
+### Sidebar nav (desktop rail) — *wordmark implemented; rail chrome not yet*
+Deep rail (`oklch(0.14 0.025 20)`), `216px`, `line` right border. **Wordmark at top — implemented** (`Components/Sidebar.fs`): "Media" (Instrument Serif, ink) + italic gold "*theca*" — the brief's 3a treatment (the 3a tagline beneath is intentionally omitted). The rest of the rail chrome below is *not yet implemented*: primary items (Tonight ◆ / Movies / TV Series / Games / Friends / Catalogs) then a bottom group (Events / Settings / avatar + name). **Active item** = `surface` background + `--ring-active` (inset gold left edge) + gold glyph; inactive = muted ink, no fill.
 
 ### Top bar — *not yet implemented*
 Section tabs (All / Movies / TV Series / Games) as an underline nav — active tab carries a `2px` gold bottom-border; inactive muted. Right-aligned **search pill**: `surface` fill, `line` border, `--radius-pill`, `⌕` glyph + "Search your library…" placeholder.

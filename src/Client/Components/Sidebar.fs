@@ -29,17 +29,21 @@ let view (currentPage: Page) =
     Html.aside [
         prop.className "hidden lg:flex flex-col w-64 min-h-screen bg-base-200/80 backdrop-blur-sm border-r border-base-300/50"
         prop.children [
-            // Logo header with subtle bottom border
+            // Logo header with subtle bottom border — Velvet Lobby wordmark (brief 3a):
+            // "Media" in Instrument Serif ink + italic gold "theca".
             Html.div [
                 prop.className "flex items-center gap-3 px-6 py-6 border-b border-base-300/30"
                 prop.children [
                     Html.span [
-                        prop.className "text-primary drop-shadow-[0_0_8px_oklch(86.133%_0.141_139.549_/_0.4)]"
+                        prop.className "text-primary drop-shadow-[0_0_8px_oklch(0.80_0.12_82_/_0.4)]"
                         prop.children [ Icons.mediatheca () ]
                     ]
                     Html.span [
-                        prop.className "text-xl font-bold font-display uppercase tracking-wider text-gradient-primary"
-                        prop.text "Mediatheca"
+                        prop.className "font-display text-2xl leading-none text-base-content"
+                        prop.children [
+                            Html.text "Media"
+                            Html.span [ prop.className "italic text-primary"; prop.text "theca" ]
+                        ]
                     ]
                 ]
             ]
