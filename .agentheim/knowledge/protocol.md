@@ -5,6 +5,21 @@ Newest entries on top.
 
 ---
 
+## 2026-07-02 19:10 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~25m (first Batch started 18:45 → now)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** design-system-r7k2m: 1
+**Commits:** 1 (design-system-r7k2m; this session-end line committed separately)
+**Carry-over:** .gitignore: left behind (owner: user WIP, pre-existing at session start — adds `.agentheim/.dashboard`; surfaced for disposition, user away, safe default B applied); CLAUDE.md: left behind (owner: user WIP, pre-existing DB data-dir path doc correction confirmed intentional by harness; the in-scope r7k2m fonts hunk was committed separately via staged hunk-split, DB-path hunk left unstaged; surfaced for disposition, user away, safe default B applied)
+**Note:** design-system-r7k2m (Velvet Lobby re-skin — tokens & type foundation) shipped and verified first-try. Replaced the `dim` palette in place with the burgundy-black/gold oklch tokens, swapped Oswald/Inter for Instrument Serif/Instrument Sans/Spline Sans Mono (self-hosted `@fontsource`), retargeted `DesignSystem.fs` + the StyleGuide page, re-tinted the glass overlays (ADR-0006 rule kept fully in force), and reconciled `styleguide.md` as the gate source of truth. Clean `npm run build`. The pre-existing working-tree `styleguide.md` Velvet Lobby draft (criterion #5, ~340 lines) was folded into the task commit. Sibling **design-system-h3q8n** (component patterns & motion) is unblocked (its `depends_on: [design-system-r7k2m]` is now satisfied) but sits in `backlog/`, not `todo/` — it needs a `modeling` promote before `work` will pick it up. Two gating decisions on the foundation were recommended-defaults applied while user away and are flagged in the task Notes for re-confirm.
+
+---
+
 ## 2026-07-02 19:05 -- Task verified and completed: design-system-r7k2m - Velvet Lobby re-skin — tokens & type foundation
 
 **Type:** Work / Task completion
