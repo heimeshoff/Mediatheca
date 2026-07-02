@@ -5,6 +5,21 @@ Newest entries on top.
 
 ---
 
+## 2026-07-02 18:53 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~19m (first Batch started 18:34 → now)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** design-system-h3q8n: 1
+**Commits:** 2 (design-system-h3q8n task commit; a carry-over reconciliation commit; this session-end line committed separately)
+**Carry-over:** .gitignore: committed (reconcile stranded doc/config edits — ignore `.agentheim/.dashboard`); CLAUDE.md: committed (reconcile stranded doc/config edits — DB data-dir path correction to `DATA_DIR`/`~/app/mediatheca`, matches `src/Server/Program.fs`). Both were pre-existing user WIP carried across prior sessions; user present, chose "commit both" — the recurring carry-over leak is now closed.
+**Note:** design-system-h3q8n (Velvet Lobby component patterns & motion) shipped and verified first-try. Ported the § 1.3–1.6 tokens (spacing/radii/shadows/animation incl. `--sweep` + gold-leaf sweep `@keyframes`), added the velvet-card (§ 3.1) and media-chrome-glass (§ 3.3) surfaces distinct from the unchanged overlay glass (§ 3.2, ADR-0006), and added nine component patterns (hero card, filmstrip row, secondary card, In-focus poster frame, six-state lifecycle status badges, segmented + continuous progress, star rating, section header, list row) plus three motion primitives (In-focus-only gold-leaf sweep, 400ms leave-transition, 200ms cross-fade) as typed Feliz compositions in `DesignSystem.fs`, with live StyleGuide specimens and `styleguide.md`/README in lockstep (ADR-0009). Clean `npm run build`. The design-system `todo/` is now empty and the whole board is quiescent. The worker surfaced a new games-BC backlog item **games-status-vocabulary-reconcile** (reconcile the games `GameStatus` type with the design system's six-state `LifecycleStatus` vocabulary — a decision task). Concept candidate **velvet-lobby-design-language** converging across r7k2m + h3q8n + ADR-0006 + ADR-0009 — user may want a concept page.
+
+---
+
 ## 2026-07-02 18:51 -- Task verified and completed: design-system-h3q8n - Velvet Lobby re-skin — component patterns & motion
 
 **Type:** Work / Task completion
