@@ -1,7 +1,7 @@
 ---
 id: design-system-h3q8n
 title: Velvet Lobby re-skin — component patterns & motion
-status: backlog
+status: todo
 type: feature
 context: design-system
 created: 2026-07-02
@@ -29,6 +29,16 @@ in `styleguide.md`. These are the patterns the brief repeats across 3a/3b/3c and
 the 3d system board. Kept as **one cohesive component pass** (not split) — every specimen shares
 the same StyleGuide-page + `styleguide.md` destination, so they land together.
 
+**Token prerequisite (step zero — carved out of r7k2m into this task per `styleguide.md` § 0 & § 7):**
+before the components can reference tokens *by name*, port the **§ 1.3–1.6 tokens** into
+`index.css` — spacing (`--space-*`), radii (`--radius-*`), shadows/elevation (`--shadow-hero` /
+`-card` / `-filmstrip`, `--ring-active`), and animation (`--duration-*`, `--sweep` **+ the
+gold-leaf sweep `@keyframes`**). Also add the two non-overlay surface treatments the specimens
+sit on: the **velvet card** (§ 3.1 — solid `surface` background + `line` ring, no blur/translucency)
+and the narrower **media-chrome glass** (§ 3.3 — `blur(6px)` for small controls over artwork). The
+foundation task [[design-system-r7k2m]] shipped only the palette / type / glass-retint and
+**explicitly deferred these here**; the patterns below reference them, so they land first.
+
 **Patterns (from the brief):**
 - **Cinematic hero card** — backdrop gradient with bottom scrim, In-focus badge top-left, title in Instrument Serif, watched-with avatar stack, segmented progress, rating, gold "▶ Watch" pill.
 - **Filmstrip movie row** — black strip with sprocket-hole perforations top & bottom, poster gradients inset, titles + runtime/"rec. by" below.
@@ -47,7 +57,9 @@ the same StyleGuide-page + `styleguide.md` destination, so they land together.
 
 ## Acceptance criteria
 
-- [ ] Each pattern above exists as a **typed Feliz composition in `DesignSystem.fs`** (not inline in the page), referencing foundation tokens from [[design-system-r7k2m]] by name — no hardcoded oklch.
+- [ ] The **§ 1.3–1.6 tokens** (spacing, radii, shadows/elevation, animation incl. `--sweep` and the gold-leaf sweep `@keyframes`) are ported into `index.css` — these were carved out of [[design-system-r7k2m]] into this task and are the named values the components reference.
+- [ ] The **velvet card** (§ 3.1 — solid, non-overlay `surface`+`line`-ring surface) and the **media-chrome glass** (§ 3.3 — `blur(6px)` over artwork) treatments exist (typed `DesignSystem.fs` helper + CSS), distinct from the mandatory overlay glass (§ 3.2, unchanged — ADR-0006).
+- [ ] Each pattern above exists as a **typed Feliz composition in `DesignSystem.fs`** (not inline in the page), referencing foundation tokens from [[design-system-r7k2m]] and the newly-ported § 1.3–1.6 tokens by name — no hardcoded oklch.
 - [ ] The in-app StyleGuide page (`src/Client/Pages/StyleGuide`) shows a live specimen of each pattern: hero card, filmstrip row, secondary card, In-focus poster frame, all six status badges, both progress styles, star rating, section header, list row.
 - [ ] Status badges cover the full game lifecycle (Backlog → InFocus → Playing → Completed / Abandoned / OnHold) with the palette mapping above; "In focus" is the only badge that animates.
 - [ ] Motion **primitives** are encoded once (keyframes / helpers for the gold-leaf sweep, the 400ms leave-transition, the 200ms cross-fade) and documented; the gold-leaf sweep appears on In-focus surfaces only. Wiring these into queue-leave / tab-change behavior is explicitly **not** in this task.
@@ -56,6 +68,7 @@ the same StyleGuide-page + `styleguide.md` destination, so they land together.
 
 ## Notes
 
+- **Re-confirmed & promoted (2026-07-02, user present):** foundation [[design-system-r7k2m]] shipped (19:05), so the `depends_on` is met. User re-confirmed the three defaults below — kept **cohesive / not-split**, typed `DesignSystem.fs` home, and motion-**primitives-only** — and this task was **promoted to `todo/`**. This refinement also surfaced a **token gap**: r7k2m deferred the **§ 1.3–1.6 tokens** (spacing / radii / shadows / animation) plus the velvet-card (§ 3.1) and media-chrome-glass (§ 3.3) surfaces into this task — now made explicit as *step zero* in **What** and in the acceptance criteria, since the components reference those tokens by name. Full running-app sign-off on the redesign stays open: the user will review the shipped foundation **and** these component specimens together when the specimens land.
 - **Refinement decisions (2026-07-02, defaults applied while user away — re-confirm if desired):**
   1. **Not split** — kept as one cohesive component pass following the foundation pass.
   2. **Code home = `DesignSystem.fs` (typed), not inline.** This resolves the design-system BC README's standing open question ("migrate patterns to a dedicated `DesignSystem.fs` module vs stay inline"); the README's Open-questions bullet can be retired when this task is worked.

@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-02 19:20 -- Modeling / Refined: design-system-h3q8n - Velvet Lobby re-skin — component patterns & motion
+
+**Type:** Modeling / Refine
+**BC:** design-system
+**Status after:** todo
+**Summary:** Second refinement, user present, now that foundation [[design-system-r7k2m]] has shipped. User re-confirmed the three prior defaults (kept **cohesive / not-split**, typed `DesignSystem.fs` home, motion-**primitives-only**). Cross-checking against the shipped code surfaced a **token gap**: `styleguide.md` § 0 & § 7 carved the **§ 1.3–1.6 tokens** (spacing / radii / shadows / animation incl. the gold-leaf sweep `@keyframes`) plus the velvet-card (§ 3.1) and media-chrome-glass (§ 3.3) surfaces out of r7k2m and into this task, but the acceptance criteria assumed they already existed. Made that explicit as *step zero* in **What** and added two acceptance criteria (port § 1.3–1.6 tokens; velvet-card + media-chrome-glass helpers, distinct from the unchanged overlay glass). Dependency met + criteria concrete → **promoted to `todo/`**. Full running-app sign-off on the redesign stays open (user reviews foundation + components together when specimens land).
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-07-02 19:10 -- Work session ended
 
 **Type:** Work / Session end
