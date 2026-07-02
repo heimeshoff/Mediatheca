@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-07-02 19:20 -- Modeling / Captured: design-system-t4b9k - Layered sidebar nav — white active tab, curved-corner boundary
+
+**Type:** Modeling / Capture
+**BC:** design-system
+**Filed to:** backlog
+**Summary:** Rework the desktop sidebar to the "Mediatheca Directions" doc's layered treatment — a white/light active tab that reads as a raised layer, a curved (inverted-corner) boundary where the active tab meets the content edge, and a top/bottom split with Events + Settings pinned to the foot of the rail. Filed to backlog because it changes the design language (styleguide gate) and the white-tab choice has a palette tension to resolve with the user first.
+
+---
+
 ## 2026-07-02 18:53 -- Work session ended
 
 **Type:** Work / Session end

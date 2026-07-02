@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 5
@@ -37,7 +37,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-<!-- no tasks in backlog -->
+- **design-system-t4b9k** -- Layered sidebar nav — white active tab, curved-corner boundary -- `backlog/design-system-t4b9k-layered-sidebar-nav.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
