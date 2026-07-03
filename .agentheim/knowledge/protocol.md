@@ -5,6 +5,21 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 09:12 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~20m (first Batch started 08:52 → now)
+**Completed:** 3 (first-try PASS: 3, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** design-system-snpnv: 1, design-system-bky6v: 1, design-system-wd5zk: 1
+**Commits:** 5 (1 batch-start claim + 3 task + this session-end line)
+**Carry-over:** Mediatheca Directions.html: left behind (owner: user's design reference doc — the 912KB captured Claude design session cited by every task's Notes; untracked since before this session)
+**Note:** First fully-parallel 3-worker batch under worktree isolation (ADR-0032). All three design-system tasks (snpnv typography 3c type scale, wd5zk filmstrip 3a proportions, bky6v in-focus gold-sweep fix) shipped and passed verification first try. Because all three edited the same shared files (`DesignSystem.fs`, `index.css`, `styleguide.md`, StyleGuide specimen), merges were serialized: snpnv merged clean; wd5zk auto-merged clean (non-overlapping regions), fully-merged main re-built clean before commit; bky6v hit ONE real conflict in styleguide.md — a keep-both changelog collision where bky6v and snpnv each appended a "Shipped (…)" block at the same sign-off insertion point. Surfaced to the user per ADR-0032's never-auto-guess rule; user chose keep-both; resolved (both blocks stacked), fully-merged main re-built clean, committed. bky6v also filed a new backlog item **design-system-fq3vp** (compact on-poster "✦ Focus" pill — the 3c grid-badge variant it deferred rather than building). The design-system board is now quiescent: todo empty, doing empty; backlog holds grtw7 (sidebar 3a alignment, gated on the ADR-0013 ivory-vs-burgundy tension) and fq3vp. No concept candidates surfaced this run. The full-redesign human sign-off flagged in styleguide.md's Sign-off section remains open — a good next step for the user (a running-app review of the now-complete Velvet Lobby tokens/typography/patterns/sidebar/filmstrip/in-focus motion).
+
+---
+
 ## 2026-07-03 09:11 -- Task verified and completed: design-system-bky6v - In-focus signifiers must animate — gold sweep
 
 **Type:** Work / Task completion
