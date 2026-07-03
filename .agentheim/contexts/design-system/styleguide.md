@@ -159,6 +159,22 @@ The shipped helper set keeps the codebase's existing four-tier ladder (`bodyText
 
 **Decision:** serif display (Instrument Serif, with italic as a distinct "voice") + clean sans body + mono for data creates an *editorial programme* feel — the library reads like a cinema listing, not a dashboard. **Uppercase is retired as the heading treatment** (it was Oswald's job — the global forced-uppercase CSS rule on h1–h6 was removed); uppercase now signals only an **eyebrow/data label**. Rejected: condensed all-caps headings (too utilitarian for the velvet direction).
 
+### 3c list-page type tiers — implemented (design-system-snpnv)
+
+Direction **3c (Movies Grid)** in the reviewed design session (`Mediatheca Directions.html`, marker `3c MOVIES GRID`) calls for a denser, list-page-specific set of tiers that the editorial scale above doesn't cover. These are **additions**, not renames — `cardTitle` (Instrument Serif, `text-lg`) stays the correct voice for velvet cards (3a's secondary cards use serif titles); the poster-grid / filmstrip caption is a deliberately *different, sans* voice, because a dense grid of small captions reads better upright than in serif italic-adjacent mixed case at small sizes.
+
+| Helper | Role | Composition (as shipped) |
+|---|---|---|
+| `gridCaptionTitle` | Poster-grid card / filmstrip caption title | Instrument Sans, **12px**, weight 600, `leading-[1.3]`, ink |
+| `gridCaptionMeta` | Poster-grid card / filmstrip caption meta (e.g. "2024 · rec. by Sam") | Instrument Sans, **10.5px**, ink-muted |
+| `gridCaptionPair title meta` | Composition of the pair above, stacked | `flex flex-col gap-0.5` wrapping the two spans |
+| `listPageHeaderTitle` | List-page hero title | Instrument Serif, **34px**, `leading-none`, ink |
+| `listPageHeaderCount` | List-page count, baseline-paired with the title (e.g. "148 titles · 12 in focus") | Spline Sans Mono, **11px**, ink-muted |
+| `listPageHeaderPattern title count` | Composition of the pair above | `display:flex; align-items:baseline; gap:14px` |
+| `filterPill label isActive onClick` | Filter chip, active/inactive toggle | **11.5px** Instrument Sans; active = weight 600, `--color-base-200` ink (`oklch(0.16 0.028 20)`) on `--color-gold` fill; inactive = `--color-ink-secondary`, 1px `--color-line` border, `--radius-pill`, `padding: 7px 15px` |
+
+Ink-token mapping: the doc's literal `oklch(0.6 0.03 40)` (grid meta) maps to the already-minted `--color-ink-muted` (`oklch(0.62 0.02 40)`); the doc's `oklch(0.7 0.02 45)` (inactive pill) maps to `--color-ink-secondary` (`oklch(0.74 0.015 45)`); the doc's dark active-pill ink `oklch(0.16 0.028 20)` is already minted as `--color-base-200` — no new tokens needed, only new composed helpers. Implemented: `.filter-pill`/`.filter-pill-active`/`.filter-pill-inactive` in `index.css`; `gridCaptionTitle`/`gridCaptionMeta`/`gridCaptionPair`/`listPageHeaderTitle`/`listPageHeaderCount`/`listPageHeaderPattern`/`filterPill` in `DesignSystem.fs`. Specimen: StyleGuide "Typography" § "3c List-Page Chrome". Wiring these into an actual Movies grid page (filters, search, sort) is Movies-BC work, out of scope here.
+
 ---
 
 ## 3. Surfaces & overlays
@@ -366,6 +382,9 @@ The redesign is not fully shipped until these are done in lockstep. Track remain
 
 **Shipped (design-system-t4b9k):**
 - [x] **Sidebar nav (desktop rail — layered, ivory active tab)** (§ 4) — top/bottom grouped rail (`mt-auto` bottom pin), ivory active-tab surface + dark-burgundy ink + gold icon (`--color-nav-active-bg/-ink/-icon`), concave corner-notch boundary against the rail/content edge (`--nav-notch-size`, ADR-0013). `.nav-item*` (`index.css`) + `DesignSystem.navItemClass`/`navItemActiveIconClass`/`navGroupTop`/`navGroupBottom` (`DesignSystem.fs`), `Components/Sidebar.fs`, live StyleGuide specimen.
+
+**Shipped (design-system-snpnv):**
+- [x] **3c list-page type tiers** (§ 2) — dense poster-grid caption pair (sans, distinct from `cardTitle`'s serif), list-page header title+count baseline pairing, filter-pill active/inactive typography. `.filter-pill`/`.filter-pill-active`/`.filter-pill-inactive` (`index.css`) + `gridCaptionTitle`/`gridCaptionMeta`/`gridCaptionPair`/`listPageHeaderTitle`/`listPageHeaderCount`/`listPageHeaderPattern`/`filterPill` (`DesignSystem.fs`); live StyleGuide "3c List-Page Chrome" specimen. Additions only — no existing helper renamed, no page built (that's Movies-BC work).
 
 **Not yet implemented (future design-system backlog items, not blocking this task):**
 - [ ] **Top bar, lifecycle stepper, detail-page panels (HLTB tiers/play history/friends), avatars, game row, poster-grid page chrome** (§ 4) — documented target, not built as typed compositions/specimens. Some (game row) are composable today from shipped primitives (`velvetCard` + `progressContinuous` + `statusBadge`) but not packaged as their own pattern.

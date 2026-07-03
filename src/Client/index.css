@@ -264,6 +264,33 @@ h1, h2, h3, h4, h5, h6 {
 .status-badge-abandoned { color: oklch(0.62 0.09 25); border-color: oklch(0.42 0.07 25); }
 .status-badge-on-hold   { color: oklch(0.65 0.06 240); border-color: oklch(0.42 0.05 240); }
 
+/* § 2 Typography — 3c list-page filter pill (design-system-snpnv). Two
+   states: active = weight 600 dark ink on gold fill; inactive = ink-secondary
+   with a hairline line-toned border. The grid caption pair and list-header
+   title+count tiers need no state variants, so they stay plain Tailwind
+   arbitrary-value utilities in DesignSystem.fs rather than CSS classes here. */
+.filter-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 15px;
+    border-radius: var(--radius-pill);
+    font-family: var(--font-sans);
+    font-size: 0.71875rem; /* 11.5px */
+    line-height: 1;
+    border: 1px solid transparent;
+    background: transparent;
+    cursor: pointer;
+}
+.filter-pill-active {
+    font-weight: 600;
+    color: var(--color-base-200);
+    background: var(--color-gold);
+}
+.filter-pill-inactive {
+    color: var(--color-ink-secondary);
+    border-color: var(--color-line);
+}
+
 /* § 4 Progress meters — segmented (film-frame, per-episode) and continuous
    (time/percent, gold-gradient fill). */
 .progress-segmented {

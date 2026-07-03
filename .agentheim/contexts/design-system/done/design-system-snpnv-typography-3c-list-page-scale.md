@@ -1,11 +1,11 @@
 ---
 id: design-system-snpnv
 title: Typography — adopt dir 3c's list-page type scale (grid captions, page header, filter pills)
-status: doing
+status: done
 type: feature
 context: design-system
 created: 2026-07-03
-completed:
+completed: 2026-07-03
 depends_on: [design-system-001]
 blocks: []
 tags: [typography, velvet-lobby, styleguide, 3c]
@@ -32,13 +32,26 @@ Deliverables follow the BC's lockstep convention: styleguide § 2 scale table ro
 
 ## Acceptance criteria
 
-- [ ] `styleguide.md` § 2's semantic type scale documents the three new tiers (grid card title / grid meta, page-header title+count pairing, filter-pill active/inactive) with the literal 3c values above.
-- [ ] `DesignSystem.fs` exposes typed helpers for each tier (names at worker's discretion, consistent with existing `cardTitle`/`mutedText` naming), backed by tokens/CSS where needed.
-- [ ] The live StyleGuide page renders a "3c list-page chrome" typography specimen showing header + count, filter pills, and a grid caption pair.
-- [ ] Existing helpers (`cardTitle`, ink ladder) are unchanged — no app-wide re-skin in this task.
-- [ ] `npm run build` clean.
+- [x] `styleguide.md` § 2's semantic type scale documents the three new tiers (grid card title / grid meta, page-header title+count pairing, filter-pill active/inactive) with the literal 3c values above.
+- [x] `DesignSystem.fs` exposes typed helpers for each tier (names at worker's discretion, consistent with existing `cardTitle`/`mutedText` naming), backed by tokens/CSS where needed.
+- [x] The live StyleGuide page renders a "3c list-page chrome" typography specimen showing header + count, filter pills, and a grid caption pair.
+- [x] Existing helpers (`cardTitle`, ink ladder) are unchanged — no app-wide re-skin in this task.
+- [x] `npm run build` clean.
 
 ## Notes
 
 - Reference markup: `Mediatheca Directions.html` § `3c MOVIES GRID` (912KB single-file archive; the section sits at byte offset ~820798, extractable by searching the marker comment). All needed literal values are quoted above so the worker shouldn't need to parse the file.
 - Building the actual Movies grid *page* (filters, search, sort, grid) is Movies-BC work, not this task — this task only mints the typographic vocabulary.
+
+## Outcome
+
+Added the 3c list-page type tiers as pure additions alongside the existing editorial scale — no rename, no re-skin. All three literal-value ink/gold targets from the design doc mapped onto already-minted tokens (no new tokens needed): grid meta → `--color-ink-muted`, inactive pill → `--color-ink-secondary`, active pill dark ink → `--color-base-200` (an exact match), active pill fill → `--color-gold`.
+
+Key files:
+- `.agentheim/contexts/design-system/styleguide.md` — new § 2 "3c list-page type tiers" subsection (table + ink-token mapping) and a "Shipped (design-system-snpnv)" § 7 checklist entry.
+- `src/Client/index.css` — `.filter-pill` / `.filter-pill-active` / `.filter-pill-inactive` (active/inactive states need CSS; the other two tiers are plain Tailwind arbitrary-value utility strings, no new CSS).
+- `src/Client/DesignSystem.fs` — `gridCaptionTitle`, `gridCaptionMeta`, `gridCaptionPair`, `listPageHeaderTitle`, `listPageHeaderCount`, `listPageHeaderPattern`, `filterPill`.
+- `src/Client/Pages/StyleGuide/Views.fs` — new "3c List-Page Chrome" specimen inside the Typography section (header+count, filter pills, grid caption pair).
+- `.agentheim/contexts/design-system/README.md` — ubiquitous-language entry for the new tiers.
+
+`npm run build` compiles clean (Fable + Vite + Tailwind, 172 modules transformed, no errors).

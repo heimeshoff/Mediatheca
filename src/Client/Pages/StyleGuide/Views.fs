@@ -250,6 +250,35 @@ let private typographySection () =
                 ]
             ]
 
+            subheading "3c List-Page Chrome"
+
+            decision "Dense list-page tiers from direction 3c (Movies Grid) -- additions alongside the editorial scale above, not renames. The poster-grid caption is a deliberately sans voice (distinct from cardTitle's serif), since a dense grid of small captions reads better upright than in the card voice."
+
+            Html.div [
+                prop.className "flex flex-col gap-3"
+                prop.children [
+                    specimen "List-page header -- serif title baseline-paired with a mono count" "DesignSystem.listPageHeaderPattern" (
+                        DesignSystem.listPageHeaderPattern "Movies" "148 titles · 12 in focus"
+                    )
+                    specimen "Filter pills -- active (gold fill) / inactive (line border)" "DesignSystem.filterPill" (
+                        Html.div [
+                            prop.className "flex items-center gap-2"
+                            prop.children [
+                                DesignSystem.filterPill "All" true ignore
+                                DesignSystem.filterPill "In focus" false ignore
+                                DesignSystem.filterPill "Completed" false ignore
+                            ]
+                        ]
+                    )
+                    specimen "Grid caption pair -- dense poster-grid / filmstrip caption (sans, not cardTitle)" "DesignSystem.gridCaptionPair" (
+                        Html.div [
+                            prop.className "w-24"
+                            prop.children [ DesignSystem.gridCaptionPair "Blade Runner" "1982 · rec. by Sam" ]
+                        ]
+                    )
+                ]
+            ]
+
             subheading "Font Families"
 
             Html.div [

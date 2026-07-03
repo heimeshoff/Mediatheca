@@ -368,6 +368,61 @@ let listRow (thumb: ReactElement) (title: string) (meta: string) : ReactElement 
         ]
     ]
 
+// ── 3c list-page chrome (§ 2 Typography, design-system-snpnv) ──
+// Dense poster-grid captions, list-page header, and filter pills — a
+// deliberately *sans* voice distinct from `cardTitle` (serif, velvet cards).
+
+/// Grid card title — dense poster-grid / filmstrip caption. Instrument Sans
+/// (NOT Instrument Serif like `cardTitle`) — the poster grid reads better
+/// upright at small sizes than in the serif-adjacent card voice.
+let gridCaptionTitle = "text-[12px] font-sans font-semibold leading-[1.3] text-base-content"
+
+/// Grid meta — the muted second line beneath a grid caption title, e.g.
+/// "2024 · rec. by Sam".
+let gridCaptionMeta = "text-[10.5px] font-sans text-ink-muted"
+
+/// Grid caption pair composition — title + meta stacked, as seen beneath
+/// poster-grid cards and filmstrip tiles.
+let gridCaptionPair (title: string) (meta: string) : ReactElement =
+    Html.div [
+        prop.className "flex flex-col gap-0.5"
+        prop.children [
+            Html.span [ prop.className gridCaptionTitle; prop.text title ]
+            Html.span [ prop.className gridCaptionMeta; prop.text meta ]
+        ]
+    ]
+
+/// List-page header title — Instrument Serif, fixed 34px (distinct from
+/// `pageTitle`'s responsive 4xl/5xl hero scale; this is the dense list-page size).
+let listPageHeaderTitle = "text-[34px] font-display leading-none text-base-content"
+
+/// List-page header count — Spline Sans Mono, baseline-paired with the title,
+/// e.g. "148 titles · 12 in focus".
+let listPageHeaderCount = "text-[11px] font-mono text-ink-muted"
+
+/// List-page header pattern — serif title baseline-aligned with a mono count
+/// line (3c: "148 titles · 12 in focus").
+let listPageHeaderPattern (title: string) (count: string) : ReactElement =
+    Html.div [
+        prop.className "flex items-baseline gap-[14px]"
+        prop.children [
+            Html.h1 [ prop.className listPageHeaderTitle; prop.text title ]
+            Html.span [ prop.className listPageHeaderCount; prop.text count ]
+        ]
+    ]
+
+/// Filter pill — active/inactive toggle chip for list-page filter bars.
+/// Active = weight 600 dark ink on gold fill; inactive = ink-secondary with a
+/// hairline border. Backed by `.filter-pill`/`.filter-pill-active`/`.filter-pill-inactive`
+/// in index.css.
+let filterPill (label: string) (isActive: bool) (onClick: unit -> unit) : ReactElement =
+    Html.button [
+        prop.type' "button"
+        prop.className ("filter-pill " + (if isActive then "filter-pill-active" else "filter-pill-inactive"))
+        prop.text label
+        prop.onClick (fun _ -> onClick ())
+    ]
+
 // ── In-focus poster frame (§ 4 Poster grid) ──
 
 /// Wraps any poster/card element with the reusable gold-frame "In focus"

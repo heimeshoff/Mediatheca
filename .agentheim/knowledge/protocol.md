@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 09:04 -- Task verified and completed: design-system-snpnv - Typography — adopt dir 3c's list-page type scale
+
+**Type:** Work / Task completion
+**Task:** design-system-snpnv - Typography — adopt dir 3c's list-page type scale (grid captions, page header, filter pills)
+**Summary:** Minted the 3c list-page type tiers (grid caption pair, list-page header+count baseline pairing, filter-pill active/inactive) as additions to the semantic type scale — styleguide.md § 2, typed helpers in DesignSystem.fs, live StyleGuide specimen; existing `cardTitle`/ink ladder untouched.
+**Duration:** ~12m (dispatch → verifier verdict)
+**Verification:** PASS (iteration 1)
+**Files changed:** 5
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-07-03 08:52 -- Batch started: [design-system-snpnv, design-system-bky6v, design-system-wd5zk]
 
 **Type:** Work / Batch start

@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 1
 - **Todo:** 0
-- **Doing:** 3
-- **Done:** 6
+- **Doing:** 2
+- **Done:** 7
 <!-- task-counts:end -->
 
 ### Todo
@@ -23,13 +23,13 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **design-system-snpnv** -- Typography — adopt dir 3c's list-page type scale (grid captions, page header, filter pills) -- `doing/design-system-snpnv-typography-3c-list-page-scale.md`
 - **design-system-bky6v** -- In-focus signifiers must animate — gold sweep on status badge and poster frame -- `doing/design-system-bky6v-in-focus-gold-sweep-animation.md`
 - **design-system-wd5zk** -- Movies filmstrip — full-width 3a proportions (flex-1 posters, ~196px tall) -- `doing/design-system-wd5zk-filmstrip-3a-sizing.md`
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **design-system-snpnv** -- Typography — adopt dir 3c's list-page type scale (grid captions, page header, filter pills) -- `done/design-system-snpnv-typography-3c-list-page-scale.md`
 - **design-system-t4b9k** -- Layered sidebar nav — ivory active tab, curved-corner boundary -- `done/design-system-t4b9k-layered-sidebar-nav.md`
 - **design-system-h3q8n** -- Velvet Lobby re-skin — component patterns & motion -- `done/design-system-h3q8n-velvet-lobby-component-patterns.md`
 - **design-system-r7k2m** -- Velvet Lobby re-skin — tokens & type foundation -- `done/design-system-r7k2m-velvet-lobby-tokens-type-foundation.md`
