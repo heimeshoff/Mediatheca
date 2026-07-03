@@ -442,6 +442,21 @@ let inFocusFrame (child: ReactElement) : ReactElement =
         ]
     ]
 
+/// Compact on-poster "✦ Focus" pill (§ 4 Poster grid, design-system-fq3vp) —
+/// the 3c grid-badge variant: small, top-left, directly on the artwork.
+/// Deliberately a SOLID gold fill, not `goldLeafSweep` -- it always co-occurs
+/// with `inFocusFrame`'s animated sweeping border directly behind it, so a
+/// second sweep on an ~8.5px pill would compete rather than read as life (see
+/// § 4 Motion discipline). A separate composition from `statusBadge InFocus`
+/// (list rows, hero, detail) so the two can diverge freely -- render as a
+/// sibling positioned over a poster, e.g.:
+///   Html.div [ prop.className "relative"; prop.children [ poster; inFocusPill ] ]
+let inFocusPill : ReactElement =
+    Html.span [
+        prop.className "in-focus-pill"
+        prop.text "✦ Focus"
+    ]
+
 // ── Movies filmstrip (§ 4 Movies filmstrip) ──
 
 type FilmstripItem = {

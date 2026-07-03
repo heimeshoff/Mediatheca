@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 09:30 -- Task verified and completed: design-system-fq3vp - Compact on-poster "✦ Focus" pill (3c grid badge variant)
+
+**Type:** Work / Task completion
+**Task:** design-system-fq3vp - Compact on-poster "✦ Focus" pill (3c grid badge variant)
+**Summary:** Shipped `DesignSystem.inFocusPill` / `.in-focus-pill` — the compact 3c grid-badge variant (8.5px/700/0.18em uppercase "✦ Focus", dark ink on solid gold), a genuinely separate composition from `statusBadge InFocus`, deliberately solid (no `.gold-sweep`, no new keyframe) for motion economy against the co-occurring animated `inFocusFrame`. Added a StyleGuide specimen pairing the pill with `inFocusFrame` on a poster; updated styleguide.md § 4 Poster grid + Motion discipline and README.md in lockstep.
+**Duration:** ~9m (dispatch → verifier verdict)
+**Verification:** PASS (iteration 1)
+**Files changed:** 5
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-07-03 09:35 -- Batch started: [design-system-fq3vp]
 
 **Type:** Work / Batch start

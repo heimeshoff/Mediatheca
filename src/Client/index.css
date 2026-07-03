@@ -372,6 +372,34 @@ h1, h2, h3, h4, h5, h6 {
     overflow: hidden;
 }
 
+/* § 4 Poster grid -- compact on-poster "✦ Focus" pill (design-system-fq3vp),
+   the 3c grid-badge variant, distinct from .status-badge. Render as a
+   sibling of .in-focus-frame (not nested inside .in-focus-frame-inner) so
+   it sits on top of the frame's clipping layer, top-left over the artwork.
+   Deliberately SOLID -- no .gold-sweep here, no new keyframe (§ 4 Motion
+   discipline: one moving element per poster; the frame behind it already
+   sweeps). background-color (not the `background` shorthand) is used for
+   the same reason noted on .status-badge -- keeps this rule inert should a
+   sweep class ever accidentally be added alongside it. */
+.in-focus-pill {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: var(--radius-pill);
+    font-family: var(--font-sans);
+    font-size: 8.5px;
+    font-weight: 700;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: oklch(0.16 0.024 82);
+    background-color: oklch(0.84 0.11 85);
+}
+
 /* § 1.6 Animation — honor prefers-reduced-motion by freezing the gold-leaf
    sweep at a fixed gradient position instead of disabling the ornament
    outright (the gradient fill itself is still the "In focus" signal, only

@@ -1,11 +1,11 @@
 ---
 id: design-system-fq3vp
 title: Compact on-poster "✦ Focus" pill (3c grid badge variant)
-status: doing
+status: done
 type: feature
 context: design-system
 created: 2026-07-03
-completed:
+completed: 2026-07-03
 depends_on: [design-system-001]
 blocks: []
 tags: [motion, gold-sweep, in-focus, status-badge, poster-grid, velvet-lobby]
@@ -34,12 +34,24 @@ The animated members of the In-focus family (badge `.gold-sweep`, poster `.in-fo
 
 ## Acceptance criteria
 
-- [ ] `DesignSystem.inFocusPill` (+ `.in-focus-pill` in `index.css`) renders the compact on-poster pill per the 3c literal spec: 8.5px, weight 700, 0.18em tracking, uppercase, "✦ Focus" label, dark ink (`oklch(0.16 0.024 82)`) on **solid** gold `oklch(0.84 0.11 85)`, positioned top-left over a poster/card.
-- [ ] The pill is a **solid fill** — it does **not** apply `.gold-sweep` / `DesignSystem.goldLeafSweep`. No new keyframe animation is introduced for it.
-- [ ] `styleguide.md` § 4 "Motion discipline" documents the solid-not-swept decision and its rationale (motion economy against the co-occurring animated `inFocusFrame`; reduced-motion coherence).
-- [ ] StyleGuide specimen added showing `inFocusPill` composed with `DesignSystem.inFocusFrame` on a poster (the intended poster-grid pairing), so the "one moving element per poster" intent is visible in situ.
-- [ ] `styleguide.md` § 4 "Poster grid" updated to point at the shipped `inFocusPill` instead of "not yet built" — and its guidance that poster chrome should reuse `statusBadge InFocus` is updated to name `inFocusPill` as the poster-grid In-focus badge.
-- [ ] `npm run build` clean.
+- [x] `DesignSystem.inFocusPill` (+ `.in-focus-pill` in `index.css`) renders the compact on-poster pill per the 3c literal spec: 8.5px, weight 700, 0.18em tracking, uppercase, "✦ Focus" label, dark ink (`oklch(0.16 0.024 82)`) on **solid** gold `oklch(0.84 0.11 85)`, positioned top-left over a poster/card.
+- [x] The pill is a **solid fill** — it does **not** apply `.gold-sweep` / `DesignSystem.goldLeafSweep`. No new keyframe animation is introduced for it.
+- [x] `styleguide.md` § 4 "Motion discipline" documents the solid-not-swept decision and its rationale (motion economy against the co-occurring animated `inFocusFrame`; reduced-motion coherence).
+- [x] StyleGuide specimen added showing `inFocusPill` composed with `DesignSystem.inFocusFrame` on a poster (the intended poster-grid pairing), so the "one moving element per poster" intent is visible in situ.
+- [x] `styleguide.md` § 4 "Poster grid" updated to point at the shipped `inFocusPill` instead of "not yet built" — and its guidance that poster chrome should reuse `statusBadge InFocus` is updated to name `inFocusPill` as the poster-grid In-focus badge.
+- [x] `npm run build` clean.
+
+## Outcome
+
+Shipped `DesignSystem.inFocusPill` (`src/Client/DesignSystem.fs`, right after `inFocusFrame`) — a `ReactElement` rendering `Html.span [ prop.className "in-focus-pill"; prop.text "✦ Focus" ]`. Backed by `.in-focus-pill` in `src/Client/index.css` (`position: absolute; top/left: 8px`, 8.5px/700/0.18em uppercase, `color: oklch(0.16 0.024 82)` on `background-color: oklch(0.84 0.11 85)`; `background-color` chosen over the `background` shorthand for the same clobbering-hazard reason as `.status-badge`, per design-system-bky6v). No `.gold-sweep` / `goldLeafSweep` applied, no new keyframe — a genuinely separate composition from `statusBadge InFocus` so the two diverge freely.
+
+StyleGuide specimen added in `src/Client/Pages/StyleGuide/Views.fs` directly after the existing "In-Focus Poster Frame" specimen: a new "In-Focus Pill (compact on-poster badge)" subsection renders `inFocusPill` as a sibling of `inFocusFrame` inside a `position: relative` wrapper (not nested inside `.in-focus-frame-inner`, so it isn't clipped) over a `PosterCard.view`, alongside a plain poster for contrast.
+
+`styleguide.md` updated in lockstep: § 4 "Poster grid" now credits design-system-fq3vp and names `inFocusPill` (not `statusBadge InFocus`) as the poster-grid on-artwork badge; § 4 Motion "Discipline" gained a bullet documenting the solid-not-swept rationale (motion economy vs. the co-occurring animated `inFocusFrame`; reduced-motion coherence — the reduced-motion freeze already establishes solid gold as an accepted In-focus signal); the § 0 status table, "Shipped" checklist, and Sign-off section were updated to record the new pattern. `README.md`'s ubiquitous-language section gained an "In-focus pill" entry.
+
+`npm run build` compiles clean (Fable + Vite, 172 modules transformed, no errors).
+
+Key files: `src/Client/DesignSystem.fs`, `src/Client/index.css`, `src/Client/Pages/StyleGuide/Views.fs`, `.agentheim/contexts/design-system/styleguide.md`, `.agentheim/contexts/design-system/README.md`.
 
 ## Notes
 

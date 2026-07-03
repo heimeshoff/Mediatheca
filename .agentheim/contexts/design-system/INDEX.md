@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 1
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 9
+- **Doing:** 0
+- **Done:** 10
 <!-- task-counts:end -->
 
 ### Todo
@@ -23,11 +23,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **design-system-fq3vp** -- Compact on-poster "✦ Focus" pill (3c grid badge variant) -- `doing/design-system-fq3vp-compact-on-poster-focus-pill.md`
+<!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **design-system-fq3vp** -- Compact on-poster "✦ Focus" pill (3c grid badge variant) -- `done/design-system-fq3vp-compact-on-poster-focus-pill.md`
 - **design-system-bky6v** -- In-focus signifiers must animate — gold sweep on status badge and poster frame -- `done/design-system-bky6v-in-focus-gold-sweep-animation.md`
 - **design-system-wd5zk** -- Movies filmstrip — full-width 3a proportions (flex-1 posters, ~196px tall) -- `done/design-system-wd5zk-filmstrip-3a-sizing.md`
 - **design-system-snpnv** -- Typography — adopt dir 3c's list-page type scale (grid captions, page header, filter pills) -- `done/design-system-snpnv-typography-3c-list-page-scale.md`

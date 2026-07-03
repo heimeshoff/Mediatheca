@@ -1621,6 +1621,31 @@ let private velvetLobbyPatternsSection () =
                 prop.text "DesignSystem.inFocusFrame child -- wraps any poster/card element with the gold-frame In-focus treatment, the visual sibling of the In-focus badge (left has the frame, right does not)."
             ]
 
+            // ── In-focus pill (compact on-poster badge) ──
+            subheading "In-Focus Pill (compact on-poster badge)"
+
+            Html.div [
+                prop.className "flex gap-4 mt-4 max-w-xs"
+                prop.children [
+                    Html.div [
+                        prop.className "relative"
+                        prop.children [
+                            DesignSystem.inFocusFrame (PosterCard.view "dune-part-two-2024" "Dune: Part Two" 2024 None None)
+                            DesignSystem.inFocusPill
+                        ]
+                    ]
+                    PosterCard.view "the-matrix-1999" "The Matrix" 1999 None None
+                ]
+            ]
+            Html.p [
+                prop.className (DesignSystem.faintText + " mt-2")
+                prop.text "DesignSystem.inFocusPill composed with inFocusFrame -- the intended poster-grid pairing. The pill is a solid gold fill (no gold-sweep); the frame behind it is the one animated element -- one moving element per poster."
+            ]
+            Html.code [
+                prop.className "text-xs font-mono text-primary/70 mt-2 block"
+                prop.text "DesignSystem.inFocusPill -- render as a sibling of inFocusFrame inside a position-relative wrapper"
+            ]
+
             // ── Movies filmstrip ──
             subheading "Movies Filmstrip"
 
