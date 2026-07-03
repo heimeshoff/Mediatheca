@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 11:47 -- Batch started: [design-system-grtw7]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-grtw7 - Sidebar nav — align with dir 3a (full revert to burgundy active tab, supersedes ADR-0013)
+**Parallel:** no (1 worker)
+
+---
+
 ## 2026-07-03 10:05 -- Modeling / Refined: design-system-grtw7 - Sidebar nav — align with dir 3a (full revert to burgundy active tab)
 
 **Type:** Modeling / Refine

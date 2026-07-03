@@ -1,7 +1,7 @@
 ---
 id: design-system-grtw7
 title: Sidebar nav — align with dir 3a (full revert to burgundy active tab, supersedes ADR-0013)
-status: todo
+status: doing
 type: feature
 context: design-system
 created: 2026-07-03
