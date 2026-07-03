@@ -99,7 +99,7 @@ let private overviewSection () =
                 prop.className "grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl"
                 prop.children [
                     Html.div [
-                        prop.className (DesignSystem.glassSubtle + " p-5 rounded-xl border border-base-content/5")
+                        prop.className (DesignSystem.velvetCard + " p-5 rounded-xl border border-base-content/5")
                         prop.children [
                             Html.h4 [
                                 prop.className (DesignSystem.subtitle + " text-primary mb-2")
@@ -107,16 +107,16 @@ let private overviewSection () =
                             ]
                             Html.p [
                                 prop.className DesignSystem.secondaryText
-                                prop.text "Raw design tokens defined in index.css under :root. Glass opacities, spacing scale, border radii, animation durations, shadows, and typography tracking. These are the primitive values."
+                                prop.text "Raw design tokens defined in index.css under :root. Paper-overlay fill/shadow, spacing scale, border radii, animation durations, shadows, and typography tracking. These are the primitive values."
                             ]
                             Html.code [
                                 prop.className "block mt-3 text-xs font-mono text-base-content/50 bg-base-300/30 p-2 rounded"
-                                prop.text "--glass-blur-standard: 24px;"
+                                prop.text "--shadow-paper: 0 10px 28px -8px oklch(0 0 0 / 0.55) ...;"
                             ]
                         ]
                     ]
                     Html.div [
-                        prop.className (DesignSystem.glassSubtle + " p-5 rounded-xl border border-base-content/5")
+                        prop.className (DesignSystem.velvetCard + " p-5 rounded-xl border border-base-content/5")
                         prop.children [
                             Html.h4 [
                                 prop.className (DesignSystem.subtitle + " text-primary mb-2")
@@ -128,7 +128,7 @@ let private overviewSection () =
                             ]
                             Html.code [
                                 prop.className "block mt-3 text-xs font-mono text-base-content/50 bg-base-300/30 p-2 rounded"
-                                prop.text "DesignSystem.glassCard"
+                                prop.text "DesignSystem.velvetCard"
                             ]
                         ]
                     ]
@@ -139,7 +139,7 @@ let private overviewSection () =
 
             codeBlock """// In a component:
 Html.div [
-    prop.className DesignSystem.glassCard
+    prop.className DesignSystem.velvetCard
     prop.children [
         Html.h2 [
             prop.className DesignSystem.sectionHeader
@@ -705,40 +705,41 @@ let private spacingSection () =
         ]
     ]
 
-// ── Section: Glassmorphism ──
+// ── Section: Paper Overlay ──
 
-/// A gradient background that makes glass blur visible
-let private glassBackground (children: ReactElement list) =
+/// A gradient backdrop that makes the paper overlay's elevation shadow read
+/// clearly against a busy background.
+let private overlayBackdrop (children: ReactElement list) =
     Html.div [
         prop.className "relative rounded-xl overflow-hidden p-6"
         prop.style [
-            style.backgroundImage "linear-gradient(135deg, oklch(50% 0.15 200), oklch(40% 0.12 280), oklch(35% 0.1 330))"
+            style.backgroundImage "linear-gradient(135deg, oklch(0.30 0.03 26), oklch(0.20 0.03 22), oklch(0.16 0.028 20))"
         ]
         prop.children children
     ]
 
-let private glassmorphismSection () =
+let private paperOverlaySection () =
     Html.div [
         prop.className "flex flex-col gap-6"
         prop.children [
-            sectionTitle "Glassmorphism"
+            sectionTitle "Paper Overlay"
 
-            decision "Every overlay in Mediatheca uses glassmorphism -- semi-transparent backgrounds with backdrop blur. This creates depth and context, letting the underlying content remain visible while focusing attention on the overlay. Velvet Lobby re-tints the glass to the burgundy/gold palette (.glass-card, .rating-dropdown) but keeps the rule in full force -- ADR-0006 is unchanged, no fully-opaque overlay is introduced. Solid \"velvet card\" surfaces are page/card backgrounds, not floating overlays, so there's no conflict."
+            decision "Every floating surface in Mediatheca -- dropdowns, popovers, modals -- is solid paper lifted off the page: an opaque fill (`--color-paper`), a subtle line ring, and a true elevation shadow (`--shadow-paper`). No translucency, no `backdrop-filter` (ADR-0016 supersedes ADR-0006's mandatory glassmorphism). Paper overlay is a distinct vocabulary from `velvetCard` (page/card chrome, flush with the page, ring-only elevation) -- overlays read as lifted above the page, chrome does not."
 
-            subheading "Glass Levels"
+            subheading "Paper Overlay"
 
-            // glassCard
-            glassBackground [
+            // paperOverlay
+            overlayBackdrop [
                 Html.div [
-                    prop.className (DesignSystem.glassCard + " p-5")
+                    prop.className (DesignSystem.paperOverlay + " p-5")
                     prop.children [
                         Html.h3 [
                             prop.className DesignSystem.cardTitle
-                            prop.text "Glass Card"
+                            prop.text "Paper Overlay"
                         ]
                         Html.p [
                             prop.className (DesignSystem.secondaryText + " mt-2")
-                            prop.text "Standard glassmorphism panel. Used for sidebar cards, detail panels, and general content containers. 55% opacity with 24px blur."
+                            prop.text "Opaque fill, line ring, elevation shadow. Used for modals and floating panels -- fully legible over any backdrop, no blur required."
                         ]
                     ]
                 ]
@@ -747,68 +748,16 @@ let private glassmorphismSection () =
                     prop.children [
                         Html.code [
                             prop.className "text-xs font-mono text-white/60 bg-black/30 px-2 py-1 rounded"
-                            prop.text "DesignSystem.glassCard"
+                            prop.text "DesignSystem.paperOverlay"
                         ]
                     ]
                 ]
             ]
 
-            // glassOverlay
-            glassBackground [
+            // paperDropdown
+            overlayBackdrop [
                 Html.div [
-                    prop.className (DesignSystem.glassOverlay + " p-5")
-                    prop.children [
-                        Html.h3 [
-                            prop.className DesignSystem.cardTitle
-                            prop.text "Glass Overlay"
-                        ]
-                        Html.p [
-                            prop.className (DesignSystem.secondaryText + " mt-2")
-                            prop.text "Heavy glassmorphism for modals and important overlays. 70% opacity with extra-large blur. More opaque to keep modal content readable."
-                        ]
-                    ]
-                ]
-                Html.div [
-                    prop.className "mt-2"
-                    prop.children [
-                        Html.code [
-                            prop.className "text-xs font-mono text-white/60 bg-black/30 px-2 py-1 rounded"
-                            prop.text "DesignSystem.glassOverlay"
-                        ]
-                    ]
-                ]
-            ]
-
-            // glassSubtle
-            glassBackground [
-                Html.div [
-                    prop.className (DesignSystem.glassSubtle + " p-5 rounded-xl")
-                    prop.children [
-                        Html.h3 [
-                            prop.className DesignSystem.cardTitle
-                            prop.text "Glass Subtle"
-                        ]
-                        Html.p [
-                            prop.className (DesignSystem.secondaryText + " mt-2")
-                            prop.text "Subtle glassmorphism for content block cards and inline panels. 50% opacity with a soft blur. Minimal visual weight."
-                        ]
-                    ]
-                ]
-                Html.div [
-                    prop.className "mt-2"
-                    prop.children [
-                        Html.code [
-                            prop.className "text-xs font-mono text-white/60 bg-black/30 px-2 py-1 rounded"
-                            prop.text "DesignSystem.glassSubtle"
-                        ]
-                    ]
-                ]
-            ]
-
-            // glassDropdown
-            glassBackground [
-                Html.div [
-                    prop.className (DesignSystem.glassDropdown + " p-3 w-56")
+                    prop.className (DesignSystem.paperDropdown + " p-3 w-56")
                     prop.children [
                         Html.div [
                             prop.className "rating-dropdown-item"
@@ -835,7 +784,7 @@ let private glassmorphismSection () =
                     prop.children [
                         Html.code [
                             prop.className "text-xs font-mono text-white/60 bg-black/30 px-2 py-1 rounded"
-                            prop.text "DesignSystem.glassDropdown"
+                            prop.text "DesignSystem.paperDropdown"
                         ]
                     ]
                 ]
@@ -844,23 +793,9 @@ let private glassmorphismSection () =
             subheading "Decisions"
 
             decisionBox
-                "Universal Glassmorphism"
-                "Every overlay uses glassmorphism -- never fully opaque backgrounds on floating elements. Opacity range: 0.55-0.70 depending on importance (lighter = more see-through = less important)."
-                "Opaque overlays (lose spatial context, feel disconnected from the content beneath)."
-
-            Html.div [
-                prop.className "bg-warning/10 border-l-4 border-warning/40 p-4 rounded-r-lg max-w-3xl"
-                prop.children [
-                    Html.p [
-                        prop.className (DesignSystem.subtitle + " text-warning/90 mb-2")
-                        prop.text "Gotcha: Nested backdrop-filter"
-                    ]
-                    Html.p [
-                        prop.className DesignSystem.secondaryText
-                        prop.text "If a parent has backdrop-filter (e.g. backdrop-blur-sm), any child's backdrop-filter will only blur the parent's content, not the page behind it. Fix: render glassmorphic dropdowns/popovers as siblings to the blurred parent, not children. Wrap both in a plain position: relative container without backdrop-filter."
-                    ]
-                ]
-            ]
+                "Paper, not glass"
+                "Every overlay is solid paper -- opaque fill + elevation shadow + line ring -- never translucent, never blurred. Distinct from velvetCard (page chrome, flush with the page)."
+                "Glassmorphism (semi-transparent background + backdrop-filter blur) -- retired 2026-07-03; ADR-0016 supersedes ADR-0006."
         ]
     ]
 
@@ -1098,7 +1033,7 @@ let private componentsSection () =
 
             Html.p [
                 prop.className DesignSystem.secondaryText
-                prop.text "Fixed-position modal dialog with glassmorphism overlay. Cannot be rendered inline (it covers the entire viewport). Accepts a title, close handler, content, and optional footer."
+                prop.text "Fixed-position modal dialog with a paper overlay. Cannot be rendered inline (it covers the entire viewport). Accepts a title, close handler, content, and optional footer."
             ]
 
             Html.div [
@@ -1124,7 +1059,7 @@ let private componentsSection () =
                     ]
                     Html.p [
                         prop.className (DesignSystem.faintText + " mt-3")
-                        prop.text "Uses DesignSystem.modalContainer (fixed inset-0 z-50) + DesignSystem.modalPanel (glassOverlay + animate-fade-in). Backdrop click closes the modal."
+                        prop.text "Uses DesignSystem.modalContainer (fixed inset-0 z-50) + DesignSystem.modalPanel (paperOverlay + animate-fade-in). Backdrop click closes the modal."
                     ]
                 ]
             ]
@@ -1321,7 +1256,7 @@ let private componentsSection () =
 
             Html.p [
                 prop.className DesignSystem.secondaryText
-                prop.text "Trigger-and-dropdown action menu (kebab menus, hero action buttons). The dropdown is a glassmorphic overlay (rating-dropdown, per the Glassmorphism section). The dropdown renders as a SIBLING of the trigger button -- never a child -- so its backdrop-filter blurs the page behind it rather than the trigger. Click a trigger below to open its menu."
+                prop.text "Trigger-and-dropdown action menu (kebab menus, hero action buttons). The dropdown is a paper overlay (rating-dropdown, per the Paper Overlay section). The dropdown renders as a SIBLING of the trigger button -- never a child. Click a trigger below to open its menu."
 
             ]
 
@@ -1347,7 +1282,7 @@ let private componentsSection () =
                         ]
                     ]
 
-                    // heroView -- glass trigger
+                    // heroView -- larger trigger
                     Html.div [
                         prop.className "flex flex-col gap-3"
                         prop.children [
@@ -1362,7 +1297,7 @@ let private componentsSection () =
                                 ]
                             ]
                             Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "ActionMenu.heroView items" ]
-                            Html.span [ prop.className DesignSystem.faintText; prop.text "Hero-positioned -- larger glass trigger for detail headers" ]
+                            Html.span [ prop.className DesignSystem.faintText; prop.text "Hero-positioned -- larger trigger for detail headers" ]
                         ]
                     ]
 
@@ -1425,10 +1360,10 @@ let private velvetLobbyPatternsSection () =
         prop.children [
             sectionTitle "Velvet Lobby Patterns"
 
-            decision "The recurring component patterns from the Velvet Lobby re-skin (design brief turn 3, options 3a dashboard / 3b game detail / 3c movies grid), re-expressed as typed Feliz compositions in DesignSystem.fs (not inline in pages) so every BC's frontend conforms to the same shapes. Tokens: styleguide.md § 1.3-1.6 (spacing/radii/shadows/animation, incl. the gold-leaf sweep). Surfaces: § 3.1 velvet card, § 3.3 media-chrome glass."
+            decision "The recurring component patterns from the Velvet Lobby re-skin (design brief turn 3, options 3a dashboard / 3b game detail / 3c movies grid), re-expressed as typed Feliz compositions in DesignSystem.fs (not inline in pages) so every BC's frontend conforms to the same shapes. Tokens: styleguide.md § 1.3-1.6 (spacing/radii/shadows/animation, incl. the gold-leaf sweep). Surfaces: § 3.1 velvet card, paper overlay (ADR-0016) for floating controls."
 
-            // ── Velvet card & media-chrome glass ──
-            subheading "Surfaces — Velvet Card & Media-Chrome Glass"
+            // ── Velvet card & paper overlay ──
+            subheading "Surfaces — Velvet Card & Paper Overlay"
 
             Html.div [
                 prop.className "grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 max-w-3xl"
@@ -1438,12 +1373,12 @@ let private velvetLobbyPatternsSection () =
                             prop.className (DesignSystem.velvetCard + " p-4")
                             prop.children [ Html.p [ prop.className DesignSystem.bodyText; prop.text "Velvet card" ] ]
                         ])
-                    specimen "Narrower glass (blur 6px) for small controls over artwork (§ 3.3) — addition alongside the mandatory overlay glass (§ 3.2), not a replacement." "DesignSystem.mediaChromeGlass"
+                    specimen "Paper overlay pill for small controls floating directly over artwork (ADR-0016) — the same opaque-fill/elevation material as dropdowns and modals, just pill-shaped." "DesignSystem.paperOverlay"
                         (Html.div [
                             prop.className "relative h-20 rounded-lg bg-gradient-to-br from-primary/30 to-base-300 flex items-center justify-center"
                             prop.children [
                                 Html.div [
-                                    prop.className (DesignSystem.mediaChromeGlass + " px-3 py-1.5 text-xs font-sans text-base-content")
+                                    prop.className (DesignSystem.paperOverlay + " rounded-full px-3 py-1.5 text-xs font-sans text-base-content")
                                     prop.text "Change artwork"
                                 ]
                             ]
@@ -1815,7 +1750,7 @@ let private contentBlocksSection () =
                         "image", "Image Block", "Image attachments with optional caption. Uses ImageRef for storage reference. (Planned -- not yet in editor.)"
                     ] do
                         Html.div [
-                            prop.className (DesignSystem.glassSubtle + " p-5 rounded-xl border border-base-content/5")
+                            prop.className (DesignSystem.velvetCard + " p-5 rounded-xl border border-base-content/5")
                             prop.children [
                                 Html.h4 [
                                     prop.className (DesignSystem.subtitle + " text-primary mb-2")
@@ -2330,7 +2265,7 @@ let private sectionNav (activeSection: Section) (dispatch: Msg -> unit) =
         Typography, "Typography"
         Colors, "Colors"
         Spacing, "Spacing"
-        Glassmorphism, "Glassmorphism"
+        PaperOverlay, "Paper Overlay"
         Animations, "Animations"
         Components, "Components"
         VelvetLobbyPatterns, "Velvet Lobby Patterns"
@@ -2358,7 +2293,7 @@ let private sectionContent (section: Section) =
     | Typography -> typographySection ()
     | Colors -> colorsSection ()
     | Spacing -> spacingSection ()
-    | Glassmorphism -> glassmorphismSection ()
+    | PaperOverlay -> paperOverlaySection ()
     | Animations -> animationsSection ()
     | Components -> componentsSection ()
     | VelvetLobbyPatterns -> velvetLobbyPatternsSection ()

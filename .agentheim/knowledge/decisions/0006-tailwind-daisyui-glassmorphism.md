@@ -5,7 +5,7 @@ scope: global
 status: accepted
 date: 2026-05-12
 supersedes: []
-superseded_by: []
+superseded_by: [0016]
 related_tasks: []
 related_research: []
 ---

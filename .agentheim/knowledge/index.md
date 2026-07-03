@@ -13,7 +13,7 @@ For BC-scoped artifacts, see each BC's `INDEX.md`.
 <!-- bc-list:start -->
 - **administration** -- **Operational plumbing.** Settings, event store, projection mechanics, event browser, image storage. The infrastructure surface that keeps the single-user app running and inspectable. -- `contexts/administration/INDEX.md`
 - **curation** -- User-created **collections** that group media across types — ordered lists of movies / series / games — plus **content blocks** (free-form annotations attached to catalogs and detail pages). The "I made a list" half of the app. -- `contexts/curation/INDEX.md`
-- **design-system** -- The **cross-cutting visual language** for Mediatheca's UI. Owns typography, color tokens, the dim theme, the glassmorphism overlay rules, Feliz/DaisyUI component patterns, and the in-app StyleGuide page. Gates frontend work in every BC. -- `contexts/design-system/INDEX.md`
+- **design-system** -- The **cross-cutting visual language** for Mediatheca's UI. Owns typography, color tokens, the dim theme, the paper-overlay rules for floating surfaces (ADR-0016, retired glassmorphism), Feliz/DaisyUI component patterns, and the in-app StyleGuide page. Gates frontend work in every BC. -- `contexts/design-system/INDEX.md`
 - **friends** -- Lightweight registry of **people you experience media with**. Friends are referenced by slug from every other BC; their existence is the foundation of the watched-with / played-with / recommended-by language. -- `contexts/friends/INDEX.md`
 - **games** -- Owns the **Game aggregate** — video games with lifecycle status, play modes, family ownership, and Steam / HowLongToBeat metadata. Source of truth for "what am I playing", "how long did it take me", "who shares this title". -- `contexts/games/INDEX.md`
 - **integration** -- **Adapters to external systems.** Translates external shapes (TMDB / RAWG / Steam / HLTB / Jellyfin / Cinemarco) into commands the core BCs accept, and runs scheduled sync jobs that pull external state on a cadence. The anticorruption layer that keeps core BCs free of HTTP and vendor JSON. -- `contexts/integration/INDEX.md`
@@ -31,7 +31,7 @@ For BC-scoped artifacts, see each BC's `INDEX.md`.
 - **0003** -- SQLite as the sole persistence layer -- 2026-05-12 -- `knowledge/decisions/0003-sqlite-persistence.md`
 - **0004** -- Fable.Remoting for type-safe client/server RPC -- 2026-05-12 -- `knowledge/decisions/0004-fable-remoting.md`
 - **0005** -- Elmish (MVU) as the client architecture -- 2026-05-12 -- `knowledge/decisions/0005-elmish-mvu.md`
-- **0006** -- TailwindCSS 4 + DaisyUI 5 with mandatory glassmorphism for overlays -- 2026-05-12 -- `knowledge/decisions/0006-tailwind-daisyui-glassmorphism.md`
+- **0006** -- TailwindCSS 4 + DaisyUI 5 with mandatory glassmorphism for overlays *(overlay-material rule superseded by design-system ADR-0016 — paper overlay; Tailwind/DaisyUI/dim-theme decisions still stand)* -- 2026-05-12 -- `knowledge/decisions/0006-tailwind-daisyui-glassmorphism.md`
 - **0007** -- Single-user app, no authentication -- 2026-05-12 -- `knowledge/decisions/0007-single-user-no-auth.md`
 - **0008** -- Ten bounded contexts for Mediatheca -- 2026-05-12 -- `knowledge/decisions/0008-bounded-contexts-mediatheca.md`
 <!-- adr-global:end -->

@@ -56,7 +56,7 @@ let private navItem (currentPage: Page) (item: NavItem) =
 
 let view (currentPage: Page) =
     Html.aside [
-        prop.className "hidden lg:flex flex-col w-64 min-h-screen bg-base-200/80 backdrop-blur-sm border-r border-base-300/50"
+        prop.className "hidden lg:flex flex-col w-64 min-h-screen bg-base-200 border-r border-base-300/50"
         prop.children [
             // Logo header with subtle bottom border — Velvet Lobby wordmark (brief 3a):
             // "Media" in Instrument Serif ink + italic gold "theca", plus the

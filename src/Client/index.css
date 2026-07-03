@@ -23,17 +23,13 @@
 
 /* ── Design Tokens ── */
 :root {
-    /* Glass effect tokens */
-    --glass-bg-opacity-light: 0.55;
-    --glass-bg-opacity-medium: 0.60;
-    --glass-bg-opacity-heavy: 0.70;
-    --glass-blur-subtle: 12px;
-    --glass-blur-standard: 24px;
-    --glass-blur-heavy: 40px;
-    --glass-saturate: 1.2;
-    --glass-border-opacity: 0.15;
-    --glass-highlight-opacity: 0.08;
-    --glass-shadow-opacity: 0.6;
+    /* Paper overlay tokens (ADR-0016, supersedes ADR-0006's mandatory
+       glassmorphism) — the floating-surface material: opaque fill (lighter
+       than the page), a true elevation shadow, a subtle line ring. No
+       translucency, no backdrop-filter. Distinct from `--color-line` /
+       `--shadow-card` (velvet-card's page-chrome ring-only elevation). */
+    --color-paper: oklch(0.24 0.032 24);
+    --shadow-paper: 0 10px 28px -8px oklch(0 0 0 / 0.55), 0 0 0 1px oklch(0.34 0.04 30 / 0.6);
 
     /* Spacing scale (legacy, pre-Velvet-Lobby) */
     --space-page-mobile: 1rem;
@@ -192,13 +188,17 @@ h1, h2, h3, h4, h5, h6 {
 .stagger-grid > *:nth-child(12) { animation-delay: 440ms; }
 
 /* ── Velvet Lobby component patterns (design-system-h3q8n) ──
-   styleguide.md § 3.1 (velvet card), § 3.3 (media-chrome glass), § 4
-   (component patterns) and the Motion subsection. Consumed by the typed
-   Feliz compositions in DesignSystem.fs — see that file for the F# side. */
+   styleguide.md § 3.1 (velvet card), § 4 (component patterns) and the
+   Motion subsection. Consumed by the typed Feliz compositions in
+   DesignSystem.fs — see that file for the F# side. The § 3.3 media-chrome
+   glass variant and § 3.2's mandatory overlay glass were retired by
+   ADR-0016 (design-system-pv3mq) — see `.paper-overlay` below, the
+   single floating-surface material for dropdowns/popovers/modals. */
 
 /* § 3.1 — velvet card: solid, non-overlay page/card surface. Background +
-   line-ring elevation, no blur/translucency (distinct from § 3.2 overlay
-   glass, which is unchanged — ADR-0006). */
+   line-ring elevation, no blur/translucency. Distinct from `.paper-overlay`
+   (floating surfaces) — velvet card sits flush with the page, paper
+   overlay lifts above it (ADR-0016). */
 .velvet-card {
     background: var(--color-base-100);
     border-radius: var(--radius-card);
@@ -208,15 +208,17 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: var(--shadow-hero);
 }
 
-/* § 3.3 — media chrome: a narrower glass variant for small controls floating
-   directly over artwork. An ADDITION alongside § 3.2's mandatory overlay
-   glass, not a replacement — dropdowns/modals/popovers stay full-spec. */
-.media-chrome-glass {
-    background: oklch(0.14 0.025 20 / 0.6);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    border: 1px solid oklch(1 0 0 / 0.15);
-    border-radius: var(--radius-pill);
+/* Paper overlay (ADR-0016, supersedes ADR-0006's mandatory glassmorphism) —
+   the single floating-surface material for dropdowns, popovers, and modals.
+   Opaque `--color-paper` fill + line ring + a true elevation shadow (paper
+   lifted off the page). No translucency, no backdrop-filter. Distinct from
+   `.velvet-card` (page chrome, flush with the page) — see DesignSystem.fs
+   `paperOverlay`/`paperDropdown`. */
+.paper-overlay {
+    background: var(--color-paper);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-paper);
 }
 
 /* Motion: the gold-leaf sweep (§ 1.6, § 4 Status badges, § 4 Motion) — the one
@@ -559,7 +561,6 @@ h1, h2, h3, h4, h5, h6 {
     background-clip: text;
 }
 
-/* ── Glass card ── */
 /* ── Hero Spotlight ── */
 .hero-spotlight {
     border: 1px solid oklch(100% 0 0 / 0.08);
@@ -573,33 +574,23 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ── Section Open (title + content, no card chrome) ── */
 .section-open {
-    /* No background, no border, no backdrop-filter — just structural spacing */
+    /* No background, no border — just structural spacing */
     padding: 0;
 }
 
-.glass-card {
-    background: oklch(0.20 0.03 22 / 0.6);
-    backdrop-filter: blur(12px);
-    border: 1px solid oklch(0.93 0.012 60 / 0.08);
-}
-
-/* ── Rating dropdown ── */
+/* ── Rating dropdown (paper overlay — ADR-0016) ── */
 @keyframes fadeInDown {
     from { opacity: 0; transform: translateY(-8px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 
 .rating-dropdown {
-    background: oklch(0.14 0.025 20 / 0.65);
-    backdrop-filter: blur(24px) saturate(1.2);
-    -webkit-backdrop-filter: blur(24px) saturate(1.2);
-    border: 1px solid oklch(0.93 0.012 60 / 0.15);
+    background: var(--color-paper);
+    border: 1px solid var(--color-line);
     border-radius: 0.75rem;
     padding: 0.5rem;
     min-width: 220px;
-    box-shadow:
-        inset 0 1px 0 0 oklch(100% 0 0 / 0.08),
-        0 12px 40px -8px oklch(0% 0 0 / 0.6);
+    box-shadow: var(--shadow-paper);
     animation: fadeInDown 0.15s ease-out;
 }
 

@@ -61,8 +61,8 @@ Mediatheca is a personal media library + diary + intelligence hub built on event
 - **Key actors:** Single user (operator role).
 
 ### Design system
-- **Purpose:** Cross-cutting visual language — typography, color tokens, glassmorphism rules, Feliz/DaisyUI component patterns, the in-app StyleGuide page. Gates frontend work in every BC.
-- **Core language:** Token, theme (dim), glassmorphism, backdrop-filter, surface, design-system component.
+- **Purpose:** Cross-cutting visual language — typography, color tokens, paper-overlay rules, Feliz/DaisyUI component patterns, the in-app StyleGuide page. Gates frontend work in every BC.
+- **Core language:** Token, theme (dim), paper overlay, velvet card, surface, design-system component.
 - **Classification:** supporting
 - **Key actors:** Single user (developer).
 - **Notes:** All frontend tasks in any BC `depends_on` the styleguide.

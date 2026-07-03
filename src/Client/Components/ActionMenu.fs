@@ -54,8 +54,8 @@ let private renderSections (setIsOpen: bool -> unit) (sections: ActionMenuSectio
         for item in section.Items do
             renderItem setIsOpen item ]
 
-/// Hover-reveal action menu with glassmorphism dropdown.
-/// Renders as a sibling structure to avoid backdrop-filter nesting issues.
+/// Hover-reveal action menu with a paper-overlay dropdown.
+/// Renders as a sibling structure to the trigger button.
 [<ReactComponent>]
 let view (items: ActionMenuItem list) =
     let isOpen, setIsOpen = React.useState false
@@ -103,7 +103,7 @@ let view (items: ActionMenuItem list) =
                     ]
                 ]
             ]
-            // Dropdown menu (sibling to button, not child of any blurred element)
+            // Dropdown menu (sibling to the trigger button)
             if isOpen then
                 // Click-away backdrop
                 Html.div [
@@ -169,9 +169,9 @@ let heroView (items: ActionMenuItem list) =
             if not (isNull el) then menuRef.current <- Some (el :?> Browser.Types.HTMLElement))
         prop.className "relative"
         prop.children [
-            // Trigger button - glass style matching "Change backdrop"
+            // Trigger button - matches "Change backdrop" styling
             Html.button [
-                prop.className "w-9 h-9 flex items-center justify-center rounded-full text-base-content backdrop-blur-sm bg-base-300/30 hover:bg-base-300/50 transition-all cursor-pointer"
+                prop.className "w-9 h-9 flex items-center justify-center rounded-full text-base-content bg-base-300/30 hover:bg-base-300/50 transition-all cursor-pointer"
                 prop.onClick (fun e ->
                     e.stopPropagation()
                     setIsOpen (not isOpen))
@@ -231,7 +231,7 @@ let heroViewSections (sections: ActionMenuSection list) =
         prop.className "relative"
         prop.children [
             Html.button [
-                prop.className "w-9 h-9 flex items-center justify-center rounded-full text-base-content backdrop-blur-sm bg-base-300/30 hover:bg-base-300/50 transition-all cursor-pointer"
+                prop.className "w-9 h-9 flex items-center justify-center rounded-full text-base-content bg-base-300/30 hover:bg-base-300/50 transition-all cursor-pointer"
                 prop.onClick (fun e ->
                     e.stopPropagation()
                     setIsOpen (not isOpen))

@@ -46,7 +46,7 @@ Personal media library app (movies, series, games, books) built with full-stack 
 
 - Fonts ("Velvet Lobby"): Instrument Serif (`font-display`, headings — mixed case; *italic* is the section-header/wordmark voice), Instrument Sans (`font-sans`, body/UI), Spline Sans Mono (`font-mono`, dates/durations/counts/ids) — all via self-hosted `@fontsource` packages
 - Theme: custom "dim" dark theme in `index.css` via `@plugin "daisyui/theme"`, selected by `data-theme="dim"` on `<html>`
-- **Glassmorphism for all overlays**: Every dropdown, popover, modal, and floating panel MUST use glassmorphism — semi-transparent background (`/0.55`–`/0.70` opacity), `backdrop-filter: blur(24px) saturate(1.2)`, subtle border (`oklch(… / 0.15)`), and `inset 0 1px 0 0 oklch(100% 0 0 / 0.08)` highlight. Never use fully opaque backgrounds on overlays. See `.rating-dropdown` and `.glass-card` in `index.css` for reference.
+- **Paper overlay for all floating surfaces** (ADR-0016, supersedes ADR-0006's mandatory glassmorphism): every dropdown, popover, modal, and floating panel uses **paper overlay** — an opaque fill (`--color-paper`, lighter than the page), a subtle line ring (`--color-line`), and a true elevation shadow (`--shadow-paper`, paper lifted off the page). No translucency, no `backdrop-filter`. Distinct from `.velvet-card` (page/card chrome, flush with the page). See `.paper-overlay` and `.rating-dropdown` in `index.css`, and `DesignSystem.paperOverlay`/`paperDropdown`.
 - **Design system canonical artifact:** the authoritative design system is the **live in-app StyleGuide page** (`src/Client/Pages/StyleGuide`), rendering real Feliz specimens backed by `src/Client/DesignSystem.fs` (typed compositions) and `src/Client/index.css` (tokens/values). This running system — not a standalone prose doc — is the source of truth for design-system intent and the frontend task gate (ADR 0015).
 - F# modules for code organization (not classes)
 - Async workflows for I/O operations
@@ -61,7 +61,6 @@ Personal media library app (movies, series, games, books) built with full-stack 
 
 ## Gotchas
 
-- **`backdrop-filter` breaks on nested elements**: If a parent has `backdrop-filter` (e.g. `backdrop-blur-sm`), any child's `backdrop-filter` will only blur the parent's content, not the page behind it. Fix: render glassmorphic dropdowns/popovers as **siblings** to the blurred parent, not children. Wrap both in a plain `position: relative` container without `backdrop-filter`.
 - F# `open Module.Foo` opens Foo's *contents* — use `open Module` to access `Foo.bar`. Sibling modules in the same namespace are accessible by name without `open`.
 - `vite-plugin-fable@0.1.x` requires Vite 6; `0.2.x` requires Vite 7 — don't upgrade one without the other
 - `ts-lsp-client@1.1.0` breaks vite-plugin-fable ESM imports — pinned to `1.0.4` via npm overrides

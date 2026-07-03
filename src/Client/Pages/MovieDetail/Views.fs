@@ -5,6 +5,7 @@ open Feliz.DaisyUI
 open Feliz.Router
 open Mediatheca.Shared
 open Mediatheca.Client.Pages.MovieDetail.Types
+open Mediatheca.Client
 open Mediatheca.Client.Components
 
 let private formatDateOnly (date: string) =
@@ -43,7 +44,7 @@ let private starRating (rating: float) =
 
 let private detailCard (label: string) (value: string) =
     Html.div [
-        prop.className "bg-base-100/50 backdrop-blur-sm p-4 rounded-xl border border-base-content/5"
+        prop.className "bg-base-100/50 p-4 rounded-xl border border-base-content/5"
         prop.children [
             Html.span [
                 prop.className "block text-base-content/40 text-xs uppercase font-bold tracking-widest mb-1"
@@ -181,20 +182,20 @@ let private HeroRating (tmdbRating: float option, personalRating: int option, is
         ]
     ]
 
-let private glassCard (children: ReactElement list) =
+let private panelCard (children: ReactElement list) =
     Html.div [
-        prop.className "bg-base-100/50 backdrop-blur-xl border border-base-content/8 p-6 rounded-xl"
+        prop.className (DesignSystem.velvetCard + " p-6")
         prop.children children
     ]
 
 let private personalRatingCard (rating: int option) (isOpen: bool) (dispatch: Msg -> unit) =
     let currentOption = getRatingOption rating
-    // Outer container has position:relative but NO backdrop-filter,
-    // so the dropdown's z-50 escapes the glassCard stacking context.
+    // Outer container is position:relative so the dropdown's z-50 escapes
+    // the panel card's stacking context.
     Html.div [
         prop.className "relative"
         prop.children [
-            glassCard [
+            panelCard [
                 Html.div [
                     prop.className "flex items-center justify-between mb-4"
                     prop.children [
@@ -628,7 +629,7 @@ let private friendsCard (movie: MovieDetail) (model: Model) (dispatch: Msg -> un
     Html.div [
         prop.className "relative"
         prop.children [
-            glassCard [
+            panelCard [
                 // Header
                 Html.div [
                     prop.className "flex items-center justify-between mb-4"
@@ -871,7 +872,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                 Daisy.button.button [
                                     button.ghost
                                     button.sm
-                                    prop.className "text-base-content backdrop-blur-sm bg-base-300/30"
+                                    prop.className "text-base-content bg-base-300/30"
                                     prop.onClick (fun _ -> onBack ())
                                     prop.text "\u2190 Back"
                                 ]
@@ -1021,7 +1022,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                             ]
                                                         else
                                                             Html.button [
-                                                                prop.className "inline-flex items-center gap-2 bg-base-content/10 hover:bg-base-content/20 text-base-content/70 hover:text-base-content px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer backdrop-blur-sm"
+                                                                prop.className "inline-flex items-center gap-2 bg-base-content/10 hover:bg-base-content/20 text-base-content/70 hover:text-base-content px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
                                                                 prop.onClick (fun _ -> dispatch (Set_in_focus true))
                                                                 prop.children [
                                                                     Html.span [ prop.className "w-4 h-4"; prop.children [ Icons.crosshairOutline () ] ]
@@ -1055,7 +1056,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                             prop.children [
                                                 // Add to catalog button
                                                 Html.button [
-                                                    prop.className "w-9 h-9 rounded-full bg-base-100/50 backdrop-blur-sm border border-base-content/15 hover:bg-base-100/70 text-base-content/50 hover:text-base-content flex items-center justify-center transition-colors cursor-pointer"
+                                                    prop.className "w-9 h-9 rounded-full bg-base-100/50 border border-base-content/15 hover:bg-base-100/70 text-base-content/50 hover:text-base-content flex items-center justify-center transition-colors cursor-pointer"
                                                     prop.onClick (fun _ -> dispatch Open_catalog_picker)
                                                     prop.children [
                                                         Html.span [ prop.className "[&>svg]:w-5 [&>svg]:h-5"; prop.children [ Icons.catalog () ] ]

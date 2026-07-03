@@ -1,15 +1,15 @@
 ---
 id: design-system-pv3mq
 title: Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006)
-status: doing
+status: done
 type: refactor
 context: design-system
 created: 2026-07-03
-completed:
+completed: 2026-07-03
 depends_on: []
 blocks: []
 tags: [glassmorphism, overlays, surface, tokens, adr-0006, velvet-lobby]
-related_adrs: [0006, 0015]
+related_adrs: [0006, 0015, 0016]
 related_research: []
 prior_art: [design-system-h3q8n, design-system-sg8kd]
 ---
@@ -63,18 +63,19 @@ Governing artifacts to repoint (docs / decisions):
 
 ## Acceptance criteria
 
-- [ ] No `backdrop-filter` / `backdrop-blur` / translucent-overlay styling remains in
+- [x] No `backdrop-filter` / `backdrop-blur` / translucent-overlay styling remains in
       `DesignSystem.fs`, `index.css`, or any page/component view (grep-clean).
-- [ ] All dropdowns, popovers, modals, and floating panels render as the agreed paper /
+- [x] All dropdowns, popovers, modals, and floating panels render as the agreed paper /
       material surface (opaque fill + elevation shadow) and are legible over any backdrop.
-- [ ] The StyleGuide page's glassmorphism section is gone and replaced by the new
+- [x] The StyleGuide page's glassmorphism section is gone and replaced by the new
       overlay-material specimen(s); the page compiles and renders.
-- [ ] `npm run build` is clean (Fable compiles, no dead CSS, no dangling `.glass-*` refs).
-- [ ] ADR-0006 is superseded by a new ADR (bidirectional link); CLAUDE.md, context-map,
-      index, README, and the design-check skill no longer prescribe glassmorphism.
-- [ ] The `design-check` skill audits against the new material, not glassmorphism.
-- [ ] The `backdrop-filter` nested-element gotcha is removed from CLAUDE.md if no overlay
-      relies on backdrop-filter anymore (or retained with a note if one edge case survives).
+- [x] `npm run build` is clean (Fable compiles, no dead CSS, no dangling `.glass-*` refs).
+- [x] ADR-0006 is superseded by a new ADR (bidirectional link); CLAUDE.md, context-map,
+      README, and the design-check skill no longer prescribe glassmorphism. (`.agentheim/knowledge/index.md`
+      is conductor-owned — not edited by this worker; flagged for conductor repoint, see Notes.)
+- [x] The `design-check` skill audits against the new material, not glassmorphism.
+- [x] The `backdrop-filter` nested-element gotcha is removed from CLAUDE.md — confirmed via
+      grep that no shipped overlay relies on `backdrop-filter` anymore.
 
 ## Notes
 
@@ -111,3 +112,35 @@ code later), split this task at refine time.
 This is a design-system task itself, so it carries no styleguide-gate `depends_on`.
 Because it rewrites shared overlay vocabulary consumed by many BCs' views, prefer running
 it as an isolated single-task batch (no sibling frontend work in flight) to avoid churn.
+
+## Outcome
+
+Glassmorphism fully retired. Every floating surface (dropdown, popover, modal, small
+control over artwork) now uses **paper overlay** — opaque `--color-paper` fill + line
+ring + a true elevation shadow (`--shadow-paper`), no translucency, no `backdrop-filter`
+anywhere in `src/Client`. `.rating-dropdown` kept its historical CSS class name (only its
+body changed from translucent+blurred to opaque+shadowed), which meant its ~30 existing
+call sites (ActionMenu, EntryList, ContentBlockEditor, every detail page's rating
+dropdown) needed no per-call-site edits. Non-overlay "glass" page-chrome usages
+(`glassCard`/`glassSubtle`, several local per-page `glassCard` helpers) migrated to the
+already-shipped `velvetCard` (design-system-h3q8n), completing a migration that task's own
+code comment had already flagged but not executed. `.media-chrome-glass` (§ 3.3) folded
+into `paperOverlay`. Wrote superseding ADR-0016 (bidirectional link with ADR-0006, which
+keeps `status: accepted` per the sg8kd/grtw7 precedent). Repointed CLAUDE.md (Conventions
++ removed the now-inapplicable backdrop-filter nesting Gotcha), `.agentheim/context-map.md`,
+the design-system BC README, and the `design-check` skill (`SKILL.md` + `design-rules.md`,
+renumbered rule categories 1-8). `npm run build` is clean (Fable compiles, no dangling
+`.glass-*`/`backdrop-filter`/`backdrop-blur` refs outside intentional historical prose).
+
+`.agentheim/knowledge/index.md`'s ADR-0006 line and design-system BC description still say
+"glassmorphism" — that file is conductor-owned (workers may not edit any INDEX.md), flagged
+here for the conductor to repoint during integration.
+
+Key files: `src/Client/DesignSystem.fs`, `src/Client/index.css`,
+`src/Client/Pages/StyleGuide/{Types,Views}.fs`, `src/Client/Components/{ActionMenu,EntryList,
+ContentBlockEditor,SearchModal,Sidebar}.fs`, `src/Client/Pages/{MovieDetail,SeriesDetail,
+GameDetail,Settings,Dashboard,Movies,Series}/Views.fs`, `.agentheim/knowledge/decisions/
+0016-paper-overlay-retires-glassmorphism.md`, `.agentheim/knowledge/decisions/
+0006-tailwind-daisyui-glassmorphism.md` (superseded_by added), `CLAUDE.md`,
+`.agentheim/context-map.md`, `.agentheim/contexts/design-system/README.md`,
+`.claude/skills/design-check/{SKILL.md,references/design-rules.md}`.

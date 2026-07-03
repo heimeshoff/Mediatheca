@@ -80,7 +80,7 @@ let private tabBar (activeTab: DashboardTab) (dispatch: Msg -> unit) =
 
 let private sectionCard (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
     Html.div [
-        prop.className (DesignSystem.glassCard + " p-4 " + DesignSystem.animateFadeInUp)
+        prop.className (DesignSystem.velvetCard + " p-4 " + DesignSystem.animateFadeInUp)
         prop.children [
             Html.div [
                 prop.className "flex items-center gap-2 mb-3"
@@ -105,7 +105,7 @@ let private sectionCard (icon: unit -> ReactElement) (title: string) (children: 
 /// Section card that allows overflow (for horizontal scrollers)
 let private sectionCardOverflow (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
     Html.div [
-        prop.className (DesignSystem.glassCard + " p-4 " + DesignSystem.animateFadeInUp + " overflow-hidden")
+        prop.className (DesignSystem.velvetCard + " p-4 " + DesignSystem.animateFadeInUp + " overflow-hidden")
         prop.children [
             Html.div [
                 prop.className "flex items-center gap-2 mb-3"
@@ -129,7 +129,7 @@ let private sectionCardOverflow (icon: unit -> ReactElement) (title: string) (ch
 /// Section card with overflow that includes an action button in the header
 let private sectionCardOverflowWithAction (icon: unit -> ReactElement) (title: string) (actionElement: ReactElement) (children: ReactElement list) =
     Html.div [
-        prop.className (DesignSystem.glassCard + " p-4 " + DesignSystem.animateFadeInUp + " overflow-hidden")
+        prop.className (DesignSystem.velvetCard + " p-4 " + DesignSystem.animateFadeInUp + " overflow-hidden")
         prop.children [
             Html.div [
                 prop.className "flex items-center gap-2 mb-3"
@@ -308,7 +308,7 @@ let private seriesPosterCard (jellyfinServerUrl: string option) (item: Dashboard
                                     prop.target "_blank"
                                     prop.rel "noopener noreferrer"
                                     prop.onClick (fun e -> e.stopPropagation())
-                                    prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100/55 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg opacity-0 group-hover:opacity-100 cursor-pointer"
+                                    prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100 border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg opacity-0 group-hover:opacity-100 cursor-pointer"
                                     prop.title "Play in Jellyfin"
                                     prop.children [
                                         Html.span [
@@ -441,7 +441,7 @@ let private movieToWatchPosterCard (jellyfinServerUrl: string option) (item: Das
                                     prop.target "_blank"
                                     prop.rel "noopener noreferrer"
                                     prop.onClick (fun e -> e.stopPropagation())
-                                    prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100/55 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg cursor-pointer"
+                                    prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100 border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg cursor-pointer"
                                     prop.title "Play in Jellyfin"
                                     prop.children [
                                         Html.span [
@@ -948,7 +948,7 @@ let private heroSpotlight (jellyfinServerUrl: string option) (item: DashboardSer
 
                     // Episode still inset (only when both backdrop + still exist).
                     // Sits in the top-left corner; the In Focus indicator is suppressed when this is shown.
-                    // Plain rendering — no glassmorphism per task spec.
+                    // Plain rendering — no overlay chrome per task spec.
                     match insetRef with
                     | Some still ->
                         Html.div [
@@ -1006,7 +1006,7 @@ let private heroSpotlight (jellyfinServerUrl: string option) (item: DashboardSer
                             prop.target "_blank"
                             prop.rel "noopener noreferrer"
                             prop.onClick (fun e -> e.stopPropagation())
-                            prop.className "absolute top-3 right-3 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-base-100/55 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg cursor-pointer"
+                            prop.className "absolute top-3 right-3 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-base-100 border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg cursor-pointer"
                             prop.title "Play in Jellyfin"
                             prop.children [ Icons.play () ]
                         ]
@@ -1365,7 +1365,7 @@ let private formatTotalTime (totalMinutes: int) =
 
 let private heroStatCard (label: string) (value: string) (sublabel: string) (colorClass: string) =
     Html.div [
-        prop.className (DesignSystem.glassCard + " p-4 flex flex-col items-center justify-center text-center min-h-[90px]")
+        prop.className (DesignSystem.velvetCard + " p-4 flex flex-col items-center justify-center text-center min-h-[90px]")
         prop.children [
             Html.span [
                 prop.className $"text-2xl font-display font-bold {colorClass}"
@@ -1386,7 +1386,7 @@ let private heroStatCard (label: string) (value: string) (sublabel: string) (col
 let private crossMediaHeroStats (stats: DashboardCrossMediaStats) =
     let totalMinutes = stats.TotalMovieMinutes + stats.TotalSeriesMinutes + stats.TotalGameMinutes
     Html.div [
-        prop.className (DesignSystem.glassCard + " p-4 " + DesignSystem.animateFadeInUp)
+        prop.className (DesignSystem.velvetCard + " p-4 " + DesignSystem.animateFadeInUp)
         prop.children [
             Html.div [
                 prop.className "flex items-center gap-2 mb-3"
@@ -3162,7 +3162,7 @@ let private seriesTabPosterCard (jellyfinServerUrl: string option) (item: Dashbo
                                     prop.target "_blank"
                                     prop.rel "noopener noreferrer"
                                     prop.onClick (fun e -> e.stopPropagation())
-                                    prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100/55 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg opacity-0 group-hover:opacity-100 cursor-pointer"
+                                    prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100 border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg opacity-0 group-hover:opacity-100 cursor-pointer"
                                     prop.title "Play in Jellyfin"
                                     prop.children [
                                         Html.span [
@@ -3412,7 +3412,7 @@ let private inFocusEstimateCard (estimate: InFocusEstimate) =
             else
                 sprintf "%d min" totalMinutes
         Html.div [
-            prop.className (DesignSystem.glassCard + " p-5 " + DesignSystem.animateFadeInUp)
+            prop.className (DesignSystem.velvetCard + " p-5 " + DesignSystem.animateFadeInUp)
             prop.children [
                 Html.div [
                     prop.className "flex items-center gap-2 mb-2"
@@ -4247,7 +4247,7 @@ let private gamesTabView (data: DashboardGamesTab) (achievementsState: Achieveme
 
 let private placeholderTab (label: string) =
     Html.div [
-        prop.className (DesignSystem.glassCard + " p-8 text-center " + DesignSystem.animateFadeIn)
+        prop.className (DesignSystem.velvetCard + " p-8 text-center " + DesignSystem.animateFadeIn)
         prop.children [
             Html.p [
                 prop.className "text-base-content/40 text-sm font-medium"

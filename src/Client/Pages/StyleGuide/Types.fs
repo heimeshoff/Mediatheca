@@ -5,7 +5,7 @@ type Section =
     | Typography
     | Colors
     | Spacing
-    | Glassmorphism
+    | PaperOverlay
     | Animations
     | Components
     | VelvetLobbyPatterns

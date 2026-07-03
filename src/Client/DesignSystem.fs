@@ -4,21 +4,21 @@ open Feliz
 
 // Design system composition helpers.
 // Components should use these instead of hardcoding class strings.
-// CSS custom properties (--glass-*, --space-*, etc.) are defined in index.css.
+// CSS custom properties (--color-paper, --space-*, etc.) are defined in index.css.
 
-// ── Glass Effects ──
+// ── Paper Overlay (ADR-0016: opaque elevation, replaces glassmorphism) ──
 
-/// Standard glassmorphism panel (sidebar cards, detail panels)
-let glassCard = "bg-base-100/55 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 rounded-xl shadow-lg"
+/// Paper overlay — solid opaque fill (lighter than the page) + elevation
+/// shadow + a subtle line ring. The floating-surface vocabulary: dropdowns,
+/// popovers, modals. Distinct from `velvetCard` (page chrome, flush with the
+/// page, ring-only elevation) — overlays float above the page with a true
+/// drop shadow. No translucency, no backdrop-filter (ADR-0016 supersedes
+/// ADR-0006's mandatory glassmorphism).
+let paperOverlay = "paper-overlay"
 
-/// Heavy glassmorphism (modals, important overlays)
-let glassOverlay = "bg-base-100/70 backdrop-blur-xl rounded-2xl shadow-2xl border border-base-content/10"
-
-/// Subtle glassmorphism (content block cards, inline panels)
-let glassSubtle = "bg-base-100/50 backdrop-blur-sm"
-
-/// Glassmorphism dropdown (rating dropdown, action menus)
-let glassDropdown = "rating-dropdown"
+/// Paper dropdown (rating dropdown, action menus, context menus) — same
+/// paper-overlay material with dropdown-specific padding/min-width/animation.
+let paperDropdown = "rating-dropdown"
 
 // ── Typography (Velvet Lobby: Instrument Serif / Instrument Sans / Spline Sans Mono) ──
 // Four ink levels are minted as literal oklch steps in index.css (--color-ink-*),
@@ -195,7 +195,7 @@ let modalBackdrop = "absolute inset-0 bg-black/30"
 let modalContainer = "fixed inset-0 z-50 flex justify-center items-start pt-[10vh]"
 
 /// Modal panel (the actual dialog box)
-let modalPanel = glassOverlay + " overflow-hidden animate-fade-in"
+let modalPanel = paperOverlay + " overflow-hidden animate-fade-in"
 
 // ─────────────────────────────────────────────────────────────────────────
 // Velvet Lobby component patterns (design-system-h3q8n)
@@ -204,21 +204,18 @@ let modalPanel = glassOverlay + " overflow-hidden animate-fade-in"
 // via the CSS classes minted in index.css — no hardcoded oklch here.
 // ─────────────────────────────────────────────────────────────────────────
 
-// ── Surfaces (§ 3.1 velvet card, § 3.3 media-chrome glass) ──
+// ── Surfaces (§ 3.1 velvet card) ──
 
-/// Solid, non-overlay card surface — "velvet card" (§ 3.1). Replaces
-/// `.glass-card` for page/card chrome: `surface` background + `line` ring,
-/// no blur/translucency. Never use for floating overlays — those stay glass
-/// per § 3.2 (ADR-0006, unchanged).
+/// Solid, non-overlay card surface — "velvet card" (§ 3.1). Page/card
+/// chrome: `surface` background + `line` ring, no blur/translucency. Never
+/// use for floating overlays — those use `paperOverlay`/`paperDropdown`
+/// (ADR-0016). The old § 3.3 "media-chrome glass" variant for small
+/// controls over artwork was retired by ADR-0016 — such controls now use
+/// `paperOverlay` (or a plain solid fill) directly.
 let velvetCard = "velvet-card"
 
 /// Velvet card with the elevated hero shadow (cover art, hero panels).
 let velvetCardHero = "velvet-card velvet-card-hero"
-
-/// Narrower glass for small controls floating directly over artwork (§ 3.3)
-/// — e.g. a "Change artwork" pill, a play button on a backdrop. An ADDITION
-/// alongside § 3.2's mandatory overlay glass, not a replacement.
-let mediaChromeGlass = "media-chrome-glass"
 
 // ── Motion primitives (§ 1.6, § 4 Motion) — vocabulary only. Design-system
 // owns the keyframes/helpers; BCs decide *where* they fire. ──

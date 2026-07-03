@@ -207,8 +207,7 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
     | NotHovering | Failed -> Html.none
     | Loading ->
         Html.div [
-            prop.className "w-80 p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
-            prop.style [ style.custom ("boxShadow", "inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 20px 25px -5px rgb(0 0 0 / 0.1)") ]
+            prop.className ("w-80 p-4 animate-fade-in " + Mediatheca.Client.DesignSystem.paperOverlay)
             prop.children [
                 Html.div [
                     prop.className "flex justify-center py-8"
@@ -218,8 +217,7 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
         ]
     | LoadedTmdb data ->
         Html.div [
-            prop.className "w-80 max-h-[50vh] overflow-y-auto p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
-            prop.style [ style.custom ("boxShadow", "inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 20px 25px -5px rgb(0 0 0 / 0.1)") ]
+            prop.className ("w-80 max-h-[50vh] overflow-y-auto p-4 animate-fade-in " + Mediatheca.Client.DesignSystem.paperOverlay)
             prop.children [
                 Html.h4 [
                     prop.className "font-display text-sm font-bold uppercase tracking-wider mb-1"
@@ -282,8 +280,7 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
         ]
     | LoadedRawg data ->
         Html.div [
-            prop.className "w-80 max-h-[50vh] overflow-y-auto p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
-            prop.style [ style.custom ("boxShadow", "inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 20px 25px -5px rgb(0 0 0 / 0.1)") ]
+            prop.className ("w-80 max-h-[50vh] overflow-y-auto p-4 animate-fade-in " + Mediatheca.Client.DesignSystem.paperOverlay)
             prop.children [
                 Html.h4 [
                     prop.className "font-display text-sm font-bold uppercase tracking-wider mb-1"
@@ -352,8 +349,7 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
         ]
     | LoadedLibraryMovie data ->
         Html.div [
-            prop.className "w-80 max-h-[50vh] overflow-y-auto p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
-            prop.style [ style.custom ("boxShadow", "inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 20px 25px -5px rgb(0 0 0 / 0.1)") ]
+            prop.className ("w-80 max-h-[50vh] overflow-y-auto p-4 animate-fade-in " + Mediatheca.Client.DesignSystem.paperOverlay)
             prop.children [
                 Html.h4 [
                     prop.className "font-display text-sm font-bold uppercase tracking-wider mb-1"
@@ -403,8 +399,7 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
         ]
     | LoadedLibrarySeries data ->
         Html.div [
-            prop.className "w-80 max-h-[50vh] overflow-y-auto p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
-            prop.style [ style.custom ("boxShadow", "inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 20px 25px -5px rgb(0 0 0 / 0.1)") ]
+            prop.className ("w-80 max-h-[50vh] overflow-y-auto p-4 animate-fade-in " + Mediatheca.Client.DesignSystem.paperOverlay)
             prop.children [
                 Html.h4 [
                     prop.className "font-display text-sm font-bold uppercase tracking-wider mb-1"
@@ -453,8 +448,7 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
         ]
     | LoadedLibraryGame data ->
         Html.div [
-            prop.className "w-80 max-h-[50vh] overflow-y-auto p-4 bg-base-100/65 backdrop-blur-[24px] backdrop-saturate-[1.2] border border-base-content/15 shadow-xl rounded-xl animate-fade-in"
-            prop.style [ style.custom ("boxShadow", "inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 20px 25px -5px rgb(0 0 0 / 0.1)") ]
+            prop.className ("w-80 max-h-[50vh] overflow-y-auto p-4 animate-fade-in " + Mediatheca.Client.DesignSystem.paperOverlay)
             prop.children [
                 Html.h4 [
                     prop.className "font-display text-sm font-bold uppercase tracking-wider mb-1"

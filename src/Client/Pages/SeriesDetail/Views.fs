@@ -73,9 +73,9 @@ let private statusBadge (status: SeriesStatus) =
         | UnknownStatus -> (badge.ghost, "Unknown")
     Daisy.badge [ badge.sm; color; prop.text label ]
 
-let private glassCard (children: ReactElement list) =
+let private detailCard (children: ReactElement list) =
     Html.div [
-        prop.className (DesignSystem.glassCard + " p-6")
+        prop.className (DesignSystem.velvetCard + " p-6")
         prop.children children
     ]
 
@@ -130,7 +130,7 @@ let private personalRatingCard (rating: int option) (isOpen: bool) (dispatch: Ms
     Html.div [
         prop.className "relative"
         prop.children [
-            glassCard [
+            detailCard [
                 Html.div [
                     prop.className "flex items-center justify-between mb-4"
                     prop.children [
@@ -627,7 +627,7 @@ let private episodeCard
         if episode.IsWatched then "" else "opacity-80"
     let isEditingDate = model.EditingEpisodeDate = Some (seasonNumber, episode.EpisodeNumber)
     Html.div [
-        prop.className $"bg-base-100/50 backdrop-blur-sm border {borderClass} rounded-xl transition-all {opacityClass}"
+        prop.className $"bg-base-100/50 border {borderClass} rounded-xl transition-all {opacityClass}"
         prop.children [
             Html.div [
                 prop.className "flex gap-4 p-4"
@@ -780,7 +780,7 @@ let private episodeCard
                                         if isEditingDate then
                                             EditableDateInput.EditableDateInput
                                                 (episode.WatchedDate |> Option.defaultValue "")
-                                                ("input-xs w-36 border-base-content/15 " + DesignSystem.glassCard)
+                                                ("input-xs w-36 border-base-content/15 " + DesignSystem.velvetCard)
                                                 (fun v -> dispatch (Update_episode_date (seasonNumber, episode.EpisodeNumber, v)))
                                                 (fun () -> dispatch Cancel_edit_episode_date)
                                         else
@@ -906,15 +906,14 @@ let private rewatchSessionPanel (series: SeriesDetail) (model: Model) (dispatch:
                         let sessionName =
                             if List.isEmpty session.Friends then "Personal"
                             else session.Friends |> List.map (fun f -> f.Name) |> String.concat ", "
-                        // Plain wrapper — no backdrop-filter — so dropdown sibling gets proper blur
                         Html.div [
                             prop.className "group relative flex-shrink-0 w-52"
                             prop.children [
-                                // Card (has glass effect)
+                                // Card (velvet-card surface)
                                 Html.div [
                                     prop.className (
                                         "p-4 rounded-xl transition-all cursor-pointer border " +
-                                        DesignSystem.glassSubtle + " " +
+                                        DesignSystem.velvetCard + " " +
                                         (if isSelected then "border-primary/30 bg-primary/10"
                                          else "border-base-content/8 hover:border-base-content/15"))
                                     prop.onClick (fun _ -> dispatch (Select_rewatch session.RewatchId))
@@ -993,7 +992,7 @@ let private rewatchSessionPanel (series: SeriesDetail) (model: Model) (dispatch:
                                         ]
                                     ]
                                 ]
-                                // Context menu dropdown — rendered as sibling to glass card
+                                // Context menu dropdown — rendered as sibling to the velvet card
                                 if model.SessionMenuOpen = Some session.RewatchId then
                                     Html.div [
                                         prop.className "absolute right-2 top-10 z-[100] min-w-[180px] rating-dropdown py-1"
@@ -1246,7 +1245,7 @@ let private friendsCard (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
     Html.div [
         prop.className "relative"
         prop.children [
-            glassCard [
+            detailCard [
                 // Header
                 Html.div [
                     prop.className "flex items-center justify-between mb-4"
@@ -1347,7 +1346,7 @@ let private overviewTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                         prop.className "flex flex-wrap items-center gap-2"
                         prop.children [
                             Html.button [
-                                prop.className "w-9 h-9 rounded-full bg-base-100/50 backdrop-blur-sm border border-base-content/15 hover:bg-base-100/70 text-base-content/50 hover:text-base-content flex items-center justify-center transition-colors cursor-pointer"
+                                prop.className "w-9 h-9 rounded-full bg-base-100/50 border border-base-content/15 hover:bg-base-100/70 text-base-content/50 hover:text-base-content flex items-center justify-center transition-colors cursor-pointer"
                                 prop.onClick (fun _ -> dispatch (Open_catalog_picker Series_catalog))
                                 prop.children [
                                     Html.span [ prop.className "[&>svg]:w-5 [&>svg]:h-5"; prop.children [ Icons.catalog () ] ]
@@ -1579,7 +1578,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                 Daisy.button.button [
                                     button.ghost
                                     button.sm
-                                    prop.className "text-base-content backdrop-blur-sm bg-base-300/30"
+                                    prop.className "text-base-content bg-base-300/30"
                                     prop.onClick (fun _ -> onBack ())
                                     prop.text "\u2190 Back"
                                 ]
@@ -1745,7 +1744,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                             ]
                                                         else
                                                             Html.button [
-                                                                prop.className "inline-flex items-center gap-2 bg-base-content/10 hover:bg-base-content/20 text-base-content/70 hover:text-base-content px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer backdrop-blur-sm"
+                                                                prop.className "inline-flex items-center gap-2 bg-base-content/10 hover:bg-base-content/20 text-base-content/70 hover:text-base-content px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
                                                                 prop.onClick (fun _ -> dispatch (Set_in_focus true))
                                                                 prop.children [
                                                                     Html.span [ prop.className "w-4 h-4"; prop.children [ Icons.crosshairOutline () ] ]
@@ -1769,7 +1768,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                 prop.className "hidden lg:block flex-shrink-0"
                                                 prop.children [
                                                     Html.div [
-                                                        prop.className (DesignSystem.glassCard + " p-4 min-w-[180px]")
+                                                        prop.className (DesignSystem.velvetCard + " p-4 min-w-[180px]")
                                                         prop.children [
                                                             Html.p [
                                                                 prop.className "text-xs font-bold text-primary uppercase tracking-wider mb-1"

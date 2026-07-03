@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 15:22 -- Task verified and completed: design-system-pv3mq - Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006)
+
+**Type:** Work / Task completion
+**Task:** design-system-pv3mq - Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006)
+**Summary:** Retired glassmorphism as the overlay vocabulary — replaced with **paper overlay** (opaque `--color-paper` fill + `--color-line` ring + true `--shadow-paper` elevation, no translucency/backdrop-filter, distinct from `.velvet-card`). Removed `--glass-*` tokens, `.glass-card`, `.media-chrome-glass`, and the `glassCard/glassOverlay/glassSubtle/glassDropdown/mediaChromeGlass` compositions; rewrote `.rating-dropdown` to paper; repointed every dropdown/popover/modal/panel across Components + detail/list pages to `paperOverlay`/`paperDropdown`; consolidated non-overlay "glass" page-chrome onto `velvetCard`. Rewrote the StyleGuide specimen section (Glassmorphism → PaperOverlay). Wrote superseding **ADR-0016** (design-system scope; supersedes global ADR-0006 bidirectionally — Tailwind/DaisyUI/dim-theme parts of 0006 still stand). Repointed CLAUDE.md (§ Conventions paper-overlay bullet; § Gotchas backdrop-filter trap removed as no overlay blurs anymore), context-map, design-system README, and the design-check skill. Conductor repointed the top-level `knowledge/index.md` (design-system BC description + ADR-0006 line marked superseded) — that file is conductor-owned so the worker correctly left it.
+**Duration:** ~33m (dispatch 14:49 → verifier verdict 15:22)
+**Verification:** PASS (iteration 1)
+**Files changed:** 24
+**Tests added:** 0 (visual/CSS refactor — verified via clean `npm run build` + grep-clean sweep of `backdrop-filter`/`backdrop-blur`/`.glass-*`)
+**ADRs written:** 0016
+
+---
+
 ## 2026-07-03 14:49 -- Batch started: [design-system-pv3mq]
 
 **Type:** Work / Batch start

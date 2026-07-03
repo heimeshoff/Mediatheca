@@ -222,7 +222,7 @@ let private renderEditingBlock (block: ContentBlockDto) (eb: EditingBlock) (setE
             prop.children [ textarea "text-sm leading-5 font-sans text-base-content/80" ]
         ]
 
-/// Context menu for a block (glassmorphic, Notion-style)
+/// Context menu for a block (paper overlay, Notion-style)
 let private contextMenu
     (block: ContentBlockDto)
     (onRemove: unit -> unit)
@@ -660,7 +660,7 @@ let view
                         ]
                     ]
                     // Context menu — rendered as sibling (not inside the
-                    // opacity-controlled handle) so backdrop-filter works
+                    // opacity-controlled handle) so it stacks correctly
                     if menuBlockId = Some block.BlockId then
                         let ungroupOption =
                             match block.RowGroup, onUngroupBlock with

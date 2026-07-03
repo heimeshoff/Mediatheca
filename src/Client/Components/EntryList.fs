@@ -113,9 +113,7 @@ let private directionIcon dir =
     | ViewSortDirection.Ascending -> Icons.chevronDown ()
     | ViewSortDirection.Descending -> Icons.chevronUp ()
 
-/// Sort button with absolute-position glassmorphic dropdown.
-/// Uses position:absolute so backdrop-filter isn't broken by
-/// ancestor compositing layers (e.g. animate-fade-in).
+/// Sort button with an absolutely-positioned paper-overlay dropdown.
 [<ReactComponent>]
 let private SortButton (sort: SortState, onSort: SortState -> unit, showWatchOrder: bool) =
     let isOpen, setIsOpen = React.useState false
@@ -148,9 +146,9 @@ let private SortButton (sort: SortState, onSort: SortState -> unit, showWatchOrd
                     prop.className "fixed inset-0 z-40"
                     prop.onClick (fun _ -> setIsOpen false)
                 ]
-                // Dropdown — absolute position so backdrop-filter works
+                // Dropdown — absolutely positioned relative to the trigger
                 Html.div [
-                    prop.className (DesignSystem.glassDropdown + " absolute top-full right-0 mt-2 z-50 w-48 p-1.5")
+                    prop.className (DesignSystem.paperDropdown + " absolute top-full right-0 mt-2 z-50 w-48 p-1.5")
                     prop.children [
                         for field in fields do
                             let isActive = sort.Field = field

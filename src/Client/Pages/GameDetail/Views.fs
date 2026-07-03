@@ -37,9 +37,9 @@ let private starRating (rating: float) =
         ]
     ]
 
-let private glassCard (children: ReactElement list) =
+let private panelCard (children: ReactElement list) =
     Html.div [
-        prop.className "bg-base-100/50 backdrop-blur-xl border border-base-content/8 p-6 rounded-xl"
+        prop.className (DesignSystem.velvetCard + " p-6")
         prop.children children
     ]
 
@@ -115,7 +115,7 @@ let private personalRatingCard (rating: int option) (isOpen: bool) (dispatch: Ms
     Html.div [
         prop.className "relative"
         prop.children [
-            glassCard [
+            panelCard [
                 Html.div [
                     prop.className "flex items-center justify-between mb-4"
                     prop.children [
@@ -914,7 +914,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                 Daisy.button.button [
                                     button.ghost
                                     button.sm
-                                    prop.className "text-base-content backdrop-blur-sm bg-base-300/30"
+                                    prop.className "text-base-content bg-base-300/30"
                                     prop.onClick (fun _ -> onBack ())
                                     prop.text "\u2190 Back"
                                 ]
@@ -927,7 +927,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                 Daisy.button.button [
                                     button.ghost
                                     button.sm
-                                    prop.className "text-base-content backdrop-blur-sm bg-base-300/30"
+                                    prop.className "text-base-content bg-base-300/30"
                                     prop.onClick (fun _ -> dispatch (Open_image_picker Backdrop_picker))
                                     prop.text "Change backdrop"
                                 ]
@@ -1145,9 +1145,9 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                         Html.div [
                                                             prop.className (
                                                                 if List.length visibleTrailers > 1 then
-                                                                    "relative w-full aspect-video rounded-xl overflow-hidden glass-card mb-4"
+                                                                    "relative w-full aspect-video rounded-xl overflow-hidden velvet-card mb-4"
                                                                 else
-                                                                    "relative w-full aspect-video rounded-xl overflow-hidden glass-card")
+                                                                    "relative w-full aspect-video rounded-xl overflow-hidden velvet-card")
                                                             prop.children [
                                                                 match selectedTrailer with
                                                                 | Some trailer ->
@@ -1213,7 +1213,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                 prop.className "flex flex-wrap items-center gap-2"
                                                 prop.children [
                                                     Html.button [
-                                                        prop.className "w-9 h-9 rounded-full bg-base-100/50 backdrop-blur-sm border border-base-content/15 hover:bg-base-100/70 text-base-content/50 hover:text-base-content flex items-center justify-center transition-colors cursor-pointer"
+                                                        prop.className "w-9 h-9 rounded-full bg-base-100/50 border border-base-content/15 hover:bg-base-100/70 text-base-content/50 hover:text-base-content flex items-center justify-center transition-colors cursor-pointer"
                                                         prop.onClick (fun _ -> dispatch Open_catalog_picker)
                                                         prop.children [
                                                             Html.span [ prop.className "[&>svg]:w-5 [&>svg]:h-5"; prop.children [ Icons.catalog () ] ]
@@ -1293,7 +1293,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                         prop.className "lg:col-span-4 space-y-6"
                                         prop.children [
                                             // External Links
-                                            glassCard [
+                                            panelCard [
                                                 Html.h3 [ prop.className "text-lg font-bold mb-4"; prop.text "Links" ]
                                                 Html.div [
                                                     prop.className "space-y-3"
@@ -1341,7 +1341,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                 ]
                                             ]
                                             // HowLongToBeat
-                                            glassCard [
+                                            panelCard [
                                                 Html.div [
                                                     prop.className "flex items-center justify-between mb-4"
                                                     prop.children [
@@ -1498,7 +1498,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                             | _ -> ()
                                                         ]
                                                     ]
-                                                glassCard [
+                                                panelCard [
                                                     Html.div [
                                                         prop.className "flex items-center justify-between mb-4"
                                                         prop.children [
@@ -1599,7 +1599,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                     | _ -> ()
                                                 ]
 
-                                            // Delete confirmation modal (glassmorphic, sibling of any blurred parent)
+                                            // Delete confirmation modal (paper overlay)
                                             match model.PendingDelete with
                                             | Some pendingId ->
                                                 let pendingSession =
@@ -1615,7 +1615,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                         Html.div [
                                                             prop.className "absolute inset-0 bg-base-300/40"
                                                         ]
-                                                        // Glassmorphic dialog
+                                                        // Paper overlay dialog
                                                         Html.div [
                                                             prop.className "relative rating-dropdown p-6 max-w-sm w-full"
                                                             prop.onClick (fun e -> e.stopPropagation())
@@ -1665,7 +1665,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                             Html.div [
                                                 prop.className "relative"
                                                 prop.children [
-                                                    glassCard [
+                                                    panelCard [
                                                         // Header
                                                         Html.div [
                                                             prop.className "flex items-center justify-between mb-4"
@@ -1824,7 +1824,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                 ]
                                             ]
                                             // Play Modes
-                                            glassCard [
+                                            panelCard [
                                                 Html.div [
                                                     prop.className "flex items-center justify-between mb-4"
                                                     prop.children [
@@ -2026,9 +2026,8 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                 // Event History Modal
                 if model.ShowEventHistory then
                     EventHistoryModal.view $"Game-{model.Slug}" (fun () -> dispatch Close_event_history)
-                // Connect-with-Steam candidate picker — rendered at view root so
-                // its rating-dropdown backdrop-filter isn't nested under the
-                // Links glassCard's backdrop-blur (see CLAUDE.md gotcha).
+                // Connect-with-Steam candidate picker — rendered at view root
+                // so its rating-dropdown stacks above the Links panel card.
                 match model.ConnectSteamState with
                 | ShowingCandidates candidates ->
                     ConnectSteamPicker (candidates, dispatch)

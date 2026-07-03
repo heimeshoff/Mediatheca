@@ -48,13 +48,13 @@ let private feedbackAlert (result: Result<string, string> option) =
     | Some (Error msg) -> Daisy.alert [ alert.error; prop.className "mb-2"; prop.text msg ]
     | None -> Html.none
 
-/// Glassmorphic failure panel for a persisted SyncFailed status.
-/// Surfaces the persisted error message (already includes per-item counts)
-/// plus the last-run time when present. Uses the styleguide glass panel
-/// (DesignSystem.glassCard) with an error accent — never an opaque box.
+/// Failure panel for a persisted SyncFailed status. Surfaces the persisted
+/// error message (already includes per-item counts) plus the last-run time
+/// when present. Uses the velvet-card page-chrome surface (DesignSystem.velvetCard)
+/// with an error accent.
 let private syncFailurePanel (error: string) (lastTime: string option) =
     Html.div [
-        prop.className (DesignSystem.glassCard + " border-error/40 bg-error/10 p-4 mb-4")
+        prop.className (DesignSystem.velvetCard + " border-error/40 bg-error/10 p-4 mb-4")
         prop.children [
             Html.div [
                 prop.className "flex items-center gap-2 mb-1"
@@ -96,7 +96,7 @@ let private jellyfinSyncStatusView (status: JellyfinSyncStatus option) =
 
 let private integrationCard (icon: unit -> ReactElement) (title: string) (description: string) (badge: ReactElement) (detail: ReactElement) =
     Html.div [
-        prop.className (DesignSystem.glassCard + " " + DesignSystem.cardHover + " overflow-hidden")
+        prop.className (DesignSystem.velvetCard + " " + DesignSystem.cardHover + " overflow-hidden")
         prop.children [
             Html.div [
                 prop.className "collapse collapse-arrow"

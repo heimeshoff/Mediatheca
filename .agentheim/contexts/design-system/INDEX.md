@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 12
+- **Doing:** 0
+- **Done:** 13
 <!-- task-counts:end -->
 
 ### Todo
@@ -23,11 +23,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **design-system-pv3mq** -- Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006) -- `doing/design-system-pv3mq-retire-glassmorphism-paper-material.md`
+<!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **design-system-pv3mq** -- Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006) -- `done/design-system-pv3mq-retire-glassmorphism-paper-material.md`
 - **design-system-sg8kd** -- Retire styleguide.md — in-app StyleGuide page is authoritative (supersede ADR-0009) -- `done/design-system-sg8kd-retire-styleguide-md.md`
 - **design-system-grtw7** -- Sidebar nav — align with dir 3a (full revert to burgundy active tab, supersedes ADR-0013) -- `done/design-system-grtw7-sidebar-3a-alignment.md`
 - **design-system-fq3vp** -- Compact on-poster "✦ Focus" pill (3c grid badge variant) -- `done/design-system-fq3vp-compact-on-poster-focus-pill.md`
@@ -50,6 +51,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0016** -- Glassmorphism retired; paper overlay (opaque elevation) is the floating-surface material (supersedes global ADR-0006) -- 2026-07-03 -- `knowledge/decisions/0016-paper-overlay-retires-glassmorphism.md`
 - **0015** -- styleguide.md retired; in-app StyleGuide page (DesignSystem.fs + index.css) is authoritative -- 2026-07-03 -- `knowledge/decisions/0015-styleguide-md-retired-in-app-page-authoritative.md`
 - **0014** -- Sidebar active-nav tab reverted to dir 3a's burgundy fill (retracts ADR-0013's ivory placard) -- 2026-07-03 -- `knowledge/decisions/0014-sidebar-nav-reverted-to-3a-burgundy-tab.md`
 - **0013** -- Sidebar active-nav tab — ivory placard + concave corner-notch (override of brief's burgundy fill) -- 2026-07-03 -- `knowledge/decisions/0013-sidebar-nav-ivory-tab-and-corner-notch.md`
