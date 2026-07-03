@@ -11,19 +11,19 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 1
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 9
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **design-system-fq3vp** -- Compact on-poster "✦ Focus" pill (3c grid badge variant) -- `todo/design-system-fq3vp-compact-on-poster-focus-pill.md`
+<!-- no tasks in todo -->
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
-<!-- no tasks in doing -->
+- **design-system-fq3vp** -- Compact on-poster "✦ Focus" pill (3c grid badge variant) -- `doing/design-system-fq3vp-compact-on-poster-focus-pill.md`
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)

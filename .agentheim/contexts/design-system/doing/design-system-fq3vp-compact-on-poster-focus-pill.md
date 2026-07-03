@@ -1,7 +1,7 @@
 ---
 id: design-system-fq3vp
 title: Compact on-poster "✦ Focus" pill (3c grid badge variant)
-status: todo
+status: doing
 type: feature
 context: design-system
 created: 2026-07-03

@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 09:35 -- Batch started: [design-system-fq3vp]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-fq3vp - Compact on-poster "✦ Focus" pill (3c grid badge variant)
+**Parallel:** no (1 worker)
+
+---
+
 ## 2026-07-03 09:20 -- Modeling / Refined: design-system-fq3vp - Compact on-poster "✦ Focus" pill (3c grid badge variant)
 
 **Type:** Modeling / Refine
