@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 09:20 -- Modeling / Refined: design-system-fq3vp - Compact on-poster "✦ Focus" pill (3c grid badge variant)
+
+**Type:** Modeling / Refine
+**BC:** design-system
+**Status after:** todo
+**Summary:** Resolved the one open decision the capture deferred — sweep-vs-solid for the compact 3c grid pill. User chose **solid gold** (3c literal spec), not the animated gold-leaf sweep: the pill always co-occurs with the already-animated `inFocusFrame` border directly behind it, so a solid fill keeps one motion focal point per poster (motion economy), and a static gold fill is already an accepted In-focus signal (it's the reduced-motion fallback for the existing sweep carriers). Named the new composition `inFocusPill` / `.in-focus-pill` (poster-grid sibling of `inFocusFrame`). Locked the resolutions into acceptance criteria (added an explicit "no `.gold-sweep`" criterion and a styleguide § 4 Motion-discipline rationale criterion) and promoted backlog → todo.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-07-03 09:12 -- Work session ended
 
 **Type:** Work / Session end

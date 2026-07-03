@@ -10,15 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 2
-- **Todo:** 0
+- **Backlog:** 1
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 9
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-<!-- no tasks in todo -->
+- **design-system-fq3vp** -- Compact on-poster "✦ Focus" pill (3c grid badge variant) -- `todo/design-system-fq3vp-compact-on-poster-focus-pill.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -42,7 +42,6 @@ research touching this BC, and concept synthesis pages.
 ### Backlog
 <!-- backlog-list:start -->
 - **design-system-grtw7** -- Sidebar nav — align with dir 3a (gating: ivory ADR-0013 vs 3a burgundy active tab) -- `backlog/design-system-grtw7-sidebar-3a-alignment.md`
-- **design-system-fq3vp** -- Compact on-poster "✦ Focus" pill (3c grid badge variant) -- `backlog/design-system-fq3vp-compact-on-poster-focus-pill.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
