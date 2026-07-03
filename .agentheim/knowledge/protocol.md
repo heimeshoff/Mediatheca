@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 10:20 -- Modeling / Refined: design-system-sg8kd - Retire styleguide.md — in-app StyleGuide page is authoritative (supersede ADR-0009)
+
+**Type:** Modeling / Refine
+**BC:** design-system
+**Status after:** todo
+**Summary:** Settled the three open decisions on this `type: decision` task and promoted backlog → todo. (1) Frontend gate **redefined around the living system** (`DesignSystem.fs` + `index.css` + in-app StyleGuide page, reviewed on the running page); frontend tasks still `depends_on` a design-system task (anchor stays `design-system-001`). (2) Glassmorphism spec + backdrop-filter gotcha **pre-verified present in CLAUDE.md** (lines 49/64) independent of styleguide.md — nothing lost. (3) styleguide.md **archived** to `.workflow.archived/`, not deleted (user-sanctioned exception to that folder's read-only guardrail). Rewire targets narrowed to CLAUDE.md L50, design-check `design-rules.md` Source-of-Truth, and the design-system README; ADR-0009 to be superseded (new ADR ~0014). New sequencing edge added: `depends_on: [design-system-grtw7]` — grtw7 is in `doing/` and still writes styleguide.md § 4 in lockstep, so sg8kd must run after it lands; reciprocal `blocks` on grtw7 deliberately deferred (in-flight worker owns the file). Concrete acceptance criteria finalized.
+**Split into:** none
+**ADRs written:** none (superseding ADR is worker output; new ADR marks ADR-0009 `superseded_by`)
+
+---
+
 ## 2026-07-03 11:47 -- Batch started: [design-system-grtw7]
 
 **Type:** Work / Batch start
