@@ -2,7 +2,7 @@
 
 ## Source of Truth
 
-- **Canonical styleguide (intent & gate):** `.agentheim/contexts/design-system/styleguide.md` — the source of truth for design-system intent and the frontend task gate (ADR 0009). The code below remains authoritative for concrete values.
+- **Canonical design system (intent & gate):** the live in-app StyleGuide page (`src/Client/Pages/StyleGuide`) is the source of truth for design-system intent and the frontend task gate (ADR 0015), backed by `DesignSystem.fs` and `index.css` below.
 - **CSS tokens & classes:** `src/Client/index.css`
 - **F# class compositions:** `src/Client/DesignSystem.fs`
 - **Components:** `src/Client/Components/` and `src/Client/Pages/*/Views.fs`

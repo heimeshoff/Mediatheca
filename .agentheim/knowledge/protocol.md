@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 12:12 -- Task verified and completed: design-system-sg8kd - Retire styleguide.md — in-app StyleGuide page is authoritative
+
+**Type:** Work / Task completion
+**Task:** design-system-sg8kd - Retire styleguide.md — the in-app StyleGuide page is the authoritative artifact (supersede ADR-0009)
+**Summary:** Wrote **ADR-0015** superseding ADR-0009 (bidirectional): the live in-app StyleGuide page — backed by `DesignSystem.fs` + `index.css` — is now the authoritative design-system artifact, styleguide.md is retired, and the frontend gate is redefined as "conform to the living system, reviewed on the running StyleGuide page" (anchor stays `design-system-001`). Archived `styleguide.md` → `.workflow.archived/styleguide.md` (not deleted). Repointed CLAUDE.md § Conventions, the design-check skill's `design-rules.md` "Source of Truth", and the design-system README (Existing assets + gate section, stale `todo/` path fixed). Confirmed the glassmorphism spec + backdrop-filter gotcha remain intact in CLAUDE.md.
+**Duration:** ~6m (dispatch 12:06 → verifier verdict)
+**Verification:** PASS (iteration 1)
+**Files changed:** 7
+**Tests added:** 0
+**ADRs written:** 0015
+
+---
+
 ## 2026-07-03 12:06 -- Batch started: [design-system-sg8kd]
 
 **Type:** Work / Batch start

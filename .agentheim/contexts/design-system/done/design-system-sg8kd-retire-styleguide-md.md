@@ -1,15 +1,15 @@
 ---
 id: design-system-sg8kd
 title: Retire styleguide.md — the in-app StyleGuide page is the authoritative artifact (supersede ADR-0009)
-status: doing
+status: done
 type: decision
 context: design-system
 created: 2026-07-03
-completed:
+completed: 2026-07-03
 depends_on: [design-system-grtw7]
 blocks: []
 tags: [design-system, styleguide, gate, adr-supersede, cleanup]
-related_adrs: [0009]
+related_adrs: [0009, 0015]
 related_research: []
 prior_art: [design-system-001, design-system-002]
 ---
@@ -56,3 +56,18 @@ This directly reverses **ADR-0009** ("styleguide.md is the canonical design-syst
 - Blast radius mapped 2026-07-03: `styleguide.md` is referenced in ~23 files — the authoritative/live ones to rewire are **CLAUDE.md, `.claude/skills/design-check/references/design-rules.md`, and the design-system README**; ADR-0009 to supersede. The rest are done-task Notes + protocol history (historical, leave as-is). grtw7 dropped from the rewire list per the sequencing note above.
 - Decision 2 pre-verified at refine: CLAUDE.md § Conventions (line 49) holds the glassmorphism spec, § Gotchas (line 64) holds the backdrop-filter gotcha — both independent of styleguide.md.
 - This task is `type: decision`; its worked output is the superseding ADR + the coordinated rewire, not application code. No `npm run build` gate needed (no source touched) — but a `grep` sweep confirms the rewire is complete.
+
+## Outcome
+
+Wrote **ADR-0015** (`.agentheim/knowledge/decisions/0015-styleguide-md-retired-in-app-page-authoritative.md`), superseding ADR-0009: the in-app StyleGuide page (backed by `DesignSystem.fs` + `index.css`) is now the authoritative design-system artifact; `styleguide.md` is retired; the frontend gate is redefined around the living system, keeping its force and its `design-system-001` anchor. Set `supersedes: [0009]` on 0015 and `superseded_by: [0015]` on ADR-0009 (bidirectional link); kept ADR-0009's `status: accepted` to match the repo's observed convention on superseded ADRs (ADR-0013 stays `accepted` with `superseded_by: [0014]`).
+
+Archived `styleguide.md` from `.agentheim/contexts/design-system/styleguide.md` to `.workflow.archived/styleguide.md` via a plain filesystem move (no `git mv` — conductor stages it) — no copy remains under `contexts/design-system/`.
+
+Rewired the three live authoritative pointers enumerated by the task:
+- `CLAUDE.md` § Conventions "Design system canonical artifact" line now points at the in-app StyleGuide page + `DesignSystem.fs`/`index.css`, citing ADR-0015. Re-confirmed the glassmorphism spec (§ Conventions, line 49) and the backdrop-filter gotcha (§ Gotchas, line 64) are both still present and untouched.
+- `.claude/skills/design-check/references/design-rules.md` "Source of Truth" now names the in-app StyleGuide page + `DesignSystem.fs` + `index.css`, citing ADR-0015.
+- `.agentheim/contexts/design-system/README.md`: "Existing assets" repoints at the living system and records the retirement/archive; "The styleguide gate (load-bearing)" is redefined per decision 1 (still `depends_on: design-system-001`, meaning shifted to "conform to the live system, reviewed on the running StyleGuide page") and the stale `todo/design-system-001-...` path is corrected to `done/`.
+
+Left done-task Notes, protocol history, in-code comments (`src/Client/*.fs`, `src/Client/index.css`), the StyleGuide page's own specimen copy, and other-BC task files (e.g. `contexts/games/backlog/games-status-vocabulary-reconcile.md`) untouched — all out of this task's scope per its Notes and the worker's file-touch rules. grtw7 was not a rewire target, as specified.
+
+Final `grep -rn "styleguide.md"` sweep confirms no remaining authoritative/source-of-truth reference in live docs/skills (CLAUDE.md, the design-check skill, the design-system README) — only historical/in-code-comment references remain, all correctly out of scope.

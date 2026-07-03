@@ -40,19 +40,19 @@ None. This BC produces UI artifacts (CSS tokens, Feliz components, documentation
 
 ## The styleguide gate (load-bearing)
 
-**Every frontend / UI task in any BC must `depends_on` the design-system styleguide task** (currently [`design-system-001-formalize-styleguide`](todo/design-system-001-formalize-styleguide.md)). The styleguide is reviewed and signed off by the user before any BC implements UI against it. Refer captures of frontend tasks back here.
+**Every frontend / UI task in any BC must `depends_on` a design-system task** (anchor: [`design-system-001-formalize-styleguide`](done/design-system-001-formalize-styleguide.md), done). Per ADR-0015, the gate no longer reviews against a standalone prose document — it reviews against the **living design system**: `DesignSystem.fs` (typed compositions) + `index.css` (tokens/values), inspected via the running in-app StyleGuide page. The gate keeps its force; only its meaning shifted from "conform to `styleguide.md`" to "conform to the live system, reviewed on the running StyleGuide page." Refer captures of frontend tasks back here.
 
-When the styleguide changes (new token, new pattern, retired pattern), the change goes through this BC's backlog so the gate stays meaningful.
+When the design system changes (new token, new pattern, retired pattern), the change goes through this BC's backlog so the gate stays meaningful.
 
 ## Existing assets (mature project)
 
-The **canonical, reviewable artifact** is [`styleguide.md`](styleguide.md) (produced by `design-system-001`). It consolidates the sources below and is the source of truth for the frontend task gate. Read it first.
+The **canonical, reviewable artifact** is the live **in-app StyleGuide page** (`src/Client/Pages/StyleGuide`), backed by `DesignSystem.fs` and `index.css` (ADR-0015, superseding ADR-0009). `styleguide.md`, the original standalone document produced by `design-system-001`, was retired 2026-07-03 (`design-system-sg8kd`) and archived to `.workflow.archived/styleguide.md` as a historical record — it is no longer read or updated.
 
-Underlying sources it formalizes:
+Underlying sources:
 - `src/Client/index.css` — token definitions, dim theme, `.glass-card`, `.rating-dropdown`, etc. (authoritative for *values*).
-- `src/Client/DesignSystem.fs` — typed Feliz/Tailwind class compositions used by components.
-- `src/Client/Pages/StyleGuide` — the live, in-app reference page.
-- `CLAUDE.md` § "Conventions" and "Gotchas" — glassmorphism rule + backdrop-filter trap (reproduced verbatim in `styleguide.md`; `CLAUDE.md` now points at the styleguide as canonical — ADR 0009).
+- `src/Client/DesignSystem.fs` — typed Feliz/Tailwind class compositions used by components (authoritative for pattern *intent*).
+- `src/Client/Pages/StyleGuide` — the live, in-app reference page; the review surface for the gate.
+- `CLAUDE.md` § "Conventions" and "Gotchas" — glassmorphism rule + backdrop-filter trap; independent of `styleguide.md`'s retirement, unaffected.
 - The `design-check` skill (`.claude/skills/design-check/`) — audits code against the system.
 
 ## Open questions
