@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 13:30 -- Modeling / Captured: design-system-pv3mq - Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006)
+
+**Type:** Modeling / Capture
+**BC:** design-system
+**Filed to:** backlog
+**Summary:** User: "we don't use glassmorphism anymore — this is a paper-style material design at best." Captured as full retirement of glassmorphism as the overlay vocabulary — rip out the `glass*` compositions (`DesignSystem.fs`), `.glass-card`/`.rating-dropdown`/`.media-chrome-glass` + `--glass-*` (`index.css`), restyle every dropdown/popover/modal to a solid paper/material surface, remove the StyleGuide glass section, and supersede ADR-0006 (global) plus repoint CLAUDE.md / context-map / index / README / design-check skill. Left under-refined in backlog: the exact replacement material (paper/solid elevation vs. reuse `.velvet-card`) is an open decision for a refine pass — the superseding ADR is worker output per the sg8kd/grtw7 precedent.
+
+---
+
 ## 2026-07-03 12:15 -- Work session ended
 
 **Type:** Work / Session end
