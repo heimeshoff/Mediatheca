@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 1
-- **Doing:** 1
-- **Done:** 10
+- **Doing:** 0
+- **Done:** 11
 <!-- task-counts:end -->
 
 ### Todo
@@ -23,11 +23,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **design-system-grtw7** -- Sidebar nav — align with dir 3a (full revert to burgundy active tab, supersedes ADR-0013) -- `doing/design-system-grtw7-sidebar-3a-alignment.md`
+<!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **design-system-grtw7** -- Sidebar nav — align with dir 3a (full revert to burgundy active tab, supersedes ADR-0013) -- `done/design-system-grtw7-sidebar-3a-alignment.md`
 - **design-system-fq3vp** -- Compact on-poster "✦ Focus" pill (3c grid badge variant) -- `done/design-system-fq3vp-compact-on-poster-focus-pill.md`
 - **design-system-bky6v** -- In-focus signifiers must animate — gold sweep on status badge and poster frame -- `done/design-system-bky6v-in-focus-gold-sweep-animation.md`
 - **design-system-wd5zk** -- Movies filmstrip — full-width 3a proportions (flex-1 posters, ~196px tall) -- `done/design-system-wd5zk-filmstrip-3a-sizing.md`
@@ -48,6 +49,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0014** -- Sidebar active-nav tab reverted to dir 3a's burgundy fill (retracts ADR-0013's ivory placard) -- 2026-07-03 -- `knowledge/decisions/0014-sidebar-nav-reverted-to-3a-burgundy-tab.md`
 - **0013** -- Sidebar active-nav tab — ivory placard + concave corner-notch (override of brief's burgundy fill) -- 2026-07-03 -- `knowledge/decisions/0013-sidebar-nav-ivory-tab-and-corner-notch.md`
 - **0009** -- styleguide.md is the canonical design-system artifact; CLAUDE.md points at it -- 2026-05-27 -- `knowledge/decisions/0009-styleguide-canonical-artifact.md`
 <!-- adr-local:end -->

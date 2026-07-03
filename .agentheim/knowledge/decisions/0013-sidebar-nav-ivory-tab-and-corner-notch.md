@@ -5,7 +5,7 @@ scope: design-system
 status: accepted
 date: 2026-07-03
 supersedes: []
-superseded_by: []
+superseded_by: [0014]
 related_tasks: [design-system-t4b9k]
 related_research: []
 ---

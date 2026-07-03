@@ -16,6 +16,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 12:04 -- Task verified and completed: design-system-grtw7 - Sidebar nav — align with dir 3a (full revert to burgundy active tab)
+
+**Type:** Work / Task completion
+**Task:** design-system-grtw7 - Sidebar nav — align with dir 3a (full revert to burgundy active tab, supersedes ADR-0013)
+**Summary:** Reverted the sidebar active-tab from ADR-0013's ivory placard + concave corner-notch back to dir 3a's burgundy fill (`oklch(0.22 0.035 25)`) + gold inset-left bar (`--ring-active`) + gold ◆ icon; removed the ivory tokens and the entire corner-notch machinery (no dead CSS); landed the non-contentious 3a deltas (tagline "Where entertainment lives", item metrics, one-step-smaller bottom group); kept `w-64` rail, no profile chip. Wrote superseding **ADR-0014** (supersedes 0013; 0013 `superseded_by: [0014]`, bidirectional). styleguide.md § 4, README, and the StyleGuide page specimen updated in lockstep.
+**Duration:** ~17m (dispatch 11:47 → verifier verdict)
+**Verification:** PASS (iteration 1)
+**Files changed:** 9
+**Tests added:** 0
+**ADRs written:** 0014
+
+---
+
 ## 2026-07-03 11:47 -- Batch started: [design-system-grtw7]
 
 **Type:** Work / Batch start

@@ -15,7 +15,8 @@ type NavItem = {
 }
 
 // Top group: primary destinations. Bottom group: pinned to the foot of the
-// rail via `mt-auto` (styleguide.md § 4 Sidebar nav — design-system-t4b9k).
+// rail via `mt-auto` (styleguide.md § 4 Sidebar nav — design-system-t4b9k,
+// active-tab treatment reverted to dir 3a's burgundy fill by design-system-grtw7).
 let private topNavItems = [
     { Label = "Dashboard"; Page = Dashboard; IsActive = (fun p -> p = Dashboard); Icon = Icons.dashboard; Href = Router.format "" }
     { Label = "Movies"; Page = Movie_list; IsActive = Route.isMoviesSection; Icon = Icons.movie; Href = Router.format "movies" }
@@ -44,7 +45,7 @@ let private navItem (currentPage: Page) (item: NavItem) =
                 )
                 prop.children [
                     Html.span [
-                        prop.className (if isActive then DesignSystem.navItemActiveIconClass else "")
+                        prop.className (if isActive then DesignSystem.navItemActiveIconClass else DesignSystem.navItemIconClass)
                         prop.children [ item.Icon() ]
                     ]
                     Html.span [ prop.text item.Label ]
@@ -58,20 +59,30 @@ let view (currentPage: Page) =
         prop.className "hidden lg:flex flex-col w-64 min-h-screen bg-base-200/80 backdrop-blur-sm border-r border-base-300/50"
         prop.children [
             // Logo header with subtle bottom border — Velvet Lobby wordmark (brief 3a):
-            // "Media" in Instrument Serif ink + italic gold "theca".
+            // "Media" in Instrument Serif ink + italic gold "theca", plus the
+            // dir 3a tagline underneath.
             Html.div [
-                prop.className "flex items-center gap-3 px-6 py-6 border-b border-base-300/30"
+                prop.className "flex flex-col px-6 py-6 border-b border-base-300/30"
                 prop.children [
-                    Html.span [
-                        prop.className "text-primary drop-shadow-[0_0_8px_oklch(0.80_0.12_82_/_0.4)]"
-                        prop.children [ Icons.mediatheca () ]
-                    ]
-                    Html.span [
-                        prop.className "font-display text-2xl leading-none text-base-content"
+                    Html.div [
+                        prop.className "flex items-center gap-3"
                         prop.children [
-                            Html.text "Media"
-                            Html.span [ prop.className "italic text-primary"; prop.text "theca" ]
+                            Html.span [
+                                prop.className "text-primary drop-shadow-[0_0_8px_oklch(0.80_0.12_82_/_0.4)]"
+                                prop.children [ Icons.mediatheca () ]
+                            ]
+                            Html.span [
+                                prop.className "font-display text-2xl leading-none text-base-content"
+                                prop.children [
+                                    Html.text "Media"
+                                    Html.span [ prop.className "italic text-primary"; prop.text "theca" ]
+                                ]
+                            ]
                         ]
+                    ]
+                    Html.div [
+                        prop.className DesignSystem.navTagline
+                        prop.text "Where entertainment lives"
                     ]
                 ]
             ]

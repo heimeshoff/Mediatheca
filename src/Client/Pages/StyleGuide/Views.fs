@@ -1451,10 +1451,10 @@ let private velvetLobbyPatternsSection () =
                 ]
             ]
 
-            // ── Sidebar nav (layered rail, ivory active tab) ──
+            // ── Sidebar nav (dir 3a burgundy active tab) ──
             subheading "Sidebar Nav"
 
-            decision "The desktop rail (§ 4 Sidebar nav — design-system-t4b9k): a top group of primary destinations and a bottom group (Events/Settings) pinned via mt-auto. The active item is its own raised ivory layer — not a highlight on the flat rail — with dark-burgundy ink and a gold icon, joined to the rail/content boundary by a concave corner-notch (see ADR-0013)."
+            decision "The desktop rail (§ 4 Sidebar nav — dir 3a, design-system-grtw7): a wordmark + tagline header, a top group of primary destinations, and a bottom group (Events/Settings, one step smaller) pinned via mt-auto. The active item is a burgundy fill (`--color-nav-active-fill`) with a gold inset-left bar (`--ring-active`) and a gold icon — the brief's own dir-3a treatment, reverted from the ADR-0013 ivory placard + concave corner-notch (superseding ADR-0014)."
 
             Html.div [
                 prop.className "mt-4 max-w-[220px] rounded-lg overflow-hidden bg-base-200/80 border border-base-300/50 p-3"
@@ -1474,13 +1474,19 @@ let private velvetLobbyPatternsSection () =
                             Html.li [
                                 Html.div [
                                     prop.className (DesignSystem.navItem + " " + DesignSystem.navItemInactive)
-                                    prop.children [ Icons.movie (); Html.span [ prop.text "Movies" ] ]
+                                    prop.children [
+                                        Html.span [ prop.className DesignSystem.navItemIconClass; prop.children [ Icons.movie () ] ]
+                                        Html.span [ prop.text "Movies" ]
+                                    ]
                                 ]
                             ]
                             Html.li [
                                 Html.div [
                                     prop.className (DesignSystem.navItem + " " + DesignSystem.navItemInactive)
-                                    prop.children [ Icons.tv (); Html.span [ prop.text "TV Series" ] ]
+                                    prop.children [
+                                        Html.span [ prop.className DesignSystem.navItemIconClass; prop.children [ Icons.tv () ] ]
+                                        Html.span [ prop.text "TV Series" ]
+                                    ]
                                 ]
                             ]
                         ]
@@ -1491,7 +1497,10 @@ let private velvetLobbyPatternsSection () =
                             Html.li [
                                 Html.div [
                                     prop.className (DesignSystem.navItem + " " + DesignSystem.navItemInactive)
-                                    prop.children [ Icons.settings (); Html.span [ prop.text "Settings" ] ]
+                                    prop.children [
+                                        Html.span [ prop.className DesignSystem.navItemIconClass; prop.children [ Icons.settings () ] ]
+                                        Html.span [ prop.text "Settings" ]
+                                    ]
                                 ]
                             ]
                         ]

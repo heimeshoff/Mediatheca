@@ -77,15 +77,13 @@
     --shadow-filmstrip: 0 16px 36px -18px oklch(0 0 0 / 0.9);
     --ring-active: inset 2px 0 0 oklch(0.80 0.12 82);
 
-    /* Sidebar nav — layered active tab (styleguide.md § 4 Sidebar nav,
-       design-system-t4b9k). Warm ivory placard, dark-burgundy ink, gold icon —
-       in the gold family, not literal white (see ADR-0013). */
-    --color-nav-active-bg: oklch(0.94 0.02 75);
-    --color-nav-active-ink: oklch(0.20 0.03 25);
-    --color-nav-active-icon: oklch(0.55 0.16 55);
-    --radius-nav-tab: 1rem;
-    --nav-notch-size: 1rem;
-    --shadow-nav-active: 0 6px 16px -6px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(0.20 0.03 25 / 0.08);
+    /* Sidebar nav — dir 3a active tab (styleguide.md § 4 Sidebar nav,
+       design-system-grtw7). Burgundy fill + the gold `--ring-active`
+       inset-left bar — the brief's own dir-3a treatment, reverted from the
+       ADR-0013 ivory placard + concave corner-notch (superseding ADR-0014). */
+    --color-nav-active-fill: oklch(0.22 0.035 25);
+    --color-nav-icon-muted: oklch(0.45 0.03 35);
+    --color-nav-bottom-muted: oklch(0.55 0.02 40);
 
     /* Velvet Lobby animation (styleguide.md § 1.6 + Motion) */
     --duration-fast: 0.15s;
@@ -504,56 +502,52 @@ h1, h2, h3, h4, h5, h6 {
     opacity: 1;
 }
 
-/* ── Sidebar nav — layered rail, ivory active tab (styleguide.md § 4 Sidebar
-   nav, design-system-t4b9k). Supersedes the old left-edge glow bar: the
-   active item is now its own raised ivory layer, not a highlight on the
-   flat rail surface. ── */
+/* ── Sidebar nav — dir 3a active tab (styleguide.md § 4 Sidebar nav,
+   design-system-grtw7). Reverted from the ADR-0013 ivory placard + concave
+   corner-notch back to the brief's own burgundy fill + gold inset-left bar
+   (superseding ADR-0014). ── */
 .nav-item {
     position: relative;
     transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .nav-item-active {
-    background: var(--color-nav-active-bg);
-    color: var(--color-nav-active-ink);
-    border-radius: var(--radius-nav-tab);
-    box-shadow: var(--shadow-nav-active);
-    /* Bleed past the rail's inner gutter (--space-gap-standard, matches the
-       nav container's px-3) so the tab's right edge sits flush against the
-       rail/content boundary — the concave notches below curve that boundary
-       around the tab's corners (ADR-0013). */
-    margin-right: calc(-1 * var(--space-gap-standard));
-    padding-right: calc(var(--space-gap-standard) + var(--space-card));
+    background: var(--color-nav-active-fill);
+    box-shadow: var(--ring-active);
+    font-size: 13px;
+    font-weight: 600;
 }
 
-/* Icon sits in gold, distinct from the ink-colored label — the label span
-   inherits `color` from .nav-item-active (currentColor), this override wins
-   for the icon's own currentColor stroke/fill. */
+.nav-item-inactive {
+    color: var(--color-ink-muted);
+    font-size: 13px;
+}
+
+/* Icon — muted by default (distinct shade from the inactive label's ink),
+   12px (top group; the bottom group scales it to 11px below). The active
+   item's icon flips to gold via .nav-item-active-icon. */
+.nav-item-icon {
+    color: var(--color-nav-icon-muted);
+}
+.nav-item-icon svg {
+    width: 12px;
+    height: 12px;
+}
 .nav-item-active-icon {
-    color: var(--color-nav-active-icon);
+    color: var(--color-gold);
 }
 
-/* Concave corner masks — "the content panel's edge sweeps around the tab."
-   Each notch is a small square painted in the page/rail tone
-   (--color-base-300) with a hard-edged radial gradient cut from the corner
-   nearest the tab, revealing the rail underneath and forming the curve that
-   joins the straight boundary above/below to the tab's own rounded corner. */
-.nav-item-active::before,
-.nav-item-active::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    width: var(--nav-notch-size);
-    height: var(--nav-notch-size);
-    pointer-events: none;
+/* Bottom group (Events/Settings) — one step smaller (dir 3a). */
+.nav-group-bottom .nav-item {
+    font-size: 12px;
 }
-.nav-item-active::before {
-    top: calc(-1 * var(--nav-notch-size));
-    background: radial-gradient(circle at bottom right, transparent var(--nav-notch-size), var(--color-base-300) var(--nav-notch-size));
+.nav-group-bottom .nav-item-icon svg {
+    width: 11px;
+    height: 11px;
 }
-.nav-item-active::after {
-    bottom: calc(-1 * var(--nav-notch-size));
-    background: radial-gradient(circle at top right, transparent var(--nav-notch-size), var(--color-base-300) var(--nav-notch-size));
+.nav-group-bottom .nav-item-inactive,
+.nav-group-bottom .nav-item-inactive .nav-item-icon {
+    color: var(--color-nav-bottom-muted);
 }
 
 /* ── Gradient text ── */
