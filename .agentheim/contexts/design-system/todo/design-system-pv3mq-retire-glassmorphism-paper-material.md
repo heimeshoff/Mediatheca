@@ -1,7 +1,7 @@
 ---
 id: design-system-pv3mq
 title: Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006)
-status: backlog
+status: todo
 type: refactor
 context: design-system
 created: 2026-07-03

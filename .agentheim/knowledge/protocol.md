@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 14:40 -- Modeling / Promoted: design-system-pv3mq - Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006)
+
+**Type:** Modeling / Promote
+**BC:** design-system
+**From → To:** backlog → todo
+**Summary:** Promoted the glassmorphism-retirement refactor to todo. Task has concrete acceptance criteria (grep-clean of backdrop-filter, paper/material overlays, StyleGuide section replaced, clean `npm run build`, ADR-0006 superseded + docs repointed, design-check retargeted) and no unmet dependencies. One open decision left for the worker to bake into the superseding ADR: the exact replacement material — (a) paper/solid elevation vs (b) reuse `.velvet-card` — the user's framing leans (a). Note: `task-lifecycle-cli.mjs promote` moved the file + updated the frontmatter `status` but threw on the INDEX edit (CLI marker regex expects LF; this repo's INDEX/protocol are CRLF), so the INDEX/count/protocol/commit bookkeeping was completed by hand.
+
+---
+
 ## 2026-07-03 13:30 -- Modeling / Captured: design-system-pv3mq - Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006)
 
 **Type:** Modeling / Capture

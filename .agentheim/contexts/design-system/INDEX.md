@@ -10,15 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
-- **Todo:** 0
+- **Backlog:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 12
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-<!-- no tasks in todo -->
+- **design-system-pv3mq** -- Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006) -- `todo/design-system-pv3mq-retire-glassmorphism-paper-material.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -44,7 +44,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **design-system-pv3mq** -- Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006) -- `backlog/design-system-pv3mq-retire-glassmorphism-paper-material.md`
+<!-- no tasks in backlog -->
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
