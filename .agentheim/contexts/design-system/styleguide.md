@@ -29,8 +29,8 @@ Tokens and typography have landed; component patterns have not.
 | Velvet card (solid page/card surfaces) | **Shipped** | `.velvet-card` / `DesignSystem.velvetCard` (§ 3.1) — design-system-h3q8n |
 | Spacing / radii / shadows / animation tokens (§ 1.3–1.6) | **Shipped** | Ported into `index.css` `:root` — design-system-h3q8n |
 | Media-chrome glass (§ 3.3) | **Shipped** | `.media-chrome-glass` / `DesignSystem.mediaChromeGlass` — design-system-h3q8n |
-| Component patterns (§ 4: hero card, filmstrip, secondary card, In-focus frame, status badges, progress meters, star rating, section header, list row) | **Shipped** | Typed `DesignSystem.fs` compositions + live StyleGuide specimens — design-system-h3q8n |
-| Motion primitives (gold-leaf sweep, leave-transition, cross-fade) | **Shipped (vocabulary only)** | `DesignSystem.goldLeafSweep` / `.leaveTransition` / `.crossFade` — design-system-h3q8n. BCs still need to wire *where* leave-transition/cross-fade fire — out of scope for this task |
+| Component patterns (§ 4: hero card, filmstrip, secondary card, In-focus frame, status badges, progress meters, star rating, section header, list row) | **Shipped** | Typed `DesignSystem.fs` compositions + live StyleGuide specimens — design-system-h3q8n. In-focus badge sweep + poster frame animation fixed in design-system-bky6v (see § 4 Status badges, § 4 Poster grid) |
+| Motion primitives (gold-leaf sweep, leave-transition, cross-fade) | **Shipped (vocabulary only)** | `DesignSystem.goldLeafSweep` / `.leaveTransition` / `.crossFade` — design-system-h3q8n. BCs still need to wire *where* leave-transition/cross-fade fire — out of scope for this task. Reduced-motion handling added in design-system-bky6v |
 | Sidebar nav (desktop rail — layered, ivory active tab) | **Shipped** | Top/bottom grouped rail, ivory active tab + dark-burgundy ink + gold icon + concave corner-notch boundary — `Components/Sidebar.fs`, `DesignSystem.navItemClass`/`navItemActiveIconClass`/`navGroupTop`/`navGroupBottom` — design-system-t4b9k |
 | Top bar, lifecycle stepper, detail-page panels (HLTB tiers/play history/friends), avatars, poster grid page chrome | **Not yet implemented** | Documented target (§ 4) but not built as typed compositions or specimens — remain future design-system backlog items |
 
@@ -286,6 +286,8 @@ Pill badges, uppercase, letter-spaced. Each state has its own hue:
 
 `.status-badge*` (`index.css`) + `DesignSystem.statusBadge (status: DesignSystem.LifecycleStatus)`. **Note:** `LifecycleStatus` is this pattern's own vocabulary (Backlog/InFocus/Playing/Completed/Abandoned/OnHold), distinct from `Shared.GameStatus` (which has no `Playing` state and instead has `Dismissed`) — see the design-system BC README for the discrepancy this surfaced; mapping a BC's real status enum onto this vocabulary is a BC-level decision. Specimen: StyleGuide § Status Badges.
 
+**Bug fix (design-system-bky6v):** the In-focus badge shipped static — `.status-badge`'s `background: transparent` shorthand reset `background-image`/`background-size` to their initial values, silently clobbering `.gold-sweep`'s gradient (both rules share specificity, and `.status-badge` came later in the cascade). Fixed by using `background-color: transparent` instead, which only sets the color channel. The sweep now visibly runs on the badge (and everywhere it's reused, e.g. the hero card's In-focus badge).
+
 ### Progress meters (two kinds) — *Implemented (design-system-h3q8n)*
 - **Segmented** ("film-frame") — one bar per episode; filled = `gold`, empty = `oklch(0.32 0.03 30)`. For countable units (episodes).
 - **Continuous** — single track (`line`) with a gold-gradient fill (`linear-gradient(90deg, oklch(0.68 0.1 80), oklch(0.85 0.11 86))`). For time/percent (play time, HLTB).
@@ -303,10 +305,12 @@ Horizontal Backlog → In focus → Playing → Completed with connector rules; 
 ### Detail-page panels (3b) — *not yet implemented*
 Right-column velvet cards: **HLTB tiers** (labeled bars — Main story / Main+extra / My time [gold] / Completionist), **Play history** (mono date + duration rows, `+` add affordance), **Friends** (Owned by / Recommended by / Played with — avatars, "since JUN 20", dashed "pending" badge). Left column: cover art (`--shadow-hero`) + external-link rows (Steam / Website / HLTB). Trailers: 16:9 player + a thumbnail strip, active thumb ringed in gold.
 
-### Poster grid (3c list page) — In-focus frame *Implemented (design-system-h3q8n)*, page chrome *not yet implemented*
-Poster-grid list page with filter pills; **"In focus" items get the gold frame** (a gold ring/border marking them out from the grid).
+### Poster grid (3c list page) — In-focus frame *Implemented (design-system-h3q8n, animated design-system-bky6v)*, page chrome *not yet implemented*
+Poster-grid list page with filter pills; **"In focus" items get the gold frame** — an animated sweeping gold-gradient border + gold glow (not a static ring).
 
-The gold-frame treatment itself: `.in-focus-frame` (`index.css`) + `DesignSystem.inFocusFrame child` — wraps any poster/card element, the visual sibling of the In-focus status badge. Specimen: StyleGuide § In-Focus Poster Frame. The filter-pill grid page chrome around it is not built by this task.
+The gold-frame treatment: two-layer markup, `.in-focus-frame` (gradient-bordered wrapper, `1.5px` padding, `8px` radius, `background-size:200% 100%` gold gradient, `animation: gold-leaf-sweep var(--sweep)`, `box-shadow: 0 14px 30px -12px oklch(0.6 0.11 82 / 0.45)` glow) + `.in-focus-frame-inner` (clips the child to `7px` radius) — both in `index.css`. `DesignSystem.inFocusFrame child` composes both layers; the function signature is unchanged from the earlier static-ring version, so existing/future call sites are unaffected by the visual upgrade. Specimen: StyleGuide § In-Focus Poster Frame. The filter-pill grid page chrome around it is not built by this task.
+
+**On-poster badge, worker's call (design-system-bky6v):** the reviewed 3c direction shows a distinct compact on-artwork pill ("✦ Focus", 8.5px/700/0.18em tracking, dark ink on solid gold, top-left on the poster) separate from the full-size `.status-badge` used elsewhere. This task does **not** add that distinct compact variant — out of scope (not in this task's acceptance criteria). For now, `DesignSystem.statusBadge InFocus` is the only "In focus" badge in the system and is what any future poster-grid page chrome should reuse for an on-poster badge, composed with `inFocusFrame`. Adding the true compact "✦ Focus" pill variant, if wanted, is a follow-up task.
 
 ### Avatars — *not yet implemented*
 Circular, initial-based, per-person hue. Self = gold-tinted (`oklch(0.34 0.05 25)` / gold text). Groups overlap (`-11px` margin) with a `2px` `surface`-colored ring separating them. A minimal overlapping avatar stack ships inline inside `DesignSystem.heroCard`'s `WatchedWith` list, but not as its own reusable primitive/specimen yet.
@@ -322,9 +326,10 @@ Design-system owns the motion **vocabulary**, not its application. Three primiti
 | Cross-fade | `--duration-crossfade` (200ms) | `.cross-fade` | `crossFade` |
 
 **Discipline:**
-- The gold-leaf sweep is reserved for **"In focus" surfaces only** (the status badge, the hero card's In-focus badge) — it is the one animated ornament in the system; do not spread it to ordinary elements.
+- The gold-leaf sweep is reserved for **"In focus" surfaces only** (the status badge, the hero card's In-focus badge, the in-focus poster frame) — it is the one animated ornament in the system; do not spread it to ordinary elements.
 - *Where* the leave-transition fires (e.g. items leaving a queue) and *where* the cross-fade fires (e.g. dashboard tab-panel swaps) is **BC behavior, out of scope for design-system** — this task ships the reusable primitives; the owning BC (e.g. a future dashboard rework) wires the application.
 - The **spotlight gradient is static** — never animated. This is a rule, not a helper; there is no spotlight animation primitive to reach for.
+- **`prefers-reduced-motion: reduce`** (design-system-bky6v, worker judgment — not mandated by the reviewed doc): both sweep carriers (`.gold-sweep`, `.in-focus-frame`) freeze at a fixed gradient position (`animation: none; background-position: 0% 0`) under this media query. The gold fill itself remains the "In focus" signal; only the motion is suppressed.
 
 Specimen: StyleGuide "Velvet Lobby Patterns" § Motion (documents the three primitives; does not demonstrate queue-leave/tab-crossfade wiring, which is out of scope here).
 
@@ -386,6 +391,11 @@ The redesign is not fully shipped until these are done in lockstep. Track remain
 **Shipped (design-system-snpnv):**
 - [x] **3c list-page type tiers** (§ 2) — dense poster-grid caption pair (sans, distinct from `cardTitle`'s serif), list-page header title+count baseline pairing, filter-pill active/inactive typography. `.filter-pill`/`.filter-pill-active`/`.filter-pill-inactive` (`index.css`) + `gridCaptionTitle`/`gridCaptionMeta`/`gridCaptionPair`/`listPageHeaderTitle`/`listPageHeaderCount`/`listPageHeaderPattern`/`filterPill` (`DesignSystem.fs`); live StyleGuide "3c List-Page Chrome" specimen. Additions only — no existing helper renamed, no page built (that's Movies-BC work).
 
+**Shipped (design-system-bky6v):**
+- [x] **In-focus status badge sweep fix** (§ 4 Status badges) — root cause: `.status-badge`'s `background: transparent` shorthand reset `background-image`/`background-size` to initial, clobbering `.gold-sweep`'s gradient (same specificity, later in the cascade). Fixed via `background-color: transparent`; the sweep now visibly runs on the badge and anywhere it's reused (hero card).
+- [x] **Animated In-focus poster frame** (§ 4 Poster grid) — `.in-focus-frame` replaced the static gold-ring `box-shadow` with a two-layer sweeping gradient border (`.in-focus-frame` wrapper + `.in-focus-frame-inner` clip) + gold glow, per the reviewed 3c direction. `DesignSystem.inFocusFrame` signature unchanged.
+- [x] **`prefers-reduced-motion` handling** for both sweep carriers (worker judgment, not mandated by the reviewed doc) — freezes the gradient at a fixed position instead of animating.
+
 **Not yet implemented (future design-system backlog items, not blocking this task):**
 - [ ] **Top bar, lifecycle stepper, detail-page panels (HLTB tiers/play history/friends), avatars, game row, poster-grid page chrome** (§ 4) — documented target, not built as typed compositions/specimens. Some (game row) are composable today from shipped primitives (`velvetCard` + `progressContinuous` + `statusBadge`) but not packaged as their own pattern.
 - [ ] **`design-check`** — re-author `references/design-rules.md`: retarget typography rules (serif display, no forced uppercase, mono data role), retarget the color/token rule descriptions to the velvet palette, and add the new component-pattern classes. The glassmorphism rule itself needs no change.
@@ -399,4 +409,5 @@ The redesign is not fully shipped until these are done in lockstep. Track remain
 - [x] **Token & type foundation implemented** (design-system-r7k2m, 2026-07-02): palette, text hierarchy, typography, and the glassmorphism re-tint are shipped in code (`index.css`, `DesignSystem.fs`, `App.fs`) and reflected here. `npm run build` compiles clean.
 - [x] **Component patterns & motion implemented** (design-system-h3q8n, 2026-07-02): § 1.3–1.6 tokens, § 3.1 velvet card, § 3.3 media-chrome glass, § 4 component patterns (hero card, filmstrip, secondary card, In-focus frame, status badges, progress meters, star rating, section header, list row), and § 4 Motion primitives (gold-leaf sweep, leave-transition, cross-fade) are shipped in code (`index.css`, `DesignSystem.fs`) with live StyleGuide specimens and reflected here. `npm run build` compiles clean.
 - [x] **Sidebar nav implemented** (design-system-t4b9k, 2026-07-03): top/bottom grouped rail, ivory active tab (dark-burgundy ink, gold icon), concave corner-notch boundary — shipped in code (`index.css`, `DesignSystem.fs`, `Components/Sidebar.fs`) with a live StyleGuide specimen and reflected here (§ 4, ADR-0013). `npm run build` compiles clean.
+- [x] **In-focus gold-sweep animation fixed** (design-system-bky6v, 2026-07-03): the In-focus status badge now visibly runs the gold-leaf sweep (root cause: a `background` shorthand clobbering `background-image`), and the In-focus poster frame carries the same animated sweeping gradient border + gold glow instead of a static ring — shipped in code (`index.css`, `DesignSystem.fs`) and reflected here (§ 4 Status badges, § 4 Poster grid, § 4 Motion). `npm run build` compiles clean.
 - [ ] **Human review — full redesign sign-off:** the two gating decisions (glassmorphism coexistence, theme replace-in-place) were resolved with recommended defaults while the user was away and are **flagged for re-confirm**. The user has not yet reviewed the shipped tokens/typography/component patterns in the running app. Until then, treat this as *implemented pending confirmation*, not a fully closed gate.

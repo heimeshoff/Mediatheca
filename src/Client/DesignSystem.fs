@@ -427,11 +427,19 @@ let filterPill (label: string) (isActive: bool) (onClick: unit -> unit) : ReactE
 
 /// Wraps any poster/card element with the reusable gold-frame "In focus"
 /// treatment — the visual sibling of the "In focus" status badge. Every BC's
-/// poster grid should render In-focus items through this wrapper.
+/// poster grid should render In-focus items through this wrapper. Renders as
+/// an animated sweeping gold-gradient border (`.in-focus-frame`) with an
+/// inner clipping layer (`.in-focus-frame-inner`) — signature unchanged from
+/// the earlier static-ring version, so existing call sites are unaffected.
 let inFocusFrame (child: ReactElement) : ReactElement =
     Html.div [
         prop.className "in-focus-frame relative"
-        prop.children [ child ]
+        prop.children [
+            Html.div [
+                prop.className "in-focus-frame-inner"
+                prop.children [ child ]
+            ]
+        ]
     ]
 
 // ── Movies filmstrip (§ 4 Movies filmstrip) ──

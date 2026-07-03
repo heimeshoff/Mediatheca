@@ -5,6 +5,21 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 09:11 -- Task verified and completed: design-system-bky6v - In-focus signifiers must animate — gold sweep
+
+**Type:** Work / Task completion
+**Task:** design-system-bky6v - In-focus signifiers must animate — gold sweep on status badge and poster frame
+**Summary:** Root-caused the static In-focus badge to `.status-badge`'s `background: transparent` shorthand clobbering `.gold-sweep`'s `background-image` (fixed via `background-color: transparent`, confirmed in compiled CSS); replaced the static `.in-focus-frame` ring with a two-layer animated sweeping-gradient border + glow (`inFocusFrame` signature unchanged); added `prefers-reduced-motion` freezing for both sweep carriers. Deferred the compact on-poster "✦ Focus" pill to new backlog item design-system-fq3vp.
+**Duration:** ~19m (dispatch → verifier verdict; +merge-conflict resolution)
+**Verification:** PASS (iteration 1)
+**Merge note:** squash-merge to main hit one real conflict in styleguide.md (bky6v vs snpnv each appended a "Shipped (…)" changelog block at the same insertion point). Surfaced per ADR-0032; user chose keep-both; conflict resolved (both blocks stacked), fully-merged main re-built clean before commit.
+**Files changed:** 4
+**Tests added:** 0
+**ADRs written:** none
+**New backlog items:** design-system-fq3vp (compact on-poster "✦ Focus" pill)
+
+---
+
 ## 2026-07-03 09:07 -- Task verified and completed: design-system-wd5zk - Movies filmstrip — full-width 3a proportions
 
 **Type:** Work / Task completion

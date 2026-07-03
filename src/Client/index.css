@@ -242,7 +242,13 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* § 4 Status badges — pill, uppercase, 0.14em tracking. One hue per lifecycle
-   state; "In focus" is the only variant that also carries .gold-sweep. */
+   state; "In focus" is the only variant that also carries .gold-sweep.
+   NOTE: background-color (not the `background` shorthand) is deliberate —
+   `background: transparent` resets background-image/background-size to
+   their initial values too, which silently clobbers .gold-sweep's gradient
+   on the In-focus variant (both rules share specificity 0-1-0-0, and this
+   rule comes later in the cascade, so it would always win). See
+   design-system-bky6v. */
 .status-badge {
     display: inline-flex;
     align-items: center;
@@ -255,7 +261,7 @@ h1, h2, h3, h4, h5, h6 {
     text-transform: uppercase;
     letter-spacing: 0.14em;
     border: 1px solid transparent;
-    background: transparent;
+    background-color: transparent;
 }
 .status-badge-backlog   { color: oklch(0.62 0.02 40); border-color: oklch(0.36 0.03 30); }
 .status-badge-in-focus  { color: oklch(0.16 0.024 82); }
@@ -340,10 +346,44 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* § 4 Poster grid — the gold-frame "In focus" treatment, the visual sibling
-   of the In-focus badge. */
+   of the In-focus badge. Animated sweeping gradient border (padding-box
+   trick) + gold glow, per the reviewed 3c direction — replaces the earlier
+   static gold-ring box-shadow (design-system-bky6v). Two-layer markup:
+   .in-focus-frame is the gradient-bordered wrapper (1.5px padding reveals
+   the gradient as a border), .in-focus-frame-inner clips the child to the
+   inner radius so the sweep only shows at the edge. */
 .in-focus-frame {
-    box-shadow: 0 0 0 2px var(--color-gold), var(--shadow-card);
-    border-radius: var(--radius-card);
+    position: relative;
+    padding: 1.5px;
+    border-radius: 8px;
+    background-image: linear-gradient(
+        90deg,
+        oklch(0.68 0.10 80),
+        oklch(0.88 0.11 88),
+        oklch(0.68 0.10 80)
+    );
+    background-size: 200% 100%;
+    animation: gold-leaf-sweep var(--sweep);
+    box-shadow: 0 14px 30px -12px oklch(0.6 0.11 82 / 0.45);
+}
+.in-focus-frame-inner {
+    display: block;
+    border-radius: 7px;
+    overflow: hidden;
+}
+
+/* § 1.6 Animation — honor prefers-reduced-motion by freezing the gold-leaf
+   sweep at a fixed gradient position instead of disabling the ornament
+   outright (the gradient fill itself is still the "In focus" signal, only
+   the motion is suppressed). Applies to both sweep carriers: .gold-sweep
+   (status badge) and .in-focus-frame (poster frame border). Not required by
+   the reviewed doc — worker judgment call, design-system-bky6v. */
+@media (prefers-reduced-motion: reduce) {
+    .gold-sweep,
+    .in-focus-frame {
+        animation: none;
+        background-position: 0% 0;
+    }
 }
 
 /* § 4 Recently-played list — hairline row separators. */

@@ -10,10 +10,10 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
+- **Backlog:** 2
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 8
+- **Doing:** 0
+- **Done:** 9
 <!-- task-counts:end -->
 
 ### Todo
@@ -23,11 +23,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **design-system-bky6v** -- In-focus signifiers must animate — gold sweep on status badge and poster frame -- `doing/design-system-bky6v-in-focus-gold-sweep-animation.md`
+<!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **design-system-bky6v** -- In-focus signifiers must animate — gold sweep on status badge and poster frame -- `done/design-system-bky6v-in-focus-gold-sweep-animation.md`
 - **design-system-wd5zk** -- Movies filmstrip — full-width 3a proportions (flex-1 posters, ~196px tall) -- `done/design-system-wd5zk-filmstrip-3a-sizing.md`
 - **design-system-snpnv** -- Typography — adopt dir 3c's list-page type scale (grid captions, page header, filter pills) -- `done/design-system-snpnv-typography-3c-list-page-scale.md`
 - **design-system-t4b9k** -- Layered sidebar nav — ivory active tab, curved-corner boundary -- `done/design-system-t4b9k-layered-sidebar-nav.md`
@@ -41,6 +42,7 @@ research touching this BC, and concept synthesis pages.
 ### Backlog
 <!-- backlog-list:start -->
 - **design-system-grtw7** -- Sidebar nav — align with dir 3a (gating: ivory ADR-0013 vs 3a burgundy active tab) -- `backlog/design-system-grtw7-sidebar-3a-alignment.md`
+- **design-system-fq3vp** -- Compact on-poster "✦ Focus" pill (3c grid badge variant) -- `backlog/design-system-fq3vp-compact-on-poster-focus-pill.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
