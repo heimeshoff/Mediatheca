@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 10:05 -- Modeling / Refined: design-system-grtw7 - Sidebar nav — align with dir 3a (full revert to burgundy active tab)
+
+**Type:** Modeling / Refine
+**BC:** design-system
+**Status after:** todo
+**Summary:** Resolved the single gating question that kept grtw7 in backlog — the ADR-0013 ivory-placard vs. 3a-burgundy active-tab conflict. Re-asked the user (the 2026-07-03 AskUserQuestion had gone unanswered); user chose **full 3a revert**: burgundy fill `oklch(0.22 0.035 25)` + gold inset-left bar (`--ring-active`) + gold ◆ icon, removing the ivory tokens and the concave corner-notch machinery. This **supersedes ADR-0013** — the superseding ADR is a worker acceptance criterion (written in lockstep with the code removal, not now, to avoid desyncing the ADR from still-shipped ivory). Secondary decisions: keep rail width at `w-64`/256px (3a's 216px not adopted); skip the profile chip (single-user app). Baked option 1 + the non-contentious 3a deltas into concrete acceptance criteria and promoted backlog → todo.
+**Split into:** none
+**ADRs written:** none (superseding ADR deferred to the worker)
+
+---
+
 ## 2026-07-03 09:45 -- Work session ended
 
 **Type:** Work / Session end
