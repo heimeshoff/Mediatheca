@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 08:52 -- Batch started: [design-system-snpnv, design-system-bky6v, design-system-wd5zk]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-snpnv - Typography — adopt dir 3c's list-page type scale; design-system-bky6v - In-focus signifiers must animate — gold sweep on status badge and poster frame; design-system-wd5zk - Movies filmstrip — full-width 3a proportions
+**Parallel:** yes (3 workers)
+
+---
+
 ## 2026-07-03 -- Modeling / Captured: design-system-snpnv, design-system-bky6v, design-system-wd5zk, design-system-grtw7 - Velvet Lobby drift vs design doc (dirs 3a/3c)
 
 **Type:** Modeling / Capture

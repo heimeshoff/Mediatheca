@@ -1,7 +1,7 @@
 ---
 id: design-system-bky6v
 title: In-focus signifiers must animate — gold sweep on status badge and poster frame
-status: todo
+status: doing
 type: bug
 context: design-system
 created: 2026-07-03

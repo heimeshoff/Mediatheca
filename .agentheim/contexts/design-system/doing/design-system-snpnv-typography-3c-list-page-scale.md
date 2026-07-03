@@ -1,7 +1,7 @@
 ---
 id: design-system-snpnv
 title: Typography — adopt dir 3c's list-page type scale (grid captions, page header, filter pills)
-status: todo
+status: doing
 type: feature
 context: design-system
 created: 2026-07-03

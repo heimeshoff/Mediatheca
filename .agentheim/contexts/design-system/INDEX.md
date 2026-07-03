@@ -11,21 +11,21 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 1
-- **Todo:** 3
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 3
 - **Done:** 6
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **design-system-snpnv** -- Typography — adopt dir 3c's list-page type scale (grid captions, page header, filter pills) -- `todo/design-system-snpnv-typography-3c-list-page-scale.md`
-- **design-system-bky6v** -- In-focus signifiers must animate — gold sweep on status badge and poster frame -- `todo/design-system-bky6v-in-focus-gold-sweep-animation.md`
-- **design-system-wd5zk** -- Movies filmstrip — full-width 3a proportions (flex-1 posters, ~196px tall) -- `todo/design-system-wd5zk-filmstrip-3a-sizing.md`
+<!-- no tasks in todo -->
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
-<!-- no tasks in doing -->
+- **design-system-snpnv** -- Typography — adopt dir 3c's list-page type scale (grid captions, page header, filter pills) -- `doing/design-system-snpnv-typography-3c-list-page-scale.md`
+- **design-system-bky6v** -- In-focus signifiers must animate — gold sweep on status badge and poster frame -- `doing/design-system-bky6v-in-focus-gold-sweep-animation.md`
+- **design-system-wd5zk** -- Movies filmstrip — full-width 3a proportions (flex-1 posters, ~196px tall) -- `doing/design-system-wd5zk-filmstrip-3a-sizing.md`
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)

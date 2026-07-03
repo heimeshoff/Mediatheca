@@ -1,7 +1,7 @@
 ---
 id: design-system-wd5zk
 title: Movies filmstrip — full-width 3a proportions (flex-1 posters, ~196px tall)
-status: todo
+status: doing
 type: bug
 context: design-system
 created: 2026-07-03
