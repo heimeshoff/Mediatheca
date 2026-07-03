@@ -5,6 +5,21 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 12:15 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~28m (first Batch started 11:47 → now)
+**Completed:** 2 (first-try PASS: 2, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** design-system-grtw7: 1, design-system-sg8kd: 1
+**Commits:** 5 (2 batch-start claims + 2 task commits + this session-end line)
+**Carry-over:** Mediatheca Directions.html: left behind (owner: user's design reference doc — the 912KB captured Claude design session cited by tasks' Notes; untracked by the user since before this session, not project bookkeeping). Two leftover `.worktrees/` dirs (design-system-grtw7 from this session, design-system-fq3vp orphaned by the 09:xx session's cleanup): discarded — both held only regenerable MSBuild `obj/Debug/net9.0` build residue left behind after `git worktree remove` deregistered them (no source, no task files, no uncommitted work); `.worktrees/` now empty and removed.
+**Note:** Two sequential single-task design-system batches under worktree isolation (ADR-0032), each PASS first try. **grtw7** reverted the sidebar active tab from ADR-0013's ivory placard + concave corner-notch back to dir 3a's burgundy fill (`oklch(0.22 0.035 25)`) + gold inset-left bar + gold ◆ icon, removed the ivory tokens and corner-notch machinery cleanly, landed the non-contentious 3a deltas (tagline, item metrics, one-step-smaller bottom group), and wrote **ADR-0014** superseding 0013 (bidirectional). **sg8kd** was promoted backlog→todo by a concurrent `modeling` session *during* grtw7's run (committed cleanly as 67857df between grtw7's batch-start and completion — picked up automatically on the next re-scan once its `depends_on: [grtw7]` cleared); it wrote **ADR-0015** superseding 0009, archived `styleguide.md` → `.workflow.archived/`, and repointed CLAUDE.md + the design-check skill + the design-system README to the **live in-app StyleGuide page** (backed by `DesignSystem.fs` + `index.css`) as the authoritative design-system artifact — the frontend gate redefined as "conform to the living system, reviewed on the running StyleGuide page" (anchor stays design-system-001). No conflicts (sequential single-task batches). No concept candidates, no new backlog items. The design-system board is now fully quiescent: backlog / todo / doing all empty, done: 12. The full-redesign human sign-off remains the natural next step for the user — a running-app review of the now-complete Velvet Lobby system, including the reverted 3a burgundy sidebar.
+
+---
+
 ## 2026-07-03 12:12 -- Task verified and completed: design-system-sg8kd - Retire styleguide.md — in-app StyleGuide page is authoritative
 
 **Type:** Work / Task completion
