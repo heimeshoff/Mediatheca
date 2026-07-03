@@ -5,7 +5,22 @@ Newest entries on top.
 
 ---
 
-## 2026-07-03 09:30 -- Task verified and completed: design-system-fq3vp - Compact on-poster "✦ Focus" pill (3c grid badge variant)
+## 2026-07-03 09:45 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~10m (Batch started 09:35 → now)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** design-system-fq3vp: 1
+**Commits:** 3 (1 batch-start claim + 1 task + this session-end line)
+**Carry-over:** Mediatheca Directions.html: left behind (owner: user's design reference doc — the 912KB captured Claude design session cited by every task's Notes; untracked by the user since before this session, not project bookkeeping)
+**Note:** Single-task batch under worktree isolation (ADR-0032). design-system-fq3vp (compact on-poster "✦ Focus" pill) shipped and passed verification first try — clean squash-merge, no conflicts (only ready task this run, so no sibling to collide with). `DesignSystem.inFocusPill` / `.in-focus-pill` is the deliberately-solid third member of the In-focus family (badge `.gold-sweep`, poster `inFocusFrame` animated; pill solid), resolving the sweep-vs-solid tension the refine flow locked to solid. The design-system board is now quiescent: todo empty, doing empty; backlog holds only grtw7 (sidebar 3a alignment, still gated on the ADR-0013 ivory-vs-3a-burgundy tension). No concept candidates, no new backlog items, no ADRs this run. The full-redesign human sign-off flagged in styleguide.md's Sign-off section remains open — a running-app review of the now-complete Velvet Lobby tokens/typography/patterns/sidebar/filmstrip/in-focus motion (now including the pill) is the natural next step for the user.
+
+---
+
+## 2026-07-03 09:44 -- Task verified and completed: design-system-fq3vp - Compact on-poster "✦ Focus" pill (3c grid badge variant)
 
 **Type:** Work / Task completion
 **Task:** design-system-fq3vp - Compact on-poster "✦ Focus" pill (3c grid badge variant)
