@@ -1,7 +1,7 @@
 ---
 id: design-system-pv3mq
 title: Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006)
-status: todo
+status: doing
 type: refactor
 context: design-system
 created: 2026-07-03
@@ -87,6 +87,15 @@ material"?
   overlays (surface bg + line ring + shadow), no separate overlay material.
 - The user's words ("paper style material design at best") lean toward (a) — a genuine
   paper elevation with shadow — but this is the user's call. Confirm before work.
+
+**RESOLVED at dispatch (2026-07-03, user):** option **(a) Paper elevation (distinct)**.
+The replacement overlay material is a solid **opaque fill** (slightly lighter than the page
+backdrop) + an **elevation shadow** (paper lifted off the page, e.g. `0 8px 24px oklch(... /
+0.4)`-ish — pick concrete values that read as elevation on the burgundy-black backdrop) + a
+**subtle line ring**. **No translucency, no `backdrop-filter`.** It is a *distinct* overlay
+vocabulary from `.velvet-card` (page chrome) — do NOT collapse the two into one class; overlays
+should read as paper lifted above the page, visually separable from a page card. Bake this into
+the superseding ADR-0006 replacement as the decided overlay material.
 
 **Prior art / dependencies:**
 - `design-system-h3q8n` (Velvet Lobby component patterns) introduced `.velvet-card`,

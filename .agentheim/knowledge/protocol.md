@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 14:49 -- Batch started: [design-system-pv3mq]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-pv3mq - Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006)
+**Parallel:** no (1 worker — sole ready task; task's own Notes ask for an isolated single-task batch since it rewrites shared overlay vocabulary consumed by many BCs' views)
+**Planning advisory:** none (`.agentheim/state/whats-next.md` absent)
+
+Open decision resolved at dispatch: replacement overlay material = **(a) paper elevation (distinct)** — opaque fill + elevation shadow + line ring, no translucency/backdrop-filter, kept distinct from `.velvet-card`. Recorded in the task file's Notes for the worker to bake into the superseding ADR-0006.
+
+---
+
 ## 2026-07-03 14:40 -- Modeling / Promoted: design-system-pv3mq - Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006)
 
 **Type:** Modeling / Promote
