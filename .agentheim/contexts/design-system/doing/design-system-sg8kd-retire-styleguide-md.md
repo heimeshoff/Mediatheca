@@ -1,7 +1,7 @@
 ---
 id: design-system-sg8kd
 title: Retire styleguide.md — the in-app StyleGuide page is the authoritative artifact (supersede ADR-0009)
-status: todo
+status: doing
 type: decision
 context: design-system
 created: 2026-07-03

@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 12:06 -- Batch started: [design-system-sg8kd]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-sg8kd - Retire styleguide.md — the in-app StyleGuide page is the authoritative artifact (supersede ADR-0009)
+**Parallel:** no (1 worker)
+
+---
+
 ## 2026-07-03 10:20 -- Modeling / Refined: design-system-sg8kd - Retire styleguide.md — in-app StyleGuide page is authoritative (supersede ADR-0009)
 
 **Type:** Modeling / Refine
