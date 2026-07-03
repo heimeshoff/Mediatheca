@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 -- Modeling / Captured: design-system-snpnv, design-system-bky6v, design-system-wd5zk, design-system-grtw7 - Velvet Lobby drift vs design doc (dirs 3a/3c)
+
+**Type:** Modeling / Capture
+**BC:** design-system
+**Filed to:** todo (snpnv, bky6v, wd5zk), backlog (grtw7)
+**Summary:** User reviewed the captured Claude design session (`Mediatheca Directions.html`) and flagged four gaps between the shipped Velvet Lobby implementation and dirs 3a/3c: (1) snpnv — styleguide § 2 lacks 3c's list-page type tiers (sans 12px/600 grid card titles, 10.5px meta, 34px serif page header + baseline mono count, 11.5px filter pills); (2) bky6v — the InFocus status badge doesn't visibly run the gold sweep and `.in-focus-frame` is a static ring where 3c animates both; (3) wd5zk — the shipped filmstrip's `w-16` tiles are far below 3a's flex-1 / 196px-tall posters; (4) grtw7 — sidebar should align with 3a, filed to backlog because "look like 3a" collides with ADR-0013's explicit ivory-tab override (AskUserQuestion went unanswered; gating question documented in the task). All literal values extracted from the doc into the tasks so workers need not parse the 912KB archive.
+
+---
+
 ## 2026-07-03 -- Work session ended
 
 **Type:** Work / Session end

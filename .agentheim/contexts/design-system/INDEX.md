@@ -10,15 +10,17 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
-- **Todo:** 0
+- **Backlog:** 1
+- **Todo:** 3
 - **Doing:** 0
 - **Done:** 6
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-<!-- no tasks in todo -->
+- **design-system-snpnv** -- Typography — adopt dir 3c's list-page type scale (grid captions, page header, filter pills) -- `todo/design-system-snpnv-typography-3c-list-page-scale.md`
+- **design-system-bky6v** -- In-focus signifiers must animate — gold sweep on status badge and poster frame -- `todo/design-system-bky6v-in-focus-gold-sweep-animation.md`
+- **design-system-wd5zk** -- Movies filmstrip — full-width 3a proportions (flex-1 posters, ~196px tall) -- `todo/design-system-wd5zk-filmstrip-3a-sizing.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -38,7 +40,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-<!-- no tasks in backlog -->
+- **design-system-grtw7** -- Sidebar nav — align with dir 3a (gating: ivory ADR-0013 vs 3a burgundy active tab) -- `backlog/design-system-grtw7-sidebar-3a-alignment.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
