@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
+- **Backlog:** 2
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 10
@@ -43,6 +43,7 @@ research touching this BC, and concept synthesis pages.
 ### Backlog
 <!-- backlog-list:start -->
 - **design-system-grtw7** -- Sidebar nav — align with dir 3a (gating: ivory ADR-0013 vs 3a burgundy active tab) -- `backlog/design-system-grtw7-sidebar-3a-alignment.md`
+- **design-system-sg8kd** -- Retire styleguide.md — in-app StyleGuide page is authoritative (supersede ADR-0009) -- `backlog/design-system-sg8kd-retire-styleguide-md.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
