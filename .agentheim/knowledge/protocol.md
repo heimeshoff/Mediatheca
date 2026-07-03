@@ -5,6 +5,22 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 15:24 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~35m (first Batch started 14:49 → now)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** design-system-pv3mq: 1
+**Commits:** 3 (1 batch-start claim + 1 task commit + this session-end line)
+**Vision-conformance:** none — batch aligns with vision (a pure visual-material refactor, orthogonal to every v1 success criterion; dropping GPU-heavy `backdrop-filter` if anything aids the mobile-first principle)
+**Carry-over:** src/Client/index.css: left behind (owner: user's own WIP, `.status-badge` sizing/weight tweak "per 3d system-board reference" — appeared after the 12:15 session end, unrelated to this task's overlay region; preserved uncommitted via stash-around-squash so the squash-merge couldn't clobber it). "Mediatheca Directions.html": left behind (owner: user's design reference doc — the 912KB captured Claude design session, untracked by the user since before this session, not project bookkeeping). No worktree orphans (`.worktrees/design-system-pv3mq` residual held only 3 regenerable MSBuild `obj/Debug/net9.0` AssemblyInfo files after `git worktree remove` deregistered it — discarded; `.worktrees/` now removed).
+**Note:** Single isolated single-task design-system batch under worktree isolation (ADR-0032), PASS first try. **pv3mq** completed the Velvet Lobby re-skin's last open thread — retired glassmorphism as the floating-surface vocabulary and replaced it with **paper overlay** (opaque `--color-paper` fill + `--color-line` ring + true `--shadow-paper` elevation, no translucency/backdrop-filter, distinct from `.velvet-card`). Ripped out `--glass-*`, `.glass-card`, `.media-chrome-glass`, and the `glass*` DesignSystem compositions; repointed every dropdown/popover/modal/panel across Components + detail/list pages to `paperOverlay`/`paperDropdown`; rewrote the StyleGuide specimen (Glassmorphism → PaperOverlay). Wrote **ADR-0016** (design-system scope) superseding global **ADR-0006** bidirectionally — 0006's Tailwind/DaisyUI/dim-theme decisions still stand; only its mandatory-glassmorphism overlay rule is retired. Repointed CLAUDE.md (§ Conventions paper bullet; § Gotchas backdrop-filter trap removed as no overlay blurs anymore), context-map, design-system README, design-check skill, and (conductor-owned) `knowledge/index.md`. The one open decision — replacement material — was resolved with the user at dispatch: option (a) paper elevation (distinct), not (b) reuse `.velvet-card`. `npm run build` clean; grep-clean of `backdrop-filter`/`backdrop-blur`/`.glass-*` in `src/Client/`. No conflicts, no concept candidates, no new backlog items. The design-system board is fully quiescent again: backlog / todo / doing all empty, done: 13.
+
+---
+
 ## 2026-07-03 15:22 -- Task verified and completed: design-system-pv3mq - Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006)
 
 **Type:** Work / Task completion
