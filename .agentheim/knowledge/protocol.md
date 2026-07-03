@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-03 09:07 -- Task verified and completed: design-system-wd5zk - Movies filmstrip — full-width 3a proportions
+
+**Type:** Work / Task completion
+**Task:** design-system-wd5zk - Movies filmstrip — full-width 3a proportions (flex-1 posters, ~196px tall)
+**Summary:** Reworked the Movies filmstrip pattern from a 64px thumbnail row to 3a's full-width cinematic proportions — flex-1 196px-tall posters, 8px sibling sprocket bars with 7px clearance, mirrored flex-1 caption row; `filmstripRow` signature unchanged.
+**Duration:** ~15m (dispatch → verifier verdict)
+**Verification:** PASS (iteration 1)
+**Files changed:** 4
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-07-03 09:04 -- Task verified and completed: design-system-snpnv - Typography — adopt dir 3c's list-page type scale
 
 **Type:** Work / Task completion

@@ -442,43 +442,57 @@ type FilmstripItem = {
     Meta: string
 }
 
-/// Filmstrip movie row — black sprocket-holed well with poster tiles inside,
-/// captions (title + meta, e.g. runtime/"rec. by") beneath the strip.
+/// Filmstrip movie row — black sprocket-holed well with a row of flex-1
+/// posters (196px tall, 3a proportions) filling its full width edge to
+/// edge, captions (title + meta, e.g. runtime/"rec. by") beneath the strip.
 let filmstripRow (items: FilmstripItem list) : ReactElement =
     Html.div [
-        prop.className "flex flex-col gap-2"
+        prop.className "flex flex-col"
         prop.children [
             Html.div [
-                prop.className "filmstrip flex gap-2"
+                prop.className "filmstrip"
                 prop.children [
-                    for item in items do
-                        Html.div [
-                            prop.key item.Title
-                            prop.className "aspect-[2/3] w-16 rounded-[var(--radius-poster)] bg-base-300 overflow-hidden flex-shrink-0"
-                            prop.children [
-                                match item.PosterRef with
-                                | Some ref ->
-                                    Html.img [
-                                        prop.src $"/images/{ref}"
-                                        prop.alt item.Title
-                                        prop.className "w-full h-full object-cover"
+                    Html.div [ prop.className "filmstrip-sprocket mb-[7px]" ]
+                    Html.div [
+                        prop.className "flex gap-2.5 px-4"
+                        prop.children [
+                            for item in items do
+                                Html.div [
+                                    prop.key item.Title
+                                    prop.className "flex-1 h-[196px] rounded-[var(--radius-poster)] bg-base-300 overflow-hidden"
+                                    prop.children [
+                                        match item.PosterRef with
+                                        | Some ref ->
+                                            Html.img [
+                                                prop.src $"/images/{ref}"
+                                                prop.alt item.Title
+                                                prop.className "w-full h-full object-cover"
+                                            ]
+                                        | None ->
+                                            Html.div [ prop.className "w-full h-full bg-gradient-to-br from-base-300 to-base-200" ]
                                     ]
-                                | None ->
-                                    Html.div [ prop.className "w-full h-full bg-gradient-to-br from-base-300 to-base-200" ]
-                            ]
+                                ]
                         ]
+                    ]
+                    Html.div [ prop.className "filmstrip-sprocket mt-[7px]" ]
                 ]
             ]
             Html.div [
-                prop.className "flex gap-2"
+                prop.className "flex gap-2.5 px-4 pt-[10px]"
                 prop.children [
                     for item in items do
                         Html.div [
                             prop.key (item.Title + "-caption")
-                            prop.className "w-16 flex flex-col gap-0.5"
+                            prop.className "flex-1 flex flex-col gap-0.5 min-w-0"
                             prop.children [
-                                Html.span [ prop.className (cardTitle + " text-xs truncate"); prop.text item.Title ]
-                                Html.span [ prop.className faintText; prop.text item.Meta ]
+                                Html.span [
+                                    prop.className "font-sans text-[12px] font-semibold leading-[1.35] text-base-content truncate"
+                                    prop.text item.Title
+                                ]
+                                Html.span [
+                                    prop.className "font-sans text-[10.5px] text-ink-muted truncate"
+                                    prop.text item.Meta
+                                ]
                             ]
                         ]
                 ]

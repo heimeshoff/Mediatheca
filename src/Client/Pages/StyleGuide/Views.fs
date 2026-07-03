@@ -1625,12 +1625,14 @@ let private velvetLobbyPatternsSection () =
             subheading "Movies Filmstrip"
 
             Html.div [
-                prop.className "mt-4 max-w-2xl"
+                prop.className "mt-4 max-w-[1200px]"
                 prop.children [
                     DesignSystem.filmstripRow [
                         { PosterRef = None; Title = "Alien"; Meta = "1h57 · rec. by Mara" }
                         { PosterRef = None; Title = "Blade Runner"; Meta = "1h57" }
-                        { PosterRef = None; Title = "Dune"; Meta = "2h35 · rec. by Alex" }
+                        { PosterRef = None; Title = "Dune: Part Two"; Meta = "2h46 · rec. by Sam" }
+                        { PosterRef = None; Title = "Arrival"; Meta = "1h56 · rec. by Alex" }
+                        { PosterRef = None; Title = "Sicario"; Meta = "2h1m" }
                     ]
                 ]
             ]

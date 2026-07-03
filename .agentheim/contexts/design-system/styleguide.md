@@ -259,10 +259,10 @@ Backdrop thumb with top-fade, serif title, "Next: S2 E3 · 44 min" meta, segment
 
 `DesignSystem.secondaryMediaCard { Title; NextLabel; ProgressFilled; ProgressTotal }`. The backdrop-thumb top-fade is left to the caller (this pattern renders the text/progress chrome). Specimen: StyleGuide § Secondary Media Card.
 
-### Movies filmstrip — *Implemented (design-system-h3q8n)*
-The cinema motif: a **black (`#000`) well** with **sprocket-hole** strips top and bottom (`repeating-linear-gradient(90deg, transparent 0 7px, oklch(0.3 0.01 60) 7px 15px, transparent 15px 22px)`), a row of poster tiles (`--radius-poster`, `2px`) inside, and captions (title + runtime + "rec. by / with") beneath the strip. Carries `--shadow-filmstrip`.
+### Movies filmstrip — *Implemented (design-system-h3q8n, resized to 3a proportions in design-system-wd5zk)*
+The cinema motif: a **black (`#000`) well** (radius `--radius-panel`/`8px`, `padding: 7px 0`, `--shadow-filmstrip`) with **sprocket-hole** strips top and bottom (`.filmstrip-sprocket`, `8px` tall, `repeating-linear-gradient(90deg, transparent 0 7px, oklch(0.3 0.01 60) 7px 15px, transparent 15px 22px)`, `7px` clearance margin to the poster row), a row of **`flex: 1` posters** (equal columns filling the strip edge to edge, **196px tall**, `--radius-poster`/`2px`, `10px` gap, `16px` side padding) — this is dir **3a**'s full-width cinematic-centerpiece sizing, not a thumbnail row. Captions sit in a mirrored `flex: 1` row beneath (`10px` gap, `16px` side padding, `10px` padding-top): title `12px`/weight `600`/line-height `1.35`, meta `10.5px` `ink-muted` on a second line ("2h 46m · rec. by Sam").
 
-`.filmstrip` (`index.css`) + `DesignSystem.filmstripRow [ { PosterRef; Title; Meta } ]`. Specimen: StyleGuide § Movies Filmstrip.
+`.filmstrip` / `.filmstrip-sprocket` (`index.css`) + `DesignSystem.filmstripRow [ { PosterRef; Title; Meta } ]` (`DesignSystem.fs`) — the caption type values are inlined pending a shared "grid caption" type tier (see design-system-snpnv). Specimen: StyleGuide § Movies Filmstrip.
 
 ### Game row — *not yet implemented*
 Horizontal velvet card: capsule thumbnail + title + **HLTB progress bar** (continuous, gold gradient fill) with mono "18h / ~34h" + a **status pill** (§ Status badges). Composable today from the shipped `DesignSystem.velvetCard` + `progressContinuous` + `statusBadge` primitives, but not built as its own typed composition/specimen.

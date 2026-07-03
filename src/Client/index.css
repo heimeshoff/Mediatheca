@@ -319,26 +319,18 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* § 4 Movies filmstrip — black well with sprocket-hole perforation strips
-   top & bottom. */
+   top & bottom, flanking a row of flex-1 posters (196px tall, 3a proportions). */
 .filmstrip {
-    position: relative;
     background: #000;
     border-radius: var(--radius-panel);
     box-shadow: var(--shadow-filmstrip);
-    padding: 14px 0.5rem;
+    padding: 7px 0;
     overflow: hidden;
 }
-.filmstrip::before,
-.filmstrip::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 10px;
+.filmstrip-sprocket {
+    height: 8px;
     background: repeating-linear-gradient(90deg, transparent 0 7px, oklch(0.3 0.01 60) 7px 15px, transparent 15px 22px);
 }
-.filmstrip::before { top: 0; }
-.filmstrip::after { bottom: 0; }
 
 /* § 4 Section header — hairline rule that fades out. */
 .section-rule {
