@@ -5,6 +5,22 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 15:11 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~15m (Batch started 14:56 → now)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** intelligence-dq8rk: 1
+**Commits:** 3 (1 batch-start claim + 1 task commit + this session-end line)
+**Vision-conformance:** none — batch aligns with vision (direction 3a directly realizes the "Unified Dashboard → All tab" success criterion and the "intent-driven, not a catalog" / "unified, not siloed" design principles by stripping analytics off the landing page to surface what's-next media; the Books column is a labelled coming-soon *stub* — no events/API — so it does not build the "Books (v2)" Out-of-Scope feature, only reserves its layout slot)
+**Carry-over:** src/Client/index.css: left behind (owner: user's own WIP — the `.status-badge` sizing/weight tweak "per 3d system-board reference", carried uncommitted across prior sessions; the task's squash-merge touched no CSS so the two are disjoint). "Mediatheca Directions.html": left behind (owner: user's design reference doc — the ~912KB captured Claude design session cited by this task's Notes, untracked by the user since before this session, not project bookkeeping). .agentheim/state/: left behind (owner: work's own advisory observability heartbeat — `in-flight.json`, the ADR-0027 git-ignored advisory-artifact category; never a lifecycle write). `.worktrees/` residue: removed (empty dir after the PASS teardown deregistered `aw/intelligence-dq8rk`; no source, no task files, no uncommitted work — the node_modules junction was unlinked before teardown so the shared root `node_modules` stayed intact).
+**Note:** Single isolated single-task intelligence batch under worktree isolation (ADR-0032), PASS first try. **intelligence-dq8rk** re-pointed the Dashboard to direction 3a: the shared `tabBar` now consumes the reusable `DesignSystem.underlineTabClass` shipped by design-system-k9p3v (no bespoke pill CSS), a same-row right-aligned "Search your library" control wires through the existing cross-MVU `SearchModal` via a new `Open_search_modal` message the root `State.fs` intercepts (mirroring the Games/Movies/Series sibling pattern — search was not reimplemented), the page `<h1>` title was dropped, and `allTabView` was rewritten to strip analytics (Activity heatmap + monthly breakdown, the 14-day games play chart + summary stats, the hero spotlight, and `newGamesSection`) in favor of a full-width TV Series Next-Up row → full-width Movies row → a two-column Games (In Focus) / Books-placeholder split. Orphaned helpers (`activitySection`, `heroSpotlight`, `gamesRecentlyPlayedChartWithStats`, `newGamesSection`, …) were left in place unused (harmless, no `WarningsAsErrors`) to keep the diff scoped to the All-tab composition. `npm run build` clean. No BC README change (pure layout re-point, no new ubiquitous language). No ADR, no conflicts, no concept candidates, no new backlog items. The intelligence board is quiescent: backlog holds its remaining items, todo / doing empty.
+
+---
+
 ## 2026-07-06 15:09 -- Task verified and completed: intelligence-dq8rk - Dashboard All-tab 3a layout — underline tabs + library search, media rows, games/books split
 
 **Type:** Work / Task completion
