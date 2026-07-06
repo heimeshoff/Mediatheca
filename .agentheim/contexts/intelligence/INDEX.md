@@ -33,7 +33,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **intelligence-dq8rk** -- Dashboard All-tab 3a layout — inline orange-underline tabs + search, media rows, games/books split -- `backlog/intelligence-dq8rk-dashboard-3a-layout.md`
+- **intelligence-dq8rk** -- Dashboard All-tab 3a layout — underline tabs + library search, media rows, games/books split -- `backlog/intelligence-dq8rk-dashboard-3a-layout.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC

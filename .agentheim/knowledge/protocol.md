@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 13:46 -- Modeling / Refined: intelligence-dq8rk - Dashboard All-tab 3a layout
+
+**Type:** Modeling / Refine
+**BC:** intelligence
+**Status after:** backlog (blocked on new dependency design-system-k9p3v)
+**Summary:** Resolved the three open interpretation points with the user. (1) **Hero spotlight — dropped:** the TV Series row is a pure full-width equal-weight poster row, no featured lead card. (2) **Tab restyle — promoted to a reusable design-system pattern** (mirrors the 3a sidebar → ADR-0014 call): split off a new design-system task for the underline-tab component; this task now *consumes* it and gains `depends_on: design-system-k9p3v`. (3) **New Games — dropped from the All tab** (recently-added games stay on the Games tab). Also baked in a concrete cross-MVU finding for the worker: the library search modal lives in the **root** MVU (`model.SearchModal`), so the header "Search your library" control must follow the sibling-page pattern (dispatch a `Open_search_modal` message that root `State.fs` intercepts) rather than reimplement search. Acceptance criteria + What/Notes rewritten to match; open-interpretation section removed. Stays in backlog because its new dependency is not yet done.
+**Split into:** design-system-k9p3v (Underline tab pattern — reusable DesignSystem component; authored ready → filed to design-system **todo**, `depends_on: design-system-001` [done], `blocks: intelligence-dq8rk`)
+**ADRs written:** none
+
+---
+
 ## 2026-07-06 13:36 -- Modeling / Captured: intelligence-dq8rk - Dashboard All-tab 3a layout
 
 **Type:** Modeling / Capture
