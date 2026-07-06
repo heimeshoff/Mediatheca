@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 16:48 -- Task verified and completed: intelligence-r4m2p - Dashboard header search must stay pinned right on every tab; Games/Books split stacks when tight
+
+**Type:** Work / Task completion
+**Task:** intelligence-r4m2p - Dashboard header search must stay pinned right on every tab; Games/Books split stacks when tight
+**Summary:** Fix Dashboard header search sliding off-screen on All/Movies/TV tabs (min-w-0 on shared main flex column) and raise Games/Books split to xl so it stacks single-column at tight widths
+**Duration:** 8m
+**Verification:** PASS (iteration 1)
+**Files changed:** 2
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-07-06 16:37 -- Batch started: [intelligence-r4m2p]
 
 **Type:** Work / Batch start

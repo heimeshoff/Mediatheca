@@ -9,7 +9,11 @@ let view (currentPage: Page) (content: ReactElement) =
         prop.children [
             Sidebar.view currentPage
             Html.main [
-                prop.className "flex-1 pb-20 lg:pb-0"
+                // min-w-0 overrides the flex item's default automatic min-width (auto),
+                // which otherwise lets a wide horizontally-scrolling descendant (e.g. a
+                // poster row with overflow-x-auto) force this whole column wider than the
+                // viewport instead of clipping/scrolling internally.
+                prop.className "flex-1 min-w-0 pb-20 lg:pb-0"
                 prop.children [ content ]
             ]
             BottomNav.view currentPage

@@ -1849,9 +1849,11 @@ let private allTabView (data: DashboardAllTab) =
             // 2. Movies to Watch — full-width poster row
             moviesToWatchPosterSection data.JellyfinServerUrl data.MoviesToWatch
 
-            // 3. Games (left) / Books (right) two-column split
+            // 3. Games (left) / Books (right) two-column split — stays single-column
+            // until xl (raised from lg) so both columns get comfortable room rather
+            // than squeezing two-up at mid widths.
             Html.div [
-                prop.className "grid grid-cols-1 lg:grid-cols-2 gap-4"
+                prop.className "grid grid-cols-1 xl:grid-cols-2 gap-4"
                 prop.children [
                     gamesInFocusPosterSection data.GamesInFocus
                     booksColumnPlaceholder

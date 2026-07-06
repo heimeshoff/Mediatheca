@@ -1,11 +1,11 @@
 ---
 id: intelligence-r4m2p
 title: Dashboard header search must stay pinned right on every tab; Games/Books split stacks when tight
-status: doing
+status: done
 type: bug
 context: intelligence
 created: 2026-07-06
-completed:
+completed: 2026-07-06
 depends_on: [design-system-001]
 blocks: []
 tags: [dashboard, responsive, layout, header, search]
@@ -71,3 +71,39 @@ the All-tab Games/Books split stack to one column when space is tight.
 - Frontend task: styleguide gate met (`depends_on: design-system-001`, done). Verify any
   header/layout change against the live in-app StyleGuide page per ADR-0015.
 - Built on top of `intelligence-dq8rk`, which introduced this header + Games/Books split.
+
+## Outcome
+Root cause confirmed: `Layout.fs`'s `Html.main` (the flex-1 column next to `Sidebar`) had
+no `min-w-0`, so its automatic min-width defaulted to the min-content width of whatever it
+contained. On All/Movies/TV Series, the full-width horizontally-scrolling poster rows
+(`overflow-x-auto` flex rows) pushed that min-content width past the viewport, forcing
+`main` — and everything inside it, including the `headerLine`'s right-aligned search
+button — wider than the viewport. The Games tab's poster grid (`grid-cols-2 sm:grid-cols-3`,
+wraps instead of scrolling) never hit this floor, which is why only Games looked correct.
+
+Fix: added `min-w-0` to `Html.main` in `src/Client/Components/Layout.fs` — this is the
+standard override for a flex item whose descendant relies on `overflow-x-auto` to
+self-contain, and it is a shared-layout fix so it protects every page (not just Dashboard)
+from the same class of bug, not only the Dashboard tabs named in this task's acceptance
+criteria. `headerLine` and `tabBar` themselves were unchanged — they were already correct;
+they just needed their ancestor to stop growing past the viewport.
+
+Separately, raised the All-tab Games/Books split breakpoint in
+`src/Client/Pages/Dashboard/Views.fs` (`allTabView`) from `lg:grid-cols-2` to
+`xl:grid-cols-2`, so the split stays a single stacked column through the mid-width range
+where two columns were cramped, and only goes two-up once there's comfortable room
+(≥1280px, Tailwind's default `xl`).
+
+Verified via `npm run build` (clean Fable compile, no type errors). No Expecto tests were
+added — this is a pure responsive-CSS/layout fix with no server-side or testable-in-Expecto
+behavior; TDD is legitimately skipped per the "no UI test infrastructure" category (manual/
+build-based verification only, consistent with how `intelligence-dq8rk` was verified).
+
+Key files:
+- `src/Client/Components/Layout.fs` — added `min-w-0` to the shared `main` flex item (the
+  actual fix for the off-screen search bug).
+- `src/Client/Pages/Dashboard/Views.fs` — raised the Games/Books split breakpoint to `xl`.
+
+No BC ubiquitous-language changes; intelligence BC README left as-is. No ADR written — this
+is a well-understood CSS flexbox pattern (min-content overriding a flex item's shrink),
+not an architecturally significant decision.
