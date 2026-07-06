@@ -1045,18 +1045,74 @@ let private heroSpotlight (jellyfinServerUrl: string option) (item: DashboardSer
         ]
     ]
 
-// ── Next Up — Open section scroller (All tab, below hero) ──
+// ── Next episode — cinematic hero cards (All tab, below hero) ──
+
+/// Series card for the "Next episode" section: `DesignSystem.nextEpisodeHeroCard`
+/// wrapped in the same navigate-to-series-detail anchor the poster cards use.
+/// The Jellyfin play button is built here (it needs `Icons.play` and the
+/// `jellyfinPlayUrl` helper, both page-local) and handed to the design-system
+/// card as a pre-rendered, self-positioned slot.
+let private seriesNextEpisodeCard (jellyfinServerUrl: string option) (item: DashboardSeriesNextUp) =
+    let episodeLabel =
+        if item.NextUpSeason > 0 then
+            Some $"S{item.NextUpSeason}E{item.NextUpEpisode}: {item.NextUpTitle}"
+        else
+            None
+    let jellyfinButton =
+        match jellyfinServerUrl, item.JellyfinEpisodeId with
+        | Some serverUrl, Some episodeId ->
+            Some (
+                Html.a [
+                    prop.href (jellyfinPlayUrl serverUrl episodeId)
+                    prop.target "_blank"
+                    prop.rel "noopener noreferrer"
+                    prop.onClick (fun e -> e.stopPropagation())
+                    prop.className "absolute bottom-3 right-3 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-base-100 border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg cursor-pointer"
+                    prop.title "Play in Jellyfin"
+                    prop.children [
+                        Html.span [
+                            prop.className "w-4 h-4"
+                            prop.children [ Icons.play () ]
+                        ]
+                    ]
+                ]
+            )
+        | _ -> None
+    Html.a [
+        prop.href (Router.format ("series", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("series", item.Slug)
+        )
+        prop.className "flex-shrink-0 w-[280px] sm:w-[320px] cursor-pointer group snap-start"
+        prop.children [
+            DesignSystem.nextEpisodeHeroCard {
+                SeriesName = item.Name
+                EpisodeLabel = episodeLabel
+                BackdropRef = item.BackdropRef
+                PosterRef = item.PosterRef
+                EpisodeStillRef = item.EpisodeStillRef
+                InFocus = item.InFocus
+                ProgressFilled = item.WatchedEpisodeCount
+                ProgressTotal = item.EpisodeCount
+                WatchedWith =
+                    item.WatchWithFriends
+                    |> List.map (fun f -> { DesignSystem.NextEpisodeHeroFriend.ImageRef = f.ImageRef; Name = f.Name })
+                JellyfinButton = jellyfinButton
+            }
+        ]
+    ]
 
 let private seriesNextUpOpenScroller (jellyfinServerUrl: string option) (items: DashboardSeriesNextUp list) =
     if List.isEmpty items then
         Html.none
     else
-        sectionOpen Icons.tv "Next Up" [
+        sectionOpen Icons.tv "Next episode" [
             Html.div [
                 prop.className "flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
                 prop.children [
                     for item in items do
-                        seriesPosterCard jellyfinServerUrl item
+                        seriesNextEpisodeCard jellyfinServerUrl item
                 ]
             ]
         ]

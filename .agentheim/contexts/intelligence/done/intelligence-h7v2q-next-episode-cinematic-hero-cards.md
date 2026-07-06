@@ -1,11 +1,11 @@
 ---
 id: intelligence-h7v2q
 title: Dashboard "Next episode" — cinematic hero cards (backdrop + still + progress + watched-with + Jellyfin play)
-status: doing
+status: done
 type: feature
 context: intelligence
 created: 2026-07-06
-completed:
+completed: 2026-07-06
 depends_on: [design-system-001]
 blocks: []
 tags: [dashboard, frontend, series, next-up, hero-card, jellyfin]
@@ -59,28 +59,63 @@ Scope is the **All tab** section the user described (`seriesNextUpOpenScroller` 
 scroller is out of scope for this task unless trivially shared.
 
 ## Acceptance criteria
-- [ ] The All-tab section header text is **"Next episode"** (not "Next Up").
-- [ ] Each next-up entry renders as a backdrop-filled cinematic hero card, visually
+- [x] The All-tab section header text is **"Next episode"** (not "Next Up").
+- [x] Each next-up entry renders as a backdrop-filled cinematic hero card, visually
       consistent with `DesignSystem.heroCard` (backdrop canvas + bottom scrim overlay),
       not the previous small poster card.
-- [ ] The series **backdrop** (`BackdropRef`) fills the card background; a sensible
+- [x] The series **backdrop** (`BackdropRef`) fills the card background; a sensible
       fallback is used when `BackdropRef` is `None` (e.g. poster, or a neutral panel) so
       the card never renders empty.
-- [ ] The **episode still** (`EpisodeStillRef`) appears as a thumbnail inset in the
+- [x] The **episode still** (`EpisodeStillRef`) appears as a thumbnail inset in the
       **top-right** corner (omitted gracefully when `None`).
-- [ ] The bottom overlay shows the **series name** and the **episode name**
+- [x] The bottom overlay shows the **series name** and the **episode name**
       (`SxxExx: title`) legibly over the backdrop.
-- [ ] The **segmented progress meter** shows `WatchedEpisodeCount` filled of
+- [x] The **segmented progress meter** shows `WatchedEpisodeCount` filled of
       `EpisodeCount`, using the design-system segmented-progress component.
-- [ ] Each **watched-with friend** is shown with **both their image and name**
+- [x] Each **watched-with friend** is shown with **both their image and name**
       (empty/absent when `WatchWithFriends` is empty).
-- [ ] The **Jellyfin play button** appears in the **bottom-right only** when both
+- [x] The **Jellyfin play button** appears in the **bottom-right only** when both
       `JellyfinServerUrl` and `JellyfinEpisodeId` are present; clicking it opens the
       Jellyfin episode URL without navigating the card to series detail.
-- [ ] Clicking elsewhere on the card still navigates to the series detail page.
-- [ ] `npm run build` compiles clean (Fable + Vite), no type errors, no new warnings.
-- [ ] Design-check passes (paper-overlay/token/typography conventions; scrim + serif
+- [x] Clicking elsewhere on the card still navigates to the series detail page.
+- [x] `npm run build` compiles clean (Fable + Vite), no type errors, no new warnings.
+- [x] Design-check passes (paper-overlay/token/typography conventions; scrim + serif
       title + mono episode label follow the styleguide).
+
+## Outcome
+Replaced the All-tab "Next Up" poster-card row with cinematic "Next episode" hero
+cards, backed by a new reusable `DesignSystem.nextEpisodeHeroCard` component
+(`src/Client/DesignSystem.fs`, after `heroCard`):
+
+- New types `NextEpisodeHeroFriend` (`ImageRef: string option; Name: string` — kept
+  primitive, decoupled from the `FriendRef` shared type, same precedent as the
+  existing `FilmstripItem`) and `NextEpisodeHeroCardProps`.
+- `nextEpisodeHeroCard` renders: backdrop image (falls back to poster, then a
+  neutral gradient panel) filling a `velvetCardHero` `aspect-video` canvas; a
+  bottom scrim gradient; the `InFocus` status badge top-left; the episode still
+  inset top-right (omitted when absent); a bottom overlay with the series name
+  (`font-display`), the `SxxExx: title` episode label (`font-mono`), the
+  `progressSegmented` meter, and watched-with friend chips (image + name, matching
+  `friendPill`'s visual language); and a caller-supplied `JellyfinButton` slot
+  (a pre-rendered, self-positioned `ReactElement option`) so the design-system
+  module doesn't need to depend on `Icons` (compiled before `Components/Icons.fs`
+  in `Client.fsproj`) or the Jellyfin URL helper.
+- `src/Client/Pages/Dashboard/Views.fs`: added `seriesNextEpisodeCard` (wraps the
+  new design-system card in the existing navigate-to-series-detail anchor,
+  building the Jellyfin play button with the page-local `jellyfinPlayUrl` +
+  `Icons.play` and mapping `item.WatchWithFriends: FriendRef list` to
+  `NextEpisodeHeroFriend list`); `seriesNextUpOpenScroller` now renders
+  `seriesNextEpisodeCard` per item under the section title `"Next episode"`
+  (was `"Next Up"`), with card width bumped to `w-[280px] sm:w-[320px]` to fit
+  the cinematic aspect-video treatment. The Series-tab poster scroller
+  (`seriesNextUpScroller` / `seriesPosterCard`) is unchanged, per scope.
+
+`npm run build` (Fable + Vite) compiles clean, no type errors, no new warnings.
+No server/projection/API changes — all fields were already on
+`DashboardSeriesNextUp`. No BC README update — this is UI presentation, no new
+domain/ubiquitous-language concept. No ADR — the component follows the existing
+`FilmstripItem` primitive-slot precedent already established in
+`DesignSystem.fs`, not a novel architectural decision.
 
 ## Notes
 - Data is **fully available already** on `DashboardSeriesNextUp` (`src/Shared/Shared.fs`

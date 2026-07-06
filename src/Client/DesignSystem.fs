@@ -636,3 +636,121 @@ let heroCard (props: HeroCardProps) : ReactElement =
             ]
         ]
     ]
+
+// ── Next episode hero card (Dashboard "Next episode" — cinematic backdrop cards) ──
+
+/// One watched-with friend, reduced to the two fields the card renders
+/// (image ref + name) — kept primitive so this module stays decoupled from
+/// the `FriendRef` shared type, matching the `FilmstripItem` precedent above.
+type NextEpisodeHeroFriend = {
+    ImageRef: string option
+    Name: string
+}
+
+type NextEpisodeHeroCardProps = {
+    SeriesName: string
+    /// "SxxExx: title" — `None` when there is no next-up episode to label.
+    EpisodeLabel: string option
+    BackdropRef: string option
+    /// Fallback background when `BackdropRef` is `None`.
+    PosterRef: string option
+    EpisodeStillRef: string option
+    InFocus: bool
+    ProgressFilled: int
+    ProgressTotal: int
+    WatchedWith: NextEpisodeHeroFriend list
+    /// Fully-rendered, self-positioned (`absolute bottom-3 right-3 ...`) Jellyfin
+    /// play button, or `None` when the episode isn't on Jellyfin. Rendered as-is
+    /// by the caller so this module doesn't need to know about icons/URLs.
+    JellyfinButton: ReactElement option
+}
+
+/// Cinematic "Next episode" hero card — the repeated, real-data variant of the
+/// styleguide's single-specimen `heroCard`. Backdrop fills the canvas, the
+/// episode still insets top-right, a bottom scrim overlay carries the series
+/// name, episode label, segmented progress, and watched-with friends
+/// (image + name), and the caller-supplied Jellyfin button (if any) sits
+/// bottom-right.
+let nextEpisodeHeroCard (props: NextEpisodeHeroCardProps) : ReactElement =
+    let backgroundRef = props.BackdropRef |> Option.orElse props.PosterRef
+    Html.div [
+        prop.className (velvetCardHero + " relative w-full aspect-video overflow-hidden")
+        prop.children [
+            match backgroundRef with
+            | Some ref ->
+                Html.img [
+                    prop.src $"/images/{ref}"
+                    prop.alt props.SeriesName
+                    prop.className "absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                ]
+            | None ->
+                Html.div [ prop.className "absolute inset-0 bg-gradient-to-br from-primary/20 to-base-300" ]
+
+            // Bottom scrim so the overlay text stays legible over the backdrop.
+            Html.div [ prop.className "absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" ]
+
+            if props.InFocus then
+                Html.div [
+                    prop.className "absolute top-3 left-3 z-10"
+                    prop.children [ statusBadge InFocus ]
+                ]
+
+            match props.EpisodeStillRef with
+            | Some still ->
+                Html.div [
+                    prop.className "absolute top-3 right-3 w-20 sm:w-24 aspect-video rounded-lg overflow-hidden border border-white/10 shadow-lg z-[5]"
+                    prop.children [
+                        Html.img [
+                            prop.src $"/images/{still}"
+                            prop.alt props.SeriesName
+                            prop.className "w-full h-full object-cover"
+                        ]
+                    ]
+                ]
+            | None -> ()
+
+            Html.div [
+                prop.className "absolute bottom-0 left-0 right-0 p-3 sm:p-4 flex flex-col gap-1.5 z-[1]"
+                prop.children [
+                    Html.h3 [
+                        prop.className "text-lg sm:text-xl font-display text-white/95 truncate"
+                        prop.text props.SeriesName
+                    ]
+                    match props.EpisodeLabel with
+                    | Some label ->
+                        Html.p [
+                            prop.className "text-xs font-mono text-white/70 truncate"
+                            prop.text label
+                        ]
+                    | None -> ()
+                    progressSegmented props.ProgressFilled props.ProgressTotal
+                    if not props.WatchedWith.IsEmpty then
+                        Html.div [
+                            prop.className "flex items-center gap-1.5 flex-wrap"
+                            prop.children [
+                                for friend in props.WatchedWith do
+                                    Html.span [
+                                        prop.key friend.Name
+                                        prop.className "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-white/10 text-white/80"
+                                        prop.children [
+                                            match friend.ImageRef with
+                                            | Some img ->
+                                                Html.img [
+                                                    prop.src $"/images/{img}"
+                                                    prop.alt friend.Name
+                                                    prop.className "w-3.5 h-3.5 rounded-full object-cover"
+                                                ]
+                                            | None -> ()
+                                            Html.span [ prop.text friend.Name ]
+                                        ]
+                                    ]
+                            ]
+                        ]
+                ]
+            ]
+
+            match props.JellyfinButton with
+            | Some button -> button
+            | None -> ()
+        ]
+    ]

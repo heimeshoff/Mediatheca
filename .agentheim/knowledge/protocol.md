@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 18:33 -- Task verified and completed: intelligence-h7v2q - Dashboard "Next episode" — cinematic hero cards (backdrop + still + progress + watched-with + Jellyfin play)
+
+**Type:** Work / Task completion
+**Task:** intelligence-h7v2q - Dashboard "Next episode" — cinematic hero cards (backdrop + still + progress + watched-with + Jellyfin play)
+**Summary:** Rework Dashboard All-tab TV Next Up into cinematic Next episode hero cards (backdrop + still inset + segmented progress + watched-with friends + Jellyfin play), backed by new reusable DesignSystem.nextEpisodeHeroCard
+**Duration:** 12m34s
+**Verification:** PASS (iteration 1)
+**Files changed:** 2
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-07-06 18:19 -- Batch started: [intelligence-h7v2q]
 
 **Type:** Work / Batch start
