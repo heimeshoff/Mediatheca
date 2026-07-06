@@ -5,6 +5,22 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 14:46 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~11m (Batch started 14:35 → now)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** design-system-k9p3v: 1
+**Commits:** 3 (1 batch-start claim + 1 task commit + this session-end line)
+**Vision-conformance:** none — batch aligns with vision (the underline-tab pattern directly serves the "Unified Dashboard" v1 tab strip and the "Unified, not siloed — one dashboard with tabs" design principle; pulls toward no Out-of-Scope item)
+**Carry-over:** src/Client/index.css: left behind (owner: user's own WIP — the `.status-badge` sizing/weight tweak "per 3d system-board reference", carried uncommitted since before this session; preserved via stash-around-squash so the underline-tab squash-merge into the same file couldn't clobber it — the two regions are disjoint). "Mediatheca Directions.html": left behind (owner: user's design reference doc — the 912KB captured Claude design session cited by tasks' Notes, untracked by the user since before this session, not project bookkeeping). .worktrees/design-system-k9p3v: discarded (orphan teardown residue — held only regenerable MSBuild `obj/Debug/net9.0` AssemblyInfo/cache files after `git worktree remove` deregistered it; no source, no task files, no uncommitted work).
+**Note:** Single isolated single-task design-system batch under worktree isolation (ADR-0032), PASS first try. **k9p3v** shipped the reusable **underline-tab** pattern — the header-tab sibling of the dir-3a sidebar nav: `DesignSystem.underlineTab`/`underlineTabActive`/`underlineTabInactive`/`underlineTabClass isActive` (modeled on the `navItem*` family), backed by `.underline-tab::after`/`.underline-tab-active::after` in `index.css` drawing a gold underline via the existing `--color-gold` token (no new colour), a live StyleGuide "Underline Tabs" specimen (1 active + 3 inactive), and a design-system README ubiquitous-language entry. No ADR (net-new additive pattern, nothing superseded — per the task's own latitude note). `npm run build` clean. No consumer migrated: the Dashboard `tabBar` re-point is `intelligence-dq8rk`'s job, which `depends_on` this task and is now unblocked — it remains in **intelligence backlog** (promotion is a `modeling` call, not `work`'s). No conflicts, no concept candidates, no new backlog items. The design-system board is quiescent again: backlog / todo / doing all empty, done: 14.
+
+---
+
 ## 2026-07-06 14:45 -- Task verified and completed: design-system-k9p3v - Underline tab pattern — reusable DesignSystem component (dir 3a header tabs)
 
 **Type:** Work / Task completion
