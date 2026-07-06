@@ -5,6 +5,22 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 18:34 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~15m (Batch started 18:19 → now)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** intelligence-h7v2q: 1
+**Commits:** 3 (1 batch-start claim + 1 task commit + this session-end line)
+**Vision-conformance:** none — batch aligns with vision (the hero-card rework directly realizes the "Unified Dashboard → All Tab → TV Series: Next Up" v1 success criterion — next unwatched episode, watch-with friends, episode progress — and the "Intent-driven" design principle by turning the next-up strip into a press-play invitation; the Jellyfin play button reuses the app's pre-existing `jellyfinPlayUrl` deep-link pattern, which is distinct from the Out-of-Scope "Jellyfin **sync**" (v2) non-goal, so no divergence)
+**Carry-over:** src/Client/index.css: left behind (owner: user's own WIP — the `.status-badge` sizing/weight tweak, carried uncommitted across prior sessions; this session's squash-merge touched only DesignSystem.fs + Views.fs, disjoint from the CSS region). "Mediatheca Directions.html": left behind (owner: user's design reference doc — the ~912KB captured Claude design session, untracked by the user since before this session, not project bookkeeping). .agentheim/state/: left behind (owner: work's own advisory observability heartbeat — `in-flight.json`, the ADR-0027 git-ignored advisory-artifact category; never a lifecycle write). .worktrees/: removed (empty dir residue after the PASS teardown deregistered `aw/intelligence-h7v2q`; no node_modules junction existed for this non-`dashboard/` task, so the shared root `node_modules` was never touched).
+**Note:** Single isolated single-task intelligence batch under worktree isolation (ADR-0032), PASS first try. **intelligence-h7v2q** reworked the Dashboard All-tab TV "Next Up" strip into "Next episode" cinematic hero cards, backed by a new reusable `DesignSystem.nextEpisodeHeroCard` component (backdrop-fills-canvas with poster→neutral-gradient fallback, episode still inset top-right, bottom scrim overlay carrying serif series name + mono `SxxExx: title` label + segmented episodes-watched progress meter + watched-with friend chips with image and name, InFocus badge top-left, and a caller-supplied `JellyfinButton` slot bottom-right so the design-system module stays decoupled from `Icons`/URL helpers). `src/Client/Pages/Dashboard/Views.fs` gained `seriesNextEpisodeCard` (wraps the card in the existing navigate-to-series-detail anchor, builds the Jellyfin play button with page-local `jellyfinPlayUrl` + `Icons.play` + `stopPropagation`, maps `WatchWithFriends` to the card's friend type); `seriesNextUpOpenScroller` now renders it per item under the retitled "Next episode" heading. Pure client presentation — no server/projection/event/API change (all fields already on `DashboardSeriesNextUp`). `npm run build` clean (✓ 42.65s), verifier PASS iteration 1. No BC README change (no new ubiquitous language), no ADR (follows the existing `FilmstripItem` primitive-slot precedent, not architecturally novel), no conflicts, no concept candidates, no new backlog items. The intelligence board is quiescent again: todo / doing empty, backlog holds its remaining items. **Reminder confirmed:** the intelligence `doing/` directory was again missing at session start (as the prior session flagged) and had to be recreated before the claim CLI could move the task — the other BCs likely share this gap; worth a one-time backfill of empty `doing/` dirs before their first `work` run.
+
+---
+
 ## 2026-07-06 18:33 -- Task verified and completed: intelligence-h7v2q - Dashboard "Next episode" — cinematic hero cards (backdrop + still + progress + watched-with + Jellyfin play)
 
 **Type:** Work / Task completion
