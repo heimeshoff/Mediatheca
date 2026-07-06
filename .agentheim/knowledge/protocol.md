@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 13:36 -- Modeling / Captured: intelligence-dq8rk - Dashboard All-tab 3a layout
+
+**Type:** Modeling / Capture
+**BC:** intelligence
+**Filed to:** backlog
+**Summary:** Rework the Dashboard All-tab to direction 3a: drop the "Dashboard" title, restyle the four tabs to text-with-orange-underline on one header line with an inline "Search your library" (wired to the existing SearchModal/searchLibrary), strip the Activity section (heatmap + monthly breakdown) and the yearly play/watch-time summary, and lay out a full-width TV Series row → full-width Movies row → two-column Games (left) / Books-placeholder (right, replacing 3a's recently-played). Frontend task; depends_on the design-system styleguide gate (design-system-001, done). Left in backlog — a few interpretive points open (hero spotlight fate, whether the tab restyle spins off a reusable design-system pattern, New Games section survival).
+
+---
+
 ## 2026-07-03 15:24 -- Work session ended
 
 **Type:** Work / Session end
