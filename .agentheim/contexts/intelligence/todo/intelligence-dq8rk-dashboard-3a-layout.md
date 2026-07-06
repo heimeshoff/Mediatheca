@@ -1,7 +1,7 @@
 ---
 id: intelligence-dq8rk
 title: Dashboard All-tab 3a layout — underline tabs + library search, media rows, games/books split
-status: backlog
+status: todo
 type: feature
 context: intelligence
 created: 2026-07-06

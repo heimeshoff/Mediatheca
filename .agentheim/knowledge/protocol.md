@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 14:54 -- Modeling / Promoted: intelligence-dq8rk - Dashboard All-tab 3a layout — underline tabs + library search, media rows, games/books split
+
+**Type:** Modeling / Promote
+**BC:** intelligence
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-06 14:52 -- Modeling / Refined: intelligence-dq8rk - Dashboard All-tab 3a layout
 
 **Type:** Modeling / Refine
