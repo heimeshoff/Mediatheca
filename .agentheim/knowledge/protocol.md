@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 15:20 -- Modeling / Captured: intelligence-r4m2p - Dashboard header search must stay pinned right on every tab; Games/Books split stacks when tight
+
+**Type:** Modeling / Capture
+**BC:** intelligence
+**Filed to:** todo
+**Summary:** Dashboard responsive-layout bug. The shared header's "Search your library" control stays pinned to the viewport's right on the Games tab but slides off-screen on All/Movies/TV Series — hypothesis: horizontal overflow from full-width poster rows grows the page container past the viewport, carrying the right-aligned search with it. Also make the All-tab Games/Books split stack to one column at tight widths instead of a cramped two-up. Frontend gate met (design-system-001 done).
+
+---
+
 ## 2026-07-06 15:11 -- Work session ended
 
 **Type:** Work / Session end
