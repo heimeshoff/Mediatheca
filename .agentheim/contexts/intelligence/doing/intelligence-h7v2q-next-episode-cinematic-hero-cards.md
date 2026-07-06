@@ -1,7 +1,7 @@
 ---
 id: intelligence-h7v2q
 title: Dashboard "Next episode" — cinematic hero cards (backdrop + still + progress + watched-with + Jellyfin play)
-status: todo
+status: doing
 type: feature
 context: intelligence
 created: 2026-07-06

@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 18:19 -- Batch started: [intelligence-h7v2q]
+
+**Type:** Work / Batch start
+**Tasks:** intelligence-h7v2q - Dashboard "Next episode" — cinematic hero cards (backdrop + still + progress + watched-with + Jellyfin play)
+**Parallel:** no (1 worker — sole ready task; dep design-system-001 done)
+
+---
+
 ## 2026-07-06 17:00 -- Modeling / Captured: intelligence-h7v2q - Dashboard "Next episode" cinematic hero cards
 
 **Type:** Modeling / Capture
