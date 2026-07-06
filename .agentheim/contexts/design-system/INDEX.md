@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 13
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **design-system-k9p3v** -- Underline tab pattern — reusable DesignSystem component (dir 3a header tabs) -- `todo/design-system-k9p3v-underline-tab-pattern.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **design-system-k9p3v** — Underline tab pattern — reusable DesignSystem component (dir 3a header tabs) (feature) — `doing/design-system-k9p3v-underline-tab-pattern.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

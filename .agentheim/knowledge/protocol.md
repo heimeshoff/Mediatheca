@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 14:35 -- Batch started: [design-system-k9p3v]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-k9p3v - Underline tab pattern — reusable DesignSystem component (dir 3a header tabs)
+**Parallel:** no (1 worker — sole ready task; consumer intelligence-dq8rk is blocked on it)
+
+---
+
 ## 2026-07-06 13:46 -- Modeling / Refined: intelligence-dq8rk - Dashboard All-tab 3a layout
 
 **Type:** Modeling / Refine

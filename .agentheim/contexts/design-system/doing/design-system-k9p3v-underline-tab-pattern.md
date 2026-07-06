@@ -1,7 +1,7 @@
 ---
 id: design-system-k9p3v
 title: Underline tab pattern — reusable DesignSystem component (dir 3a header tabs)
-status: todo
+status: doing
 type: feature
 context: design-system
 created: 2026-07-06
