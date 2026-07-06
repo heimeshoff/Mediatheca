@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 14:45 -- Task verified and completed: design-system-k9p3v - Underline tab pattern — reusable DesignSystem component (dir 3a header tabs)
+
+**Type:** Work / Task completion
+**Task:** design-system-k9p3v - Underline tab pattern — reusable DesignSystem component (dir 3a header tabs)
+**Summary:** Add reusable underline-tab pattern (gold-underline text tabs, no filled-pill chrome) to the design system
+**Duration:** ~8m
+**Verification:** PASS (iteration 1)
+**Files changed:** 4
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-07-06 14:35 -- Batch started: [design-system-k9p3v]
 
 **Type:** Work / Batch start

@@ -181,6 +181,30 @@ let navGroupBottom = "nav-group-bottom flex flex-col gap-[2px] mt-auto"
 /// Tagline under the wordmark (dir 3a): "Where entertainment lives".
 let navTagline = "text-[8.5px] font-sans uppercase tracking-[0.26em] text-ink-faint mt-[3px] whitespace-nowrap"
 
+// ── Underline tab (§ 4 dir 3a header tabs, design-system-k9p3v) ──
+// The header-tab sibling of the dir-3a sidebar nav above: a text tab with a
+// gold underline under the active tab, no filled-pill / bordered-button
+// chrome. The caller renders its own `Html.button`s and owns the tab list +
+// click wiring; this composition owns only the look.
+
+/// Underline tab (base classes) — layout + reset only (no fill, no border);
+/// the gold underline bar itself is drawn by `.underline-tab-active::after`
+/// in index.css (`--color-gold`, the same token as the sidebar's active
+/// icon/inset-bar — no new colour introduced).
+let underlineTab = "underline-tab relative bg-transparent border-0 px-1 pb-[10px] font-sans text-sm cursor-pointer transition-colors duration-200"
+
+/// Underline tab active state — full-ink label (weight 600) + gold underline.
+let underlineTabActive = "underline-tab-active text-base-content font-semibold"
+
+/// Underline tab inactive state — muted ink, hovers toward the active ink as
+/// an affordance hint (mirrors `navItemInactive`'s hover language).
+let underlineTabInactive = "underline-tab-inactive text-ink-muted hover:text-base-content"
+
+/// Underline tab helper — returns full class string based on active state,
+/// same isActive-branch shape as `navItemClass` / `filterPill`.
+let underlineTabClass isActive =
+    underlineTab + " " + (if isActive then underlineTabActive else underlineTabInactive)
+
 // ── Stat Cards ──
 
 /// Stat card with subtle glow effect

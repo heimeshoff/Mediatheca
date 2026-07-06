@@ -552,6 +552,29 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--color-nav-bottom-muted);
 }
 
+/* ── Underline tab (dir 3a header tabs, design-system-k9p3v) — text tabs
+   with a gold underline under the active tab; no filled-pill /
+   bordered-button chrome. Ink color is plain Tailwind utility (text-base-content
+   / text-ink-muted, layered in DesignSystem.fs); only the underline bar
+   itself needs a CSS rule, since a Tailwind arbitrary pseudo-element for a
+   sliding/appearing bar gets unwieldy. Sibling of the dir-3a sidebar nav
+   above, promoted as a reusable pattern instead of styled inline on a page
+   (design-system-k9p3v; first consumer is the Dashboard, intelligence-dq8rk). ── */
+.underline-tab::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    transition: background-color 0.2s ease;
+}
+.underline-tab-active::after {
+    background: var(--color-gold);
+}
+
 /* ── Gradient text ── */
 /* Velvet Lobby gold foil — accent (bright foil end) → gold (primary). Was cyan-green. */
 .text-gradient-primary {

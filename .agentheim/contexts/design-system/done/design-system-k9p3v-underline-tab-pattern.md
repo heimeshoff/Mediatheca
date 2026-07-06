@@ -1,11 +1,11 @@
 ---
 id: design-system-k9p3v
 title: Underline tab pattern — reusable DesignSystem component (dir 3a header tabs)
-status: doing
+status: done
 type: feature
 context: design-system
 created: 2026-07-06
-completed:
+completed: 2026-07-06
 depends_on: [design-system-001]
 blocks: [intelligence-dq8rk]
 tags: [tabs, nav, velvet-lobby, 3a, frontend]
@@ -52,3 +52,6 @@ dashboard header happens in `intelligence-dq8rk`; this task delivers the shared 
 - **Precedent:** the 3a **sidebar** work (design-system-grtw7, ADR-0014) is the model for "a 3a nav treatment promoted into the shared system." Follow the same shape: tokens/CSS in `index.css`, typed compositions in `DesignSystem.fs`, a StyleGuide specimen, a README ubiquitous-language entry.
 - **Worker latitude — ADR?** grtw7 wrote a superseding ADR only because it *reversed* an earlier decision. This is a net-new additive pattern with nothing to supersede, so an ADR is likely unnecessary — write one only if a genuine cross-cutting decision surfaces (e.g. the gold-underline accent choice merits recording). Don't force one.
 - **Consumer waiting on this:** `intelligence-dq8rk` (Dashboard All-tab 3a layout) `depends_on` this task and will re-point `tabBar` onto the shared pattern once it lands.
+
+## Outcome
+Shipped the underline-tab composition: `DesignSystem.underlineTab` / `underlineTabActive` / `underlineTabInactive` / `underlineTabClass isActive` in `src/Client/DesignSystem.fs` (modeled on `navItemClass`'s isActive-branch shape, placed directly after the dir-3a nav group). Layout/reset/ink color live as Tailwind utilities mixed into the class strings (matching `navItemInactive`'s convention); only the gold underline bar itself needed CSS — `.underline-tab::after` / `.underline-tab-active::after` in `src/Client/index.css`, reusing the existing `--color-gold` token (no new colour). Rendered as a "Underline Tabs" specimen on the live StyleGuide page (`src/Client/Pages/StyleGuide/Views.fs`, directly under "Sidebar Nav") showing one active + three inactive tabs. Added a design-system README ubiquitous-language entry. No ADR — this is a net-new additive pattern with nothing to supersede (per the task's own latitude note), and no cross-cutting decision surfaced. No consumer migration in this task; `intelligence-dq8rk` re-points the Dashboard's `tabBar` onto `underlineTabClass` separately. `npm run build` is clean.

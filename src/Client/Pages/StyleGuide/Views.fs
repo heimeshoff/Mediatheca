@@ -1447,6 +1447,41 @@ let private velvetLobbyPatternsSection () =
                 prop.text "DesignSystem.navItemClass isActive, navItemActiveIconClass, navGroupTop, navGroupBottom -- see Components/Sidebar.fs"
             ]
 
+            // ── Underline tabs ──
+            subheading "Underline Tabs"
+
+            decision "Direction 3a's header-tab strip (design-system-k9p3v): a text tab with a gold underline under the active tab, no filled-pill / bordered-button chrome -- reuses the sidebar's gold token (`--color-gold`), no new colour. Promoted as a shared pattern the same way the sidebar's dir-3a treatment was (design-system-grtw7 / ADR-0014); the Dashboard header re-points onto it in intelligence-dq8rk."
+
+            Html.div [
+                prop.className "mt-4 flex items-center gap-6 border-b border-base-content/5"
+                prop.children [
+                    Html.button [
+                        prop.type' "button"
+                        prop.className (DesignSystem.underlineTabClass true)
+                        prop.text "All"
+                    ]
+                    Html.button [
+                        prop.type' "button"
+                        prop.className (DesignSystem.underlineTabClass false)
+                        prop.text "Movies"
+                    ]
+                    Html.button [
+                        prop.type' "button"
+                        prop.className (DesignSystem.underlineTabClass false)
+                        prop.text "Series"
+                    ]
+                    Html.button [
+                        prop.type' "button"
+                        prop.className (DesignSystem.underlineTabClass false)
+                        prop.text "Games"
+                    ]
+                ]
+            ]
+            Html.code [
+                prop.className "text-xs font-mono text-primary/70 mt-2 block"
+                prop.text "DesignSystem.underlineTabClass isActive -- caller renders its own Html.button list + click wiring"
+            ]
+
             // ── Status badges ──
             subheading "Status Badges"
 

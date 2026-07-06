@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 13
+- **Doing:** 0
+- **Done:** 14
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **design-system-k9p3v** — Underline tab pattern — reusable DesignSystem component (dir 3a header tabs) (feature) — `doing/design-system-k9p3v-underline-tab-pattern.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **design-system-k9p3v** — Underline tab pattern — reusable DesignSystem component (dir 3a header tabs) (feature) — `done/design-system-k9p3v-underline-tab-pattern.md`
 - **design-system-pv3mq** -- Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006) -- `done/design-system-pv3mq-retire-glassmorphism-paper-material.md`
 - **design-system-sg8kd** -- Retire styleguide.md — in-app StyleGuide page is authoritative (supersede ADR-0009) -- `done/design-system-sg8kd-retire-styleguide-md.md`
 - **design-system-grtw7** -- Sidebar nav — align with dir 3a (full revert to burgundy active tab, supersedes ADR-0013) -- `done/design-system-grtw7-sidebar-3a-alignment.md`
