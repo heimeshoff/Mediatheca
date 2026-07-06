@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 16:37 -- Batch started: [intelligence-r4m2p]
+
+**Type:** Work / Batch start
+**Tasks:** intelligence-r4m2p - Dashboard header search must stay pinned right on every tab; Games/Books split stacks when tight
+**Parallel:** no (1 worker — sole ready task; dashboard header/responsive bug, dep design-system-001 done)
+
+---
+
 ## 2026-07-06 15:20 -- Modeling / Captured: intelligence-r4m2p - Dashboard header search must stay pinned right on every tab; Games/Books split stacks when tight
 
 **Type:** Modeling / Capture

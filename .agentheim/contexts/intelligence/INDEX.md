@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 1
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **intelligence-r4m2p** — Dashboard header search must stay pinned right on every tab; Games/Books split stacks when tight (bug) — `todo/intelligence-r4m2p-dashboard-search-pin-responsive-split.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **intelligence-r4m2p** — Dashboard header search must stay pinned right on every tab; Games/Books split stacks when tight (bug) — `doing/intelligence-r4m2p-dashboard-search-pin-responsive-split.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

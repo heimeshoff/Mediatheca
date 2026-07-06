@@ -1,7 +1,7 @@
 ---
 id: intelligence-r4m2p
 title: Dashboard header search must stay pinned right on every tab; Games/Books split stacks when tight
-status: todo
+status: doing
 type: bug
 context: intelligence
 created: 2026-07-06
