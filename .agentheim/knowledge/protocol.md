@@ -5,6 +5,22 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 16:49 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~10m (Batch started 16:39 → now)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** intelligence-r4m2p: 1
+**Commits:** 3 (1 batch-start claim + 1 task commit + this session-end line)
+**Vision-conformance:** none — batch aligns with vision (the responsive-layout bug fix directly serves the "Unified Dashboard" v1 success criterion and the "Mobile-first — dashboard sections work as a vertical scroll on mobile" design principle; adjusting the Books-placeholder's `lg`→`xl` responsive breakpoint only tunes an existing layout slot and does not build the "Books (v2)" Out-of-Scope feature)
+**Carry-over:** src/Client/index.css: left behind (owner: user's own WIP — the `.status-badge` sizing/weight tweak, carried uncommitted across prior sessions; this session's squash-merge touched only Layout.fs + Views.fs, disjoint from the CSS region). "Mediatheca Directions.html": left behind (owner: user's design reference doc — the ~912KB captured Claude design session, untracked by the user since before this session, not project bookkeeping). .agentheim/state/: left behind (owner: work's own advisory observability heartbeat — `in-flight.json`, the ADR-0027 git-ignored advisory-artifact category; never a lifecycle write). .worktrees/: removed (empty dir residue after the PASS teardown deregistered `aw/intelligence-r4m2p`; the node_modules junction was unlinked before `git worktree remove` so the shared root `node_modules` stayed intact — verified `node_modules/react` present post-unlink).
+**Note:** Single isolated single-task intelligence batch under worktree isolation (ADR-0032), PASS first try. **intelligence-r4m2p** fixed the Dashboard header search sliding off-screen on the All / Movies / TV Series tabs. Root cause (confirmed by the verifier against the actual `overflow-x-auto` poster rows and the block-level descendant chain): the shared `Html.main` flex column in `src/Client/Components/Layout.fs` lacked `min-w-0`, so its default `min-width:auto` let a horizontally-scrolling poster row force the whole column — and the right-aligned `headerLine` search button — wider than the viewport (the Games tab's wrapping poster *grid* never hit this floor, which is why only Games looked correct). Fix: added `min-w-0` to that shared `main` — a one-class flexbox fix that protects every page, not just the Dashboard tabs. Separately raised the All-tab Games/Books split from `lg:grid-cols-2` to `xl:grid-cols-2` (`allTabView`, Views.fs) so it stays a single stacked column through the mid-width range where two columns were cramped. `npm run build` clean (✓ 41.48s). No BC README change (no new ubiquitous language), no ADR (well-understood CSS pattern, not architecturally significant), no conflicts, no concept candidates, no new backlog items. The intelligence board is now quiescent: backlog holds its remaining items, todo / doing empty. **Note for next session:** the intelligence `doing/` directory was missing at session start and had to be created before the claim CLI could move the task — worth confirming the other BCs have their `doing/` dirs before their first `work` run.
+
+---
+
 ## 2026-07-06 16:48 -- Task verified and completed: intelligence-r4m2p - Dashboard header search must stay pinned right on every tab; Games/Books split stacks when tight
 
 **Type:** Work / Task completion
