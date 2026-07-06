@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 14:56 -- Batch started: [intelligence-dq8rk]
+
+**Type:** Work / Batch start
+**Tasks:** intelligence-dq8rk - Dashboard All-tab 3a layout — underline tabs + library search, media rows, games/books split
+**Parallel:** no (1 worker — sole ready task; frontend Dashboard 3a layout, deps design-system-001 + design-system-k9p3v both done)
+
+---
+
 ## 2026-07-06 14:54 -- Modeling / Promoted: intelligence-dq8rk - Dashboard All-tab 3a layout — underline tabs + library search, media rows, games/books split
 
 **Type:** Modeling / Promote

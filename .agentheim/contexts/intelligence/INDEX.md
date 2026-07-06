@@ -11,19 +11,19 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 0
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **intelligence-dq8rk** — Dashboard All-tab 3a layout — underline tabs + library search, media rows, games/books split (feature) — `todo/intelligence-dq8rk-dashboard-3a-layout.md`
 <!-- no tasks in todo -->
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **intelligence-dq8rk** — Dashboard All-tab 3a layout — underline tabs + library search, media rows, games/books split (feature) — `doing/intelligence-dq8rk-dashboard-3a-layout.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
