@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 14:52 -- Modeling / Refined: intelligence-dq8rk - Dashboard All-tab 3a layout
+
+**Type:** Modeling / Refine
+**BC:** intelligence
+**Status after:** todo (auto-promoted — blocker cleared)
+**Summary:** Readiness pass now that the sole blocker shipped. `design-system-k9p3v` (the reusable underline-tab component) completed PASS at 14:45, so both `depends_on` (design-system-001 + design-system-k9p3v) are done and the task cleared the gate. Baked the now-concrete k9p3v API into the Notes — the worker consumes `DesignSystem.underlineTabClass isActive` (backed by `.underline-tab::after` / `--color-gold`), swapping the filled-pill class in `tabBar` (Views.fs:54), with the live StyleGuide "Underline Tabs" specimen as the design-system gate. Verified all worker-facing anchors still resolve (tabBar:54, activitySection:1800, allTabView:1815, heroSpotlight:911, gamesInFocusPosterSection:1111, newGamesSection:1261, placeholderTab:4248). No split, no ADR.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-07-06 14:46 -- Work session ended
 
 **Type:** Work / Session end

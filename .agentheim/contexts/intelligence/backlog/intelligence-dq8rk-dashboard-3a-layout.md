@@ -70,6 +70,14 @@ to match 3a:
   underline tab was promoted to a reusable design-system component (`design-system-k9p3v`,
   mirroring the 3a sidebar → ADR-0014 precedent). This task **consumes** it: re-point `tabBar`
   onto the shared composition. Do not re-style tabs inline here.
+  - **Concrete API (delivered by k9p3v, now shipped):** apply `DesignSystem.underlineTabClass isActive`
+    to each tab button's `className` (it composes `underlineTab` + `underlineTabActive`/`underlineTabInactive`
+    for you); the gold underline is drawn by `.underline-tab::after` / `.underline-tab-active::after` in
+    `index.css` off the existing `--color-gold` token. The `tabBar` function is at
+    `src/Client/Pages/Dashboard/Views.fs:54` — it currently renders filled pills; swap the pill class
+    for `underlineTabClass`, keep the existing `activeTab`/`dispatch` wiring. Visual reference: the live
+    **"Underline Tabs"** specimen on the StyleGuide page (1 active + 3 inactive), which is the design-system
+    gate for this change.
 - **Search wiring (cross-MVU — important).** The library search modal lives in the **root** MVU
   (`model.SearchModal`, `src/Client/Views.fs`), not the Dashboard page. Sibling pages open it by
   dispatching their **own** `Open_search_modal` message that root `State.fs` intercepts and turns
