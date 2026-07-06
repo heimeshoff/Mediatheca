@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 2
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **intelligence-h7v2q** — Dashboard "Next episode" — cinematic hero cards (backdrop + still + progress + watched-with + Jellyfin play) (feature) — `todo/intelligence-h7v2q-next-episode-cinematic-hero-cards.md`
 <!-- todo-list:end -->
 
 ### Doing

@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 17:00 -- Modeling / Captured: intelligence-h7v2q - Dashboard "Next episode" cinematic hero cards
+
+**Type:** Modeling / Capture
+**BC:** intelligence
+**Filed to:** todo
+**Summary:** Rework the Dashboard All-tab TV "Next Up" section into "Next episode" cinematic hero cards modeled on `DesignSystem.heroCard`: series backdrop as the card background, episode still inset top-right, a bottom scrim overlay carrying series name + episode name + segmented episodes-watched progress meter + watched-with friends (image and name) + a Jellyfin play button bottom-right when the episode is on Jellyfin. Pure client presentation task — all fields already on `DashboardSeriesNextUp`; no server/projection/API change. Frontend gate (design-system-001) met; upgrades the section built by intelligence-dq8rk.
+
+---
+
 ## 2026-07-06 16:49 -- Work session ended
 
 **Type:** Work / Session end
