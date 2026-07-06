@@ -509,15 +509,19 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         updateSearchModal api childMsg model
 
     | Dashboard_msg childMsg ->
-        let childModel, childCmd = Pages.Dashboard.State.update api childMsg model.DashboardModel
-        let extraCmd =
-            match childMsg with
-            | Pages.Dashboard.Types.SwitchTab _ ->
-                // Re-trigger Jellyfin sync on tab switch (server enforces 5-min cooldown)
-                Cmd.OfAsync.perform api.triggerJellyfinSync () JellyfinSyncTriggered
-            | _ -> Cmd.none
-        { model with DashboardModel = childModel },
-        Cmd.batch [ Cmd.map Dashboard_msg childCmd; extraCmd ]
+        match childMsg with
+        | Pages.Dashboard.Types.Open_search_modal ->
+            { model with SearchModal = Some (SearchModal.initWithGames model.MovieListModel.Movies model.SeriesListModel.Series model.GameListModel.Games) }, Cmd.none
+        | _ ->
+            let childModel, childCmd = Pages.Dashboard.State.update api childMsg model.DashboardModel
+            let extraCmd =
+                match childMsg with
+                | Pages.Dashboard.Types.SwitchTab _ ->
+                    // Re-trigger Jellyfin sync on tab switch (server enforces 5-min cooldown)
+                    Cmd.OfAsync.perform api.triggerJellyfinSync () JellyfinSyncTriggered
+                | _ -> Cmd.none
+            { model with DashboardModel = childModel },
+            Cmd.batch [ Cmd.map Dashboard_msg childCmd; extraCmd ]
 
     | Movie_list_msg childMsg ->
         match childMsg with

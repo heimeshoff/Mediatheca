@@ -35,3 +35,4 @@ type Msg =
     | AchievementsLoaded of Result<SteamAchievement list, string>
     | TriggerPlaytimeSync
     | PlaytimeSyncCompleted of Result<PlaytimeSyncResult, string>
+    | Open_search_modal

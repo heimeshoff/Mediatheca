@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-06 15:09 -- Task verified and completed: intelligence-dq8rk - Dashboard All-tab 3a layout — underline tabs + library search, media rows, games/books split
+
+**Type:** Work / Task completion
+**Task:** intelligence-dq8rk - Dashboard All-tab 3a layout — underline tabs + library search, media rows, games/books split
+**Summary:** Rework Dashboard All-tab to direction 3a — underline tabs + inline library search, full-width TV & Movies rows, Games/Books two-column split
+**Duration:** 11m
+**Verification:** PASS (iteration 1)
+**Files changed:** 4
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-07-06 14:56 -- Batch started: [intelligence-dq8rk]
 
 **Type:** Work / Batch start

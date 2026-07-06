@@ -53,18 +53,12 @@ let private formatDayOfWeek (dateStr: string) =
 
 let private tabBar (activeTab: DashboardTab) (dispatch: Msg -> unit) =
     Html.div [
-        prop.className "flex gap-1 p-1 rounded-xl bg-base-300/40 w-fit"
+        prop.className "flex gap-6"
         prop.role "tablist"
         prop.children [
             let tab (label: string) tabValue =
                 Html.button [
-                    prop.className (
-                        "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 "
-                        + if activeTab = tabValue then
-                            "bg-primary/15 text-primary border border-primary/30"
-                          else
-                            "text-base-content/60 hover:text-base-content hover:bg-base-300/50 border border-transparent"
-                    )
+                    prop.className (DesignSystem.underlineTabClass (activeTab = tabValue))
                     prop.role "tab"
                     prop.onClick (fun _ -> dispatch (SwitchTab tabValue))
                     prop.text label
@@ -73,6 +67,29 @@ let private tabBar (activeTab: DashboardTab) (dispatch: Msg -> unit) =
             tab "Movies" MoviesTab
             tab "TV Series" SeriesTab
             tab "Games" GamesTab
+        ]
+    ]
+
+// ── Library search control (header line, right-aligned) ──
+
+let private searchLibraryButton (dispatch: Msg -> unit) =
+    Html.button [
+        prop.className "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-base-content/50 hover:text-base-content hover:bg-base-300/40 transition-colors"
+        prop.onClick (fun _ -> dispatch Open_search_modal)
+        prop.children [
+            Icons.magnifyingGlass ()
+            Html.span [ prop.text "Search your library" ]
+        ]
+    ]
+
+// ── Header line — tabs + search, single row ──
+
+let private headerLine (activeTab: DashboardTab) (dispatch: Msg -> unit) =
+    Html.div [
+        prop.className "flex items-center justify-between gap-4 mb-6"
+        prop.children [
+            tabBar activeTab dispatch
+            searchLibraryButton dispatch
         ]
     ]
 
@@ -1810,61 +1827,34 @@ let private activitySection (activityDays: DashboardActivityDay list) (breakdown
         ]
     ]
 
-// ── All Tab — 2-Column Grid Layout ──
+// ── Books placeholder (right column, matches Games column chrome) ──
 
-let private allTabView (data: DashboardAllTab) (isSyncing: bool) (dispatch: Msg -> unit) =
-    // Pick the first active (non-finished, non-abandoned) series for the hero spotlight
-    let heroItem =
-        data.SeriesNextUp
-        |> List.tryFind (fun s -> not s.IsFinished && not s.IsAbandoned && s.NextUpSeason > 0)
-    // Remaining series for the Next Up scroller (skip the hero item)
-    let nextUpItems =
-        match heroItem with
-        | Some hero ->
-            data.SeriesNextUp |> List.filter (fun s -> s.Slug <> hero.Slug)
-        | None -> data.SeriesNextUp
+let private booksColumnPlaceholder =
+    sectionCard Icons.catalog "Books" [
+        Html.p [
+            prop.className "text-base-content/40 text-sm font-medium text-center py-6"
+            prop.text "Books coming soon."
+        ]
+    ]
 
+// ── All Tab — 3a layout: TV row, Movies row, Games/Books split ──
+
+let private allTabView (data: DashboardAllTab) =
     Html.div [
         prop.className "flex flex-col gap-4"
         prop.children [
-            // 1. Activity section — heatmap + monthly breakdown side by side
-            activitySection data.ActivityDays data.MonthlyBreakdown
+            // 1. TV Series — full-width Next Up poster row (no hero lead card)
+            seriesNextUpOpenScroller data.JellyfinServerUrl data.SeriesNextUp
 
-            // 2-column grid on desktop
+            // 2. Movies to Watch — full-width poster row
+            moviesToWatchPosterSection data.JellyfinServerUrl data.MoviesToWatch
+
+            // 3. Games (left) / Books (right) two-column split
             Html.div [
-                prop.className "grid grid-cols-1 lg:grid-cols-3 gap-4"
+                prop.className "grid grid-cols-1 lg:grid-cols-2 gap-4"
                 prop.children [
-                    // Left column (2/3)
-                    Html.div [
-                        prop.className "lg:col-span-2 flex flex-col gap-4"
-                        prop.children [
-                            // 2. Hero Episode Spotlight
-                            match heroItem with
-                            | Some item -> heroSpotlight data.JellyfinServerUrl item
-                            | None -> ()
-
-                            // 3. Next Up — open section (no card chrome)
-                            seriesNextUpOpenScroller data.JellyfinServerUrl nextUpItems
-
-                            // 4. Movies to Watch
-                            moviesToWatchPosterSection data.JellyfinServerUrl data.MoviesToWatch
-                        ]
-                    ]
-
-                    // Right column (1/3)
-                    Html.div [
-                        prop.className "lg:col-span-1 flex flex-col gap-4"
-                        prop.children [
-                            // 5. Games play activity chart (existing 14-day chart)
-                            gamesRecentlyPlayedChartWithStats data.PlaySessions isSyncing dispatch
-
-                            // 6. Games In Focus — poster cards
-                            gamesInFocusPosterSection data.GamesInFocus
-
-                            // 7. New Games
-                            newGamesSection data.NewGames
-                        ]
-                    ]
+                    gamesInFocusPosterSection data.GamesInFocus
+                    booksColumnPlaceholder
                 ]
             ]
         ]
@@ -4277,17 +4267,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
             Html.div [
                 prop.className DesignSystem.pageContainer
                 prop.children [
-                    // Page title
-                    Html.h1 [
-                        prop.className (DesignSystem.pageTitle + " mb-4")
-                        prop.text "Dashboard"
-                    ]
-
-                    // Tab bar
-                    Html.div [
-                        prop.className "mb-6"
-                        prop.children [ tabBar model.ActiveTab dispatch ]
-                    ]
+                    // Header line — tabs (underline pattern) + library search, same row
+                    headerLine model.ActiveTab dispatch
 
                     // Tab content
                     if model.IsLoading then
@@ -4296,7 +4277,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         match model.ActiveTab with
                         | All ->
                             match model.AllTabData with
-                            | Some data -> allTabView data model.IsSyncing dispatch
+                            | Some data -> allTabView data
                             | None -> loadingView
                         | MoviesTab ->
                             match model.MoviesTabData with

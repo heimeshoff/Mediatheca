@@ -91,3 +91,8 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 fetchTabData api All
             ]
         { model with IsSyncing = false }, refreshCmds
+
+    | Open_search_modal ->
+        // Intercepted by root State.fs (Dashboard_msg branch), mirroring the
+        // Games/Movies/Series Open_search_modal pattern — no-op here.
+        model, Cmd.none

@@ -1,11 +1,11 @@
 ---
 id: intelligence-dq8rk
 title: Dashboard All-tab 3a layout — underline tabs + library search, media rows, games/books split
-status: doing
+status: done
 type: feature
 context: intelligence
 created: 2026-07-06
-completed:
+completed: 2026-07-06
 depends_on: [design-system-001, design-system-k9p3v]
 blocks: []
 tags: [dashboard, layout, frontend, 3a]
@@ -51,17 +51,17 @@ to match 3a:
      replaces 3a's recently-played list on the right.
 
 ## Acceptance criteria
-- [ ] The "Dashboard" `<h1>` page title is gone from the All tab.
-- [ ] The four tabs render using the shared **underline-tab pattern** (`design-system-k9p3v`) — text tabs with a gold underline on the active tab, no filled pill/button chrome. The dashboard does **not** carry bespoke tab CSS; it consumes the DesignSystem composition.
-- [ ] A "Search your library" control sits on the **same top line** as the tabs, right-aligned, and triggers the existing working library search (not a dummy).
-- [ ] The Activity section (heatmap + monthly breakdown) no longer renders on the All tab.
-- [ ] The games 14-day play chart / summary-stats block and any yearly cross-media play-time & watch-time totals no longer render on the All tab.
-- [ ] All-tab body order is: full-width **TV Series** row → full-width **Movies** row → two-column **Games (left) / Books (right)** area.
-- [ ] The TV Series row is a pure full-width poster row (Next Up) — **no `heroSpotlight` lead card**.
-- [ ] The Games column shows In Focus + recently-played games only — **no `newGamesSection`**, no 14-day activity chart / summary-stats block.
-- [ ] The Books column is a labelled placeholder card with an empty/coming-soon state, matching the games column's chrome.
-- [ ] Movies / TV Series / Games tabs still function; only the All-tab composition and the shared tab/header change.
-- [ ] Conforms to the design system (typography, velvet-card/paper-overlay, `DesignSystem.fs`), reviewed on the running StyleGuide page. `npm run build` is clean.
+- [x] The "Dashboard" `<h1>` page title is gone from the All tab.
+- [x] The four tabs render using the shared **underline-tab pattern** (`design-system-k9p3v`) — text tabs with a gold underline on the active tab, no filled pill/button chrome. The dashboard does **not** carry bespoke tab CSS; it consumes the DesignSystem composition.
+- [x] A "Search your library" control sits on the **same top line** as the tabs, right-aligned, and triggers the existing working library search (not a dummy).
+- [x] The Activity section (heatmap + monthly breakdown) no longer renders on the All tab.
+- [x] The games 14-day play chart / summary-stats block and any yearly cross-media play-time & watch-time totals no longer render on the All tab.
+- [x] All-tab body order is: full-width **TV Series** row → full-width **Movies** row → two-column **Games (left) / Books (right)** area.
+- [x] The TV Series row is a pure full-width poster row (Next Up) — **no `heroSpotlight` lead card**.
+- [x] The Games column shows In Focus + recently-played games only — **no `newGamesSection`**, no 14-day activity chart / summary-stats block.
+- [x] The Books column is a labelled placeholder card with an empty/coming-soon state, matching the games column's chrome.
+- [x] Movies / TV Series / Games tabs still function; only the All-tab composition and the shared tab/header change.
+- [x] Conforms to the design system (typography, velvet-card/paper-overlay, `DesignSystem.fs`), reviewed on the running StyleGuide page. `npm run build` is clean.
 
 ## Notes
 - **Reference:** direction **3a** in `Mediatheca Directions.html` (the captured design session in
@@ -91,3 +91,27 @@ to match 3a:
   then a `lg:grid-cols-3` split with hero/Next-Up/Movies on the left and games-chart/in-focus/
   new-games on the right. Collapses to: header line, TV row, Movies row, Games/Books two-column.
   The page shell (`view`, ~line 4273) holds the title + `tabBar`.
+
+## Outcome
+Re-pointed the Dashboard's shared header and All tab to 3a. `tabBar` now consumes
+`DesignSystem.underlineTabClass` (no bespoke pill CSS); a new `searchLibraryButton` sits on the
+same row via a new `headerLine` composition, dispatching a new `Open_search_modal` case on
+`Pages.Dashboard.Types.Msg` that root `State.fs`'s `Dashboard_msg` branch intercepts (mirroring
+the Games/Movies/Series `Open_search_modal` pattern) to open the existing `SearchModal`. Dropped
+the page `<h1>` title. `allTabView` was rewritten to drop `activitySection`,
+`gamesRecentlyPlayedChartWithStats`, the hero-spotlight lead card, and `newGamesSection`, and now
+renders: full-width `seriesNextUpOpenScroller` (all `SeriesNextUp`, no hero carve-out) → full-width
+`moviesToWatchPosterSection` → a two-column `grid` of `gamesInFocusPosterSection` (left) and a new
+`booksColumnPlaceholder` (right, `sectionCard Icons.catalog "Books"` with a quiet "Books coming
+soon." empty state, matching the games column's chrome). The now-orphaned `activitySection`,
+`activityHeatmapContent`, `monthlyBreakdownContent`, `heroSpotlight`, `gamesRecentlyPlayedChartWithStats`,
+`playSessionSummaryStats`, `newGamesSection`, `newGameItem` helpers were left in place (unused,
+harmless, no `WarningsAsErrors`) rather than deleted, to keep the diff scoped to the All-tab
+composition per the task's minimum-viable-change guidance. `npm run build` is clean. No BC README
+change — no new ubiquitous language, aggregates, or invariants; this is a pure Dashboard-page
+layout re-point.
+
+Key files: `src/Client/Pages/Dashboard/Views.fs` (tabBar, searchLibraryButton, headerLine,
+booksColumnPlaceholder, allTabView, view), `src/Client/Pages/Dashboard/Types.fs` (+`Open_search_modal`),
+`src/Client/Pages/Dashboard/State.fs` (+no-op `Open_search_modal` case), `src/Client/State.fs`
+(root `Dashboard_msg` branch now intercepts `Open_search_modal`).
