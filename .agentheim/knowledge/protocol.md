@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-07 19:57 -- Task verified and completed: intelligence-p9m4t - Dashboard "Movies to Watch" — wrap posters in the filmstrip well
+
+**Type:** Work / Task completion
+**Task:** intelligence-p9m4t - Dashboard "Movies to Watch" — wrap posters in the filmstrip well
+**Summary:** Reskin Dashboard All-tab Movies to Watch into the filmstrip well (DesignSystem.filmstripRow) with caller-supplied nav/InFocus/Jellyfin slots per the h7v2q precedent; fill-then-scroll overflow
+**Duration:** 9m40s
+**Verification:** PASS (iteration 1)
+**Files changed:** 3
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-07-07 19:37 -- Batch started: [intelligence-p9m4t]
 
 **Type:** Work / Batch start

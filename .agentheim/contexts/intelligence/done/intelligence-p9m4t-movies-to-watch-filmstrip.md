@@ -1,11 +1,11 @@
 ---
 id: intelligence-p9m4t
 title: Dashboard "Movies to Watch" — wrap posters in the filmstrip well
-status: doing
+status: done
 type: feature
 context: intelligence
 created: 2026-07-07
-completed:
+completed: 2026-07-07
 depends_on: [design-system-001]
 blocks: []
 tags: [dashboard, movies, filmstrip, design-system]
@@ -43,27 +43,27 @@ Two shape decisions (confirmed with the user at capture):
   bottom-right when the movie has a `JellyfinId` and a Jellyfin server URL is configured.
 
 ## Acceptance criteria
-- [ ] The All-tab "Movies to Watch" section renders its posters inside the filmstrip
+- [x] The All-tab "Movies to Watch" section renders its posters inside the filmstrip
       well — black background, sprocket-hole perforation strip top and bottom
       (`.filmstrip` / `.filmstrip-sprocket`), matching the 3A specimen — replacing the
       current plain `overflow-x-auto` poster-card row.
-- [ ] Posters keep 3A proportions (~196px tall, `--radius-poster`) and read as equal
+- [x] Posters keep 3A proportions (~196px tall, `--radius-poster`) and read as equal
       tiles within the strip.
-- [ ] When the movies overflow the strip width, the entire sprocketed well (sprockets +
+- [x] When the movies overflow the strip width, the entire sprocketed well (sprockets +
       posters together) scrolls horizontally as one piece; no separate static frame
       around a moving inner row.
-- [ ] Each tile navigates to `/movies/<slug>` on click.
-- [ ] In-focus movies show the InFocus crosshair badge (top-left) on their tile.
-- [ ] Movies with a `JellyfinId` show the Jellyfin play button (bottom-right) when a
+- [x] Each tile navigates to `/movies/<slug>` on click.
+- [x] In-focus movies show the InFocus crosshair badge (top-left) on their tile.
+- [x] Movies with a `JellyfinId` show the Jellyfin play button (bottom-right) when a
       Jellyfin server URL is configured; clicking it opens Jellyfin and does not trigger
       the tile's navigation (stopPropagation), as today.
-- [ ] Captions (title + year) render beneath the strip, per the specimen.
-- [ ] The section stays hidden when there are no movies to watch (current behavior).
-- [ ] The filmstrip primitive change follows the h7v2q precedent — interactive bits
+- [x] Captions (title + year) render beneath the strip, per the specimen.
+- [x] The section stays hidden when there are no movies to watch (current behavior).
+- [x] The filmstrip primitive change follows the h7v2q precedent — interactive bits
       (nav target, InFocus flag, a caller-supplied Jellyfin-button slot) are passed in so
       `DesignSystem` stays decoupled from `Icons` / URL helpers. If `filmstripRow`'s
       signature changes, the StyleGuide "Movies Filmstrip" specimen is updated to match.
-- [ ] `npm run build` is clean (Fable compiles, no type errors).
+- [x] `npm run build` is clean (Fable compiles, no type errors).
 
 ## Notes
 - Current code: `src/Client/Pages/Dashboard/Views.fs` — `movieToWatchPosterCard` +
@@ -84,3 +84,42 @@ Two shape decisions (confirmed with the user at capture):
   scrolled content width) vs. a wrapping approach — resolve during implementation.
 - Design gate: frontend task in a frontend-bearing BC → `depends_on` the styleguide
   (design-system-001, done). Run the design-check / StyleGuide gate before completion.
+
+## Outcome
+Extended `DesignSystem.FilmstripItem` (`src/Client/DesignSystem.fs` ~L492) with
+caller-supplied interactive slots — `Key`, `Href` / `OnNavigate` (nav target),
+`InFocusBadge`, and `JellyfinButton` (both pre-rendered `ReactElement option`
+slots, self-positioned) — following the `nextEpisodeHeroCard` precedent
+(intelligence-h7v2q) so `DesignSystem` stays decoupled from `Feliz.Router` /
+`Icons`. Reworked `filmstripRow` so each tile renders as a plain `div` (no
+Href/OnNavigate) or an `Html.a` (nav wired via `preventDefault` +
+`OnNavigate`), and resolved the overflow shape decision by making the
+*entire* sprocketed well + captions one `overflow-x-auto` ancestor around a
+`flex flex-col w-max min-w-full` block; tiles use `flex-[1_0_130px]`
+(grow-to-fill, never shrink below the 3a poster proportion) so the strip
+fills available width when it fits and becomes one horizontally-scrollable
+piece (sprockets, posters, and captions moving together) once it overflows.
+
+Added `movieToWatchFilmstripItem` (`src/Client/Pages/Dashboard/Views.fs`,
+below `movieToWatchPosterCard`) which builds the InFocus crosshair badge and
+Jellyfin play button locally (needs `Icons.crosshairSmFilled` / `Icons.play`
+/ `jellyfinPlayUrl`) and hands them to `DesignSystem.filmstripRow` as
+pre-rendered slots; `moviesToWatchPosterSection` now calls
+`DesignSystem.filmstripRow` instead of rendering the old bare
+`overflow-x-auto` scroller. `movieToWatchPosterCard` itself is untouched and
+still used by the separate Movies-tab "Movies to Watch" section (out of
+scope — different call site, not the All-tab section this task targets).
+
+Updated the StyleGuide "Movies Filmstrip" specimen
+(`src/Client/Pages/StyleGuide/Views.fs` ~L1628) to match the new
+`FilmstripItem` field set (`Key`, `Href = None`, `OnNavigate = None`,
+`InFocusBadge = None`, `JellyfinButton = None` for the non-interactive
+specimen tiles).
+
+`npm run build` is clean. No server/projection/API change. No BC README
+change (no new ubiquitous language — same precedent as h7v2q). No ADR (this
+follows the existing `FilmstripItem` / caller-supplied-slot precedent from
+h7v2q rather than introducing a new pattern).
+
+Key files: `src/Client/DesignSystem.fs`, `src/Client/Pages/Dashboard/Views.fs`,
+`src/Client/Pages/StyleGuide/Views.fs`.

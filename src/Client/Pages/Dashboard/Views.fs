@@ -490,18 +490,69 @@ let private movieToWatchPosterCard (jellyfinServerUrl: string option) (item: Das
         ]
     ]
 
+/// "Movies to Watch" filmstrip item — wraps a `DashboardMovieToWatch` into a
+/// `DesignSystem.FilmstripItem`. The InFocus crosshair badge and the
+/// Jellyfin play button are built here (they need `Icons.crosshairSmFilled`
+/// / `Icons.play` / `jellyfinPlayUrl`, all page-local) and handed to the
+/// design-system row as pre-rendered, self-positioned slots, and the nav
+/// target is handed in as an `Href` + `OnNavigate` callback pair -- same
+/// caller-supplied-slot shape as `seriesNextEpisodeCard` (intelligence-h7v2q).
+let private movieToWatchFilmstripItem (jellyfinServerUrl: string option) (item: DashboardMovieToWatch) : DesignSystem.FilmstripItem =
+    let inFocusBadge =
+        if item.InFocus then
+            Some (
+                Html.div [
+                    prop.className "absolute top-1.5 left-1.5 z-10"
+                    prop.children [
+                        Html.span [
+                            prop.className "flex items-center justify-center w-6 h-6 rounded-full bg-warning/90 text-warning-content shadow-md"
+                            prop.children [ Icons.crosshairSmFilled () ]
+                        ]
+                    ]
+                ]
+            )
+        else
+            None
+    let jellyfinButton =
+        match jellyfinServerUrl, item.JellyfinId with
+        | Some serverUrl, Some jellyfinId ->
+            Some (
+                Html.a [
+                    prop.href (jellyfinPlayUrl serverUrl jellyfinId)
+                    prop.target "_blank"
+                    prop.rel "noopener noreferrer"
+                    prop.onClick (fun e -> e.stopPropagation())
+                    prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100 border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg cursor-pointer"
+                    prop.title "Play in Jellyfin"
+                    prop.children [
+                        Html.span [
+                            prop.className "w-4 h-4"
+                            prop.children [ Icons.play () ]
+                        ]
+                    ]
+                ]
+            )
+        | _ -> None
+    {
+        DesignSystem.FilmstripItem.Key = item.Slug
+        PosterRef = item.PosterRef
+        Title = item.Name
+        Meta = string item.Year
+        Href = Some (Router.format ("movies", item.Slug))
+        OnNavigate = Some (fun () -> Router.navigate ("movies", item.Slug))
+        InFocusBadge = inFocusBadge
+        JellyfinButton = jellyfinButton
+    }
+
+/// Dashboard All-tab "Movies to Watch" — posters inside the filmstrip well
+/// (`DesignSystem.filmstripRow`), replacing the plain poster scroller
+/// (intelligence-p9m4t; upgrades the section built by intelligence-dq8rk).
 let private moviesToWatchPosterSection (jellyfinServerUrl: string option) (items: DashboardMovieToWatch list) =
     if List.isEmpty items then
         Html.none
     else
         sectionOpen Icons.movie "Movies to Watch" [
-            Html.div [
-                prop.className "flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-base-content/20 scrollbar-track-transparent"
-                prop.children [
-                    for item in items do
-                        movieToWatchPosterCard jellyfinServerUrl item
-                ]
-            ]
+            DesignSystem.filmstripRow (items |> List.map (movieToWatchFilmstripItem jellyfinServerUrl))
         ]
 
 // ── Movies to Watch (list row — kept for reference/fallback) ──

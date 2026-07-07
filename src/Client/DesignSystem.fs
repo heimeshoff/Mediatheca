@@ -492,64 +492,121 @@ let inFocusPill : ReactElement =
 // ── Movies filmstrip (§ 4 Movies filmstrip) ──
 
 type FilmstripItem = {
+    /// Stable React key — prefer a real identifier (e.g. slug) over `Title`
+    /// so items with the same title don't collide.
+    Key: string
     PosterRef: string option
     Title: string
     Meta: string
+    /// Anchor href for the tile, when the tile navigates somewhere. Paired
+    /// with `OnNavigate` (SPA-style client nav); when both are `None` the
+    /// tile renders as a plain, non-interactive `div`.
+    Href: string option
+    OnNavigate: (unit -> unit) option
+    /// Fully-rendered, self-positioned (`absolute top-1.5 left-1.5 ...`)
+    /// InFocus badge, or `None`. Rendered as-is by the caller, matching the
+    /// `JellyfinButton` slot below, so this module doesn't need `Icons`.
+    InFocusBadge: ReactElement option
+    /// Fully-rendered, self-positioned (`absolute bottom-2 right-2 ...`)
+    /// Jellyfin play button, or `None` when the item isn't on Jellyfin.
+    /// Rendered as-is by the caller so this module doesn't need to know
+    /// about icons/URLs (`nextEpisodeHeroCard` precedent).
+    JellyfinButton: ReactElement option
 }
 
-/// Filmstrip movie row — black sprocket-holed well with a row of flex-1
-/// posters (196px tall, 3a proportions) filling its full width edge to
-/// edge, captions (title + meta, e.g. runtime/"rec. by") beneath the strip.
+/// Filmstrip movie row — black sprocket-holed well with a row of
+/// equal-width posters (196px tall, 3a proportions), captions (title +
+/// meta, e.g. runtime/"rec. by") beneath the strip. Overflow = fill +
+/// scroll hybrid: posters grow to fill the available width (`flex-grow`)
+/// but never shrink below their 3a proportion (`flex-shrink-0`); once the
+/// row's natural content width exceeds the section width, the whole thing
+/// -- sprockets, posters, and captions together, sized via a shared
+/// `w-max` block -- becomes one horizontally-scrollable piece (the single
+/// `overflow-x-auto` ancestor wrapping everything), never a static frame
+/// around an inner scroller. Interactive bits (`Href`/`OnNavigate`,
+/// `InFocusBadge`, `JellyfinButton`) are caller-supplied per the
+/// `nextEpisodeHeroCard` precedent, so this module stays decoupled from
+/// `Feliz.Router` / `Icons` / URL helpers.
 let filmstripRow (items: FilmstripItem list) : ReactElement =
+    let tileWrapperClass = "flex-[1_0_130px] group"
+    let posterBoxClass = "relative w-full h-[196px] rounded-[var(--radius-poster)] bg-base-300 overflow-hidden"
+    let posterTile (item: FilmstripItem) =
+        Html.div [
+            prop.className posterBoxClass
+            prop.children [
+                match item.PosterRef with
+                | Some ref ->
+                    Html.img [
+                        prop.src $"/images/{ref}"
+                        prop.alt item.Title
+                        prop.className "w-full h-full object-cover"
+                    ]
+                | None ->
+                    Html.div [ prop.className "w-full h-full bg-gradient-to-br from-base-300 to-base-200" ]
+                match item.InFocusBadge with
+                | Some badge -> badge
+                | None -> ()
+                match item.JellyfinButton with
+                | Some button -> button
+                | None -> ()
+            ]
+        ]
     Html.div [
-        prop.className "flex flex-col"
+        prop.className "overflow-x-auto"
         prop.children [
             Html.div [
-                prop.className "filmstrip"
+                prop.className "flex flex-col w-max min-w-full"
                 prop.children [
-                    Html.div [ prop.className "filmstrip-sprocket mb-[7px]" ]
                     Html.div [
-                        prop.className "flex gap-2.5 px-4"
+                        prop.className "filmstrip"
+                        prop.children [
+                            Html.div [ prop.className "filmstrip-sprocket mb-[7px]" ]
+                            Html.div [
+                                prop.className "flex gap-2.5 px-4"
+                                prop.children [
+                                    for item in items do
+                                        match item.Href, item.OnNavigate with
+                                        | None, None ->
+                                            Html.div [
+                                                prop.key item.Key
+                                                prop.className tileWrapperClass
+                                                prop.children [ posterTile item ]
+                                            ]
+                                        | href, onNavigate ->
+                                            Html.a [
+                                                prop.key item.Key
+                                                prop.href (href |> Option.defaultValue "#")
+                                                prop.className (tileWrapperClass + " cursor-pointer")
+                                                prop.onClick (fun e ->
+                                                    e.preventDefault()
+                                                    onNavigate |> Option.iter (fun f -> f ()))
+                                                prop.children [ posterTile item ]
+                                            ]
+                                ]
+                            ]
+                            Html.div [ prop.className "filmstrip-sprocket mt-[7px]" ]
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "flex gap-2.5 px-4 pt-[10px]"
                         prop.children [
                             for item in items do
                                 Html.div [
-                                    prop.key item.Title
-                                    prop.className "flex-1 h-[196px] rounded-[var(--radius-poster)] bg-base-300 overflow-hidden"
+                                    prop.key (item.Key + "-caption")
+                                    prop.className "flex-[1_0_130px] flex flex-col gap-0.5 min-w-0"
                                     prop.children [
-                                        match item.PosterRef with
-                                        | Some ref ->
-                                            Html.img [
-                                                prop.src $"/images/{ref}"
-                                                prop.alt item.Title
-                                                prop.className "w-full h-full object-cover"
-                                            ]
-                                        | None ->
-                                            Html.div [ prop.className "w-full h-full bg-gradient-to-br from-base-300 to-base-200" ]
+                                        Html.span [
+                                            prop.className "font-sans text-[12px] font-semibold leading-[1.35] text-base-content truncate"
+                                            prop.text item.Title
+                                        ]
+                                        Html.span [
+                                            prop.className "font-sans text-[10.5px] text-ink-muted truncate"
+                                            prop.text item.Meta
+                                        ]
                                     ]
                                 ]
                         ]
                     ]
-                    Html.div [ prop.className "filmstrip-sprocket mt-[7px]" ]
-                ]
-            ]
-            Html.div [
-                prop.className "flex gap-2.5 px-4 pt-[10px]"
-                prop.children [
-                    for item in items do
-                        Html.div [
-                            prop.key (item.Title + "-caption")
-                            prop.className "flex-1 flex flex-col gap-0.5 min-w-0"
-                            prop.children [
-                                Html.span [
-                                    prop.className "font-sans text-[12px] font-semibold leading-[1.35] text-base-content truncate"
-                                    prop.text item.Title
-                                ]
-                                Html.span [
-                                    prop.className "font-sans text-[10.5px] text-ink-muted truncate"
-                                    prop.text item.Meta
-                                ]
-                            ]
-                        ]
                 ]
             ]
         ]
