@@ -1,7 +1,7 @@
 ---
 id: intelligence-p9m4t
 title: Dashboard "Movies to Watch" — wrap posters in the filmstrip well
-status: todo
+status: doing
 type: feature
 context: intelligence
 created: 2026-07-07

@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-07 19:37 -- Batch started: [intelligence-p9m4t]
+
+**Type:** Work / Batch start
+**Tasks:** intelligence-p9m4t - Dashboard "Movies to Watch" — wrap posters in the filmstrip well
+**Parallel:** no (1 worker — sole ready task; dep design-system-001 done)
+
+---
+
 ## 2026-07-07 -- Modeling / Captured: intelligence-p9m4t - Dashboard "Movies to Watch" filmstrip
 
 **Type:** Modeling / Capture
