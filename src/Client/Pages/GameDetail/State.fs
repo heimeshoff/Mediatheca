@@ -48,49 +48,6 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Set_tab tab ->
         { model with ActiveTab = tab }, Cmd.none
 
-    | Upload_screenshot (data, filename, insertBefore) ->
-        model,
-        Cmd.OfAsync.either
-            (fun () -> api.uploadContentImage data filename)
-            ()
-            (fun r -> Screenshot_uploaded (r, insertBefore))
-            (fun ex -> Screenshot_uploaded (Error ex.Message, insertBefore))
-
-    | Screenshot_uploaded (Ok imageRef, insertBefore) ->
-        let req : AddContentBlockRequest = {
-            BlockType = "screenshot"
-            Content = ""
-            ImageRef = Some imageRef
-            Url = None
-            Caption = None
-        }
-        model,
-        Cmd.OfAsync.either
-            (fun () -> async {
-                match! api.addGameContentBlock model.Slug req with
-                | Ok newBlockId ->
-                    match insertBefore with
-                    | Some targetId ->
-                        match! api.getGameDetail model.Slug with
-                        | Some g ->
-                            let sorted = g.ContentBlocks |> List.sortBy (fun b -> b.Position)
-                            let ids = sorted |> List.map (fun b -> b.BlockId)
-                            let withoutNew = ids |> List.filter (fun id -> id <> newBlockId)
-                            let newOrder =
-                                withoutNew
-                                |> List.collect (fun id ->
-                                    if id = targetId then [newBlockId; id]
-                                    else [id])
-                            let! _ = api.reorderContentBlocks model.Slug None newOrder
-                            return Ok ()
-                        | None -> return Ok ()
-                    | None -> return Ok ()
-                | Error e -> return Error e
-            }) () Content_block_result (fun ex -> Content_block_result (Error ex.Message))
-
-    | Screenshot_uploaded (Error err, _) ->
-        { model with Error = Some err }, Cmd.none
-
     | Load_game slug ->
         { model with IsLoading = true; Slug = slug },
         Cmd.batch [
@@ -268,62 +225,6 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         ]
 
     | Friend_and_played_with_result (Error err) ->
-        { model with Error = Some err }, Cmd.none
-
-    | Add_content_block request ->
-        model,
-        Cmd.OfAsync.perform
-            (fun () -> api.addGameContentBlock model.Slug request)
-            ()
-            (fun result -> Content_block_result (result |> Result.map ignore))
-
-    | Update_content_block (blockId, request) ->
-        model,
-        Cmd.OfAsync.perform
-            (fun () -> api.updateGameContentBlock model.Slug blockId request)
-            ()
-            Content_block_result
-
-    | Remove_content_block blockId ->
-        model,
-        Cmd.OfAsync.perform
-            (fun () -> api.removeGameContentBlock model.Slug blockId)
-            ()
-            Content_block_result
-
-    | Change_content_block_type (blockId, blockType) ->
-        model,
-        Cmd.OfAsync.perform
-            (fun () -> api.changeContentBlockType model.Slug blockId blockType)
-            ()
-            Content_block_result
-
-    | Reorder_content_blocks blockIds ->
-        model,
-        Cmd.OfAsync.perform
-            (fun () -> api.reorderContentBlocks model.Slug None blockIds)
-            ()
-            Content_block_result
-
-    | Group_content_blocks (leftId, rightId) ->
-        let rowGroup = System.Guid.NewGuid().ToString("N")
-        model,
-        Cmd.OfAsync.perform
-            (fun () -> api.groupContentBlocksInRow model.Slug leftId rightId rowGroup)
-            ()
-            Content_block_result
-
-    | Ungroup_content_block blockId ->
-        model,
-        Cmd.OfAsync.perform
-            (fun () -> api.ungroupContentBlock model.Slug blockId)
-            ()
-            Content_block_result
-
-    | Content_block_result (Ok _) ->
-        model, Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
-
-    | Content_block_result (Error err) ->
         { model with Error = Some err }, Cmd.none
 
     | Catalogs_loaded catalogs ->

@@ -1067,7 +1067,7 @@ let private seriesNextEpisodeCard (jellyfinServerUrl: string option) (item: Dash
                     prop.target "_blank"
                     prop.rel "noopener noreferrer"
                     prop.onClick (fun e -> e.stopPropagation())
-                    prop.className "absolute bottom-3 right-3 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-base-100 border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg cursor-pointer"
+                    prop.className "absolute top-3 right-3 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-base-100 border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg cursor-pointer"
                     prop.title "Play in Jellyfin"
                     prop.children [
                         Html.span [
@@ -1091,13 +1091,16 @@ let private seriesNextEpisodeCard (jellyfinServerUrl: string option) (item: Dash
                 EpisodeLabel = episodeLabel
                 BackdropRef = item.BackdropRef
                 PosterRef = item.PosterRef
-                EpisodeStillRef = item.EpisodeStillRef
                 InFocus = item.InFocus
                 ProgressFilled = item.WatchedEpisodeCount
                 ProgressTotal = item.EpisodeCount
                 WatchedWith =
                     item.WatchWithFriends
-                    |> List.map (fun f -> { DesignSystem.NextEpisodeHeroFriend.ImageRef = f.ImageRef; Name = f.Name })
+                    |> List.map (fun f ->
+                        { DesignSystem.NextEpisodeHeroFriend.ImageRef = f.ImageRef
+                          Name = f.Name
+                          Href = Router.format ("friends", f.Slug)
+                          OnClick = fun () -> Router.navigate ("friends", f.Slug) })
                 JellyfinButton = jellyfinButton
             }
         ]

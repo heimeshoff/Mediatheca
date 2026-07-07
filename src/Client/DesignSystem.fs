@@ -645,6 +645,12 @@ let heroCard (props: HeroCardProps) : ReactElement =
 type NextEpisodeHeroFriend = {
     ImageRef: string option
     Name: string
+    /// Link target for the friend's detail page — a real href for link
+    /// semantics (hover, middle-click, copy-link).
+    Href: string
+    /// SPA navigation to the friend's page, invoked on click after the
+    /// component cancels the default navigation and the card click-through.
+    OnClick: unit -> unit
 }
 
 type NextEpisodeHeroCardProps = {
@@ -654,23 +660,21 @@ type NextEpisodeHeroCardProps = {
     BackdropRef: string option
     /// Fallback background when `BackdropRef` is `None`.
     PosterRef: string option
-    EpisodeStillRef: string option
     InFocus: bool
     ProgressFilled: int
     ProgressTotal: int
     WatchedWith: NextEpisodeHeroFriend list
-    /// Fully-rendered, self-positioned (`absolute bottom-3 right-3 ...`) Jellyfin
+    /// Fully-rendered, self-positioned (`absolute top-3 right-3 ...`) Jellyfin
     /// play button, or `None` when the episode isn't on Jellyfin. Rendered as-is
     /// by the caller so this module doesn't need to know about icons/URLs.
     JellyfinButton: ReactElement option
 }
 
 /// Cinematic "Next episode" hero card — the repeated, real-data variant of the
-/// styleguide's single-specimen `heroCard`. Backdrop fills the canvas, the
-/// episode still insets top-right, a bottom scrim overlay carries the series
-/// name, episode label, segmented progress, and watched-with friends
-/// (image + name), and the caller-supplied Jellyfin button (if any) sits
-/// bottom-right.
+/// styleguide's single-specimen `heroCard`. Backdrop fills the canvas, a bottom
+/// scrim overlay carries the series name, episode label, segmented progress, and
+/// watched-with friends (image + name, each linking to the friend's page), and
+/// the caller-supplied Jellyfin button (if any) sits top-right.
 let nextEpisodeHeroCard (props: NextEpisodeHeroCardProps) : ReactElement =
     let backgroundRef = props.BackdropRef |> Option.orElse props.PosterRef
     Html.div [
@@ -695,20 +699,6 @@ let nextEpisodeHeroCard (props: NextEpisodeHeroCardProps) : ReactElement =
                     prop.children [ statusBadge InFocus ]
                 ]
 
-            match props.EpisodeStillRef with
-            | Some still ->
-                Html.div [
-                    prop.className "absolute top-3 right-3 w-20 sm:w-24 aspect-video rounded-lg overflow-hidden border border-white/10 shadow-lg z-[5]"
-                    prop.children [
-                        Html.img [
-                            prop.src $"/images/{still}"
-                            prop.alt props.SeriesName
-                            prop.className "w-full h-full object-cover"
-                        ]
-                    ]
-                ]
-            | None -> ()
-
             Html.div [
                 prop.className "absolute bottom-0 left-0 right-0 p-3 sm:p-4 flex flex-col gap-1.5 z-[1]"
                 prop.children [
@@ -729,9 +719,14 @@ let nextEpisodeHeroCard (props: NextEpisodeHeroCardProps) : ReactElement =
                             prop.className "flex items-center gap-1.5 flex-wrap"
                             prop.children [
                                 for friend in props.WatchedWith do
-                                    Html.span [
+                                    Html.a [
                                         prop.key friend.Name
-                                        prop.className "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-white/10 text-white/80"
+                                        prop.href friend.Href
+                                        prop.onClick (fun e ->
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            friend.OnClick())
+                                        prop.className "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-white/10 text-white/80 hover:bg-white/20 hover:text-white transition-colors cursor-pointer"
                                         prop.children [
                                             match friend.ImageRef with
                                             | Some img ->

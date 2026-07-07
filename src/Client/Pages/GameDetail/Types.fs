@@ -76,8 +76,6 @@ type Model = {
 
 type Msg =
     | Set_tab of GameTab
-    | Upload_screenshot of data: byte array * filename: string * insertBefore: string option
-    | Screenshot_uploaded of Result<string, string> * insertBefore: string option
     | Load_game of string
     | Game_loaded of GameDetail option
     | Friends_loaded of FriendListItem list
@@ -106,14 +104,6 @@ type Msg =
     | Friend_and_play_with_result of Result<unit, string>
     | Add_friend_and_played_with of name: string
     | Friend_and_played_with_result of Result<unit, string>
-    | Add_content_block of AddContentBlockRequest
-    | Update_content_block of blockId: string * UpdateContentBlockRequest
-    | Remove_content_block of blockId: string
-    | Change_content_block_type of blockId: string * blockType: string
-    | Reorder_content_blocks of blockIds: string list
-    | Group_content_blocks of leftId: string * rightId: string
-    | Ungroup_content_block of blockId: string
-    | Content_block_result of Result<unit, string>
     | Catalogs_loaded of CatalogListItem list
     | Game_catalogs_loaded of CatalogRef list
     | Open_catalog_picker

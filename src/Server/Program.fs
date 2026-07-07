@@ -161,6 +161,11 @@ let main args =
     Projection.rebuildProjection conn GameProjection.handler
     Projection.startAllProjections conn projectionHandlers
 
+    // Game journal (Notion-style blocks, plain storage) — table + one-time
+    // migration of the old event-sourced game content blocks
+    GameJournal.initialize conn
+    GameJournal.migrateFromContentBlocks conn dataDir
+
     // Backfill director/crew data for existing movies
     let backfillDirectors () =
         try

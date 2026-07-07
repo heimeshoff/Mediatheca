@@ -2812,6 +2812,8 @@ module Api =
                     // Clean up images
                     ImageStore.deleteImage imageBasePath (sprintf "posters/game-%s.jpg" slug)
                     ImageStore.deleteImage imageBasePath (sprintf "backdrops/game-%s.jpg" slug)
+                    // Clean up the journal (block rows + uploaded content images)
+                    GameJournal.deleteForGame conn imageBasePath slug
                     return Ok ()
                 | Error e -> return Error e
             }
@@ -3021,6 +3023,15 @@ module Api =
                         Games.Serialization.toEventData
                         (Games.Remove_played_with friendSlug)
                         projectionHandlers
+            }
+
+            // Game Journal (Notion-style block document, plain storage)
+            getGameJournal = fun slug -> async {
+                return GameJournal.get conn slug
+            }
+
+            saveGameJournal = fun slug blocks -> async {
+                return GameJournal.save conn slug blocks
             }
 
             // Game Content Blocks + Catalogs

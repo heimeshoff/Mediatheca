@@ -166,6 +166,48 @@ type UpdateContentBlockRequest = {
     Caption: string option
 }
 
+// Game Journal (Notion-style block document; plain storage, not event-sourced)
+//
+// The document is a flat list of blocks forming a tree via ParentId:
+//   - root blocks (ParentId = None) stack vertically
+//   - "columnList" blocks contain "column" blocks (side-by-side, Width = flex ratio)
+//   - "column" blocks contain content blocks
+//   - "toggle" blocks contain their collapsible children
+// Position orders siblings within one parent. The whole document is saved at once.
+
+module JournalBlockTypes =
+    let text = "text"
+    let heading1 = "h1"
+    let heading2 = "h2"
+    let heading3 = "h3"
+    let heading4 = "h4"
+    let bullet = "bullet"
+    let numbered = "numbered"
+    let todo = "todo"
+    let toggle = "toggle"
+    let quote = "quote"
+    let callout = "callout"
+    let code = "code"
+    let link = "link"
+    let image = "image"
+    let columnList = "columnList"
+    let column = "column"
+
+type JournalBlockDto = {
+    Id: string
+    ParentId: string option
+    BlockType: string
+    Content: string
+    Checked: bool
+    Collapsed: bool
+    Language: string option
+    Url: string option
+    ImageRef: string option
+    Caption: string option
+    Position: int
+    Width: float
+}
+
 // Catalogs
 
 type CatalogEntryDto = {
@@ -1153,6 +1195,9 @@ type IMediathecaApi = {
     addGameContentBlock: string -> AddContentBlockRequest -> Async<Result<string, string>>
     updateGameContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
     removeGameContentBlock: string -> string -> Async<Result<unit, string>>
+    // Game Journal (Notion-style block document)
+    getGameJournal: string -> Async<JournalBlockDto list>
+    saveGameJournal: string -> JournalBlockDto list -> Async<Result<unit, string>>
     getCatalogsForGame: string -> Async<CatalogRef list>
     getGameImageCandidates: string -> Async<GameImageCandidate list>
     selectGameImage: string -> string -> string -> Async<Result<unit, string>>
