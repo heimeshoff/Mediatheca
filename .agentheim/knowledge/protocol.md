@@ -5,6 +5,22 @@ Newest entries on top.
 
 ---
 
+## 2026-07-07 20:00 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~23m (Batch started 19:37 → now)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** intelligence-p9m4t: 1
+**Commits:** 3 (1 batch-start claim + 1 task commit + this session-end line)
+**Vision-conformance:** none — batch aligns with vision (the filmstrip reskin directly realizes the "Unified Dashboard → All Tab → Movies" curated-overview success area and the "Intent-driven" / "Unified, not siloed" design principles; the retained Jellyfin **play** deep-link button is a pre-existing launch affordance, distinct from the "Trakt.tv / Jellyfin **sync** (v2)" Out-of-Scope non-goal, so no divergence — same reasoning as the h7v2q session)
+**Carry-over:** "Mediatheca Directions.html": left behind (owner: user's design reference doc — the ~912KB captured Claude design session, untracked by the user since before this session, not project bookkeeping). .agentheim/state/in-flight.json: git-ignored advisory heartbeat (ADR-0027 category), never shown by `git status`, not a lifecycle write. The remaining pre-session WIP (DesignSystem.fs, Views.fs, GameDetail/*, Server/*, Shared.fs, index.css, JournalEditor.fs, GameJournal.fs, tests) was committed by the user mid-session as `e52baaf "Journal component"` to unblock this integration — no longer carry-over.
+**Note:** Single-task intelligence batch under worktree isolation (ADR-0032), verifier PASS first try. **intelligence-p9m4t** reskinned the Dashboard All-tab "Movies to Watch" row into the filmstrip well (`DesignSystem.filmstripRow`), replacing the bare `overflow-x-auto` poster scroller. Extended `DesignSystem.FilmstripItem` with caller-supplied `Key` / `Href` / `OnNavigate` / `InFocusBadge` / `JellyfinButton` slots (pre-rendered, self-positioned) per the h7v2q `nextEpisodeHeroCard` precedent so the design-system module stays decoupled from `Feliz.Router` / `Icons` / URL helpers; resolved the overflow-shape decision by wrapping the whole sprocketed well + captions in one `overflow-x-auto` ancestor over a `flex flex-col w-max min-w-full` block (fill-then-scroll: tiles `flex-[1_0_130px]` grow-to-fill but never shrink below the 3a proportion, and the entire strip — sprockets, posters, captions — scrolls as one piece on overflow). `Views.fs` gained `movieToWatchFilmstripItem` (builds the InFocus crosshair + Jellyfin play button locally and hands them in as slots); `moviesToWatchPosterSection` now calls `filmstripRow`. StyleGuide "Movies Filmstrip" specimen updated to the new field set. `movieToWatchPosterCard` (Movies-tab section) untouched, out of scope. `npm run build` clean (✓ 41.17s). No BC README change, no ADR (follows the existing `FilmstripItem` primitive-slot precedent), no concept candidates, no new backlog items. **Integration wrinkle (surfaced to user):** the squash-merge was initially blocked because the user had uncommitted hero-card WIP (friend links, still-inset removal, top-right Jellyfin button) in the same two files (DesignSystem.fs + Views.fs) — but in disjoint regions (`nextEpisodeHeroCard` / `seriesNextEpisodeCard` vs. `filmstripRow` / `moviesToWatchPosterSection`). Per user choice, the user committed their WIP first (`e52baaf`); the subsequent squash-merge then auto-merged both files cleanly with no conflict. The intelligence board is quiescent again: todo / doing empty. **Reminder (again):** the intelligence `doing/` directory was missing at session start and had to be recreated before the claim CLI could move the task — the standing backfill-empty-`doing/`-dirs suggestion still stands.
+
+---
+
 ## 2026-07-07 19:57 -- Task verified and completed: intelligence-p9m4t - Dashboard "Movies to Watch" — wrap posters in the filmstrip well
 
 **Type:** Work / Task completion
