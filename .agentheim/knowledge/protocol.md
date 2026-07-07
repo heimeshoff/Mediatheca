@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-07-07 -- Modeling / Captured: intelligence-p9m4t - Dashboard "Movies to Watch" filmstrip
+
+**Type:** Modeling / Capture
+**BC:** intelligence
+**Filed to:** todo
+**Summary:** Reskin the Dashboard All-tab "Movies to Watch" section so its posters sit inside the existing filmstrip well (`.filmstrip` / `DesignSystem.filmstripRow`, from design-system-wd5zk) matching the 3A / §4 direction, replacing the plain poster scroller. Confirmed shape: fill + scroll hybrid (whole sprocketed well scrolls as one piece on overflow) and keep all tile affordances (click-to-detail, InFocus crosshair, Jellyfin play). Extends the filmstrip primitive via caller-supplied slots per the h7v2q precedent. Pure client presentation — all fields already on `DashboardMovieToWatch`. Frontend gate (design-system-001) met.
+
+---
+
 ## 2026-07-06 18:34 -- Work session ended
 
 **Type:** Work / Session end

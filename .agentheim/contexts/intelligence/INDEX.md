@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 3
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **intelligence-p9m4t** — Dashboard "Movies to Watch" — wrap posters in the filmstrip well (feature) — `todo/intelligence-p9m4t-movies-to-watch-filmstrip.md`
 <!-- todo-list:end -->
 
 ### Doing
