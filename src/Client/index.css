@@ -496,6 +496,13 @@ h1, h2, h3, h4, h5, h6 {
 .poster-card:hover .poster-shine {
     opacity: 1;
 }
+/* Group-hover trigger for `.poster-shine` on cards that drive hover via
+   Tailwind's `group` marker rather than `.poster-card` (filmstrip movie
+   posters, Next-episode hero cards). Kept unlayered so it beats Tailwind's
+   layered utilities the same way the `.poster-card:hover` rule above does. */
+.group:hover .poster-shine {
+    opacity: 1;
+}
 
 .poster-card .poster-overlay {
     opacity: 0;

@@ -33,3 +33,4 @@ uploads/
 ## Docker
 *.tar
 .agentheim/.dashboard
+.agentheim/state

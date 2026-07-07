@@ -529,7 +529,7 @@ type FilmstripItem = {
 /// `Feliz.Router` / `Icons` / URL helpers.
 let filmstripRow (items: FilmstripItem list) : ReactElement =
     let tileWrapperClass = "flex-[1_0_130px] group"
-    let posterBoxClass = "relative w-full h-[196px] rounded-[var(--radius-poster)] bg-base-300 overflow-hidden"
+    let posterBoxClass = "relative w-full h-[196px] rounded-[var(--radius-poster)] bg-base-300 overflow-hidden transition-transform duration-300 group-hover:scale-105"
     let posterTile (item: FilmstripItem) =
         Html.div [
             prop.className posterBoxClass
@@ -549,6 +549,10 @@ let filmstripRow (items: FilmstripItem list) : ReactElement =
                 match item.JellyfinButton with
                 | Some button -> button
                 | None -> ()
+                // Light shine on hover — same `.poster-shine` overlay the game
+                // poster cards use; the `.group:hover .poster-shine` rule in
+                // index.css fades it in via the tile's Tailwind `group`.
+                Html.div [ prop.className posterShine ]
             ]
         ]
     Html.div [
@@ -735,20 +739,25 @@ type NextEpisodeHeroCardProps = {
 let nextEpisodeHeroCard (props: NextEpisodeHeroCardProps) : ReactElement =
     let backgroundRef = props.BackdropRef |> Option.orElse props.PosterRef
     Html.div [
-        prop.className (velvetCardHero + " relative w-full aspect-video overflow-hidden")
+        prop.className (velvetCardHero + " relative w-full aspect-video overflow-hidden transition-transform duration-300 group-hover:scale-105")
         prop.children [
             match backgroundRef with
             | Some ref ->
                 Html.img [
                     prop.src $"/images/{ref}"
                     prop.alt props.SeriesName
-                    prop.className "absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    prop.className "absolute inset-0 w-full h-full object-cover"
                 ]
             | None ->
                 Html.div [ prop.className "absolute inset-0 bg-gradient-to-br from-primary/20 to-base-300" ]
 
             // Bottom scrim so the overlay text stays legible over the backdrop.
             Html.div [ prop.className "absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" ]
+
+            // Light shine on hover — same `.poster-shine` overlay the game
+            // poster cards use; the `.group:hover .poster-shine` rule in
+            // index.css fades it in via the card wrapper's Tailwind `group`.
+            Html.div [ prop.className posterShine ]
 
             if props.InFocus then
                 Html.div [
