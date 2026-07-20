@@ -1,7 +1,7 @@
 ---
 id: administration-v4y9g
 title: Stream drill-in — per-stream timeline with formatted+raw views, projection state, cross-links
-status: todo
+status: doing
 type: feature
 context: administration
 created: 2026-07-20

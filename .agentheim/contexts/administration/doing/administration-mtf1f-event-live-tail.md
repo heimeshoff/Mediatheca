@@ -1,7 +1,7 @@
 ---
 id: administration-mtf1f
 title: Event explorer live tail — follow mode for incoming events
-status: todo
+status: doing
 type: feature
 context: administration
 created: 2026-07-20

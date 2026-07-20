@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-20 17:59 -- Batch started: [administration-hw74a, administration-v4y9g, administration-mtf1f]
+
+**Type:** Work / Batch start
+**Tasks:** administration-hw74a - Store health tab — event volume stats, largest streams, storage sizes, administration-v4y9g - Stream drill-in — per-stream timeline with formatted+raw views, projection state, cross-links, administration-mtf1f - Event explorer live tail — follow mode for incoming events
+**Parallel:** yes (3 workers — MAX_PARALLEL=3). administration-qjcp4 is READY but deliberately held to a later wave: it is the only remaining task that rewrites src/Server/Program.fs (it retires the startup projection-rebuild hack), and the parked, verified-but-unmerged infrastructure-w8fnp branch already conflicts with Program.fs pending a user decision — dispatching qjcp4 now would compound that unresolved conflict. The three dispatched tasks are additive to the shared IAdminApi/Administration.fs/Admin-shell seams (new methods, new tab content) rather than rewrites, so git 3-way merge should absorb them; they will still be squash-merged sequentially. ADR numbers pre-assigned at dispatch (hw74a=0021, v4y9g=0022, mtf1f=0023) after four collisions this session caused by workers independently picking the next free number off identical repo snapshots.
+
+---
+
 ## 2026-07-20 17:58 -- Task verified and completed: administration-g5dfy - Event explorer — FTS payload search, time/position/BC filters, keyset pagination
 
 **Type:** Work / Task completion

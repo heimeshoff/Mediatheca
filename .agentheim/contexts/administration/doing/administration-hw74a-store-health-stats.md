@@ -1,7 +1,7 @@
 ---
 id: administration-hw74a
 title: Store health tab — event volume stats, largest streams, storage sizes
-status: todo
+status: doing
 type: feature
 context: administration
 created: 2026-07-20

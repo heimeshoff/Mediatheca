@@ -11,21 +11,21 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 6
-- **Todo:** 4
-- **Doing:** 0
+- **Todo:** 1
+- **Doing:** 3
 - **Done:** 2
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **administration-v4y9g** — Stream drill-in — per-stream timeline with formatted+raw views, projection state, cross-links (feature) — `todo/administration-v4y9g-stream-drill-in-timeline.md`
-- **administration-mtf1f** — Event explorer live tail — follow mode for incoming events (feature) — `todo/administration-mtf1f-event-live-tail.md`
 - **administration-qjcp4** — Projection dashboard — checkpoint/lag overview and rebuild-by-command with streamed progress (feature) — `todo/administration-qjcp4-projection-dashboard-rebuild.md`
-- **administration-hw74a** — Store health tab — event volume stats, largest streams, storage sizes (feature) — `todo/administration-hw74a-store-health-stats.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **administration-mtf1f** — Event explorer live tail — follow mode for incoming events (feature) — `doing/administration-mtf1f-event-live-tail.md`
+- **administration-v4y9g** — Stream drill-in — per-stream timeline with formatted+raw views, projection state, cross-links (feature) — `doing/administration-v4y9g-stream-drill-in-timeline.md`
+- **administration-hw74a** — Store health tab — event volume stats, largest streams, storage sizes (feature) — `doing/administration-hw74a-store-health-stats.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
