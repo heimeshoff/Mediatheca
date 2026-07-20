@@ -60,6 +60,12 @@ Mediatheca is a personal media library + diary + intelligence hub built on event
 - **Classification:** generic
 - **Key actors:** Single user (operator role).
 
+### Infrastructure
+- **Purpose:** Globally-true technical concerns — deployment topology (Docker container, Windows/macOS desktop shells), hosting, packaging, runtime configuration, base tooling. The standing home for tech decisions that apply to the system as a whole.
+- **Core language:** Deployment target, desktop shell, self-contained publish, data dir, loopback binding.
+- **Classification:** generic
+- **Key actors:** Single user (developer/operator).
+
 ### Design system
 - **Purpose:** Cross-cutting visual language — typography, color tokens, paper-overlay rules, Feliz/DaisyUI component patterns, the in-app StyleGuide page. Gates frontend work in every BC.
 - **Core language:** Token, theme (dim), paper overlay, velvet card, surface, design-system component.
@@ -94,4 +100,4 @@ Mediatheca is a personal media library + diary + intelligence hub built on event
 
 - **Core:** Movies, Series, Games, Journal, Intelligence — these are the reason the app exists. Differentiation lives here.
 - **Supporting:** Friends, Curation, Design system — necessary, custom-built, but not the heart of the value proposition.
-- **Generic:** Integration, Administration — boring plumbing where boring choices are correct.
+- **Generic:** Integration, Administration, Infrastructure — boring plumbing where boring choices are correct.

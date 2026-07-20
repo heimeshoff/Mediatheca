@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-07-20 17:06 -- Modeling / Captured: infrastructure-w8fnp - Photino desktop shell prototype
+
+**Type:** Modeling / Capture
+**BC:** infrastructure (new BC — created this capture with builder approval; minimal README + INDEX; also added to knowledge/index.md bc-list and context-map.md)
+**Filed to:** todo
+**Summary:** Spike a Photino.NET desktop shell (`src/Desktop/`) hosting the existing Giraffe/Kestrel server in-process behind a native webview, enabling self-standing Windows/macOS deployment from the one F# codebase (Rust rewrite considered and rejected). Constraints captured: loopback-only binding (no auth, ADR-0007), plain self-contained publish — no Native AOT (Fable.Remoting/Giraffe reflection, ADR-0004), macOS data-dir default `~/Library/Application Support/Mediatheca`, Docker target unaffected. Filed straight to todo — concrete acceptance criteria, no unmet dependencies (not a styleguide-gated frontend task).
+
+---
+
 ## 2026-07-20 -- Modeling / Captured: Administration console — event sourcing analysis & administration suite (12 tasks)
 
 **Type:** Modeling / Capture
