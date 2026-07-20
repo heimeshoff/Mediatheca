@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-07-20 -- Modeling / Captured: Administration console — event sourcing analysis & administration suite (12 tasks)
+
+**Type:** Modeling / Capture
+**BC:** administration
+**Filed to:** todo (6) + backlog (6)
+**Summary:** Captured the Administration console proposal as 12 tasks. Todo (concrete, worker-ready): administration-p0jka (foundation — IAdminApi contract + Administration.fs + /admin tabbed section absorbing /events), administration-g5dfy (event explorer: FTS5 payload search, time/position/BC filters, keyset pagination), administration-v4y9g (stream drill-in timeline: formatted+raw views, projection state, cross-links), administration-mtf1f (live tail), administration-qjcp4 (projection dashboard + rebuild-by-command with SSE progress; retires the Program.fs startup rebuild hack), administration-hw74a (store health stats). Backlog (need refinement): administration-btvqa (shadow-table drift detector + unknown-event report), administration-xjmda (compensating-event composer), administration-wwc36 (event surgery: edit/delete/rename with auto-backup + preview + projections-dirty flag), administration-vrc56 (NDJSON export/import), administration-yamm5 (job runs console), administration-xx3mw (image cache admin). All frontend tasks gate on design-system-001 (done). Related ADRs linked: 0002 (event sourcing), 0003 (SQLite), 0004 (Fable.Remoting).
+
+---
+
 ## 2026-07-07 20:00 -- Work session ended
 
 **Type:** Work / Session end

@@ -10,15 +10,20 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
-- **Todo:** 0
+- **Backlog:** 6
+- **Todo:** 6
 - **Doing:** 0
 - **Done:** 0
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-<!-- no tasks in todo -->
+- **administration-p0jka** — Admin console foundation — IAdminApi contract, Administration.fs, /admin section with tabs (feature) — `todo/administration-p0jka-admin-console-foundation.md`
+- **administration-g5dfy** — Event explorer — FTS payload search, time/position/BC filters, keyset pagination (feature) — `todo/administration-g5dfy-event-explorer-search-filters-pagination.md`
+- **administration-v4y9g** — Stream drill-in — per-stream timeline with formatted+raw views, projection state, cross-links (feature) — `todo/administration-v4y9g-stream-drill-in-timeline.md`
+- **administration-mtf1f** — Event explorer live tail — follow mode for incoming events (feature) — `todo/administration-mtf1f-event-live-tail.md`
+- **administration-qjcp4** — Projection dashboard — checkpoint/lag overview and rebuild-by-command with streamed progress (feature) — `todo/administration-qjcp4-projection-dashboard-rebuild.md`
+- **administration-hw74a** — Store health tab — event volume stats, largest streams, storage sizes (feature) — `todo/administration-hw74a-store-health-stats.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -33,7 +38,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-<!-- no tasks in backlog -->
+- **administration-btvqa** — Integrity checks — shadow-table replay drift detector and unknown-event report (feature) — `backlog/administration-btvqa-projection-drift-integrity-checks.md`
+- **administration-xjmda** — Compensating-event composer — append corrective events from the admin UI (feature) — `backlog/administration-xjmda-compensating-event-composer.md`
+- **administration-wwc36** — Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag (feature) — `backlog/administration-wwc36-event-surgery-guardrails.md`
+- **administration-vrc56** — Event log export/import as NDJSON (feature) — `backlog/administration-vrc56-ndjson-export-import.md`
+- **administration-yamm5** — Job runs console — history, outcomes, and run-now for scheduled jobs (feature) — `backlog/administration-yamm5-job-runs-console.md`
+- **administration-xx3mw** — Image cache admin — orphan detection, size overview, purge (feature) — `backlog/administration-xx3mw-image-cache-admin.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
