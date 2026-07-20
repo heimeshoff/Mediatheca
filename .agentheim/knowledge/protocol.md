@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-20 17:31 -- Batch started: [administration-g5dfy, integration-ygwsa]
+
+**Type:** Work / Batch start
+**Tasks:** administration-g5dfy - Event explorer — FTS payload search, time/position/BC filters, keyset pagination, integration-ygwsa - Spike — mint Steam Family access tokens from a stored refresh token (SteamKit2)
+**Parallel:** yes (2 new workers, 3 live incl. still-running infrastructure-w8fnp — MAX_PARALLEL=3). administration-hw74a, administration-qjcp4 and administration-v4y9g are all READY but held to a later wave: all four unblocked administration tasks edit the same seams (IAdminApi in Shared.fs, Administration.fs, Client/Pages/Admin/Views.fs, the administration BC README), so dispatching more than one per wave would collide at squash-merge. administration-g5dfy picked first of the four because it is the only one that unblocks a further task (administration-mtf1f live tail depends on it). integration-ygwsa paired in because it is a different BC on a disjoint file tree — zero merge surface against g5dfy.
+
+---
+
 ## 2026-07-20 17:30 -- Task verified and completed: administration-p0jka - Admin console foundation — IAdminApi contract, Administration.fs, /admin section with tabs
 
 **Type:** Work / Task completion

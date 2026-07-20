@@ -11,14 +11,13 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 6
-- **Todo:** 5
-- **Doing:** 0
+- **Todo:** 4
+- **Doing:** 1
 - **Done:** 1
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **administration-g5dfy** — Event explorer — FTS payload search, time/position/BC filters, keyset pagination (feature) — `todo/administration-g5dfy-event-explorer-search-filters-pagination.md`
 - **administration-v4y9g** — Stream drill-in — per-stream timeline with formatted+raw views, projection state, cross-links (feature) — `todo/administration-v4y9g-stream-drill-in-timeline.md`
 - **administration-mtf1f** — Event explorer live tail — follow mode for incoming events (feature) — `todo/administration-mtf1f-event-live-tail.md`
 - **administration-qjcp4** — Projection dashboard — checkpoint/lag overview and rebuild-by-command with streamed progress (feature) — `todo/administration-qjcp4-projection-dashboard-rebuild.md`
@@ -27,6 +26,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
+- **administration-g5dfy** — Event explorer — FTS payload search, time/position/BC filters, keyset pagination (feature) — `doing/administration-g5dfy-event-explorer-search-filters-pagination.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

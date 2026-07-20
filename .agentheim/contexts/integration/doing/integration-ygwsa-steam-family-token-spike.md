@@ -1,7 +1,7 @@
 ---
 id: integration-ygwsa
 title: Spike — mint Steam Family access tokens from a stored refresh token (SteamKit2)
-status: todo
+status: doing
 type: spike
 context: integration
 created: 2026-07-20

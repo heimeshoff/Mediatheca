@@ -1,7 +1,7 @@
 ---
 id: administration-g5dfy
 title: Event explorer — FTS payload search, time/position/BC filters, keyset pagination
-status: todo
+status: doing
 type: feature
 context: administration
 created: 2026-07-20

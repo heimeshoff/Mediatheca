@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 2
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 7
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **integration-ygwsa** -- Spike — mint Steam Family access tokens from a stored refresh token (SteamKit2) -- `spike` -- `todo/integration-ygwsa-steam-family-token-spike.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **integration-ygwsa** — Spike — mint Steam Family access tokens from a stored refresh token (SteamKit2) (spike) — `doing/integration-ygwsa-steam-family-token-spike.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
