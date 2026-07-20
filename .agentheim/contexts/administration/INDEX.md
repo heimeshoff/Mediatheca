@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 6
 - **Todo:** 1
-- **Doing:** 3
-- **Done:** 2
+- **Doing:** 2
+- **Done:** 3
 <!-- task-counts:end -->
 
 ### Todo
@@ -25,12 +25,12 @@ research touching this BC, and concept synthesis pages.
 <!-- doing-list:start -->
 - **administration-mtf1f** — Event explorer live tail — follow mode for incoming events (feature) — `doing/administration-mtf1f-event-live-tail.md`
 - **administration-v4y9g** — Stream drill-in — per-stream timeline with formatted+raw views, projection state, cross-links (feature) — `doing/administration-v4y9g-stream-drill-in-timeline.md`
-- **administration-hw74a** — Store health tab — event volume stats, largest streams, storage sizes (feature) — `doing/administration-hw74a-store-health-stats.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **administration-hw74a** — Store health tab — event volume stats, largest streams, storage sizes (feature) — `done/administration-hw74a-store-health-stats.md`
 - **administration-g5dfy** — Event explorer — FTS payload search, time/position/BC filters, keyset pagination (feature) — `done/administration-g5dfy-event-explorer-search-filters-pagination.md`
 - **administration-p0jka** — Admin console foundation — IAdminApi contract, Administration.fs, /admin section with tabs (feature) — `done/administration-p0jka-admin-console-foundation.md`
 <!-- no tasks in done -->
@@ -49,6 +49,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0021** -- Health tab uses index-only aggregate queries over the events table (materialized summary deferred) -- 2026-07-20 -- `knowledge/decisions/0021-health-tab-index-only-aggregate-queries.md`
 - **0020** -- Event explorer uses FTS5 external-content search and client-tracked keyset pagination -- 2026-07-20 -- `knowledge/decisions/0020-event-explorer-fts5-search-and-keyset-pagination.md`
 - **0017** -- Administration console gets its own Fable.Remoting API (IAdminApi) -- 2026-07-20 -- `knowledge/decisions/0017-second-remoting-api-for-admin-console.md`
 <!-- adr-local:end -->

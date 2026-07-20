@@ -294,6 +294,38 @@ module EventStore =
         |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
         |> Option.defaultValue 0
 
+    // Health stats (administration-hw74a) — GROUP BY on stream_id/event_type
+    // reuses idx_events_stream_id/idx_events_event_type, so these are
+    // index-only scans (no row data touched); the day-count query is bounded
+    // by an indexed timestamp range rather than scanning the whole table. See
+    // ADR-0021 for the full cost reasoning.
+
+    /// Event count per distinct stream, unordered. Callers derive both the
+    /// bounded-context breakdown (grouping streams by prefix) and the
+    /// top-N-largest-streams list (sorting/truncating) from this one scan.
+    let getEventCountsByStream (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand "SELECT stream_id, COUNT(*) as cnt FROM events GROUP BY stream_id"
+        |> Db.query (fun rd -> rd.ReadString "stream_id", rd.ReadInt32 "cnt")
+
+    /// Event count per distinct event type, unordered. Callers derive both
+    /// the distinct-type count and the top-N-by-frequency list from this one
+    /// scan.
+    let getEventCountsByType (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand "SELECT event_type, COUNT(*) as cnt FROM events GROUP BY event_type"
+        |> Db.query (fun rd -> rd.ReadString "event_type", rd.ReadInt32 "cnt")
+
+    /// Per-day event counts for timestamps >= sinceIso (ISO-8601 TEXT, same
+    /// format events.timestamp is stored in). Bounded by the indexed
+    /// timestamp range rather than a full-table scan, so cost tracks the
+    /// window size (e.g. ~90 days), not total store history.
+    let getDailyEventCounts (conn: SqliteConnection) (sinceIso: string) : (string * int) list =
+        conn
+        |> Db.newCommand "SELECT substr(timestamp,1,10) as day, COUNT(*) as cnt FROM events WHERE timestamp >= @since GROUP BY day ORDER BY day"
+        |> Db.setParams [ "since", SqlType.String sinceIso ]
+        |> Db.query (fun rd -> rd.ReadString "day", rd.ReadInt32 "cnt")
+
     // Writing
 
     let appendToStream (conn: SqliteConnection) (streamId: string) (expectedPosition: int64) (events: EventData list) : AppendResult =

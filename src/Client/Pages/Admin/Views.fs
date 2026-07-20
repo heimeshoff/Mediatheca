@@ -43,10 +43,9 @@ let private placeholderPanel (tab: AdminTab) =
     let blurb =
         match tab with
         | AdminProjections -> "Projection dashboard — rebuild status and controls land here."
-        | AdminHealth -> "Store health — event store diagnostics land here."
         | AdminJobs -> "Scheduled jobs — background job status lands here."
         | AdminSurgery -> "Event surgery — corrective tooling lands here."
-        | AdminEvents -> ""
+        | AdminEvents | AdminHealth -> ""
     Html.div [
         prop.className (DesignSystem.velvetCard + " p-8 text-center")
         prop.children [
@@ -76,6 +75,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
             match model.ActiveTab with
             | AdminEvents ->
                 Mediatheca.Client.Pages.EventBrowser.Views.view model.EventBrowserModel (Event_browser_msg >> dispatch)
+            | AdminHealth ->
+                Mediatheca.Client.Pages.AdminHealth.Views.view model.HealthModel (Health_msg >> dispatch)
             | other ->
                 Html.div [
                     prop.className DesignSystem.pagePadding

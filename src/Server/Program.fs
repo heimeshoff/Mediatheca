@@ -206,7 +206,7 @@ let main args =
 
     // Create API
     let api = Api.create conn httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig imageBasePath projectionHandlers
-    let adminApi = Administration.create conn
+    let adminApi = Administration.create conn dbPath imageBasePath
 
     let remotingHandler =
         Remoting.createApi ()

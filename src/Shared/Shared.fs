@@ -1315,10 +1315,44 @@ module AdminRoute =
     let builder (_typeName: string) (methodName: string) =
         sprintf "/api/admin/%s" methodName
 
+// Health tab (administration-hw74a) — one aggregate DTO for the whole tab so
+// it loads in a single round trip. See ADR-0021 for the query-cost reasoning
+// behind what's aggregated server-side vs. what's a raw top-N list.
+type BoundedContextEventCount = { BoundedContext: string; Count: int }
+type DailyEventCount = { Date: string; Count: int }
+type StreamEventCount = { StreamId: string; Count: int }
+type EventTypeCount = { EventType: string; Count: int }
+
+type StorageStats = {
+    DbSizeBytes: int64
+    WalSizeBytes: int64
+    ImagesSizeBytes: int64
+    ImagesFileCount: int
+}
+
+type HealthStats = {
+    TotalEventCount: int
+    /// Per bounded context, by stream-id prefix (Administration.boundedContextPrefixes).
+    /// Includes an "Other" entry when streams don't match a known prefix, so
+    /// this list's counts always sum to TotalEventCount.
+    BoundedContextCounts: BoundedContextEventCount list
+    /// One entry per day for the last ~90 days, oldest first, zero-filled for
+    /// days with no events (so the sparkline gets an even series).
+    DailyCounts: DailyEventCount list
+    /// Largest streams by event count, descending, top 10.
+    TopStreams: StreamEventCount list
+    DistinctEventTypeCount: int
+    /// Most frequent event types, descending, top 10.
+    TopEventTypes: EventTypeCount list
+    Storage: StorageStats
+}
+
 type IAdminApi = {
     // Event Store Browser
     getEventPage: EventPageQuery -> Async<EventPage>
     getEventStreams: unit -> Async<string list>
     getEventTypes: unit -> Async<string list>
     getBoundedContexts: unit -> Async<string list>
+    // Health
+    getHealthStats: unit -> Async<HealthStats>
 }

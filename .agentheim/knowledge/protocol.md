@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-20 18:14 -- Task verified and completed: administration-hw74a - Store health tab — event volume stats, largest streams, storage sizes
+
+**Type:** Work / Task completion
+**Task:** administration-hw74a - Store health tab — event volume stats, largest streams, storage sizes
+**Summary:** Add the Health tab (event volume stats, per-BC breakdown, 90-day sparkline, top streams/types, storage sizes) via a new IAdminApi.getHealthStats aggregate DTO backed by index-only queries
+**Duration:** 12m20s
+**Verification:** PASS (iteration 1)
+**Files changed:** 15
+**Tests added:** 6
+**ADRs written:** 0021
+
+---
+
 ## 2026-07-20 17:59 -- Batch started: [administration-hw74a, administration-v4y9g, administration-mtf1f]
 
 **Type:** Work / Batch start
