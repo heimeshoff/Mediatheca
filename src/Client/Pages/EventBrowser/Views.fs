@@ -6,9 +6,12 @@ open Mediatheca.Client.Pages.EventBrowser.Types
 open Mediatheca.Client
 open Mediatheca.Client.Components
 
-let private eventRow (event: Mediatheca.Shared.EventDto) (isExpanded: bool) (dispatch: Msg -> unit) =
+let private eventRow (event: Mediatheca.Shared.EventDto) (isExpanded: bool) (isNewlyArrived: bool) (dispatch: Msg -> unit) =
     Html.div [
-        prop.className "border-b border-base-300/30 last:border-0"
+        prop.className (
+            "border-b border-base-300/30 last:border-0 "
+            + if isNewlyArrived then DesignSystem.animateHighlight else ""
+        )
         prop.children [
             Html.div [
                 prop.className "flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-base-300/30 transition-colors"
@@ -76,6 +79,31 @@ let private eventRow (event: Mediatheca.Shared.EventDto) (isExpanded: bool) (dis
                         ]
                     ]
                 ]
+        ]
+    ]
+
+/// Follow toggle (administration-mtf1f). Only meaningful on the newest page —
+/// disabled once the user has paged back into history, since Follow would
+/// otherwise prepend live rows onto a page they're actively reading (see
+/// State.stopFollowing's doc comment).
+let private followToggle (model: Model) (dispatch: Msg -> unit) =
+    let onFirstPage = model.CurrentBefore = None
+    Html.button [
+        prop.className (DesignSystem.pill model.Following + " flex items-center gap-2")
+        prop.disabled (not onFirstPage)
+        prop.title (
+            if onFirstPage then "Follow live events matching the active filters"
+            else "Follow is only available on the newest page"
+        )
+        prop.onClick (fun _ -> dispatch Toggle_follow)
+        prop.children [
+            Html.span [
+                prop.className (
+                    "inline-block w-2 h-2 rounded-full "
+                    + if model.Following then "bg-success animate-pulse" else "bg-base-content/30"
+                )
+            ]
+            Html.span [ prop.text (if model.Following then "Following" else "Follow") ]
         ]
     ]
 
@@ -207,9 +235,15 @@ let view (model: Model) (dispatch: Msg -> unit) =
     Html.div [
         prop.className (DesignSystem.pagePadding + " " + DesignSystem.animateFadeIn)
         prop.children [
-            Html.h1 [
-                prop.className "text-2xl font-bold font-display text-gradient-primary mb-6"
-                prop.text "Event Store"
+            Html.div [
+                prop.className "flex items-center justify-between mb-6"
+                prop.children [
+                    Html.h1 [
+                        prop.className "text-2xl font-bold font-display text-gradient-primary"
+                        prop.text "Event Store"
+                    ]
+                    followToggle model dispatch
+                ]
             ]
 
             filterBar model dispatch
@@ -248,7 +282,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 match model.ExpandedEvent with
                                 | Some pos -> pos = event.GlobalPosition
                                 | None -> false
-                            eventRow event isExpanded dispatch
+                            let isNewlyArrived = Set.contains event.GlobalPosition model.NewlyArrived
+                            eventRow event isExpanded isNewlyArrived dispatch
                     ]
                 ]
 

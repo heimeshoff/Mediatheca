@@ -80,6 +80,31 @@ let administrationTests =
             Expect.contains streams "movies-dune-2021" "Should include movies stream"
             Expect.contains streams "friends-alice" "Should include friends stream"
 
+        testCase "getEventsAfter returns only events after the given position through IAdminApi" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            EventStore.appendToStream conn "movies-dune-2021" -1L [ makeEvent "MovieAdded" "{}" ] |> ignore
+            let api = createApi conn
+            let firstPage = api.getEventPage { Filter = EventFilter.empty; Before = None; PageSize = 100 } |> Async.RunSynchronously
+            let seenPosition = firstPage.Events.[0].GlobalPosition
+
+            EventStore.appendToStream conn "friends-alice" -1L [ makeEvent "FriendAdded" "{}" ] |> ignore
+
+            let tail = api.getEventsAfter { Filter = EventFilter.empty; After = seenPosition; Limit = 100 } |> Async.RunSynchronously
+
+            Expect.equal (List.length tail) 1 "Should return only the newly appended event"
+            Expect.equal tail.[0].StreamId "friends-alice" "Should be the newly appended event"
+
+        testCase "getEventsAfter resolves BoundedContext filter to a stream_id prefix" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            EventStore.appendToStream conn "Movie-dune" -1L [ makeEvent "MovieAdded" "{}" ] |> ignore
+            EventStore.appendToStream conn "Friend-alice" -1L [ makeEvent "FriendAdded" "{}" ] |> ignore
+            let api = createApi conn
+
+            let tail = api.getEventsAfter { Filter = { EventFilter.empty with BoundedContext = Some "Movies" }; After = 0L; Limit = 100 } |> Async.RunSynchronously
+
+            Expect.equal (List.length tail) 1 "Only the Movie- stream event should match"
+            Expect.equal tail.[0].StreamId "Movie-dune" "Should be the movie event"
+
         testCase "getEventTypes returns distinct event types through IAdminApi" <| fun _ ->
             let conn = createInMemoryConnection ()
             EventStore.appendToStream conn "movies-dune-2021" -1L [ makeEvent "MovieAdded" "{}" ] |> ignore

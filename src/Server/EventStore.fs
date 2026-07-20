@@ -190,16 +190,12 @@ module EventStore =
     let private toFtsPhraseQuery (term: string) =
         "\"" + term.Replace("\"", "\"\"") + "\""
 
-    /// Keyset-paginated, filtered event query, newest-first.
-    /// `before = None` returns the first (newest) page; `before = Some p`
-    /// returns events with global_position strictly less than `p` — i.e. the
-    /// page immediately older than whatever page ended at `p`. Callers page
-    /// backward by remembering the cursor that produced each page they've
-    /// already seen (a client-side cursor stack) rather than via a server-side
-    /// "after" direction, so there is exactly one keyset direction to reason
-    /// about here.
-    /// Returns (page of at most `pageSize` events, hasMore, totalMatches).
-    let queryEventPage (conn: SqliteConnection) (filter: QueryFilter) (before: int64 option) (pageSize: int) : StoredEvent list * bool * int =
+    /// Shared condition-building for `filter`, used by both `queryEventPage`
+    /// (newest-first, keyset-paginated) and `queryEventsAfter` (ascending
+    /// live-tail, administration-mtf1f) — the two differ only in direction and
+    /// bound, not in what counts as a match. Returns (WHERE conditions, SQL
+    /// parameters), both already accounting for which filter fields are set.
+    let private buildFilterConditions (filter: QueryFilter) : string list * (string * SqlType) list =
         let mutable conditions = []
         let mutable paramList = []
 
@@ -239,8 +235,19 @@ module EventStore =
             paramList <- ("ts_to", SqlType.String ts) :: paramList
         | _ -> ()
 
-        let baseConditions = conditions |> List.rev
-        let baseParams = paramList
+        (conditions |> List.rev), paramList
+
+    /// Keyset-paginated, filtered event query, newest-first.
+    /// `before = None` returns the first (newest) page; `before = Some p`
+    /// returns events with global_position strictly less than `p` — i.e. the
+    /// page immediately older than whatever page ended at `p`. Callers page
+    /// backward by remembering the cursor that produced each page they've
+    /// already seen (a client-side cursor stack) rather than via a server-side
+    /// "after" direction, so there is exactly one keyset direction to reason
+    /// about here.
+    /// Returns (page of at most `pageSize` events, hasMore, totalMatches).
+    let queryEventPage (conn: SqliteConnection) (filter: QueryFilter) (before: int64 option) (pageSize: int) : StoredEvent list * bool * int =
+        let baseConditions, baseParams = buildFilterConditions filter
 
         let whereClause (extra: string list) =
             match baseConditions @ extra with
@@ -271,6 +278,23 @@ module EventStore =
         let hasMore = List.length rows > pageSize
         let page = rows |> List.truncate pageSize
         page, hasMore, totalMatches
+
+    /// Ascending "everything after global position `after`, matching `filter`"
+    /// query for live-tail polling (administration-mtf1f, Follow mode). Reuses
+    /// the exact same condition-building as `queryEventPage`
+    /// (`buildFilterConditions`) and differs only in direction (ascending, not
+    /// descending) and bound (`global_position > after`, not a keyset `before`
+    /// cursor) — see ADR-0023. `limit` bounds a single poll response.
+    let queryEventsAfter (conn: SqliteConnection) (filter: QueryFilter) (after: int64) (limit: int) : StoredEvent list =
+        let baseConditions, baseParams = buildFilterConditions filter
+        let conditions = "e.global_position > @after" :: baseConditions
+        let whereClause = " WHERE " + String.concat " AND " conditions
+        let queryParams = ("after", SqlType.Int64 after) :: ("fetch_limit", SqlType.Int32 limit) :: baseParams
+
+        conn
+        |> Db.newCommand ($"SELECT e.global_position, e.stream_id, e.stream_position, e.event_type, e.data, e.metadata, e.timestamp FROM events e{whereClause} ORDER BY e.global_position ASC LIMIT @fetch_limit")
+        |> Db.setParams queryParams
+        |> Db.query readEvent
 
     let getDistinctStreams (conn: SqliteConnection) : string list =
         conn

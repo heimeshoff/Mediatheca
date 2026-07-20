@@ -182,6 +182,40 @@ let eventStoreTests =
             Expect.equal (List.length allPositions) (List.length (List.distinct allPositions)) "No event should appear on more than one page"
             Expect.equal (List.length allPositions) 5 "All 5 events should be covered across the pages"
 
+        testCase "queryEventsAfter returns only events strictly after the given position, ascending" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            for i in 1..5 do
+                EventStore.appendToStream conn $"stream-{i}" -1L [ makeEvent "TestEvent" $"""{{"i":{i}}}""" ] |> ignore
+
+            let all = EventStore.readAllForward conn 0L 100
+            let thirdPosition = all.[2].GlobalPosition
+
+            let results = EventStore.queryEventsAfter conn EventStore.emptyQueryFilter thirdPosition 100
+
+            Expect.equal (List.length results) 2 "Should return only the two events after the third"
+            Expect.isTrue (results |> List.forall (fun e -> e.GlobalPosition > thirdPosition)) "Every result must be strictly after the given position"
+            Expect.equal (results |> List.map (fun e -> e.GlobalPosition)) (results |> List.map (fun e -> e.GlobalPosition) |> List.sort) "Results must be ascending by global position"
+
+        testCase "queryEventsAfter applies the same filters as queryEventPage" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            EventStore.appendToStream conn "Movie-dune" -1L [ makeEvent "MovieAdded" "{}" ] |> ignore
+            EventStore.appendToStream conn "Friend-alice" -1L [ makeEvent "FriendAdded" "{}" ] |> ignore
+
+            let filter = { EventStore.emptyQueryFilter with StreamPrefix = Some "Movie-" }
+            let results = EventStore.queryEventsAfter conn filter 0L 100
+
+            Expect.equal (List.length results) 1 "Only the Movie- prefixed event should match"
+            Expect.equal results.[0].StreamId "Movie-dune" "Should be the movie event"
+
+        testCase "queryEventsAfter caps results at the given limit" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            for i in 1..5 do
+                EventStore.appendToStream conn $"stream-{i}" -1L [ makeEvent "TestEvent" $"""{{"i":{i}}}""" ] |> ignore
+
+            let results = EventStore.queryEventsAfter conn EventStore.emptyQueryFilter 0L 2
+
+            Expect.equal (List.length results) 2 "Should be capped at the limit"
+
         testCase "FTS backfill is idempotent and covers pre-existing events after restart" <| fun _ ->
             let conn = createInMemoryConnection ()
             EventStore.appendToStream conn "movies-1" -1L [ makeEvent "MovieAdded" """{"title":"Blade Runner marginalia"}""" ] |> ignore

@@ -395,6 +395,17 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
                 | Not_found -> model.NavigationHistory
                 | _ -> pushHistory prevPage model.NavigationHistory
         let model = { model with CurrentPage = page; NavigationHistory = newHistory; SuppressNextHistoryPush = false }
+        // Leaving the Admin page entirely (as opposed to switching tabs within
+        // it) stops any live Follow poll in the Event Browser. Every other
+        // page branch below replaces only its own child model and leaves
+        // AdminModel untouched, so without this a Follow session started
+        // before navigating away would keep polling indefinitely
+        // (administration-mtf1f iteration 2 — see ADR-0023).
+        let model =
+            match prevPage, page with
+            | Admin _, Admin _ -> model
+            | Admin _, _ -> { model with AdminModel = Pages.Admin.State.stopFollowing model.AdminModel }
+            | _ -> model
         match page with
         | Movie_list ->
             let childModel, childCmd = Pages.Movies.State.init ()

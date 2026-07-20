@@ -158,6 +158,14 @@ h1, h2, h3, h4, h5, h6 {
     100% { background-position: 200% 0; }
 }
 
+/* Subtle highlight for a row that just arrived (event explorer live tail,
+   administration-mtf1f) — a brief primary-tinted flash settling back to
+   transparent, layered on top of fade-in-up's entrance motion. */
+@keyframes highlight-flash {
+    0%   { background-color: color-mix(in oklch, var(--color-primary) 18%, transparent); }
+    100% { background-color: transparent; }
+}
+
 .animate-fade-in-up {
     animation: fade-in-up 0.4s ease-out both;
 }
@@ -168,6 +176,10 @@ h1, h2, h3, h4, h5, h6 {
 
 .animate-scale-in {
     animation: scale-in 0.3s ease-out both;
+}
+
+.animate-highlight {
+    animation: fade-in-up 0.4s ease-out both, highlight-flash 1.6s ease-out both;
 }
 
 /* Stagger children in grids */

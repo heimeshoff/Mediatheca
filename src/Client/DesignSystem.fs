@@ -107,6 +107,10 @@ let animateFadeInUp = "animate-fade-in-up"
 /// Scale in animation
 let animateScaleIn = "animate-scale-in"
 
+/// Subtle highlight flash + fade-in-up, for a row that just arrived live
+/// (event explorer live tail, administration-mtf1f).
+let animateHighlight = "animate-highlight"
+
 /// Stagger grid container — children animate in with cascading delay
 let staggerGrid = "stagger-grid"
 

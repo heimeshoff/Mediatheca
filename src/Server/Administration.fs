@@ -143,6 +143,20 @@ module Administration =
                 }
             }
 
+            getEventsAfter = fun query -> async {
+                let filter: EventStore.QueryFilter = {
+                    Search = query.Filter.Search
+                    StreamFilter = query.Filter.StreamFilter
+                    EventTypeFilter = query.Filter.EventTypeFilter
+                    StreamPrefix = prefixForBoundedContext query.Filter.BoundedContext
+                    TimestampFrom = query.Filter.TimestampFrom
+                    TimestampTo = query.Filter.TimestampTo
+                }
+                let limit = max 1 query.Limit
+                let events = EventStore.queryEventsAfter conn filter query.After limit
+                return events |> List.map toEventDto
+            }
+
             getEventStreams = fun () -> async {
                 return EventStore.getDistinctStreams conn
             }

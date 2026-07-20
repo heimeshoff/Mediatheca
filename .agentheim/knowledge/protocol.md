@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-20 18:33 -- Task verified and completed: administration-mtf1f - Event explorer live tail — follow mode for incoming events
+
+**Type:** Work / Task completion
+**Task:** administration-mtf1f - Event explorer live tail — follow mode for incoming events
+**Summary:** Add the Follow live-tail toggle to the event explorer — bounded getEventsAfter poll reusing the g5dfy filter shape, epoch-guarded self-rescheduling Cmd with teardown on navigation away from Admin
+**Duration:** 31m10s
+**Verification:** PASS (iteration 2)
+**Files changed:** 16
+**Tests added:** 5
+**ADRs written:** 0023
+
+---
+
 ## 2026-07-20 18:14 -- Task verified and completed: administration-hw74a - Store health tab — event volume stats, largest streams, storage sizes
 
 **Type:** Work / Task completion

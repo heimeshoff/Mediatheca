@@ -492,6 +492,18 @@ type EventPage = {
     TotalMatches: int
 }
 
+/// Live-tail query for the event explorer's Follow mode (administration-mtf1f):
+/// "everything after global position `After`, matching `Filter`" — the
+/// ascending direction ADR-0020 deliberately left off `EventPageQuery`.
+/// Reuses `EventFilter` as-is (see its doc comment). `Limit` bounds a single
+/// poll response so a burst of writes between polls can't return an unbounded
+/// batch — see ADR-0023.
+type EventTailQuery = {
+    Filter: EventFilter
+    After: int64
+    Limit: int
+}
+
 // Movie DTOs (after WatchSession and ContentBlock since they reference those types)
 
 type MovieListItem = {
@@ -1353,6 +1365,8 @@ type IAdminApi = {
     getEventStreams: unit -> Async<string list>
     getEventTypes: unit -> Async<string list>
     getBoundedContexts: unit -> Async<string list>
+    /// Live-tail poll for Follow mode (administration-mtf1f) — see EventTailQuery.
+    getEventsAfter: EventTailQuery -> Async<EventDto list>
     // Health
     getHealthStats: unit -> Async<HealthStats>
 }
