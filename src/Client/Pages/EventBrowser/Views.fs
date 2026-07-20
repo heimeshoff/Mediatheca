@@ -79,6 +79,130 @@ let private eventRow (event: Mediatheca.Shared.EventDto) (isExpanded: bool) (dis
         ]
     ]
 
+let private pageSizeOptions = [ 25; 50; 100; 200 ]
+
+let private filterBar (model: Model) (dispatch: Msg -> unit) =
+    Html.div [
+        prop.className "flex flex-col gap-3 mb-6"
+        prop.children [
+            Daisy.input [
+                input.bordered
+                prop.className "w-full font-mono text-sm"
+                prop.placeholder "Search event payloads..."
+                prop.value model.Search
+                prop.onChange (Search_changed >> dispatch)
+            ]
+            Html.div [
+                prop.className "flex flex-col sm:flex-row gap-3"
+                prop.children [
+                    Daisy.select [
+                        prop.className "flex-1"
+                        prop.value model.StreamFilter
+                        prop.onChange (Stream_filter_changed >> dispatch)
+                        prop.children [
+                            Html.option [ prop.value ""; prop.text "All streams" ]
+                            for stream in model.Streams do
+                                Html.option [ prop.value stream; prop.text stream ]
+                        ]
+                    ]
+                    Daisy.select [
+                        prop.className "flex-1"
+                        prop.value model.EventTypeFilter
+                        prop.onChange (Event_type_filter_changed >> dispatch)
+                        prop.children [
+                            Html.option [ prop.value ""; prop.text "All event types" ]
+                            for eventType in model.EventTypes do
+                                Html.option [ prop.value eventType; prop.text (eventType.Replace("_", " ")) ]
+                        ]
+                    ]
+                    Daisy.select [
+                        prop.className "flex-1"
+                        prop.value model.BoundedContextFilter
+                        prop.onChange (Bounded_context_filter_changed >> dispatch)
+                        prop.children [
+                            Html.option [ prop.value ""; prop.text "All bounded contexts" ]
+                            for bc in model.BoundedContexts do
+                                Html.option [ prop.value bc; prop.text bc ]
+                        ]
+                    ]
+                ]
+            ]
+            Html.div [
+                prop.className "flex flex-col sm:flex-row gap-3 items-stretch sm:items-center"
+                prop.children [
+                    Html.label [
+                        prop.className "flex items-center gap-2 text-xs text-base-content/50 font-mono flex-1"
+                        prop.children [
+                            Html.span [ prop.text "From" ]
+                            Daisy.input [
+                                input.bordered
+                                input.sm
+                                prop.type' "date"
+                                prop.className "flex-1"
+                                prop.value model.TimestampFrom
+                                prop.onChange (Timestamp_from_changed >> dispatch)
+                            ]
+                        ]
+                    ]
+                    Html.label [
+                        prop.className "flex items-center gap-2 text-xs text-base-content/50 font-mono flex-1"
+                        prop.children [
+                            Html.span [ prop.text "To" ]
+                            Daisy.input [
+                                input.bordered
+                                input.sm
+                                prop.type' "date"
+                                prop.className "flex-1"
+                                prop.value model.TimestampTo
+                                prop.onChange (Timestamp_to_changed >> dispatch)
+                            ]
+                        ]
+                    ]
+                    Daisy.select [
+                        select.sm
+                        prop.value (string model.PageSize)
+                        prop.onChange (fun (v: string) -> dispatch (Page_size_changed (int v)))
+                        prop.children [
+                            for size in pageSizeOptions do
+                                Html.option [ prop.value (string size); prop.text $"{size} / page" ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+let private paginationBar (model: Model) (dispatch: Msg -> unit) =
+    let firstShown =
+        if model.TotalMatches = 0 then 0
+        else (model.CursorStack |> List.length) * model.PageSize + 1
+    let lastShown = firstShown + (List.length model.Events) - 1
+    Html.div [
+        prop.className "flex items-center justify-between mt-4 text-sm text-base-content/40 font-mono"
+        prop.children [
+            Daisy.button.button [
+                button.outline
+                button.sm
+                prop.disabled (List.isEmpty model.CursorStack || model.IsLoading)
+                prop.onClick (fun _ -> dispatch Prev_page)
+                prop.text "Prev"
+            ]
+            Html.span [
+                prop.text (
+                    if model.TotalMatches = 0 then "No matches"
+                    else $"Showing {firstShown}-{lastShown} of {model.TotalMatches}"
+                )
+            ]
+            Daisy.button.button [
+                button.outline
+                button.sm
+                prop.disabled (not model.HasMore || model.IsLoading)
+                prop.onClick (fun _ -> dispatch Next_page)
+                prop.text "Next"
+            ]
+        ]
+    ]
+
 let view (model: Model) (dispatch: Msg -> unit) =
     Html.div [
         prop.className (DesignSystem.pagePadding + " " + DesignSystem.animateFadeIn)
@@ -88,44 +212,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 prop.text "Event Store"
             ]
 
-            // Filters
-            Html.div [
-                prop.className "flex flex-col sm:flex-row gap-3 mb-6"
-                prop.children [
-                    Daisy.select [
-                        prop.className "flex-1"
-                        prop.value model.StreamFilter
-                        prop.onChange (Stream_filter_changed >> dispatch)
-                        prop.children [
-                            Html.option [
-                                prop.value ""
-                                prop.text "All streams"
-                            ]
-                            for stream in model.Streams do
-                                Html.option [
-                                    prop.value stream
-                                    prop.text stream
-                                ]
-                        ]
-                    ]
-                    Daisy.select [
-                        prop.className "flex-1"
-                        prop.value model.EventTypeFilter
-                        prop.onChange (Event_type_filter_changed >> dispatch)
-                        prop.children [
-                            Html.option [
-                                prop.value ""
-                                prop.text "All event types"
-                            ]
-                            for eventType in model.EventTypes do
-                                Html.option [
-                                    prop.value eventType
-                                    prop.text (eventType.Replace("_", " "))
-                                ]
-                        ]
-                    ]
-                ]
-            ]
+            filterBar model dispatch
 
             if model.IsLoading then
                 Html.div [
@@ -165,9 +252,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     ]
                 ]
 
-                Html.div [
-                    prop.className "mt-4 text-center text-sm text-base-content/40"
-                    prop.text $"Showing {List.length model.Events} events"
-                ]
+                paginationBar model dispatch
         ]
     ]

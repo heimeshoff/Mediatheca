@@ -439,11 +439,57 @@ type EventDto = {
     Timestamp: string
 }
 
-type EventQuery = {
+/// Composable filter over the event log (administration-g5dfy). Shared, as-is,
+/// by the paged event-explorer query below and — going forward — by a live-tail
+/// "everything after global position N matching these filters" query
+/// (administration-mtf1f): both consume this exact filter shape and only differ
+/// in pagination direction.
+type EventFilter = {
+    /// Full-text search over the event payload (events.data), via a server-side
+    /// FTS5 index. Free text — the server treats the whole string as a literal
+    /// phrase, not an FTS5 query expression.
+    Search: string option
+    /// Substring match on stream_id.
     StreamFilter: string option
+    /// Substring match on event_type.
     EventTypeFilter: string option
-    Limit: int
-    Offset: int
+    /// One of the bounded-context names returned by IAdminApi.getBoundedContexts
+    /// (e.g. "Movies"); resolved server-side to a stream_id prefix.
+    BoundedContext: string option
+    /// ISO-8601 timestamp, inclusive lower bound.
+    TimestampFrom: string option
+    /// ISO-8601 timestamp, inclusive upper bound.
+    TimestampTo: string option
+}
+
+module EventFilter =
+    let empty : EventFilter = {
+        Search = None
+        StreamFilter = None
+        EventTypeFilter = None
+        BoundedContext = None
+        TimestampFrom = None
+        TimestampTo = None
+    }
+
+/// Keyset-paginated event query, newest-first. `Before = None` asks for the
+/// first (newest) page; `Before = Some p` asks for events strictly older than
+/// global position `p` (i.e. the page immediately after whatever page ended at
+/// `p`). There is no server-side "after" direction — callers page backward by
+/// remembering the cursor that produced each page they've already seen.
+type EventPageQuery = {
+    Filter: EventFilter
+    Before: int64 option
+    PageSize: int
+}
+
+type EventPage = {
+    Events: EventDto list
+    /// True if there is at least one more (older) event beyond this page.
+    HasMore: bool
+    /// Total number of events matching Filter, ignoring pagination — for a
+    /// "X of Y matches" indicator.
+    TotalMatches: int
 }
 
 // Movie DTOs (after WatchSession and ContentBlock since they reference those types)
@@ -1271,7 +1317,8 @@ module AdminRoute =
 
 type IAdminApi = {
     // Event Store Browser
-    getEvents: EventQuery -> Async<EventDto list>
+    getEventPage: EventPageQuery -> Async<EventPage>
     getEventStreams: unit -> Async<string list>
     getEventTypes: unit -> Async<string list>
+    getBoundedContexts: unit -> Async<string list>
 }

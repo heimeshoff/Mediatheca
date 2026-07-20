@@ -67,9 +67,60 @@ module EventStore =
         """
         cmd.ExecuteNonQuery() |> ignore
 
+    /// FTS5 external-content index over events.data, so the event browser can
+    /// full-text search event payloads (administration-g5dfy). External content
+    /// (content='events', content_rowid='global_position') means the FTS index
+    /// stores no copy of the payload itself — it mirrors `events` by rowid, kept
+    /// in sync going forward by an AFTER INSERT trigger (events are append-only;
+    /// there is no UPDATE/DELETE trigger to write because rows in `events` never
+    /// change or disappear).
+    ///
+    /// Idempotent across restarts: CREATE ... IF NOT EXISTS is a no-op on an
+    /// already-migrated database. Backfills pre-existing rows (events inserted
+    /// before this migration existed) by checking, *before* creating it,
+    /// whether `events_fts` already exists — if it doesn't, this is either a
+    /// brand-new database (nothing to backfill) or a database that predates
+    /// this migration (rows already in `events` with no FTS entries yet) —
+    /// either way, issuing FTS5's built-in `('rebuild')` command once right
+    /// after creation is correct and cheap.
+    ///
+    /// Deliberately NOT implemented as "rebuild if COUNT(*) FROM events_fts
+    /// disagrees with COUNT(*) FROM events": for an external-content FTS5
+    /// table, an unfiltered COUNT(*)/SELECT is satisfied by mirroring the
+    /// content table's rowids directly — it does not consult the inverted
+    /// index — so a freshly created, entirely unindexed events_fts table
+    /// already reports the "correct" count and that check never fires.
+    let private createFtsIndex (conn: SqliteConnection) =
+        let alreadyMigrated =
+            conn
+            |> Db.newCommand "SELECT COUNT(*) as cnt FROM sqlite_master WHERE type = 'table' AND name = 'events_fts'"
+            |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "cnt")
+            |> Option.defaultValue 0
+            |> fun cnt -> cnt > 0
+
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- """
+            CREATE VIRTUAL TABLE IF NOT EXISTS events_fts USING fts5(
+                data,
+                content='events',
+                content_rowid='global_position'
+            );
+
+            CREATE TRIGGER IF NOT EXISTS events_fts_ai AFTER INSERT ON events BEGIN
+                INSERT INTO events_fts(rowid, data) VALUES (new.global_position, new.data);
+            END;
+        """
+        cmd.ExecuteNonQuery() |> ignore
+
+        if not alreadyMigrated then
+            conn
+            |> Db.newCommand "INSERT INTO events_fts(events_fts) VALUES ('rebuild')"
+            |> Db.exec
+
     let initialize (conn: SqliteConnection) =
         setPragmas conn
         createTables conn
+        createFtsIndex conn
 
     // Reading
 
@@ -105,33 +156,121 @@ module EventStore =
         ]
         |> Db.query readEvent
 
-    let queryEvents (conn: SqliteConnection) (streamFilter: string option) (eventTypeFilter: string option) (limit: int) (offset: int) : StoredEvent list =
+    /// Composable filter for `queryEventPage`. Deliberately BC-agnostic at this
+    /// layer: `StreamPrefix` is an already-resolved `stream_id` prefix (e.g.
+    /// "Movie-"), not a bounded-context name — the name-to-prefix mapping is
+    /// admin-console knowledge that lives in `Administration.fs`, not here.
+    /// Shared with (not duplicated by) any future "events after global position N
+    /// matching this same filter" live-tail query (administration-mtf1f) — that
+    /// query reuses this exact record and only swaps the pagination direction.
+    type QueryFilter = {
+        Search: string option
+        StreamFilter: string option
+        EventTypeFilter: string option
+        StreamPrefix: string option
+        TimestampFrom: string option
+        TimestampTo: string option
+    }
+
+    let emptyQueryFilter : QueryFilter = {
+        Search = None
+        StreamFilter = None
+        EventTypeFilter = None
+        StreamPrefix = None
+        TimestampFrom = None
+        TimestampTo = None
+    }
+
+    /// FTS5 MATCH input is a tiny query language of its own (AND/OR/NOT, `-`,
+    /// `*`, column filters...). Free-text search boxes shouldn't hand user input
+    /// straight to that parser — a term like `blade-runner` or `friend's` would
+    /// throw a syntax error instead of matching. Wrapping the whole term as a
+    /// quoted FTS5 string turns it into a literal phrase query; embedded quotes
+    /// are escaped by doubling, per FTS5 string-literal syntax.
+    let private toFtsPhraseQuery (term: string) =
+        "\"" + term.Replace("\"", "\"\"") + "\""
+
+    /// Keyset-paginated, filtered event query, newest-first.
+    /// `before = None` returns the first (newest) page; `before = Some p`
+    /// returns events with global_position strictly less than `p` — i.e. the
+    /// page immediately older than whatever page ended at `p`. Callers page
+    /// backward by remembering the cursor that produced each page they've
+    /// already seen (a client-side cursor stack) rather than via a server-side
+    /// "after" direction, so there is exactly one keyset direction to reason
+    /// about here.
+    /// Returns (page of at most `pageSize` events, hasMore, totalMatches).
+    let queryEventPage (conn: SqliteConnection) (filter: QueryFilter) (before: int64 option) (pageSize: int) : StoredEvent list * bool * int =
         let mutable conditions = []
         let mutable paramList = []
 
-        match streamFilter with
+        match filter.Search with
+        | Some s when s.Trim() <> "" ->
+            conditions <- "e.global_position IN (SELECT rowid FROM events_fts WHERE events_fts MATCH @search)" :: conditions
+            paramList <- ("search", SqlType.String (toFtsPhraseQuery (s.Trim()))) :: paramList
+        | _ -> ()
+
+        match filter.StreamFilter with
         | Some f when f <> "" ->
-            conditions <- "stream_id LIKE @stream_filter" :: conditions
+            conditions <- "e.stream_id LIKE @stream_filter" :: conditions
             paramList <- ("stream_filter", SqlType.String ($"%%{f}%%")) :: paramList
         | _ -> ()
 
-        match eventTypeFilter with
+        match filter.EventTypeFilter with
         | Some f when f <> "" ->
-            conditions <- "event_type LIKE @event_type_filter" :: conditions
+            conditions <- "e.event_type LIKE @event_type_filter" :: conditions
             paramList <- ("event_type_filter", SqlType.String ($"%%{f}%%")) :: paramList
         | _ -> ()
 
-        let whereClause =
-            if conditions.IsEmpty then ""
-            else " WHERE " + (conditions |> List.rev |> String.concat " AND ")
+        match filter.StreamPrefix with
+        | Some prefix when prefix <> "" ->
+            conditions <- "e.stream_id LIKE @stream_prefix" :: conditions
+            paramList <- ("stream_prefix", SqlType.String ($"{prefix}%%")) :: paramList
+        | _ -> ()
 
-        paramList <- ("limit", SqlType.Int32 limit) :: paramList
-        paramList <- ("offset", SqlType.Int32 offset) :: paramList
+        match filter.TimestampFrom with
+        | Some ts when ts <> "" ->
+            conditions <- "e.timestamp >= @ts_from" :: conditions
+            paramList <- ("ts_from", SqlType.String ts) :: paramList
+        | _ -> ()
 
-        conn
-        |> Db.newCommand ($"SELECT global_position, stream_id, stream_position, event_type, data, metadata, timestamp FROM events{whereClause} ORDER BY global_position DESC LIMIT @limit OFFSET @offset")
-        |> Db.setParams (List.rev paramList)
-        |> Db.query readEvent
+        match filter.TimestampTo with
+        | Some ts when ts <> "" ->
+            conditions <- "e.timestamp <= @ts_to" :: conditions
+            paramList <- ("ts_to", SqlType.String ts) :: paramList
+        | _ -> ()
+
+        let baseConditions = conditions |> List.rev
+        let baseParams = paramList
+
+        let whereClause (extra: string list) =
+            match baseConditions @ extra with
+            | [] -> ""
+            | all -> " WHERE " + String.concat " AND " all
+
+        let totalMatches =
+            conn
+            |> Db.newCommand ($"SELECT COUNT(*) as cnt FROM events e{whereClause []}")
+            |> Db.setParams baseParams
+            |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "cnt")
+            |> Option.defaultValue 0
+
+        let pageConditions, pageParams =
+            match before with
+            | Some p -> [ "e.global_position < @before" ], ("before", SqlType.Int64 p) :: baseParams
+            | None -> [], baseParams
+
+        let fetchLimit = pageSize + 1
+        let pageParams = ("fetch_limit", SqlType.Int32 fetchLimit) :: pageParams
+
+        let rows =
+            conn
+            |> Db.newCommand ($"SELECT e.global_position, e.stream_id, e.stream_position, e.event_type, e.data, e.metadata, e.timestamp FROM events e{whereClause pageConditions} ORDER BY e.global_position DESC LIMIT @fetch_limit")
+            |> Db.setParams pageParams
+            |> Db.query readEvent
+
+        let hasMore = List.length rows > pageSize
+        let page = rows |> List.truncate pageSize
+        page, hasMore, totalMatches
 
     let getDistinctStreams (conn: SqliteConnection) : string list =
         conn

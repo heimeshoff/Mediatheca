@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-20 17:58 -- Task verified and completed: administration-g5dfy - Event explorer — FTS payload search, time/position/BC filters, keyset pagination
+
+**Type:** Work / Task completion
+**Task:** administration-g5dfy - Event explorer — FTS payload search, time/position/BC filters, keyset pagination
+**Summary:** Add FTS5 payload search, composable time/BC/stream/type filters, and keyset pagination to the event explorer, replacing the fixed LIKE/offset query
+**Duration:** 23m40s
+**Verification:** PASS (iteration 1)
+**Files changed:** 11
+**Tests added:** 8
+**ADRs written:** 0020
+
+---
+
 ## 2026-07-20 17:55 -- Task verified and completed: integration-ygwsa - Spike — mint Steam Family access tokens from a stored refresh token (SteamKit2)
 
 **Type:** Work / Task completion
