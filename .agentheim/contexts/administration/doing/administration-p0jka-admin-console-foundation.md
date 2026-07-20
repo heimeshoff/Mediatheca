@@ -1,7 +1,7 @@
 ---
 id: administration-p0jka
 title: Admin console foundation — IAdminApi contract, Administration.fs, /admin section with tabs
-status: todo
+status: doing
 type: feature
 context: administration
 created: 2026-07-20

@@ -11,14 +11,13 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 6
-- **Todo:** 6
-- **Doing:** 0
+- **Todo:** 5
+- **Doing:** 1
 - **Done:** 0
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **administration-p0jka** — Admin console foundation — IAdminApi contract, Administration.fs, /admin section with tabs (feature) — `todo/administration-p0jka-admin-console-foundation.md`
 - **administration-g5dfy** — Event explorer — FTS payload search, time/position/BC filters, keyset pagination (feature) — `todo/administration-g5dfy-event-explorer-search-filters-pagination.md`
 - **administration-v4y9g** — Stream drill-in — per-stream timeline with formatted+raw views, projection state, cross-links (feature) — `todo/administration-v4y9g-stream-drill-in-timeline.md`
 - **administration-mtf1f** — Event explorer live tail — follow mode for incoming events (feature) — `todo/administration-mtf1f-event-live-tail.md`
@@ -28,6 +27,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
+- **administration-p0jka** — Admin console foundation — IAdminApi contract, Administration.fs, /admin section with tabs (feature) — `doing/administration-p0jka-admin-console-foundation.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

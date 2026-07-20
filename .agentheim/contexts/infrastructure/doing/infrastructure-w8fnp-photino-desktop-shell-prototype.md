@@ -1,7 +1,7 @@
 ---
 id: infrastructure-w8fnp
 title: Photino desktop shell prototype — Kestrel in-process, native webview, self-contained Windows/Mac packaging
-status: todo
+status: doing
 type: spike
 context: infrastructure
 created: 2026-07-20

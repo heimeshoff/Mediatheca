@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-20 17:12 -- Batch started: [administration-p0jka, infrastructure-w8fnp]
+
+**Type:** Work / Batch start
+**Tasks:** administration-p0jka - Admin console foundation — IAdminApi contract, Administration.fs, /admin section with tabs, infrastructure-w8fnp - Photino desktop shell prototype — Kestrel in-process, native webview, self-contained Windows/Mac packaging
+**Parallel:** yes (2 workers — the only two ready tasks; the other 5 administration tasks all gate on administration-p0jka and stay blocked this wave)
+
+---
+
 ## 2026-07-20 17:06 -- Modeling / Captured: infrastructure-w8fnp - Photino desktop shell prototype
 
 **Type:** Modeling / Capture
