@@ -23,6 +23,7 @@
     <Compile Include="JellyfinImportTests.fs" />
     <Compile Include="JellyfinMaterializeTests.fs" />
     <Compile Include="JellyfinReauthTests.fs" />
+    <Compile Include="SteamFamilyTokenTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

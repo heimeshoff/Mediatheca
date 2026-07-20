@@ -290,6 +290,61 @@ module Steam =
                 return None
         }
 
+    // ── Family access-token mint-and-retry seam (integration-ygwsa spike) ──
+    //
+    // Mirrors ADR-0011 (`Jellyfin.withReauthRetry`): surface a rejected token as
+    // data, then orchestrate the mint-and-retry purely so the exactly-once
+    // policy is unit-testable with plain lambdas — no HTTP, no SteamKit2, no
+    // SQLite. See ADR-0019 for the spike write-up: the *live* mint
+    // implementation (SteamKit2 QR/credentials login → stored refresh token →
+    // `IAuthenticationService/GenerateAccessTokenForApp` HTTP call) is
+    // UNVERIFIED against the real `IFamilyGroupsService` audience/scope — that
+    // empirical check is deferred to integration-hebjs. This seam is what
+    // hebjs should wire the real `mint`/`persist` lambdas into once it does.
+
+    /// A failed family-API fetch, distinguishing a rejected/expired access
+    /// token (the trigger to mint a fresh one) from any other failure.
+    type FamilyFetchError =
+        | Rejected
+        | FamilyOtherFailure of string
+
+    /// Mints a fresh access token from whatever long-lived credential the
+    /// caller has stored (a Steam refresh token, in the production shape).
+    /// Injected as a lambda so `withTokenRefresh` never has to know how
+    /// minting actually happens.
+    type TokenMinter = unit -> Async<Result<string, string>>
+
+    /// Runs a token-consuming fetch with an exactly-once mint-and-retry
+    /// policy: run `fetch` once with `token`; on `Error Rejected`, call `mint`
+    /// exactly once; on success persist the fresh token via `persist` and
+    /// retry `fetch` exactly once with it; a second `Rejected`, a failed
+    /// mint, or any `FamilyOtherFailure` returns a clear `Error` and never
+    /// loops. Same shape as `Jellyfin.withReauthRetry` (ADR-0011).
+    let withTokenRefresh
+        (token: string)
+        (fetch: string -> Async<Result<'a, FamilyFetchError>>)
+        (mint: TokenMinter)
+        (persist: string -> unit)
+        : Async<Result<'a, string>> =
+        async {
+            let! first = fetch token
+            match first with
+            | Ok value -> return Ok value
+            | Error (FamilyOtherFailure msg) -> return Error msg
+            | Error Rejected ->
+                let! minted = mint ()
+                match minted with
+                | Error e -> return Error (sprintf "Steam family token mint failed: %s" e)
+                | Ok freshToken ->
+                    persist freshToken
+                    let! retry = fetch freshToken
+                    match retry with
+                    | Ok value -> return Ok value
+                    | Error (FamilyOtherFailure msg) -> return Error msg
+                    | Error Rejected ->
+                        return Error "Steam rejected the family token again after minting a fresh one; aborting (no retry loop)"
+        }
+
     let getFamilyGroupForUser (httpClient: HttpClient) (accessToken: string) : Async<Result<SteamFamilyGroupResponse, string>> =
         async {
             try

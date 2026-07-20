@@ -34,3 +34,6 @@ uploads/
 *.tar
 .agentheim/.dashboard
 .agentheim/state
+
+## Spike credentials (never commit — long-lived Steam refresh token)
+spikes/steam-family-token-spike/refresh-token.local.txt

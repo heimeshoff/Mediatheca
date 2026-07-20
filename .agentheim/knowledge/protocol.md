@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-20 17:55 -- Task verified and completed: integration-ygwsa - Spike — mint Steam Family access tokens from a stored refresh token (SteamKit2)
+
+**Type:** Work / Task completion
+**Task:** integration-ygwsa - Spike — mint Steam Family access tokens from a stored refresh token (SteamKit2)
+**Summary:** Ship the ADR-0011-shaped Steam.withTokenRefresh mint-and-retry seam (unit-tested with injected fakes) plus an explicitly-unexecuted SteamKit2 QR-login harness and research, deferring live audience/scope verification to integration-hebjs
+**Duration:** 24m30s
+**Verification:** PASS (iteration 2)
+**Files changed:** 11
+**Tests added:** 5
+**ADRs written:** 0019
+
+---
+
 ## 2026-07-20 17:31 -- Batch started: [administration-g5dfy, integration-ygwsa]
 
 **Type:** Work / Batch start

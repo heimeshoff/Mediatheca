@@ -1,0 +1,71 @@
+// Spike harness (integration-ygwsa) — UNEXECUTED, see README.md in this folder.
+//
+// One-time interactive QR login via SteamKit2, requesting a long-lived
+// ("persistent") refresh token scoped to the MobileApp platform (see
+// README.md for why MobileApp rather than the SteamKit2-sample default of
+// SteamClient). Prints the QR challenge URL for the user to scan with the
+// Steam mobile app, then persists the resulting refresh token to a local
+// file. Never committed; never logged to a shared location.
+//
+// Run: dotnet fsi login.fsx
+
+#r "nuget: SteamKit2, 3.1.0"
+
+open System
+open SteamKit2
+open SteamKit2.Authentication
+
+let refreshTokenPath =
+    System.IO.Path.Combine(__SOURCE_DIRECTORY__, "refresh-token.local.txt")
+
+let run () =
+    async {
+        let steamClient = new SteamClient()
+
+        // The QR/credentials auth handshake itself is expected to run over
+        // plain HTTPS (WebApiTransport) once PlatformType is MobileApp/WebBrowser
+        // rather than SteamClient (research finding — not independently
+        // verified against SteamKit2's own transport-selection source, only
+        // inferred from the sibling node-steam-session library). We still
+        // connect the CM client here because the SteamKit2 API surface for
+        // `.Authentication` is exposed as a handler on a connected
+        // `SteamClient` instance in the current SDK; if this turns out to be
+        // unnecessary, dropping `Connect()` would make the harness fully
+        // CM-connection-free.
+        use manager = new CallbackManager(steamClient)
+        let mutable connected = false
+        let onConnected = manager.Subscribe<SteamClient.ConnectedCallback>(fun _ -> connected <- true)
+        steamClient.Connect()
+
+        while not connected do
+            manager.RunWaitCallbacks(TimeSpan.FromMilliseconds(100.0))
+
+        let authDetails =
+            AuthSessionDetails(
+                PlatformType = EAuthTokenPlatformType.k_EAuthTokenPlatformType_MobileApp,
+                IsPersistentSession = true,
+                ClientOSType = EOSType.Android9
+            )
+
+        let! authSession =
+            steamClient.Authentication.BeginAuthSessionViaQRAsync(authDetails)
+            |> Async.AwaitTask
+
+        printfn "Scan this QR code with the Steam mobile app:"
+        printfn "%s" authSession.ChallengeURL
+        authSession.add_ChallengeURLChanged(fun () ->
+            printfn "QR refreshed, scan again:"
+            printfn "%s" authSession.ChallengeURL)
+
+        let! pollResponse = authSession.PollingWaitForResultAsync() |> Async.AwaitTask
+
+        printfn "Logged in as: %s" pollResponse.AccountName
+        printfn "Refresh token acquired (length %d chars) — writing to %s" pollResponse.RefreshToken.Length refreshTokenPath
+
+        System.IO.File.WriteAllText(refreshTokenPath, pollResponse.RefreshToken)
+        printfn "Done. DO NOT COMMIT refresh-token.local.txt — it is a long-lived credential."
+
+        steamClient.Disconnect()
+    }
+
+run () |> Async.RunSynchronously
