@@ -14,7 +14,7 @@ let init () : Model * Cmd<Msg> =
       ExpandedEvent = None },
     Cmd.ofMsg Load_events
 
-let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
+let update (api: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
     | Load_events ->
         let query: EventQuery = {

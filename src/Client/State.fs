@@ -11,7 +11,7 @@ let private debounceCmd (ms: int) (msg: Msg) : Cmd<Msg> =
         Fable.Core.JS.setTimeout (fun () -> dispatch msg) ms |> ignore
     )
 
-let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
+let init (api: IMediathecaApi) (adminApi: IAdminApi) () : Model * Cmd<Msg> =
     let dashboardModel, dashboardCmd = Pages.Dashboard.State.init ()
     let movieListModel, movieListCmd = Pages.Movies.State.init ()
     let movieDetailModel, movieDetailCmd = Pages.MovieDetail.State.init ""
@@ -23,7 +23,7 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
     let friendDetailModel, friendDetailCmd = Pages.FriendDetail.State.init ""
     let catalogListModel, catalogListCmd = Pages.Catalogs.State.init ()
     let catalogDetailModel, catalogDetailCmd = Pages.CatalogDetail.State.init ""
-    let eventBrowserModel, eventBrowserCmd = Pages.EventBrowser.State.init ()
+    let adminModel, adminCmd = Pages.Admin.State.init AdminEvents
     let settingsModel, settingsCmd = Pages.Settings.State.init ()
     let styleGuideModel, styleGuideCmd = Pages.StyleGuide.State.init ()
 
@@ -43,7 +43,7 @@ let init (api: IMediathecaApi) () : Model * Cmd<Msg> =
         FriendDetailModel = friendDetailModel
         CatalogListModel = catalogListModel
         CatalogDetailModel = catalogDetailModel
-        EventBrowserModel = eventBrowserModel
+        AdminModel = adminModel
         SettingsModel = settingsModel
         StyleGuideModel = styleGuideModel
         SearchModal = None
@@ -380,7 +380,7 @@ let private pushHistory (prev: Page) (history: Page list) : Page list =
     | head :: _ when head = prev -> history |> List.truncate maxHistory
     | _ -> (prev :: history) |> List.truncate maxHistory
 
-let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
+let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
     | Url_changed segments ->
         let page = Route.parseUrl segments
@@ -436,10 +436,10 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             let childModel, childCmd = Pages.CatalogDetail.State.init slug
             { model with CatalogDetailModel = childModel },
             Cmd.map Catalog_detail_msg childCmd
-        | Event_browser ->
-            let childModel, childCmd = Pages.EventBrowser.State.init ()
-            { model with EventBrowserModel = childModel },
-            Cmd.map Event_browser_msg childCmd
+        | Admin tab ->
+            let childModel, childCmd = Pages.Admin.State.init tab
+            { model with AdminModel = childModel },
+            Cmd.map Admin_msg childCmd
         | Settings ->
             let childModel, childCmd = Pages.Settings.State.init ()
             { model with SettingsModel = childModel },
@@ -575,9 +575,9 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         let childModel, childCmd = Pages.CatalogDetail.State.update api childMsg model.CatalogDetailModel
         { model with CatalogDetailModel = childModel }, Cmd.map Catalog_detail_msg childCmd
 
-    | Event_browser_msg childMsg ->
-        let childModel, childCmd = Pages.EventBrowser.State.update api childMsg model.EventBrowserModel
-        { model with EventBrowserModel = childModel }, Cmd.map Event_browser_msg childCmd
+    | Admin_msg childMsg ->
+        let childModel, childCmd = Pages.Admin.State.update adminApi childMsg model.AdminModel
+        { model with AdminModel = childModel }, Cmd.map Admin_msg childCmd
 
     | Settings_msg childMsg ->
         let childModel, childCmd = Pages.Settings.State.update api childMsg model.SettingsModel

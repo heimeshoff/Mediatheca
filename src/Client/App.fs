@@ -21,13 +21,20 @@ importSideEffects "@fontsource/spline-sans-mono/400.css"
 importSideEffects "@fontsource/spline-sans-mono/500.css"
 importSideEffects "./index.css"
 
-// API proxy
+// API proxies — IMediathecaApi (domain BCs) and IAdminApi (administration
+// console; ADR-0004 allows multiple Fable.Remoting APIs) are separate
+// contracts served under distinct routes.
 let api: IMediathecaApi =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<IMediathecaApi>
 
+let adminApi: IAdminApi =
+    Remoting.createApi ()
+    |> Remoting.withRouteBuilder AdminRoute.builder
+    |> Remoting.buildProxy<IAdminApi>
+
 // Entry point
-Program.mkProgram (init api) (update api) view
+Program.mkProgram (init api adminApi) (update api adminApi) view
 |> Program.withReactSynchronous "feliz-app"
 |> Program.run

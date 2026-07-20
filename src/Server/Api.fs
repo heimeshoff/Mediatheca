@@ -2027,27 +2027,6 @@ module Api =
                 }
             }
 
-            // Event Store Browser
-            getEvents = fun query -> async {
-                let events = EventStore.queryEvents conn query.StreamFilter query.EventTypeFilter query.Limit query.Offset
-                return events |> List.map (fun e ->
-                    { Mediatheca.Shared.EventDto.GlobalPosition = e.GlobalPosition
-                      StreamId = e.StreamId
-                      StreamPosition = e.StreamPosition
-                      EventType = e.EventType
-                      Data = e.Data
-                      Timestamp = e.Timestamp.ToString("o") }
-                )
-            }
-
-            getEventStreams = fun () -> async {
-                return EventStore.getDistinctStreams conn
-            }
-
-            getEventTypes = fun () -> async {
-                return EventStore.getDistinctEventTypes conn
-            }
-
             addFriend = fun name -> async {
                 let slug = Slug.friendSlug name
                 let sid = Friends.streamId slug

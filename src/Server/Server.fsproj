@@ -37,6 +37,7 @@
     <Compile Include="CinemarcoImport.fs" />
     <Compile Include="EventFormatting.fs" />
     <Compile Include="Api.fs" />
+    <Compile Include="Administration.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

@@ -206,6 +206,7 @@ let main args =
 
     // Create API
     let api = Api.create conn httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig imageBasePath projectionHandlers
+    let adminApi = Administration.create conn
 
     let remotingHandler =
         Remoting.createApi ()
@@ -216,12 +217,22 @@ let main args =
             Propagate ex.Message)
         |> Remoting.buildHttpHandler
 
+    let adminRemotingHandler =
+        Remoting.createApi ()
+        |> Remoting.withRouteBuilder AdminRoute.builder
+        |> Remoting.fromValue adminApi
+        |> Remoting.withErrorHandler (fun ex _routeInfo ->
+            eprintfn "Fable.Remoting error (admin): %s\n%s" ex.Message ex.StackTrace
+            Propagate ex.Message)
+        |> Remoting.buildHttpHandler
+
     let webApp =
         choose [
             route "/health" >=> text "ok"
             route "/api/stream/import-steam-family"
                 >=> Api.steamFamilyImportHandler conn httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers
             remotingHandler
+            adminRemotingHandler
         ]
 
     // Serve static files from deploy/public in production

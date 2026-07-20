@@ -27,7 +27,7 @@ let private topNavItems = [
 ]
 
 let private bottomNavItems = [
-    { Label = "Events"; Page = Event_browser; IsActive = (fun p -> p = Event_browser); Icon = Icons.events; Href = Router.format "events" }
+    { Label = "Admin"; Page = Admin AdminEvents; IsActive = Route.isAdminSection; Icon = Icons.events; Href = Router.format ("admin", "events") }
     { Label = "Settings"; Page = Settings; IsActive = (fun p -> p = Settings); Icon = Icons.settings; Href = Router.format "settings" }
 ]
 

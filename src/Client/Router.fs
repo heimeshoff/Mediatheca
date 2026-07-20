@@ -2,6 +2,17 @@ module Mediatheca.Client.Router
 
 open Feliz.Router
 
+/// Sub-tabs of the /admin section. URL-addressable — each tab is its own route
+/// (/admin/events, /admin/projections, ...) so later admin-console tasks
+/// (explorer upgrades, projection dashboard, health, jobs, surgery) slot in
+/// without reworking the shell.
+type AdminTab =
+    | AdminEvents
+    | AdminProjections
+    | AdminHealth
+    | AdminJobs
+    | AdminSurgery
+
 type Page =
     | Dashboard
     | Movie_list
@@ -14,7 +25,7 @@ type Page =
     | Friend_detail of slug: string
     | Catalog_list
     | Catalog_detail of slug: string
-    | Event_browser
+    | Admin of AdminTab
     | Settings
     | Styleguide
     | Not_found
@@ -33,10 +44,25 @@ module Route =
         | [ "friends"; slug ] -> Friend_detail slug
         | [ "catalogs" ] -> Catalog_list
         | [ "catalogs"; slug ] -> Catalog_detail slug
-        | [ "events" ] -> Event_browser
+        | [ "admin" ] -> Admin AdminEvents
+        | [ "admin"; "events" ] -> Admin AdminEvents
+        | [ "admin"; "projections" ] -> Admin AdminProjections
+        | [ "admin"; "health" ] -> Admin AdminHealth
+        | [ "admin"; "jobs" ] -> Admin AdminJobs
+        | [ "admin"; "surgery" ] -> Admin AdminSurgery
+        // Legacy alias — old /events bookmarks still resolve to the Events tab.
+        | [ "events" ] -> Admin AdminEvents
         | [ "settings" ] -> Settings
         | [ "styleguide" ] -> Styleguide
         | _ -> Not_found
+
+    let private adminTabSegment (tab: AdminTab) =
+        match tab with
+        | AdminEvents -> "events"
+        | AdminProjections -> "projections"
+        | AdminHealth -> "health"
+        | AdminJobs -> "jobs"
+        | AdminSurgery -> "surgery"
 
     let toUrl (page: Page) =
         match page with
@@ -51,7 +77,7 @@ module Route =
         | Friend_detail slug -> Router.format ("friends", slug)
         | Catalog_list -> Router.format "catalogs"
         | Catalog_detail slug -> Router.format ("catalogs", slug)
-        | Event_browser -> Router.format "events"
+        | Admin tab -> Router.format ("admin", adminTabSegment tab)
         | Settings -> Router.format "settings"
         | Styleguide -> Router.format "styleguide"
         | Not_found -> Router.format "not-found"
@@ -69,10 +95,15 @@ module Route =
         | Friend_detail slug -> Router.navigate ("friends", slug)
         | Catalog_list -> Router.navigate "catalogs"
         | Catalog_detail slug -> Router.navigate ("catalogs", slug)
-        | Event_browser -> Router.navigate "events"
+        | Admin tab -> Router.navigate ("admin", adminTabSegment tab)
         | Settings -> Router.navigate "settings"
         | Styleguide -> Router.navigate "styleguide"
         | Not_found -> Router.navigate "not-found"
+
+    let isAdminSection (page: Page) =
+        match page with
+        | Admin _ -> true
+        | _ -> false
 
     let isMoviesSection (page: Page) =
         match page with

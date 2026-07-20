@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-20 17:30 -- Task verified and completed: administration-p0jka - Admin console foundation — IAdminApi contract, Administration.fs, /admin section with tabs
+
+**Type:** Work / Task completion
+**Task:** administration-p0jka - Admin console foundation — IAdminApi contract, Administration.fs, /admin section with tabs
+**Summary:** Split off IAdminApi/Administration.fs and built the /admin tabbed console shell (Events/Projections/Health/Jobs/Surgery), moving the event browser onto it with a legacy /events alias
+**Duration:** 16m10s
+**Verification:** PASS (iteration 1)
+**Files changed:** 20
+**Tests added:** 3
+**ADRs written:** 0017
+
+---
+
 ## 2026-07-20 17:14 -- Modeling / Captured: Steam Family token automation (integration-ygwsa spike + integration-hebjs feature)
 
 **Type:** Modeling / Capture

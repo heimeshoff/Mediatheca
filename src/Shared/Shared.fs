@@ -1122,10 +1122,6 @@ type IMediathecaApi = {
     getDashboardMoviesTab: unit -> Async<DashboardMoviesTab>
     getDashboardSeriesTab: unit -> Async<DashboardSeriesTab>
     getDashboardGamesTab: unit -> Async<DashboardGamesTab>
-    // Event Store Browser
-    getEvents: EventQuery -> Async<EventDto list>
-    getEventStreams: unit -> Async<string list>
-    getEventTypes: unit -> Async<string list>
     // Settings
     getTmdbApiKey: unit -> Async<string>
     setTmdbApiKey: string -> Async<Result<unit, string>>
@@ -1264,4 +1260,18 @@ type IMediathecaApi = {
     previewTmdbMovie: int -> Async<TmdbPreviewData option>
     previewTmdbSeries: int -> Async<TmdbPreviewData option>
     previewRawgGame: int -> Async<RawgPreviewData option>
+}
+
+// Administration console — a separate Remoting contract (ADR-0004 allows multiple
+// APIs) so admin plumbing (event store browser, and future projection/health/jobs/
+// surgery tooling) doesn't bloat IMediathecaApi. Routed under /api/admin/{Method}.
+module AdminRoute =
+    let builder (_typeName: string) (methodName: string) =
+        sprintf "/api/admin/%s" methodName
+
+type IAdminApi = {
+    // Event Store Browser
+    getEvents: EventQuery -> Async<EventDto list>
+    getEventStreams: unit -> Async<string list>
+    getEventTypes: unit -> Async<string list>
 }
