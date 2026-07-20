@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-07-20 17:14 -- Modeling / Captured: Steam Family token automation (integration-ygwsa spike + integration-hebjs feature)
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo (1) + backlog (1)
+**Summary:** The Steam Family import's access token is scraped manually from Chrome DevTools and dies within ~1h; the user wants one-click (ideally fully automatic) import. Captured **integration-ygwsa** (spike, todo): prove SteamKit2's IAuthenticationService flow — one-time interactive auth (QR / credentials+Guard) → stored refresh token → `GenerateAccessTokenForApp` mints family-scope access tokens that `IFamilyGroupsService` accepts; fallback if it fails is LLM/browser-driven token harvest. Captured **integration-hebjs** (feature, backlog, depends_on ygwsa + design-system-001): replace the paste-token Settings flow with a one-time "Connect Steam" setup, server auto-mints tokens, expiry never user-facing, reconnect prompt mirrors ADR-0011's Jellyfin re-auth pattern. Judgment link: ADR-0011 (same stored-credential → self-healing-token shape); no mechanical prior-art hits ≥ 2.
+
+---
+
 ## 2026-07-20 17:12 -- Batch started: [administration-p0jka, infrastructure-w8fnp]
 
 **Type:** Work / Batch start

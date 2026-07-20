@@ -10,15 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
-- **Todo:** 0
+- **Backlog:** 2
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 7
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-<!-- no tasks in todo -->
+- **integration-ygwsa** -- Spike — mint Steam Family access tokens from a stored refresh token (SteamKit2) -- `spike` -- `todo/integration-ygwsa-steam-family-token-spike.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -40,6 +40,7 @@ research touching this BC, and concept synthesis pages.
 ### Backlog
 <!-- backlog-list:start -->
 - **integration-007** -- Fetch Jellyfin episode stills when materializing a missing season -- `feature` -- `backlog/integration-007-fetch-jellyfin-episode-stills-on-materialize.md`
+- **integration-hebjs** -- One-click Steam Family import — automatic access-token acquisition -- `feature` -- `backlog/integration-hebjs-one-click-steam-family-import.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
