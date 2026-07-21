@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 15:47 -- Modeling / Refined: administration-h4br2 - Browser smoke-test the Events tab Follow toggle end-to-end
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo (auto-promoted)
+**Summary:** Made h4br2 worker-executable via chrome-devtools MCP and inlined mtf1f's three ADR-0023 behaviors as concrete checkboxes with navigate-away teardown ordered first (the load-bearing, empirically-unverified path). Split off durable coverage into two new backlog tasks: a Playwright-harness spike and a follow-on specs feature. Builder chose autonomous-worker execution + durable browser coverage. Harness shape (Playwright Test over chrome-devtools-mcp/Cypress; `webServer` dev-stack + temp DATA_DIR isolation + direct-API event trigger) came from the orchestrator (architect).
+**Split into:** administration-da908 (spike — prove Playwright harness), administration-a4d9b (feature — commit the three assertions)
+**ADRs written:** none yet — ADR-0025 (Playwright e2e harness, scope global) pre-assigned to be authored when da908 is worked
+
+---
+
 ## 2026-07-21 15:15 -- Work session ended
 
 **Type:** Work / Session end

@@ -7,7 +7,7 @@ context: administration
 created: 2026-07-20
 completed:
 depends_on: [administration-mtf1f]
-blocks: []
+blocks: [administration-da908]
 tags: [admin-console, event-store, live, testing]
 related_adrs: [0023]
 related_research: []
@@ -26,22 +26,41 @@ CLAUDE.md's MCP Servers section) but this worker didn't have a running server
 to point it at.
 
 ## What
-- Start the dev server, open `/admin/events`, turn Follow on.
-- In a second tab/action, append an event (e.g. rate a movie) and confirm the
-  row appears within ~2-3s without a page reload, with the arrival highlight.
+A `work` worker drives this hands-off via the `chrome-devtools-mcp` tools
+(CLAUDE.md's MCP Servers section) against a stack the worker starts itself.
+Exercise the **navigate-away teardown case first and explicitly** — it's the one
+path never empirically verified (fixed by static review at mtf1f iteration 2) —
+then the rest:
+- Start the dev server (`npm start`), open `/admin/events`, turn Follow on.
+- **First:** with Follow on, navigate to another page entirely (Dashboard /
+  Movies) via client-side nav and watch the Network panel for ~10s — confirm no
+  further `getEventsAfter` requests fire.
+- Turn Follow on again; append an event via a direct API call / second action
+  (e.g. rate a movie) and confirm the row appears within ~2-3s without reload,
+  with the arrival highlight.
 - Change a filter while following; confirm subsequent live rows respect it.
-- Turn Follow off (or navigate to Projections tab, or paginate to page 2) and
-  watch the Network panel for ~10s to confirm no further `getEventsAfter`
-  requests fire.
+- Toggle Follow off, and separately paginate to page 2 — after each, watch the
+  Network panel for ~10s to confirm no further `getEventsAfter` requests fire.
 
 ## Acceptance criteria
-- [ ] All three of administration-mtf1f's acceptance criteria are confirmed via live browser interaction, not just code review.
+mtf1f's three behaviors (ADR-0023), each confirmed via live browser interaction
+in a real running app, not code review:
+- [ ] **Teardown — no orphan polling (all three sub-cases):** after navigating away from `/admin`, after toggling Follow off, and after paginating away from page 1, no further `getEventsAfter` requests fire over a ~10s window. The **navigate-away** sub-case is exercised first and is the load-bearing one.
+- [ ] **Live arrival:** with Follow on, an event appended by another action appears within ~2-3s without page reload, with the arrival highlight.
+- [ ] **Filter-respecting live rows:** with a filter active, subsequent live rows respect it (a matching event arrives; a non-matching one does not).
 - [ ] Any discrepancy found is filed as a new backlog/todo item against administration-mtf1f's design (do not silently patch around it here).
 
 ## Notes
-Use `chrome-devtools-mcp` per CLAUDE.md's MCP Servers section. This is a
-verification-only task — no production code changes expected unless the smoke
-test uncovers a real bug.
+Executed by a `work` worker via `chrome-devtools-mcp` (requires Chrome running
+and the MCP server reachable). This is a verification-only task — no production
+code changes expected unless the smoke test uncovers a real bug.
+
+**Durable follow-on (this is the one-shot pass; the repeatable coverage is
+separate):** administration-da908 (spike — prove a committed Playwright e2e
+harness can drive the stack) and administration-a4d9b (feature — codify these
+three behaviors as committed Playwright specs) both depend on this task, so the
+exact flows/selectors are confirmed known-good here before they're written into
+repeatable specs.
 
 **Update (administration-mtf1f iteration 2):** a static-review pass at
 verification caught a real bug on the navigation-away path — toggling Follow

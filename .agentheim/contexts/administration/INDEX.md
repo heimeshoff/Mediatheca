@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 7
+- **Backlog:** 9
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 6
@@ -37,7 +37,9 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **administration-h4br2** — Browser smoke-test the Events tab Follow toggle end-to-end (navigate-away teardown first) (feature) — `backlog/administration-h4br2-event-browser-follow-smoke-test.md`
+- **administration-h4br2** — Browser smoke-test the Events tab Follow toggle end-to-end (chore) — `backlog/administration-h4br2-event-browser-follow-smoke-test.md`
+- **administration-da908** — Prove a Playwright harness can drive the full Mediatheca stack and observe network traffic (spike) — `backlog/administration-da908-playwright-e2e-harness-spike.md`
+- **administration-a4d9b** — Assert the Events-tab Follow toggle's three live-tail behaviors via committed Playwright specs (feature) — `backlog/administration-a4d9b-playwright-follow-toggle-specs.md`
 - **administration-btvqa** — Integrity checks — shadow-table replay drift detector and unknown-event report (feature) — `backlog/administration-btvqa-projection-drift-integrity-checks.md`
 - **administration-xjmda** — Compensating-event composer — append corrective events from the admin UI (feature) — `backlog/administration-xjmda-compensating-event-composer.md`
 - **administration-wwc36** — Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag (feature) — `backlog/administration-wwc36-event-surgery-guardrails.md`
