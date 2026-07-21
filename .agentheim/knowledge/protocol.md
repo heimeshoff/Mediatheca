@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 15:50 -- Modeling / Refined: administration-xx3mw - Image cache admin — orphan detection, size overview, purge
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** promoted to todo (see promote entry)
+**Summary:** Resolved the ref-collection source (projection-based column enumeration over 15 typed ref-bearing columns — no markdown-body scanning; verified every ref is a typed projection column) and the false-purge-mid-rebuild risk (a not-dirty guard over the six checkpoint-tracked projections; the two imperative tables cast_members/game_journal_blocks never lag). Locked builder decisions: own /admin/images tab (not a Health section), preview+confirm+not-dirty guard with hard delete (no trash). Added a TOCTOU-safe purge that re-derives the orphan set at commit and intersection-deletes. 12 concrete acceptance criteria; contract (IAdminApi additions + DU-typed guard results) sketched in Notes.
+**Split into:** none (single task — stats/orphan/purge share the registry, ref-collection, guard, and tab)
+**ADRs written:** 0025
+
+---
+
 ## 2026-07-21 15:48 -- Modeling / Promoted: administration-h4br2 - Browser smoke-test the Events tab Follow toggle end-to-end
 
 **Type:** Modeling / Promote
