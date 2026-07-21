@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 20:51 -- Task verified and completed: administration-xx3mw - Image cache admin — orphan detection, size overview, purge
+
+**Type:** Work / Task completion
+**Task:** administration-xx3mw - Image cache admin — orphan detection, size overview, purge
+**Summary:** Image cache admin — /admin/images tab with size/subfolder stats, projection-column-derived orphan detection guarded by a not-dirty check, and TOCTOU-safe hard-delete purge
+**Duration:** ~17m
+**Verification:** PASS (iteration 1)
+**Files changed:** 12
+**Tests added:** 17
+**ADRs written:** none
+
+---
+
 ## 2026-07-21 20:31 -- Batch started: [administration-xx3mw]
 
 **Type:** Work / Batch start

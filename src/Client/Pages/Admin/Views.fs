@@ -11,10 +11,11 @@ let private tabLabel (tab: AdminTab) =
     | AdminEvents -> "Events"
     | AdminProjections -> "Projections"
     | AdminHealth -> "Health"
+    | AdminImages -> "Images"
     | AdminJobs -> "Jobs"
     | AdminSurgery -> "Surgery"
 
-let private allTabs = [ AdminEvents; AdminProjections; AdminHealth; AdminJobs; AdminSurgery ]
+let private allTabs = [ AdminEvents; AdminProjections; AdminHealth; AdminImages; AdminJobs; AdminSurgery ]
 
 // URL-addressable tabs — plain anchors + Router.navigate (same pattern as
 // Sidebar's nav items) rather than in-page dispatch, so /admin/projections
@@ -44,7 +45,7 @@ let private placeholderPanel (tab: AdminTab) =
         match tab with
         | AdminJobs -> "Scheduled jobs — background job status lands here."
         | AdminSurgery -> "Event surgery — corrective tooling lands here."
-        | AdminEvents | AdminHealth | AdminProjections -> ""
+        | AdminEvents | AdminHealth | AdminProjections | AdminImages -> ""
     Html.div [
         prop.className (DesignSystem.velvetCard + " p-8 text-center")
         prop.children [
@@ -78,6 +79,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 Mediatheca.Client.Pages.AdminHealth.Views.view model.HealthModel (Health_msg >> dispatch)
             | AdminProjections ->
                 Mediatheca.Client.Pages.AdminProjections.Views.view model.ProjectionsModel (Projections_msg >> dispatch)
+            | AdminImages ->
+                Mediatheca.Client.Pages.AdminImages.Views.view model.ImagesModel (Images_msg >> dispatch)
             | other ->
                 Html.div [
                     prop.className DesignSystem.pagePadding

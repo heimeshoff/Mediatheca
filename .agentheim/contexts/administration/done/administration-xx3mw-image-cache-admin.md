@@ -1,11 +1,11 @@
 ---
 id: administration-xx3mw
 title: Image cache admin — orphan detection, size overview, purge
-status: doing
+status: done
 type: feature
 context: administration
 created: 2026-07-20
-completed:
+completed: 2026-07-21
 depends_on: [administration-p0jka, design-system-001]
 blocks: []
 tags: [admin-console, images, storage]
@@ -33,18 +33,18 @@ The `images/` cache (`<DATA_DIR>/images/` — posters, backdrops, stills, cast p
 Its own tab at `/admin/images` (`Router.AdminTab`), sibling to Events/Projections/Health/Jobs/Surgery. The Health tab's existing lightweight `images/` size line is untouched.
 
 ## Acceptance criteria
-- [ ] `/admin/images` renders as a sixth Admin tab, URL-addressable, with a subfolder breakdown table (posters/backdrops/stills/cast/content/friends, plus "(root)" if loose files exist) whose rows sum exactly to the displayed total. Health tab's existing `images/` line is unchanged.
-- [ ] The not-dirty guard blocks both orphan listing and purge while any of the six checkpoint-tracked projections is dirty or rebuilding; the client renders the block reason from the DU result, not an error. Stats remain available while blocked.
-- [ ] A `content/` journal image referenced by `content_blocks.image_ref` **or** `game_journal_blocks.image_ref` is never flagged orphan.
-- [ ] A still referenced via `series_episodes.still_ref` (e.g. `stills/<slug>-s01e02.jpg`) is never flagged orphan.
-- [ ] A `cast/<id>.jpg` shared by multiple movies/series is not flagged while any `cast_members` row references it, and is flagged once no row does.
-- [ ] Path comparison is separator-normalized and case-sensitive ordinal — a Windows-returned `\`-separated path still matches its forward-slash ref; a case-mismatched name is treated as orphan (matching Linux-deploy semantics).
-- [ ] A genuinely unreferenced file, including a stray non-image file, appears in the orphan list with correct relative path and byte size.
-- [ ] Selecting a subset for purge deletes exactly that subset and nothing else; selecting "all" deletes every currently-detected orphan.
-- [ ] Purge re-derives the referenced/orphan sets at commit: a path that became referenced or already vanished between scan and confirm is skipped (reported in the result), never deleted.
-- [ ] The confirm dialog shows accurate count + total bytes (from the held scan) before the purge call commits.
-- [ ] Purge returns actual deleted count and bytes freed; re-running stats afterward reflects the smaller total and file count.
-- [ ] Purge is filesystem-only — event count is unchanged across a purge (assert in a test).
+- [x] `/admin/images` renders as a sixth Admin tab, URL-addressable, with a subfolder breakdown table (posters/backdrops/stills/cast/content/friends, plus "(root)" if loose files exist) whose rows sum exactly to the displayed total. Health tab's existing `images/` line is unchanged.
+- [x] The not-dirty guard blocks both orphan listing and purge while any of the six checkpoint-tracked projections is dirty or rebuilding; the client renders the block reason from the DU result, not an error. Stats remain available while blocked.
+- [x] A `content/` journal image referenced by `content_blocks.image_ref` **or** `game_journal_blocks.image_ref` is never flagged orphan.
+- [x] A still referenced via `series_episodes.still_ref` (e.g. `stills/<slug>-s01e02.jpg`) is never flagged orphan.
+- [x] A `cast/<id>.jpg` shared by multiple movies/series is not flagged while any `cast_members` row references it, and is flagged once no row does.
+- [x] Path comparison is separator-normalized and case-sensitive ordinal — a Windows-returned `\`-separated path still matches its forward-slash ref; a case-mismatched name is treated as orphan (matching Linux-deploy semantics).
+- [x] A genuinely unreferenced file, including a stray non-image file, appears in the orphan list with correct relative path and byte size.
+- [x] Selecting a subset for purge deletes exactly that subset and nothing else; selecting "all" deletes every currently-detected orphan.
+- [x] Purge re-derives the referenced/orphan sets at commit: a path that became referenced or already vanished between scan and confirm is skipped (reported in the result), never deleted.
+- [x] The confirm dialog shows accurate count + total bytes (from the held scan) before the purge call commits.
+- [x] Purge returns actual deleted count and bytes freed; re-running stats afterward reflects the smaller total and file count.
+- [x] Purge is filesystem-only — event count is unchanged across a purge (assert in a test).
 
 ## Notes
 See **ADR-0025** for the ref-source / guard / purge-safety rationale.
@@ -79,3 +79,13 @@ See **ADR-0025** for the ref-source / guard / purge-safety rationale.
 - **README**: add "Images" to the Admin console tab list in `README.md`, plus ubiquitous-language entries for Images tab, Orphaned image, Referenced-ref set, Not-dirty guard, Cache purge.
 - **On-disk subfolder facts** (verified): actual set is `posters/ backdrops/ stills/ cast/ content/ friends/`. Game covers live under `posters/` as `posters/game-<slug>.jpg` — there is no `covers/` folder despite the column name `cover_ref`, and no `avatars/` folder.
 - **Out of scope**: pruning now-empty subfolder directories after purge (harmless either way; `GetFiles` ignores empty dirs).
+
+## Outcome
+Implemented per ADR-0025 exactly as scoped, no new decisions beyond it.
+
+- **Server** (`src/Server/Administration.fs`): `imageRefColumns` (the 15 `(table, column)` pairs, doc-commented load-bearing), `getReferencedImageRefs` (guarded by `tableExists` via `sqlite_master`), `isAnyProjectionDirty` (reuses a new shared `checkpointLag` helper also now used by `buildProjectionStats`), `walkImageFiles`/`relativePathOf`/`subfolderOf` (separator-normalized, case-sensitive ordinal), `buildImageCacheStats`, `computeOrphans`, and the three `IAdminApi` methods (`getImageCacheStats`, `listOrphanedImages`, `purgeOrphanedImages` — the latter TOCTOU-safe: re-checks the guard, re-derives referenced/orphan sets fresh, intersects with the request, reports skips).
+- **Shared** (`src/Shared/Shared.fs`): `ImageSubfolderStat`, `ImageCacheStats`, `OrphanImage`, `OrphanScan`, `PurgeSelection`, `PurgeResult`, and the three `IAdminApi` method signatures.
+- **Client**: new `src/Client/Pages/AdminImages/{Types,State,Views}.fs` — stats panel, orphan table with per-row checkboxes, select-all/none, "Purge selected"/"Purge all" with a `ModalPanel`-based confirm dialog (count + bytes from the held scan), blocked-reason rendering for `OrphanScanBlocked`/`PurgeBlocked`. Wired into `Router.AdminTab` (`AdminImages`, `/admin/images`) and the Admin tab shell (`src/Client/Pages/Admin/{Types,State,Views}.fs`).
+- **Tests**: 17 new Expecto tests in `tests/Server.Tests/AdministrationTests.fs` covering the registry coverage, stats/subfolder-sum, the not-dirty guard (both `listOrphanedImages` and `purgeOrphanedImages`, and that stats stay available while dirty), all three non-obvious ref sources (movie/content_blocks, game_journal_blocks, series_episodes.still_ref, cast_members incl. the clear-to-orphan transition), case-sensitive/separator-normalized comparison, stray-file reporting, subset/all purge, both TOCTOU races (became-referenced, already-vanished), deleted-count/bytes-freed plus after-purge stats, and event-store immutability across a purge. All 348 server tests pass; `npm run build` compiles clean.
+- The "mid-rebuild" half of the not-dirty guard (as opposed to the "lagging" half) shares the same `rebuildingProjections` dictionary/`ContainsKey` check already exercised by the existing Projections-tab tests' `IsRebuilding` assertions; it isn't independently re-tested here since triggering it requires driving the SSE rebuild route, which is out of this task's scope.
+- No new ADR — ADR-0025 (pre-authored) fully covers this task's decisions.

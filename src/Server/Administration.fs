@@ -229,6 +229,22 @@ module Administration =
         cmd.CommandText <- $"SELECT COUNT(*) FROM {tableName}"
         cmd.ExecuteScalar() :?> int64 |> int
 
+    /// True if `tableName` exists in this connection's schema. Guards the
+    /// image-ref registry queries below: `cast_members` (CastStore.fs) and
+    /// `game_journal_blocks` (GameJournal.fs) are imperative tables, not
+    /// registered in `projectionTables`/`projectionHandlers`, and aren't
+    /// guaranteed present in minimal/test fixtures.
+    let private tableExists (conn: SqliteConnection) (tableName: string) : bool =
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- "SELECT name FROM sqlite_master WHERE type = 'table' AND name = @name"
+        cmd.Parameters.AddWithValue("@name", tableName) |> ignore
+        use reader = cmd.ExecuteReader()
+        reader.Read()
+
+    let private checkpointLag (conn: SqliteConnection) (head: int64) (handler: Projection.ProjectionHandler) : int64 =
+        let position, _ = Projection.getCheckpointInfo conn handler.Name
+        max 0L (head - position)
+
     /// Names of projections currently mid-rebuild. Guards the "reject a
     /// second concurrent rebuild of the same projection" acceptance
     /// criterion. Module-level mutable state, scoped to the server process's
@@ -248,10 +264,121 @@ module Administration =
                 |> Option.defaultValue []
             { Name = handler.Name
               CheckpointPosition = position
-              Lag = max 0L (head - position)
+              Lag = checkpointLag conn head handler
               UpdatedAt = updatedAt
               TableCounts = tables |> List.map (fun t -> { TableName = t; RowCount = tableRowCount conn t })
               IsRebuilding = rebuildingProjections.ContainsKey(handler.Name) })
+
+    // ── Image cache admin (administration-xx3mw) ──
+
+    /// The not-dirty guard (ADR-0025): names of the six checkpoint-tracked
+    /// projections that are either mid-rebuild or lagging behind the store
+    /// head. Empty = clean, safe to trust the projection tables as the live
+    /// ref set. `cast_members`/`game_journal_blocks` are imperative writes
+    /// (CastStore.fs/GameJournal.fs) — never rebuilt, never lag — so they
+    /// need no gating here.
+    let isAnyProjectionDirty (conn: SqliteConnection) (projectionHandlers: Projection.ProjectionHandler list) : string list =
+        let head = EventStore.getMaxGlobalPosition conn
+        projectionHandlers
+        |> List.filter (fun handler ->
+            rebuildingProjections.ContainsKey(handler.Name) || checkpointLag conn head handler > 0L)
+        |> List.map (fun handler -> handler.Name)
+
+    /// The fifteen typed ref-bearing `(table, column)` pairs, verified by
+    /// reading every projection's INSERT/SELECT statements (ADR-0025) — no
+    /// markdown-body scanning needed. LOAD-BEARING: a missed or stale entry
+    /// here silently under-counts live refs, which risks a purge deleting a
+    /// still-referenced image, not merely mis-reporting a count. Keep this in
+    /// lockstep with any ref-bearing column added or renamed anywhere in the
+    /// codebase; `imageRefColumnsCoverageTest`-style tests should exercise
+    /// every entry.
+    let imageRefColumns : (string * string) list = [
+        "movie_list", "poster_ref"
+        "movie_detail", "poster_ref"
+        "movie_detail", "backdrop_ref"
+        "series_list", "poster_ref"
+        "series_detail", "poster_ref"
+        "series_detail", "backdrop_ref"
+        "series_seasons", "poster_ref"
+        "series_episodes", "still_ref"
+        "game_list", "cover_ref"
+        "game_detail", "cover_ref"
+        "game_detail", "backdrop_ref"
+        "friend_list", "image_ref"
+        "content_blocks", "image_ref"
+        "game_journal_blocks", "image_ref"
+        "cast_members", "image_ref"
+    ]
+
+    /// Every non-null, non-empty ref value currently held by any
+    /// `imageRefColumns` table, as one flat set — the "live" side of the
+    /// orphan diff. Missing tables (guarded by `tableExists`) contribute no
+    /// refs rather than erroring, since minimal/test fixtures may not have
+    /// initialized `cast_members`/`game_journal_blocks`.
+    let private getReferencedImageRefs (conn: SqliteConnection) : Set<string> =
+        imageRefColumns
+        |> List.collect (fun (table, column) ->
+            if not (tableExists conn table) then
+                []
+            else
+                use cmd = conn.CreateCommand()
+                cmd.CommandText <- $"SELECT DISTINCT {column} FROM {table} WHERE {column} IS NOT NULL AND {column} <> ''"
+                use reader = cmd.ExecuteReader()
+                [ while reader.Read() do yield reader.GetString(0) ])
+        |> Set.ofList
+
+    /// Normalizes a file system path to the same `/`-separated, case-
+    /// sensitive form the ref columns store, so a Windows-returned `\`-
+    /// separated path still matches its ref (ADR-0025: ordinal comparison,
+    /// never case-folded — case-folding would mask a genuine mismatch on the
+    /// case-sensitive Linux deploy target).
+    let private relativePathOf (imagesDir: string) (fullPath: string) : string =
+        Path.GetRelativePath(imagesDir, fullPath).Replace('\\', '/')
+
+    /// First path segment, or "(root)" for a stray loose file directly under
+    /// images/ with no subfolder.
+    let private subfolderOf (relativePath: string) : string =
+        let idx = relativePath.IndexOf('/')
+        if idx < 0 then "(root)" else relativePath.Substring(0, idx)
+
+    /// (relativePath, subfolder, sizeBytes) for every file under imagesDir,
+    /// walked recursively (same call `directoryStats` uses above). Empty
+    /// list if the directory doesn't exist yet.
+    let private walkImageFiles (imagesDir: string) : (string * string * int64) list =
+        if not (Directory.Exists(imagesDir)) then
+            []
+        else
+            Directory.GetFiles(imagesDir, "*", SearchOption.AllDirectories)
+            |> Array.map (fun f ->
+                let rel = relativePathOf imagesDir f
+                rel, subfolderOf rel, FileInfo(f).Length)
+            |> Array.toList
+
+    /// Total size/count plus a per-subfolder breakdown — always available,
+    /// no not-dirty guard needed (pure disk footprint, no projection trust
+    /// involved).
+    let private buildImageCacheStats (imagesDir: string) : ImageCacheStats =
+        let files = walkImageFiles imagesDir
+        let subfolders =
+            files
+            |> List.groupBy (fun (_, sub, _) -> sub)
+            |> List.map (fun (sub, items) ->
+                { Subfolder = sub
+                  FileCount = List.length items
+                  SizeBytes = items |> List.sumBy (fun (_, _, size) -> size) })
+            |> List.sortBy (fun s -> s.Subfolder)
+        { TotalBytes = files |> List.sumBy (fun (_, _, size) -> size)
+          TotalFileCount = List.length files
+          Subfolders = subfolders }
+
+    /// Files on disk whose relative path is absent from `referencedRefs` —
+    /// the orphan set, plus its total byte size.
+    let private computeOrphans (imagesDir: string) (referencedRefs: Set<string>) : OrphanImage list * int64 =
+        let orphans =
+            walkImageFiles imagesDir
+            |> List.filter (fun (rel, _, _) -> not (Set.contains rel referencedRefs))
+            |> List.map (fun (rel, sub, size) -> { RelativePath = rel; Subfolder = sub; SizeBytes = size })
+        orphans, orphans |> List.sumBy (fun o -> o.SizeBytes)
 
     /// Rebuild-with-live-progress command (the Projections tab's "Rebuild"
     /// button, administration-qjcp4): drop + replay one projection via
@@ -378,5 +505,56 @@ module Administration =
 
             getProjectionStats = fun () -> async {
                 return buildProjectionStats conn projectionHandlers
+            }
+
+            getImageCacheStats = fun () -> async {
+                return buildImageCacheStats imagesDir
+            }
+
+            listOrphanedImages = fun () -> async {
+                match isAnyProjectionDirty conn projectionHandlers with
+                | dirty when not (List.isEmpty dirty) ->
+                    return OrphanScanBlocked (sprintf "Blocked: waiting on %s to catch up" (String.concat ", " dirty))
+                | _ ->
+                    let referencedRefs = getReferencedImageRefs conn
+                    let orphans, totalBytes = computeOrphans imagesDir referencedRefs
+                    return OrphanScanReady (orphans, totalBytes)
+            }
+
+            /// TOCTOU-safe (ADR-0025): re-checks the not-dirty guard, then
+            /// re-derives the referenced/orphan sets fresh (not the client's
+            /// held scan) before deleting, so a path that became referenced
+            /// or already vanished between scan and confirm is skipped
+            /// rather than wrongly deleted.
+            purgeOrphanedImages = fun selection -> async {
+                match isAnyProjectionDirty conn projectionHandlers with
+                | dirty when not (List.isEmpty dirty) ->
+                    return PurgeBlocked (sprintf "Blocked: waiting on %s to catch up" (String.concat ", " dirty))
+                | _ ->
+                    let referencedRefs = getReferencedImageRefs conn
+                    let orphans, _ = computeOrphans imagesDir referencedRefs
+                    let orphanPaths = orphans |> List.map (fun o -> o.RelativePath) |> Set.ofList
+                    let requested =
+                        match selection with
+                        | PurgeAll -> orphanPaths
+                        | PurgeSpecific paths -> Set.ofList paths
+                    let toDelete = Set.intersect requested orphanPaths
+                    let alreadySkipped = Set.difference requested orphanPaths
+
+                    let mutable deletedCount = 0
+                    let mutable bytesFreed = 0L
+                    let mutable raceSkipped = []
+                    for path in toDelete do
+                        let fullPath = Path.Combine(imagesDir, path)
+                        if File.Exists(fullPath) then
+                            let size = FileInfo(fullPath).Length
+                            ImageStore.deleteImage imagesDir path
+                            deletedCount <- deletedCount + 1
+                            bytesFreed <- bytesFreed + size
+                        else
+                            raceSkipped <- path :: raceSkipped
+
+                    let skipped = (Set.toList alreadySkipped) @ (List.rev raceSkipped)
+                    return PurgeDone (deletedCount, bytesFreed, skipped)
             }
         }

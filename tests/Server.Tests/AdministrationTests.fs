@@ -16,6 +16,10 @@ let private createInMemoryConnection () =
     // exist for any Movie-/Series-/Game-/Friend-/Catalog- stream.
     CastStore.initialize conn
     JellyfinStore.initialize conn
+    // Image cache admin (administration-xx3mw) exercises game_journal_blocks,
+    // an imperative table (GameJournal.fs) that's otherwise only created
+    // lazily by Composition.fs at startup.
+    GameJournal.initialize conn
     ContentBlockProjection.handler.Init conn
     FriendProjection.handler.Init conn
     MovieProjection.handler.Init conn
@@ -46,6 +50,59 @@ let private allProjectionHandlers = [
 ]
 
 let private createApi conn = Administration.create conn noStoragePath noImagesDir allProjectionHandlers
+
+let private createImageApi conn imagesDir = Administration.create conn noStoragePath imagesDir allProjectionHandlers
+
+// ── Image cache admin (administration-xx3mw) test helpers ──
+
+let private withTempImagesDir (f: string -> unit) : unit =
+    let tempRoot = Path.Combine(Path.GetTempPath(), "mediatheca-images-test-" + System.Guid.NewGuid().ToString("N"))
+    let imagesDir = Path.Combine(tempRoot, "images")
+    Directory.CreateDirectory(imagesDir) |> ignore
+    try
+        f imagesDir
+    finally
+        Directory.Delete(tempRoot, true)
+
+let private writeImageFile (imagesDir: string) (relativePath: string) (byteCount: int) : unit =
+    let fullPath = Path.Combine(imagesDir, relativePath.Replace('/', Path.DirectorySeparatorChar))
+    let dir = Path.GetDirectoryName(fullPath)
+    if not (Directory.Exists(dir)) then Directory.CreateDirectory(dir) |> ignore
+    File.WriteAllBytes(fullPath, Array.create byteCount 0uy)
+
+let private insertMoviePosterRef (conn: SqliteConnection) (slug: string) (posterRef: string) : unit =
+    use cmd = conn.CreateCommand()
+    cmd.CommandText <- "INSERT INTO movie_list (slug, name, year, poster_ref) VALUES (@slug, @slug, 2000, @ref)"
+    cmd.Parameters.AddWithValue("@slug", slug) |> ignore
+    cmd.Parameters.AddWithValue("@ref", posterRef) |> ignore
+    cmd.ExecuteNonQuery() |> ignore
+
+let private insertContentBlock (conn: SqliteConnection) (blockId: string) (movieSlug: string) (imageRef: string) : unit =
+    use cmd = conn.CreateCommand()
+    cmd.CommandText <- "INSERT INTO content_blocks (block_id, movie_slug, block_type, image_ref) VALUES (@id, @slug, 'screenshot', @ref)"
+    cmd.Parameters.AddWithValue("@id", blockId) |> ignore
+    cmd.Parameters.AddWithValue("@slug", movieSlug) |> ignore
+    cmd.Parameters.AddWithValue("@ref", imageRef) |> ignore
+    cmd.ExecuteNonQuery() |> ignore
+
+let private insertSeriesEpisode (conn: SqliteConnection) (seriesSlug: string) (season: int) (episode: int) (stillRef: string) : unit =
+    use cmd = conn.CreateCommand()
+    cmd.CommandText <- "INSERT INTO series_episodes (series_slug, season_number, episode_number, still_ref) VALUES (@s, @se, @ep, @ref)"
+    cmd.Parameters.AddWithValue("@s", seriesSlug) |> ignore
+    cmd.Parameters.AddWithValue("@se", season) |> ignore
+    cmd.Parameters.AddWithValue("@ep", episode) |> ignore
+    cmd.Parameters.AddWithValue("@ref", stillRef) |> ignore
+    cmd.ExecuteNonQuery() |> ignore
+
+/// Simulates a cast member's image being dropped (the realistic path to "no
+/// row references it" — `cast_members` itself is the ref-bearing row per
+/// ADR-0025, so clearing its own image_ref is what makes the file orphan;
+/// deleting the row outright would trip movie_cast's FK).
+let private clearCastMemberImageRef (conn: SqliteConnection) (id: int64) : unit =
+    use cmd = conn.CreateCommand()
+    cmd.CommandText <- "UPDATE cast_members SET image_ref = NULL WHERE id = @id"
+    cmd.Parameters.AddWithValue("@id", id) |> ignore
+    cmd.ExecuteNonQuery() |> ignore
 
 [<Tests>]
 let administrationTests =
@@ -330,4 +387,258 @@ let administrationTests =
 
             Expect.equal friendStats.CheckpointPosition 0L "Checkpoint should default to 0 before any catch-up"
             Expect.isNone friendStats.UpdatedAt "A projection that has never checkpointed has no updated_at"
+
+        // ── Image cache admin (administration-xx3mw) — see ADR-0025 ──
+
+        testCase "imageRefColumns covers every ref-bearing (table, column) pair with a column that exists in the schema" <| fun _ ->
+            let conn = createInMemoryConnection ()
+
+            Expect.equal (List.length Administration.imageRefColumns) 15 "Registry should list all fifteen ref-bearing columns"
+
+            for (table, column) in Administration.imageRefColumns do
+                use cmd = conn.CreateCommand()
+                cmd.CommandText <- sprintf "PRAGMA table_info(%s)" table
+                use reader = cmd.ExecuteReader()
+                let columns = [ while reader.Read() do yield reader.GetString(1) ]
+                Expect.contains columns column (sprintf "%s.%s should exist in the schema" table column)
+
+        testCase "getImageCacheStats reports total size/count and a per-subfolder breakdown that sums to the total" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            withTempImagesDir (fun imagesDir ->
+                writeImageFile imagesDir "posters/a.jpg" 100
+                writeImageFile imagesDir "backdrops/b.jpg" 200
+                writeImageFile imagesDir "loose.txt" 50
+
+                let api = createImageApi conn imagesDir
+                let stats = api.getImageCacheStats () |> Async.RunSynchronously
+
+                Expect.equal stats.TotalFileCount 3 "Three files total"
+                Expect.equal stats.TotalBytes 350L "Sizes should sum to 350 bytes"
+                Expect.equal (stats.Subfolders |> List.sumBy (fun s -> s.SizeBytes)) stats.TotalBytes "Subfolder rows should sum to the total bytes"
+                Expect.equal (stats.Subfolders |> List.sumBy (fun s -> s.FileCount)) stats.TotalFileCount "Subfolder rows should sum to the total file count"
+                let rootRow = stats.Subfolders |> List.tryFind (fun s -> s.Subfolder = "(root)")
+                Expect.isSome rootRow "A loose file directly under images/ should be reported under (root)"
+                Expect.equal rootRow.Value.SizeBytes 50L "(root) row should report the loose file's size")
+
+        testCase "listOrphanedImages is blocked while a checkpoint-tracked projection lags behind the store head" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            EventStore.appendToStream conn (Friends.streamId "marco") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None }) ] |> ignore
+            Projection.runProjection conn FriendProjection.handler
+            // A second event arrives, but the projection is never re-run — FriendProjection now lags.
+            EventStore.appendToStream conn (Friends.streamId "alice") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Alice"; ImageRef = None }) ] |> ignore
+            let api = createApi conn
+
+            match api.listOrphanedImages () |> Async.RunSynchronously with
+            | OrphanScanBlocked reason -> Expect.stringContains reason "FriendProjection" "Reason should name the lagging projection"
+            | OrphanScanReady _ -> failwith "Expected the scan to be blocked while FriendProjection lags"
+
+        testCase "purgeOrphanedImages is blocked while a checkpoint-tracked projection lags behind the store head" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            EventStore.appendToStream conn (Friends.streamId "marco") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None }) ] |> ignore
+            Projection.runProjection conn FriendProjection.handler
+            EventStore.appendToStream conn (Friends.streamId "alice") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Alice"; ImageRef = None }) ] |> ignore
+            let api = createApi conn
+
+            match api.purgeOrphanedImages PurgeAll |> Async.RunSynchronously with
+            | PurgeBlocked reason -> Expect.stringContains reason "FriendProjection" "Reason should name the lagging projection"
+            | PurgeDone _ -> failwith "Expected the purge to be blocked while FriendProjection lags"
+
+        testCase "getImageCacheStats remains available while a projection is dirty — stats need no not-dirty guard" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            EventStore.appendToStream conn (Friends.streamId "marco") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None }) ] |> ignore
+            // FriendProjection is never caught up — dirty by lag — but stats don't gate on it.
+            withTempImagesDir (fun imagesDir ->
+                writeImageFile imagesDir "posters/a.jpg" 10
+                let api = createImageApi conn imagesDir
+                let stats = api.getImageCacheStats () |> Async.RunSynchronously
+                Expect.equal stats.TotalFileCount 1 "Stats should compute normally despite the dirty projection")
+
+        testCase "a content_blocks.image_ref (movie journal) is never flagged orphan" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            insertContentBlock conn "block-1" "dune" "content/movie-journal-1.jpg"
+            withTempImagesDir (fun imagesDir ->
+                writeImageFile imagesDir "content/movie-journal-1.jpg" 10
+                let api = createImageApi conn imagesDir
+                match api.listOrphanedImages () |> Async.RunSynchronously with
+                | OrphanScanReady (orphans, _) ->
+                    Expect.isEmpty (orphans |> List.filter (fun o -> o.RelativePath = "content/movie-journal-1.jpg")) "Referenced movie journal image should not be orphan"
+                | OrphanScanBlocked reason -> failwith reason)
+
+        testCase "a game_journal_blocks.image_ref (game journal) is never flagged orphan" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let block: JournalBlockDto = {
+                Id = "block-1"; ParentId = None; BlockType = JournalBlockTypes.image
+                Content = ""; Checked = false; Collapsed = false; Language = None; Url = None
+                ImageRef = Some "content/game-journal-1.jpg"; Caption = None; Position = 0; Width = 1.0
+            }
+            GameJournal.save conn "some-game" [ block ] |> ignore
+            withTempImagesDir (fun imagesDir ->
+                writeImageFile imagesDir "content/game-journal-1.jpg" 10
+                let api = createImageApi conn imagesDir
+                match api.listOrphanedImages () |> Async.RunSynchronously with
+                | OrphanScanReady (orphans, _) ->
+                    Expect.isEmpty (orphans |> List.filter (fun o -> o.RelativePath = "content/game-journal-1.jpg")) "Referenced game journal image should not be orphan"
+                | OrphanScanBlocked reason -> failwith reason)
+
+        testCase "a series_episodes.still_ref is never flagged orphan" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            insertSeriesEpisode conn "the-wire" 1 2 "stills/the-wire-s01e02.jpg"
+            withTempImagesDir (fun imagesDir ->
+                writeImageFile imagesDir "stills/the-wire-s01e02.jpg" 10
+                let api = createImageApi conn imagesDir
+                match api.listOrphanedImages () |> Async.RunSynchronously with
+                | OrphanScanReady (orphans, _) ->
+                    Expect.isEmpty (orphans |> List.filter (fun o -> o.RelativePath = "stills/the-wire-s01e02.jpg")) "Referenced episode still should not be orphan"
+                | OrphanScanBlocked reason -> failwith reason)
+
+        testCase "a cast/<id>.jpg is not flagged orphan while a cast_members row references it, and is flagged once no row does" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let castId = CastStore.upsertCastMember conn "Actor" 999 (Some "cast/999.jpg")
+            // Shared by more than one movie — sharing doesn't change how liveness is derived
+            // (cast_members.image_ref alone is the ref-bearing column per ADR-0025).
+            CastStore.addMovieCast conn "Movie-dune" castId "Self" 0 true
+            CastStore.addMovieCast conn "Movie-arrival" castId "Self" 0 true
+            withTempImagesDir (fun imagesDir ->
+                writeImageFile imagesDir "cast/999.jpg" 10
+                let api = createImageApi conn imagesDir
+
+                match api.listOrphanedImages () |> Async.RunSynchronously with
+                | OrphanScanReady (orphans, _) ->
+                    Expect.isEmpty (orphans |> List.filter (fun o -> o.RelativePath = "cast/999.jpg")) "Shared cast image should not be orphan while cast_members references it"
+                | OrphanScanBlocked reason -> failwith reason
+
+                clearCastMemberImageRef conn castId
+
+                match api.listOrphanedImages () |> Async.RunSynchronously with
+                | OrphanScanReady (orphans, _) ->
+                    Expect.isNonEmpty (orphans |> List.filter (fun o -> o.RelativePath = "cast/999.jpg")) "Cast image should be orphan once no cast_members row references it"
+                | OrphanScanBlocked reason -> failwith reason)
+
+        testCase "path comparison is separator-normalized and case-sensitive: a case-mismatched name is treated as orphan" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            insertMoviePosterRef conn "dune" "posters/dune.jpg"
+            withTempImagesDir (fun imagesDir ->
+                // The on-disk file's actual casing differs from the stored ref's —
+                // ordinal comparison must not fold case (ADR-0025: matches the
+                // case-sensitive Linux deploy target). Only one file is ever written
+                // here (dev runs on a case-insensitive Windows filesystem, so writing
+                // both "dune.jpg" and "Dune.jpg" would collide onto the same file).
+                writeImageFile imagesDir "posters/Dune.jpg" 10
+                let api = createImageApi conn imagesDir
+
+                match api.listOrphanedImages () |> Async.RunSynchronously with
+                | OrphanScanReady (orphans, _) ->
+                    Expect.equal (List.length orphans) 1 "Case-mismatched file should be flagged orphan even though a same-named ref exists"
+                    Expect.equal orphans.[0].RelativePath "posters/Dune.jpg" "Relative path should be forward-slash normalized and preserve on-disk casing"
+                | OrphanScanBlocked reason -> failwith reason)
+
+        testCase "a genuinely unreferenced file, including a stray non-image file, appears in the orphan list with correct path and size" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            withTempImagesDir (fun imagesDir ->
+                writeImageFile imagesDir "posters/orphan-poster.jpg" 100
+                writeImageFile imagesDir "notes.txt" 30
+                let api = createImageApi conn imagesDir
+
+                match api.listOrphanedImages () |> Async.RunSynchronously with
+                | OrphanScanReady (orphans, totalBytes) ->
+                    let poster = orphans |> List.find (fun o -> o.RelativePath = "posters/orphan-poster.jpg")
+                    Expect.equal poster.SizeBytes 100L "Orphaned poster should report its correct size"
+                    let stray = orphans |> List.find (fun o -> o.RelativePath = "notes.txt")
+                    Expect.equal stray.SizeBytes 30L "Stray non-image file should report its correct size"
+                    Expect.equal stray.Subfolder "(root)" "Loose file should be reported under (root)"
+                    Expect.equal totalBytes 130L "Total orphan bytes should sum both files"
+                | OrphanScanBlocked reason -> failwith reason)
+
+        testCase "purging a specific subset deletes exactly that subset and nothing else" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            withTempImagesDir (fun imagesDir ->
+                writeImageFile imagesDir "posters/orphan1.jpg" 10
+                writeImageFile imagesDir "posters/orphan2.jpg" 20
+                let api = createImageApi conn imagesDir
+
+                match api.purgeOrphanedImages (PurgeSpecific [ "posters/orphan1.jpg" ]) |> Async.RunSynchronously with
+                | PurgeDone (deletedCount, bytesFreed, skipped) ->
+                    Expect.equal deletedCount 1 "Only the requested file should be deleted"
+                    Expect.equal bytesFreed 10L "Bytes freed should match the deleted file's size"
+                    Expect.isEmpty skipped "Nothing should be skipped"
+                    Expect.isFalse (File.Exists(Path.Combine(imagesDir, "posters", "orphan1.jpg"))) "orphan1 should be deleted"
+                    Expect.isTrue (File.Exists(Path.Combine(imagesDir, "posters", "orphan2.jpg"))) "orphan2 should be untouched"
+                | PurgeBlocked reason -> failwith reason)
+
+        testCase "purging PurgeAll deletes every currently-detected orphan and leaves referenced files alone" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            insertMoviePosterRef conn "dune" "posters/dune.jpg"
+            withTempImagesDir (fun imagesDir ->
+                writeImageFile imagesDir "posters/dune.jpg" 10
+                writeImageFile imagesDir "posters/orphan1.jpg" 20
+                writeImageFile imagesDir "posters/orphan2.jpg" 30
+                let api = createImageApi conn imagesDir
+
+                match api.purgeOrphanedImages PurgeAll |> Async.RunSynchronously with
+                | PurgeDone (deletedCount, bytesFreed, skipped) ->
+                    Expect.equal deletedCount 2 "Both orphans should be deleted"
+                    Expect.equal bytesFreed 50L "Bytes freed should sum both orphans"
+                    Expect.isEmpty skipped "Nothing should be skipped"
+                    Expect.isTrue (File.Exists(Path.Combine(imagesDir, "posters", "dune.jpg"))) "Referenced poster should remain"
+                    Expect.isFalse (File.Exists(Path.Combine(imagesDir, "posters", "orphan1.jpg"))) "orphan1 should be deleted"
+                    Expect.isFalse (File.Exists(Path.Combine(imagesDir, "posters", "orphan2.jpg"))) "orphan2 should be deleted"
+                | PurgeBlocked reason -> failwith reason)
+
+        testCase "purge re-derives at commit: a path that became referenced since the scan is skipped, not deleted" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            withTempImagesDir (fun imagesDir ->
+                writeImageFile imagesDir "posters/became-referenced.jpg" 10
+                let api = createImageApi conn imagesDir
+                // Simulate the file becoming referenced after the client's held scan
+                // but before the purge call commits.
+                insertMoviePosterRef conn "newly-added" "posters/became-referenced.jpg"
+
+                match api.purgeOrphanedImages (PurgeSpecific [ "posters/became-referenced.jpg" ]) |> Async.RunSynchronously with
+                | PurgeDone (deletedCount, _, skipped) ->
+                    Expect.equal deletedCount 0 "Should not delete a file that became referenced before commit"
+                    Expect.contains skipped "posters/became-referenced.jpg" "Should report the now-referenced path as skipped"
+                    Expect.isTrue (File.Exists(Path.Combine(imagesDir, "posters", "became-referenced.jpg"))) "File should remain on disk"
+                | PurgeBlocked reason -> failwith reason)
+
+        testCase "purge skips a requested path that's already vanished from disk, without erroring" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            withTempImagesDir (fun imagesDir ->
+                let api = createImageApi conn imagesDir
+
+                match api.purgeOrphanedImages (PurgeSpecific [ "posters/gone.jpg" ]) |> Async.RunSynchronously with
+                | PurgeDone (deletedCount, bytesFreed, skipped) ->
+                    Expect.equal deletedCount 0 "Nothing to delete"
+                    Expect.equal bytesFreed 0L "No bytes freed"
+                    Expect.contains skipped "posters/gone.jpg" "Should report the already-vanished path as skipped"
+                | PurgeBlocked reason -> failwith reason)
+
+        testCase "purge returns actual deleted count and bytes freed, and stats reflect the smaller total afterward" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            withTempImagesDir (fun imagesDir ->
+                writeImageFile imagesDir "posters/orphan.jpg" 100
+                let api = createImageApi conn imagesDir
+                let statsBefore = api.getImageCacheStats () |> Async.RunSynchronously
+
+                match api.purgeOrphanedImages PurgeAll |> Async.RunSynchronously with
+                | PurgeDone (deletedCount, bytesFreed, _) ->
+                    Expect.equal deletedCount 1 "One file deleted"
+                    Expect.equal bytesFreed 100L "Bytes freed should match the deleted file's size"
+                    let statsAfter = api.getImageCacheStats () |> Async.RunSynchronously
+                    Expect.equal statsAfter.TotalFileCount (statsBefore.TotalFileCount - 1) "File count should shrink by 1"
+                    Expect.equal statsAfter.TotalBytes (statsBefore.TotalBytes - 100L) "Total bytes should shrink by 100"
+                | PurgeBlocked reason -> failwith reason)
+
+        testCase "purge is filesystem-only: total event count is unchanged across a purge" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            EventStore.appendToStream conn (Friends.streamId "marco") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None }) ] |> ignore
+            Projection.runProjection conn FriendProjection.handler
+            let eventCountBefore = EventStore.getTotalEventCount conn
+
+            withTempImagesDir (fun imagesDir ->
+                writeImageFile imagesDir "posters/orphan.jpg" 10
+                let api = createImageApi conn imagesDir
+                api.purgeOrphanedImages PurgeAll |> Async.RunSynchronously |> ignore
+
+                let eventCountAfter = EventStore.getTotalEventCount conn
+                Expect.equal eventCountAfter eventCountBefore "Purge must never touch the event store")
     ]

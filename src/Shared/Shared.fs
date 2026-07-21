@@ -1444,6 +1444,41 @@ type ProjectionStatRow = {
     IsRebuilding: bool
 }
 
+// Image cache admin (administration-xx3mw): stats/orphan-detection/purge for
+// the images/ cache. Live refs come from the fifteen typed ref-bearing
+// projection columns (Administration.imageRefColumns), never event replay —
+// see ADR-0025.
+
+/// One images/ subfolder's footprint (posters/backdrops/stills/cast/content/
+/// friends, plus "(root)" for stray loose files). Rows are derived by
+/// grouping the actual on-disk walk, so they always sum exactly to the
+/// aggregate total/count.
+type ImageSubfolderStat = { Subfolder: string; FileCount: int; SizeBytes: int64 }
+
+/// Always available (pure disk footprint, no not-dirty guard needed).
+type ImageCacheStats = { TotalBytes: int64; TotalFileCount: int; Subfolders: ImageSubfolderStat list }
+
+type OrphanImage = { RelativePath: string; Subfolder: string; SizeBytes: int64 }
+
+/// `OrphanScanBlocked` fires while any of the six checkpoint-tracked
+/// projections is dirty or mid-rebuild (ADR-0025's not-dirty guard) — an
+/// operator-facing reason string, not an exception, so the client renders it
+/// as a DU case rather than an error state.
+type OrphanScan =
+    | OrphanScanBlocked of reason: string
+    | OrphanScanReady of orphans: OrphanImage list * totalBytes: int64
+
+type PurgeSelection =
+    | PurgeAll
+    | PurgeSpecific of relativePaths: string list
+
+/// `skipped` lists requested paths the server declined to delete because
+/// they were no longer genuinely orphan at commit time (re-referenced or
+/// already gone) — the TOCTOU-safe re-derivation ADR-0025 requires.
+type PurgeResult =
+    | PurgeBlocked of reason: string
+    | PurgeDone of deletedCount: int * bytesFreed: int64 * skipped: string list
+
 type IAdminApi = {
     // Event Store Browser
     getEventPage: EventPageQuery -> Async<EventPage>
@@ -1458,4 +1493,8 @@ type IAdminApi = {
     getHealthStats: unit -> Async<HealthStats>
     // Projections (administration-qjcp4)
     getProjectionStats: unit -> Async<ProjectionStatRow list>
+    // Images (administration-xx3mw)
+    getImageCacheStats: unit -> Async<ImageCacheStats>
+    listOrphanedImages: unit -> Async<OrphanScan>
+    purgeOrphanedImages: PurgeSelection -> Async<PurgeResult>
 }

@@ -10,6 +10,7 @@ type AdminTab =
     | AdminEvents
     | AdminProjections
     | AdminHealth
+    | AdminImages
     | AdminJobs
     | AdminSurgery
 
@@ -53,6 +54,7 @@ module Route =
         | [ "admin"; "events" ] -> Admin AdminEvents
         | [ "admin"; "projections" ] -> Admin AdminProjections
         | [ "admin"; "health" ] -> Admin AdminHealth
+        | [ "admin"; "images" ] -> Admin AdminImages
         | [ "admin"; "jobs" ] -> Admin AdminJobs
         | [ "admin"; "surgery" ] -> Admin AdminSurgery
         | [ "admin"; "streams"; streamId ] -> Stream_detail streamId
@@ -67,6 +69,7 @@ module Route =
         | AdminEvents -> "events"
         | AdminProjections -> "projections"
         | AdminHealth -> "health"
+        | AdminImages -> "images"
         | AdminJobs -> "jobs"
         | AdminSurgery -> "surgery"
 
