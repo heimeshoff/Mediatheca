@@ -1,7 +1,7 @@
 ---
 id: administration-xx3mw
 title: Image cache admin — orphan detection, size overview, purge
-status: todo
+status: doing
 type: feature
 context: administration
 created: 2026-07-20

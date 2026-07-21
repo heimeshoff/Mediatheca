@@ -11,20 +11,20 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 6
-- **Todo:** 3
-- **Doing:** 0
+- **Todo:** 2
+- **Doing:** 1
 - **Done:** 6
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
 - **administration-yamm5** — Job runs console — history, outcomes, and run-now for scheduled jobs (feature) — `todo/administration-yamm5-job-runs-console.md`
-- **administration-xx3mw** — Image cache admin — orphan detection, size overview, purge (feature) — `todo/administration-xx3mw-image-cache-admin.md`
 - **administration-h4br2** — Browser smoke-test the Events tab Follow toggle end-to-end (chore) — `todo/administration-h4br2-event-browser-follow-smoke-test.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **administration-xx3mw** — Image cache admin — orphan detection, size overview, purge (feature) — `doing/administration-xx3mw-image-cache-admin.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

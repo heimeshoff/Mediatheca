@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 20:31 -- Batch started: [administration-xx3mw]
+
+**Type:** Work / Batch start
+**Tasks:** administration-xx3mw - Image cache admin — orphan detection, size overview, purge
+**Parallel:** no (1 worker — sequential per builder decision; yamm5 held to next wave: overlaps xx3mw on IAdminApi/Administration.fs/admin client shell/administration README; h4br2 not dispatched: chrome-devtools smoke-test run by conductor session directly)
+
+---
+
 ## 2026-07-21 16:02 -- Modeling / Promoted: administration-yamm5 - Job runs console — history, outcomes, and run-now for scheduled jobs
 
 **Type:** Modeling / Promote
