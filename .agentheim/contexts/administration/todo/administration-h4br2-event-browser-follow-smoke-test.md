@@ -1,7 +1,7 @@
 ---
 id: administration-h4br2
 title: Browser smoke-test the Events tab Follow toggle end-to-end
-status: backlog
+status: todo
 type: chore
 context: administration
 created: 2026-07-20

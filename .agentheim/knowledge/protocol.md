@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 15:48 -- Modeling / Promoted: administration-h4br2 - Browser smoke-test the Events tab Follow toggle end-to-end
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-21 15:47 -- Modeling / Refined: administration-h4br2 - Browser smoke-test the Events tab Follow toggle end-to-end
 
 **Type:** Modeling / Refine
