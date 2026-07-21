@@ -36,7 +36,16 @@ let private makeEvent eventType data : EventStore.EventData = {
 let private noStoragePath = "test-fixtures-do-not-exist/nowhere.db"
 let private noImagesDir = "test-fixtures-do-not-exist/images"
 
-let private createApi conn = Administration.create conn noStoragePath noImagesDir
+let private allProjectionHandlers = [
+    MovieProjection.handler
+    FriendProjection.handler
+    ContentBlockProjection.handler
+    CatalogProjection.handler
+    SeriesProjection.handler
+    GameProjection.handler
+]
+
+let private createApi conn = Administration.create conn noStoragePath noImagesDir allProjectionHandlers
 
 [<Tests>]
 let administrationTests =
@@ -270,7 +279,7 @@ let administrationTests =
             File.WriteAllBytes(Path.Combine(imagesDir, "poster2.jpg"), Array.create 256 0uy)
 
             try
-                let api = Administration.create conn dbPath imagesDir
+                let api = Administration.create conn dbPath imagesDir allProjectionHandlers
                 let stats = api.getHealthStats () |> Async.RunSynchronously
 
                 Expect.equal stats.Storage.DbSizeBytes 1024L "DB size should match the file on disk"
@@ -279,4 +288,46 @@ let administrationTests =
                 Expect.equal stats.Storage.WalSizeBytes 0L "No WAL sidecar was written, so its size is 0"
             finally
                 Directory.Delete(tempRoot, true)
+
+        testCase "getProjectionStats lists all registered projections with checkpoint, lag, and row counts" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let streamId = Friends.streamId "marco"
+            EventStore.appendToStream conn streamId -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None }) ] |> ignore
+            Projection.runProjection conn FriendProjection.handler
+            let api = createApi conn
+
+            let stats = api.getProjectionStats () |> Async.RunSynchronously
+
+            Expect.equal (List.length stats) (List.length allProjectionHandlers) "Should list every registered projection handler"
+            let friendStats = stats |> List.find (fun s -> s.Name = "FriendProjection")
+            Expect.equal friendStats.CheckpointPosition 1L "Checkpoint should be at position 1 after catching up on the one event"
+            Expect.equal friendStats.Lag 0L "Lag should be 0 once caught up to the store head"
+            Expect.isSome friendStats.UpdatedAt "A projection that has checkpointed should report an updated_at"
+            Expect.isFalse friendStats.IsRebuilding "No rebuild is in flight"
+            let friendListCount = friendStats.TableCounts |> List.find (fun t -> t.TableName = "friend_list")
+            Expect.equal friendListCount.RowCount 1 "friend_list should have the one row for Marco"
+
+        testCase "getProjectionStats reports lag when a projection has not caught up to newer events" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            EventStore.appendToStream conn (Friends.streamId "marco") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None }) ] |> ignore
+            Projection.runProjection conn FriendProjection.handler
+            // A second event arrives, but the projection is never re-run to catch up on it.
+            EventStore.appendToStream conn (Friends.streamId "alice") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Alice"; ImageRef = None }) ] |> ignore
+            let api = createApi conn
+
+            let stats = api.getProjectionStats () |> Async.RunSynchronously
+            let friendStats = stats |> List.find (fun s -> s.Name = "FriendProjection")
+
+            Expect.equal friendStats.CheckpointPosition 1L "Checkpoint should still be at position 1"
+            Expect.equal friendStats.Lag 1L "Lag should be 1: store head (2) minus checkpoint (1)"
+
+        testCase "getProjectionStats reports no checkpoint yet for a projection that has never caught up" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let api = createApi conn
+
+            let stats = api.getProjectionStats () |> Async.RunSynchronously
+            let friendStats = stats |> List.find (fun s -> s.Name = "FriendProjection")
+
+            Expect.equal friendStats.CheckpointPosition 0L "Checkpoint should default to 0 before any catch-up"
+            Expect.isNone friendStats.UpdatedAt "A projection that has never checkpointed has no updated_at"
     ]

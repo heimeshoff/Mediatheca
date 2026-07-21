@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 13:18 -- Task verified and completed: administration-qjcp4 - Projection dashboard — checkpoint/lag overview and rebuild-by-command with streamed progress
+
+**Type:** Work / Task completion
+**Task:** administration-qjcp4 - Projection dashboard — checkpoint/lag overview and rebuild-by-command with streamed progress
+**Summary:** Projection dashboard — /admin/projections lists all six handlers (checkpoint, lag vs head, updated-at, row counts) with per-projection + rebuild-all commands streaming live SSE progress via a concurrency-guarded route; retired the Series/Game startup force-rebuild hack
+**Duration:** ~14m (worker) + verify
+**Verification:** PASS (iteration 1)
+**Files changed:** 17
+**Tests added:** 6
+**ADRs written:** 0024
+
+---
+
 ## 2026-07-21 12:56 -- Batch started: [administration-qjcp4]
 
 **Type:** Work / Batch start

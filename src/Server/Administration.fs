@@ -3,6 +3,7 @@ namespace Mediatheca.Server
 open System
 open System.IO
 open Microsoft.Data.Sqlite
+open Giraffe
 open Mediatheca.Shared
 
 /// Server-side implementation of IAdminApi — the Administration console's
@@ -208,11 +209,111 @@ module Administration =
             }
         }
 
+    // ── Projection dashboard (administration-qjcp4) ──
+
+    /// Table(s) each projection owns, for the dashboard's per-table row
+    /// counts. Admin-console-only knowledge of each projection's schema —
+    /// same pattern as boundedContextPrefixes above. Keep in sync if a
+    /// projection's owned tables ever change.
+    let private projectionTables = [
+        "MovieProjection", [ "movie_list"; "movie_detail"; "watch_sessions" ]
+        "FriendProjection", [ "friend_list" ]
+        "ContentBlockProjection", [ "content_blocks" ]
+        "CatalogProjection", [ "catalog_list"; "catalog_entries" ]
+        "SeriesProjection", [ "series_list"; "series_detail"; "series_seasons"; "series_episodes"; "series_rewatch_sessions"; "series_episode_progress" ]
+        "GameProjection", [ "game_list"; "game_detail" ]
+    ]
+
+    let private tableRowCount (conn: SqliteConnection) (tableName: string) : int =
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- $"SELECT COUNT(*) FROM {tableName}"
+        cmd.ExecuteScalar() :?> int64 |> int
+
+    /// Names of projections currently mid-rebuild. Guards the "reject a
+    /// second concurrent rebuild of the same projection" acceptance
+    /// criterion. Module-level mutable state, scoped to the server process's
+    /// lifetime — same shape as other singleton server state in this
+    /// codebase (e.g. JellyfinSync's last-sync-time cache).
+    let private rebuildingProjections = System.Collections.Concurrent.ConcurrentDictionary<string, unit>()
+
+    let private buildProjectionStats (conn: SqliteConnection) (projectionHandlers: Projection.ProjectionHandler list) : ProjectionStatRow list =
+        let head = EventStore.getMaxGlobalPosition conn
+        projectionHandlers
+        |> List.map (fun handler ->
+            let position, updatedAt = Projection.getCheckpointInfo conn handler.Name
+            let tables =
+                projectionTables
+                |> List.tryFind (fun (name, _) -> name = handler.Name)
+                |> Option.map snd
+                |> Option.defaultValue []
+            { Name = handler.Name
+              CheckpointPosition = position
+              Lag = max 0L (head - position)
+              UpdatedAt = updatedAt
+              TableCounts = tables |> List.map (fun t -> { TableName = t; RowCount = tableRowCount conn t })
+              IsRebuilding = rebuildingProjections.ContainsKey(handler.Name) })
+
+    /// Rebuild-with-live-progress command (the Projections tab's "Rebuild"
+    /// button, administration-qjcp4): drop + replay one projection via
+    /// `Projection.rebuildProjectionWithProgress`, streaming SSE progress the
+    /// same way `Api.steamFamilyImportHandler` streams Steam Family import
+    /// progress. Wired as a raw Giraffe route (not through Remoting — SSE is
+    /// a long-lived response, not a request/response RPC). A second request
+    /// for a projection already rebuilding gets a "rejected" SSE event
+    /// instead of running concurrently, per the task's explicit
+    /// single-writer-safety acceptance criterion.
+    let projectionRebuildStreamHandler
+        (conn: SqliteConnection)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        : HttpHandler =
+        routef "/api/stream/rebuild-projection/%s" (fun projectionName ->
+            fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
+                task {
+                    ctx.Response.Headers.["Content-Type"] <- Microsoft.Extensions.Primitives.StringValues("text/event-stream")
+                    ctx.Response.Headers.["Cache-Control"] <- Microsoft.Extensions.Primitives.StringValues("no-cache")
+                    ctx.Response.Headers.["Connection"] <- Microsoft.Extensions.Primitives.StringValues("keep-alive")
+
+                    let writer = ctx.Response
+
+                    let writeEvent (eventType: string) (json: string) = task {
+                        let line = sprintf "data: {\"type\":\"%s\",%s}\n\n" eventType (json.TrimStart('{').TrimEnd('}'))
+                        let bytes = System.Text.Encoding.UTF8.GetBytes(line)
+                        do! writer.Body.WriteAsync(bytes, 0, bytes.Length)
+                        do! writer.Body.FlushAsync()
+                    }
+
+                    match projectionHandlers |> List.tryFind (fun h -> h.Name = projectionName) with
+                    | None ->
+                        do! writeEvent "error" (sprintf "{\"message\":\"Unknown projection '%s'\"}" projectionName)
+                    | Some handler ->
+                        if not (rebuildingProjections.TryAdd(projectionName, ())) then
+                            do! writeEvent "rejected" (sprintf "{\"message\":\"%s is already rebuilding\"}" projectionName)
+                        else
+                            try
+                                try
+                                    let emit (progress: Projection.RebuildProgress) =
+                                        let json = sprintf "\"position\":%d,\"head\":%d,\"eventsProcessed\":%d" progress.Position progress.Head progress.EventsProcessed
+                                        writeEvent "progress" (sprintf "{%s}" json)
+                                        |> Async.AwaitTask |> Async.RunSynchronously
+                                    Projection.rebuildProjectionWithProgress conn handler emit
+                                    do! writeEvent "complete" "{}"
+                                with ex ->
+                                    let escaped = ex.Message.Replace("\\", "\\\\").Replace("\"", "\\\"")
+                                    do! writeEvent "error" (sprintf "{\"message\":\"%s\"}" escaped)
+                            finally
+                                rebuildingProjections.TryRemove(projectionName) |> ignore
+
+                    return! earlyReturn ctx
+                }
+        )
+
     /// `dbPath`/`imagesDir` are the same paths Program.fs computes from
     /// DATA_DIR (mediatheca.db and the images/ cache) — passed through here
     /// so the Health tab's storage stats reflect the actual data dir rather
-    /// than duplicating DATA_DIR resolution logic.
-    let create (conn: SqliteConnection) (dbPath: string) (imagesDir: string) : IAdminApi =
+    /// than duplicating DATA_DIR resolution logic. `projectionHandlers` is
+    /// the same registry Composition.fs passes to Api.create — reused here
+    /// for the Projections tab's checkpoint/lag/row-count listing.
+    let create (conn: SqliteConnection) (dbPath: string) (imagesDir: string) (projectionHandlers: Projection.ProjectionHandler list) : IAdminApi =
         {
             getEventPage = fun query -> async {
                 let filter: EventStore.QueryFilter = {
@@ -273,5 +374,9 @@ module Administration =
 
             getHealthStats = fun () -> async {
                 return buildHealthStats conn dbPath imagesDir
+            }
+
+            getProjectionStats = fun () -> async {
+                return buildProjectionStats conn projectionHandlers
             }
         }

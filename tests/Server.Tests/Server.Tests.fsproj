@@ -14,6 +14,7 @@
     <Compile Include="CatalogsTests.fs" />
     <Compile Include="EventStoreTests.fs" />
     <Compile Include="AdministrationTests.fs" />
+    <Compile Include="ProjectionRebuildTests.fs" />
     <Compile Include="MoviesIntegrationTests.fs" />
     <Compile Include="FriendIntegrationTests.fs" />
     <Compile Include="SeriesTests.fs" />

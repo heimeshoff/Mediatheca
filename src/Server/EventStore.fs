@@ -318,6 +318,19 @@ module EventStore =
         |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
         |> Option.defaultValue 0
 
+    /// Store head — the highest `global_position` currently in the log. Used
+    /// by the projection dashboard (administration-qjcp4) to compute lag
+    /// (head - checkpoint) and to size a rebuild's progress bar. 0 for an
+    /// empty store. Deliberately `MAX(global_position)` rather than
+    /// `COUNT(*)` — the two coincide only in the gap-free common case, and
+    /// `global_position` is the actual quantity checkpoints are measured
+    /// against.
+    let getMaxGlobalPosition (conn: SqliteConnection) : int64 =
+        conn
+        |> Db.newCommand "SELECT MAX(global_position) as head FROM events"
+        |> Db.querySingle (fun rd -> if rd.IsDBNull(rd.GetOrdinal("head")) then 0L else rd.ReadInt64 "head")
+        |> Option.defaultValue 0L
+
     // Health stats (administration-hw74a) — GROUP BY on stream_id/event_type
     // reuses idx_events_stream_id/idx_events_event_type, so these are
     // index-only scans (no row data touched); the day-count query is bounded

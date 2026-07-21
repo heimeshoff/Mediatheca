@@ -8,12 +8,15 @@ open Mediatheca.Client.Pages.Admin.Types
 let init (tab: AdminTab) : Model * Cmd<Msg> =
     let eventBrowserModel, eventBrowserCmd = Mediatheca.Client.Pages.EventBrowser.State.init ()
     let healthModel, healthCmd = Mediatheca.Client.Pages.AdminHealth.State.init ()
+    let projectionsModel, projectionsCmd = Mediatheca.Client.Pages.AdminProjections.State.init ()
     { ActiveTab = tab
       EventBrowserModel = eventBrowserModel
-      HealthModel = healthModel },
+      HealthModel = healthModel
+      ProjectionsModel = projectionsModel },
     Cmd.batch [
         Cmd.map Event_browser_msg eventBrowserCmd
         Cmd.map Health_msg healthCmd
+        Cmd.map Projections_msg projectionsCmd
     ]
 
 /// Called from root `State.Url_changed` when the user navigates away from the
@@ -35,3 +38,7 @@ let update (adminApi: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Health_msg childMsg ->
         let childModel, childCmd = Mediatheca.Client.Pages.AdminHealth.State.update adminApi childMsg model.HealthModel
         { model with HealthModel = childModel }, Cmd.map Health_msg childCmd
+
+    | Projections_msg childMsg ->
+        let childModel, childCmd = Mediatheca.Client.Pages.AdminProjections.State.update adminApi childMsg model.ProjectionsModel
+        { model with ProjectionsModel = childModel }, Cmd.map Projections_msg childCmd

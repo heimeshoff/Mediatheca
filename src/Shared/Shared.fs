@@ -1414,6 +1414,36 @@ type HealthStats = {
     Storage: StorageStats
 }
 
+// Projection dashboard (administration-qjcp4): checkpoint/lag overview per
+// registered Projection.ProjectionHandler, plus a rebuild command whose
+// progress streams over SSE (not through Remoting — see
+// Administration.projectionRebuildStreamHandler, wired as a raw Giraffe
+// route). See ADR-0002 for why projections are disposable/rebuildable in the
+// first place.
+
+/// One table a projection owns, with its current row count. A projection may
+/// own several tables of different shapes (e.g. SeriesProjection's list/
+/// detail/season/episode tables) — reported per-table rather than summed so
+/// an operator can tell them apart.
+type ProjectionTableCount = { TableName: string; RowCount: int }
+
+type ProjectionStatRow = {
+    Name: string
+    /// `projection_checkpoints.last_position` — how far this projection has
+    /// caught up to.
+    CheckpointPosition: int64
+    /// Store head (MAX(global_position)) minus CheckpointPosition. 0 when
+    /// fully caught up.
+    Lag: int64
+    /// `projection_checkpoints.updated_at`, None if this projection has
+    /// never checkpointed.
+    UpdatedAt: string option
+    TableCounts: ProjectionTableCount list
+    /// True while a rebuild of this projection is in flight on the server —
+    /// drives the "Rebuild" button's disabled state after a page reload.
+    IsRebuilding: bool
+}
+
 type IAdminApi = {
     // Event Store Browser
     getEventPage: EventPageQuery -> Async<EventPage>
@@ -1426,4 +1456,6 @@ type IAdminApi = {
     getEventsAfter: EventTailQuery -> Async<EventDto list>
     // Health
     getHealthStats: unit -> Async<HealthStats>
+    // Projections (administration-qjcp4)
+    getProjectionStats: unit -> Async<ProjectionStatRow list>
 }

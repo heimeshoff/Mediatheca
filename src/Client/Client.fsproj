@@ -68,6 +68,9 @@
     <Compile Include="Pages\AdminHealth\Types.fs" />
     <Compile Include="Pages\AdminHealth\State.fs" />
     <Compile Include="Pages\AdminHealth\Views.fs" />
+    <Compile Include="Pages\AdminProjections\Types.fs" />
+    <Compile Include="Pages\AdminProjections\State.fs" />
+    <Compile Include="Pages\AdminProjections\Views.fs" />
     <Compile Include="Pages\Admin\Types.fs" />
     <Compile Include="Pages\Admin\State.fs" />
     <Compile Include="Pages\Admin\Views.fs" />

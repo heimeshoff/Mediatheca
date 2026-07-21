@@ -164,9 +164,11 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         GameProjection.handler
     ]
 
-    // Catch up all projections, rebuilding game projection for steam_app_id column
-    Projection.rebuildProjection conn SeriesProjection.handler
-    Projection.rebuildProjection conn GameProjection.handler
+    // Catch up all projections from their saved checkpoints. Projections are
+    // disposable read models (ADR-0002); a full rebuild is now an explicit
+    // operator command from the Projections admin tab
+    // (Administration.projectionRebuildStreamHandler) rather than something
+    // startup forces on every boot.
     Projection.startAllProjections conn projectionHandlers
 
     // Game journal (Notion-style blocks, plain storage) — table + one-time
@@ -214,7 +216,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
 
     // Create API
     let api = Api.create conn httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig imageBasePath projectionHandlers
-    let adminApi = Administration.create conn dbPath imageBasePath
+    let adminApi = Administration.create conn dbPath imageBasePath projectionHandlers
 
     let remotingHandler =
         Remoting.createApi ()
@@ -239,6 +241,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
             route "/health" >=> text "ok"
             route "/api/stream/import-steam-family"
                 >=> Api.steamFamilyImportHandler conn httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers
+            Administration.projectionRebuildStreamHandler conn projectionHandlers
             remotingHandler
             adminRemotingHandler
         ]
