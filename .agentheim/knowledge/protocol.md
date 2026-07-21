@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 21:32 -- Task verified and completed: administration-h4br2 - Browser smoke-test the Events tab Follow toggle end-to-end
+
+**Type:** Work / Task completion
+**Task:** administration-h4br2 - Browser smoke-test the Events tab Follow toggle end-to-end
+**Summary:** Browser smoke-tested the Events Follow toggle end-to-end via chrome-devtools against an isolated DATA_DIR — all three ADR-0023 behaviors (navigate-away/toggle-off/paginate teardown, live arrival + highlight, filter-respecting live rows) confirmed live; no discrepancies
+**Duration:** ~25m
+**Verification:** PASS (conductor-run browser smoke test — no verifier agent; the task IS the verification)
+**Files changed:** 0
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-07-21 21:15 -- Batch started: [administration-h4br2]
 
 **Type:** Work / Batch start
