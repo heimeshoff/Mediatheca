@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 20:52 -- Batch started: [administration-yamm5]
+
+**Type:** Work / Batch start
+**Tasks:** administration-yamm5 - Job runs console — history, outcomes, and run-now for scheduled jobs
+**Parallel:** no (1 worker — sequential per builder decision; xx3mw completed in the prior wave; h4br2 not dispatched: chrome-devtools smoke-test run by conductor session directly)
+
+---
+
 ## 2026-07-21 20:51 -- Task verified and completed: administration-xx3mw - Image cache admin — orphan detection, size overview, purge
 
 **Type:** Work / Task completion

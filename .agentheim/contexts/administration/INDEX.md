@@ -11,19 +11,19 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 6
-- **Todo:** 2
-- **Doing:** 0
+- **Todo:** 1
+- **Doing:** 1
 - **Done:** 7
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **administration-yamm5** — Job runs console — history, outcomes, and run-now for scheduled jobs (feature) — `todo/administration-yamm5-job-runs-console.md`
 - **administration-h4br2** — Browser smoke-test the Events tab Follow toggle end-to-end (chore) — `todo/administration-h4br2-event-browser-follow-smoke-test.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **administration-yamm5** — Job runs console — history, outcomes, and run-now for scheduled jobs (feature) — `doing/administration-yamm5-job-runs-console.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
