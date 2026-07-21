@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 13:35 -- Modeling / Captured: design-system-dib4q - DaisyUI 5 input-bordered migration
+
+**Type:** Modeling / Capture
+**BC:** design-system
+**Filed to:** todo
+**Summary:** DaisyUI 5 removed the `input-bordered` class. Two stale usages survive: typed `input.bordered` in administration's EventBrowser/Views.fs (3× FS0039 compile errors, non-fatal but pollute every build) and the dead `input-bordered` className string in games' GameDetail/Views.fs (2×, silent no-op). Captured as one design-system-owned migration bug, ready to work. Surfaced during the 2026-07-21 work session (verifiers were told to ignore these known errors).
+
+---
+
 ## 2026-07-21 13:20 -- Work session ended
 
 **Type:** Work / Session end
