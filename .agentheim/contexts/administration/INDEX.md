@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 7
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 5
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **administration-qjcp4** — Projection dashboard — checkpoint/lag overview and rebuild-by-command with streamed progress (feature) — `todo/administration-qjcp4-projection-dashboard-rebuild.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **administration-qjcp4** — Projection dashboard — checkpoint/lag overview and rebuild-by-command with streamed progress (feature) — `doing/administration-qjcp4-projection-dashboard-rebuild.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

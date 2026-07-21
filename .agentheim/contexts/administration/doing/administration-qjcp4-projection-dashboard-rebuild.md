@@ -1,7 +1,7 @@
 ---
 id: administration-qjcp4
 title: Projection dashboard — checkpoint/lag overview and rebuild-by-command with streamed progress
-status: todo
+status: doing
 type: feature
 context: administration
 created: 2026-07-20

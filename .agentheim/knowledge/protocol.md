@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 12:56 -- Batch started: [administration-qjcp4]
+
+**Type:** Work / Batch start
+**Tasks:** administration-qjcp4 - Projection dashboard — checkpoint/lag overview and rebuild-by-command with streamed progress
+**Parallel:** no (1 worker — user-directed single task after resuming the two interrupted tasks)
+
+---
+
 ## 2026-07-21 12:54 -- Task verified and completed: administration-v4y9g - Stream drill-in — per-stream timeline with formatted+raw views, projection state, cross-links
 
 **Type:** Work / Task completion
