@@ -28,7 +28,6 @@ research touching this BC, and concept synthesis pages.
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
 - **infrastructure-w8fnp** — Photino desktop shell prototype — Kestrel in-process, native webview, self-contained Windows/Mac packaging (spike) — `done/infrastructure-w8fnp-photino-desktop-shell-prototype.md`
-<!-- no tasks in done -->
 <!-- done-list:end -->
 
 ### Backlog

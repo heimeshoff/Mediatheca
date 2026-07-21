@@ -31,7 +31,6 @@ research touching this BC, and concept synthesis pages.
 - **intelligence-h7v2q** — Dashboard "Next episode" — cinematic hero cards (backdrop + still + progress + watched-with + Jellyfin play) (feature) — `done/intelligence-h7v2q-next-episode-cinematic-hero-cards.md`
 - **intelligence-r4m2p** — Dashboard header search must stay pinned right on every tab; Games/Books split stacks when tight (bug) — `done/intelligence-r4m2p-dashboard-search-pin-responsive-split.md`
 - **intelligence-dq8rk** — Dashboard All-tab 3a layout — underline tabs + library search, media rows, games/books split (feature) — `done/intelligence-dq8rk-dashboard-3a-layout.md`
-<!-- no tasks in done -->
 <!-- done-list:end -->
 
 ### Backlog

@@ -28,7 +28,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
-<!-- no tasks in done -->
 <!-- done-list:end -->
 
 ### Backlog
