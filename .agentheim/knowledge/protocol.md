@@ -5,6 +5,25 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 15:15 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~8m (batch started 15:07 → now)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** design-system-dib4q: 1
+**Commits:** 3 (batch-start claim, task integration, this session-end line)
+**Vision-conformance:** none — batch aligns with vision. design-system-dib4q is a mechanical DaisyUI 4→5 build-health fix on existing UI (removing the removed `input-bordered` API surface); it advances none and diverges from none of the vision's stated non-goals (Books, Trakt/Jellyfin sync, yearly reports, friend-level intelligence, trailer playback) or success criteria. No whats-next write — clean batch, nothing to surface.
+**Carry-over:** `"Mediatheca Directions.html"`: left behind (owner: user's design-reference doc — the ~912KB captured Claude design session, untracked since before this session, not project bookkeeping; same disposition as the 2026-07-06/07/20/21 sessions). No worktrees remain — the one worktree (design-system-dib4q) was torn down after integration.
+
+**Note:** Single ready task this session. One conductor-level snag worth recording: the mechanized `claim`/`complete` CLI (v0.9.2) mis-derived the bounded context for task id `design-system-dib4q`. `deriveContext`'s suffix regex uses a Crockford base32 alphabet `[0-9a-hjkmnp-tv-z]` (excludes i/l/o/u), but the slug `dib4q` contains an `i`, so the 5-char-token branch failed to match and the whole id was treated as the context — pointing at a non-existent `contexts/design-system-dib4q/` folder (`{ok:false,code:"not-found"}`, nothing moved). Worked around by passing the explicit context override the CLI already supports (`{"contexts":{"design-system-dib4q":"design-system"}}` for `claim`, `{"context":"design-system"}` for `complete`) — no code change, no data loss. The malformed slug (an `i` where the generator's alphabet forbids one) is the underlying cause; worth a `modeling` capture against agentic-workflow if id generation should be tightened, or if `deriveContext` should fall back to longest-matching-BC when the token branch misses.
+
+**Conductor notes:** (1) Client-only Fable change: the load-bearing gate was `npm run build` (the vite/Fable compile pass), not `npm test` (the .NET Expecto server suite, which doesn't touch `src/Client/`) — verifier ran the build, confirmed zero `FS0039 ... 'bordered'` errors (was 3) and exit 0. (2) Fresh worktree lacked the root `node_modules` needed by `vite build`; junctioned the main tree's copy in and unlinked it (`cmd /c rmdir`, reparse-point-only) BEFORE `git worktree remove --force` per the ADR-0037 data-loss safety note — main `node_modules` confirmed intact (177 entries) after. (3) This closes the last of the carried-forward `FS0039 input-bordered` tech debt the 2026-07-20/21 sessions had every verifier ignore.
+
+---
+
 ## 2026-07-21 15:14 -- Task verified and completed: design-system-dib4q - DaisyUI 5 input-bordered migration — remove the removed modifier from all inputs
 
 **Type:** Work / Task completion
