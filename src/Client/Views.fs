@@ -49,6 +49,8 @@ let private pageContent (model: Model) (dispatch: Msg -> unit) =
         Pages.CatalogDetail.Views.view model.CatalogDetailModel (Catalog_detail_msg >> dispatch)
     | Admin _ ->
         Pages.Admin.Views.view model.AdminModel (Admin_msg >> dispatch)
+    | Stream_detail _ ->
+        Pages.StreamDetail.Views.view model.StreamDetailModel (Stream_detail_msg >> dispatch)
     | Settings ->
         Pages.Settings.Views.view model.SettingsModel (Settings_msg >> dispatch)
     | Styleguide ->

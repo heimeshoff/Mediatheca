@@ -5,6 +5,7 @@ open Feliz.DaisyUI
 open Mediatheca.Client.Pages.EventBrowser.Types
 open Mediatheca.Client
 open Mediatheca.Client.Components
+open Mediatheca.Client.Router
 
 let private eventRow (event: Mediatheca.Shared.EventDto) (isExpanded: bool) (isNewlyArrived: bool) (dispatch: Msg -> unit) =
     Html.div [
@@ -22,8 +23,16 @@ let private eventRow (event: Mediatheca.Shared.EventDto) (isExpanded: bool) (isN
                         prop.text (string event.GlobalPosition)
                     ]
                     Html.span [
-                        prop.className "text-xs text-primary/70 font-mono truncate w-40 flex-none"
+                        // Stream drill-in (administration-v4y9g): click a stream id
+                        // to open its full history + current projection state.
+                        // stopPropagation so this doesn't also toggle the row's
+                        // own raw-JSON expansion.
+                        prop.className "text-xs text-primary/70 font-mono truncate w-40 flex-none hover:underline cursor-pointer"
+                        prop.title event.StreamId
                         prop.text event.StreamId
+                        prop.onClick (fun e ->
+                            e.stopPropagation ()
+                            Route.navigateTo (Stream_detail event.StreamId))
                     ]
                     Html.span [
                         prop.className "text-sm font-medium flex-1 truncate"

@@ -24,6 +24,7 @@ let init (api: IMediathecaApi) (adminApi: IAdminApi) () : Model * Cmd<Msg> =
     let catalogListModel, catalogListCmd = Pages.Catalogs.State.init ()
     let catalogDetailModel, catalogDetailCmd = Pages.CatalogDetail.State.init ""
     let adminModel, adminCmd = Pages.Admin.State.init AdminEvents
+    let streamDetailModel, streamDetailCmd = Pages.StreamDetail.State.init ""
     let settingsModel, settingsCmd = Pages.Settings.State.init ()
     let styleGuideModel, styleGuideCmd = Pages.StyleGuide.State.init ()
 
@@ -44,6 +45,7 @@ let init (api: IMediathecaApi) (adminApi: IAdminApi) () : Model * Cmd<Msg> =
         CatalogListModel = catalogListModel
         CatalogDetailModel = catalogDetailModel
         AdminModel = adminModel
+        StreamDetailModel = streamDetailModel
         SettingsModel = settingsModel
         StyleGuideModel = styleGuideModel
         SearchModal = None
@@ -451,6 +453,10 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
             let childModel, childCmd = Pages.Admin.State.init tab
             { model with AdminModel = childModel },
             Cmd.map Admin_msg childCmd
+        | Stream_detail streamId ->
+            let childModel, childCmd = Pages.StreamDetail.State.init streamId
+            { model with StreamDetailModel = childModel },
+            Cmd.map Stream_detail_msg childCmd
         | Settings ->
             let childModel, childCmd = Pages.Settings.State.init ()
             { model with SettingsModel = childModel },
@@ -589,6 +595,10 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
     | Admin_msg childMsg ->
         let childModel, childCmd = Pages.Admin.State.update adminApi childMsg model.AdminModel
         { model with AdminModel = childModel }, Cmd.map Admin_msg childCmd
+
+    | Stream_detail_msg childMsg ->
+        let childModel, childCmd = Pages.StreamDetail.State.update adminApi childMsg model.StreamDetailModel
+        { model with StreamDetailModel = childModel }, Cmd.map Stream_detail_msg childCmd
 
     | Settings_msg childMsg ->
         let childModel, childCmd = Pages.Settings.State.update api childMsg model.SettingsModel

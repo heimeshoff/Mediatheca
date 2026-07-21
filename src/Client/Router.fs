@@ -26,6 +26,11 @@ type Page =
     | Catalog_list
     | Catalog_detail of slug: string
     | Admin of AdminTab
+    /// Stream drill-in (administration-v4y9g): full history + current
+    /// projection state for one event stream. Sibling to the Admin tab
+    /// routes but parameterized, so it's a top-level Page case (like the
+    /// other *_detail pages) rather than an AdminTab variant.
+    | Stream_detail of streamId: string
     | Settings
     | Styleguide
     | Not_found
@@ -50,6 +55,7 @@ module Route =
         | [ "admin"; "health" ] -> Admin AdminHealth
         | [ "admin"; "jobs" ] -> Admin AdminJobs
         | [ "admin"; "surgery" ] -> Admin AdminSurgery
+        | [ "admin"; "streams"; streamId ] -> Stream_detail streamId
         // Legacy alias — old /events bookmarks still resolve to the Events tab.
         | [ "events" ] -> Admin AdminEvents
         | [ "settings" ] -> Settings
@@ -78,6 +84,7 @@ module Route =
         | Catalog_list -> Router.format "catalogs"
         | Catalog_detail slug -> Router.format ("catalogs", slug)
         | Admin tab -> Router.format ("admin", adminTabSegment tab)
+        | Stream_detail streamId -> Router.format ("admin", "streams", streamId)
         | Settings -> Router.format "settings"
         | Styleguide -> Router.format "styleguide"
         | Not_found -> Router.format "not-found"
@@ -96,13 +103,14 @@ module Route =
         | Catalog_list -> Router.navigate "catalogs"
         | Catalog_detail slug -> Router.navigate ("catalogs", slug)
         | Admin tab -> Router.navigate ("admin", adminTabSegment tab)
+        | Stream_detail streamId -> Router.navigate ("admin", "streams", streamId)
         | Settings -> Router.navigate "settings"
         | Styleguide -> Router.navigate "styleguide"
         | Not_found -> Router.navigate "not-found"
 
     let isAdminSection (page: Page) =
         match page with
-        | Admin _ -> true
+        | Admin _ | Stream_detail _ -> true
         | _ -> false
 
     let isMoviesSection (page: Page) =

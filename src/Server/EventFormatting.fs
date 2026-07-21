@@ -354,6 +354,30 @@ module EventFormatting =
             Some { Timestamp = ts; Label = "Content block ungrouped"; Details = [] }
         | _ -> None
 
+    /// Known payload reference fields that name another stream, for the
+    /// stream drill-in's cross-linking (administration-v4y9g). Field name ->
+    /// (stream_id prefix, human-readable kind). A field can appear across many
+    /// event types (friendSlug shows up in recommendation, watch-session, and
+    /// rewatch-session events alike), so this is independent of formatEvent's
+    /// per-event-type dispatch above.
+    let private crossLinkFields = [
+        "friendSlug", "Friend-", "Friend"
+        "movieSlug", "Movie-", "Movie"
+        "seriesSlug", "Series-", "Series"
+        "gameSlug", "Game-", "Game"
+    ]
+
+    /// Extracts known reference fields from an event payload as
+    /// (kind, target stream id) pairs. Silently skips fields that are absent,
+    /// null, or not a string. Doesn't verify the target stream actually
+    /// exists — see StreamCrossLink's doc comment for why a dangling
+    /// reference is still safe to link.
+    let crossLinksFromPayload (data: string) : (string * string) list =
+        crossLinkFields
+        |> List.choose (fun (field, prefix, kind) ->
+            tryField field data
+            |> Option.map (fun value -> kind, prefix + value))
+
     /// Determine which formatter to use based on stream ID prefix
     let formatEvent (storedEvent: EventStore.StoredEvent) : EventHistoryEntry option =
         let streamId = storedEvent.StreamId

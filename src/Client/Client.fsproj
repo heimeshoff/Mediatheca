@@ -62,6 +62,9 @@
     <Compile Include="Pages\EventBrowser\Types.fs" />
     <Compile Include="Pages\EventBrowser\State.fs" />
     <Compile Include="Pages\EventBrowser\Views.fs" />
+    <Compile Include="Pages\StreamDetail\Types.fs" />
+    <Compile Include="Pages\StreamDetail\State.fs" />
+    <Compile Include="Pages\StreamDetail\Views.fs" />
     <Compile Include="Pages\AdminHealth\Types.fs" />
     <Compile Include="Pages\AdminHealth\State.fs" />
     <Compile Include="Pages\AdminHealth\Views.fs" />

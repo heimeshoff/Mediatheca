@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 12:54 -- Task verified and completed: administration-v4y9g - Stream drill-in — per-stream timeline with formatted+raw views, projection state, cross-links
+
+**Type:** Work / Task completion
+**Task:** administration-v4y9g - Stream drill-in — per-stream timeline with formatted+raw views, projection state, cross-links
+**Summary:** Stream drill-in — per-stream timeline (/admin/streams/<id>) with formatted+raw-JSON toggle, projection-state panel by stream prefix, and payload cross-links, reusing EventFormatting
+**Duration:** resumed — conflict-resolve+verify ~15m (original worker ran in prior interrupted session)
+**Verification:** PASS (iteration 1)
+**Files changed:** 15
+**Tests added:** 4
+**ADRs written:** 0022
+
+---
+
 ## 2026-07-21 12:38 -- Task verified and completed: infrastructure-w8fnp - Photino desktop shell prototype — Kestrel in-process, native webview, self-contained Windows/Mac packaging
 
 **Type:** Work / Task completion

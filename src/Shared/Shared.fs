@@ -492,6 +492,61 @@ type EventPage = {
     TotalMatches: int
 }
 
+// Stream drill-in (administration-v4y9g): full history of one aggregate's
+// stream plus what the projection currently says about it — see ADR-0002
+// (event sourcing + CQRS) for why this juxtaposition matters. Deliberately
+// separate from EventHistoryEntry/getStreamEvents (IMediathecaApi), which
+// backs the per-media detail page's history modal and is out of scope here.
+
+/// One reference to another stream, extracted from a known payload field
+/// (friendSlug, movieSlug, seriesSlug, gameSlug) while formatting a stream's
+/// timeline. The target may not correspond to an existing stream (e.g. the
+/// referenced friend was later removed) — navigating there is not an error,
+/// it just shows an empty timeline, so a dangling cross-link is safe to render.
+type StreamCrossLink = {
+    /// Human-readable kind of the reference, e.g. "Friend", "Movie".
+    Kind: string
+    TargetStreamId: string
+}
+
+/// One event in a stream drill-in timeline. Carries both the formatted view
+/// (via EventFormatting.formatEvent, when a formatter recognizes this event
+/// type) and the raw data/metadata/positions for the per-event raw-JSON
+/// toggle. FormattedLabel = None marks an event type no formatter knows yet —
+/// rendered as raw JSON with an "unformatted" marker (feeds the future drift
+/// report, administration-btvqa) rather than disappearing.
+type StreamTimelineEntry = {
+    GlobalPosition: int64
+    StreamPosition: int64
+    EventType: string
+    Timestamp: string
+    Data: string
+    Metadata: string
+    FormattedLabel: string option
+    FormattedDetails: string list
+    CrossLinks: StreamCrossLink list
+}
+
+/// Current read-model state for a stream, when its prefix maps to a known
+/// per-BC projection (Movie/Series/Game/Friend/Catalog). Fields are loose
+/// label/value pairs rather than a typed DTO because projection schemas vary
+/// per BC and this panel exists to answer "what does the projection say right
+/// now", not to duplicate each BC's typed detail contract.
+type ProjectionStateRow = {
+    Kind: string
+    Fields: (string * string) list
+    /// (route segment, slug) for a link to the media detail page, e.g. ("movies", slug).
+    DetailLink: (string * string) option
+}
+
+/// Full stream drill-in payload: one stream's entire event history plus its
+/// current projected state.
+type StreamDetailDto = {
+    StreamId: string
+    Entries: StreamTimelineEntry list
+    ProjectionRows: ProjectionStateRow list
+}
+
 /// Live-tail query for the event explorer's Follow mode (administration-mtf1f):
 /// "everything after global position `After`, matching `Filter`" — the
 /// ascending direction ADR-0020 deliberately left off `EventPageQuery`.
@@ -1365,6 +1420,8 @@ type IAdminApi = {
     getEventStreams: unit -> Async<string list>
     getEventTypes: unit -> Async<string list>
     getBoundedContexts: unit -> Async<string list>
+    // Stream drill-in (administration-v4y9g)
+    getStreamDetail: string -> Async<StreamDetailDto>
     /// Live-tail poll for Follow mode (administration-mtf1f) — see EventTailQuery.
     getEventsAfter: EventTailQuery -> Async<EventDto list>
     // Health

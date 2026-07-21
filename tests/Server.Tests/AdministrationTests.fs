@@ -10,6 +10,18 @@ let private createInMemoryConnection () =
     let conn = new SqliteConnection("Data Source=:memory:")
     conn.Open()
     EventStore.initialize conn
+    // Stream drill-in's projection panel (administration-v4y9g) dispatches to
+    // each BC's projection getBySlug, which — like the running server, which
+    // always has every projection initialized — expects these tables to
+    // exist for any Movie-/Series-/Game-/Friend-/Catalog- stream.
+    CastStore.initialize conn
+    JellyfinStore.initialize conn
+    ContentBlockProjection.handler.Init conn
+    FriendProjection.handler.Init conn
+    MovieProjection.handler.Init conn
+    SeriesProjection.handler.Init conn
+    GameProjection.handler.Init conn
+    CatalogProjection.handler.Init conn
     conn
 
 let private makeEvent eventType data : EventStore.EventData = {
@@ -115,6 +127,70 @@ let administrationTests =
 
             Expect.contains types "MovieAdded" "Should include MovieAdded"
             Expect.contains types "MovieRated" "Should include MovieRated"
+
+        testCase "getStreamDetail returns the stream's events in order with formatted labels and cross-links" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let streamId = Movies.streamId "the-matrix-1999"
+            let addedData: Movies.MovieAddedData = {
+                Name = "The Matrix"; Year = 1999; Runtime = None; Overview = ""
+                Genres = []; PosterRef = None; BackdropRef = None; TmdbId = 603; TmdbRating = None
+            }
+            let addedEvent = Movies.Serialization.toEventData (Movies.Movie_added_to_library addedData)
+            let recommendedEvent = Movies.Serialization.toEventData (Movies.Movie_recommended_by "alice")
+            EventStore.appendToStream conn streamId -1L [ addedEvent ] |> ignore
+            EventStore.appendToStream conn streamId 0L [ recommendedEvent ] |> ignore
+            let api = createApi conn
+
+            let detail = api.getStreamDetail streamId |> Async.RunSynchronously
+
+            Expect.equal detail.StreamId streamId "Stream id should match"
+            Expect.equal (List.length detail.Entries) 2 "Should return both events"
+            Expect.equal detail.Entries.[0].EventType "Movie_added_to_library" "First event should be the earliest by stream position"
+            Expect.equal detail.Entries.[0].FormattedLabel (Some "Added to library") "First event should be formatted"
+            Expect.equal detail.Entries.[1].EventType "Movie_recommended_by" "Second event should be the recommendation"
+            Expect.equal detail.Entries.[1].FormattedLabel (Some "Recommendation added") "Second event should be formatted"
+            Expect.equal detail.Entries.[1].CrossLinks [ { Kind = "Friend"; TargetStreamId = "Friend-alice" } ] "Recommendation event should cross-link to the friend's stream"
+
+        testCase "getStreamDetail marks events with no known formatter as unformatted raw JSON" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let streamId = Movies.streamId "the-matrix-1999"
+            EventStore.appendToStream conn streamId -1L [ makeEvent "Some_unknown_event" """{"foo":"bar"}""" ] |> ignore
+            let api = createApi conn
+
+            let detail = api.getStreamDetail streamId |> Async.RunSynchronously
+
+            Expect.equal (List.length detail.Entries) 1 "Should return the one event"
+            Expect.isNone detail.Entries.[0].FormattedLabel "Unknown event type should have no formatted label"
+            Expect.equal detail.Entries.[0].Data """{"foo":"bar"}""" "Raw data should still be available"
+
+        testCase "getStreamDetail dispatches the projection panel by stream prefix" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let streamId = Movies.streamId "the-matrix-1999"
+            let addedData: Movies.MovieAddedData = {
+                Name = "The Matrix"; Year = 1999; Runtime = None; Overview = ""
+                Genres = [ "Action" ]; PosterRef = None; BackdropRef = None; TmdbId = 603; TmdbRating = Some 8.7
+            }
+            EventStore.appendToStream conn streamId -1L [ Movies.Serialization.toEventData (Movies.Movie_added_to_library addedData) ] |> ignore
+            Projection.runProjection conn MovieProjection.handler
+            let api = createApi conn
+
+            let detail = api.getStreamDetail streamId |> Async.RunSynchronously
+
+            Expect.equal (List.length detail.ProjectionRows) 1 "Should have one projection row for the Movie stream"
+            let row = detail.ProjectionRows.[0]
+            Expect.equal row.Kind "Movie" "Projection row kind should be Movie"
+            Expect.contains row.Fields ("Name", "The Matrix") "Fields should include the movie name"
+            Expect.equal row.DetailLink (Some ("movies", "the-matrix-1999")) "Should link to the movie detail page"
+
+        testCase "getStreamDetail returns no projection row for a stream prefix with no projection dispatch" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let streamId = "ContentBlocks-the-matrix-1999"
+            EventStore.appendToStream conn streamId -1L [ makeEvent "Content_block_added" """{"blockType":"text"}""" ] |> ignore
+            let api = createApi conn
+
+            let detail = api.getStreamDetail streamId |> Async.RunSynchronously
+
+            Expect.isEmpty detail.ProjectionRows "ContentBlocks streams have no projection panel dispatch"
 
         testCase "getHealthStats total event count matches a direct SQL count" <| fun _ ->
             let conn = createInMemoryConnection ()

@@ -39,6 +39,95 @@ module Administration =
           Data = e.Data
           Timestamp = e.Timestamp.ToString("o") }
 
+    let private optToString (v: 'a option) : string =
+        v |> Option.map string |> Option.defaultValue "-"
+
+    /// Stream drill-in's "current state" panel (administration-v4y9g): dispatch
+    /// on stream_id prefix to the matching per-BC projection's getBySlug, and
+    /// flatten its typed detail DTO into loose display fields. Only the five
+    /// BCs the task calls out (Movie/Series/Game/Friend/Catalog) get a row —
+    /// other stream kinds (e.g. ContentBlocks-) simply have no projection panel.
+    let private projectionRowFor (conn: SqliteConnection) (streamId: string) : Mediatheca.Shared.ProjectionStateRow option =
+        if streamId.StartsWith("Movie-") then
+            let slug = streamId.Substring("Movie-".Length)
+            MovieProjection.getBySlug conn slug
+            |> Option.map (fun m ->
+                { Mediatheca.Shared.ProjectionStateRow.Kind = "Movie"
+                  Fields = [
+                      "Name", m.Name
+                      "Year", string m.Year
+                      "Genres", String.concat ", " m.Genres
+                      "Personal rating", optToString m.PersonalRating
+                      "TMDB rating", optToString m.TmdbRating
+                      "In focus", string m.InFocus
+                  ]
+                  DetailLink = Some ("movies", slug) })
+        elif streamId.StartsWith("Series-") then
+            let slug = streamId.Substring("Series-".Length)
+            SeriesProjection.getBySlug conn slug None
+            |> Option.map (fun s ->
+                { Mediatheca.Shared.ProjectionStateRow.Kind = "Series"
+                  Fields = [
+                      "Name", s.Name
+                      "Year", string s.Year
+                      "Status", string s.Status
+                      "Personal rating", optToString s.PersonalRating
+                      "Abandoned", string s.IsAbandoned
+                      "In focus", string s.InFocus
+                  ]
+                  DetailLink = Some ("series", slug) })
+        elif streamId.StartsWith("Game-") then
+            let slug = streamId.Substring("Game-".Length)
+            GameProjection.getBySlug conn slug
+            |> Option.map (fun g ->
+                { Mediatheca.Shared.ProjectionStateRow.Kind = "Game"
+                  Fields = [
+                      "Name", g.Name
+                      "Year", string g.Year
+                      "Status", string g.Status
+                      "Personal rating", optToString g.PersonalRating
+                      "Total play time (min)", string g.TotalPlayTimeMinutes
+                  ]
+                  DetailLink = Some ("games", slug) })
+        elif streamId.StartsWith("Friend-") then
+            let slug = streamId.Substring("Friend-".Length)
+            FriendProjection.getBySlug conn slug
+            |> Option.map (fun f ->
+                { Mediatheca.Shared.ProjectionStateRow.Kind = "Friend"
+                  Fields = [
+                      "Name", f.Name
+                      "Has image", string f.ImageRef.IsSome
+                  ]
+                  DetailLink = Some ("friends", slug) })
+        elif streamId.StartsWith("Catalog-") then
+            let slug = streamId.Substring("Catalog-".Length)
+            CatalogProjection.getBySlug conn slug
+            |> Option.map (fun c ->
+                { Mediatheca.Shared.ProjectionStateRow.Kind = "Catalog"
+                  Fields = [
+                      "Name", c.Name
+                      "Description", c.Description
+                      "Sorted", string c.IsSorted
+                      "Entry count", string (List.length c.Entries)
+                  ]
+                  DetailLink = Some ("catalogs", slug) })
+        else
+            None
+
+    let private toTimelineEntry (e: EventStore.StoredEvent) : Mediatheca.Shared.StreamTimelineEntry =
+        let formatted = EventFormatting.formatEvent e
+        { GlobalPosition = e.GlobalPosition
+          StreamPosition = e.StreamPosition
+          EventType = e.EventType
+          Timestamp = e.Timestamp.ToString("o")
+          Data = e.Data
+          Metadata = e.Metadata
+          FormattedLabel = formatted |> Option.map (fun f -> f.Label)
+          FormattedDetails = formatted |> Option.map (fun f -> f.Details) |> Option.defaultValue []
+          CrossLinks =
+            EventFormatting.crossLinksFromPayload e.Data
+            |> List.map (fun (kind, target) -> { Mediatheca.Shared.StreamCrossLink.Kind = kind; TargetStreamId = target }) }
+
     /// File size in bytes, or 0 if the file doesn't exist (e.g. no WAL
     /// sidecar currently checkpointed out, or an in-memory test database
     /// with no backing file at all).
@@ -167,6 +256,19 @@ module Administration =
 
             getBoundedContexts = fun () -> async {
                 return boundedContextPrefixes |> List.map fst
+            }
+
+            getStreamDetail = fun streamId -> async {
+                let entries =
+                    EventStore.readStream conn streamId
+                    |> List.map toTimelineEntry
+                let projectionRows =
+                    projectionRowFor conn streamId |> Option.toList
+                return {
+                    Mediatheca.Shared.StreamDetailDto.StreamId = streamId
+                    Entries = entries
+                    ProjectionRows = projectionRows
+                }
             }
 
             getHealthStats = fun () -> async {

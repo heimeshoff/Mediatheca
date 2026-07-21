@@ -21,6 +21,7 @@ type Model = {
     CatalogListModel: Pages.Catalogs.Types.Model
     CatalogDetailModel: Pages.CatalogDetail.Types.Model
     AdminModel: Pages.Admin.Types.Model
+    StreamDetailModel: Pages.StreamDetail.Types.Model
     SettingsModel: Pages.Settings.Types.Model
     StyleGuideModel: Pages.StyleGuide.Types.Model
     SearchModal: SearchModal.Model option
@@ -47,6 +48,7 @@ type Msg =
     | Catalog_list_msg of Pages.Catalogs.Types.Msg
     | Catalog_detail_msg of Pages.CatalogDetail.Types.Msg
     | Admin_msg of Pages.Admin.Types.Msg
+    | Stream_detail_msg of Pages.StreamDetail.Types.Msg
     | Settings_msg of Pages.Settings.Types.Msg
     | Styleguide_msg of Pages.StyleGuide.Types.Msg
     // Jellyfin Auto-Sync
