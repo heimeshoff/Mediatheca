@@ -5,6 +5,28 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 13:20 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~50m (recovery of the two interrupted worktrees ~12:30 → qjcp4 integrated 13:18)
+**Completed:** 3 (first-try PASS: 1 — qjcp4; re-verified after merge reconciliation: 2 — w8fnp iter 2, v4y9g iter 1; skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** infrastructure-w8fnp: 1 (conflict-resolution worker), administration-v4y9g: 1 (conflict-resolution worker), administration-qjcp4: 1 (fresh implementation)
+**Commits:** 5 (w8fnp integration, v4y9g integration, qjcp4 batch-start claim, qjcp4 integration, this session-end line)
+**Vision-conformance:** none — no divergence from any stated non-goal. w8fnp is deployment infrastructure; v4y9g and qjcp4 continue the administration console suite — the same *unlisted-but-not-forbidden* operator/observability work the 2026-07-20 session already surfaced as advisory (the vision's v1 list — In Focus, Unified Dashboard, Steam Import, HLTB — names none of it, and none of it is Out-of-Scope either). qjcp4 also retired a real startup hack (the unconditional Series/Game rebuild). No new whats-next write — the standing advisory already captures this; a duplicate would only clobber it.
+**Carry-over:** `"Mediatheca Directions.html"`: left behind (owner: user's design-reference doc — the ~912KB captured Claude design session, untracked since before this session, not project bookkeeping; same disposition as the 2026-07-06/07/20 sessions). No worktrees remain — all three (w8fnp, v4y9g, qjcp4) were torn down after integration.
+
+**Note:** This session resumed the two tasks the 2026-07-20 session verified-PASS but parked on unresolvable-by-conductor merge conflicts, then executed the one task that had been held behind them. Both parked worktrees were 9 commits stale; the "structural lesson" from 2026-07-20 (long tasks branch from a base that moves underneath them) played out exactly as predicted. Resolution followed the merge-back doctrine each time: conductor merged current `main` INTO the parked branch (bringing the intervening work into scope), a worker authored the semantic reconciliation, then a fresh verifier re-audited before the squash-merge to `main`.
+- **infrastructure-w8fnp** (Photino desktop-shell spike, ADR-0018): conflict was the `Program.fs`→`Composition.fs` extraction colliding with p0jka's admin Remoting wiring. Worker folded `adminApi`/`adminRemotingHandler` into `Composition.buildApp` and fixed the `Administration.fs`-before-`Composition.fs` compile order. Re-verified PASS (iter 2), 321/321.
+- **administration-v4y9g** (stream drill-in, ADR-0022): 5-file conflict — both sides added disjoint members to `IAdminApi`/`Administration.fs`/`Shared.fs`/tests/`Client.fsproj`/README. Worker unioned stream-drill-in (getStreamDetail + DTOs + StreamDetail page) with the Health-tab + live-tail members already on main; kept main's 3-arg `Administration.create`. Verified PASS (iter 1), 325/325.
+- **administration-qjcp4** (projection dashboard, ADR-0024): the task file's `Program.fs:160-161` references were stale post-w8fnp — the startup rebuild hack had moved to `Composition.fs:168-170`; worker was told this at dispatch and retired it there. Added `/admin/projections` (checkpoint/lag/updated-at/row-counts for all six handlers), a concurrency-guarded `/api/stream/rebuild-projection/{name}` SSE route reusing the steam-family streaming pattern, and `getProjectionStats` on `IAdminApi`. Verified PASS (iter 1), 331/331; `npm run build` clean. ADR-0024 pre-assigned at dispatch (no collision).
+
+**Conductor notes:** (1) Pre-assigned qjcp4's ADR number (0024) at dispatch per the 2026-07-20 lesson — zero collisions. (2) Both parked worktrees lacked `node_modules`; created a Windows junction to the main tree's copy so verifiers could run `npm test`/`npm run build`, and unlinked each junction (`cmd /c rmdir`, reparse-point-only) BEFORE `git worktree remove --force` per the ADR-0037 data-loss safety note. (3) Pre-existing tech debt carried forward untouched: 3 `FS0039 input-bordered` errors in `EventBrowser/Views.fs` (DaisyUI 5 removed `input-bordered`), non-fatal (build exits 0), confirmed present on plain main — every verifier was told to ignore these specific lines. Worth a `modeling` capture. (4) Full Expecto suite on `main` now **331** (was 315 at the 2026-07-20 session end: +6 w8fnp DataDir/desktop, +4 v4y9g stream-detail, +6 qjcp4 rebuild-equivalence, net of overlap). ADRs 0018, 0022, 0024 now on main.
+
+---
+
 ## 2026-07-21 13:18 -- Task verified and completed: administration-qjcp4 - Projection dashboard — checkpoint/lag overview and rebuild-by-command with streamed progress
 
 **Type:** Work / Task completion
