@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 16:02 -- Modeling / Promoted: administration-yamm5 - Job runs console — history, outcomes, and run-now for scheduled jobs
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-21 15:56 -- Modeling / Refined: administration-yamm5 - Job runs console — history, outcomes, and run-now for scheduled jobs
 
 **Type:** Modeling / Refine

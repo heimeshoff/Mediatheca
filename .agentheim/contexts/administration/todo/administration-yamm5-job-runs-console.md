@@ -1,7 +1,7 @@
 ---
 id: administration-yamm5
 title: Job runs console — history, outcomes, and run-now for scheduled jobs
-status: backlog
+status: todo
 type: feature
 context: administration
 created: 2026-07-20
