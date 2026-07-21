@@ -12,14 +12,20 @@ A task belongs here if it passes the routing test: *"if any one BC didn't exist,
 
 ## Ubiquitous language
 
-- **Deployment target** — a way the app ships to a user: Docker container (Linux, current), Windows desktop app, macOS desktop app. One codebase, multiple targets.
-- **Desktop shell** — a native window (webview) hosting the existing web app with the server running in-process; not a rewrite of the client. Candidate technology: Photino.NET.
-- **Self-contained publish** — `dotnet publish -r <rid> --self-contained`: runtime bundled, no .NET install required on the target machine. The packaging mode for desktop targets. Native AOT is explicitly *not* used (Fable.Remoting and Giraffe rely on reflection).
-- **Data dir** — where `mediatheca.db` and the `images/` cache live. `DATA_DIR` env var if set, else a per-platform default (see `src/Server/Program.fs`). Desktop targets need platform-appropriate defaults (e.g. `~/Library/Application Support/Mediatheca` on macOS).
-- **Loopback binding** — desktop targets must bind Kestrel to `127.0.0.1` on an ephemeral/free port, never `0.0.0.0`: the app has no authentication (ADR-0007), so the server must not be reachable from the network when running as a desktop app.
+- **Deployment target** — a way the app ships to a user: Docker container (Linux, current, `src/Server/Program.fs`), Windows desktop app, macOS desktop app (both `src/Desktop/`, prototyped in infrastructure-w8fnp / ADR-0018). One codebase, multiple targets.
+- **Composition root** — `src/Server/Composition.fs`, specifically `Composition.buildApp (args: string[]) (urls: string option) : WebApplication`. The one place the server (DB init, projections, scheduled jobs, Fable.Remoting API) gets wired up. Every deployment target calls it instead of duplicating setup: `src/Server/Program.fs` (Docker/CLI, `urls = None`, host default binding) and `src/Desktop/Program.fs` (desktop shell, `urls = Some "http://127.0.0.1:<port>"`).
+- **Desktop shell** — a native window (webview) hosting the existing web app with the server running in-process; not a rewrite of the client. Implemented with **Photino.NET** (`src/Desktop/`) as of infrastructure-w8fnp — chosen over a plain browser launcher (too thin) and a Tauri sidecar (extra Rust toolchain, IPC boundary); Tauri remains the documented fallback if Photino's installer/auto-update story proves insufficient.
+- **Self-contained publish** — `dotnet publish -r <rid> --self-contained`: runtime bundled, no .NET install required on the target machine. The packaging mode for desktop targets (`scripts/publish-desktop-win.ps1`, `scripts/publish-desktop-mac.sh`). Native AOT is explicitly *not* used (Fable.Remoting and Giraffe rely on reflection, ADR-0004) — `Desktop.fsproj` sets `<PublishAot>false</PublishAot>` explicitly. `--self-contained` must be passed on the command line, not hardcoded as `<SelfContained>` in `Desktop.fsproj` — MSBuild's NETSDK1150 executable-reference validation only trusts it as a genuine global property (see ADR-0018 for the mechanics; this is brittle but necessary).
+- **Data dir** — where `mediatheca.db` and the `images/` cache live. `DATA_DIR` env var if set, else a per-platform default, now resolved by the pure, unit-tested `src/Server/DataDir.fs` (`DataDir.resolveDefault()`, called from `Composition.buildApp`): Windows/Linux keep `~/app/mediatheca`; macOS gets `~/Library/Application Support/Mediatheca`.
+- **Loopback binding** — desktop targets must bind Kestrel to `127.0.0.1` on an ephemeral/free port, never `0.0.0.0`: the app has no authentication (ADR-0007), so the server must not be reachable from the network when running as a desktop app. `src/Desktop/Program.fs` finds a free port itself (bind a `TcpListener` to `127.0.0.1:0`, read back the assigned port, release it) before starting the composition root.
 
 ## Invariants
 
-- One codebase serves every deployment target — no per-target forks of domain or client code.
+- One codebase serves every deployment target — no per-target forks of domain or client code. Enforced structurally: both `Program.fs` entry points call the same `Composition.buildApp`.
 - Desktop targets never expose the unauthenticated server beyond loopback.
-- Docker deployment (the current production target) keeps working unchanged as desktop targets are added.
+- Docker deployment (the current production target) keeps working unchanged as desktop targets are added — its exact publish command (`dotnet publish src/Server/Server.fsproj -c Release -o ...`, no `-r`, no `--self-contained`) must keep producing a framework-dependent build; verify this directly (not just "the code still compiles") whenever `Server.fsproj` is touched for desktop-shell reasons.
+
+## Status
+
+- **Windows desktop shell:** prototyped and smoke-tested on a real dev machine (infrastructure-w8fnp) — server starts, binds loopback-only, serves the full SPA + Fable.Remoting API, self-contained publish runs without a .NET install. Not yet productionized: no installer, code signing, auto-update, tray icon, or single-instance guard. See ADR-0018.
+- **macOS desktop shell:** publish-verified only (cross-compiled `osx-arm64` self-contained publish succeeds and produces the expected native bundle). Never run on an actual Mac — runtime behavior is unverified.

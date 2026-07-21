@@ -2,9 +2,20 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
+    <!-- Docker publishes this project directly (no -r, no SelfContained) and
+         must keep working framework-dependent, unchanged. The Desktop shell
+         (src/Desktop/Desktop.fsproj) project-references this project and
+         publishes self-contained for a RID — MSBuild's NETSDK1150 check
+         requires a self-contained exe's project references to also resolve
+         as self-contained once a RuntimeIdentifier is flowing through, so
+         this only turns on when one is present (i.e. never for the plain
+         Docker publish). -->
+    <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
+    <RuntimeIdentifiers>win-x64;osx-arm64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="DataDir.fs" />
     <Compile Include="EventStore.fs" />
     <Compile Include="Projection.fs" />
     <Compile Include="Movies.fs" />
@@ -38,6 +49,7 @@
     <Compile Include="EventFormatting.fs" />
     <Compile Include="Api.fs" />
     <Compile Include="Administration.fs" />
+    <Compile Include="Composition.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

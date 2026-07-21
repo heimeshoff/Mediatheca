@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <!-- Photino/WebView2 is a Windows-only prototype target for now; osx-arm64
+         publish is documented/scripted separately (see BC README / ADR) since
+         there's no Mac in the dev loop to smoke-test against. -->
+    <RuntimeIdentifiers>win-x64;osx-arm64</RuntimeIdentifiers>
+    <!-- SelfContained is intentionally NOT hardcoded here: pass the
+         self-contained flag (or SelfContained=true) explicitly at build or
+         publish time on the command line. MSBuild's NETSDK1150
+         executable-reference validation only trusts SelfContained when it
+         arrives as a genuine command-line global property (that is what
+         flows down to the Server.fsproj reference); a value merely set in
+         this .fsproj isn't visible to that check and the build fails. See
+         the BC README for the full story. -->
+    <!-- Explicitly NOT PublishAot — Fable.Remoting/Giraffe are reflection-heavy
+         (ADR-0004); Native AOT trimming would break the API surface. -->
+    <PublishAot>false</PublishAot>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Explicitly flow RuntimeIdentifier/SelfContained down to Server.fsproj
+         for this reference: it's the composition root's project too
+         (Composition.fs), and NETSDK1150 requires a self-contained exe's
+         referenced exe projects to resolve as self-contained as well. This
+         only affects builds *through* this reference — the Docker publish
+         path (`dotnet publish src/Server/Server.fsproj`, no -r) never sets
+         these and is unaffected. -->
+    <ProjectReference Include="..\Server\Server.fsproj">
+      <AdditionalProperties>RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained)</AdditionalProperties>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Photino.NET" Version="4.0.16" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Built client assets, served the same way Program.fs serves them
+         (deploy/public relative to the working directory). Copied into the
+         publish output so a self-contained publish is a complete app. -->
+    <Content Include="..\..\deploy\public\**\*" Condition="Exists('..\..\deploy\public')">
+      <Link>deploy\public\%(RecursiveDir)%(FileName)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

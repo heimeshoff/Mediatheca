@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 12:38 -- Task verified and completed: infrastructure-w8fnp - Photino desktop shell prototype — Kestrel in-process, native webview, self-contained Windows/Mac packaging
+
+**Type:** Work / Task completion
+**Task:** infrastructure-w8fnp - Photino desktop shell prototype — Kestrel in-process, native webview, self-contained Windows/Mac packaging
+**Summary:** Photino desktop-shell spike — extract server composition into Composition.fs (shared by Docker + Desktop), in-process loopback Kestrel + native webview, self-contained Win/Mac publish scripts, macOS data-dir default
+**Duration:** resumed — reverify+conflict-resolve ~6m (original worker ran in prior interrupted session)
+**Verification:** PASS (iteration 2)
+**Files changed:** 14
+**Tests added:** 6
+**ADRs written:** 0018
+
+---
+
 ## 2026-07-20 18:40 -- Work session ended
 
 **Type:** Work / Session end

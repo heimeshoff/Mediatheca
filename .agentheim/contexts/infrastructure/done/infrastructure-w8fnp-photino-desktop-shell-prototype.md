@@ -1,15 +1,15 @@
 ---
 id: infrastructure-w8fnp
 title: Photino desktop shell prototype — Kestrel in-process, native webview, self-contained Windows/Mac packaging
-status: doing
+status: done
 type: spike
 context: infrastructure
 created: 2026-07-20
-completed:
+completed: 2026-07-20
 depends_on: []
 blocks: []
 tags: [deployment, desktop, photino, packaging, hosting]
-related_adrs: [0001, 0004, 0007]
+related_adrs: [0001, 0004, 0007, 0018]
 related_research: []
 prior_art: []
 ---
@@ -46,3 +46,44 @@ Prototype a Photino.NET desktop shell as a separate project in the repo (e.g. `s
 - Open question for the spike: how the client assets are located at runtime when published (relative to the exe vs. embedded resources).
 - Tauri-with-sidecar remains the fallback if Photino disappoints (installer/auto-update polish), at the cost of a thin Rust shell.
 - Not a frontend task in the design-system sense — no UI code beyond hosting the existing SPA, so no styleguide dependency.
+
+## Outcome
+
+Built and smoke-tested. Full findings and decisions in ADR-0018
+(`.agentheim/knowledge/decisions/0018-photino-desktop-shell.md`); summary here:
+
+- `src/Server/Composition.fs` (new) — the extracted composition root,
+  `buildApp (args: string[]) (urls: string option) : WebApplication`. Everything
+  `Program.fs` used to do inline (DB init, projections, scheduled jobs, Fable.Remoting
+  API) now lives here, called by both entry points. `src/Server/Program.fs` is now a
+  4-line wrapper (`Composition.buildApp args None |> fun app -> app.Run(); 0`).
+- `src/Server/DataDir.fs` (new) — pure, unit-tested data-dir resolution
+  (`DataDirTests.fs`, 6 tests): `DATA_DIR` env var wins everywhere; macOS defaults to
+  `~/Library/Application Support/Mediatheca`; Windows/Linux keep `~/app/mediatheca`.
+- `src/Desktop/` (new project) — `Desktop.fsproj` + `Program.fs`. Finds a free loopback
+  port, calls `Composition.buildApp` with `http://127.0.0.1:<port>`, starts it, opens a
+  `PhotinoWindow` loaded at that URL, blocks on `WaitForClose()`, stops the server.
+- Windows: self-contained `win-x64` publish (`dotnet publish -r win-x64
+  --self-contained`) smoke-tested directly on the dev machine — process starts, binds
+  `127.0.0.1` only (verified with `netstat`), serves `/health` and the full SPA bundle
+  (verified with `curl`), stays alive with no errors. Visual rendering of the webview
+  itself could not be confirmed from this environment (screen capture shows a black
+  window area — a known WebView2-over-remote-desktop GPU-compositing quirk, not
+  evidence of failure, since the HTTP layer underneath served correctly throughout) —
+  flagged as a follow-up manual check in the ADR.
+- macOS: `dotnet publish -r osx-arm64 --self-contained` build-verified (cross-published
+  from Windows, produces the expected `Photino.Native.dylib` / `libe_sqlite3.dylib`
+  bundle). Never run on an actual Mac — runtime-unverified, called out explicitly.
+- Docker path re-verified unaffected: the exact Dockerfile publish command
+  (`dotnet publish src/Server/Server.fsproj -c Release -o ...`, no `-r`, no
+  `--self-contained`) still produces a framework-dependent build after all changes.
+- `npm run build` and the full server test suite (294 tests, 288 pre-existing + 6 new
+  `DataDirTests`) both green.
+- Non-obvious MSBuild fix documented in ADR-0018: referencing the executable
+  `Server.fsproj` from the self-contained executable `Desktop.fsproj` trips
+  `NETSDK1150`; fixed via conditional `SelfContained` + `RuntimeIdentifiers` on
+  `Server.fsproj` and explicit `AdditionalProperties` on the `ProjectReference`, with
+  `--self-contained` required as a genuine command-line flag on `Desktop.fsproj` builds
+  (not hardcoded in the `.fsproj`).
+- Productionizing gap (not in scope for this spike): no installer, code signing,
+  auto-update, tray icon, or single-instance guard.

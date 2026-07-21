@@ -35,6 +35,7 @@ For BC-scoped artifacts, see each BC's `INDEX.md`.
 - **0006** -- TailwindCSS 4 + DaisyUI 5 with mandatory glassmorphism for overlays *(overlay-material rule superseded by design-system ADR-0016 — paper overlay; Tailwind/DaisyUI/dim-theme decisions still stand)* -- 2026-05-12 -- `knowledge/decisions/0006-tailwind-daisyui-glassmorphism.md`
 - **0007** -- Single-user app, no authentication -- 2026-05-12 -- `knowledge/decisions/0007-single-user-no-auth.md`
 - **0008** -- Ten bounded contexts for Mediatheca -- 2026-05-12 -- `knowledge/decisions/0008-bounded-contexts-mediatheca.md`
+- **0018** -- Photino.NET desktop shell — in-process Kestrel, loopback-only, self-contained publish -- 2026-07-20 -- `knowledge/decisions/0018-photino-desktop-shell.md`
 <!-- adr-global:end -->
 
 ## Cross-BC research

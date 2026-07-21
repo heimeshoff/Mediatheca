@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <Compile Include="SlugTests.fs" />
+    <Compile Include="DataDirTests.fs" />
     <Compile Include="MoviesTests.fs" />
     <Compile Include="FriendsTests.fs" />
     <Compile Include="ContentBlocksTests.fs" />
