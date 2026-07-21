@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 21:15 -- Batch started: [administration-h4br2]
+
+**Type:** Work / Batch start
+**Tasks:** administration-h4br2 - Browser smoke-test the Events tab Follow toggle end-to-end
+**Parallel:** no (conductor-run — chrome-devtools browser smoke-test driven by the work session directly, not a dispatched worker, since the worker subagent type has no chrome-devtools MCP access)
+
+---
+
 ## 2026-07-21 21:14 -- Task verified and completed: administration-yamm5 - Job runs console — history, outcomes, and run-now for scheduled jobs
 
 **Type:** Work / Task completion
