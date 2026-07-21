@@ -101,6 +101,12 @@ The curated overview. Answers "what's next?" at a glance.
 - Display comparison on game detail page (your play time vs average)
 - Show on Games dashboard tab
 
+### Operability & Observability — Admin Console (recognized 2026-07-21)
+The event-sourced store (ADR-0002) is only as trustworthy as it is inspectable. The `/admin` console gives the single user, **in an operator role**, the tools to see into and maintain the substrate the rest of the app is built on. This workstream was previously unlisted — the work skill's vision-conformance pass surfaced that a whole arc of admin-console work served no named roadmap item; it is absorbed here as recognized v1 work at the builder's direction.
+- **Shipped:** tabbed `/admin` shell + its own `IAdminApi` contract (ADR-0017); event explorer with FTS5 payload search, composable filters, and keyset pagination (ADR-0020), plus a live-tail Follow mode (ADR-0023); Health tab — event volume, per-BC breakdown, storage sizes (ADR-0021); per-stream drill-in — formatted+raw history, projection state, cross-links (ADR-0022); projection dashboard — checkpoint/lag overview and rebuild-by-command with streamed progress (ADR-0024).
+- **Backlog (recognized, not yet scheduled):** projection-drift integrity checks, compensating-event composer, event surgery (guarded raw edit/delete/rename), NDJSON event-log export/import, scheduled-job runs console, image-cache admin.
+- **Boundary:** operator tooling stays proportionate to a single-user, single-operator app. It makes the event substrate inspectable and repairable — it is **not** an end-user product surface (that is the Unified Dashboard). When admin-console scope competes with the media-experience roadmap (In Focus, Unified Dashboard, Steam Import, HLTB), the media experience wins.
+
 ## Out of Scope (v1)
 
 - Books (v2)

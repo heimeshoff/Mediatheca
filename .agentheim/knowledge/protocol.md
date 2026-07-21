@@ -5,6 +5,13 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 13:42 -- Vision updated: admin console absorbed into v1 roadmap
+
+**Type:** Vision / Roadmap
+**Summary:** Resolved the standing vision-conformance observation (the whole administration console suite was unlisted v1 work) by absorbing it — builder chose *absorb*, not deprioritize. Added a "Operability & Observability — Admin Console" workstream under Remaining v1 Work: names the shipped surfaces (admin shell/IAdminApi, event explorer + FTS search + live-tail, Health tab, stream drill-in, projection dashboard; ADRs 0017/0020/0021/0022/0023/0024) and the recognized-but-unscheduled backlog (integrity checks, compensating-event composer, event surgery, NDJSON export/import, job-runs console, image-cache admin). Set an explicit boundary: operator tooling stays proportionate and yields to the media-experience roadmap (In Focus, Unified Dashboard, Steam Import, HLTB) when they compete.
+
+---
+
 ## 2026-07-21 13:35 -- Modeling / Captured: design-system-dib4q - DaisyUI 5 input-bordered migration
 
 **Type:** Modeling / Capture
