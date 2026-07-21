@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 15:56 -- Modeling / Refined: administration-yamm5 - Job runs console — history, outcomes, and run-now for scheduled jobs
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo (auto-promoted)
+**Summary:** Locked three builder decisions — run-now = fire-and-forget + poll (reusing ADR-0023 polling, not SSE), scope = the two ScheduledJobs entries via a shared registry, history kept in full (no pruning). Architect (via orchestrator) produced the technical shape and wrote ADR-0026: JobSpec.Run → Async<JobRunOutcome>, an injected JobRunRecorder seam (ScheduledJobs compiles before Administration, so the store dependency points one way), a job_runs table with startup-only running→interrupted crash reconciliation, and a name-keyed ConcurrentDictionary guard covering both trigger sources. Tightened What, wrote testable acceptance criteria (terminal-outcome guarantee, concurrent-trigger refusal, skipped-vs-error distinction, startup reconciliation), and a server/shared/client implementation outline with exact IAdminApi signatures. No split; both depends_on targets (administration-p0jka, design-system-001) are done.
+**Split into:** none
+**ADRs written:** 0026
+
+---
+
 ## 2026-07-21 15:52 -- Modeling / Promoted: administration-xx3mw - Image cache admin — orphan detection, size overview, purge
 
 **Type:** Modeling / Promote
