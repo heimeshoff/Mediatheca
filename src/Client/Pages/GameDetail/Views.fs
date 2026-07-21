@@ -1460,14 +1460,14 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                                 prop.children [
                                                                     Html.input [
                                                                         prop.type' "date"
-                                                                        prop.className "input input-xs input-bordered bg-base-100/50"
+                                                                        prop.className "input input-xs bg-base-100/50"
                                                                         prop.value draft.Date
                                                                         prop.onChange (fun (v: string) -> dispatch (Session_draft_date_changed v))
                                                                     ]
                                                                     Html.input [
                                                                         prop.type' "number"
                                                                         prop.placeholder "min"
-                                                                        prop.className "input input-xs input-bordered bg-base-100/50 w-20"
+                                                                        prop.className "input input-xs bg-base-100/50 w-20"
                                                                         prop.value draft.MinutesText
                                                                         prop.min 1
                                                                         prop.max (24 * 60)

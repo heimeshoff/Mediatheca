@@ -123,7 +123,6 @@ let private filterBar (model: Model) (dispatch: Msg -> unit) =
         prop.className "flex flex-col gap-3 mb-6"
         prop.children [
             Daisy.input [
-                input.bordered
                 prop.className "w-full font-mono text-sm"
                 prop.placeholder "Search event payloads..."
                 prop.value model.Search
@@ -172,7 +171,6 @@ let private filterBar (model: Model) (dispatch: Msg -> unit) =
                         prop.children [
                             Html.span [ prop.text "From" ]
                             Daisy.input [
-                                input.bordered
                                 input.sm
                                 prop.type' "date"
                                 prop.className "flex-1"
@@ -186,7 +184,6 @@ let private filterBar (model: Model) (dispatch: Msg -> unit) =
                         prop.children [
                             Html.span [ prop.text "To" ]
                             Daisy.input [
-                                input.bordered
                                 input.sm
                                 prop.type' "date"
                                 prop.className "flex-1"

@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 15:14 -- Task verified and completed: design-system-dib4q - DaisyUI 5 input-bordered migration — remove the removed modifier from all inputs
+
+**Type:** Work / Task completion
+**Task:** design-system-dib4q - DaisyUI 5 input-bordered migration — remove the removed modifier from all inputs
+**Summary:** Removed the DaisyUI-5-removed input-bordered modifier from all remaining client inputs (typed input.bordered in EventBrowser search/date filters, dead input-bordered token in GameDetail inline session inputs), eliminating the 3 recurring FS0039 build errors
+**Duration:** ~6m
+**Verification:** PASS (iteration 1)
+**Files changed:** 2
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-07-21 15:07 -- Batch started: [design-system-dib4q]
 
 **Type:** Work / Batch start

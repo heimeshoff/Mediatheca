@@ -1,11 +1,11 @@
 ---
 id: design-system-dib4q
 title: DaisyUI 5 input-bordered migration — remove the removed modifier from all inputs
-status: doing
+status: done
 type: bug
 context: design-system
 created: 2026-07-21
-completed:
+completed: 2026-07-21
 depends_on: [design-system-001]
 blocks: []
 tags: [daisyui, migration, tech-debt, forms, build-health]
@@ -39,3 +39,6 @@ Remove the obsolete `input-bordered` usage everywhere and confirm the inputs sti
 - This is a design-system-owned DaisyUI component-pattern concern that surfaces in two feature BCs' view files (administration's EventBrowser, games' GameDetail) — captured here rather than split, since it's one root cause and the fix should be applied consistently.
 - Reference for the current border idiom: the in-app StyleGuide (`src/Client/Pages/StyleGuide`) and `DesignSystem.fs` — reuse whatever input treatment the design system already blesses instead of reintroducing a bespoke border utility.
 - Low-risk, mechanical. No new ADR expected. Run the `design-check` skill on the touched views before completion (ADR-0015 frontend gate).
+
+## Outcome
+Removed the removed-in-DaisyUI-5 `input-bordered` modifier from every remaining call site: the typed `input.bordered` member on 3 `Daisy.input` elements in `src/Client/Pages/EventBrowser/Views.fs` (search field, From/To date filters — lines ~126, ~175, ~189) and the dead `input-bordered` string token in 2 `prop.className` calls in `src/Client/Pages/GameDetail/Views.fs` (inline play-session date/minutes inputs — lines ~1463, ~1470), keeping the surrounding classes (`input input-xs bg-base-100/50`, `w-20`, etc.) intact. A whole-client grep confirms zero `input-bordered`/`input.bordered` occurrences remain and `file-input-bordered` (a distinct, still-valid DaisyUI 5 class, unused anywhere in this codebase) was left untouched. `npm run build` now transforms cleanly with no `FS0039 ... 'bordered'` errors (previously 3, printed on every build) and exits 0. DaisyUI 5 inputs are bordered by default, so visual appearance of the affected fields is unchanged. No BC README or ADR changes — this is a mechanical removal of a removed API surface, not a new design-system decision.
