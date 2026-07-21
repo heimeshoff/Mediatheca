@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 8
-- **Todo:** 1
+- **Backlog:** 7
+- **Todo:** 2
 - **Doing:** 0
 - **Done:** 6
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **administration-xx3mw** — Image cache admin — orphan detection, size overview, purge (feature) — `todo/administration-xx3mw-image-cache-admin.md`
 - **administration-h4br2** — Browser smoke-test the Events tab Follow toggle end-to-end (chore) — `todo/administration-h4br2-event-browser-follow-smoke-test.md`
 <!-- todo-list:end -->
 
@@ -45,7 +46,6 @@ research touching this BC, and concept synthesis pages.
 - **administration-wwc36** — Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag (feature) — `backlog/administration-wwc36-event-surgery-guardrails.md`
 - **administration-vrc56** — Event log export/import as NDJSON (feature) — `backlog/administration-vrc56-ndjson-export-import.md`
 - **administration-yamm5** — Job runs console — history, outcomes, and run-now for scheduled jobs (feature) — `backlog/administration-yamm5-job-runs-console.md`
-- **administration-xx3mw** — Image cache admin — orphan detection, size overview, purge (feature) — `backlog/administration-xx3mw-image-cache-admin.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC

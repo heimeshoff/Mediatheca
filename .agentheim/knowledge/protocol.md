@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 15:52 -- Modeling / Promoted: administration-xx3mw - Image cache admin — orphan detection, size overview, purge
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-21 15:50 -- Modeling / Refined: administration-xx3mw - Image cache admin — orphan detection, size overview, purge
 
 **Type:** Modeling / Refine
