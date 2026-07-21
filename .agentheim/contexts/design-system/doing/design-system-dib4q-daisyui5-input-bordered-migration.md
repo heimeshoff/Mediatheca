@@ -1,7 +1,7 @@
 ---
 id: design-system-dib4q
 title: DaisyUI 5 input-bordered migration — remove the removed modifier from all inputs
-status: todo
+status: doing
 type: bug
 context: design-system
 created: 2026-07-21

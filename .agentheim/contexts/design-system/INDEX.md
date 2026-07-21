@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 14
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **design-system-dib4q** — DaisyUI 5 input-bordered migration — remove the removed modifier from all inputs (bug) — `todo/design-system-dib4q-daisyui5-input-bordered-migration.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **design-system-dib4q** — DaisyUI 5 input-bordered migration — remove the removed modifier from all inputs (bug) — `doing/design-system-dib4q-daisyui5-input-bordered-migration.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

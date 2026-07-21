@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 15:07 -- Batch started: [design-system-dib4q]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-dib4q - DaisyUI 5 input-bordered migration — remove the removed modifier from all inputs
+**Parallel:** no (1 worker — only ready task; DaisyUI 5 input-bordered migration)
+
+---
+
 ## 2026-07-21 13:42 -- Vision updated: admin console absorbed into v1 roadmap
 
 **Type:** Vision / Roadmap
