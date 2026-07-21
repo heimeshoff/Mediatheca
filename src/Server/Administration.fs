@@ -434,13 +434,160 @@ module Administration =
                 }
         )
 
+    // ── Job runs console (administration-yamm5, ADR-0026) ──
+
+    /// Names of jobs currently mid-run, for either trigger. Exact structural
+    /// copy of `rebuildingProjections` above — same "name-keyed in-memory
+    /// guard" shape, module-level, process-lifetime. The single source of
+    /// truth for the concurrent-trigger refusal: a scheduled fire and a
+    /// manual "Run now" of the SAME job name can never both hold it.
+    let private runningJobs = System.Collections.Concurrent.ConcurrentDictionary<string, unit>()
+
+    let private ensureJobRunsTable (conn: SqliteConnection) : unit =
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- """
+            CREATE TABLE IF NOT EXISTS job_runs (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_name     TEXT NOT NULL,
+                trigger      TEXT NOT NULL,
+                status       TEXT NOT NULL,
+                summary      TEXT,
+                started_at   TEXT NOT NULL,
+                finished_at  TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_job_runs_name_started ON job_runs (job_name, started_at DESC);
+            """
+        cmd.ExecuteNonQuery() |> ignore
+
+    /// Startup-only crash reconciliation (ADR-0026): at process start the
+    /// in-memory `runningJobs` guard is definitionally empty, so any row
+    /// still `running` is orphaned by a hard crash mid-run — never a live
+    /// in-flight run, since a live run always holds the guard. Reconciling on
+    /// read instead would be unable to tell those two cases apart, so this
+    /// only ever runs once, from `initializeJobRuns` at startup.
+    let private reconcileInterruptedRuns (conn: SqliteConnection) : unit =
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- """
+            UPDATE job_runs
+            SET status = 'interrupted',
+                finished_at = @now,
+                summary = 'Interrupted — server restarted while this run was in progress'
+            WHERE status = 'running'
+            """
+        cmd.Parameters.AddWithValue("@now", DateTime.UtcNow.ToString("o")) |> ignore
+        cmd.ExecuteNonQuery() |> ignore
+
+    /// Table creation + startup reconciliation. Called once from
+    /// Composition.fs's init sequence, before `ScheduledJobs.startAll`.
+    let initializeJobRuns (conn: SqliteConnection) : unit =
+        ensureJobRunsTable conn
+        reconcileInterruptedRuns conn
+
+    let private insertRunningRow (conn: SqliteConnection) (jobName: string) (trigger: string) : int64 =
+        use insertCmd = conn.CreateCommand()
+        insertCmd.CommandText <- """
+            INSERT INTO job_runs (job_name, trigger, status, summary, started_at, finished_at)
+            VALUES (@jobName, @trigger, 'running', NULL, @startedAt, NULL)
+            """
+        insertCmd.Parameters.AddWithValue("@jobName", jobName) |> ignore
+        insertCmd.Parameters.AddWithValue("@trigger", trigger) |> ignore
+        insertCmd.Parameters.AddWithValue("@startedAt", DateTime.UtcNow.ToString("o")) |> ignore
+        insertCmd.ExecuteNonQuery() |> ignore
+
+        use idCmd = conn.CreateCommand()
+        idCmd.CommandText <- "SELECT last_insert_rowid()"
+        idCmd.ExecuteScalar() :?> int64
+
+    let private dispositionToStatus (disposition: ScheduledJobs.JobDisposition) : string =
+        match disposition with
+        | ScheduledJobs.JobDisposition.Ok -> "ok"
+        | ScheduledJobs.JobDisposition.Skipped -> "skipped"
+
+    let private completeRun (conn: SqliteConnection) (runId: int64) (disposition: ScheduledJobs.JobDisposition) (summary: string) : unit =
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- "UPDATE job_runs SET status = @status, summary = @summary, finished_at = @finishedAt WHERE id = @id"
+        cmd.Parameters.AddWithValue("@status", dispositionToStatus disposition) |> ignore
+        cmd.Parameters.AddWithValue("@summary", summary) |> ignore
+        cmd.Parameters.AddWithValue("@finishedAt", DateTime.UtcNow.ToString("o")) |> ignore
+        cmd.Parameters.AddWithValue("@id", runId) |> ignore
+        cmd.ExecuteNonQuery() |> ignore
+
+    let private failRun (conn: SqliteConnection) (runId: int64) (message: string) : unit =
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- "UPDATE job_runs SET status = 'error', summary = @summary, finished_at = @finishedAt WHERE id = @id"
+        cmd.Parameters.AddWithValue("@summary", message) |> ignore
+        cmd.Parameters.AddWithValue("@finishedAt", DateTime.UtcNow.ToString("o")) |> ignore
+        cmd.Parameters.AddWithValue("@id", runId) |> ignore
+        cmd.ExecuteNonQuery() |> ignore
+
+    /// Builds the `ScheduledJobs.JobRunRecorder` seam. Closures over `conn`
+    /// and the private `runningJobs` guard above, so every recorder built
+    /// from the same `conn` shares the same guard state (Composition.fs
+    /// builds exactly one and passes it to both `ScheduledJobs.startAll` and
+    /// `create`, per ADR-0026).
+    let makeJobRunRecorder (conn: SqliteConnection) : ScheduledJobs.JobRunRecorder =
+        { TryClaim = fun jobName -> runningJobs.TryAdd(jobName, ())
+          Release = fun jobName -> runningJobs.TryRemove(jobName) |> ignore
+          BeginRun = fun jobName trigger -> insertRunningRow conn jobName trigger
+          Complete = fun runId disposition summary -> completeRun conn runId disposition summary
+          Fail = fun runId message -> failRun conn runId message }
+
+    let private statusFromString (s: string) : JobRunStatus =
+        match s with
+        | "running" -> RunStatusRunning
+        | "ok" -> RunStatusOk
+        | "error" -> RunStatusError
+        | "skipped" -> RunStatusSkipped
+        | "interrupted" -> RunStatusInterrupted
+        | other -> failwithf "Unknown job_runs.status value: %s" other
+
+    /// Most recent `limit` runs for one job, newest first — backed by the
+    /// `(job_name, started_at DESC)` index. No pruning (ADR-0026): this is a
+    /// display cap, not a retention policy.
+    let private getRecentRuns (conn: SqliteConnection) (jobName: string) (limit: int) : JobRunDto list =
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- """
+            SELECT id, job_name, trigger, status, summary, started_at, finished_at
+            FROM job_runs
+            WHERE job_name = @jobName
+            ORDER BY started_at DESC
+            LIMIT @limit
+            """
+        cmd.Parameters.AddWithValue("@jobName", jobName) |> ignore
+        cmd.Parameters.AddWithValue("@limit", limit) |> ignore
+        use reader = cmd.ExecuteReader()
+        [ while reader.Read() do
+            yield {
+                JobRunDto.Id = reader.GetInt64(0)
+                JobName = reader.GetString(1)
+                Trigger = reader.GetString(2)
+                Status = statusFromString (reader.GetString(3))
+                Summary = if reader.IsDBNull(4) then None else Some (reader.GetString(4))
+                StartedAt = reader.GetString(5)
+                FinishedAt = if reader.IsDBNull(6) then None else Some (reader.GetString(6))
+            } ]
+
     /// `dbPath`/`imagesDir` are the same paths Program.fs computes from
     /// DATA_DIR (mediatheca.db and the images/ cache) — passed through here
     /// so the Health tab's storage stats reflect the actual data dir rather
     /// than duplicating DATA_DIR resolution logic. `projectionHandlers` is
     /// the same registry Composition.fs passes to Api.create — reused here
     /// for the Projections tab's checkpoint/lag/row-count listing.
-    let create (conn: SqliteConnection) (dbPath: string) (imagesDir: string) (projectionHandlers: Projection.ProjectionHandler list) : IAdminApi =
+    /// `scheduledJobs` is the same `ScheduledJobs.JobSpec list` registry
+    /// Composition.fs passes to `ScheduledJobs.startAll` — reused here so
+    /// `getJobStatuses`/`runJobNow` stay in lockstep with whatever jobs are
+    /// actually scheduled (a future `JobSpec` auto-appears, no extra wiring).
+    /// `recorder` is the SAME `ScheduledJobs.JobRunRecorder` instance passed
+    /// to `startAll`, so a manual "Run now" and the scheduled timer share one
+    /// guard dictionary and one connection (ADR-0026).
+    let create
+        (conn: SqliteConnection)
+        (dbPath: string)
+        (imagesDir: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (scheduledJobs: ScheduledJobs.JobSpec list)
+        (recorder: ScheduledJobs.JobRunRecorder)
+        : IAdminApi =
         {
             getEventPage = fun query -> async {
                 let filter: EventStore.QueryFilter = {
@@ -556,5 +703,32 @@ module Administration =
 
                     let skipped = (Set.toList alreadySkipped) @ (List.rev raceSkipped)
                     return PurgeDone (deletedCount, bytesFreed, skipped)
+            }
+
+            getJobStatuses = fun () -> async {
+                return
+                    scheduledJobs
+                    |> List.map (fun spec ->
+                        let recent = getRecentRuns conn spec.Name 10
+                        { JobStatusDto.JobName = spec.Name
+                          NextFireAt = (ScheduledJobs.nextRun DateTime.Now spec.Hour).ToString("o")
+                          LastRun = recent |> List.tryHead
+                          RecentRuns = recent })
+            }
+
+            /// Fire-and-forget (ADR-0026): starts the job body on its own
+            /// async and returns `RunJobStarted runId` immediately, before
+            /// the job completes. The tab polls `getJobStatuses` until the
+            /// row resolves. `RunJobRejected` covers both an unknown job name
+            /// and a job already in flight under either trigger.
+            runJobNow = fun jobName -> async {
+                match scheduledJobs |> List.tryFind (fun s -> s.Name = jobName) with
+                | None -> return RunJobRejected
+                | Some spec ->
+                    match ScheduledJobs.tryStartJob recorder spec "manual" with
+                    | Error () -> return RunJobRejected
+                    | Ok (runId, body) ->
+                        Async.Start body
+                        return RunJobStarted runId
             }
         }

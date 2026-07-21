@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-21 21:14 -- Task verified and completed: administration-yamm5 - Job runs console — history, outcomes, and run-now for scheduled jobs
+
+**Type:** Work / Task completion
+**Task:** administration-yamm5 - Job runs console — history, outcomes, and run-now for scheduled jobs
+**Summary:** Job runs console — durable job_runs recording via an injected recorder seam, name-keyed concurrency guard, startup crash reconciliation, and a /admin/jobs tab with fire-and-forget run-now + polling
+**Duration:** ~19m
+**Verification:** PASS (iteration 1)
+**Files changed:** 15
+**Tests added:** 10
+**ADRs written:** none
+
+---
+
 ## 2026-07-21 20:52 -- Batch started: [administration-yamm5]
 
 **Type:** Work / Batch start

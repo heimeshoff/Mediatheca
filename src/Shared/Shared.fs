@@ -1479,6 +1479,50 @@ type PurgeResult =
     | PurgeBlocked of reason: string
     | PurgeDone of deletedCount: int * bytesFreed: int64 * skipped: string list
 
+// Job runs console (administration-yamm5): durable history for the two
+// ScheduledJobs.JobSpec entries, plus a fire-and-forget "run now" (ADR-0026).
+// Terminal statuses map 1:1 to job_runs.status; case names are deliberately
+// NOT `Ok`/`Error` (those are FSharp.Core's Result cases, and Shared.fs is
+// `open`ed by nearly every server module — reusing them here would shadow
+// the Result cases everywhere this module is opened).
+type JobRunStatus =
+    | RunStatusRunning
+    | RunStatusOk
+    | RunStatusError
+    | RunStatusSkipped
+    | RunStatusInterrupted
+
+/// One row of `job_runs`. `Summary` is None only while `Status` is
+/// `RunStatusRunning`. `StartedAt`/`FinishedAt` are ISO-8601 UTC (stored as
+/// such); the Jobs tab must label them explicitly against `NextFireAt`
+/// (local time) rather than rendering both in one zone.
+type JobRunDto = {
+    Id: int64
+    JobName: string
+    Trigger: string
+    Status: JobRunStatus
+    Summary: string option
+    StartedAt: string
+    FinishedAt: string option
+}
+
+/// Per-job status for the Jobs tab: next scheduled fire (local time, from
+/// `ScheduledJobs.nextRun`), the most recent run (if any), and recent-run
+/// history (no pruning — ADR-0026 keeps all rows).
+type JobStatusDto = {
+    JobName: string
+    NextFireAt: string
+    LastRun: JobRunDto option
+    RecentRuns: JobRunDto list
+}
+
+/// Result of an operator-triggered "Run now". Fire-and-forget: `RunJobStarted`
+/// carries the new `running` row's id so the tab can poll for it to resolve;
+/// `RunJobRejected` means the job was already in flight under either trigger.
+type RunJobResult =
+    | RunJobStarted of runId: int64
+    | RunJobRejected
+
 type IAdminApi = {
     // Event Store Browser
     getEventPage: EventPageQuery -> Async<EventPage>
@@ -1497,4 +1541,7 @@ type IAdminApi = {
     getImageCacheStats: unit -> Async<ImageCacheStats>
     listOrphanedImages: unit -> Async<OrphanScan>
     purgeOrphanedImages: PurgeSelection -> Async<PurgeResult>
+    // Jobs (administration-yamm5)
+    getJobStatuses: unit -> Async<JobStatusDto list>
+    runJobNow: string -> Async<RunJobResult>
 }

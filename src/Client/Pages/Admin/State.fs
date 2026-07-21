@@ -10,16 +10,19 @@ let init (tab: AdminTab) : Model * Cmd<Msg> =
     let healthModel, healthCmd = Mediatheca.Client.Pages.AdminHealth.State.init ()
     let projectionsModel, projectionsCmd = Mediatheca.Client.Pages.AdminProjections.State.init ()
     let imagesModel, imagesCmd = Mediatheca.Client.Pages.AdminImages.State.init ()
+    let jobsModel, jobsCmd = Mediatheca.Client.Pages.AdminJobs.State.init ()
     { ActiveTab = tab
       EventBrowserModel = eventBrowserModel
       HealthModel = healthModel
       ProjectionsModel = projectionsModel
-      ImagesModel = imagesModel },
+      ImagesModel = imagesModel
+      JobsModel = jobsModel },
     Cmd.batch [
         Cmd.map Event_browser_msg eventBrowserCmd
         Cmd.map Health_msg healthCmd
         Cmd.map Projections_msg projectionsCmd
         Cmd.map Images_msg imagesCmd
+        Cmd.map Jobs_msg jobsCmd
     ]
 
 /// Called from root `State.Url_changed` when the user navigates away from the
@@ -49,3 +52,7 @@ let update (adminApi: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Images_msg childMsg ->
         let childModel, childCmd = Mediatheca.Client.Pages.AdminImages.State.update adminApi childMsg model.ImagesModel
         { model with ImagesModel = childModel }, Cmd.map Images_msg childCmd
+
+    | Jobs_msg childMsg ->
+        let childModel, childCmd = Mediatheca.Client.Pages.AdminJobs.State.update adminApi childMsg model.JobsModel
+        { model with JobsModel = childModel }, Cmd.map Jobs_msg childCmd

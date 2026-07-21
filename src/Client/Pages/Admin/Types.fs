@@ -6,14 +6,15 @@ open Mediatheca.Client.Router
 // existing EventBrowser page), Health delegates to AdminHealth
 // (administration-hw74a), Projections delegates to AdminProjections
 // (administration-qjcp4), Images delegates to AdminImages
-// (administration-xx3mw); Jobs/Surgery remain placeholder panels until their
-// own backlog tasks land.
+// (administration-xx3mw), Jobs delegates to AdminJobs (administration-yamm5);
+// Surgery remains a placeholder panel until its own backlog task lands.
 type Model = {
     ActiveTab: AdminTab
     EventBrowserModel: Mediatheca.Client.Pages.EventBrowser.Types.Model
     HealthModel: Mediatheca.Client.Pages.AdminHealth.Types.Model
     ProjectionsModel: Mediatheca.Client.Pages.AdminProjections.Types.Model
     ImagesModel: Mediatheca.Client.Pages.AdminImages.Types.Model
+    JobsModel: Mediatheca.Client.Pages.AdminJobs.Types.Model
 }
 
 type Msg =
@@ -21,3 +22,4 @@ type Msg =
     | Health_msg of Mediatheca.Client.Pages.AdminHealth.Types.Msg
     | Projections_msg of Mediatheca.Client.Pages.AdminProjections.Types.Msg
     | Images_msg of Mediatheca.Client.Pages.AdminImages.Types.Msg
+    | Jobs_msg of Mediatheca.Client.Pages.AdminJobs.Types.Msg

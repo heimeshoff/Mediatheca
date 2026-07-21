@@ -335,6 +335,19 @@ module SeriesRefresh =
             """
         |> Db.query (fun (rd: IDataReader) -> rd.ReadString "slug")
 
+    /// The counts `runNightlyJob` previously only `eprintfn`d (administration-yamm5
+    /// / ADR-0026), now returned so Composition.fs's job-runs registry can map
+    /// them into a `ScheduledJobs.JobRunOutcome` summary. `Skipped = true`
+    /// means the whole run declined to act (TMDB API key not configured) —
+    /// the other counts are meaningless (all zero) in that case.
+    type SeriesRefreshSummary = {
+        Refreshed: int
+        Errors: int
+        NewEpisodes: int
+        StatusTransitions: int
+        Skipped: bool
+    }
+
     /// Run the nightly refresh: iterate every refresh candidate and refresh
     /// it. Throttled with a small delay between series so TMDB isn't hit
     /// with bursts for large libraries.
@@ -344,11 +357,12 @@ module SeriesRefresh =
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
-        : Async<unit> =
+        : Async<SeriesRefreshSummary> =
         async {
             let tmdbConfig = getTmdbConfig()
             if String.IsNullOrWhiteSpace(tmdbConfig.ApiKey) then
                 eprintfn "[SeriesRefresh] Skipping nightly refresh: TMDB API key not configured"
+                return { Refreshed = 0; Errors = 0; NewEpisodes = 0; StatusTransitions = 0; Skipped = true }
             else
                 let candidates = getRefreshCandidates conn
                 eprintfn "[SeriesRefresh] Nightly refresh: %d series to check" candidates.Length
@@ -381,4 +395,5 @@ module SeriesRefresh =
                     do! Async.Sleep 500
                 eprintfn "[SeriesRefresh] Nightly refresh complete: %d refreshed, %d errors, %d new episodes, %d status transitions"
                     refreshed errors totalNewEpisodes statusTransitions
+                return { Refreshed = refreshed; Errors = errors; NewEpisodes = totalNewEpisodes; StatusTransitions = statusTransitions; Skipped = false }
         }

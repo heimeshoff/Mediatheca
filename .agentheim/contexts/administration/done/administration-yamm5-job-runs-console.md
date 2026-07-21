@@ -1,11 +1,11 @@
 ---
 id: administration-yamm5
 title: Job runs console — history, outcomes, and run-now for scheduled jobs
-status: doing
+status: done
 type: feature
 context: administration
 created: 2026-07-20
-completed:
+completed: 2026-07-21
 depends_on: [administration-p0jka, design-system-001]
 blocks: []
 tags: [admin-console, jobs, observability]
@@ -51,3 +51,13 @@ Scope is exactly the two `ScheduledJobs.JobSpec` entries, driven by a **shared j
 - **Client:** new `src/Client/Pages/AdminJobs/` (`Types.fs`/`State.fs`/`Views.fs`), MVU shape mirroring `AdminHealth`/`AdminProjections`; reuse ADR-0023's epoch-guarded polling `Cmd` for the run-now refetch. `Router.fs` already has `AdminJobs` at `/admin/jobs`. Frontend gate satisfied via `design-system-001` (done). **Timezone care:** `NextFireAt` is local time while `started_at`/`finished_at` are stored UTC — label them explicitly rather than rendering both in one zone.
 
 _No split — the architect recommends this stays a single task; both `depends_on` targets (`administration-p0jka`, `design-system-001`) are done._
+
+## Outcome
+
+Implemented exactly per ADR-0026. `ScheduledJobs.fs`: `JobDisposition`/`JobRunOutcome`/`JobRunRecorder` (new), `JobSpec.Run` now returns `Async<JobRunOutcome>`, `tryStartJob` (replaces `runJobSafe`) is the shared choke point with the try/finally terminal-outcome guarantee, `startAll` takes the recorder. `Administration.fs`: `runningJobs` guard (copy of `rebuildingProjections`), `job_runs` schema + CRUD, `makeJobRunRecorder`, `initializeJobRuns` (table + startup-only `running`→`interrupted` reconciliation), `getJobStatuses`/`runJobNow` added to `create` (which now also takes `scheduledJobs`/`recorder`). `Composition.fs`: the registry + hours moved above `Administration.create`, job bodies map to `JobRunOutcome`, `initializeJobRuns` runs before `ScheduledJobs.startAll jobRunRecorder scheduledJobs`. `PlaytimeTracker.runSync` unchanged; `SeriesRefresh.runNightlyJob` now returns `SeriesRefreshSummary`. Client: new `src/Client/Pages/AdminJobs/` (Types/State/Views) wired into `Admin` as the Jobs tab, reusing ADR-0023's epoch-guarded polling `Cmd` for the run-now refetch.
+
+One deliberate deviation from ADR-0026's literal case names: `Shared.fs`'s `JobRunStatus` uses `RunStatusRunning`/`RunStatusOk`/`RunStatusError`/`RunStatusSkipped`/`RunStatusInterrupted` rather than bare `Ok`/`Error`, because `Shared.fs` is `open`ed by nearly every server module — a DU case named `Ok`/`Error` there would shadow `FSharp.Core`'s `Result` cases everywhere. `ScheduledJobs.JobDisposition = Ok | Skipped` does use bare `Ok` as the ADR specifies, since that type is local to `ScheduledJobs.fs` only (confirmed via `Result.Ok`/`Result.Error` qualification inside that file to avoid the same shadowing locally).
+
+Tests: `tests/Server.Tests/JobRunsTests.fs` (new, 10 cases) covers the terminal-outcome guarantee (ok/skipped/exception), the fire-and-forget run-now + resolution, the concurrent-trigger refusal, startup-only reconciliation (and that a mere read never reconciles), and `getJobStatuses`. `AdministrationTests.fs`'s `createApi`/`createImageApi` helpers updated for `create`'s new `scheduledJobs`/`recorder` parameters. 358 tests pass; `npm run build` is clean.
+
+Key files: `src/Server/ScheduledJobs.fs`, `src/Server/Administration.fs`, `src/Server/Composition.fs`, `src/Server/SeriesRefresh.fs`, `src/Shared/Shared.fs`, `src/Client/Pages/AdminJobs/{Types,State,Views}.fs`, `src/Client/Pages/Admin/{Types,State,Views}.fs`, `tests/Server.Tests/JobRunsTests.fs`, `tests/Server.Tests/AdministrationTests.fs`.

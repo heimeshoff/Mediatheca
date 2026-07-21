@@ -43,9 +43,8 @@ let private tabBar (activeTab: AdminTab) =
 let private placeholderPanel (tab: AdminTab) =
     let blurb =
         match tab with
-        | AdminJobs -> "Scheduled jobs — background job status lands here."
         | AdminSurgery -> "Event surgery — corrective tooling lands here."
-        | AdminEvents | AdminHealth | AdminProjections | AdminImages -> ""
+        | AdminEvents | AdminHealth | AdminProjections | AdminImages | AdminJobs -> ""
     Html.div [
         prop.className (DesignSystem.velvetCard + " p-8 text-center")
         prop.children [
@@ -81,6 +80,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 Mediatheca.Client.Pages.AdminProjections.Views.view model.ProjectionsModel (Projections_msg >> dispatch)
             | AdminImages ->
                 Mediatheca.Client.Pages.AdminImages.Views.view model.ImagesModel (Images_msg >> dispatch)
+            | AdminJobs ->
+                Mediatheca.Client.Pages.AdminJobs.Views.view model.JobsModel (Jobs_msg >> dispatch)
             | other ->
                 Html.div [
                     prop.className DesignSystem.pagePadding

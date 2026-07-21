@@ -26,6 +26,10 @@ let private createInMemoryConnection () =
     SeriesProjection.handler.Init conn
     GameProjection.handler.Init conn
     CatalogProjection.handler.Init conn
+    // Job runs console (administration-yamm5): table + startup reconciliation,
+    // same as Composition.fs's init sequence, so any test exercising
+    // getJobStatuses/runJobNow has the table ready.
+    Administration.initializeJobRuns conn
     conn
 
 let private makeEvent eventType data : EventStore.EventData = {
@@ -49,9 +53,14 @@ let private allProjectionHandlers = [
     GameProjection.handler
 ]
 
-let private createApi conn = Administration.create conn noStoragePath noImagesDir allProjectionHandlers
+/// Most Administration tests don't exercise the Jobs tab — an empty registry
+/// keeps createApi/createImageApi callers unchanged. Job-runs-specific tests
+/// (JobRunsTests.fs) build their own scheduledJobs/recorder directly.
+let private createApi conn =
+    Administration.create conn noStoragePath noImagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn)
 
-let private createImageApi conn imagesDir = Administration.create conn noStoragePath imagesDir allProjectionHandlers
+let private createImageApi conn imagesDir =
+    Administration.create conn noStoragePath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn)
 
 // ── Image cache admin (administration-xx3mw) test helpers ──
 
@@ -336,7 +345,7 @@ let administrationTests =
             File.WriteAllBytes(Path.Combine(imagesDir, "poster2.jpg"), Array.create 256 0uy)
 
             try
-                let api = Administration.create conn dbPath imagesDir allProjectionHandlers
+                let api = Administration.create conn dbPath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn)
                 let stats = api.getHealthStats () |> Async.RunSynchronously
 
                 Expect.equal stats.Storage.DbSizeBytes 1024L "DB size should match the file on disk"

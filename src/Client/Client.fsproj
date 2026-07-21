@@ -74,6 +74,9 @@
     <Compile Include="Pages\AdminImages\Types.fs" />
     <Compile Include="Pages\AdminImages\State.fs" />
     <Compile Include="Pages\AdminImages\Views.fs" />
+    <Compile Include="Pages\AdminJobs\Types.fs" />
+    <Compile Include="Pages\AdminJobs\State.fs" />
+    <Compile Include="Pages\AdminJobs\Views.fs" />
     <Compile Include="Pages\Admin\Types.fs" />
     <Compile Include="Pages\Admin\State.fs" />
     <Compile Include="Pages\Admin\Views.fs" />

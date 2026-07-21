@@ -214,9 +214,62 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     // Initialize JellyfinSync (restore last sync time from DB)
     JellyfinSync.initialize conn
 
+    // Scheduled jobs registry (administration-yamm5 / ADR-0026): built here,
+    // above both `Administration.create` and `ScheduledJobs.startAll`, so the
+    // same list — and the same job-runs recorder — feed both the Jobs tab's
+    // read API and the daily timer. Daily refresh at a configurable
+    // local-time hour (defaults to 04:00 local).
+    let playtimeSyncHour =
+        SettingsStore.getSetting conn "playtime_sync_hour"
+        |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
+        |> Option.defaultValue 4
+
+    let seriesRefreshHour =
+        SettingsStore.getSetting conn "series_refresh_hour"
+        |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
+        |> Option.defaultValue 4
+
+    let scheduledJobs : ScheduledJobs.JobSpec list = [
+        { Name = "Steam playtime sync"
+          Hour = playtimeSyncHour
+          Run = fun () ->
+            async {
+                // PlaytimeTracker computes the gaming-day internally (boundary at syncHour + 30 min),
+                // so a 04:00 scheduled fire and an early-morning catch-up both attribute to yesterday.
+                match! PlaytimeTracker.runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers None with
+                | Ok result ->
+                    let summary =
+                        sprintf "%d sessions, %d snapshots, %d games created, %d promoted to focus"
+                            result.SessionsRecorded result.SnapshotsUpdated result.GamesCreated result.GamesPromotedToFocus
+                    eprintfn "[PlaytimeTracker] Sync complete: %s" summary
+                    return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = summary } : ScheduledJobs.JobRunOutcome)
+                | Error err ->
+                    eprintfn "[PlaytimeTracker] Sync skipped: %s" err
+                    return ({ Disposition = ScheduledJobs.JobDisposition.Skipped; Summary = err } : ScheduledJobs.JobRunOutcome)
+            } }
+        { Name = "Series TMDB refresh"
+          Hour = seriesRefreshHour
+          Run = fun () ->
+            async {
+                let! summary = SeriesRefresh.runNightlyJob conn httpClient getTmdbConfig imageBasePath projectionHandlers
+                if summary.Skipped then
+                    return ({ Disposition = ScheduledJobs.JobDisposition.Skipped; Summary = "TMDB API key not configured" } : ScheduledJobs.JobRunOutcome)
+                else
+                    let text =
+                        sprintf "%d refreshed, %d errors, %d new episodes, %d status transitions"
+                            summary.Refreshed summary.Errors summary.NewEpisodes summary.StatusTransitions
+                    return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = text } : ScheduledJobs.JobRunOutcome)
+            } }
+    ]
+
+    // job_runs table + startup crash reconciliation (ADR-0026), before the
+    // recorder is built or the timer starts.
+    Administration.initializeJobRuns conn
+    let jobRunRecorder = Administration.makeJobRunRecorder conn
+
     // Create API
     let api = Api.create conn httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig imageBasePath projectionHandlers
-    let adminApi = Administration.create conn dbPath imageBasePath projectionHandlers
+    let adminApi = Administration.create conn dbPath imageBasePath projectionHandlers scheduledJobs jobRunRecorder
 
     let remotingHandler =
         Remoting.createApi ()
@@ -273,35 +326,9 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
 
     app.UseGiraffe webApp
 
-    // Scheduled jobs: daily refresh at a configurable local-time hour (defaults to 04:00 local)
-    let playtimeSyncHour =
-        SettingsStore.getSetting conn "playtime_sync_hour"
-        |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
-        |> Option.defaultValue 4
-
-    let seriesRefreshHour =
-        SettingsStore.getSetting conn "series_refresh_hour"
-        |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
-        |> Option.defaultValue 4
-
-    let scheduledJobs : ScheduledJobs.JobSpec list = [
-        { Name = "Steam playtime sync"
-          Hour = playtimeSyncHour
-          Run = fun () ->
-            async {
-                // PlaytimeTracker computes the gaming-day internally (boundary at syncHour + 30 min),
-                // so a 04:00 scheduled fire and an early-morning catch-up both attribute to yesterday.
-                match! PlaytimeTracker.runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers None with
-                | Ok result ->
-                    eprintfn "[PlaytimeTracker] Sync complete: %d sessions, %d snapshots, %d games created, %d promoted to focus" result.SessionsRecorded result.SnapshotsUpdated result.GamesCreated result.GamesPromotedToFocus
-                | Error err ->
-                    eprintfn "[PlaytimeTracker] Sync skipped: %s" err
-            } }
-        { Name = "Series TMDB refresh"
-          Hour = seriesRefreshHour
-          Run = fun () ->
-            SeriesRefresh.runNightlyJob conn httpClient getTmdbConfig imageBasePath projectionHandlers }
-    ]
-    let _scheduledJobTimers = ScheduledJobs.startAll scheduledJobs
+    // Scheduled jobs: registry, hours, and the job-runs recorder are all
+    // built above (before Administration.create) per ADR-0026 — start the
+    // timers here, sharing the same recorder instance.
+    let _scheduledJobTimers = ScheduledJobs.startAll jobRunRecorder scheduledJobs
 
     app
