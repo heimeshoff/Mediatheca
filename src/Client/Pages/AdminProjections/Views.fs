@@ -169,11 +169,111 @@ let private backupSection (model: Model) (dispatch: Msg -> unit) =
         ]
     ]
 
+/// One row-level discrepancy in the drift-check results (administration-btvqa,
+/// ADR-0031): table, primary key, kind (only-in-live / only-in-shadow /
+/// column-mismatch), and — for a column mismatch — which columns differ.
+let private driftDiscrepancyRow (d: DriftDiscrepancy) =
+    let kindLabel =
+        match d.Kind with
+        | "onlyInLive" -> "only in live"
+        | "onlyInShadow" -> "only in shadow"
+        | "columnMismatch" -> "column mismatch"
+        | other -> other
+    Html.div [
+        prop.key (d.Table + "|" + d.PrimaryKey + "|" + d.Kind)
+        prop.className "flex flex-wrap items-baseline gap-x-2 gap-y-1"
+        prop.children [
+            Html.span [ prop.className (DesignSystem.dataText + " text-sm"); prop.text d.Table ]
+            Html.span [ prop.className (DesignSystem.mutedText + " text-sm"); prop.text d.PrimaryKey ]
+            Daisy.badge [ badge.warning; badge.sm; prop.text kindLabel ]
+            if not (List.isEmpty d.Columns) then
+                Html.span [ prop.className (DesignSystem.dataText + " text-sm"); prop.text (String.concat ", " d.Columns) ]
+        ]
+    ]
+
+let private driftProjectionSection (p: ProjectionDrift) =
+    Html.div [
+        prop.key p.Name
+        prop.className "flex flex-col gap-1"
+        prop.children [
+            Html.h4 [ prop.className DesignSystem.eyebrow; prop.text p.Name ]
+            for d in p.Discrepancies -> driftDiscrepancyRow d
+        ]
+    ]
+
+/// Shadow-table replay drift detector (administration-btvqa, ADR-0031): "Run
+/// check" streams SSE progress from `/api/stream/drift-check` (thin wrapper
+/// over `Administration.checkProjectionDrift`, gated by the same not-dirty
+/// guard the image-cache orphan scan uses, ADR-0025) then renders per-table
+/// discrepancies grouped by projection, or a clean-bill-of-health message.
+let private driftCheckSection (model: Model) (dispatch: Msg -> unit) =
+    Html.div [
+        prop.className (DesignSystem.velvetCard + " p-4 flex flex-col gap-3")
+        prop.children [
+            Html.div [
+                prop.className "flex items-center justify-between gap-3"
+                prop.children [
+                    Html.h3 [ prop.className DesignSystem.cardTitle; prop.text "Drift check" ]
+                    Daisy.button.button [
+                        button.outline
+                        button.sm
+                        prop.disabled model.IsDriftChecking
+                        prop.onClick (fun _ -> dispatch Drift_check_clicked)
+                        prop.text (if model.IsDriftChecking then "Checking..." else "Run check")
+                    ]
+                ]
+            ]
+            Html.p [
+                prop.className DesignSystem.mutedText
+                prop.text "Replays the full event log into a throwaway shadow copy and compares it row-by-row against the live projection tables — verifies every read model is exactly what the log says, without touching live data."
+            ]
+            if model.IsDriftChecking then
+                Html.div [
+                    prop.className "flex items-center gap-2"
+                    prop.children [
+                        Daisy.loading [ loading.spinner; loading.xs ]
+                        Html.span [
+                            prop.className (DesignSystem.dataText + " text-sm")
+                            prop.text (
+                                match model.DriftCheckProgress with
+                                | Some name -> sprintf "Replayed %s..." name
+                                | None -> "Starting...")
+                        ]
+                    ]
+                ]
+            match model.DriftCheckResult with
+            | Some result when result.TotalDiscrepancies = 0 ->
+                Html.p [
+                    prop.className "text-xs text-success"
+                    prop.text (sprintf "No discrepancies found across %d projections. Every read model matches the event log." (List.length result.Projections))
+                ]
+            | Some result ->
+                Html.div [
+                    prop.className "flex flex-col gap-3"
+                    prop.children [
+                        Html.p [
+                            prop.className "text-xs text-warning"
+                            prop.text (sprintf "%d discrepancies found." result.TotalDiscrepancies)
+                        ]
+                        for p in result.Projections do
+                            if not (List.isEmpty p.Discrepancies) then
+                                driftProjectionSection p
+                    ]
+                ]
+            | None -> Html.none
+            match model.DriftCheckMessage with
+            | Some message -> Html.p [ prop.className "text-xs text-warning"; prop.text message ]
+            | None -> Html.none
+        ]
+    ]
+
 let view (model: Model) (dispatch: Msg -> unit) =
     Html.div [
         prop.className (DesignSystem.pagePadding + " flex flex-col gap-4")
         prop.children [
             backupSection model dispatch
+
+            driftCheckSection model dispatch
 
             Html.div [
                 prop.className "flex items-center justify-between gap-3"

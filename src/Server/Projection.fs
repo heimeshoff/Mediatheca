@@ -125,3 +125,27 @@ module Projection =
     let startAllProjections (conn: SqliteConnection) (handlers: ProjectionHandler list) : unit =
         for handler in handlers do
             runProjection conn handler
+
+    /// Same drop+replay shape as `rebuildProjection`, but reads events from a
+    /// separate connection (`liveConn`) and writes exclusively into
+    /// `shadowConn` — the shadow-replay drift detector's throwaway-connection
+    /// design (administration-btvqa, ADR-0031): `liveConn` is only ever read
+    /// from (via `EventStore.readAllForward`), `shadowConn` is the only
+    /// connection ever written to, so "read-only against live" holds by
+    /// construction with zero changes to any `*Projection.fs` handler body.
+    /// Skips checkpoint writes entirely — the shadow DB never needs `events` /
+    /// `projection_checkpoints`, only each handler's own owned tables.
+    let replayIntoShadow (liveConn: SqliteConnection) (shadowConn: SqliteConnection) (handler: ProjectionHandler) : unit =
+        handler.Drop shadowConn
+        handler.Init shadowConn
+        let batchSize = 100
+        let mutable position = 0L
+        let mutable keepGoing = true
+
+        while keepGoing do
+            match EventStore.readAllForward liveConn position batchSize with
+            | [] -> keepGoing <- false
+            | events ->
+                for event in events do
+                    handler.Handle shadowConn event
+                position <- (List.last events).GlobalPosition

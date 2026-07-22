@@ -21,6 +21,28 @@ type RebuildProgress = {
 /// (administration-vrc56, ADR-0029).
 type ImportOutcome = { EventsImported: int }
 
+/// One row-level discrepancy from a shadow-replay drift check
+/// (administration-btvqa, ADR-0031). `Kind` is one of "onlyInLive" /
+/// "onlyInShadow" / "columnMismatch" (mirrors `Administration.DriftDiscrepancy`
+/// server-side); `Columns` is populated only for "columnMismatch".
+type DriftDiscrepancy = {
+    Table: string
+    PrimaryKey: string
+    Kind: string
+    Columns: string list
+}
+
+type ProjectionDrift = {
+    Name: string
+    Discrepancies: DriftDiscrepancy list
+}
+
+/// The `complete` event's full payload from `/api/stream/drift-check`.
+type DriftCheckResult = {
+    Projections: ProjectionDrift list
+    TotalDiscrepancies: int
+}
+
 type Model = {
     Stats: ProjectionStatRow list
     IsLoading: bool
@@ -45,6 +67,17 @@ type Model = {
     /// Refusal (non-empty target store) or malformed-line failure message,
     /// cleared on the next import attempt.
     ImportMessage: string option
+    /// Shadow-table replay drift detector (administration-btvqa, ADR-0031):
+    /// "Run check" streams SSE progress from `/api/stream/drift-check` the
+    /// same way a projection rebuild does.
+    IsDriftChecking: bool
+    /// Name of the projection whose shadow replay most recently finished,
+    /// for a lightweight "currently replaying" indicator during the run.
+    DriftCheckProgress: string option
+    DriftCheckResult: DriftCheckResult option
+    /// Rejection (dirty projection) or error message, cleared on the next
+    /// "Run check" click.
+    DriftCheckMessage: string option
 }
 
 type Msg =
@@ -61,3 +94,8 @@ type Msg =
     | Import_completed of ImportOutcome
     | Import_rejected of string
     | Import_failed of string
+    | Drift_check_clicked
+    | Drift_check_progress of string
+    | Drift_check_completed of DriftCheckResult
+    | Drift_check_rejected of string
+    | Drift_check_failed of string

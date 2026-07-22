@@ -1,15 +1,15 @@
 ---
 id: administration-btvqa
 title: Shadow-table replay drift detector — verify projection read models exactly match the event log
-status: doing
+status: done
 type: feature
 context: administration
 created: 2026-07-20
-completed:
+completed: 2026-07-22
 depends_on: [administration-qjcp4, design-system-001]
 blocks: []
 tags: [admin-console, projections, integrity, drift]
-related_adrs: [0002, 0024, 0025]
+related_adrs: [0002, 0024, 0025, 0031]
 related_research: []
 prior_art: []
 ---
@@ -118,3 +118,54 @@ without risking the live read models.
   shared code or ordering dependency. The drift detector needs no knowledge of
   which event types a handler recognizes; it runs the real, unmodified `Handle`
   function, which does its own internal filtering.
+
+## Outcome
+
+Shipped as designed, with one corrected number: written as **ADR-0031**, not
+ADR-0030 (0030 was taken earlier this session by administration-cx92m's
+request-connection semaphore gate).
+
+- `src/Server/Projection.fs` — new `replayIntoShadow (liveConn) (shadowConn)
+  (handler)`, the `conn`-decoupled sibling of `rebuildProjection`: drop+init
+  against `shadowConn`, full replay reading from `liveConn` via
+  `EventStore.readAllForward`, no checkpoint writes. Zero changes to any
+  `*Projection.fs`.
+- `src/Server/Administration.fs` — new drift-detector section:
+  `checkProjectionDrift` (the public test seam), `diffTable`/`readRows`/
+  `tableColumnInfo` (generic `PRAGMA table_info`-based key detection, no
+  hand-maintained PK registry), `DriftDiscrepancy`/`ProjectionDrift` types,
+  `driftCheckRejectionMessage` (the not-dirty guard's operator-facing
+  wording, also directly unit-tested), `driftCheckStreamHandler` (the SSE
+  route, its own single-flight `driftCheckInProgress` guard).
+- **Found and fixed a design bug during TDD**: the first draft diffed each
+  handler's tables immediately after that handler's own shadow replay —
+  wrong, since `FriendProjection` (which scrubs `movie_detail` via a
+  cross-BC write) replays *after* `MovieProjection` in registration order.
+  The cross-BC acceptance-criterion test caught this: `checkProjectionDrift`
+  now replays every handler fully before diffing any table. Recorded in
+  ADR-0031's Decision/Alternatives-considered sections.
+- `src/Server/Composition.fs` — mounted `/api/stream/drift-check` in the
+  `choose` list alongside the other raw SSE routes.
+- `tests/Server.Tests/ProjectionDriftTests.fs` (new, 5 tests, all green) —
+  healthy store (zero discrepancies), corrupted-row detection (table/PK/
+  column identified), cross-BC Friend-removes-from-Movie scrub (zero
+  discrepancies), live-tables-and-checkpoints-untouched assertion, dirty-
+  projection rejection message.
+- `src/Client/Pages/AdminProjections/{Types,State,Views}.fs` — "Run check"
+  control + results rendering on the Projections tab: `DriftDiscrepancy`/
+  `ProjectionDrift`/`DriftCheckResult` client types, an SSE consumer
+  (`runDriftCheckStream`) mirroring the existing rebuild/import stream
+  readers, and a `driftCheckSection` card (paper/velvet-card chrome,
+  DaisyUI badges for discrepancy kind, matching existing Projections-tab
+  patterns).
+- `.agentheim/knowledge/decisions/0031-projection-drift-detector-throwaway-shadow-connection.md` (new).
+- `.agentheim/contexts/administration/README.md` — new "Drift check" bullet;
+  removed a now-stale "feeds the future drift report" forward-reference in
+  the Stream drill-in bullet.
+
+Test status: `dotnet run --project tests/Server.Tests/Server.Tests.fsproj
+-- --sequenced` — 383/383 passing. The default parallel run intermittently
+errors 1-3 pre-existing `JobRunsTests.fs` cases (timing-sensitive under
+Expecto's parallel execution) — confirmed pre-existing and unrelated: these
+tests pass consistently in isolation, and this task touches no job-related
+file. `npm run build` (Fable client compile) green.

@@ -25,7 +25,11 @@ let init () : Model * Cmd<Msg> =
       PendingRebuildAllQueue = []
       IsImporting = false
       ImportResult = None
-      ImportMessage = None },
+      ImportMessage = None
+      IsDriftChecking = false
+      DriftCheckProgress = None
+      DriftCheckResult = None
+      DriftCheckMessage = None },
     Cmd.ofMsg Load
 
 /// Consumes the SSE stream from `/api/stream/rebuild-projection/{name}`
@@ -130,6 +134,70 @@ let private runImportStream (file: Browser.Types.File) : Cmd<Msg> =
         } |> Async.StartImmediate
     )
 
+let private parseDiscrepancy (raw: obj) : DriftDiscrepancy =
+    { Table = raw?table |> string
+      PrimaryKey = raw?primaryKey |> string
+      Kind = raw?kind |> string
+      Columns = raw?columns |> unbox<string[]> |> Array.toList }
+
+let private parseProjectionDrift (raw: obj) : ProjectionDrift =
+    { Name = raw?name |> string
+      Discrepancies = raw?discrepancies |> unbox<obj[]> |> Array.toList |> List.map parseDiscrepancy }
+
+let private parseDriftCheckResult (parsed: obj) : DriftCheckResult =
+    { Projections = parsed?projections |> unbox<obj[]> |> Array.toList |> List.map parseProjectionDrift
+      TotalDiscrepancies = parsed?totalDiscrepancies |> int }
+
+/// Consumes the SSE stream from `/api/stream/drift-check`
+/// (Administration.driftCheckStreamHandler, administration-btvqa/ADR-0031).
+/// Same reader/buffer/`data: ` framing as `runRebuildStream`/`runImportStream`
+/// above; the "complete" payload is the one non-trivial shape (a nested
+/// projections/discrepancies structure), parsed field-by-field via Fable's
+/// `?` reflection since there is no shared JSON decoder for this SSE-only
+/// (non-Remoting) payload.
+let private runDriftCheckStream () : Cmd<Msg> =
+    Cmd.ofEffect (fun dispatch ->
+        async {
+            try
+                let! response = jsFetch "/api/stream/drift-check" |> Async.AwaitPromise
+                let reader: obj = response?body?getReader()
+                let mutable buffer = ""
+                let mutable reading = true
+                while reading do
+                    let! chunk = (reader?read() : JS.Promise<obj>) |> Async.AwaitPromise
+                    let isDone: bool = chunk?``done``
+                    if isDone then
+                        reading <- false
+                    else
+                        let value: obj = chunk?value
+                        let text = decodeBytes value
+                        buffer <- buffer + text
+                        let mutable idx = buffer.IndexOf("\n\n")
+                        while idx >= 0 do
+                            let message = buffer.[0..idx-1]
+                            buffer <- buffer.[idx+2..]
+                            let dataLine =
+                                if message.StartsWith("data: ") then message.[6..]
+                                else message
+                            if dataLine <> "" then
+                                let parsed: obj = JS.JSON.parse dataLine
+                                let eventType: string = parsed?``type``
+                                match eventType with
+                                | "progress" ->
+                                    dispatch (Drift_check_progress (parsed?projection |> string))
+                                | "rejected" ->
+                                    dispatch (Drift_check_rejected (parsed?message |> string))
+                                | "complete" ->
+                                    dispatch (Drift_check_completed (parseDriftCheckResult parsed))
+                                | "error" ->
+                                    dispatch (Drift_check_failed (parsed?message |> string))
+                                | _ -> ()
+                            idx <- buffer.IndexOf("\n\n")
+            with ex ->
+                dispatch (Drift_check_failed ex.Message)
+        } |> Async.StartImmediate
+    )
+
 let update (api: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
     | Load ->
@@ -207,3 +275,23 @@ let update (api: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Import_failed message ->
         { model with IsImporting = false; ImportMessage = Some message }, Cmd.none
+
+    | Drift_check_clicked ->
+        { model with
+            IsDriftChecking = true
+            DriftCheckProgress = None
+            DriftCheckResult = None
+            DriftCheckMessage = None },
+        runDriftCheckStream ()
+
+    | Drift_check_progress name ->
+        { model with DriftCheckProgress = Some name }, Cmd.none
+
+    | Drift_check_completed result ->
+        { model with IsDriftChecking = false; DriftCheckProgress = None; DriftCheckResult = Some result }, Cmd.none
+
+    | Drift_check_rejected message ->
+        { model with IsDriftChecking = false; DriftCheckProgress = None; DriftCheckMessage = Some message }, Cmd.none
+
+    | Drift_check_failed message ->
+        { model with IsDriftChecking = false; DriftCheckProgress = None; DriftCheckMessage = Some message }, Cmd.none

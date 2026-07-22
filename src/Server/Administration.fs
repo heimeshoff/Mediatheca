@@ -345,6 +345,193 @@ module Administration =
             rebuildingProjections.ContainsKey(handler.Name) || checkpointLag conn head handler > 0L)
         |> List.map (fun handler -> handler.Name)
 
+    // ── Shadow-table replay drift detector (administration-btvqa, ADR-0031) ──
+
+    /// Own single-flight guard for the drift check — NOT `rebuildingProjections`,
+    /// whose meaning ("live tables are being written") is never true here (the
+    /// live connection is only ever read from). Same TryAdd/TryRemove shape as
+    /// `rebuildingProjections`, keyed on a single fixed name since the whole
+    /// check (all six projections) runs as one operation, not one per
+    /// projection.
+    let private driftCheckInProgress = System.Collections.Concurrent.ConcurrentDictionary<string, unit>()
+    let private driftCheckKey = "drift-check"
+
+    let private escapeJson (s: string) = s.Replace("\\", "\\\\").Replace("\"", "\\\"")
+
+    /// Not private — `checkProjectionDrift` below is the direct test seam
+    /// (ProjectionDriftTests.fs), the same "test the underlying function, not
+    /// the SSE route" shape `ProjectionRebuildTests.fs` established for
+    /// `rebuildProjectionWithProgress`.
+    type DriftDiscrepancy = {
+        Table: string
+        PrimaryKey: string
+        Kind: string // "onlyInLive" | "onlyInShadow" | "columnMismatch"
+        Columns: string list
+    }
+
+    type ProjectionDrift = {
+        Name: string
+        Discrepancies: DriftDiscrepancy list
+    }
+
+    /// Primary-key columns (in declared PK order) and all other columns for
+    /// `table`, read from SQLite's own `PRAGMA table_info` rather than a
+    /// hand-maintained PK registry alongside each `*Projection.fs`'s own
+    /// `CREATE TABLE ... PRIMARY KEY (...)` declaration — the same schema
+    /// info, without duplicating it.
+    let private tableColumnInfo (conn: SqliteConnection) (table: string) : string list * string list =
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- sprintf "PRAGMA table_info(%s)" table
+        use reader = cmd.ExecuteReader()
+        let rows =
+            [ while reader.Read() do
+                yield reader.GetString(reader.GetOrdinal("name")), reader.GetInt32(reader.GetOrdinal("pk")) ]
+        let pkCols = rows |> List.filter (fun (_, pk) -> pk > 0) |> List.sortBy snd |> List.map fst
+        let otherCols = rows |> List.filter (fun (_, pk) -> pk = 0) |> List.map fst
+        pkCols, otherCols
+
+    /// Every row of `table`, keyed by its primary-key tuple (joined into one
+    /// string with a separator that can't appear in a column value) to a
+    /// human-readable display string plus a map of non-PK column -> value
+    /// (`None` = SQL NULL).
+    let private readRows (conn: SqliteConnection) (table: string) (pkCols: string list) (otherCols: string list) : Map<string, string * Map<string, string option>> =
+        let allCols = pkCols @ otherCols
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- sprintf "SELECT %s FROM %s" (String.concat ", " allCols) table
+        use reader = cmd.ExecuteReader()
+        let mutable result = Map.empty
+        while reader.Read() do
+            let valueOf (col: string) : string option =
+                let idx = reader.GetOrdinal(col)
+                if reader.IsDBNull(idx) then None
+                else Some (System.Convert.ToString(reader.GetValue(idx), System.Globalization.CultureInfo.InvariantCulture))
+            let keyParts = pkCols |> List.map (fun c -> valueOf c |> Option.defaultValue "")
+            let key = String.concat "" keyParts
+            let display = (pkCols, keyParts) ||> List.map2 (fun c v -> sprintf "%s=%s" c v) |> String.concat ", "
+            let cols = otherCols |> List.map (fun c -> c, valueOf c) |> Map.ofList
+            result <- Map.add key (display, cols) result
+        result
+
+    /// Rows-only-in-live, rows-only-in-shadow, and same-key-differing-column
+    /// discrepancies for one table, comparing `liveConn` (unmodified — read
+    /// only) against `shadowConn` (the freshly-replayed shadow copy).
+    let private diffTable (liveConn: SqliteConnection) (shadowConn: SqliteConnection) (table: string) : DriftDiscrepancy list =
+        if not (tableExists liveConn table) || not (tableExists shadowConn table) then
+            []
+        else
+            let pkCols, otherCols = tableColumnInfo liveConn table
+            let liveRows = readRows liveConn table pkCols otherCols
+            let shadowRows = readRows shadowConn table pkCols otherCols
+            let allKeys = Set.union (liveRows |> Map.toSeq |> Seq.map fst |> Set.ofSeq) (shadowRows |> Map.toSeq |> Seq.map fst |> Set.ofSeq)
+            [ for key in allKeys do
+                match Map.tryFind key liveRows, Map.tryFind key shadowRows with
+                | Some (display, _), None ->
+                    yield { Table = table; PrimaryKey = display; Kind = "onlyInLive"; Columns = [] }
+                | None, Some (display, _) ->
+                    yield { Table = table; PrimaryKey = display; Kind = "onlyInShadow"; Columns = [] }
+                | Some (display, liveCols), Some (_, shadowCols) ->
+                    let differingColumns =
+                        otherCols
+                        |> List.filter (fun c -> Map.tryFind c liveCols <> Map.tryFind c shadowCols)
+                    if not (List.isEmpty differingColumns) then
+                        yield { Table = table; PrimaryKey = display; Kind = "columnMismatch"; Columns = differingColumns }
+                | None, None -> () ]
+
+    let private discrepancyJson (d: DriftDiscrepancy) =
+        let columnsJson = d.Columns |> List.map (fun c -> sprintf "\"%s\"" (escapeJson c)) |> String.concat ","
+        sprintf "{\"table\":\"%s\",\"primaryKey\":\"%s\",\"kind\":\"%s\",\"columns\":[%s]}"
+            (escapeJson d.Table) (escapeJson d.PrimaryKey) d.Kind columnsJson
+
+    let private projectionDriftJson (p: ProjectionDrift) =
+        let discJson = p.Discrepancies |> List.map discrepancyJson |> String.concat ","
+        sprintf "{\"name\":\"%s\",\"discrepancies\":[%s]}" (escapeJson p.Name) discJson
+
+    /// The drift check itself: for every handler, in registration order,
+    /// `Projection.replayIntoShadow` drop+inits+replays the FULL live event
+    /// log into the shadow connection (load-bearing order — FriendProjection's
+    /// Friend_removed case scrubs movie_detail/watch_sessions and needs those
+    /// tables to already exist, same as live catch-up's own registration
+    /// order). ALL handlers finish replaying before any diffing starts — a
+    /// cross-projection write (Friend_removed scrubbing movie_detail) must be
+    /// allowed to land before movie_detail is compared, or MovieProjection
+    /// (which replays first) would be diffed against its own not-yet-scrubbed
+    /// shadow state and report false drift. Diffing then walks each
+    /// projection's owned tables (`projectionTables`) between `liveConn`
+    /// (read-only) and `shadowConn`.
+    let checkProjectionDrift (liveConn: SqliteConnection) (shadowConn: SqliteConnection) (projectionHandlers: Projection.ProjectionHandler list) (onProgress: string -> unit) : ProjectionDrift list =
+        for handler in projectionHandlers do
+            Projection.replayIntoShadow liveConn shadowConn handler
+            onProgress handler.Name
+
+        projectionHandlers
+        |> List.map (fun handler ->
+            let tables =
+                projectionTables
+                |> List.tryFind (fun (name, _) -> name = handler.Name)
+                |> Option.map snd
+                |> Option.defaultValue []
+            let discrepancies = tables |> List.collect (diffTable liveConn shadowConn)
+            { Name = handler.Name; Discrepancies = discrepancies })
+
+    /// Operator-facing rejection reason (ADR-0025's not-dirty guard) — names
+    /// every dirty projection so an operator can tell which rebuild/catch-up
+    /// to wait for, rather than a generic "try again later". Exposed (not
+    /// inlined into the SSE handler) so its wording is directly unit-testable
+    /// without an HttpContext, same test-the-underlying-function shape
+    /// `ProjectionRebuildTests.fs` established.
+    let driftCheckRejectionMessage (dirtyProjections: string list) : string =
+        let names = String.concat ", " dirtyProjections
+        let verb = if List.length dirtyProjections = 1 then "is" else "are"
+        sprintf "Refused: %s %s dirty (mid-rebuild or lagging) - shadow-at-head vs. live-behind-head would report false drift" names verb
+
+    /// The Projections tab's "Run check" command: a Giraffe SSE route
+    /// mirroring `projectionRebuildStreamHandler`'s `progress`/`complete`/
+    /// `rejected` framing (ADR-0024), gated by the not-dirty guard (ADR-0025)
+    /// since shadow-at-head vs. live-behind-head would report false drift.
+    /// Never touches `conn` — the shadow copy lives entirely in its own
+    /// throwaway `:memory:` connection (ADR-0031), so the live tables are
+    /// provably read-only for the whole run.
+    let driftCheckStreamHandler (conn: SqliteConnection) (projectionHandlers: Projection.ProjectionHandler list) : HttpHandler =
+        fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
+            task {
+                ctx.Response.Headers.["Content-Type"] <- Microsoft.Extensions.Primitives.StringValues("text/event-stream")
+                ctx.Response.Headers.["Cache-Control"] <- Microsoft.Extensions.Primitives.StringValues("no-cache")
+                ctx.Response.Headers.["Connection"] <- Microsoft.Extensions.Primitives.StringValues("keep-alive")
+
+                let writer = ctx.Response
+
+                let writeEvent (eventType: string) (json: string) = task {
+                    let line = Sse.sseFrame eventType json
+                    let bytes = System.Text.Encoding.UTF8.GetBytes(line)
+                    do! writer.Body.WriteAsync(bytes, 0, bytes.Length)
+                    do! writer.Body.FlushAsync()
+                }
+
+                let dirty = isAnyProjectionDirty conn projectionHandlers
+                if not (List.isEmpty dirty) then
+                    do! writeEvent "rejected" (sprintf "{\"message\":\"%s\"}" (escapeJson (driftCheckRejectionMessage dirty)))
+                elif not (driftCheckInProgress.TryAdd(driftCheckKey, ())) then
+                    do! writeEvent "rejected" "{\"message\":\"A drift check is already running\"}"
+                else
+                    try
+                        try
+                            use shadowConn = new SqliteConnection("Data Source=:memory:")
+                            shadowConn.Open()
+                            let emit (name: string) =
+                                writeEvent "progress" (sprintf "{\"projection\":\"%s\"}" (escapeJson name))
+                                |> Async.AwaitTask |> Async.RunSynchronously
+                            let results = checkProjectionDrift conn shadowConn projectionHandlers emit
+                            let total = results |> List.sumBy (fun p -> List.length p.Discrepancies)
+                            let projectionsJson = results |> List.map projectionDriftJson |> String.concat ","
+                            do! writeEvent "complete" (sprintf "{\"projections\":[%s],\"totalDiscrepancies\":%d}" projectionsJson total)
+                        with ex ->
+                            do! writeEvent "error" (sprintf "{\"message\":\"%s\"}" (escapeJson ex.Message))
+                    finally
+                        driftCheckInProgress.TryRemove(driftCheckKey) |> ignore
+
+                return! earlyReturn ctx
+            }
+
     /// The fifteen typed ref-bearing `(table, column)` pairs, verified by
     /// reading every projection's INSERT/SELECT statements (ADR-0025) — no
     /// markdown-body scanning needed. LOAD-BEARING: a missed or stale entry

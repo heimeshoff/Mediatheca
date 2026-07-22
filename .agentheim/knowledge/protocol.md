@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 14:57 -- Task verified and completed: administration-btvqa - Shadow-table replay drift detector — verify projection read models exactly match the event log
+
+**Type:** Work / Task completion
+**Task:** administration-btvqa - Shadow-table replay drift detector — verify projection read models exactly match the event log
+**Summary:** Added a shadow-table replay drift detector (ADR-0031) — Projections-tab Run check replays the full event log into a throwaway :memory: connection per handler and diffs row-by-row against live tables, gated by the not-dirty guard, streamed over SSE
+**Duration:** 25m1s
+**Verification:** PASS (iteration 1)
+**Files changed:** 9
+**Tests added:** 5
+**ADRs written:** 0031-projection-drift-detector-throwaway-shadow-connection.md
+
+---
+
 ## 2026-07-22 14:32 -- Batch started: [administration-btvqa]
 
 **Type:** Work / Batch start

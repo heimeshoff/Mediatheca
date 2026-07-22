@@ -20,6 +20,7 @@
     <Compile Include="JobConnectionConcurrencyTests.fs" />
     <Compile Include="RequestConnectionConcurrencyTests.fs" />
     <Compile Include="ProjectionRebuildTests.fs" />
+    <Compile Include="ProjectionDriftTests.fs" />
     <Compile Include="MoviesIntegrationTests.fs" />
     <Compile Include="FriendIntegrationTests.fs" />
     <Compile Include="SeriesTests.fs" />

@@ -334,6 +334,8 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
             route "/api/stream/import-events"
                 >=> Administration.importEventsStreamHandler conn requestDbLock
             Administration.projectionRebuildStreamHandler conn projectionHandlers
+            route "/api/stream/drift-check"
+                >=> Administration.driftCheckStreamHandler conn projectionHandlers
             remotingHandler
             adminRemotingHandler
         ]
