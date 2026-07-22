@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 11:45 -- Task verified and completed: administration-a4d9b - Assert the Events-tab Follow toggle's three live-tail behaviors via committed Playwright specs
+
+**Type:** Work / Task completion
+**Task:** administration-a4d9b - Assert the Events-tab Follow toggle's three live-tail behaviors via committed Playwright specs
+**Summary:** Five committed Playwright specs codify ADR-0023 Follow-toggle behaviors — arrival+animate-highlight, filter-respecting live rows, and all three no-orphan-polling sub-cases incl. the load-bearing client-side navigate-away — on the ADR-0027 harness
+**Duration:** ~22m
+**Verification:** PASS (iteration 1)
+**Files changed:** 3
+**Tests added:** 5
+**ADRs written:** none
+
+---
+
 ## 2026-07-22 11:18 -- Batch started: [administration-tj8n2, administration-a4d9b, administration-vrc56]
 
 **Type:** Work / Batch start

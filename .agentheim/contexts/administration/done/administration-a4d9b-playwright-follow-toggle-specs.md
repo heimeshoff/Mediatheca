@@ -1,11 +1,11 @@
 ---
 id: administration-a4d9b
 title: Assert the Events-tab Follow toggle's three live-tail behaviors via committed Playwright specs
-status: doing
+status: done
 type: feature
 context: administration
 created: 2026-07-21
-completed:
+completed: 2026-07-22
 depends_on: [administration-da908, administration-h4br2]
 blocks: []
 tags: [admin-console, event-store, live, testing, e2e]
@@ -71,3 +71,46 @@ actual mechanism, not an invented perceptual proxy. No `[human-eye]` criteria.
 Shaped via the orchestrator (architect) during the administration-h4br2
 refinement, 2026-07-21; enriched at refine-time (2026-07-22) once da908 shipped
 the harness and resolved the open selector/observability unknowns.
+
+## Outcome
+
+Added `tests/e2e/event-tail-follow.spec.ts` alongside the harness-proving
+smoke spec, with five committed specs covering ADR-0023's behaviors 1:1:
+
+- **Arrival** — Follow on, an `addFriend` call lands live within a bounded
+  4s window, and the arrived row (scoped via `div.border-b`, the actual
+  `eventRow` wrapper, not a bare `div` text-match that could resolve to an
+  outer ancestor) carries `animate-highlight`.
+- **Filter-respecting live rows** — with a unique search term active, a
+  matching live friend arrives; a simultaneously-created non-matching
+  friend's name never appears anywhere on the page.
+- **No orphan polling**, all three sub-cases, each asserting zero further
+  `getEventsAfter` requests over a 10s window after the action: (a) Follow
+  toggled off, (b) pagination away from page 1 (forcing `HasMore` via 26
+  same-filter events, independent of ambient DB size), and (c)
+  **[load-bearing]** real client-side navigation away from `/admin` via the
+  sidebar's Dashboard link (Feliz.Router `Url_changed`), not a reload —
+  the path fixed only by static review at administration-mtf1f iteration 2.
+
+All 6 e2e specs pass (`npm run test:e2e`), `npm run build` is clean, and the
+Expecto suite passes (358/358).
+
+Two discrepancies surfaced and were **not** patched here, per the task's own
+rule:
+- Concurrent `addFriend` calls (tried via `Promise.all`) intermittently crash
+  the server (`SqliteConnection does not support nested transactions` /
+  "cannot start a transaction within a transaction") — empirical
+  confirmation of the already-tracked **administration-cx92m** (shared
+  connection request-concurrency audit). Specs were rewritten to trigger
+  events strictly sequentially to route around it.
+- The event explorer's zero-filter-match state renders `"No events found."`,
+  never `paginationBar`'s own `"No matches"` string — the latter is
+  unreachable dead code given `view`'s branch order (`List.isEmpty
+  model.Events` always wins first when `TotalMatches = 0`). Filed as new
+  backlog item **administration-nf3wk**.
+
+Key files:
+- `tests/e2e/event-tail-follow.spec.ts` (new)
+- `.agentheim/contexts/administration/backlog/administration-nf3wk-dead-no-matches-branch.md` (new)
+- `.agentheim/contexts/administration/README.md` (updated: Playwright
+  harness bullet)
