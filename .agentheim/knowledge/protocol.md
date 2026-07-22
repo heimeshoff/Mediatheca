@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 12:30 -- Modeling / Refined: administration-h4k2p - Fix trailing-comma malformed JSON in empty-payload SSE frames
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Source-grounded all three `writeEvent` SSE handlers: confirmed the only live trailing-comma bug is `projectionRebuildStreamHandler`'s `writeEvent "complete" "{}"` (Administration.fs:515); `steamFamilyImportHandler` (Api.fs) and `importEventsStreamHandler` (Administration.fs, vrc56/ADR-0029) share the identical fragile `TrimStart('{').TrimEnd('}')` helper but aren't reachable with an empty payload today. Widened scope (builder decision) from the one call site to extracting a single pure `sseFrame` helper all three handlers call — closes the latent landmine in the other two and makes the wire framing unit-testable (the exact gap that let this ship). Sharpened acceptance criteria: Expecto over the pure helper, grep-check that inline frame-building is gone, plus the live-rebuild and Rebuild-button confirmations; classified per ADR-0061 (all machine-checkable except the perceptual Rebuild-button check, marked `[human-eye]`). No ADR (bug-fix refactor). Auto-promoted to todo.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-07-22 12:05 -- Work session ended
 
 **Type:** Work / Session end

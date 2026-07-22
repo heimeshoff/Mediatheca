@@ -44,7 +44,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **administration-h4k2p** — Fix trailing-comma malformed JSON in SSE "complete"/empty-payload events (breaks the Projections tab's Rebuild button completion handling) (bugfix) — `backlog/administration-h4k2p-sse-empty-payload-trailing-comma-bug.md`
+- **administration-h4k2p** — Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure. (bugfix) — `backlog/administration-h4k2p-sse-empty-payload-trailing-comma-bug.md`
 - **administration-nf3wk** — Event Browser's "No matches" pagination-bar text is dead code — the empty-events branch always wins first (bugfix) — `backlog/administration-nf3wk-dead-no-matches-branch.md`
 - **administration-cx92m** — Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate (spike) — `backlog/administration-cx92m-shared-connection-request-concurrency-audit.md`
 - **administration-btvqa** — Integrity checks — shadow-table replay drift detector and unknown-event report (feature) — `backlog/administration-btvqa-projection-drift-integrity-checks.md`
