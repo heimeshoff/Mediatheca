@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 14:16 -- Batch started: [administration-gxd6e]
+
+**Type:** Work / Batch start
+**Tasks:** administration-gxd6e - Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples
+**Parallel:** no (1 worker — sequential wave: administration-btvqa and administration-xjmda held to later waves because all three extend the same IAdminApi contract in src/Shared/Shared.fs, the Administration.create member list, and Composition.fs route wiring; running them serially gives each verifier the true integrated base and avoids F# type-definition merge-back conflicts)
+
+---
+
 ## 2026-07-22 14:15 -- Task verified and completed: administration-cx92m - Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate
 
 **Type:** Work / Task completion

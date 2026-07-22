@@ -1,7 +1,7 @@
 ---
 id: administration-gxd6e
 title: Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples
-status: todo
+status: doing
 type: feature
 context: administration
 created: 2026-07-22
