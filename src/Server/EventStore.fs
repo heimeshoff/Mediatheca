@@ -2,8 +2,10 @@ namespace Mediatheca.Server
 
 open System
 open System.Data
+open System.IO
 open Microsoft.Data.Sqlite
 open Donald
+open Thoth.Json.Net
 
 module EventStore =
 
@@ -406,3 +408,145 @@ module EventStore =
             with _ ->
                 tx.Rollback()
                 reraise ()
+
+    // NDJSON export/import (administration-vrc56, ADR-0029) — the event
+    // log's portable form: a backup/restore substrate and the base for
+    // future copy-on-write log transformations. See ADR-0029 for why the
+    // payload columns are embedded as opaque JSON-escaped strings rather
+    // than re-nested as JSON objects, why `global_position` is preserved via
+    // an explicit-rowid INSERT bypassing `appendToStream`, and why import
+    // deliberately leaves projections dirty instead of self-triggering a
+    // rebuild.
+
+    /// Streams the full event log as NDJSON (one JSON object per line, ascending
+    /// `global_position`) onto `writer`, walking `readAllForward`'s existing
+    /// batching so the whole log is never materialized as one in-memory
+    /// collection or string. Field order is fixed:
+    /// globalPosition, streamId, streamPosition, eventType, data, metadata, timestamp.
+    /// `data`/`metadata` are embedded as JSON-escaped STRING values holding the
+    /// literal `events.data`/`events.metadata` TEXT content, not reparsed and
+    /// re-nested as JSON objects — a JSON string escape/unescape is a lossless
+    /// bijection, so the round-trip doesn't depend on canonical-JSON matching
+    /// between whatever wrote the original payload and whatever writes it back.
+    /// `globalPosition`/`streamPosition` are written as bare JSON numbers (via
+    /// `sprintf "%d"`, not `Encode.int64` — Thoth encodes int64 as a JSON
+    /// string to protect JS number precision, which this schema doesn't need).
+    let exportNdjson (conn: SqliteConnection) (writer: TextWriter) : unit =
+        let batchSize = 500
+
+        let escapeString (s: string) : string =
+            Encode.string s |> Encode.toString 0
+
+        let writeLine (ev: StoredEvent) =
+            let line =
+                sprintf "{\"globalPosition\":%d,\"streamId\":%s,\"streamPosition\":%d,\"eventType\":%s,\"data\":%s,\"metadata\":%s,\"timestamp\":%s}"
+                    ev.GlobalPosition
+                    (escapeString ev.StreamId)
+                    ev.StreamPosition
+                    (escapeString ev.EventType)
+                    (escapeString ev.Data)
+                    (escapeString ev.Metadata)
+                    (escapeString (ev.Timestamp.ToString("o")))
+            writer.WriteLine(line: string)
+
+        let rec loop (fromPosition: int64) =
+            match readAllForward conn fromPosition batchSize with
+            | [] -> ()
+            | batch ->
+                batch |> List.iter writeLine
+                loop (List.last batch).GlobalPosition
+
+        loop 0L
+
+    /// Result of a successful `importNdjson` call.
+    type ImportOutcome = { EventsImported: int }
+
+    /// Why an import didn't happen (or didn't finish).
+    type ImportFailure =
+        /// The target store already has events — import into a non-empty
+        /// store is a separate, more dangerous operation (administration-n8kqw).
+        | StoreNotEmpty
+        /// `lineNumber` is 1-based over non-blank lines seen so far;
+        /// `message` is the underlying JSON-decode error.
+        | MalformedLine of lineNumber: int * message: string
+
+    let private ndjsonLineDecoder : Decoder<int64 * string * int64 * string * string * string * string> =
+        Decode.object (fun get ->
+            get.Required.Field "globalPosition" Decode.int64,
+            get.Required.Field "streamId" Decode.string,
+            get.Required.Field "streamPosition" Decode.int64,
+            get.Required.Field "eventType" Decode.string,
+            get.Required.Field "data" Decode.string,
+            get.Required.Field "metadata" Decode.string,
+            get.Required.Field "timestamp" Decode.string
+        )
+
+    /// Imports an NDJSON event log produced by `exportNdjson` into the target
+    /// store, reading `reader` line-by-line so the upload is never buffered
+    /// whole. Refuses immediately (`StoreNotEmpty`) if the target store
+    /// already has events, before a single line is read from `reader`.
+    /// Preserves each line's `global_position` exactly via an explicit-rowid
+    /// INSERT (bypassing `appendToStream`, which recomputes stream position
+    /// and timestamp and has no notion of "preserve this exact position");
+    /// SQLite's AUTOINCREMENT bookkeeping (`sqlite_sequence`) advances to
+    /// match the highest explicit rowid inserted, so a subsequent ordinary
+    /// append continues from `(imported max global_position) + 1`. The whole
+    /// import runs in one transaction: a malformed line partway through rolls
+    /// back everything, leaving the target store empty rather than partially
+    /// populated. Does not touch `projection_checkpoints` — the store reads
+    /// as dirty via the existing lag-detection until the operator runs the
+    /// existing Rebuild-all control (administration-qjcp4, ADR-0025).
+    let importNdjson (conn: SqliteConnection) (reader: TextReader) : Result<ImportOutcome, ImportFailure> =
+        if getTotalEventCount conn > 0 then
+            Error StoreNotEmpty
+        else
+            let mutable lineNumber = 0
+            let mutable count = 0
+            use tx = conn.BeginTransaction()
+            try
+                let mutable outcome : Result<ImportOutcome, ImportFailure> option = None
+
+                while outcome.IsNone do
+                    match reader.ReadLine() with
+                    | null ->
+                        outcome <- Some (Ok { EventsImported = count })
+                    | line when line.Trim() = "" ->
+                        lineNumber <- lineNumber + 1
+                    | line ->
+                        lineNumber <- lineNumber + 1
+                        match Decode.fromString ndjsonLineDecoder line with
+                        | Error err ->
+                            outcome <- Some (Error (MalformedLine(lineNumber, err)))
+                        | Ok (globalPosition, streamId, streamPosition, eventType, data, metadata, timestamp) ->
+                            conn
+                            |> Db.newCommand """
+                                INSERT INTO events (global_position, stream_id, stream_position, event_type, data, metadata, timestamp)
+                                VALUES (@global_position, @stream_id, @stream_position, @event_type, @data, @metadata, @timestamp)
+                            """
+                            |> Db.setParams [
+                                "global_position", SqlType.Int64 globalPosition
+                                "stream_id", SqlType.String streamId
+                                "stream_position", SqlType.Int64 streamPosition
+                                "event_type", SqlType.String eventType
+                                "data", SqlType.String data
+                                "metadata", SqlType.String metadata
+                                "timestamp", SqlType.String timestamp
+                            ]
+                            |> Db.exec
+                            count <- count + 1
+
+                match outcome with
+                | Some (Ok result) ->
+                    tx.Commit()
+                    Ok result
+                | Some (Error failure) ->
+                    tx.Rollback()
+                    Error failure
+                | None ->
+                    // Unreachable: the loop only exits via one of the two
+                    // `outcome <- Some ...` assignments above.
+                    tx.Rollback()
+                    Error (MalformedLine(lineNumber, "Unexpected end of import"))
+            with ex ->
+                tx.Rollback()
+                Error (MalformedLine(lineNumber, ex.Message))

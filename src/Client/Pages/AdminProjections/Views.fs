@@ -108,10 +108,73 @@ let private projectionCard (model: Model) (dispatch: Msg -> unit) (row: Projecti
         ]
     ]
 
+/// Backup section (administration-vrc56, ADR-0029): export the full event
+/// log as NDJSON (a plain `<a href>` download — the server sets
+/// Content-Disposition, no client state needed), or import an NDJSON export
+/// into an empty store. After a successful import, projections are left
+/// untouched on purpose (checkpoints stay put, so the store reads as dirty
+/// via the existing lag detection above) — the operator runs "Rebuild all"
+/// next, reusing the same control rather than growing a second rebuild
+/// path. Import into a non-empty store is refused server-side and surfaced
+/// here as a visible message, not a raw error.
+let private backupSection (model: Model) (dispatch: Msg -> unit) =
+    let importInputId = "admin-import-events-input"
+    Html.div [
+        prop.className (DesignSystem.velvetCard + " p-4 flex flex-col gap-3")
+        prop.children [
+            Html.h3 [ prop.className DesignSystem.cardTitle; prop.text "Backup" ]
+            Html.p [
+                prop.className DesignSystem.mutedText
+                prop.text "Export the full event log as NDJSON, or import one into a freshly emptied store. Import into a store that already has events is refused."
+            ]
+            Html.div [
+                prop.className "flex items-center gap-3"
+                prop.children [
+                    Html.a [
+                        prop.href "/api/stream/export-events"
+                        prop.className "btn btn-outline btn-sm"
+                        prop.text "Export events"
+                    ]
+                    Html.label [
+                        prop.htmlFor importInputId
+                        prop.className ("btn btn-outline btn-sm" + (if model.IsImporting then " btn-disabled" else ""))
+                        prop.text (if model.IsImporting then "Importing..." else "Import events")
+                    ]
+                    Html.input [
+                        prop.id importInputId
+                        prop.type' "file"
+                        prop.accept ".ndjson,application/x-ndjson,text/plain"
+                        prop.className "hidden"
+                        prop.disabled model.IsImporting
+                        prop.onChange (fun (e: Browser.Types.Event) ->
+                            let input: Browser.Types.HTMLInputElement = unbox e.target
+                            let files = input.files
+                            if files.length > 0 then
+                                dispatch (Import_file_selected files.[0])
+                                input.value <- "")
+                    ]
+                    if model.IsImporting then Daisy.loading [ loading.spinner; loading.xs ]
+                ]
+            ]
+            match model.ImportResult with
+            | Some outcome ->
+                Html.p [
+                    prop.className "text-xs text-success"
+                    prop.text (sprintf "Imported %d events. Run Rebuild all below to bring projections up to date." outcome.EventsImported)
+                ]
+            | None -> Html.none
+            match model.ImportMessage with
+            | Some message -> Html.p [ prop.className "text-xs text-warning"; prop.text message ]
+            | None -> Html.none
+        ]
+    ]
+
 let view (model: Model) (dispatch: Msg -> unit) =
     Html.div [
         prop.className (DesignSystem.pagePadding + " flex flex-col gap-4")
         prop.children [
+            backupSection model dispatch
+
             Html.div [
                 prop.className "flex items-center justify-between gap-3"
                 prop.children [

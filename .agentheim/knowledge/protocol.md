@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 12:04 -- Task verified and completed: administration-vrc56 - Event log export/import as NDJSON — stream out/in via plain Giraffe routes, preserving exact global_position, into an empty store only
+
+**Type:** Work / Task completion
+**Task:** administration-vrc56 - Event log export/import as NDJSON — stream out/in via plain Giraffe routes, preserving exact global_position, into an empty store only
+**Summary:** NDJSON event-log export/import — Giraffe-decoupled EventStore.exportNdjson/importNdjson (plain-stream export, SSE-progress import), preserving exact global_position into an empty store only, with an Admin Backup UI section
+**Duration:** ~31m
+**Verification:** PASS (iteration 1)
+**Files changed:** 11
+**Tests added:** 8
+**ADRs written:** 0029-ndjson-event-log-export-import.md
+
+---
+
 ## 2026-07-22 11:58 -- Task verified and completed: administration-tj8n2 - Scheduled-job timers race on the shared SqliteConnection and crash the process — fix with a dedicated job connection plus a per-command lock
 
 **Type:** Work / Task completion

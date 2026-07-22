@@ -313,6 +313,10 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
             route "/health" >=> text "ok"
             route "/api/stream/import-steam-family"
                 >=> Api.steamFamilyImportHandler conn httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers
+            route "/api/stream/export-events"
+                >=> Administration.exportEventsStreamHandler conn
+            route "/api/stream/import-events"
+                >=> Administration.importEventsStreamHandler conn
             Administration.projectionRebuildStreamHandler conn projectionHandlers
             remotingHandler
             adminRemotingHandler

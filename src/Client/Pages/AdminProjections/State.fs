@@ -9,6 +9,9 @@ open Mediatheca.Client.Pages.AdminProjections.Types
 [<Emit("fetch($0)")>]
 let private jsFetch (url: string) : JS.Promise<obj> = jsNative
 
+[<Emit("fetch($0, { method: 'POST', body: $1 })")>]
+let private jsFetchPostFile (url: string) (file: Browser.Types.File) : JS.Promise<obj> = jsNative
+
 [<Emit("new TextDecoder().decode($0)")>]
 let private decodeBytes (value: obj) : string = jsNative
 
@@ -19,7 +22,10 @@ let init () : Model * Cmd<Msg> =
       RebuildingNames = Set.empty
       RebuildMessages = Map.empty
       IsRebuildingAll = false
-      PendingRebuildAllQueue = [] },
+      PendingRebuildAllQueue = []
+      IsImporting = false
+      ImportResult = None
+      ImportMessage = None },
     Cmd.ofMsg Load
 
 /// Consumes the SSE stream from `/api/stream/rebuild-projection/{name}`
@@ -74,6 +80,53 @@ let private runRebuildStream (projectionName: string) : Cmd<Msg> =
                             idx <- buffer.IndexOf("\n\n")
             with ex ->
                 dispatch (Rebuild_failed (projectionName, ex.Message))
+        } |> Async.StartImmediate
+    )
+
+/// Consumes the SSE stream from `/api/stream/import-events`
+/// (Administration.importEventsStreamHandler), the file's raw bytes POSTed
+/// directly as the request body (no multipart wrapper — one file, no
+/// companion fields). Same reader/buffer/`data: ` framing as
+/// `runRebuildStream` above; only "start" is ignored since this tab has no
+/// running-count display for import (total line count is unknown up front).
+let private runImportStream (file: Browser.Types.File) : Cmd<Msg> =
+    Cmd.ofEffect (fun dispatch ->
+        async {
+            try
+                let! response = jsFetchPostFile "/api/stream/import-events" file |> Async.AwaitPromise
+                let reader: obj = response?body?getReader()
+                let mutable buffer = ""
+                let mutable reading = true
+                while reading do
+                    let! chunk = (reader?read() : JS.Promise<obj>) |> Async.AwaitPromise
+                    let isDone: bool = chunk?``done``
+                    if isDone then
+                        reading <- false
+                    else
+                        let value: obj = chunk?value
+                        let text = decodeBytes value
+                        buffer <- buffer + text
+                        let mutable idx = buffer.IndexOf("\n\n")
+                        while idx >= 0 do
+                            let message = buffer.[0..idx-1]
+                            buffer <- buffer.[idx+2..]
+                            let dataLine =
+                                if message.StartsWith("data: ") then message.[6..]
+                                else message
+                            if dataLine <> "" then
+                                let parsed: obj = JS.JSON.parse dataLine
+                                let eventType: string = parsed?``type``
+                                match eventType with
+                                | "complete" ->
+                                    dispatch (Import_completed { EventsImported = parsed?eventsImported |> int })
+                                | "rejected" ->
+                                    dispatch (Import_rejected (parsed?message |> string))
+                                | "error" ->
+                                    dispatch (Import_failed (parsed?message |> string))
+                                | _ -> ()
+                            idx <- buffer.IndexOf("\n\n")
+            with ex ->
+                dispatch (Import_failed ex.Message)
         } |> Async.StartImmediate
     )
 
@@ -137,3 +190,20 @@ let update (api: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 RebuildProgress = Map.remove name model.RebuildProgress
                 RebuildMessages = Map.add name message model.RebuildMessages }
         model, (if model.IsRebuildingAll then Cmd.ofMsg Start_next_queued_rebuild else Cmd.none)
+
+    | Import_file_selected file ->
+        { model with IsImporting = true; ImportResult = None; ImportMessage = None },
+        runImportStream file
+
+    | Import_completed outcome ->
+        // Checkpoints are left untouched by import (ADR-0025 lag detection
+        // now reads the store as dirty), so reload stats to surface the lag
+        // — the operator's next step is Rebuild all, not an automatic one.
+        { model with IsImporting = false; ImportResult = Some outcome; ImportMessage = None },
+        Cmd.ofMsg Load
+
+    | Import_rejected message ->
+        { model with IsImporting = false; ImportMessage = Some message }, Cmd.none
+
+    | Import_failed message ->
+        { model with IsImporting = false; ImportMessage = Some message }, Cmd.none

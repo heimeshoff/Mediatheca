@@ -381,6 +381,94 @@ module Administration =
             |> List.map (fun (rel, sub, size) -> { RelativePath = rel; Subfolder = sub; SizeBytes = size })
         orphans, orphans |> List.sumBy (fun o -> o.SizeBytes)
 
+    // ── Event log export/import (administration-vrc56, ADR-0029) ──
+
+    /// Kestrel refuses synchronous reads/writes on the request/response body
+    /// by default (`InvalidOperationException: Synchronous operations are
+    /// disallowed`). `EventStore.exportNdjson`/`importNdjson` are
+    /// deliberately synchronous over a plain `TextWriter`/`TextReader` — the
+    /// pinned interface that keeps the round-trip logic plain-Expecto
+    /// testable with no HTTP pipeline — so the Giraffe wrapper opts back
+    /// into synchronous I/O for this one request via Kestrel's own escape
+    /// hatch rather than making the storage-layer functions async. This
+    /// still streams (no full in-memory buffering): it only relaxes
+    /// Kestrel's *thread-starvation* guard against blocking sync calls, it
+    /// doesn't materialize the body.
+    let private allowSynchronousIO (ctx: Microsoft.AspNetCore.Http.HttpContext) =
+        match ctx.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpBodyControlFeature>() with
+        | null -> ()
+        | feature -> feature.AllowSynchronousIO <- true
+
+    /// Export the full event log as NDJSON: a plain streamed download, not
+    /// SSE — SSE's `data: {...}` framing exists for *progress* reporting
+    /// (see `importEventsStreamHandler` below), and would force a second
+    /// layer of escaping onto every already-JSON NDJSON line. Wired as a raw
+    /// Giraffe route (not Remoting — a streamed file download doesn't fit
+    /// the request/response RPC shape). `EventStore.exportNdjson` does the
+    /// actual work; this handler is a thin wrapper over `ctx.Response.Body`
+    /// so the round-trip logic stays plain-Expecto testable with no HTTP
+    /// pipeline (see `EventStoreNdjsonTests.fs`).
+    let exportEventsStreamHandler (conn: SqliteConnection) : HttpHandler =
+        fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
+            task {
+                allowSynchronousIO ctx
+                ctx.Response.Headers.["Content-Type"] <- Microsoft.Extensions.Primitives.StringValues("application/x-ndjson")
+                ctx.Response.Headers.["Content-Disposition"] <- Microsoft.Extensions.Primitives.StringValues("attachment; filename=\"mediatheca-events.ndjson\"")
+                use writer = new StreamWriter(ctx.Response.Body)
+                EventStore.exportNdjson conn writer
+                do! writer.FlushAsync()
+                return! earlyReturn ctx
+            }
+
+    /// Import an NDJSON event log into an empty store: the request body
+    /// *is* the NDJSON (no multipart wrapper — one file, no companion
+    /// fields), read line-by-line by `EventStore.importNdjson` so the
+    /// upload is never buffered whole. Response is SSE progress, the same
+    /// envelope `Api.steamFamilyImportHandler` and
+    /// `projectionRebuildStreamHandler` use — total line count is unknown
+    /// up front, so this is a single outcome event rather than a percentage
+    /// bar (there is no separate "start" event: unlike those two precedents,
+    /// import here is one atomic transaction with no intermediate progress
+    /// to report, and an empty-payload `{}` "start" event would round-trip
+    /// through this same handler's `{"type":"...",%s}` template as
+    /// `{"type":"start",}` — a trailing comma that breaks `JSON.parse` on
+    /// the client). A non-empty target store gets a "rejected" event (same
+    /// vocabulary `projectionRebuildStreamHandler` uses for its
+    /// concurrent-rebuild guard) before a single line of the body is read —
+    /// see `EventStore.importNdjson`'s doc comment for why that ordering
+    /// holds. Import that overwrites a non-empty store by wiping first is a
+    /// separate, more dangerous operation (administration-n8kqw), out of
+    /// scope here.
+    let importEventsStreamHandler (conn: SqliteConnection) : HttpHandler =
+        fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
+            task {
+                allowSynchronousIO ctx
+                ctx.Response.Headers.["Content-Type"] <- Microsoft.Extensions.Primitives.StringValues("text/event-stream")
+                ctx.Response.Headers.["Cache-Control"] <- Microsoft.Extensions.Primitives.StringValues("no-cache")
+                ctx.Response.Headers.["Connection"] <- Microsoft.Extensions.Primitives.StringValues("keep-alive")
+
+                let writer = ctx.Response
+
+                let writeEvent (eventType: string) (json: string) = task {
+                    let line = sprintf "data: {\"type\":\"%s\",%s}\n\n" eventType (json.TrimStart('{').TrimEnd('}'))
+                    let bytes = System.Text.Encoding.UTF8.GetBytes(line)
+                    do! writer.Body.WriteAsync(bytes, 0, bytes.Length)
+                    do! writer.Body.FlushAsync()
+                }
+
+                use reader = new StreamReader(ctx.Request.Body)
+                match EventStore.importNdjson conn reader with
+                | Ok outcome ->
+                    do! writeEvent "complete" (sprintf "{\"eventsImported\":%d}" outcome.EventsImported)
+                | Error EventStore.StoreNotEmpty ->
+                    do! writeEvent "rejected" "{\"message\":\"Target store already has events - import into a non-empty store is a separate operation\"}"
+                | Error (EventStore.MalformedLine(lineNumber, message)) ->
+                    let escaped = message.Replace("\\", "\\\\").Replace("\"", "\\\"")
+                    do! writeEvent "error" (sprintf "{\"lineNumber\":%d,\"message\":\"%s\"}" lineNumber escaped)
+
+                return! earlyReturn ctx
+            }
+
     /// Rebuild-with-live-progress command (the Projections tab's "Rebuild"
     /// button, administration-qjcp4): drop + replay one projection via
     /// `Projection.rebuildProjectionWithProgress`, streaming SSE progress the
