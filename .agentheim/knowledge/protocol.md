@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 17:00 -- Task verified and completed: administration-qk3f7 - Add a formatEvent case for Game_rawg_id_set — the one real handled-but-unformattable drift the unknown-event report caught
+
+**Type:** Work / Task completion
+**Task:** administration-qk3f7 - Add a formatEvent case for Game_rawg_id_set — the one real handled-but-unformattable drift the unknown-event report caught
+**Summary:** Added the Game_rawg_id_set formatter arm to EventFormatting.formatGameEvent, closing the one real handled-but-unformattable event-type drift so handled <=> formattable holds for every event type in the store
+**Duration:** ~7m
+**Verification:** PASS (iteration 1)
+**Files changed:** 3
+**Tests added:** 2
+**ADRs written:** none
+
+---
+
 ## 2026-07-22 16:57 -- Batch started: [administration-mz6kp]
 
 **Type:** Work / Batch start

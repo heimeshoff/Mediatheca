@@ -268,6 +268,15 @@ module EventFormatting =
         | "Game_steam_app_id_set" ->
             let appId = tryFieldInt "steamAppId" data |> Option.map string |> Option.defaultValue "?"
             Some { Timestamp = ts; Label = "Steam App ID set"; Details = [ appId ] }
+        | "Game_rawg_id_set" ->
+            let rawgId = tryFieldInt "rawgId" data |> Option.map string |> Option.defaultValue "?"
+            let rating = tryFieldOptionalFloat "rawgRating" data
+            let details =
+                [ $"RAWG ID: {rawgId}" ]
+                @ (match rating with
+                   | Some r -> [ $"Rating: {r}" ]
+                   | None -> [])
+            Some { Timestamp = ts; Label = "RAWG ID set"; Details = details }
         | "Game_play_time_set" ->
             let mins = tryFieldInt "totalMinutes" data |> Option.defaultValue 0
             let hours = float mins / 60.0

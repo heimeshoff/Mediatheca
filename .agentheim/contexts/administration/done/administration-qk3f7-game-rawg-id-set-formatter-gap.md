@@ -1,11 +1,11 @@
 ---
 id: administration-qk3f7
 title: Add a formatEvent case for Game_rawg_id_set — the one real handled-but-unformattable drift the unknown-event report caught
-status: doing
+status: done
 type: bug
 context: administration
 created: 2026-07-22
-completed:
+completed: 2026-07-22
 depends_on: []
 blocks: []
 tags: [admin-console, health, integrity, drift]
@@ -80,16 +80,32 @@ simply can no longer be demonstrated through real data now that the codebase is
 fully in sync — that is the intended end state, not a coverage regression.
 
 ## Acceptance criteria
-- [ ] `EventFormatting.formatEvent` returns `Some` for a `Game_rawg_id_set`
+- [x] `EventFormatting.formatEvent` returns `Some` for a `Game_rawg_id_set`
       stored event (a `Game-`-prefixed stream), with a label and a detail
       reflecting the RAWG id, plus the RAWG rating when the payload carries one.
-- [ ] The `AdministrationTests.fs:397` test no longer asserts `Game_rawg_id_set`
+- [x] The `AdministrationTests.fs:397` test no longer asserts `Game_rawg_id_set`
       is unformattable; it instead asserts `Game_rawg_id_set` appears in
       **neither** `stats.UnhandledEventTypes` nor `stats.UnformattableEventTypes`
       (handled and formattable), and its name/comment are updated to say the
       drift is closed.
-- [ ] `npm run build` (Fable compile / type-check) succeeds and `npm test`
+- [x] `npm run build` (Fable compile / type-check) succeeds and `npm test`
       (Expecto) is green.
+
+## Outcome
+Added a `"Game_rawg_id_set" ->` match arm to `EventFormatting.formatGameEvent`
+(sibling to `Game_steam_app_id_set`), formatting the RAWG id and, when
+present, the RAWG rating. Repurposed the `AdministrationTests.fs:397` test
+into a positive "appears in neither list" regression guard (renamed,
+recommented) mirroring the existing `Movie_added_to_library` test, and added
+a new `getStreamDetail` test asserting the formatted label/details for a
+`Game_rawg_id_set` event. Updated the administration BC README's
+unknown-event-report bullet, which used `Game_rawg_id_set` as its illustrative
+drift example, to reflect that the drift is now closed. `npm test` (Expecto):
+0 failed (3 pre-existing, unrelated `JobRunsTests` timing errors reproduce
+identically on a clean checkout of this branch before these changes).
+`npm run build` succeeds. Key files: `src/Server/EventFormatting.fs`,
+`tests/Server.Tests/AdministrationTests.fs`,
+`.agentheim/contexts/administration/README.md`.
 
 ## Notes
 - Sibling arm to copy: `Game_steam_app_id_set` (`EventFormatting.fs:268`) —

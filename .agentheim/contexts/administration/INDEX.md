@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 1
 - **Todo:** 1
-- **Doing:** 2
-- **Done:** 19
+- **Doing:** 1
+- **Done:** 20
 <!-- task-counts:end -->
 
 ### Todo
@@ -24,12 +24,12 @@ research touching this BC, and concept synthesis pages.
 ### Doing
 <!-- doing-list:start -->
 - **administration-mz6kp** — Migrate Api.create/Administration.create and the raw Giraffe stream handlers from one shared SqliteConnection to per-request (factory-based) connections, retiring the ADR-0030 semaphore gate (refactor) — `doing/administration-mz6kp-per-request-connection-migration.md`
-- **administration-qk3f7** — Add a formatEvent case for Game_rawg_id_set — the one real handled-but-unformattable drift the unknown-event report caught (bug) — `doing/administration-qk3f7-game-rawg-id-set-formatter-gap.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **administration-qk3f7** — Add a formatEvent case for Game_rawg_id_set — the one real handled-but-unformattable drift the unknown-event report caught (bug) — `done/administration-qk3f7-game-rawg-id-set-formatter-gap.md`
 - **administration-xjmda** — Compensating-event composer — append corrective events from the admin UI (feature) — `done/administration-xjmda-compensating-event-composer.md`
 - **administration-btvqa** — Shadow-table replay drift detector — verify projection read models exactly match the event log (feature) — `done/administration-btvqa-projection-drift-integrity-checks.md`
 - **administration-gxd6e** — Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples (feature) — `done/administration-gxd6e-unknown-event-report.md`

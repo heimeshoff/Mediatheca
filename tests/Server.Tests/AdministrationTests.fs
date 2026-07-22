@@ -243,6 +243,19 @@ let administrationTests =
             Expect.isNone detail.Entries.[0].FormattedLabel "Unknown event type should have no formatted label"
             Expect.equal detail.Entries.[0].Data """{"foo":"bar"}""" "Raw data should still be available"
 
+        testCase "getStreamDetail formats Game_rawg_id_set with the RAWG id and rating (administration-qk3f7)" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let streamId = Games.streamId "some-game"
+            EventStore.appendToStream conn streamId -1L
+                [ Games.Serialization.toEventData (Games.Game_rawg_id_set (12345, Some 4.2)) ] |> ignore
+            let api = createApi conn
+
+            let detail = api.getStreamDetail streamId |> Async.RunSynchronously
+
+            Expect.equal (List.length detail.Entries) 1 "Should return the one event"
+            Expect.equal detail.Entries.[0].FormattedLabel (Some "RAWG ID set") "Game_rawg_id_set should now have a formatted label"
+            Expect.equal detail.Entries.[0].FormattedDetails [ "RAWG ID: 12345"; $"Rating: {4.2}" ] "Details should reflect the RAWG id and rating"
+
         testCase "getStreamDetail dispatches the projection panel by stream prefix" <| fun _ ->
             let conn = createInMemoryConnection ()
             let streamId = Movies.streamId "the-matrix-1999"
@@ -394,24 +407,24 @@ let administrationTests =
             Expect.isEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "Movie_added_to_library")) "A handled type must not appear in the unhandled list — guards against a registry entry silently drifting out of sync"
             Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Movie_added_to_library")) "A type with a real formatter case must not appear in the unformattable list"
 
-        testCase "getHealthStats unformattable list flags a handled event type with no formatter case, independent of the unhandled check" <| fun _ ->
+        testCase "getHealthStats Game_rawg_id_set appears in neither the unhandled nor the unformattable list (administration-qk3f7: drift closed)" <| fun _ ->
             let conn = createInMemoryConnection ()
             // Games.Serialization.handledEventTypes lists "Game_rawg_id_set" (the
-            // deserializer recognizes it — Games.fs:555), but
-            // EventFormatting.formatGameEvent has no match arm for it, falling
-            // through to its `_ -> None` case. This is a genuine, currently-
-            // existing drift case: a type handled by its BC's deserializer that
-            // still has no formatter — exactly the independence this task's
-            // third acceptance criterion asks for (a type can be handled yet
-            // still unformattable; the two checks are not aliases).
+            // deserializer recognizes it — Games.fs:555), and
+            // EventFormatting.formatGameEvent now has a matching case
+            // (administration-qk3f7), closing the one real handled-but-
+            // unformattable drift the unknown-event report caught. This is the
+            // Games-BC parallel of the Movie_added_to_library "appears in
+            // neither list" test above: handled ⟺ formattable now holds for
+            // every real event type in the store.
             EventStore.appendToStream conn (Games.streamId "some-game") -1L
                 [ Games.Serialization.toEventData (Games.Game_rawg_id_set (12345, Some 4.2)) ] |> ignore
             let api = createApi conn
 
             let stats = api.getHealthStats () |> Async.RunSynchronously
 
-            Expect.isNonEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Game_rawg_id_set")) "Game_rawg_id_set should be flagged unformattable"
             Expect.isEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "Game_rawg_id_set")) "Game_rawg_id_set is handled by Games' deserializer, so it must not appear in the unhandled list"
+            Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Game_rawg_id_set")) "Game_rawg_id_set now has a formatter case, so it must not appear in the unformattable list"
 
         testCase "getHealthStats unhandled list flags an event type whose stream prefix matches no known bounded context" <| fun _ ->
             let conn = createInMemoryConnection ()
