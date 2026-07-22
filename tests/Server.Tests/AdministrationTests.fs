@@ -485,7 +485,7 @@ let administrationTests =
                 Content = ""; Checked = false; Collapsed = false; Language = None; Url = None
                 ImageRef = Some "content/game-journal-1.jpg"; Caption = None; Position = 0; Width = 1.0
             }
-            GameJournal.save conn "some-game" [ block ] |> ignore
+            GameJournal.save conn (new SemaphoreSlim(1, 1)) "some-game" [ block ] |> ignore
             withTempImagesDir (fun imagesDir ->
                 writeImageFile imagesDir "content/game-journal-1.jpg" 10
                 let api = createImageApi conn imagesDir

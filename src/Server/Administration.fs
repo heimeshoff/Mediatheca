@@ -439,7 +439,14 @@ module Administration =
     /// holds. Import that overwrites a non-empty store by wiping first is a
     /// separate, more dangerous operation (administration-n8kqw), out of
     /// scope here.
-    let importEventsStreamHandler (conn: SqliteConnection) : HttpHandler =
+    // administration-cx92m (ADR-0030): `dbLock` is the same process-wide
+    // SemaphoreSlim guarding `Api.executeCommand` and `GameJournal.save` —
+    // `EventStore.importNdjson`'s `conn.BeginTransaction()` is the third of
+    // the exact 3 request-reachable transaction-opening choke points on the
+    // shared `conn` that ADR-0030 serializes. Acquired only around the
+    // synchronous import call itself (never across the awaited SSE
+    // `writeEvent` writes before/after it).
+    let importEventsStreamHandler (conn: SqliteConnection) (dbLock: SemaphoreSlim) : HttpHandler =
         fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
             task {
                 allowSynchronousIO ctx
@@ -457,7 +464,11 @@ module Administration =
                 }
 
                 use reader = new StreamReader(ctx.Request.Body)
-                match EventStore.importNdjson conn reader with
+                let importResult =
+                    dbLock.Wait()
+                    try EventStore.importNdjson conn reader
+                    finally dbLock.Release() |> ignore
+                match importResult with
                 | Ok outcome ->
                     do! writeEvent "complete" (sprintf "{\"eventsImported\":%d}" outcome.EventsImported)
                 | Error EventStore.StoreNotEmpty ->

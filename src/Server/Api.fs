@@ -14,7 +14,18 @@ module Api =
         if System.String.IsNullOrEmpty(html) then ""
         else Regex.Replace(html, "<[^>]+>", "")
 
-    let private executeCommand
+    // administration-cx92m (ADR-0030): every transaction-opening command path
+    // acquires this ONE process-wide `dbLock` (built once in Composition.fs,
+    // threaded down through every call site below) so two concurrent request
+    // threads never touch the single shared `conn` object's command list at
+    // the same instant — generalizing ADR-0028's per-command-lock idiom from
+    // the dedicated job connection to the shared request connection. Held
+    // only around this synchronous body (no `let!`/`do!` inside it); every
+    // caller's own awaited HTTP work happens outside this function, so
+    // concurrent requests' network calls still overlap and only their brief
+    // DB moments serialize.
+    let private executeCommandCore
+        (dbLock: System.Threading.SemaphoreSlim)
         (conn: SqliteConnection)
         (streamId: string)
         (fromStoredEvent: EventStore.StoredEvent -> 'Event option)
@@ -24,30 +35,33 @@ module Api =
         (command: 'Command)
         (projectionHandlers: Projection.ProjectionHandler list)
         : Result<unit, string> =
+        dbLock.Wait()
+        try
+            // 1. Read stream, deserialize, reconstitute
+            let storedEvents = EventStore.readStream conn streamId
+            let events = storedEvents |> List.choose fromStoredEvent
+            let state = reconstitute events
+            let currentPosition = EventStore.getStreamPosition conn streamId
 
-        // 1. Read stream, deserialize, reconstitute
-        let storedEvents = EventStore.readStream conn streamId
-        let events = storedEvents |> List.choose fromStoredEvent
-        let state = reconstitute events
-        let currentPosition = EventStore.getStreamPosition conn streamId
-
-        // 2. Decide
-        match decide state command with
-        | Error e -> Error e
-        | Ok newEvents ->
-            if List.isEmpty newEvents then
-                Ok ()
-            else
-                // 3. Serialize and append
-                let eventDataList = newEvents |> List.map toEventData
-                match EventStore.appendToStream conn streamId currentPosition eventDataList with
-                | EventStore.ConcurrencyConflict _ ->
-                    Error "Concurrency conflict, please retry"
-                | EventStore.Success _ ->
-                    // 4. Catch-up projections
-                    for handler in projectionHandlers do
-                        Projection.runProjection conn handler
+            // 2. Decide
+            match decide state command with
+            | Error e -> Error e
+            | Ok newEvents ->
+                if List.isEmpty newEvents then
                     Ok ()
+                else
+                    // 3. Serialize and append
+                    let eventDataList = newEvents |> List.map toEventData
+                    match EventStore.appendToStream conn streamId currentPosition eventDataList with
+                    | EventStore.ConcurrencyConflict _ ->
+                        Error "Concurrency conflict, please retry"
+                    | EventStore.Success _ ->
+                        // 4. Catch-up projections
+                        for handler in projectionHandlers do
+                            Projection.runProjection conn handler
+                        Ok ()
+        finally
+            dbLock.Release() |> ignore
 
     let private generateUniqueSlug (conn: SqliteConnection) (streamIdFn: string -> string) (baseSlug: string) : string =
         let mutable slug = baseSlug
@@ -72,12 +86,21 @@ module Api =
 
     let private addMovieToLibraryImpl
         (conn: SqliteConnection)
+        (dbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (imageBasePath: string)
         (movieProjections: Projection.ProjectionHandler list)
         (tmdbId: int)
         : Async<Result<string, string>> = async {
+            // administration-cx92m (ADR-0030): full eta-expansion is required
+            // here — a bare partial application (`executeCommandCore dbLock`)
+            // would collapse to the FIRST call site's concrete type
+            // instantiation (F#'s value restriction on partially-applied
+            // generic functions) and break every other event type this
+            // function's sibling call sites use.
+            let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
+                executeCommandCore dbLock conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
             try
                 let tmdbConfig = getTmdbConfig()
                 let! details = Tmdb.getMovieDetails httpClient tmdbConfig tmdbId
@@ -189,6 +212,7 @@ module Api =
     /// (Jellyfin auto-sync vs. manual add) create duplicate slugs for the same title.
     let private addMovieToLibrary
         (conn: SqliteConnection)
+        (dbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (imageBasePath: string)
@@ -197,17 +221,20 @@ module Api =
         : Async<Result<string, string>> = async {
             match tryFindMovieSlugByTmdbId conn tmdbId with
             | Some existing -> return Ok existing
-            | None -> return! addMovieToLibraryImpl conn httpClient getTmdbConfig imageBasePath movieProjections tmdbId
+            | None -> return! addMovieToLibraryImpl conn dbLock httpClient getTmdbConfig imageBasePath movieProjections tmdbId
         }
 
     let private addSeriesToLibraryImpl
         (conn: SqliteConnection)
+        (dbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
         (tmdbId: int)
         : Async<Result<string, string>> = async {
+            let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
+                executeCommandCore dbLock conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
             try
                 let tmdbConfig = getTmdbConfig()
                 let! detailsResult = Tmdb.getTvSeriesDetails httpClient tmdbConfig tmdbId
@@ -339,6 +366,7 @@ module Api =
     /// (Jellyfin auto-sync vs. manual add) create duplicate slugs for the same title.
     let private addSeriesToLibrary
         (conn: SqliteConnection)
+        (dbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (imageBasePath: string)
@@ -347,11 +375,12 @@ module Api =
         : Async<Result<string, string>> = async {
             match tryFindSeriesSlugByTmdbId conn tmdbId with
             | Some existing -> return Ok existing
-            | None -> return! addSeriesToLibraryImpl conn httpClient getTmdbConfig imageBasePath projectionHandlers tmdbId
+            | None -> return! addSeriesToLibraryImpl conn dbLock httpClient getTmdbConfig imageBasePath projectionHandlers tmdbId
         }
 
     let runSteamFamilyImport
         (conn: SqliteConnection)
+        (dbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (getRawgConfig: unit -> Rawg.RawgConfig)
         (getSteamConfig: unit -> Steam.SteamConfig)
@@ -359,6 +388,8 @@ module Api =
         (projectionHandlers: Projection.ProjectionHandler list)
         (emit: SteamFamilyImportProgress -> unit)
         : Async<Result<SteamFamilyImportResult, string>> = async {
+            let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
+                executeCommandCore dbLock conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
             try
                 let token =
                     SettingsStore.getSetting conn "steam_family_token"
@@ -672,6 +703,7 @@ module Api =
 
     let steamFamilyImportHandler
         (conn: SqliteConnection)
+        (dbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (getRawgConfig: unit -> Rawg.RawgConfig)
         (getSteamConfig: unit -> Steam.SteamConfig)
@@ -702,7 +734,7 @@ module Api =
                     |> Async.AwaitTask |> Async.RunSynchronously
 
                 let! result =
-                    runSteamFamilyImport conn httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers emit
+                    runSteamFamilyImport conn dbLock httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers emit
                     |> Async.StartAsTask
 
                 match result with
@@ -723,12 +755,15 @@ module Api =
 
     let runJellyfinImport
         (conn: SqliteConnection)
+        (dbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (getJellyfinConfig: unit -> Jellyfin.JellyfinConfig)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
         : Async<Result<JellyfinImportResult, string>> = async {
+            let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
+                executeCommandCore dbLock conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
             try
                 let config = getJellyfinConfig ()
                 if System.String.IsNullOrWhiteSpace(config.AccessToken) || System.String.IsNullOrWhiteSpace(config.UserId) then
@@ -773,7 +808,7 @@ module Api =
                             match tmdbId with
                             | Some tid when not (Map.containsKey tid moviesByTmdbId) ->
                                 try
-                                    let! addResult = addMovieToLibrary conn httpClient getTmdbConfig imageBasePath movieProjections tid
+                                    let! addResult = addMovieToLibrary conn dbLock httpClient getTmdbConfig imageBasePath movieProjections tid
                                     match addResult with
                                     | Ok slug ->
                                         moviesByTmdbId <- Map.add tid (slug, item.Name) moviesByTmdbId
@@ -880,7 +915,7 @@ module Api =
                             match tmdbId with
                             | Some tid when not (Map.containsKey tid seriesByTmdbId) ->
                                 try
-                                    let! addResult = addSeriesToLibrary conn httpClient getTmdbConfig imageBasePath projectionHandlers tid
+                                    let! addResult = addSeriesToLibrary conn dbLock httpClient getTmdbConfig imageBasePath projectionHandlers tid
                                     match addResult with
                                     | Ok slug ->
                                         seriesByTmdbId <- Map.add tid (slug, seriesItem.Name) seriesByTmdbId
@@ -1019,12 +1054,15 @@ module Api =
     /// don't overwrite user edits.
     let private attachSteamToGameCore
         (conn: SqliteConnection)
+        (dbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (projectionHandlers: Projection.ProjectionHandler list)
         (slug: string)
         (appId: int)
         : Async<Result<unit, string>> =
         async {
+            let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
+                executeCommandCore dbLock conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
             let! storeDetails = Steam.getSteamStoreDetails httpClient appId
             match storeDetails with
             | Error e -> return Error (sprintf "Steam lookup failed: %s" e)
@@ -1096,6 +1134,7 @@ module Api =
 
     let create
         (conn: SqliteConnection)
+        (requestDbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (getRawgConfig: unit -> Rawg.RawgConfig)
@@ -1107,6 +1146,18 @@ module Api =
 
         let movieProjections = projectionHandlers
         let friendProjections = projectionHandlers
+
+        // administration-cx92m (ADR-0030): shadow the module-private
+        // `executeCommandCore` with `requestDbLock` baked in, so every
+        // existing `executeCommand conn sid ...` call site below is
+        // unchanged — only this one binding differs from before the fix.
+        // Written as a full eta-expansion (not a bare partial application)
+        // because F#'s value restriction would otherwise collapse this
+        // generic function to whichever bounded context's event/state/
+        // command types its first call site instantiates, breaking every
+        // other bounded context's calls below.
+        let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
+            executeCommandCore requestDbLock conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
 
         // administration-tj8n2: PlaytimeTracker.runSync takes a per-command
         // lock (guarding its own connection against a concurrent scheduled
@@ -1134,7 +1185,7 @@ module Api =
             }
 
             addMovie = fun tmdbId ->
-                addMovieToLibrary conn httpClient getTmdbConfig imageBasePath movieProjections tmdbId
+                addMovieToLibrary conn requestDbLock httpClient getTmdbConfig imageBasePath movieProjections tmdbId
 
             removeMovie = fun slug -> async {
                 let sid = Movies.streamId slug
@@ -2243,7 +2294,7 @@ module Api =
             }
 
             addSeries = fun tmdbId ->
-                addSeriesToLibrary conn httpClient getTmdbConfig imageBasePath projectionHandlers tmdbId
+                addSeriesToLibrary conn requestDbLock httpClient getTmdbConfig imageBasePath projectionHandlers tmdbId
 
             removeSeries = fun slug -> async {
                 let sid = Series.streamId slug
@@ -2763,7 +2814,7 @@ module Api =
                                             | next :: _ -> (top.Score - next.Score) >= 0.05
                                             | [] -> true
                                         if unambiguous then
-                                            let! _ = attachSteamToGameCore conn httpClient projectionHandlers slug top.AppId
+                                            let! _ = attachSteamToGameCore conn requestDbLock httpClient projectionHandlers slug top.AppId
                                             ()
                                     | _ -> ()
                                 with ex ->
@@ -3021,7 +3072,7 @@ module Api =
             }
 
             saveGameJournal = fun slug blocks -> async {
-                return GameJournal.save conn slug blocks
+                return GameJournal.save conn requestDbLock slug blocks
             }
 
             // Game Content Blocks + Catalogs
@@ -3739,7 +3790,7 @@ module Api =
             }
 
             importSteamFamily = fun () -> async {
-                return! runSteamFamilyImport conn httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers (fun _ -> ())
+                return! runSteamFamilyImport conn requestDbLock httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers (fun _ -> ())
             }
 
             // Connect with Steam (manual attach)
@@ -3756,7 +3807,7 @@ module Api =
             }
 
             attachSteamToGame = fun (slug, appId) -> async {
-                return! attachSteamToGameCore conn httpClient projectionHandlers slug appId
+                return! attachSteamToGameCore conn requestDbLock httpClient projectionHandlers slug appId
             }
 
             searchRawgForGame = fun slug -> async {
@@ -3972,12 +4023,12 @@ module Api =
             }
 
             importJellyfinWatchHistory = fun () ->
-                runJellyfinImport conn httpClient getTmdbConfig getJellyfinConfig imageBasePath projectionHandlers
+                runJellyfinImport conn requestDbLock httpClient getTmdbConfig getJellyfinConfig imageBasePath projectionHandlers
 
             // Jellyfin Auto-Sync
             triggerJellyfinSync = fun () ->
                 JellyfinSync.triggerSync conn httpClient getJellyfinConfig
-                    (fun () -> runJellyfinImport conn httpClient getTmdbConfig getJellyfinConfig imageBasePath projectionHandlers)
+                    (fun () -> runJellyfinImport conn requestDbLock httpClient getTmdbConfig getJellyfinConfig imageBasePath projectionHandlers)
 
             getJellyfinSyncStatus = fun () -> async {
                 return JellyfinSync.getSyncStatus ()

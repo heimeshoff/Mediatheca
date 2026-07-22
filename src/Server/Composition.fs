@@ -52,6 +52,22 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
 
     let conn = createConnection dbPath
 
+    // administration-cx92m (ADR-0030): a single process-wide SemaphoreSlim
+    // guarding every request-reachable transaction-opening call site on the
+    // shared `conn` (Api.executeCommand's body, GameJournal.save,
+    // Administration.importEventsStreamHandler's call into
+    // EventStore.importNdjson) — generalizing ADR-0028's dedicated-job-
+    // connection-plus-per-command-lock idiom from `jobConn`/`jobDbLock` to
+    // the request-serving `conn`. Acquired only around each call's
+    // synchronous DB-touching body, never across an awaited HTTP call, so
+    // concurrent requests' network I/O still overlaps and only their brief
+    // DB moments serialize. Read/plain-write races on `conn` outside these
+    // three transaction-opening sites remain open (ADR-0030: accepted, not
+    // closed) — request×request concurrency does not otherwise use one
+    // shared `conn` object safely per ADR-0028's correction, but no crash
+    // from those broader paths has been reproduced here.
+    let requestDbLock = new SemaphoreSlim(1, 1)
+
     // Initialize CastStore tables
     CastStore.initialize conn
 
@@ -175,7 +191,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     // Game journal (Notion-style blocks, plain storage) — table + one-time
     // migration of the old event-sourced game content blocks
     GameJournal.initialize conn
-    GameJournal.migrateFromContentBlocks conn dataDir
+    GameJournal.migrateFromContentBlocks conn requestDbLock dataDir
 
     // Backfill director/crew data for existing movies
     let backfillDirectors () =
@@ -287,7 +303,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     let jobRunRecorder = Administration.makeJobRunRecorder jobConn jobDbLock
 
     // Create API
-    let api = Api.create conn httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig imageBasePath projectionHandlers
+    let api = Api.create conn requestDbLock httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig imageBasePath projectionHandlers
     let adminApi = Administration.create conn dbPath imageBasePath projectionHandlers scheduledJobs jobRunRecorder
 
     let remotingHandler =
@@ -312,11 +328,11 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         choose [
             route "/health" >=> text "ok"
             route "/api/stream/import-steam-family"
-                >=> Api.steamFamilyImportHandler conn httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers
+                >=> Api.steamFamilyImportHandler conn requestDbLock httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers
             route "/api/stream/export-events"
                 >=> Administration.exportEventsStreamHandler conn
             route "/api/stream/import-events"
-                >=> Administration.importEventsStreamHandler conn
+                >=> Administration.importEventsStreamHandler conn requestDbLock
             Administration.projectionRebuildStreamHandler conn projectionHandlers
             remotingHandler
             adminRemotingHandler

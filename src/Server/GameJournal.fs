@@ -59,48 +59,60 @@ module GameJournal =
         |> Db.setParams [ "game_slug", SqlType.String gameSlug ]
         |> Db.query readBlock
 
-    let save (conn: SqliteConnection) (gameSlug: string) (blocks: JournalBlockDto list) : Result<unit, string> =
+    // administration-cx92m (ADR-0030): `dbLock` is the same process-wide
+    // SemaphoreSlim guarding `Api.executeCommand` and
+    // `Administration.importEventsStreamHandler`'s import call — this
+    // function's `conn.BeginTransaction()` is one of the exact 3
+    // request-reachable transaction-opening choke points on the shared
+    // `conn` that ADR-0030 serializes to prevent the empirically-observed
+    // `SqliteConnection does not support nested transactions` crash under
+    // concurrent requests.
+    let save (conn: SqliteConnection) (dbLock: System.Threading.SemaphoreSlim) (gameSlug: string) (blocks: JournalBlockDto list) : Result<unit, string> =
+        dbLock.Wait()
         try
-            use tran = conn.BeginTransaction()
+            try
+                use tran = conn.BeginTransaction()
 
-            use deleteCmd = conn.CreateCommand()
-            deleteCmd.Transaction <- tran
-            deleteCmd.CommandText <- "DELETE FROM game_journal_blocks WHERE game_slug = @game_slug"
-            deleteCmd.Parameters.AddWithValue("@game_slug", gameSlug) |> ignore
-            deleteCmd.ExecuteNonQuery() |> ignore
+                use deleteCmd = conn.CreateCommand()
+                deleteCmd.Transaction <- tran
+                deleteCmd.CommandText <- "DELETE FROM game_journal_blocks WHERE game_slug = @game_slug"
+                deleteCmd.Parameters.AddWithValue("@game_slug", gameSlug) |> ignore
+                deleteCmd.ExecuteNonQuery() |> ignore
 
-            for block in blocks do
-                use cmd = conn.CreateCommand()
-                cmd.Transaction <- tran
-                cmd.CommandText <- """
-                    INSERT INTO game_journal_blocks (id, game_slug, parent_id, block_type, content, checked, collapsed, language, url, image_ref, caption, position, width)
-                    VALUES (@id, @game_slug, @parent_id, @block_type, @content, @checked, @collapsed, @language, @url, @image_ref, @caption, @position, @width)
-                """
-                let addParam (name: string) (value: obj) =
-                    cmd.Parameters.AddWithValue(name, value) |> ignore
-                let addOpt (name: string) (value: string option) =
-                    match value with
-                    | Some v -> addParam name (box v)
-                    | None -> addParam name (box System.DBNull.Value)
-                addParam "@id" (box block.Id)
-                addParam "@game_slug" (box gameSlug)
-                addOpt "@parent_id" block.ParentId
-                addParam "@block_type" (box block.BlockType)
-                addParam "@content" (box block.Content)
-                addParam "@checked" (box (if block.Checked then 1 else 0))
-                addParam "@collapsed" (box (if block.Collapsed then 1 else 0))
-                addOpt "@language" block.Language
-                addOpt "@url" block.Url
-                addOpt "@image_ref" block.ImageRef
-                addOpt "@caption" block.Caption
-                addParam "@position" (box block.Position)
-                addParam "@width" (box block.Width)
-                cmd.ExecuteNonQuery() |> ignore
+                for block in blocks do
+                    use cmd = conn.CreateCommand()
+                    cmd.Transaction <- tran
+                    cmd.CommandText <- """
+                        INSERT INTO game_journal_blocks (id, game_slug, parent_id, block_type, content, checked, collapsed, language, url, image_ref, caption, position, width)
+                        VALUES (@id, @game_slug, @parent_id, @block_type, @content, @checked, @collapsed, @language, @url, @image_ref, @caption, @position, @width)
+                    """
+                    let addParam (name: string) (value: obj) =
+                        cmd.Parameters.AddWithValue(name, value) |> ignore
+                    let addOpt (name: string) (value: string option) =
+                        match value with
+                        | Some v -> addParam name (box v)
+                        | None -> addParam name (box System.DBNull.Value)
+                    addParam "@id" (box block.Id)
+                    addParam "@game_slug" (box gameSlug)
+                    addOpt "@parent_id" block.ParentId
+                    addParam "@block_type" (box block.BlockType)
+                    addParam "@content" (box block.Content)
+                    addParam "@checked" (box (if block.Checked then 1 else 0))
+                    addParam "@collapsed" (box (if block.Collapsed then 1 else 0))
+                    addOpt "@language" block.Language
+                    addOpt "@url" block.Url
+                    addOpt "@image_ref" block.ImageRef
+                    addOpt "@caption" block.Caption
+                    addParam "@position" (box block.Position)
+                    addParam "@width" (box block.Width)
+                    cmd.ExecuteNonQuery() |> ignore
 
-            tran.Commit()
-            Ok ()
-        with ex ->
-            Error $"Failed to save journal: {ex.Message}"
+                tran.Commit()
+                Ok ()
+            with ex ->
+                Error $"Failed to save journal: {ex.Message}"
+        finally
+            dbLock.Release() |> ignore
 
     /// Delete a game's whole journal: its uploaded content images first, then
     /// the block rows. Called when the game itself is removed from the library.
@@ -225,7 +237,7 @@ module GameJournal =
     /// One-time, idempotent: convert old game content blocks into the new
     /// journal table (skipping games that already have a new journal), and
     /// write a markdown dump per migrated game for manual recovery.
-    let migrateFromContentBlocks (conn: SqliteConnection) (dataDir: string) : unit =
+    let migrateFromContentBlocks (conn: SqliteConnection) (dbLock: System.Threading.SemaphoreSlim) (dataDir: string) : unit =
         match SettingsStore.getSetting conn "game_journal_migrated" with
         | Some "1" -> ()
         | _ ->
@@ -239,7 +251,7 @@ module GameJournal =
                         System.IO.File.WriteAllText(
                             System.IO.Path.Combine(exportDir, slug + ".md"),
                             dumpToMarkdown slug oldBlocks)
-                        match save conn slug (convertOldBlocks oldBlocks) with
+                        match save conn dbLock slug (convertOldBlocks oldBlocks) with
                         | Ok () -> printfn "[GameJournal] Migrated %d blocks for %s" oldBlocks.Length slug
                         | Error e -> eprintfn "[GameJournal] Migration failed for %s: %s" slug e
                 SettingsStore.setSetting conn "game_journal_migrated" "1"

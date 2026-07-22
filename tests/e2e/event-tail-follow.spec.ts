@@ -56,19 +56,18 @@ async function waitForEventsLoaded(page: Page) {
     await expect(page.locator(".loading-spinner")).toHaveCount(0, { timeout: 8_000 });
 }
 
-/** Sequential, not `Promise.all` — concurrent commands against the shared
- * `SqliteConnection` intermittently throw ("SqliteConnection does not
- * support nested transactions"), a pre-existing production race already
- * tracked as administration-cx92m (spun off alongside administration-tj8n2's
- * scheduled-job connection race). Out of scope to fix here; these specs
- * simply avoid triggering it by never sending two `addFriend` calls
- * concurrently. */
+/** Concurrent (`Promise.all`), not sequential — administration-cx92m
+ * (ADR-0030) closed the race that used to make concurrent commands against
+ * the shared `SqliteConnection` intermittently throw ("SqliteConnection
+ * does not support nested transactions") by serializing the three
+ * request-reachable transaction-opening choke points (including
+ * `Api.executeCommand`, which `addFriend` goes through) behind one
+ * process-wide `SemaphoreSlim`. This is now the regression proof for that
+ * fix: every call site below fires its `addFriend`s genuinely concurrently
+ * (`Promise.all` preserves result order, so callers that destructure by
+ * input position — e.g. `[matchingSlug]` — still get the right slug). */
 async function addFriends(request: APIRequestContext, baseURL: string, names: string[]): Promise<string[]> {
-    const slugs: string[] = [];
-    for (const name of names) {
-        slugs.push(await addFriend(request, baseURL, name));
-    }
-    return slugs;
+    return Promise.all(names.map((name) => addFriend(request, baseURL, name)));
 }
 
 test.describe("Events tab Follow toggle — ADR-0023 live-tail behaviors", () => {
@@ -241,5 +240,31 @@ test.describe("Events tab Follow toggle — ADR-0023 live-tail behaviors", () =>
 
         await page.waitForTimeout(10_000);
         expect(tailRequests.length).toBe(baseline);
+    });
+
+    test("Regression (administration-cx92m / ADR-0030): repeated concurrent addFriend bursts never crash the shared SqliteConnection", async ({
+        request,
+        baseURL,
+    }) => {
+        // Several rounds, not one — a single lucky/unlucky burst wouldn't say
+        // much either way about a race this narrow. Each round's names are
+        // unique (per-round timestamp + index) so successes across rounds
+        // never collide on slug, and each round's `addFriends` call is itself
+        // fully concurrent (Promise.all). Before ADR-0030's fix, this
+        // reliably reproduced "SqliteConnection does not support nested
+        // transactions" via `addFriend`'s `response.ok()`/`body.Ok` assertions
+        // failing (Fable.Remoting's error handler propagates a non-success
+        // response on an unhandled server exception).
+        const rounds = 5;
+        const perRound = 10;
+        for (let round = 0; round < rounds; round++) {
+            const names = Array.from(
+                { length: perRound },
+                (_, i) => `E2EConcurrencyRegression-${Date.now()}-${round}-${i}`
+            );
+            const slugs = await addFriends(request, baseURL!, names);
+            expect(slugs).toHaveLength(perRound);
+            expect(new Set(slugs).size).toBe(perRound);
+        }
     });
 });

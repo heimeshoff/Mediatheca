@@ -1,11 +1,20 @@
 module Mediatheca.Tests.GameJournalTests
 
 open System.IO
+open System.Threading
 open Expecto
 open Microsoft.Data.Sqlite
 open Donald
 open Mediatheca.Server
 open Mediatheca.Shared
+
+// administration-cx92m (ADR-0030): `GameJournal.save` now requires the same
+// process-wide dbLock parameter production threads in from Composition.fs.
+// Each test here uses its own connection with no real concurrency, so a
+// fresh, never-contended lock per test file satisfies the signature exactly
+// like `manualSyncTriggerLock`/`jobDbLock` do at their own uncontended
+// call sites.
+let private testDbLock = new SemaphoreSlim(1, 1)
 
 let private createInMemoryConnection () =
     let conn = new SqliteConnection("Data Source=:memory:")
@@ -60,7 +69,7 @@ let gameJournalTests =
                     { mkBlock "b6" JournalBlockTypes.link 4 with Content = "RAWG"; Url = Some "https://rawg.io" }
                     { mkBlock "b7" JournalBlockTypes.image 5 with ImageRef = Some "content/abc.png"; Caption = Some "screenshot" }
                 ]
-                Expect.isOk (GameJournal.save conn "elden-ring-2022" blocks) "save should succeed"
+                Expect.isOk (GameJournal.save conn testDbLock "elden-ring-2022" blocks) "save should succeed"
                 let loaded = GameJournal.get conn "elden-ring-2022"
                 Expect.equal (List.length loaded) 7 "all blocks come back"
                 let b2 = loaded |> List.find (fun b -> b.Id = "b2")
@@ -79,17 +88,17 @@ let gameJournalTests =
 
             testCase "save replaces the whole document" <| fun _ ->
                 use conn = createInMemoryConnection ()
-                GameJournal.save conn "game-1" [ mkBlock "old1" JournalBlockTypes.text 0; mkBlock "old2" JournalBlockTypes.text 1 ]
+                GameJournal.save conn testDbLock "game-1" [ mkBlock "old1" JournalBlockTypes.text 0; mkBlock "old2" JournalBlockTypes.text 1 ]
                 |> ignore
-                GameJournal.save conn "game-1" [ mkBlock "new1" JournalBlockTypes.text 0 ]
+                GameJournal.save conn testDbLock "game-1" [ mkBlock "new1" JournalBlockTypes.text 0 ]
                 |> ignore
                 let loaded = GameJournal.get conn "game-1"
                 Expect.equal (loaded |> List.map (fun b -> b.Id)) [ "new1" ] "old blocks are gone"
 
             testCase "documents are per game" <| fun _ ->
                 use conn = createInMemoryConnection ()
-                GameJournal.save conn "game-a" [ mkBlock "a1" JournalBlockTypes.text 0 ] |> ignore
-                GameJournal.save conn "game-b" [ mkBlock "b1" JournalBlockTypes.text 0 ] |> ignore
+                GameJournal.save conn testDbLock "game-a" [ mkBlock "a1" JournalBlockTypes.text 0 ] |> ignore
+                GameJournal.save conn testDbLock "game-b" [ mkBlock "b1" JournalBlockTypes.text 0 ] |> ignore
                 Expect.equal ((GameJournal.get conn "game-a") |> List.map (fun b -> b.Id)) [ "a1" ] "game-a keeps its own blocks"
                 Expect.equal ((GameJournal.get conn "game-b") |> List.map (fun b -> b.Id)) [ "b1" ] "game-b keeps its own blocks"
 
@@ -102,7 +111,7 @@ let gameJournalTests =
                     { mkBlock "t1" JournalBlockTypes.text 0 with ParentId = Some "c1" }
                     { mkBlock "t2" JournalBlockTypes.text 0 with ParentId = Some "c2" }
                 ]
-                GameJournal.save conn "game-1" blocks |> ignore
+                GameJournal.save conn testDbLock "game-1" blocks |> ignore
                 let loaded = GameJournal.get conn "game-1"
                 let c1 = loaded |> List.find (fun b -> b.Id = "c1")
                 Expect.floatClose Accuracy.high c1.Width 0.3 "width survives"
@@ -122,11 +131,11 @@ let gameJournalTests =
                     File.WriteAllBytes(Path.Combine(imageBasePath, keptImage), [| 2uy |])
                     File.WriteAllBytes(Path.Combine(imageBasePath, posterImage), [| 3uy |])
 
-                    GameJournal.save conn "doomed-2020" [
+                    GameJournal.save conn testDbLock "doomed-2020" [
                         { mkBlock "d1" JournalBlockTypes.text 0 with Content = "notes" }
                         { mkBlock "d2" JournalBlockTypes.image 1 with ImageRef = Some doomedImage }
                     ] |> ignore
-                    GameJournal.save conn "kept-2021" [
+                    GameJournal.save conn testDbLock "kept-2021" [
                         { mkBlock "k1" JournalBlockTypes.image 0 with ImageRef = Some keptImage }
                     ] |> ignore
 
@@ -229,7 +238,7 @@ let gameJournalTests =
                     """
                     |> Db.exec
 
-                    GameJournal.migrateFromContentBlocks conn dataDir
+                    GameJournal.migrateFromContentBlocks conn testDbLock dataDir
 
                     let migrated = GameJournal.get conn "hades-2020"
                     Expect.equal (List.length migrated) 1 "old block converted"
@@ -243,7 +252,7 @@ let gameJournalTests =
                     Expect.equal (SettingsStore.getSetting conn "game_journal_migrated") (Some "1") "migration flag set"
 
                     // running again must not duplicate anything
-                    GameJournal.migrateFromContentBlocks conn dataDir
+                    GameJournal.migrateFromContentBlocks conn testDbLock dataDir
                     Expect.equal (List.length (GameJournal.get conn "hades-2020")) 1 "second run is a no-op"
                 finally
                     try Directory.Delete(dataDir, true) with _ -> ()
@@ -263,10 +272,10 @@ let gameJournalTests =
                     """
                     |> Db.exec
                     // the new journal already has content
-                    GameJournal.save conn "celeste-2018" [ { mkBlock "n1" JournalBlockTypes.text 0 with Content = "already here" } ]
+                    GameJournal.save conn testDbLock "celeste-2018" [ { mkBlock "n1" JournalBlockTypes.text 0 with Content = "already here" } ]
                     |> ignore
 
-                    GameJournal.migrateFromContentBlocks conn dataDir
+                    GameJournal.migrateFromContentBlocks conn testDbLock dataDir
 
                     let blocks = GameJournal.get conn "celeste-2018"
                     Expect.equal (blocks |> List.map (fun b -> b.Id)) [ "n1" ] "existing journal untouched"

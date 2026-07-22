@@ -1,15 +1,15 @@
 ---
 id: administration-cx92m
 title: Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate
-status: doing
+status: done
 type: spike
 context: administration
 created: 2026-07-22
-completed:
+completed: 2026-07-22
 depends_on: []
 blocks: [administration-mz6kp]
 tags: [sqlite, concurrency, architecture, reliability]
-related_adrs: [0003, 0024, 0026, 0028]
+related_adrs: [0003, 0024, 0026, 0028, 0030]
 related_research: []
 prior_art: [administration-tj8n2]
 ---
@@ -141,3 +141,59 @@ factory-based reconstruction.
 - All acceptance criteria are machine-checkable (ADR-0061; no `[human-eye]`). The
   concurrent-burst e2e assertion is probabilistic — repeat the burst rather than
   relying on a single pass to raise confidence the race is closed.
+
+## Outcome
+
+Implemented the narrow gate exactly as specified. **ADR-0030** written and
+accepted (`.agentheim/knowledge/decisions/0030-request-connection-narrow-semaphore-gate.md`)
+— confirmed 0030 was still free at write time.
+
+**Finding verified against source**: `conn.BeginTransaction()` greps to exactly
+the 3 named sites (`EventStore.fs:376` via `Api.executeCommand`'s core,
+`EventStore.fs:505` via `Administration.importEventsStreamHandler`,
+`GameJournal.fs:64` via `GameJournal.save`) — the task's pre-investigation
+conclusions held.
+
+**Implementation**: `Composition.fs` builds one `requestDbLock =
+SemaphoreSlim(1,1)` beside ADR-0028's `jobDbLock`. `Api.fs`'s private
+`executeCommand` was renamed `executeCommandCore`, takes `dbLock` as its
+first parameter, and wraps its body in `dbLock.Wait() / finally
+dbLock.Release()`. Every one of its ~130 request-path call sites is
+syntactically unchanged: `Api.create` and each intermediate private helper
+(`addMovieToLibraryImpl`/`addMovieToLibrary`,
+`addSeriesToLibraryImpl`/`addSeriesToLibrary`, `runSteamFamilyImport`,
+`steamFamilyImportHandler`, `runJellyfinImport`, `attachSteamToGameCore`)
+gained a `dbLock` parameter and a local eta-expanded shadow (`let
+executeCommand conn streamId ... = executeCommandCore dbLock conn streamId
+...`) — a bare partial application was tried first and rejected: F#'s value
+restriction collapsed it to whichever bounded context's types the first call
+site used, breaking every other bounded context (Movies/Series/Catalogs/
+ContentBlocks/Friends all failed to compile until eta-expanded). `GameJournal.save`
+and its `migrateFromContentBlocks` caller, and
+`Administration.importEventsStreamHandler`, each gained the same `dbLock`
+parameter and lock around their own `BeginTransaction`/`importNdjson` call.
+
+**Regression proof**: `tests/Server.Tests/RequestConnectionConcurrencyTests.fs`
+(new, mirrors `JobConnectionConcurrencyTests.fs`'s shape) drives the real,
+unmodified `Api.create`'s `addFriend` — fully synchronous, no HTTP
+dependency, the simplest real repro of the exact production crash — against
+a real temp-file connection with 25 concurrent calls, then 5 rounds of 10;
+asserts no exception and every friend recorded exactly once. Passes
+consistently (370/370 full suite across repeated runs; one unrelated,
+pre-existing flaky failure in `JobConnectionConcurrencyTests` observed once
+under full-suite load and confirmed to pass in isolation and on rerun — not
+caused by this change, no job-connection files were touched).
+`tests/e2e/event-tail-follow.spec.ts`'s `addFriends` helper now fires
+concurrently (`Promise.all`, preserving result order for its
+position-destructuring caller), and a new dedicated regression test repeats
+a 10-way concurrent burst 5 times. **`npm run test:e2e` was NOT executed in
+this environment** — no `@playwright/test` package is installed anywhere
+reachable from this worktree (neither locally nor in the parent repo's
+`node_modules`), so the harness cannot boot here. The spec edit and gate
+logic were verified by inspection/reasoning only; a human with Playwright
+installed should run `npm run test:e2e` to confirm the concurrency
+regression closes for real.
+
+`npm test` (370 tests) and `npm run build` both green. `administration-mz6kp`
+confirmed already present in `backlog/` with the correct `depends_on`/ADR-0030
+reference (not touched, per the task's rule 4).

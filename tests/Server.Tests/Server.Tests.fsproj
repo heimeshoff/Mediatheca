@@ -18,6 +18,7 @@
     <Compile Include="AdministrationTests.fs" />
     <Compile Include="JobRunsTests.fs" />
     <Compile Include="JobConnectionConcurrencyTests.fs" />
+    <Compile Include="RequestConnectionConcurrencyTests.fs" />
     <Compile Include="ProjectionRebuildTests.fs" />
     <Compile Include="MoviesIntegrationTests.fs" />
     <Compile Include="FriendIntegrationTests.fs" />

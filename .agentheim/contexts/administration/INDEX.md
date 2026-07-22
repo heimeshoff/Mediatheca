@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 3
 - **Todo:** 3
-- **Doing:** 1
-- **Done:** 15
+- **Doing:** 0
+- **Done:** 16
 <!-- task-counts:end -->
 
 ### Todo
@@ -25,12 +25,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **administration-cx92m** — Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate (spike) — `doing/administration-cx92m-shared-connection-request-concurrency-audit.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **administration-cx92m** — Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate (spike) — `done/administration-cx92m-shared-connection-request-concurrency-audit.md`
 - **administration-nf3wk** — "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead" (bugfix) — `done/administration-nf3wk-dead-no-matches-branch.md`
 - **administration-h4k2p** — Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure. (bug) — `done/administration-h4k2p-sse-empty-payload-trailing-comma-bug.md`
 - **administration-vrc56** — Event log export/import as NDJSON — stream out/in via plain Giraffe routes, preserving exact global_position, into an empty store only (feature) — `done/administration-vrc56-ndjson-export-import.md`
@@ -58,6 +58,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0030** -- A single process-wide `SemaphoreSlim(1,1)` (`requestDbLock`) guards the 3 request-reachable transaction-opening choke points on the shared request `SqliteConnection` (`Api.executeCommand`, `GameJournal.save`, `importNdjson`), generalizing ADR-0028's per-command-lock idiom to the request connection; the residual read×write race is accepted-not-closed, and the full per-request-connection migration is deferred to administration-mz6kp. -- 2026-07-22 -- `knowledge/decisions/0030-request-connection-narrow-semaphore-gate.md`
 - **0029** -- Event-log NDJSON export/import: opaque JSON-escaped-string payload embedding for byte-stable round-trips, explicit-position INSERT bypassing `appendToStream` to preserve `global_position` into an empty store only, "leave projections dirty, reuse Rebuild-all" over self-rebuilding, and an asymmetric transport (plain stream out, SSE-progress in). -- 2026-07-22 -- `knowledge/decisions/0029-ndjson-event-log-export-import.md`
 - **0028** -- Scheduled jobs use a dedicated `SqliteConnection` plus a per-command `SemaphoreSlim` (not the shared request connection), closing both the 5s catch-up and the nightly same-hour (04:00) job×job / job×request races; corrects ADR-0024/0026's premise that WAL + `busy_timeout` made one shared connection thread-safe. -- 2026-07-22 -- `knowledge/decisions/0028-scheduled-jobs-dedicated-connection-and-per-command-lock.md`
 - **0026** -- Scheduled-job runs are recorded through a shared registry and an injected recorder seam; run-now is fire-and-forget with a startup-reconciled running row and a name-keyed in-memory guard -- 2026-07-21 -- `knowledge/decisions/0026-job-runs-recording-shared-registry-and-run-now.md`

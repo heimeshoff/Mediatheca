@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 14:15 -- Task verified and completed: administration-cx92m - Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate
+
+**Type:** Work / Task completion
+**Task:** administration-cx92m - Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate
+**Summary:** Audited the shared request SqliteConnection, wrote ADR-0030, and added a process-wide requestDbLock SemaphoreSlim generalizing ADR-0028 to guard the 3 request-reachable BeginTransaction sites, with a concurrent-burst Expecto regression
+**Duration:** 28m16s
+**Verification:** PASS (iteration 1)
+**Files changed:** 12
+**Tests added:** 3
+**ADRs written:** 0030-request-connection-narrow-semaphore-gate.md
+
+---
+
 ## 2026-07-22 13:32 -- Task verified and completed: administration-nf3wk - "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead"
 
 **Type:** Work / Task completion
