@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 16:31 -- Modeling / Promoted: administration-mz6kp - Migrate Api.create/Administration.create and the raw Giraffe stream handlers from one shared SqliteConnection to per-request (factory-based) connections, retiring the ADR-0030 semaphore gate
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-22 16:30 -- Modeling / Refined: administration-mz6kp - Per-request SqliteConnection migration
 
 **Type:** Modeling / Refine
