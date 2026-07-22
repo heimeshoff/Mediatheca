@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 12:05 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~47m (batch started 11:18 → last integration 12:05)
+**Completed:** 3 (first-try PASS: 3, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** administration-tj8n2: 1, administration-a4d9b: 1, administration-vrc56: 1
+**Commits:** 5 (1 batch-start claim, 3 task integrations, this session-end line)
+**Vision-conformance:** none — batch aligns with vision. All three tasks serve the recognized "Operability & Observability — Admin Console" v1 workstream (a4d9b: durable e2e coverage for the shipped Follow toggle per ADR-0023/0027; tj8n2: event-substrate reliability, the scheduled-job connection race; vrc56: NDJSON export/import, an explicitly-listed admin-console backlog item). None pulls toward a v1 non-goal (Books, Trakt/Jellyfin sync, yearly reports, friend intelligence, trailer playback). Standing observation (not a divergence, as in prior sessions): another all-operability batch while the media-experience roadmap (In Focus, Unified Dashboard, Steam Import, HLTB) stays unstarted — but no media tasks were ready, so there was no competition.
+**Batch mix:** 67% product-facing / 33% harness / 0% bookkeeping (3 tasks) — a4d9b + vrc56 type=feature → product-facing; tj8n2 type=bug → harness by the type heuristic (in substance a production reliability fix).
+**Carry-over:** `Mediatheca Directions.html`: left behind (owner: user's design-reference doc — untracked captured design session, present since before this session, not project bookkeeping). No registered worktrees remain — all three batch worktrees were torn down after integration. Note: 6 gitignored orphan directory shells under `.worktrees/` (administration-da908/qjcp4/v4y9g/yamm5, infrastructure-w8fnp, intelligence-p9m4t) predate this session — each holds only a stray empty `src/` shell (no node_modules junction; their tasks are all long-done). Surfaced to the builder for optional cleanup, left untouched (doctrine: never auto-remove orphan worktrees).
+
+**Notes:** (1) Merge-back conflict on the administration README between administration-a4d9b (integrated first) and administration-tj8n2 — both rewrote the same "Playwright e2e harness" bullet with contradictory tj8n2 status ("worked around, real fix still open" vs "fixed by ADR-0028, workaround retired"). Aborted the squash (`git reset --hard HEAD`), surfaced to the builder, who approved the reconciliation: keep a4d9b's fuller paragraph (spec details + nf3wk discovery), update the status clause to the ADR-0028 fix. administration-vrc56 auto-merged cleanly (different README region; non-overlapping Composition.fs/Administration.fs edits vs. tj8n2). (2) Two new backlog items filed by workers: administration-nf3wk (Event Browser "No matches" dead code, from a4d9b) and administration-h4k2p (SSE trailing-comma framing bug, from vrc56). (3) Plugin 0.9.2 lacks several lib helpers the current `work` skill references (session-start-churn, vacuum-guard, worktree-salvage, adr-allocation) — those judgment steps were done by hand; ADR numbering finalized manually (0028 → tj8n2, 0029 → vrc56; both free on main, no renumber). (4) node_modules was junctioned into each worktree (this project's JS root is the repo root, not covered by the skill's dashboard-only helper); by teardown one worktree's junction had become a real directory while the other two were still junctions (unlinked-first) — main node_modules verified intact after every teardown.
+
+---
+
 ## 2026-07-22 12:04 -- Task verified and completed: administration-vrc56 - Event log export/import as NDJSON — stream out/in via plain Giraffe routes, preserving exact global_position, into an empty store only
 
 **Type:** Work / Task completion
