@@ -450,7 +450,7 @@ module Administration =
                 let writer = ctx.Response
 
                 let writeEvent (eventType: string) (json: string) = task {
-                    let line = sprintf "data: {\"type\":\"%s\",%s}\n\n" eventType (json.TrimStart('{').TrimEnd('}'))
+                    let line = Sse.sseFrame eventType json
                     let bytes = System.Text.Encoding.UTF8.GetBytes(line)
                     do! writer.Body.WriteAsync(bytes, 0, bytes.Length)
                     do! writer.Body.FlushAsync()
@@ -492,7 +492,7 @@ module Administration =
                     let writer = ctx.Response
 
                     let writeEvent (eventType: string) (json: string) = task {
-                        let line = sprintf "data: {\"type\":\"%s\",%s}\n\n" eventType (json.TrimStart('{').TrimEnd('}'))
+                        let line = Sse.sseFrame eventType json
                         let bytes = System.Text.Encoding.UTF8.GetBytes(line)
                         do! writer.Body.WriteAsync(bytes, 0, bytes.Length)
                         do! writer.Body.FlushAsync()

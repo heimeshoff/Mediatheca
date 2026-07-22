@@ -1,11 +1,11 @@
 ---
 id: administration-h4k2p
 title: Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure.
-status: doing
+status: done
 type: bug
 context: administration
 created: 2026-07-22
-completed:
+completed: 2026-07-22
 depends_on: []
 blocks: []
 tags: [sse, event-store, projections, bug]
@@ -133,3 +133,39 @@ All acceptance criteria are machine-checkable except the final Rebuild-button
 observation, which is genuinely perceptual (`[human-eye]`, ADR-0061) — the pure
 `sseFrame` Expecto test carries the actual correctness weight; the button check
 is the operator confirming the fix lands end-to-end in the UI.
+
+## Outcome
+Extracted `Sse.sseFrame` (`src/Server/Sse.fs`, compiled just before `Api.fs` in
+`Server.fsproj`) as the single pure SSE frame-building function: it branches on
+whether the trimmed payload body is empty, so `sseFrame "complete" "{}"` now
+yields `data: {"type":"complete"}\n\n` with no trailing comma, while a
+non-empty payload keeps splicing its fields in exactly as before. All three
+`writeEvent` call sites (`Api.steamFamilyImportHandler`,
+`Administration.importEventsStreamHandler`,
+`Administration.projectionRebuildStreamHandler`) now delegate to it instead of
+each doing its own inline `TrimStart('{').TrimEnd('}')` string surgery — that
+literal string now appears exactly once in `src/Server/` (inside the helper
+itself), grep-verified.
+
+Added `tests/Server.Tests/SseTests.fs` (4 Expecto tests, wired into
+`Server.Tests.fsproj`): empty-object and empty-string payloads both parse via
+`System.Text.Json.JsonDocument.Parse` with no trailing comma, a single-field
+and a multi-field non-empty payload both keep their fields and round-trip
+through the same parser. Confirmed red/green: temporarily reverted
+`sseFrame` to the old unconditional-comma implementation, saw exactly the
+2 empty-payload tests fail with the documented `data: {"type":"complete",}`
+artifact, then restored the fix — all 4 new tests plus the full 372-test
+Expecto suite (including `ProjectionRebuildTests.fs` and
+`EventStoreNdjsonTests.fs`) pass.
+
+No client-side change was needed: the client already does
+`JS.JSON.parse dataLine` before dispatching, so a now-valid JSON `complete`
+frame lets `AdminProjections/State.fs`'s `runRebuildStream` reach
+`Rebuild_completed` instead of the JSON-parse-error catch branch. No ADR
+written (per this task's own Notes: a bug-fix refactor, not a decision). No
+BC README change (pure internal implementation detail — no ubiquitous
+language, aggregate, or event changed).
+
+Key files: `src/Server/Sse.fs`, `src/Server/Api.fs`,
+`src/Server/Administration.fs`, `src/Server/Server.fsproj`,
+`tests/Server.Tests/SseTests.fs`, `tests/Server.Tests/Server.Tests.fsproj`.

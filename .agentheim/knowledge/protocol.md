@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 13:31 -- Task verified and completed: administration-h4k2p - Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure.
+
+**Type:** Work / Task completion
+**Task:** administration-h4k2p - Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure.
+**Summary:** Extracted a single pure Sse.sseFrame helper all three SSE handlers call, fixing the empty-payload trailing-comma bug so the Projections Rebuild button reports real completion instead of a false JSON-parse failure
+**Duration:** 8m56s
+**Verification:** PASS (iteration 1)
+**Files changed:** 6
+**Tests added:** 4
+**ADRs written:** none
+
+---
+
 ## 2026-07-22 13:21 -- Batch started: [administration-h4k2p, administration-nf3wk, administration-cx92m]
 
 **Type:** Work / Batch start
