@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 16:00 -- Modeling / Refined: administration-qk3f7 - Add a formatEvent case for Game_rawg_id_set
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Grounded the fix in code (exact payload fields rawgId:int / rawgRating:float option; sibling arm Game_steam_app_id_set) and resolved the task's open hedge. Diffed all six BCs' handledEventTypes registries against their formatter arms: Game_rawg_id_set is the *only* handled-but-unformattable type, so no real gap remains for the broken regression test (AdministrationTests.fs:397) to pivot to — decided the test is repurposed into a positive "appears in neither list" guard rather than swapped to another real case or a fake registry entry. Normalized type fix→bug. Cleared readiness gate → auto-promoted.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-07-22 15:25 -- Work session ended
 
 **Type:** Work / Session end
