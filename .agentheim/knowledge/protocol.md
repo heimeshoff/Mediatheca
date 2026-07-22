@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 23:21 -- Task verified and completed: administration-wwc36 - Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag
+
+**Type:** Work / Task completion
+**Task:** administration-wwc36 - Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag
+**Summary:** Shipped the event surgery escape hatch (raw edit/delete/rename of the event log) behind a shared VACUUM-INTO-backup -> preview+confirm -> checkpoint-rewind-dirty-signal guardrail protocol, with a new Surgery admin tab, cross-tab projections-dirty banner, and keep-all backup stats (ADR-0034).
+**Duration:** 26m
+**Verification:** PASS (iteration 1)
+**Files changed:** 16
+**Tests added:** 22
+**ADRs written:** 0034-event-surgery-guardrails.md
+
+---
+
 ## 2026-07-22 18:17 -- Batch started: [administration-wwc36]
 
 **Type:** Work / Batch start

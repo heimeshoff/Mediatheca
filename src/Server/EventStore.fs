@@ -599,3 +599,128 @@ module EventStore =
             with ex ->
                 tx.Rollback()
                 Error (MalformedLine(lineNumber, ex.Message))
+
+    // Event surgery (administration-wwc36, ADR-0034) — the raw-log escape
+    // hatch for cases the compensating-event composer (ADR-0032) can't reach:
+    // a genuinely wrong-payload event, or a stranded event-type name left by
+    // a code-side DU rename. Every primitive below breaks the "events never
+    // change or disappear" assumption `createFtsIndex`'s own doc comment
+    // states — callers MUST follow an edit/delete with `rebuildFtsIndex` (the
+    // insert-only `events_fts_ai` trigger never covers an UPDATE or a
+    // vanished row) and rewind `projection_checkpoints` (Administration's
+    // `isAnyProjectionDirty`, ADR-0025) so every dependent projection reads
+    // as dirty until the operator reruns Rebuild-all. See ADR-0034 for the
+    // full guardrail protocol (backup / preview+confirm / dirty signal).
+
+    /// One event row by exact `global_position` — event surgery's "the one
+    /// targeted row" preview fetch. `None` for a position that doesn't exist
+    /// (already deleted, or never existed).
+    let getEventByGlobalPosition (conn: SqliteConnection) (globalPosition: int64) : StoredEvent option =
+        conn
+        |> Db.newCommand "SELECT global_position, stream_id, stream_position, event_type, data, metadata, timestamp FROM events WHERE global_position = @gp"
+        |> Db.setParams [ "gp", SqlType.Int64 globalPosition ]
+        |> Db.querySingle readEvent
+
+    /// Exact count of rows at `eventType` — the rename preview's headline
+    /// number (a rename can touch far more rows than any bounded sample
+    /// should render).
+    let countEventsOfType (conn: SqliteConnection) (eventType: string) : int =
+        conn
+        |> Db.newCommand "SELECT COUNT(*) as cnt FROM events WHERE event_type = @event_type"
+        |> Db.setParams [ "event_type", SqlType.String eventType ]
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "cnt")
+        |> Option.defaultValue 0
+
+    /// A bounded sample of rows at `eventType`, oldest-first — the rename
+    /// preview's "here's what you're about to touch" spot-check, capped so a
+    /// rename over thousands of rows doesn't try to render them all.
+    let sampleEventsOfType (conn: SqliteConnection) (eventType: string) (limit: int) : StoredEvent list =
+        conn
+        |> Db.newCommand "SELECT global_position, stream_id, stream_position, event_type, data, metadata, timestamp FROM events WHERE event_type = @event_type ORDER BY global_position LIMIT @limit"
+        |> Db.setParams [ "event_type", SqlType.String eventType; "limit", SqlType.Int32 limit ]
+        |> Db.query readEvent
+
+    /// Updates one event's data+metadata by exact `global_position`. Returns
+    /// rows affected (0 or 1 — global_position is the events table's primary
+    /// key). Callers MUST follow this with `rebuildFtsIndex` inside the same
+    /// transaction (see module doc above).
+    let editEventData (conn: SqliteConnection) (globalPosition: int64) (newData: string) (newMetadata: string) : int =
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- "UPDATE events SET data = @data, metadata = @metadata WHERE global_position = @gp"
+        cmd.Parameters.AddWithValue("@data", newData) |> ignore
+        cmd.Parameters.AddWithValue("@metadata", newMetadata) |> ignore
+        cmd.Parameters.AddWithValue("@gp", globalPosition) |> ignore
+        cmd.ExecuteNonQuery()
+
+    /// Deletes one event by exact `global_position`. Leaves `stream_position`/
+    /// `global_position` GAPS by design — no renumbering. Verified safe:
+    /// `appendToStream` re-reads `MAX(stream_position)` fresh via
+    /// `getStreamPosition` immediately before each append, `getMaxGlobalPosition`
+    /// is deliberately `MAX` not `COUNT`, and the keyset (`queryEventPage`) /
+    /// live-tail (`queryEventsAfter`) cursors use strict `<`/`>` only, never
+    /// assuming contiguity. Returns rows affected (0 or 1). Callers MUST
+    /// follow this with `rebuildFtsIndex` inside the same transaction — the
+    /// insert-only `events_fts_ai` trigger never covers a vanished row.
+    let deleteEventRow (conn: SqliteConnection) (globalPosition: int64) : int =
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- "DELETE FROM events WHERE global_position = @gp"
+        cmd.Parameters.AddWithValue("@gp", globalPosition) |> ignore
+        cmd.ExecuteNonQuery()
+
+    /// Renames an event type store-wide — the schema-migration verb for a
+    /// code-side DU rename that left old-named rows stranded. Reflected
+    /// automatically by `getDistinctEventTypes`/`getDistinctEventTypesForPrefix`
+    /// (both live `SELECT DISTINCT`, no cache). No FTS action needed — FTS
+    /// indexes `data`, not `event_type`. Returns rows affected (the rename
+    /// count).
+    let renameEventTypeRows (conn: SqliteConnection) (oldType: string) (newType: string) : int =
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- "UPDATE events SET event_type = @new WHERE event_type = @old"
+        cmd.Parameters.AddWithValue("@new", newType) |> ignore
+        cmd.Parameters.AddWithValue("@old", oldType) |> ignore
+        cmd.ExecuteNonQuery()
+
+    /// Re-syncs `events_fts` after an edit or delete — the exact `('rebuild')`
+    /// idiom `createFtsIndex`'s own backfill path uses. MUST run AFTER the
+    /// mutation, inside the SAME transaction (ADR-0034), so a full FTS
+    /// rebuild sees post-mutation `events` content — for a delete this is the
+    /// whole point, since the insert-only trigger never covers a vanished row.
+    let rebuildFtsIndex (conn: SqliteConnection) : unit =
+        conn
+        |> Db.newCommand "INSERT INTO events_fts(events_fts) VALUES ('rebuild')"
+        |> Db.exec
+
+    /// `VACUUM INTO` backup (ADR-0034/ADR-0003): a transactionally-consistent,
+    /// WAL-aware, one-statement snapshot of the live store to `backupPath`.
+    /// MUST run in autocommit — BEFORE any `conn.BeginTransaction()` — since
+    /// SQLite refuses `VACUUM` inside a transaction. `VACUUM INTO` also
+    /// happens to yield a plain non-WAL standalone file, exactly what a
+    /// portable backup should be. Verifies the result by opening it on a
+    /// THROWAWAY, unconfigured connection (deliberately NOT
+    /// `configureConnection` — that would flip a plain file to WAL mode and
+    /// spawn `-wal`/`-shm` sidecars next to a supposedly-inert backup file)
+    /// and running `PRAGMA integrity_check` plus a `SELECT COUNT(*) FROM
+    /// events`. `Error` on either the VACUUM itself or the verify step; the
+    /// caller MUST abort with no row touched — see `Administration`'s
+    /// commit-op wiring.
+    let vacuumIntoBackup (conn: SqliteConnection) (backupPath: string) : Result<unit, string> =
+        try
+            use cmd = conn.CreateCommand()
+            cmd.CommandText <- "VACUUM INTO @path"
+            cmd.Parameters.AddWithValue("@path", backupPath) |> ignore
+            cmd.ExecuteNonQuery() |> ignore
+
+            use verifyConn = new SqliteConnection($"Data Source={backupPath}")
+            verifyConn.Open()
+            use integrityCmd = verifyConn.CreateCommand()
+            integrityCmd.CommandText <- "PRAGMA integrity_check"
+            let integrityResult = integrityCmd.ExecuteScalar() :?> string
+            if integrityResult <> "ok" then
+                Error (sprintf "Backup integrity check failed: %s" integrityResult)
+            else
+                use countCmd = verifyConn.CreateCommand()
+                countCmd.CommandText <- "SELECT COUNT(*) FROM events"
+                countCmd.ExecuteScalar() |> ignore
+                Ok ()
+        with ex ->
+            Error ex.Message

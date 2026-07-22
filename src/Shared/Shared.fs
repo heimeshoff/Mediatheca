@@ -1574,6 +1574,60 @@ type RunJobResult =
     | RunJobStarted of runId: int64
     | RunJobRejected
 
+// Event surgery (administration-wwc36, ADR-0034): the raw-log escape hatch
+// for cases the compensating-event composer (ADR-0032) can't reach — a
+// genuinely wrong-payload event, or a stranded event-type name left by a
+// code-side DU rename. Every mutation runs behind the same three-guardrail
+// protocol: VACUUM INTO backup first, preview + explicit confirm, then a
+// projections-dirty signal (checkpoint rewind, reusing ADR-0025's
+// isAnyProjectionDirty verbatim — no new flag table).
+
+/// One event row as event surgery reads/targets it. Unlike `EventDto` (the
+/// event explorer's read-only row), this carries `Metadata` too, since edit
+/// lets the operator change both `Data` and `Metadata`.
+type SurgeryEventRow = {
+    GlobalPosition: int64
+    StreamId: string
+    StreamPosition: int64
+    EventType: string
+    Data: string
+    Metadata: string
+    Timestamp: string
+}
+
+/// Delete preview: the one targeted row, plus the stream's CURRENT (i.e.
+/// pre-delete) `stream_position` — carried so the client can render the
+/// stream-position-gap consequence copy ("deleting this leaves a gap; the
+/// stream is currently at position N") without a second round-trip.
+type SurgeryDeletePreview = {
+    Event: SurgeryEventRow
+    StreamCurrentPosition: int64
+}
+
+/// Rename preview: the exact count of rows at the old `event_type`, plus a
+/// bounded sample — a rename can touch far more rows than any preview should
+/// try to render in full.
+type SurgeryRenamePreview = {
+    Count: int
+    Sample: SurgeryEventRow list
+}
+
+/// Result of a surgery commit op (edit/delete/rename). Backup failure is a
+/// typed case, not an exception — mirrors the `OrphanScan`/`PurgeResult`
+/// typed-outcome idiom. `BackupFailed` means NO row was touched (the
+/// `VACUUM INTO` or its post-backup verify failed — abort before any
+/// mutation). `Applied` carries the backup file's path (the operator's
+/// restore point for this exact operation) and the number of rows the
+/// mutation affected.
+type SurgeryResult =
+    | BackupFailed of reason: string
+    | Applied of backupPath: string * affectedRows: int
+
+/// Cumulative footprint of the keep-all `backups/` directory. No backup is
+/// ever auto-pruned by this feature (builder decision, locked at refinement)
+/// — this is purely a directory-walk stat for the Surgery tab's backup panel.
+type BackupStats = { Count: int; TotalBytes: int64 }
+
 type IAdminApi = {
     // Event Store Browser
     getEventPage: EventPageQuery -> Async<EventPage>
@@ -1616,4 +1670,29 @@ type IAdminApi = {
     // Jobs (administration-yamm5)
     getJobStatuses: unit -> Async<JobStatusDto list>
     runJobNow: string -> Async<RunJobResult>
+    // Event surgery (administration-wwc36, ADR-0034)
+    /// The one targeted row by `global_position`, for the edit dialog's
+    /// pre-fill. `None` if no such position exists.
+    previewEventEdit: int64 -> Async<SurgeryEventRow option>
+    /// The one targeted row by `global_position` plus the stream's current
+    /// position, for the delete confirmation's gap-consequence copy. `None`
+    /// if no such position exists.
+    previewEventDelete: int64 -> Async<SurgeryDeletePreview option>
+    /// Exact count of rows at `oldType` plus a bounded sample, for the
+    /// rename confirmation dialog.
+    previewEventTypeRename: string -> Async<SurgeryRenamePreview>
+    /// Commits an edit: (globalPosition, newData, newMetadata). Backs up via
+    /// `VACUUM INTO` first (abort with no row touched on backup failure),
+    /// then updates the one row, re-syncs `events_fts`, and rewinds every
+    /// checkpoint-tracked projection to dirty.
+    editEvent: int64 -> string -> string -> Async<SurgeryResult>
+    /// Commits a delete: globalPosition. Leaves stream_position/global_position
+    /// gaps by design (no renumbering) — verified safe against the keyset/
+    /// live-tail cursors and appendToStream's fresh MAX re-read.
+    deleteEvent: int64 -> Async<SurgeryResult>
+    /// Commits a store-wide event-type rename: (oldType, newType).
+    renameEventType: string -> string -> Async<SurgeryResult>
+    /// Cumulative count + total bytes of every backup ever taken by this
+    /// feature — keep-all retention, no pruning.
+    getBackupStats: unit -> Async<BackupStats>
 }

@@ -1025,6 +1025,96 @@ module Administration =
                 FinishedAt = if reader.IsDBNull(6) then None else Some (reader.GetString(6))
             } ]
 
+    // ── Event surgery (administration-wwc36, ADR-0034) ──
+    //
+    // The raw-log escape hatch for cases the compensating-event composer
+    // (ADR-0032) can't reach: a genuinely wrong-payload event, or a stranded
+    // event-type name left by a code-side DU rename. Every commit op below
+    // runs the SAME three-guardrail protocol: VACUUM INTO backup first
+    // (abort with no row touched on failure) -> mutation + events_fts
+    // rebuild + checkpoint rewind sharing one transaction -> dirty signal
+    // reused verbatim from `isAnyProjectionDirty` (ADR-0025, no new flag
+    // table). See ADR-0034 for the full design and concurrency reasoning.
+
+    /// `<dataDir>/backups/` — a sibling of the live db file, derived from
+    /// `dbPath` the same way Composition.fs derives `images/` from the data
+    /// dir. Created on first use; never pruned (keep-all retention, locked
+    /// at refinement).
+    let private ensureBackupsDir (dbPath: string) : string =
+        let dir = Path.Combine(Path.GetDirectoryName(dbPath), "backups")
+        if not (Directory.Exists(dir)) then Directory.CreateDirectory(dir) |> ignore
+        dir
+
+    /// A fresh, collision-free backup file path under `backupsDir`. A
+    /// timestamp alone isn't collision-proof across rapid successive
+    /// surgeries (several ops fired in the same test run can land in the
+    /// same tick) — the short GUID suffix guarantees uniqueness regardless
+    /// of timing.
+    let private newBackupPath (dbPath: string) : string =
+        let dir = ensureBackupsDir dbPath
+        let stamp = DateTime.UtcNow.ToString("yyyyMMdd'T'HHmmssfffffff")
+        let unique = Guid.NewGuid().ToString("N").Substring(0, 8)
+        Path.Combine(dir, sprintf "mediatheca-%s-%s.db" stamp unique)
+
+    let private toSurgeryEventRow (e: EventStore.StoredEvent) : SurgeryEventRow =
+        { GlobalPosition = e.GlobalPosition
+          StreamId = e.StreamId
+          StreamPosition = e.StreamPosition
+          EventType = e.EventType
+          Data = e.Data
+          Metadata = e.Metadata
+          Timestamp = e.Timestamp.ToString("o") }
+
+    /// Shared commit-op body for edit/delete/rename (ADR-0034): `VACUUM
+    /// INTO` first, in autocommit (SQLite refuses VACUUM inside a
+    /// transaction), verified by `EventStore.vacuumIntoBackup`'s own
+    /// throwaway-connection check; only on success does `mutate` + (when
+    /// `needsFtsRebuild`) the FTS rebuild + the checkpoint rewind run inside
+    /// ONE transaction on `conn` — mirrors `appendCompensatingEventCore`'s
+    /// per-op-connection, no-lock shape (ADR-0033: `conn` is opened by the
+    /// caller via the shared factory, so no other in-flight request shares
+    /// this connection object). `mutate` returns the affected-row count.
+    let private runSurgeryMutation
+        (conn: SqliteConnection)
+        (dbPath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (needsFtsRebuild: bool)
+        (mutate: unit -> int)
+        : SurgeryResult =
+        let backupPath = newBackupPath dbPath
+        match EventStore.vacuumIntoBackup conn backupPath with
+        | Error reason -> BackupFailed reason
+        | Ok () ->
+            use tx = conn.BeginTransaction()
+            try
+                let affected = mutate ()
+                if needsFtsRebuild then EventStore.rebuildFtsIndex conn
+                // Rewind every checkpoint-tracked projection to dirty
+                // (ADR-0025's isAnyProjectionDirty then reports all of them
+                // non-empty) — reuses Projection.saveCheckpoint's own
+                // upsert-to-0, same net effect as the design's literal
+                // "UPDATE projection_checkpoints SET last_position = 0" but
+                // also correct for a handler that has never checkpointed.
+                for handler in projectionHandlers do
+                    Projection.saveCheckpoint conn handler.Name 0L
+                tx.Commit()
+                Applied(backupPath, affected)
+            with _ ->
+                tx.Rollback()
+                reraise ()
+
+    /// Directory walk over `backups/` for the Surgery tab's keep-all
+    /// retention panel. Empty stats (not an error) if the directory doesn't
+    /// exist yet — i.e. no surgery has ever run against this store.
+    let private computeBackupStats (dbPath: string) : BackupStats =
+        let dir = Path.Combine(Path.GetDirectoryName(dbPath), "backups")
+        if not (Directory.Exists(dir)) then
+            { Count = 0; TotalBytes = 0L }
+        else
+            let files = Directory.GetFiles(dir)
+            { Count = files.Length
+              TotalBytes = files |> Array.sumBy (fun f -> (FileInfo(f)).Length) }
+
     /// `dbPath`/`imagesDir` are the same paths Program.fs computes from
     /// DATA_DIR (mediatheca.db and the images/ cache) — passed through here
     /// so the Health tab's storage stats reflect the actual data dir rather
@@ -1239,5 +1329,45 @@ module Administration =
                     | Ok (runId, body) ->
                         Async.Start body
                         return RunJobStarted runId
+            }
+
+            previewEventEdit = fun globalPosition -> async {
+                use conn = factory ()
+                return EventStore.getEventByGlobalPosition conn globalPosition |> Option.map toSurgeryEventRow
+            }
+
+            previewEventDelete = fun globalPosition -> async {
+                use conn = factory ()
+                match EventStore.getEventByGlobalPosition conn globalPosition with
+                | None -> return None
+                | Some e ->
+                    let currentPosition = EventStore.getStreamPosition conn e.StreamId
+                    return Some { Event = toSurgeryEventRow e; StreamCurrentPosition = currentPosition }
+            }
+
+            previewEventTypeRename = fun oldType -> async {
+                use conn = factory ()
+                let count = EventStore.countEventsOfType conn oldType
+                let sample = EventStore.sampleEventsOfType conn oldType 20 |> List.map toSurgeryEventRow
+                return { Count = count; Sample = sample }
+            }
+
+            editEvent = fun globalPosition newData newMetadata -> async {
+                use conn = factory ()
+                return runSurgeryMutation conn dbPath projectionHandlers true (fun () -> EventStore.editEventData conn globalPosition newData newMetadata)
+            }
+
+            deleteEvent = fun globalPosition -> async {
+                use conn = factory ()
+                return runSurgeryMutation conn dbPath projectionHandlers true (fun () -> EventStore.deleteEventRow conn globalPosition)
+            }
+
+            renameEventType = fun oldType newType -> async {
+                use conn = factory ()
+                return runSurgeryMutation conn dbPath projectionHandlers false (fun () -> EventStore.renameEventTypeRows conn oldType newType)
+            }
+
+            getBackupStats = fun () -> async {
+                return computeBackupStats dbPath
             }
         }

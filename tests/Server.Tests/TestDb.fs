@@ -35,7 +35,15 @@ open Mediatheca.Server
 /// isolated in-memory databases). Disposing deletes the backing `.db` file
 /// and its `-wal`/`-shm` sidecars.
 type TempDb(bootstrap: SqliteConnection -> unit) =
-    let path = Path.Combine(Path.GetTempPath(), sprintf "mediatheca-test-%s.db" (Guid.NewGuid().ToString("N")))
+    // A private, per-instance subdirectory (not a bare file directly under
+    // the shared OS temp root) — so a sibling directory a test derives from
+    // `Path` (e.g. event surgery's `backups/`, administration-wwc36) is
+    // scoped to THIS TempDb alone, never shared with other tests running
+    // concurrently or with leftovers from a previous run. Dispose removes
+    // the whole directory, db file + sidecars + any such sibling included.
+    let dir = Path.Combine(Path.GetTempPath(), sprintf "mediatheca-test-%s" (Guid.NewGuid().ToString("N")))
+    do Directory.CreateDirectory(dir) |> ignore
+    let path = Path.Combine(dir, "mediatheca.db")
 
     let factory () : SqliteConnection =
         let conn = new SqliteConnection($"Data Source={path}")
@@ -48,14 +56,18 @@ type TempDb(bootstrap: SqliteConnection -> unit) =
 
     member _.Connection : SqliteConnection = connection
     member _.Factory : unit -> SqliteConnection = factory
+    /// The backing .db file's path — surfaced for tests that need a REAL
+    /// dbPath (e.g. event-surgery's VACUUM INTO backup, administration-wwc36),
+    /// not just a factory. `Administration.create` derives the sibling
+    /// `backups/` directory from this path the same way it derives it from
+    /// the production dbPath in Composition.fs — scoped to this TempDb's own
+    /// private directory (see `dir` above), never shared across tests.
+    member _.Path : string = path
 
     interface IDisposable with
         member _.Dispose() =
             connection.Dispose()
-            for suffix in [ ""; "-wal"; "-shm" ] do
-                let f = path + suffix
-                if File.Exists(f) then
-                    try File.Delete(f) with _ -> ()
+            try Directory.Delete(dir, true) with _ -> ()
 
 /// `use db = TestDb.withTempDbFactory bootstrap` — disposal (including the
 /// backing files) happens automatically at the end of the enclosing scope,

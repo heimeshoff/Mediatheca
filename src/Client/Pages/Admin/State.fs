@@ -11,18 +11,21 @@ let init (tab: AdminTab) : Model * Cmd<Msg> =
     let projectionsModel, projectionsCmd = Mediatheca.Client.Pages.AdminProjections.State.init ()
     let imagesModel, imagesCmd = Mediatheca.Client.Pages.AdminImages.State.init ()
     let jobsModel, jobsCmd = Mediatheca.Client.Pages.AdminJobs.State.init ()
+    let surgeryModel, surgeryCmd = Mediatheca.Client.Pages.AdminSurgery.State.init ()
     { ActiveTab = tab
       EventBrowserModel = eventBrowserModel
       HealthModel = healthModel
       ProjectionsModel = projectionsModel
       ImagesModel = imagesModel
-      JobsModel = jobsModel },
+      JobsModel = jobsModel
+      SurgeryModel = surgeryModel },
     Cmd.batch [
         Cmd.map Event_browser_msg eventBrowserCmd
         Cmd.map Health_msg healthCmd
         Cmd.map Projections_msg projectionsCmd
         Cmd.map Images_msg imagesCmd
         Cmd.map Jobs_msg jobsCmd
+        Cmd.map Surgery_msg surgeryCmd
     ]
 
 /// Called from root `State.Url_changed` when the user navigates away from the
@@ -56,3 +59,23 @@ let update (adminApi: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Jobs_msg childMsg ->
         let childModel, childCmd = Mediatheca.Client.Pages.AdminJobs.State.update adminApi childMsg model.JobsModel
         { model with JobsModel = childModel }, Cmd.map Jobs_msg childCmd
+
+    | Surgery_msg childMsg ->
+        let childModel, childCmd = Mediatheca.Client.Pages.AdminSurgery.State.update adminApi childMsg model.SurgeryModel
+        let model = { model with SurgeryModel = childModel }
+        // A committed surgery mutation always rewinds every checkpoint-tracked
+        // projection's checkpoint (ADR-0034) — reload the Projections tab's
+        // stats immediately (not just on next tab visit) so the cross-tab
+        // dirty banner (client-derived from getProjectionStats' Lag field,
+        // administration-wwc36) reflects it right away, the same way
+        // AdminProjections.State reloads its own Stats after every rebuild
+        // step and after import.
+        match childMsg with
+        | Mediatheca.Client.Pages.AdminSurgery.Types.Mutation_completed (Applied _) ->
+            model,
+            Cmd.batch [
+                Cmd.map Surgery_msg childCmd
+                Cmd.map Projections_msg (Cmd.ofMsg Mediatheca.Client.Pages.AdminProjections.Types.Load)
+            ]
+        | _ ->
+            model, Cmd.map Surgery_msg childCmd

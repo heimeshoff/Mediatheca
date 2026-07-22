@@ -1,15 +1,15 @@
 ---
 id: administration-wwc36
 title: Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag
-status: doing
+status: done
 type: feature
 context: administration
 created: 2026-07-20
-completed:
+completed: 2026-07-22
 depends_on: [administration-xjmda, administration-qjcp4, design-system-001]
 blocks: [administration-n8kqw]
 tags: [admin-console, event-store, surgery, backup]
-related_adrs: [0002, 0003, 0020, 0024, 0025, 0029, 0032, 0033]
+related_adrs: [0002, 0003, 0020, 0024, 0025, 0029, 0032, 0033, 0034]
 related_research: []
 prior_art: []
 ---
@@ -74,3 +74,62 @@ Transaction shape within the body:
 - *(Resolved in the 2026-07-22 ADR-0033 REFINE)* The `('rebuild')` FTS re-sync and the checkpoint rewind **share the mutation's single transaction** (steps 3–5 under one `BeginTransaction`, mutate-then-rebuild order) — matches `appendToStream`'s atomicity, so a crash can't leave the mutation applied but FTS/checkpoint un-updated. See the **Concurrency** note in `## What`.
 
 **Dependencies now all met (2026-07-22):** administration-xjmda (safe append-only path), administration-qjcp4 (the Rebuild-all the dirty banner reuses), and design-system-001 (styleguide gate) are all in `done/`. The sequencing gate that held this in backlog is cleared — this refinement promotes it to `todo/`. (administration-n8kqw still waits on this task in turn, mirroring how this one waited on xjmda.)
+
+## Outcome
+
+Shipped all three guardrailed operations (edit/delete/rename) behind the
+identical three-guardrail protocol (VACUUM INTO backup on a per-request
+connection → preview+confirm → checkpoint-rewind dirty signal), plus the
+keep-all backup-stats panel and the cross-tab "projections out of sync"
+banner.
+
+**Server (`src/Server/EventStore.fs`, `src/Server/Administration.fs`):**
+- `EventStore.fs` gained the surgery primitives: `getEventByGlobalPosition`,
+  `countEventsOfType`, `sampleEventsOfType`, `editEventData`,
+  `deleteEventRow`, `renameEventTypeRows`, `rebuildFtsIndex`,
+  `vacuumIntoBackup` (the residual-open "does `VACUUM INTO @path` accept a
+  bound parameter under Microsoft.Data.Sqlite 9.x" question — yes, confirmed
+  by `EventSurgeryTests.fs`).
+- `Administration.fs` gained `ensureBackupsDir`/`newBackupPath`,
+  `toSurgeryEventRow`, `runSurgeryMutation` (the shared commit-op body:
+  backup → verify → one transaction for mutate+FTS-rebuild+checkpoint-rewind),
+  `computeBackupStats`, and seven new `IAdminApi` members
+  (`previewEventEdit`/`previewEventDelete`/`previewEventTypeRename`/
+  `editEvent`/`deleteEvent`/`renameEventType`/`getBackupStats`), each on its
+  own `use conn = factory ()` per ADR-0033 — no lock.
+- `Shared.fs` gained `SurgeryEventRow`, `SurgeryDeletePreview`,
+  `SurgeryRenamePreview`, `SurgeryResult` (`BackupFailed`/`Applied`),
+  `BackupStats`, and the seven `IAdminApi` signatures.
+
+**Client (`src/Client/Pages/AdminSurgery/`):** a new Types/State/Views page
+wired into the existing `AdminSurgery` router tab — three operation panels
+(edit/delete/rename), each with a paper-overlay confirm dialog
+(`Components.ModalPanel`), plus a backup-stats panel. `src/Client/Pages/Admin/`
+wires the new page in and adds a cross-tab dirty banner
+(`Admin/Views.fs`'s `dirtyBanner`, client-derived from
+`AdminProjectionsModel.Stats`'s `Lag`, no new API method) that reloads
+immediately after a committed mutation (`Admin/State.fs`'s `Surgery_msg`
+handler). Verified via `npm run build` (Fable typecheck) — the client UI
+itself is `[human-eye]` per this task's acceptance criteria; a Playwright
+e2e spec closing that gap is tracked as backlog item
+administration-svq3t.
+
+**Tests:** `tests/Server.Tests/EventSurgeryTests.fs` (9 tests, EventStore.fs
+primitives in isolation) and `tests/Server.Tests/AdminSurgeryTests.fs` (13
+tests, the full `IAdminApi` surface: backup+verify, preview/cancel
+byte-for-byte invariance, FTS resync, checkpoint rewind, rename, delete +
+Rebuild-all consistency against a real Movies stream, keep-all backup
+stats, and the concurrency proof against a burst of `addFriend` calls).
+`tests/Server.Tests/TestDb.fs`'s `TempDb` now places its db file in a
+private per-instance subdirectory (exposed via a new `.Path` member) so a
+sibling `backups/` directory a test derives from it is scoped to that one
+fixture. Full suite: 414/414 passing (392 baseline + 22 new).
+
+**ADR:** `.agentheim/knowledge/decisions/0034-event-surgery-guardrails.md`.
+
+**BC README:** updated with the Event surgery bullet and the extended
+`IAdminApi` method list.
+
+**New backlog item:** administration-svq3t (Playwright e2e spec for the
+Surgery tab, closing the `[human-eye]` client-UI gap with the project's
+existing e2e harness, ADR-0027).

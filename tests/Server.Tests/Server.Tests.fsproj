@@ -14,12 +14,14 @@
     <Compile Include="CatalogsTests.fs" />
     <Compile Include="EventStoreTests.fs" />
     <Compile Include="EventStoreNdjsonTests.fs" />
+    <Compile Include="EventSurgeryTests.fs" />
     <Compile Include="SseTests.fs" />
     <Compile Include="TestDb.fs" />
     <Compile Include="AdministrationTests.fs" />
     <Compile Include="JobRunsTests.fs" />
     <Compile Include="JobConnectionConcurrencyTests.fs" />
     <Compile Include="RequestConnectionConcurrencyTests.fs" />
+    <Compile Include="AdminSurgeryTests.fs" />
     <Compile Include="ProjectionRebuildTests.fs" />
     <Compile Include="ProjectionDriftTests.fs" />
     <Compile Include="MoviesIntegrationTests.fs" />
