@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 11:10 -- Modeling / Promoted: administration-vrc56 - Event log export/import as NDJSON — stream out/in via plain Giraffe routes, preserving exact global_position, into an empty store only
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-22 11:10 -- Modeling / Promoted: administration-tj8n2 - Scheduled-job timers race on the shared SqliteConnection and crash the process — fix with a dedicated job connection plus a per-command lock
 
 **Type:** Modeling / Promote
