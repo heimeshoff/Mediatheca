@@ -1,7 +1,7 @@
 ---
 id: administration-vrc56
 title: Event log export/import as NDJSON — stream out/in via plain Giraffe routes, preserving exact global_position, into an empty store only
-status: todo
+status: doing
 type: feature
 context: administration
 created: 2026-07-20

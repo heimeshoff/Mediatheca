@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 11:18 -- Batch started: [administration-tj8n2, administration-a4d9b, administration-vrc56]
+
+**Type:** Work / Batch start
+**Tasks:** administration-tj8n2 - Scheduled-job timers race on the shared SqliteConnection and crash the process — fix with a dedicated job connection plus a per-command lock, administration-a4d9b - Assert the Events-tab Follow toggle's three live-tail behaviors via committed Playwright specs, administration-vrc56 - Event log export/import as NDJSON — stream out/in via plain Giraffe routes, preserving exact global_position, into an empty store only
+**Parallel:** yes (3 workers)
+
+---
+
 ## 2026-07-22 11:10 -- Modeling / Promoted: administration-vrc56 - Event log export/import as NDJSON — stream out/in via plain Giraffe routes, preserving exact global_position, into an empty store only
 
 **Type:** Modeling / Promote

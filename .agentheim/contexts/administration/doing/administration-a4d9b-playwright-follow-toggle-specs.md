@@ -1,7 +1,7 @@
 ---
 id: administration-a4d9b
 title: Assert the Events-tab Follow toggle's three live-tail behaviors via committed Playwright specs
-status: todo
+status: doing
 type: feature
 context: administration
 created: 2026-07-21

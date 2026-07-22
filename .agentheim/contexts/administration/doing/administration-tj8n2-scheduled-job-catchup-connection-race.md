@@ -1,7 +1,7 @@
 ---
 id: administration-tj8n2
 title: Scheduled-job timers race on the shared SqliteConnection and crash the process — fix with a dedicated job connection plus a per-command lock
-status: todo
+status: doing
 type: bug
 context: administration
 created: 2026-07-22
