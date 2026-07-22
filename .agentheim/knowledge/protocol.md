@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 14:32 -- Batch started: [administration-btvqa]
+
+**Type:** Work / Batch start
+**Tasks:** administration-btvqa - Shadow-table replay drift detector — verify projection read models exactly match the event log
+**Parallel:** no (1 worker — sequential wave: administration-xjmda held to the next wave; both extend Administration.fs / Composition.fs route wiring and IAdminApi, so serial dispatch gives each verifier the true integrated base)
+
+---
+
 ## 2026-07-22 14:31 -- Task verified and completed: administration-gxd6e - Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples
 
 **Type:** Work / Task completion

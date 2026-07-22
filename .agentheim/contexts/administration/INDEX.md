@@ -11,19 +11,19 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 4
-- **Todo:** 2
-- **Doing:** 0
+- **Todo:** 1
+- **Doing:** 1
 - **Done:** 17
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
 - **administration-xjmda** — Compensating-event composer — append corrective events from the admin UI (feature) — `todo/administration-xjmda-compensating-event-composer.md`
-- **administration-btvqa** — Shadow-table replay drift detector — verify projection read models exactly match the event log (feature) — `todo/administration-btvqa-projection-drift-integrity-checks.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **administration-btvqa** — Shadow-table replay drift detector — verify projection read models exactly match the event log (feature) — `doing/administration-btvqa-projection-drift-integrity-checks.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
