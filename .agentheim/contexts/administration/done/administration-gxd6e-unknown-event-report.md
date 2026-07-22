@@ -1,11 +1,11 @@
 ---
 id: administration-gxd6e
 title: Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples
-status: doing
+status: done
 type: feature
 context: administration
 created: 2026-07-22
-completed:
+completed: 2026-07-22
 depends_on: [design-system-001]
 blocks: []
 tags: [admin-console, health, integrity, drift]
@@ -57,9 +57,48 @@ unnoticed until something reads wrong. This surfaces them on the Health tab as a
 - [ ] The formatEvent-unformattable list correctly includes a fabricated type
       even when that type IS present in `handledEventTypes` (the two lists are
       independent checks, not aliases of each other).
-- [ ] Health tab renders both lists with count + one sample event's raw JSON,
+- [x] A fabricated unknown event type inserted directly into a test event store
+      (bypassing all `Serialization.toEventData` helpers) appears in the
+      unhandled list with the correct count.
+- [x] A real, currently-handled event type does **not** appear in either list
+      (negative case — guards against a registry entry silently drifting out of
+      sync with its `deserialize` match).
+- [x] The formatEvent-unformattable list correctly includes a fabricated type
+      even when that type IS present in `handledEventTypes` (the two lists are
+      independent checks, not aliases of each other).
+- [x] Health tab renders both lists with count + one sample event's raw JSON,
       consistent with the tab's existing paper-overlay / DaisyUI styling.
       [human-eye]
+
+## Outcome
+Added a hand-maintained `handledEventTypes: string list` to each of the six
+core BCs' `Serialization` modules (Movies, Series, Games, Friends, Catalogs,
+ContentBlocks), registered in `Administration.handledEventTypesByBoundedContext`
+alongside `boundedContextPrefixes`. `Administration.buildUnknownEventReport`
+runs the two independent checks (unhandled / unformattable) over
+`EventStore.getEventCountsByType`, using one new indexed point-lookup helper
+(`EventStore.getSampleEventForType`) per distinct event type. `HealthStats`
+gained `UnhandledEventTypes`/`UnformattableEventTypes: UnknownEventTypeRow list`
+(kept in the existing single-round-trip `getHealthStats` shape per ADR-0021).
+The Health tab (`src/Client/Pages/AdminHealth/Views.fs`) renders both lists
+with type/count/raw-JSON-sample, matching the stream drill-in's raw-JSON
+block styling, with an empty-state message when a check finds nothing.
+
+While writing the acceptance-criterion-3 test, found a genuine, currently-
+existing drift case (not fabricated): `Game_rawg_id_set` is handled by
+`Games.Serialization.deserialize` but has no case in
+`EventFormatting.formatGameEvent` — used directly as the independence-proving
+test case rather than a synthetic double, and filed as
+`administration-qk3f7` (backlog) to fix the formatter gap itself.
+
+Key files: `src/Server/EventStore.fs` (`getSampleEventForType`),
+`src/Server/Administration.fs` (`handledEventTypesByBoundedContext`,
+`isHandledByBoundedContext`, `buildUnknownEventReport`, wired into
+`buildHealthStats`), `src/Server/{Movies,Series,Games,Friends,Catalogs,ContentBlocks}.fs`
+(`Serialization.handledEventTypes`), `src/Shared/Shared.fs`
+(`UnknownEventTypeRow`, extended `HealthStats`),
+`src/Client/Pages/AdminHealth/Views.fs` (unhandled/unformattable sections),
+`tests/Server.Tests/AdministrationTests.fs` (4 new test cases).
 
 ## Notes
 - **Independent** of `administration-btvqa` (the shadow-table drift detector) —

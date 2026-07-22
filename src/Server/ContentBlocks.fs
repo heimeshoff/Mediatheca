@@ -321,6 +321,19 @@ module ContentBlocks =
                 |> Option.map Content_block_row_ungrouped
             | _ -> None
 
+        /// Hand-maintained mirror of the `deserialize` match-arm strings
+        /// above (administration-gxd6e) — see Movies.Serialization.handledEventTypes
+        /// for the pattern this follows.
+        let handledEventTypes : string list = [
+            "Content_block_added"
+            "Content_block_updated"
+            "Content_block_removed"
+            "Content_block_type_changed"
+            "Content_blocks_reordered"
+            "Content_blocks_row_grouped"
+            "Content_block_row_ungrouped"
+        ]
+
         let toEventData (event: ContentBlockEvent) : EventStore.EventData =
             let eventType, data = serialize event
             { EventType = eventType; Data = data; Metadata = "{}" }

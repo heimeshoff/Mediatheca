@@ -412,6 +412,32 @@ module Movies =
                 Some Movie_in_focus_cleared
             | _ -> None
 
+        /// Hand-maintained mirror of the `deserialize` match-arm strings
+        /// above (administration-gxd6e) — F# pattern matches aren't
+        /// reflectively introspectable, so this can't be derived, only kept
+        /// in lockstep. Consumed by the Health tab's unknown-event report via
+        /// `Administration.handledEventTypesByBoundedContext`. Same
+        /// hand-maintained-registry shape as `Administration.boundedContextPrefixes`.
+        let handledEventTypes : string list = [
+            "Movie_added_to_library"
+            "Movie_removed_from_library"
+            "Movie_categorized"
+            "Movie_poster_replaced"
+            "Movie_backdrop_replaced"
+            "Movie_recommended_by"
+            "Recommendation_removed"
+            "Want_to_watch_with"
+            "Removed_want_to_watch_with"
+            "Watch_session_recorded"
+            "Watch_session_date_changed"
+            "Friend_added_to_watch_session"
+            "Friend_removed_from_watch_session"
+            "Watch_session_removed"
+            "Personal_rating_set"
+            "Movie_in_focus_set"
+            "Movie_in_focus_cleared"
+        ]
+
         let toEventData (event: MovieEvent) : EventStore.EventData =
             let eventType, data = serialize event
             { EventType = eventType; Data = data; Metadata = "{}" }

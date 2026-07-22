@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 14:31 -- Task verified and completed: administration-gxd6e - Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples
+
+**Type:** Work / Task completion
+**Task:** administration-gxd6e - Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples
+**Summary:** Added the Health-tab unknown-event report — a hand-maintained handledEventTypes registry per BC Serialization module plus two independent checks (unhandled owning-BC / unformattable formatEvent) over getEventCountsByType, rendered as two Health-tab sections
+**Duration:** 14m11s
+**Verification:** PASS (iteration 1)
+**Files changed:** 11
+**Tests added:** 4
+**ADRs written:** none
+
+---
+
 ## 2026-07-22 14:16 -- Batch started: [administration-gxd6e]
 
 **Type:** Work / Batch start

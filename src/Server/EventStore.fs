@@ -355,6 +355,17 @@ module EventStore =
         |> Db.newCommand "SELECT event_type, COUNT(*) as cnt FROM events GROUP BY event_type"
         |> Db.query (fun rd -> rd.ReadString "event_type", rd.ReadInt32 "cnt")
 
+    /// One representative stored event for a given event type, lowest
+    /// `global_position` first — an indexed point lookup via
+    /// idx_events_event_type, LIMIT 1. Used by the Health tab's unknown-event
+    /// report (administration-gxd6e) to attach a raw-JSON sample to each
+    /// flagged event type without loading every occurrence.
+    let getSampleEventForType (conn: SqliteConnection) (eventType: string) : StoredEvent option =
+        conn
+        |> Db.newCommand "SELECT global_position, stream_id, stream_position, event_type, data, metadata, timestamp FROM events WHERE event_type = @event_type ORDER BY global_position LIMIT 1"
+        |> Db.setParams [ "event_type", SqlType.String eventType ]
+        |> Db.querySingle readEvent
+
     /// Per-day event counts for timestamps >= sinceIso (ISO-8601 TEXT, same
     /// format events.timestamp is stored in). Bounded by the indexed
     /// timestamp range rather than a full-table scan, so cost tracks the

@@ -147,6 +147,15 @@ module Friends =
                 Some Friend_removed
             | _ -> None
 
+        /// Hand-maintained mirror of the `deserialize` match-arm strings
+        /// above (administration-gxd6e) — see Movies.Serialization.handledEventTypes
+        /// for the pattern this follows.
+        let handledEventTypes : string list = [
+            "Friend_added"
+            "Friend_updated"
+            "Friend_removed"
+        ]
+
         let toEventData (event: FriendEvent) : EventStore.EventData =
             let eventType, data = serialize event
             { EventType = eventType; Data = data; Metadata = "{}" }

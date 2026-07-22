@@ -885,6 +885,38 @@ module Series =
                 |> Option.map Series_refreshed
             | _ -> None
 
+        /// Hand-maintained mirror of the `deserialize` match-arm strings
+        /// above (administration-gxd6e) — see Movies.Serialization.handledEventTypes
+        /// for the pattern this follows.
+        let handledEventTypes : string list = [
+            "Series_added_to_library"
+            "Series_removed_from_library"
+            "Series_categorized"
+            "Series_poster_replaced"
+            "Series_backdrop_replaced"
+            "Series_recommended_by"
+            "Series_recommendation_removed"
+            "Series_want_to_watch_with"
+            "Series_removed_want_to_watch_with"
+            "Series_personal_rating_set"
+            "Rewatch_session_created"
+            "Rewatch_session_removed"
+            "Default_rewatch_session_changed"
+            "Rewatch_session_friend_added"
+            "Rewatch_session_friend_removed"
+            "Episode_watched"
+            "Episode_unwatched"
+            "Season_marked_watched"
+            "Episodes_watched_up_to"
+            "Season_marked_unwatched"
+            "Episode_watched_date_changed"
+            "Series_abandoned"
+            "Series_unabandoned"
+            "Series_in_focus_set"
+            "Series_in_focus_cleared"
+            "Series_refreshed"
+        ]
+
         let toEventData (event: SeriesEvent) : EventStore.EventData =
             let eventType, data = serialize event
             { EventType = eventType; Data = data; Metadata = "{}" }

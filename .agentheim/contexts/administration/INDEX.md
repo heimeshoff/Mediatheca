@@ -10,10 +10,10 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 3
+- **Backlog:** 4
 - **Todo:** 2
-- **Doing:** 1
-- **Done:** 16
+- **Doing:** 0
+- **Done:** 17
 <!-- task-counts:end -->
 
 ### Todo
@@ -24,12 +24,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **administration-gxd6e** — Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples (feature) — `doing/administration-gxd6e-unknown-event-report.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **administration-gxd6e** — Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples (feature) — `done/administration-gxd6e-unknown-event-report.md`
 - **administration-cx92m** — Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate (spike) — `done/administration-cx92m-shared-connection-request-concurrency-audit.md`
 - **administration-nf3wk** — "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead" (bugfix) — `done/administration-nf3wk-dead-no-matches-branch.md`
 - **administration-h4k2p** — Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure. (bug) — `done/administration-h4k2p-sse-empty-payload-trailing-comma-bug.md`
@@ -50,6 +50,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **administration-qk3f7** — Add a formatEvent case for Game_rawg_id_set — a real drift the unknown-event report caught (fix) — `backlog/administration-qk3f7-game-rawg-id-set-formatter-gap.md`
 - **administration-wwc36** — Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag (feature) — `backlog/administration-wwc36-event-surgery-guardrails.md`
 - **administration-n8kqw** — Event log import — wipe-first path for a non-empty store, gated behind wwc36's surgery-grade auto-backup (feature) — `backlog/administration-n8kqw-wipe-first-import.md`
 - **administration-mz6kp** — Migrate Api.create/Administration.create and the raw Giraffe stream handlers from one shared SqliteConnection to per-request (factory-based) connections, retiring the ADR-0030 semaphore gate (refactor) — `backlog/administration-mz6kp-per-request-connection-migration.md`

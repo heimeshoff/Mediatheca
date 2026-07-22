@@ -100,6 +100,40 @@ let private topStreamsTable (streams: StreamEventCount list) =
         ]
     ]
 
+/// A single row of the unknown-event report: type name + count, and the
+/// sample event's raw JSON — same rendering as the stream drill-in's raw-JSON
+/// toggle (`Pages/StreamDetail/Views.fs`'s `rawJsonBlock`).
+let private unknownEventRow (row: UnknownEventTypeRow) =
+    Html.div [
+        prop.key row.EventType
+        prop.className "py-2 border-b border-base-content/5 last:border-b-0"
+        prop.children [
+            Html.div [
+                prop.className "flex items-center justify-between gap-3"
+                prop.children [
+                    Html.span [ prop.className DesignSystem.dataText; prop.text row.EventType ]
+                    Html.span [ prop.className DesignSystem.dataText; prop.text (string row.Count) ]
+                ]
+            ]
+            Html.pre [
+                prop.className "bg-base-300/50 rounded-lg p-3 mt-1.5 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-all"
+                prop.text row.SampleData
+            ]
+        ]
+    ]
+
+/// Renders an unknown-event list, or an empty-state message when the check
+/// found nothing to flag (mirrors the Event Browser's filter-empty message
+/// pattern: a clean check gets its own reassuring message, not silence).
+let private unknownEventList (emptyMessage: string) (rows: UnknownEventTypeRow list) =
+    if List.isEmpty rows then
+        Html.p [ prop.className DesignSystem.mutedText; prop.text emptyMessage ]
+    else
+        Html.div [
+            prop.className "flex flex-col"
+            prop.children [ for row in rows -> unknownEventRow row ]
+        ]
+
 let private storageCard (storage: StorageStats) =
     sectionCard "Storage" [
         Html.div [
@@ -173,6 +207,18 @@ let private loadedView (stats: HealthStats) =
                 prop.children [
                     sectionCard "Largest streams" [ topStreamsTable stats.TopStreams ]
                     storageCard stats.Storage
+                ]
+            ]
+
+            Html.div [
+                prop.className "grid grid-cols-1 lg:grid-cols-2 gap-4"
+                prop.children [
+                    sectionCard "Unhandled event types" [
+                        unknownEventList "No unhandled event types — every stored event type is recognized by its bounded context." stats.UnhandledEventTypes
+                    ]
+                    sectionCard "Unformattable event types" [
+                        unknownEventList "No unformattable event types — every stored event type renders in the timeline." stats.UnformattableEventTypes
+                    ]
                 ]
             ]
         ]

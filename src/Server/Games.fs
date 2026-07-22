@@ -562,6 +562,42 @@ module Games =
                 |> Option.map Game_rawg_id_set
             | _ -> None
 
+        /// Hand-maintained mirror of the `deserialize` match-arm strings
+        /// above (administration-gxd6e) — see Movies.Serialization.handledEventTypes
+        /// for the pattern this follows.
+        let handledEventTypes : string list = [
+            "Game_added_to_library"
+            "Game_removed_from_library"
+            "Game_categorized"
+            "Game_cover_replaced"
+            "Game_backdrop_replaced"
+            "Game_personal_rating_set"
+            "Game_status_changed"
+            "Game_hltb_hours_set"
+            "Game_store_added"
+            "Game_store_removed"
+            "Game_family_owner_added"
+            "Game_family_owner_removed"
+            "Game_recommended_by"
+            "Game_recommendation_removed"
+            "Want_to_play_with"
+            "Removed_want_to_play_with"
+            "Game_played_with"
+            "Game_played_with_removed"
+            "Game_steam_app_id_set"
+            "Game_play_time_set"
+            "Game_description_set"
+            "Game_short_description_set"
+            "Game_website_url_set"
+            "Game_play_mode_added"
+            "Game_play_mode_removed"
+            "Game_steam_library_date_set"
+            "Game_steam_last_played_set"
+            "Game_marked_as_owned"
+            "Game_ownership_removed"
+            "Game_rawg_id_set"
+        ]
+
         let toEventData (event: GameEvent) : EventStore.EventData =
             let eventType, data = serialize event
             { EventType = eventType; Data = data; Metadata = "{}" }

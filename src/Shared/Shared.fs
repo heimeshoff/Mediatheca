@@ -1397,6 +1397,16 @@ type StorageStats = {
     ImagesFileCount: int
 }
 
+/// One row of the Health tab's unknown-event report (administration-gxd6e):
+/// a distinct event type flagged by either the unhandled or unformattable
+/// check, with its total count and one representative sample event's raw
+/// JSON payload (display-only, not persisted).
+type UnknownEventTypeRow = {
+    EventType: string
+    Count: int
+    SampleData: string
+}
+
 type HealthStats = {
     TotalEventCount: int
     /// Per bounded context, by stream-id prefix (Administration.boundedContextPrefixes).
@@ -1412,6 +1422,16 @@ type HealthStats = {
     /// Most frequent event types, descending, top 10.
     TopEventTypes: EventTypeCount list
     Storage: StorageStats
+    /// Event types whose owning bounded context (resolved via stream prefix
+    /// on a sample event) doesn't list them in its `handledEventTypes`
+    /// registry, or whose stream prefix matches no known bounded context at
+    /// all (administration-gxd6e).
+    UnhandledEventTypes: UnknownEventTypeRow list
+    /// Event types whose sample stored event, run through
+    /// `EventFormatting.formatEvent`, returns None (administration-gxd6e).
+    /// Independent of `UnhandledEventTypes` — a type can be handled by its
+    /// BC's deserializer yet still have no formatter case.
+    UnformattableEventTypes: UnknownEventTypeRow list
 }
 
 // Projection dashboard (administration-qjcp4): checkpoint/lag overview per

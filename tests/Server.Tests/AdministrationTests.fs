@@ -360,6 +360,68 @@ let administrationTests =
             finally
                 Directory.Delete(tempRoot, true)
 
+        // ── Unknown-event report (administration-gxd6e) ──
+
+        testCase "getHealthStats unhandled list flags a fabricated event type bypassing Serialization.toEventData, with the correct count" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            // makeEvent/appendToStream builds EventData directly — none of the
+            // BCs' Serialization.toEventData helpers are involved, matching the
+            // task's "bypassing all Serialization.toEventData helpers" phrasing.
+            EventStore.appendToStream conn "Movie-dune" -1L [
+                makeEvent "Totally_unknown_event_type" "{}"
+                makeEvent "Totally_unknown_event_type" "{}"
+            ] |> ignore
+            let api = createApi conn
+
+            let stats = api.getHealthStats () |> Async.RunSynchronously
+            let row = stats.UnhandledEventTypes |> List.tryFind (fun r -> r.EventType = "Totally_unknown_event_type")
+
+            Expect.isSome row "Fabricated unknown event type should appear in the unhandled list"
+            Expect.equal row.Value.Count 2 "Count should match the two occurrences inserted directly"
+
+        testCase "getHealthStats a real, currently-handled event type appears in neither the unhandled nor the unformattable list" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let addedData: Movies.MovieAddedData = {
+                Name = "The Matrix"; Year = 1999; Runtime = None; Overview = ""
+                Genres = []; PosterRef = None; BackdropRef = None; TmdbId = 603; TmdbRating = None
+            }
+            EventStore.appendToStream conn (Movies.streamId "the-matrix-1999") -1L
+                [ Movies.Serialization.toEventData (Movies.Movie_added_to_library addedData) ] |> ignore
+            let api = createApi conn
+
+            let stats = api.getHealthStats () |> Async.RunSynchronously
+
+            Expect.isEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "Movie_added_to_library")) "A handled type must not appear in the unhandled list — guards against a registry entry silently drifting out of sync"
+            Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Movie_added_to_library")) "A type with a real formatter case must not appear in the unformattable list"
+
+        testCase "getHealthStats unformattable list flags a handled event type with no formatter case, independent of the unhandled check" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            // Games.Serialization.handledEventTypes lists "Game_rawg_id_set" (the
+            // deserializer recognizes it — Games.fs:555), but
+            // EventFormatting.formatGameEvent has no match arm for it, falling
+            // through to its `_ -> None` case. This is a genuine, currently-
+            // existing drift case: a type handled by its BC's deserializer that
+            // still has no formatter — exactly the independence this task's
+            // third acceptance criterion asks for (a type can be handled yet
+            // still unformattable; the two checks are not aliases).
+            EventStore.appendToStream conn (Games.streamId "some-game") -1L
+                [ Games.Serialization.toEventData (Games.Game_rawg_id_set (12345, Some 4.2)) ] |> ignore
+            let api = createApi conn
+
+            let stats = api.getHealthStats () |> Async.RunSynchronously
+
+            Expect.isNonEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Game_rawg_id_set")) "Game_rawg_id_set should be flagged unformattable"
+            Expect.isEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "Game_rawg_id_set")) "Game_rawg_id_set is handled by Games' deserializer, so it must not appear in the unhandled list"
+
+        testCase "getHealthStats unhandled list flags an event type whose stream prefix matches no known bounded context" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            EventStore.appendToStream conn "legacy-unprefixed-stream" -1L [ makeEvent "LegacyThing" "{}" ] |> ignore
+            let api = createApi conn
+
+            let stats = api.getHealthStats () |> Async.RunSynchronously
+
+            Expect.isNonEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "LegacyThing")) "An event type on a stream matching no known BC prefix should be flagged unhandled"
+
         testCase "getProjectionStats lists all registered projections with checkpoint, lag, and row counts" <| fun _ ->
             let conn = createInMemoryConnection ()
             let streamId = Friends.streamId "marco"

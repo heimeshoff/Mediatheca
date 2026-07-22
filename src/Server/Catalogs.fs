@@ -281,6 +281,19 @@ module Catalogs =
                 |> Option.map Entries_reordered
             | _ -> None
 
+        /// Hand-maintained mirror of the `deserialize` match-arm strings
+        /// above (administration-gxd6e) — see Movies.Serialization.handledEventTypes
+        /// for the pattern this follows.
+        let handledEventTypes : string list = [
+            "Catalog_created"
+            "Catalog_updated"
+            "Catalog_removed"
+            "Entry_added"
+            "Entry_updated"
+            "Entry_removed"
+            "Entries_reordered"
+        ]
+
         let toEventData (event: CatalogEvent) : EventStore.EventData =
             let eventType, data = serialize event
             { EventType = eventType; Data = data; Metadata = "{}" }

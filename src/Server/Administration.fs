@@ -33,6 +33,62 @@ module Administration =
     let private prefixForBoundedContext (bc: string option) : string option =
         bc |> Option.bind (fun name -> boundedContextPrefixes |> List.tryFind (fun (n, _) -> n = name) |> Option.map snd)
 
+    /// Bounded-context name -> the hand-maintained `handledEventTypes` list
+    /// mirroring that BC's `Serialization.deserialize` match arms
+    /// (administration-gxd6e). Same admin-console-only-knowledge shape as
+    /// `boundedContextPrefixes` above — kept as a separate registry since a
+    /// BC's set of handled event types is a different fact than its stream
+    /// prefix.
+    let private handledEventTypesByBoundedContext = [
+        "Movies", Movies.Serialization.handledEventTypes
+        "Series", Series.Serialization.handledEventTypes
+        "Games", Games.Serialization.handledEventTypes
+        "Friends", Friends.Serialization.handledEventTypes
+        "Catalogs", Catalogs.Serialization.handledEventTypes
+        "ContentBlocks", ContentBlocks.Serialization.handledEventTypes
+    ]
+
+    /// True if `eventType` is a known match-arm string for `bcName`'s
+    /// deserializer. False for an unrecognized `bcName` (shouldn't happen —
+    /// callers only pass names already resolved via `boundedContextPrefixes`).
+    let private isHandledByBoundedContext (bcName: string) (eventType: string) : bool =
+        handledEventTypesByBoundedContext
+        |> List.tryFind (fun (name, _) -> name = bcName)
+        |> Option.map (fun (_, types) -> List.contains eventType types)
+        |> Option.defaultValue false
+
+    /// The Health tab's unknown-event report (administration-gxd6e): two
+    /// independent checks per distinct `(eventType, count)` from
+    /// `EventStore.getEventCountsByType` (already an index-only scan, no new
+    /// query cost per ADR-0021) —
+    ///   - unhandled: the type's owning BC (resolved via stream prefix on one
+    ///     sample event) doesn't list it in `handledEventTypesByBoundedContext`,
+    ///     or its prefix matches no known BC at all.
+    ///   - unformattable: that same sample event, run through
+    ///     `EventFormatting.formatEvent`, returns None.
+    /// A type can land in neither, either, or both lists — they are not
+    /// aliases of each other (a type can be handled by its BC's deserializer
+    /// yet still have no formatter case, or vice versa).
+    let private buildUnknownEventReport (conn: SqliteConnection) (typeCounts: (string * int) list) : UnknownEventTypeRow list * UnknownEventTypeRow list =
+        let unhandled = ResizeArray()
+        let unformattable = ResizeArray()
+        for (eventType, count) in typeCounts do
+            match EventStore.getSampleEventForType conn eventType with
+            | None -> ()
+            | Some sample ->
+                let row = { EventType = eventType; Count = count; SampleData = sample.Data }
+                let owningBc =
+                    boundedContextPrefixes
+                    |> List.tryFind (fun (_, prefix) -> sample.StreamId.StartsWith(prefix))
+                    |> Option.map fst
+                let isHandled =
+                    match owningBc with
+                    | None -> false
+                    | Some bc -> isHandledByBoundedContext bc eventType
+                if not isHandled then unhandled.Add(row)
+                if EventFormatting.formatEvent sample |> Option.isNone then unformattable.Add(row)
+        List.ofSeq unhandled, List.ofSeq unformattable
+
     let private toEventDto (e: EventStore.StoredEvent) : Mediatheca.Shared.EventDto =
         { GlobalPosition = e.GlobalPosition
           StreamId = e.StreamId
@@ -195,6 +251,8 @@ module Administration =
 
         let imagesBytes, imagesFileCount = directoryStats imagesDir
 
+        let unhandledEventTypes, unformattableEventTypes = buildUnknownEventReport conn typeCounts
+
         {
             TotalEventCount = totalEvents
             BoundedContextCounts = bcCounts
@@ -208,6 +266,8 @@ module Administration =
                 ImagesSizeBytes = imagesBytes
                 ImagesFileCount = imagesFileCount
             }
+            UnhandledEventTypes = unhandledEventTypes
+            UnformattableEventTypes = unformattableEventTypes
         }
 
     // ── Projection dashboard (administration-qjcp4) ──
