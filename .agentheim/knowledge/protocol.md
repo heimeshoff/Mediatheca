@@ -5,6 +5,22 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 15:25 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~2h03m
+**Completed:** 6 (first-try PASS: 6, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** administration-h4k2p: 1, administration-nf3wk: 1, administration-cx92m: 1, administration-gxd6e: 1, administration-btvqa: 1, administration-xjmda: 1
+**Commits:** 11
+**Vision-conformance:** none — batch aligns with vision. All six are the recognized Operability/Admin-Console v1 workstream (btvqa + xjmda are named explicitly in vision.md's recognized-backlog list; the rest are supporting reliability/UX fixes for that console). None touches an Out-of-Scope v1 non-goal. Context, not a flag: the entire session was admin-console — the media-experience roadmap (In Focus, Unified Dashboard, Steam import, HLTB), which the vision's Boundary says wins when it competes with admin tooling, remains the larger unbuilt v1 arc.
+**Batch mix:** 50% product-facing / 50% harness (6 tasks) by the type heuristic (feature ×3 → product-facing; bug/bugfix/spike ×3 → harness); in substance all six are operator-facing admin-console product work, none is meta/tooling/bookkeeping.
+**Carry-over:** "Mediatheca Directions.html": left behind (owner: user WIP; pre-existing untracked at session start). Six orphan directories under .worktrees/ (administration-da908, -qjcp4, -v4y9g, -yamm5, infrastructure-w8fnp, intelligence-p9m4t): left behind (orphans from prior sessions — stale non-worktree dirs with `src/` but no `.git`, no matching doing/ task; surfaced to the builder for manual cleanup, not auto-removed per the surface-don't-delete posture). This session's own six worktrees were all cleanly torn down.
+
+---
+
 ## 2026-07-22 15:23 -- Task verified and completed: administration-xjmda - Compensating-event composer — append corrective events from the admin UI
 
 **Type:** Work / Task completion
