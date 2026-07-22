@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 18:03 -- Modeling / Refined: administration-wwc36 - Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Reconciled the concurrency model against ADR-0033 (administration-mz6kp), which landed the same day this task was last refined and **retired the ADR-0030 `requestDbLock`** the task was built around. Architect pass settled the per-request-connection shape: each commit op opens one `use conn = factory ()`, **no lock** (same model as the composer's `appendCompensatingEvent`); `VACUUM INTO` runs in autocommit first, then mutation→FTS`('rebuild')`→checkpoint-rewind share **one** transaction (mutate-then-rebuild order) — resolving the old "same-transaction vs. after" residual open. Documented that a foreign write interleaving between backup and mutation is intended (consistent snapshot taken no later than the mutation), not a race. Rewrote the concurrency acceptance criterion (concurrent surgery + `addFriend` burst on separate factory-drawn connections, file-backed temp DB). Moved the reserved ADR number **0033 → 0034** (0033 taken by mz6kp) and swapped `related_adrs` 0030 → 0033. Stays in todo/ — reconciliation restores workability; the sequencing gate that held it in the last batch is cleared.
+**Split into:** none
+**ADRs written:** none (ADR-0034 is to be written by the worker at execution time)
+
+---
+
 ## 2026-07-22 17:42 -- Work session ended
 
 **Type:** Work / Session end
