@@ -5,6 +5,23 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 23:24 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~35m (interrupted-session recovery + resume)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** administration-wwc36: 1
+**Commits:** 1 (the feature commit; batch-start 127ae4d rode in from the prior interrupted session)
+**Vision-conformance:** none — batch aligns with vision. administration-wwc36 (event surgery — guarded raw edit/delete/rename) is explicitly named in vision.md's recognized "Operability & Observability — Admin Console" backlog; it touches no v1 Out-of-Scope non-goal (Books, Trakt/Jellyfin sync, yearly reports, friend intelligence, trailer playback).
+**Batch mix:** 100% product-facing (1 task) — a `feature` touching src/Server, src/Client, src/Shared, and tests; no harness/bookkeeping surfaces.
+**Carry-over:** "Mediatheca Directions.html": left behind (user WIP, 1 file — pre-existing untracked at session start). No .agentheim/-owned files stranded. The administration-wwc36 worktree was cleanly torn down; `git worktree list` shows only main — no git-registered orphan worktrees. Separately, 6 stale directories persist under .worktrees/ (administration-da908, -qjcp4, -v4y9g, -yamm5, infrastructure-w8fnp, intelligence-p9m4t) — NOT git-registered worktrees, so the worktree-carry-over mechanism does not act on them; re-surfaced for manual cleanup per the surface-don't-delete posture, as prior sessions did.
+**Recovery note:** This session resumed an interrupted prior session — the batch-start commit (127ae4d) and the aw/administration-wwc36 worktree existed from 2026-07-22 18:17 but the worker had never produced work (clean worktree at HEAD). Resumed the single task fresh into the existing worktree.
+
+---
+
 ## 2026-07-22 23:21 -- Task verified and completed: administration-wwc36 - Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag
 
 **Type:** Work / Task completion
