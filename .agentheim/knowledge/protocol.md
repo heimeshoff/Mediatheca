@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 10:44 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~34m (batch started 10:09 → integration commit 10:43)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** administration-da908: 1
+**Commits:** 3 (1 batch-start claim, 1 spike integration, this session-end line)
+**Vision-conformance:** none — batch aligns with vision. administration-da908 stands up durable e2e coverage for the already-shipped Events-tab Follow toggle (ADR-0023), squarely within the vision's recognized "Operability & Observability — Admin Console" v1 workstream; it pulls toward no v1 non-goal (Books, Trakt/Jellyfin sync, yearly reports, friend-level intelligence, trailer playback). Observation (not a divergence, same as last session): the session was again entirely operability/testing-infrastructure work while the media-experience roadmap (In Focus, Unified Dashboard, Steam Import, HLTB) remains unstarted — but none of those are yet modeled into ready todo tasks, so there was no competition; the harness spike was the only ready work.
+**Batch mix:** 0% product-facing / 100% harness / 0% bookkeeping (1 task) — administration-da908 is type=spike whose deliverable is the e2e test harness itself → harness.
+**Carry-over:** `Mediatheca Directions.html`: left behind (owner: user's design-reference doc — the untracked ~912KB captured Claude design session, present since before this session, not project bookkeeping; same disposition as prior sessions). No worktrees remain — the da908 worktree was torn down after integration.
+
+**Notes:** (1) The worker surfaced a **real pre-existing production bug** while proving the harness — the two scheduled-job catch-up timers both fire ~5s after startup and both call `Administration.insertRunningRow` on the same shared `SqliteConnection`, an unhandled concurrent-use crash — and correctly filed it as a new backlog bug (`administration-tj8n2`) rather than fixing it inline in a spike; a defaulted-off, test-only env-var escape hatch (`MEDIATHECA_DISABLE_SCHEDULED_JOBS`) was added to `Composition.fs` to keep e2e runs from tripping it, with production/dev behavior unchanged. (2) The installed agentheim plugin version (0.9.2) has no `lib/adr-allocation.mjs`, so the ADR-0058 `finalizeAdrNumbering` step was done manually — max ADR on `main` was 0026 and only one `0027` existed on disk with no parallel worker, so 0027 was confirmed free with no renumber.
+
+---
+
 ## 2026-07-22 10:41 -- Task verified and completed: administration-da908 - Prove a Playwright harness can drive the full Mediatheca stack and observe network traffic
 
 **Type:** Work / Task completion
