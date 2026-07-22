@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 15:53 -- Modeling / Refined: administration-wwc36 - Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Reconciled the task with source that landed the same day it was last refined. Corrected the reserved ADR number 0030 → 0033 (0030 was taken by administration-cx92m); added the ADR-0030 `requestDbLock` integration as a fifth request-reachable transaction site (with a new concurrency acceptance criterion and the VACUUM-INTO-vs-transaction reasoning); pointed the confirm dialog at `Components.ModalPanel`; refreshed `related_adrs` (+0029, 0030, 0032). All three dependencies (xjmda, qjcp4, design-system-001) are now in done/, clearing the sequencing gate.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-07-22 15:53 -- Modeling / Promoted: administration-qk3f7 - Add a formatEvent case for Game_rawg_id_set — the one real handled-but-unformattable drift the unknown-event report caught
 
 **Type:** Modeling / Promote
