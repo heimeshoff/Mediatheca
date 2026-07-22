@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 12:57 -- Modeling / Promoted: administration-h4k2p - Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure.
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-22 12:30 -- Modeling / Refined: administration-h4k2p - Fix trailing-comma malformed JSON in empty-payload SSE frames
 
 **Type:** Modeling / Refine

@@ -1,7 +1,7 @@
 ---
 id: administration-h4k2p
 title: Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure.
-status: backlog
+status: todo
 type: bug
 context: administration
 created: 2026-07-22
