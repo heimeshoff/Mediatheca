@@ -8,6 +8,7 @@ module Mediatheca.Server.Composition
 open System
 open System.IO
 open System.Net.Http
+open System.Threading
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.StaticFiles
@@ -229,6 +230,21 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
         |> Option.defaultValue 4
 
+    // administration-tj8n2 (ADR-0028): scheduled jobs get their OWN connection,
+    // dedicated and never shared with request threads or `conn` — separate
+    // from the request-serving `conn` above. Both jobs (and the job-runs
+    // recorder) share this ONE job connection plus `jobDbLock`, a
+    // SemaphoreSlim(1,1) acquired around each job's individual DB-touching
+    // sections (never across an awaited HTTP call) so the two jobs' network
+    // I/O still overlaps (ADR-0026's "two different jobs can run
+    // concurrently") while their brief DB moments serialize. This corrects
+    // ADR-0024/0026's premise that WAL + busy_timeout alone makes ONE shared
+    // `SqliteConnection` object safe for concurrent multi-threaded command
+    // creation/disposal — it doesn't; that reasoning only covers separate
+    // connections to the same file, not one connection used by two threads.
+    let jobConn = createConnection dbPath
+    let jobDbLock = new SemaphoreSlim(1, 1)
+
     let scheduledJobs : ScheduledJobs.JobSpec list = [
         { Name = "Steam playtime sync"
           Hour = playtimeSyncHour
@@ -236,7 +252,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
             async {
                 // PlaytimeTracker computes the gaming-day internally (boundary at syncHour + 30 min),
                 // so a 04:00 scheduled fire and an early-morning catch-up both attribute to yesterday.
-                match! PlaytimeTracker.runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers None with
+                match! PlaytimeTracker.runSync jobConn jobDbLock httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers None with
                 | Ok result ->
                     let summary =
                         sprintf "%d sessions, %d snapshots, %d games created, %d promoted to focus"
@@ -251,7 +267,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
           Hour = seriesRefreshHour
           Run = fun () ->
             async {
-                let! summary = SeriesRefresh.runNightlyJob conn httpClient getTmdbConfig imageBasePath projectionHandlers
+                let! summary = SeriesRefresh.runNightlyJob jobConn jobDbLock httpClient getTmdbConfig imageBasePath projectionHandlers
                 if summary.Skipped then
                     return ({ Disposition = ScheduledJobs.JobDisposition.Skipped; Summary = "TMDB API key not configured" } : ScheduledJobs.JobRunOutcome)
                 else
@@ -262,10 +278,13 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
             } }
     ]
 
-    // job_runs table + startup crash reconciliation (ADR-0026), before the
-    // recorder is built or the timer starts.
+    // job_runs table + startup crash reconciliation (ADR-0026) — table
+    // creation/reconciliation runs once at startup, before any job-connection
+    // concurrency exists, so it stays on the shared `conn`; the table itself
+    // is file-level, not connection-level, so `jobConn`'s later reads/writes
+    // to it are unaffected.
     Administration.initializeJobRuns conn
-    let jobRunRecorder = Administration.makeJobRunRecorder conn
+    let jobRunRecorder = Administration.makeJobRunRecorder jobConn jobDbLock
 
     // Create API
     let api = Api.create conn httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig imageBasePath projectionHandlers
@@ -330,20 +349,13 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     // built above (before Administration.create) per ADR-0026 — start the
     // timers here, sharing the same recorder instance.
     //
-    // MEDIATHECA_DISABLE_SCHEDULED_JOBS is an opt-in escape hatch for the
-    // Playwright e2e harness (administration-da908 / ADR-0027): the two
-    // catch-up timers both fire ~5s after startup and both call
-    // `Administration.insertRunningRow` on the same shared `conn`, which is
-    // not safe for concurrent use — an unhandled exception on either timer's
-    // background thread crashes the whole process (see the harness spike's
-    // ADR and its companion backlog bug for the real fix). Skipping job
-    // startup entirely sidesteps the race for e2e runs, which don't exercise
-    // scheduled jobs anyway. Unset (or any other value) preserves today's
-    // behavior exactly — normal dev/Docker runs are unaffected.
-    let disableScheduledJobs =
-        Environment.GetEnvironmentVariable("MEDIATHECA_DISABLE_SCHEDULED_JOBS") = "1"
-    let _scheduledJobTimers =
-        if disableScheduledJobs then []
-        else ScheduledJobs.startAll jobRunRecorder scheduledJobs
+    // MEDIATHECA_DISABLE_SCHEDULED_JOBS retired (administration-tj8n2 /
+    // ADR-0028): it existed only to dodge the catch-up-timer connection race
+    // for the Playwright e2e harness (administration-da908 / ADR-0027). That
+    // race is fixed for real now — jobs run on their own dedicated connection
+    // plus a per-command lock, not the shared `conn` — so the harness no
+    // longer needs an escape hatch and jobs start unconditionally, exactly
+    // like every other run.
+    let _scheduledJobTimers = ScheduledJobs.startAll jobRunRecorder scheduledJobs
 
     app

@@ -22,6 +22,15 @@ let private createConn () =
     Administration.initializeJobRuns conn
     conn
 
+/// administration-tj8n2: `makeJobRunRecorder` now also takes the per-command
+/// `SemaphoreSlim` that guards the (real-deployment) dedicated job
+/// connection. These tests use one shared in-memory `conn` and don't need to
+/// exercise cross-connection concurrency themselves (see
+/// JobConnectionConcurrencyTests.fs for that), so a fresh, uncontended lock
+/// per recorder is enough here.
+let private makeRecorder (conn: SqliteConnection) =
+    Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1))
+
 let private noStoragePath = "test-fixtures-do-not-exist/nowhere.db"
 let private noImagesDir = "test-fixtures-do-not-exist/images"
 
@@ -87,7 +96,7 @@ let jobRunsTests =
 
         testCase "a scheduled-trigger run writes a job_runs row with trigger='scheduled', a terminal status, summary, and both timestamps" <| fun _ ->
             let conn = createConn ()
-            let recorder = Administration.makeJobRunRecorder conn
+            let recorder = makeRecorder conn
             let spec = okSpec "Job A"
 
             match ScheduledJobs.tryStartJob recorder spec "scheduled" with
@@ -105,7 +114,7 @@ let jobRunsTests =
 
         testCase "a manual (run now) trigger writes an otherwise-identical row with trigger='manual'" <| fun _ ->
             let conn = createConn ()
-            let recorder = Administration.makeJobRunRecorder conn
+            let recorder = makeRecorder conn
             let spec = okSpec "Job B"
 
             match ScheduledJobs.tryStartJob recorder spec "manual" with
@@ -120,7 +129,7 @@ let jobRunsTests =
 
         testCase "runJobNow returns before the job completes, and the running row it created resolves to a terminal status once the job finishes" <| fun _ ->
             let conn = createConn ()
-            let recorder = Administration.makeJobRunRecorder conn
+            let recorder = makeRecorder conn
             use gate = new ManualResetEventSlim(false)
             let spec = blockingSpec "Job C" gate
             let api = Administration.create conn noStoragePath noImagesDir [] [ spec ] recorder
@@ -148,7 +157,7 @@ let jobRunsTests =
 
         testCase "a run that declined to act resolves to 'skipped', distinct from 'error'" <| fun _ ->
             let conn = createConn ()
-            let recorder = Administration.makeJobRunRecorder conn
+            let recorder = makeRecorder conn
             let spec = skippedSpec "Job D"
 
             match ScheduledJobs.tryStartJob recorder spec "scheduled" with
@@ -164,7 +173,7 @@ let jobRunsTests =
 
         testCase "an uncaught exception in the job body resolves the row to 'error' with the exception message, never leaving it running" <| fun _ ->
             let conn = createConn ()
-            let recorder = Administration.makeJobRunRecorder conn
+            let recorder = makeRecorder conn
             let spec = throwingSpec "Job E"
 
             match ScheduledJobs.tryStartJob recorder spec "scheduled" with
@@ -180,7 +189,7 @@ let jobRunsTests =
 
         testCase "a second concurrent trigger of the same job (manual-while-scheduled) is refused: no second row, running job unaffected" <| fun _ ->
             let conn = createConn ()
-            let recorder = Administration.makeJobRunRecorder conn
+            let recorder = makeRecorder conn
             use gate = new ManualResetEventSlim(false)
             let spec = blockingSpec "Job F" gate
 
@@ -226,7 +235,7 @@ let jobRunsTests =
 
         testCase "reconciliation only runs at startup: a row that's genuinely running (guard held) is left alone by a later read" <| fun _ ->
             let conn = createConn ()
-            let recorder = Administration.makeJobRunRecorder conn
+            let recorder = makeRecorder conn
             use gate = new ManualResetEventSlim(false)
             let spec = blockingSpec "Job H" gate
 
@@ -248,7 +257,7 @@ let jobRunsTests =
 
         testCase "getJobStatuses reports next-fire time, last outcome, and recent-run history per job" <| fun _ ->
             let conn = createConn ()
-            let recorder = Administration.makeJobRunRecorder conn
+            let recorder = makeRecorder conn
             let spec = okSpec "Job G"
             match ScheduledJobs.tryStartJob recorder spec "scheduled" with
             | Error () -> failwith "Expected the trigger to succeed"
@@ -267,7 +276,7 @@ let jobRunsTests =
 
         testCase "runJobNow for an unregistered job name is rejected" <| fun _ ->
             let conn = createConn ()
-            let recorder = Administration.makeJobRunRecorder conn
+            let recorder = makeRecorder conn
             let api = Administration.create conn noStoragePath noImagesDir [] [] recorder
 
             match api.runJobNow "No such job" |> Async.RunSynchronously with

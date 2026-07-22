@@ -2,6 +2,7 @@ namespace Mediatheca.Server
 
 open System
 open System.IO
+open System.Threading
 open Microsoft.Data.Sqlite
 open Giraffe
 open Mediatheca.Shared
@@ -483,54 +484,76 @@ module Administration =
         ensureJobRunsTable conn
         reconcileInterruptedRuns conn
 
-    let private insertRunningRow (conn: SqliteConnection) (jobName: string) (trigger: string) : int64 =
-        use insertCmd = conn.CreateCommand()
-        insertCmd.CommandText <- """
-            INSERT INTO job_runs (job_name, trigger, status, summary, started_at, finished_at)
-            VALUES (@jobName, @trigger, 'running', NULL, @startedAt, NULL)
-            """
-        insertCmd.Parameters.AddWithValue("@jobName", jobName) |> ignore
-        insertCmd.Parameters.AddWithValue("@trigger", trigger) |> ignore
-        insertCmd.Parameters.AddWithValue("@startedAt", DateTime.UtcNow.ToString("o")) |> ignore
-        insertCmd.ExecuteNonQuery() |> ignore
+    /// administration-tj8n2: `insertRunningRow`/`completeRun`/`failRun` are the
+    /// recorder's own DB touches (`BeginRun`/`Complete`/`Fail`) — called from
+    /// whichever thread is running a job (the scheduled timer or a manual
+    /// "Run now"), possibly two at once (catch-up collision, or same-hour
+    /// daily fire). They run on the dedicated job connection (`Composition.fs`
+    /// no longer shares `conn` with jobs) and are each individually guarded by
+    /// `jobLock`, the same lock the job bodies themselves use for their own DB
+    /// sections — `Microsoft.Data.Sqlite.SqliteConnection` is not thread-safe
+    /// for concurrent command creation/disposal from multiple threads.
+    let private insertRunningRow (jobLock: SemaphoreSlim) (conn: SqliteConnection) (jobName: string) (trigger: string) : int64 =
+        jobLock.Wait()
+        try
+            use insertCmd = conn.CreateCommand()
+            insertCmd.CommandText <- """
+                INSERT INTO job_runs (job_name, trigger, status, summary, started_at, finished_at)
+                VALUES (@jobName, @trigger, 'running', NULL, @startedAt, NULL)
+                """
+            insertCmd.Parameters.AddWithValue("@jobName", jobName) |> ignore
+            insertCmd.Parameters.AddWithValue("@trigger", trigger) |> ignore
+            insertCmd.Parameters.AddWithValue("@startedAt", DateTime.UtcNow.ToString("o")) |> ignore
+            insertCmd.ExecuteNonQuery() |> ignore
 
-        use idCmd = conn.CreateCommand()
-        idCmd.CommandText <- "SELECT last_insert_rowid()"
-        idCmd.ExecuteScalar() :?> int64
+            use idCmd = conn.CreateCommand()
+            idCmd.CommandText <- "SELECT last_insert_rowid()"
+            idCmd.ExecuteScalar() :?> int64
+        finally
+            jobLock.Release() |> ignore
 
     let private dispositionToStatus (disposition: ScheduledJobs.JobDisposition) : string =
         match disposition with
         | ScheduledJobs.JobDisposition.Ok -> "ok"
         | ScheduledJobs.JobDisposition.Skipped -> "skipped"
 
-    let private completeRun (conn: SqliteConnection) (runId: int64) (disposition: ScheduledJobs.JobDisposition) (summary: string) : unit =
-        use cmd = conn.CreateCommand()
-        cmd.CommandText <- "UPDATE job_runs SET status = @status, summary = @summary, finished_at = @finishedAt WHERE id = @id"
-        cmd.Parameters.AddWithValue("@status", dispositionToStatus disposition) |> ignore
-        cmd.Parameters.AddWithValue("@summary", summary) |> ignore
-        cmd.Parameters.AddWithValue("@finishedAt", DateTime.UtcNow.ToString("o")) |> ignore
-        cmd.Parameters.AddWithValue("@id", runId) |> ignore
-        cmd.ExecuteNonQuery() |> ignore
+    let private completeRun (jobLock: SemaphoreSlim) (conn: SqliteConnection) (runId: int64) (disposition: ScheduledJobs.JobDisposition) (summary: string) : unit =
+        jobLock.Wait()
+        try
+            use cmd = conn.CreateCommand()
+            cmd.CommandText <- "UPDATE job_runs SET status = @status, summary = @summary, finished_at = @finishedAt WHERE id = @id"
+            cmd.Parameters.AddWithValue("@status", dispositionToStatus disposition) |> ignore
+            cmd.Parameters.AddWithValue("@summary", summary) |> ignore
+            cmd.Parameters.AddWithValue("@finishedAt", DateTime.UtcNow.ToString("o")) |> ignore
+            cmd.Parameters.AddWithValue("@id", runId) |> ignore
+            cmd.ExecuteNonQuery() |> ignore
+        finally
+            jobLock.Release() |> ignore
 
-    let private failRun (conn: SqliteConnection) (runId: int64) (message: string) : unit =
-        use cmd = conn.CreateCommand()
-        cmd.CommandText <- "UPDATE job_runs SET status = 'error', summary = @summary, finished_at = @finishedAt WHERE id = @id"
-        cmd.Parameters.AddWithValue("@summary", message) |> ignore
-        cmd.Parameters.AddWithValue("@finishedAt", DateTime.UtcNow.ToString("o")) |> ignore
-        cmd.Parameters.AddWithValue("@id", runId) |> ignore
-        cmd.ExecuteNonQuery() |> ignore
+    let private failRun (jobLock: SemaphoreSlim) (conn: SqliteConnection) (runId: int64) (message: string) : unit =
+        jobLock.Wait()
+        try
+            use cmd = conn.CreateCommand()
+            cmd.CommandText <- "UPDATE job_runs SET status = 'error', summary = @summary, finished_at = @finishedAt WHERE id = @id"
+            cmd.Parameters.AddWithValue("@summary", message) |> ignore
+            cmd.Parameters.AddWithValue("@finishedAt", DateTime.UtcNow.ToString("o")) |> ignore
+            cmd.Parameters.AddWithValue("@id", runId) |> ignore
+            cmd.ExecuteNonQuery() |> ignore
+        finally
+            jobLock.Release() |> ignore
 
-    /// Builds the `ScheduledJobs.JobRunRecorder` seam. Closures over `conn`
-    /// and the private `runningJobs` guard above, so every recorder built
-    /// from the same `conn` shares the same guard state (Composition.fs
-    /// builds exactly one and passes it to both `ScheduledJobs.startAll` and
-    /// `create`, per ADR-0026).
-    let makeJobRunRecorder (conn: SqliteConnection) : ScheduledJobs.JobRunRecorder =
+    /// Builds the `ScheduledJobs.JobRunRecorder` seam. Closures over `conn`,
+    /// `jobLock`, and the private `runningJobs` guard above, so every recorder
+    /// built from the same `conn`/`jobLock` pair shares the same guard state
+    /// and the same per-command serialization (Composition.fs builds exactly
+    /// one recorder — over the dedicated job connection and its lock — and
+    /// passes it to both `ScheduledJobs.startAll` and `create`, per ADR-0026).
+    let makeJobRunRecorder (conn: SqliteConnection) (jobLock: SemaphoreSlim) : ScheduledJobs.JobRunRecorder =
         { TryClaim = fun jobName -> runningJobs.TryAdd(jobName, ())
           Release = fun jobName -> runningJobs.TryRemove(jobName) |> ignore
-          BeginRun = fun jobName trigger -> insertRunningRow conn jobName trigger
-          Complete = fun runId disposition summary -> completeRun conn runId disposition summary
-          Fail = fun runId message -> failRun conn runId message }
+          BeginRun = fun jobName trigger -> insertRunningRow jobLock conn jobName trigger
+          Complete = fun runId disposition summary -> completeRun jobLock conn runId disposition summary
+          Fail = fun runId message -> failRun jobLock conn runId message }
 
     let private statusFromString (s: string) : JobRunStatus =
         match s with

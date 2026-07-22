@@ -42,12 +42,11 @@ export default defineConfig({
             port: 5000,
             env: {
                 DATA_DIR: dataDir,
-                // See ADR-0027 / administration-tj8n2: the two scheduled
-                // jobs' catch-up timers race on the shared SqliteConnection
-                // and crash the process ~5s after a cold start against an
-                // empty store. e2e runs don't exercise scheduled jobs, so
-                // skip starting them rather than hit the crash.
-                MEDIATHECA_DISABLE_SCHEDULED_JOBS: "1",
+                // administration-tj8n2 / ADR-0028: the catch-up-timer
+                // connection race that MEDIATHECA_DISABLE_SCHEDULED_JOBS used
+                // to dodge is fixed for real (dedicated job connection + a
+                // per-command lock), so jobs run unconditionally now, same as
+                // every other environment — no e2e-only escape hatch needed.
             },
             reuseExistingServer: !process.env.CI,
             timeout: 60_000,

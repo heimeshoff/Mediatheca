@@ -1,15 +1,15 @@
 ---
 id: administration-tj8n2
 title: Scheduled-job timers race on the shared SqliteConnection and crash the process — fix with a dedicated job connection plus a per-command lock
-status: doing
+status: done
 type: bug
 context: administration
 created: 2026-07-22
-completed:
+completed: 2026-07-22
 depends_on: []
 blocks: []
 tags: [scheduled-jobs, sqlite, concurrency, reliability]
-related_adrs: [0003, 0024, 0026, 0027]
+related_adrs: [0003, 0024, 0026, 0027, 0028]
 related_research: []
 prior_art: []
 ---
@@ -119,23 +119,24 @@ authoring time** (next free number then — do not hard-code it here; 0027 is
 already taken by the Playwright harness).
 
 ## Acceptance criteria
-- [ ] **Automated regression test (Expecto):** N concurrent tasks/threads call
+- [x] **Automated regression test (Expecto):** N concurrent tasks/threads call
       the fixed recorder functions *and* exercise the job-execution path against
       a real temp-file SQLite connection simultaneously; asserts no exception is
       thrown and the resulting `job_runs` row counts/statuses are correct. This
       replaces "wait 5s and watch it not crash" with something CI runs every
       time.
-- [ ] **Same-hour case is covered explicitly:** the test configures two
+- [x] **Same-hour case is covered explicitly:** the test configures two
       `JobSpec`s for the *identical* `Hour` and fires them concurrently — the
       actual recurring production failure mode, not just the catch-up window.
-- [ ] Manual repro (empty `DATA_DIR`, `dotnet run`, wait >5s) confirms the crash
+- [x] Manual repro (empty `DATA_DIR`, `dotnet run`, wait >5s) confirms the crash
       no longer occurs — retained as a smoke check that the automated test
       reflects reality, not as the primary gate.
-- [ ] `MEDIATHECA_DISABLE_SCHEDULED_JOBS` decision is recorded either way:
+- [x] `MEDIATHECA_DISABLE_SCHEDULED_JOBS` decision is recorded either way:
       if removed, a Playwright run with jobs enabled is green; if kept, a
       one-line `Composition.fs` comment states the non-crash reason the harness
-      still wants jobs off. [human-eye]
-- [ ] Expecto suite and `npm run build` remain green.
+      still wants jobs off. [human-eye] — removed; `npm run test:e2e` itself
+      was not run by this worker, left as the human spot-check.
+- [x] Expecto suite and `npm run build` remain green.
 
 ## Notes
 - The follow-up task **administration-cx92m** covers the broader question this
@@ -148,3 +149,56 @@ already taken by the Playwright harness).
 - Files in scope: `Composition.fs` (new job connection + wiring),
   `ScheduledJobs.fs`, `Administration.fs` (recorder functions),
   `PlaytimeTracker.runSync`, `SeriesRefresh.runNightlyJob`.
+- Decision recorded in **ADR-0028**.
+
+## Outcome
+
+Fixed via a dedicated job `SqliteConnection` (`Composition.fs`'s `jobConn`)
+plus a `SemaphoreSlim(1,1)` (`jobDbLock`) acquired around each job's
+individual DB-touching sections — never across an awaited HTTP call — shared
+by the job-runs recorder (`Administration.makeJobRunRecorder`) and both job
+bodies (`PlaytimeTracker.runSync`, `SeriesRefresh.runNightlyJob` via a new
+job-only `refreshOneForJob`). This closes job×request (jobs no longer share a
+connection object with request threads) and job×job (both the 5s catch-up
+collision and the recurring same-`Hour` 04:00 nightly collision), while
+preserving ADR-0026's "two different jobs can run concurrently" — network I/O
+still overlaps, only the brief DB moments serialize. `PlaytimeTracker.runSync`
+and `SeriesRefresh.runNightlyJob` (and `Administration.makeJobRunRecorder`)
+now take a `SemaphoreSlim` parameter; `Api.fs`'s pre-existing manual
+"trigger sync" call site got its own uncontended lock to satisfy the
+signature (no behavior change there — it still runs on the request-serving
+`conn`). `MEDIATHECA_DISABLE_SCHEDULED_JOBS` is retired from both
+`Composition.fs` and `playwright.config.ts`.
+
+All four acceptance criteria met:
+- **Automated regression test**:
+  `tests/Server.Tests/JobConnectionConcurrencyTests.fs` (2 new Expecto tests)
+  drives the real `ScheduledJobs.tryStartJob`/`Administration.makeJobRunRecorder`
+  against a real temp-file `SqliteConnection` with 5 (then 20) job specs fired
+  concurrently on background `Task`s; asserts no exception, exactly one
+  terminal `ok` `job_runs` row per job, and every locked write landed.
+- **Same-hour case**: two of the five specs share `Hour = 4` (the real
+  production default for both real jobs), explicitly reproducing the nightly
+  collision.
+- **Manual repro**: re-run against a fresh empty `DATA_DIR` via `dotnet run`;
+  both jobs' catch-up log lines fired and interleaved at ~5s with no crash,
+  and `/health` still responded afterward.
+- **`MEDIATHECA_DISABLE_SCHEDULED_JOBS` decision**: retired (removed from
+  `Composition.fs` and `playwright.config.ts`), since the race it dodged is
+  fixed for real. [human-eye: a full `npm run test:e2e` Playwright run with
+  jobs enabled was not executed by this worker — the manual `dotnet run`
+  repro above exercises the identical cold-start/catch-up path the harness
+  drives, so a human spot-check of `npm run test:e2e` is the remaining
+  verification step.]
+- Expecto suite (360 tests, all passing) and `npm run build` both green.
+
+Key files: `src/Server/Composition.fs`, `src/Server/ScheduledJobs.fs`
+(unchanged — `tryStartJob`'s shape already supported this),
+`src/Server/Administration.fs`, `src/Server/PlaytimeTracker.fs`,
+`src/Server/SeriesRefresh.fs`, `src/Server/Api.fs` (mechanical),
+`playwright.config.ts`,
+`tests/Server.Tests/JobConnectionConcurrencyTests.fs`,
+`tests/Server.Tests/JobRunsTests.fs` and
+`tests/Server.Tests/AdministrationTests.fs` (recorder call-site updates),
+ADR-0028, and the administration BC README (Jobs tab + Playwright harness
+bullets updated).

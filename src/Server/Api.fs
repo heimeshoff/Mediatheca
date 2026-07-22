@@ -1108,6 +1108,17 @@ module Api =
         let movieProjections = projectionHandlers
         let friendProjections = projectionHandlers
 
+        // administration-tj8n2: PlaytimeTracker.runSync takes a per-command
+        // lock (guarding its own connection against a concurrent scheduled
+        // fire on the JOB connection). `triggerPlaytimeSync` here runs on the
+        // request-serving `conn` instead — a different connection object from
+        // the job connection, so this lock is never contended by the
+        // scheduled job. It exists solely to satisfy runSync's signature and
+        // to keep two overlapping manual triggers on this request path from
+        // racing each other on `conn`; the broader request×request connection
+        // question is out of scope here (administration-cx92m).
+        let manualSyncTriggerLock = new System.Threading.SemaphoreSlim(1, 1)
+
         {
             healthCheck = fun () -> async { return "Mediatheca is running" }
 
@@ -4075,7 +4086,7 @@ module Api =
             }
 
             triggerPlaytimeSync = fun () ->
-                PlaytimeTracker.runSync conn httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers None
+                PlaytimeTracker.runSync conn manualSyncTriggerLock httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers None
 
             // Steam Achievements
             getSteamRecentAchievements = fun () -> async {

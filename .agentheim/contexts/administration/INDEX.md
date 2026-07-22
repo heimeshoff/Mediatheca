@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 6
 - **Todo:** 0
-- **Doing:** 2
-- **Done:** 11
+- **Doing:** 1
+- **Done:** 12
 <!-- task-counts:end -->
 
 ### Todo
@@ -23,12 +23,12 @@ research touching this BC, and concept synthesis pages.
 ### Doing
 <!-- doing-list:start -->
 - **administration-vrc56** — Event log export/import as NDJSON — stream out/in via plain Giraffe routes, preserving exact global_position, into an empty store only (feature) — `doing/administration-vrc56-ndjson-export-import.md`
-- **administration-tj8n2** — Scheduled-job timers race on the shared SqliteConnection and crash the process — fix with a dedicated job connection plus a per-command lock (bug) — `doing/administration-tj8n2-scheduled-job-catchup-connection-race.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **administration-tj8n2** — Scheduled-job timers race on the shared SqliteConnection and crash the process — fix with a dedicated job connection plus a per-command lock (bug) — `done/administration-tj8n2-scheduled-job-catchup-connection-race.md`
 - **administration-a4d9b** — Assert the Events-tab Follow toggle's three live-tail behaviors via committed Playwright specs (feature) — `done/administration-a4d9b-playwright-follow-toggle-specs.md`
 - **administration-da908** — Prove a Playwright harness can drive the full Mediatheca stack and observe network traffic (spike) — `done/administration-da908-playwright-e2e-harness-spike.md`
 - **administration-h4br2** — Browser smoke-test the Events tab Follow toggle end-to-end (chore) — `done/administration-h4br2-event-browser-follow-smoke-test.md`
@@ -55,6 +55,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0028** -- Scheduled jobs use a dedicated `SqliteConnection` plus a per-command `SemaphoreSlim` (not the shared request connection), closing both the 5s catch-up and the nightly same-hour (04:00) job×job / job×request races; corrects ADR-0024/0026's premise that WAL + `busy_timeout` made one shared connection thread-safe. -- 2026-07-22 -- `knowledge/decisions/0028-scheduled-jobs-dedicated-connection-and-per-command-lock.md`
 - **0026** -- Scheduled-job runs are recorded through a shared registry and an injected recorder seam; run-now is fire-and-forget with a startup-reconciled running row and a name-keyed in-memory guard -- 2026-07-21 -- `knowledge/decisions/0026-job-runs-recording-shared-registry-and-run-now.md`
 - **0025** -- Image-cache orphan detection diffs on-disk files against projection refs, guarded by a not-dirty check, and hard-deletes with re-derivation at purge -- 2026-07-21 -- `knowledge/decisions/0025-image-cache-orphan-detection-guard.md`
 - **0024** -- Projection rebuild streams over the shared connection, guarded by an in-memory concurrency lock; "Rebuild all" is client-side orchestration, not a second route -- 2026-07-21 -- `knowledge/decisions/0024-projection-rebuild-stream-connection-and-concurrency.md`

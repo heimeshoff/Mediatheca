@@ -15,6 +15,20 @@ module PlaytimeTracker =
         if String.IsNullOrEmpty(html) then ""
         else Regex.Replace(html, "<[^>]+>", "")
 
+    /// administration-tj8n2: the job connection (`runSync`'s `conn` param) is
+    /// dedicated to scheduled-job use but is shared by BOTH jobs (Steam sync,
+    /// Series refresh) and can be touched by two ThreadPool threads at once
+    /// (catch-up collision, or same-hour daily fire). `Microsoft.Data.Sqlite.
+    /// SqliteConnection` is not thread-safe for concurrent command creation/
+    /// disposal, so every synchronous DB-touching section reached from
+    /// `runSync` acquires `jobLock` for just that section — never across an
+    /// awaited HTTP call — so the two jobs' network I/O still overlaps and
+    /// only their brief DB moments serialize. Not reentrant: never call this
+    /// from code that might already be holding `jobLock` on the same thread.
+    let inline private withLock (jobLock: SemaphoreSlim) (f: unit -> 'a) : 'a =
+        jobLock.Wait()
+        try f() finally jobLock.Release() |> ignore
+
     let private generateUniqueSlug (conn: SqliteConnection) (streamIdFn: string -> string) (baseSlug: string) : string =
         let mutable slug = baseSlug
         let mutable suffix = 2
@@ -499,6 +513,7 @@ module PlaytimeTracker =
 
     let private createGameFromSteam
         (conn: SqliteConnection)
+        (jobLock: SemaphoreSlim)
         (httpClient: HttpClient)
         (getRawgConfig: unit -> Rawg.RawgConfig)
         (imageBasePath: string)
@@ -540,7 +555,7 @@ module PlaytimeTracker =
                     else ""
 
                 let baseSlug = Slug.gameSlug steamGame.Name (if year > 0 then year else 2000)
-                let slug = generateUniqueSlug conn Games.streamId baseSlug
+                let slug = withLock jobLock (fun () -> generateUniqueSlug conn Games.streamId baseSlug)
                 let! coverRef = Steam.downloadSteamCover httpClient steamGame.AppId slug imageBasePath
                 let! backdropRef = Steam.downloadSteamBackdrop httpClient steamGame.AppId slug imageBasePath
 
@@ -557,25 +572,29 @@ module PlaytimeTracker =
                     RawgRating = rawgRating
                 }
 
-                let result = executeGameCommand conn slug (Games.Add_game gameData) projectionHandlers
-                match result with
-                | Ok () ->
-                    executeGameCommand conn slug (Games.Set_steam_app_id steamGame.AppId) projectionHandlers |> ignore
-                    if steamGame.PlaytimeMinutes > 0 then
-                        executeGameCommand conn slug (Games.Set_play_time steamGame.PlaytimeMinutes) projectionHandlers |> ignore
-                    for category in steamCategories do
-                        executeGameCommand conn slug (Games.Add_play_mode category) projectionHandlers |> ignore
-                    executeGameCommand conn slug (Games.Set_steam_last_played (Steam.unixTimestampToDateString steamGame.RtimeLastPlayed)) projectionHandlers |> ignore
-                    executeGameCommand conn slug Games.Mark_as_owned projectionHandlers |> ignore
-                    return Ok slug
-                | Error e ->
-                    return Error (sprintf "Failed to create '%s': %s" steamGame.Name e)
+                let commitResult =
+                    withLock jobLock (fun () ->
+                        let result = executeGameCommand conn slug (Games.Add_game gameData) projectionHandlers
+                        match result with
+                        | Ok () ->
+                            executeGameCommand conn slug (Games.Set_steam_app_id steamGame.AppId) projectionHandlers |> ignore
+                            if steamGame.PlaytimeMinutes > 0 then
+                                executeGameCommand conn slug (Games.Set_play_time steamGame.PlaytimeMinutes) projectionHandlers |> ignore
+                            for category in steamCategories do
+                                executeGameCommand conn slug (Games.Add_play_mode category) projectionHandlers |> ignore
+                            executeGameCommand conn slug (Games.Set_steam_last_played (Steam.unixTimestampToDateString steamGame.RtimeLastPlayed)) projectionHandlers |> ignore
+                            executeGameCommand conn slug Games.Mark_as_owned projectionHandlers |> ignore
+                            Ok slug
+                        | Error e ->
+                            Error (sprintf "Failed to create '%s': %s" steamGame.Name e))
+                return commitResult
             with ex ->
                 return Error (sprintf "Error creating '%s': %s" steamGame.Name ex.Message)
         }
 
     let runSync
         (conn: SqliteConnection)
+        (jobLock: SemaphoreSlim)
         (httpClient: HttpClient)
         (getSteamConfig: unit -> Steam.SteamConfig)
         (getRawgConfig: unit -> Rawg.RawgConfig)
@@ -596,11 +615,13 @@ module PlaytimeTracker =
                     let mutable gamesPromotedToFocus = 0
                     // Gaming-day boundary is (syncHour + 30 min) — so the daily 04:00 sync
                     // (and late-night sessions ending after midnight) attribute to yesterday.
-                    let syncHour = getSyncHour conn
+                    let syncHour = withLock jobLock (fun () -> getSyncHour conn)
                     let today = defaultArg effectiveDate (toGamingDay syncHour DateTime.Now)
 
                     // Task 048: any new play activity flips the game's status to InFocus
-                    // (skipped when already InFocus to avoid redundant events).
+                    // (skipped when already InFocus to avoid redundant events). NOT locked
+                    // here — `promote` is only ever invoked from inside a section that
+                    // already holds `jobLock` below (SemaphoreSlim isn't reentrant).
                     let runCmdAll s c = executeGameCommand conn s c projectionHandlers
                     let promote slug =
                         if promoteToInFocusIfNeeded conn slug runCmdAll then
@@ -608,18 +629,21 @@ module PlaytimeTracker =
 
                     for steamGame in recentGames do
                         let! slugResult = async {
-                            match GameProjection.findBySteamAppId conn steamGame.AppId with
+                            match withLock jobLock (fun () -> GameProjection.findBySteamAppId conn steamGame.AppId) with
                             | Some slug -> return Some (slug, false)
                             | None ->
                                 // Try to match by name
-                                match GameProjection.findByName conn steamGame.Name with
+                                match withLock jobLock (fun () -> GameProjection.findByName conn steamGame.Name) with
                                 | (slug, _) :: _ ->
                                     // Found by name — link steam_app_id
-                                    executeGameCommand conn slug (Games.Set_steam_app_id steamGame.AppId) projectionHandlers |> ignore
+                                    withLock jobLock (fun () ->
+                                        executeGameCommand conn slug (Games.Set_steam_app_id steamGame.AppId) projectionHandlers |> ignore)
                                     return Some (slug, false)
                                 | [] ->
-                                    // Not in library — create new game
-                                    let! result = createGameFromSteam conn httpClient getRawgConfig imageBasePath projectionHandlers steamGame
+                                    // Not in library — create new game. createGameFromSteam
+                                    // does its own DB locking internally; not wrapped here
+                                    // since it awaits HTTP calls (RAWG/Steam images) first.
+                                    let! result = createGameFromSteam conn jobLock httpClient getRawgConfig imageBasePath projectionHandlers steamGame
                                     match result with
                                     | Ok slug ->
                                         eprintfn "[PlaytimeTracker] Created new game: %s (%s)" steamGame.Name slug
@@ -633,66 +657,72 @@ module PlaytimeTracker =
                         match slugResult with
                         | None -> ()
                         | Some (slug, wasJustCreated) ->
-                            let currentPlaytime = steamGame.PlaytimeMinutes
-                            match getLastSnapshot conn steamGame.AppId with
-                            | None ->
-                                // First time seeing this game in the tracker
-                                if currentPlaytime > 0 then
-                                    // Game with existing playtime but no snapshot — record an initial play session
-                                    let sessionDate =
-                                        match unixTimestampToGamingDay syncHour steamGame.RtimeLastPlayed with
-                                        | Some d -> d
-                                        | None -> today
-                                    recordPlaySession conn slug steamGame.AppId sessionDate currentPlaytime
-                                    sessionsRecorded <- sessionsRecorded + 1
-                                    promote slug
-                                // Save baseline snapshot
-                                saveSnapshot conn steamGame.AppId slug currentPlaytime
-                                snapshotsUpdated <- snapshotsUpdated + 1
-                            | Some (lastTotal, lastUpdatedAt) ->
-                                // Reconciliation: if snapshot exists but no play sessions, backfill initial session
-                                if currentPlaytime > 0 && not (hasAnyPlaySessions conn slug) then
-                                    let sessionDate =
-                                        match unixTimestampToGamingDay syncHour steamGame.RtimeLastPlayed with
-                                        | Some d -> d
-                                        | None -> today
-                                    recordPlaySession conn slug steamGame.AppId sessionDate currentPlaytime
-                                    sessionsRecorded <- sessionsRecorded + 1
-                                    promote slug
-                                    eprintfn "[PlaytimeTracker] Reconciled missing play session for %s (%d min)" slug currentPlaytime
-
-                                let delta = currentPlaytime - lastTotal
-                                if delta > 0 then
-                                    // Determine session date
-                                    let sessionDate =
-                                        let lastDate =
-                                            try DateTime.Parse(lastUpdatedAt).ToString("yyyy-MM-dd")
-                                            with _ -> today
-                                        if lastDate = today then
-                                            today
-                                        elif lastDate < today then
-                                            // Missed days — use rtime_last_played from Steam if available
+                            // Entirely synchronous from here through the snapshot update —
+                            // no awaited HTTP inside this branch — so one lock acquisition
+                            // covers the whole per-game DB section without holding it across
+                            // any network I/O.
+                            withLock jobLock (fun () ->
+                                let currentPlaytime = steamGame.PlaytimeMinutes
+                                match getLastSnapshot conn steamGame.AppId with
+                                | None ->
+                                    // First time seeing this game in the tracker
+                                    if currentPlaytime > 0 then
+                                        // Game with existing playtime but no snapshot — record an initial play session
+                                        let sessionDate =
                                             match unixTimestampToGamingDay syncHour steamGame.RtimeLastPlayed with
                                             | Some d -> d
                                             | None -> today
-                                        else
-                                            today
+                                        recordPlaySession conn slug steamGame.AppId sessionDate currentPlaytime
+                                        sessionsRecorded <- sessionsRecorded + 1
+                                        promote slug
+                                    // Save baseline snapshot
+                                    saveSnapshot conn steamGame.AppId slug currentPlaytime
+                                    snapshotsUpdated <- snapshotsUpdated + 1
+                                | Some (lastTotal, lastUpdatedAt) ->
+                                    // Reconciliation: if snapshot exists but no play sessions, backfill initial session
+                                    if currentPlaytime > 0 && not (hasAnyPlaySessions conn slug) then
+                                        let sessionDate =
+                                            match unixTimestampToGamingDay syncHour steamGame.RtimeLastPlayed with
+                                            | Some d -> d
+                                            | None -> today
+                                        recordPlaySession conn slug steamGame.AppId sessionDate currentPlaytime
+                                        sessionsRecorded <- sessionsRecorded + 1
+                                        promote slug
+                                        eprintfn "[PlaytimeTracker] Reconciled missing play session for %s (%d min)" slug currentPlaytime
 
-                                    recordPlaySession conn slug steamGame.AppId sessionDate delta
-                                    sessionsRecorded <- sessionsRecorded + 1
+                                    let delta = currentPlaytime - lastTotal
+                                    if delta > 0 then
+                                        // Determine session date
+                                        let sessionDate =
+                                            let lastDate =
+                                                try DateTime.Parse(lastUpdatedAt).ToString("yyyy-MM-dd")
+                                                with _ -> today
+                                            if lastDate = today then
+                                                today
+                                            elif lastDate < today then
+                                                // Missed days — use rtime_last_played from Steam if available
+                                                match unixTimestampToGamingDay syncHour steamGame.RtimeLastPlayed with
+                                                | Some d -> d
+                                                | None -> today
+                                            else
+                                                today
 
-                                    // Update game entity's TotalPlayTimeMinutes via event store.
-                                    // Recompute from SUM(minutes_played) so manual sessions are preserved
-                                    // alongside Steam-reported totals.
-                                    recomputeAndPublishTotal conn slug runCmdAll
-                                    promote slug
+                                        recordPlaySession conn slug steamGame.AppId sessionDate delta
+                                        sessionsRecorded <- sessionsRecorded + 1
 
-                                // Always update snapshot
-                                saveSnapshot conn steamGame.AppId slug currentPlaytime
-                                snapshotsUpdated <- snapshotsUpdated + 1
+                                        // Update game entity's TotalPlayTimeMinutes via event store.
+                                        // Recompute from SUM(minutes_played) so manual sessions are preserved
+                                        // alongside Steam-reported totals.
+                                        recomputeAndPublishTotal conn slug runCmdAll
+                                        promote slug
+
+                                    // Always update snapshot
+                                    saveSnapshot conn steamGame.AppId slug currentPlaytime
+                                    snapshotsUpdated <- snapshotsUpdated + 1)
 
                     // Record last sync time
-                    SettingsStore.setSetting conn "playtime_last_sync" (DateTime.UtcNow.ToString("o"))
+                    withLock jobLock (fun () ->
+                        SettingsStore.setSetting conn "playtime_last_sync" (DateTime.UtcNow.ToString("o")))
 
                     return Ok {
                         SessionsRecorded = sessionsRecorded

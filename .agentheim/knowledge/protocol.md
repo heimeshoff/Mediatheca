@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 11:58 -- Task verified and completed: administration-tj8n2 - Scheduled-job timers race on the shared SqliteConnection and crash the process — fix with a dedicated job connection plus a per-command lock
+
+**Type:** Work / Task completion
+**Task:** administration-tj8n2 - Scheduled-job timers race on the shared SqliteConnection and crash the process — fix with a dedicated job connection plus a per-command lock
+**Summary:** Scheduled jobs get a dedicated SqliteConnection plus a per-command SemaphoreSlim, closing both the 5s catch-up and the nightly same-hour (04:00) connection races; MEDIATHECA_DISABLE_SCHEDULED_JOBS retired
+**Duration:** ~25m
+**Verification:** PASS (iteration 1)
+**Files changed:** 11
+**Tests added:** 2
+**ADRs written:** 0028-scheduled-jobs-dedicated-connection-and-per-command-lock.md
+
+---
+
 ## 2026-07-22 11:45 -- Task verified and completed: administration-a4d9b - Assert the Events-tab Follow toggle's three live-tail behaviors via committed Playwright specs
 
 **Type:** Work / Task completion

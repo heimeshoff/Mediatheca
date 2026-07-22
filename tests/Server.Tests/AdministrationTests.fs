@@ -1,6 +1,7 @@
 module Mediatheca.Tests.AdministrationTests
 
 open System.IO
+open System.Threading
 open Expecto
 open Microsoft.Data.Sqlite
 open Mediatheca.Server
@@ -56,11 +57,15 @@ let private allProjectionHandlers = [
 /// Most Administration tests don't exercise the Jobs tab — an empty registry
 /// keeps createApi/createImageApi callers unchanged. Job-runs-specific tests
 /// (JobRunsTests.fs) build their own scheduledJobs/recorder directly.
+// administration-tj8n2: makeJobRunRecorder now also takes the per-command
+// SemaphoreSlim that guards the (real-deployment) dedicated job connection —
+// a fresh, uncontended lock is enough for these tests, which don't exercise
+// job-connection concurrency (JobRunsTests.fs / JobConnectionConcurrencyTests.fs do).
 let private createApi conn =
-    Administration.create conn noStoragePath noImagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn)
+    Administration.create conn noStoragePath noImagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1)))
 
 let private createImageApi conn imagesDir =
-    Administration.create conn noStoragePath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn)
+    Administration.create conn noStoragePath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1)))
 
 // ── Image cache admin (administration-xx3mw) test helpers ──
 
@@ -345,7 +350,7 @@ let administrationTests =
             File.WriteAllBytes(Path.Combine(imagesDir, "poster2.jpg"), Array.create 256 0uy)
 
             try
-                let api = Administration.create conn dbPath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn)
+                let api = Administration.create conn dbPath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1)))
                 let stats = api.getHealthStats () |> Async.RunSynchronously
 
                 Expect.equal stats.Storage.DbSizeBytes 1024L "DB size should match the file on disk"

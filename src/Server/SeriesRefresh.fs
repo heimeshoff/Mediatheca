@@ -3,6 +3,7 @@ namespace Mediatheca.Server
 open System
 open System.Data
 open System.Net.Http
+open System.Threading
 open Microsoft.Data.Sqlite
 open Donald
 
@@ -10,6 +11,18 @@ open Donald
 /// the nightly scheduled job and by the manual "Refresh from TMDB" action
 /// in the series detail page context menu.
 module SeriesRefresh =
+
+    /// administration-tj8n2: the job connection is dedicated to scheduled-job
+    /// use but shared by BOTH jobs (Steam sync, Series refresh), which can be
+    /// touched by two ThreadPool threads at once (catch-up collision, or
+    /// same-hour daily fire). `SqliteConnection` is not thread-safe for
+    /// concurrent command creation/disposal, so every synchronous DB-touching
+    /// section reached from `runNightlyJob` acquires `jobLock` for just that
+    /// section — never across an awaited HTTP call — so the two jobs'
+    /// network I/O still overlaps and only their brief DB moments serialize.
+    let inline private withLock (jobLock: SemaphoreSlim) (f: unit -> 'a) : 'a =
+        jobLock.Wait()
+        try f() finally jobLock.Release() |> ignore
 
     /// Fetch the latest TMDB data for a series and re-download any missing
     /// poster/backdrop/still images. Returns a fully-populated
@@ -309,6 +322,71 @@ module SeriesRefresh =
                             return Ok refreshData
         }
 
+    /// Job-connection variant of `refreshOne` (administration-tj8n2), used only
+    /// by `runNightlyJob`. Same behavior, but its DB touches are guarded by
+    /// `jobLock` so the two scheduled jobs — which share one dedicated job
+    /// connection — never touch it at the same instant; `fetchFromTmdb` (no DB
+    /// access) is deliberately left unlocked so the other job's network I/O
+    /// still overlaps it. Kept separate from `refreshOne` rather than adding a
+    /// lock parameter there, because `refreshOne` is also called — unlocked —
+    /// from the request-serving connection by the manual "Refresh from TMDB"
+    /// action (`Api.fs`), which has no job×job race to guard against.
+    let private refreshOneForJob
+        (jobLock: SemaphoreSlim)
+        (conn: SqliteConnection)
+        (httpClient: HttpClient)
+        (tmdbConfig: Tmdb.TmdbConfig)
+        (imageBasePath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (slug: string)
+        : Async<Result<Series.SeriesRefreshedData, string>> =
+        async {
+            let rowAndKeys =
+                withLock jobLock (fun () ->
+                    let row =
+                        conn
+                        |> Db.newCommand "SELECT tmdb_id, status FROM series_detail WHERE slug = @slug"
+                        |> Db.setParams [ "slug", SqlType.String slug ]
+                        |> Db.querySingle (fun (rd: IDataReader) ->
+                            rd.ReadInt32 "tmdb_id", rd.ReadString "status")
+                    row |> Option.map (fun (tmdbId, status) -> tmdbId, status, existingEpisodeKeys conn slug))
+            match rowAndKeys with
+            | None -> return Error (sprintf "Series '%s' not found" slug)
+            | Some (tmdbId, previousStatus, existingKeys) ->
+                let! fetchResult = fetchFromTmdb httpClient tmdbConfig imageBasePath slug tmdbId existingKeys
+                match fetchResult with
+                | Error e -> return Error e
+                | Ok result ->
+                    return
+                        withLock jobLock (fun () ->
+                            applyToProjection conn slug result
+
+                            // Append Series_refreshed event to the stream
+                            let statusTransitioned = previousStatus <> result.Status
+                            let refreshData: Series.SeriesRefreshedData = {
+                                RefreshedAt = DateTime.UtcNow.ToString("o")
+                                NewEpisodeCount = result.NewEpisodeCount
+                                PreviousStatus = if statusTransitioned then Some previousStatus else None
+                                NewStatus = if statusTransitioned then Some result.Status else None
+                            }
+                            let streamId = Series.streamId slug
+                            let storedEvents = EventStore.readStream conn streamId
+                            let events = storedEvents |> List.choose Series.Serialization.fromStoredEvent
+                            let state = Series.reconstitute events
+                            let currentPosition = EventStore.getStreamPosition conn streamId
+                            match Series.decide state (Series.Refresh_series_from_tmdb refreshData) with
+                            | Error e -> Error e
+                            | Ok newEvents ->
+                                let eventDataList = newEvents |> List.map Series.Serialization.toEventData
+                                match EventStore.appendToStream conn streamId currentPosition eventDataList with
+                                | EventStore.ConcurrencyConflict _ ->
+                                    Error "Concurrency conflict while appending Series_refreshed"
+                                | EventStore.Success _ ->
+                                    for handler in projectionHandlers do
+                                        Projection.runProjection conn handler
+                                    Ok refreshData)
+        }
+
     /// Return all series slugs that are candidates for nightly refresh.
     ///
     /// Always includes still-running series (status Returning / InProduction).
@@ -353,6 +431,7 @@ module SeriesRefresh =
     /// with bursts for large libraries.
     let runNightlyJob
         (conn: SqliteConnection)
+        (jobLock: SemaphoreSlim)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (imageBasePath: string)
@@ -364,7 +443,7 @@ module SeriesRefresh =
                 eprintfn "[SeriesRefresh] Skipping nightly refresh: TMDB API key not configured"
                 return { Refreshed = 0; Errors = 0; NewEpisodes = 0; StatusTransitions = 0; Skipped = true }
             else
-                let candidates = getRefreshCandidates conn
+                let candidates = withLock jobLock (fun () -> getRefreshCandidates conn)
                 eprintfn "[SeriesRefresh] Nightly refresh: %d series to check" candidates.Length
                 let mutable refreshed = 0
                 let mutable errors = 0
@@ -372,7 +451,7 @@ module SeriesRefresh =
                 let mutable statusTransitions = 0
                 for slug in candidates do
                     try
-                        let! result = refreshOne conn httpClient tmdbConfig imageBasePath projectionHandlers slug
+                        let! result = refreshOneForJob jobLock conn httpClient tmdbConfig imageBasePath projectionHandlers slug
                         match result with
                         | Ok data ->
                             refreshed <- refreshed + 1
