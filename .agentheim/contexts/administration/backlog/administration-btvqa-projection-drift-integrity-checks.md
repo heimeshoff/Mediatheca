@@ -1,6 +1,6 @@
 ---
 id: administration-btvqa
-title: Integrity checks — shadow-table replay drift detector and unknown-event report
+title: Shadow-table replay drift detector — verify projection read models exactly match the event log
 status: backlog
 type: feature
 context: administration
@@ -9,23 +9,112 @@ completed:
 depends_on: [administration-qjcp4, design-system-001]
 blocks: []
 tags: [admin-console, projections, integrity, drift]
-related_adrs: [0002]
+related_adrs: [0002, 0024, 0025]
 related_research: []
 prior_art: []
 ---
 
 ## Why
-Trust in an event-sourced system rests on "the projection is exactly what the log says". Nothing verifies that today — a bug in a handler or a missed catch-up would go unnoticed until the UI looks wrong. Same for schema drift: event types the code no longer handles (legacy cases like `"Playing"` folded into `InFocus`) accumulate silently.
+Trust in an event-sourced system rests on "the projection is exactly what the
+log says." Nothing verifies that today — a bug in a handler, or a missed
+catch-up, goes unnoticed until the UI looks wrong. This gives an operator a
+"Run check" button on the Projections tab that answers that question directly,
+without risking the live read models.
 
 ## What
-- **Drift detector:** replay all events through a projection's handler into shadow tables (handler `Init` parameterized with a table-name prefix, or a separate in-memory/attached database), diff shadow vs. live tables, report row-level discrepancies per projection. Read-only with respect to live data.
-- **Unknown-event report:** distinct event types in the store that (a) no projection handler processes and/or (b) `EventFormatting.formatEvent` cannot format — surfaced as a list with counts and sample events.
-- Both live on the Projections (or Health) tab with a "Run check" action; results are displayed, not persisted (or persisted with a timestamp — refine).
+- A throwaway `SqliteConnection` (temp-file or `:memory:`) is created per run.
+  For every handler in `Composition.projectionHandlers`, **in registration
+  order** (Movie → Friend → ContentBlock → Catalog → Series → Game,
+  `Composition.fs:159-166`): `handler.Drop`/`handler.Init` against the shadow
+  connection, then a full replay of the live event log (read via
+  `EventStore.readAllForward` against the *live* connection, unmodified) into
+  `handler.Handle` against the *shadow* connection. Order is load-bearing:
+  `FriendProjection`'s `Friend_removed` case scrubs `movie_detail` /
+  `watch_sessions` (`FriendProjection.fs:84-138`) and needs those tables to
+  already exist. A worker who reorders or parallelizes the shadow loop
+  silently reintroduces false-positive drift.
+- **No changes to any `*Projection.fs`** — this is the deliberate outcome of
+  the architecture decision (see Notes / ADR draft): table names stay
+  hard-coded, unmodified handler code runs verbatim against a different
+  connection object. Read-only against live data is then true *by
+  construction* (the live connection is only ever read from), a stronger
+  guarantee than any table-prefix scheme.
+- **Diff:** for each table in `Administration.projectionTables`
+  (`Administration.fs:219-226`, the existing projection→table-names map
+  already used by the Projections tab's row counts), compare shadow vs. live
+  rows keyed on each table's known primary key. Report per-projection,
+  per-table: rows only-in-live, rows only-in-shadow, and rows present in both
+  with differing columns.
+- **Gated by the not-dirty guard** (`Administration.isAnyProjectionDirty`,
+  ADR-0025): refuse to run — surfaced as a rejection reason, not an exception —
+  if any projection is mid-rebuild or lagging, since shadow-at-head vs.
+  live-behind-head would report false drift.
+- **Transport:** a Giraffe SSE route (`/api/stream/drift-check`, mirroring
+  `Administration.projectionRebuildStreamHandler`'s `progress`/`complete`/
+  `rejected` framing, ADR-0024) rather than a plain `IAdminApi` call — this
+  replays the whole log, the same cost shape as "Rebuild all." Uses its **own**
+  single-flight guard (a fresh `ConcurrentDictionary`/flag with the `TryAdd` /
+  `finally TryRemove` shape ADR-0024 established) — **not**
+  `rebuildingProjections`, whose meaning ("live tables are being written") is
+  never true here.
+- Results are **display-only**: rendered on the Projections tab, not persisted
+  to any table.
 
 ## Acceptance criteria
-- [ ] Drift check on a healthy store reports zero discrepancies; a deliberately corrupted projection row (test setup) is detected and reported.
-- [ ] Unknown-event report lists event types with counts; a fabricated unknown type in a test store shows up.
-- [ ] Live projection tables are untouched by a drift run.
+- [ ] Drift check on a healthy in-memory store (seeded via real
+      `EventStore.appendToStream` calls, same pattern as
+      `ProjectionRebuildTests.fs`) reports zero discrepancies across every
+      registered projection.
+- [ ] A deliberately corrupted live projection row (test setup: mutate one row
+      directly after normal catch-up, bypassing the event log) is detected and
+      reported with the correct table / primary-key / column identified.
+- [ ] The cross-BC write case is exercised directly: seed a movie
+      recommendation from a friend, remove the friend, run drift check — zero
+      discrepancies (proves shadow replay reproduces the Friend-removes-from-
+      Movie scrub, not just single-projection cases).
+- [ ] Live-tables-untouched assertion: after a drift run (including one that
+      finds real discrepancies), every live projection table's row count and
+      checkpoint position are byte-identical to their pre-run values.
+- [ ] Running drift check while a projection is dirty (lagging / rebuilding) is
+      rejected with an operator-facing reason, not silently run.
+- [ ] The Projections-tab "Run check" control and its result rendering are
+      visually consistent with existing Admin console patterns (paper overlay,
+      DaisyUI, existing table/list styling on that tab). [human-eye]
 
 ## Notes
-Needs refinement before work: the shadow-table mechanism requires `ProjectionHandler` to parameterize its table names (today they're hard-coded in each `*Projection.fs` `Init`), or an `ATTACH`ed scratch database with identical table names — decide the approach (likely an ADR). Determining "which event types a handler processes" may need handlers to declare their handled types explicitly — worth doing anyway for the drift report.
+- **ADR needed before implementation.** Decision (settled during this
+  refinement): the shadow replay runs into a throwaway `SqliteConnection`
+  (temp-file/`:memory:`), **not** table-name prefixing and **not** literal
+  `ATTACH`. Rejected alternatives, with source-grounded reasons:
+  - *Table-name prefix (option a):* every `*Projection.fs`'s `handleEvent`
+    embeds the table name as a literal string in every `Db.newCommand`
+    (`MovieProjection.fs` alone has 15+), not just in `Init` — parameterizing
+    "the Init" doesn't touch the handler bodies, so a prefix scheme means
+    rewriting all raw SQL across all six files; a single missed string breaks
+    the tool silently.
+  - *Literal `ATTACH` (option b):* SQLite has no schema search-path;
+    unqualified table names in a connection with an attached DB resolve against
+    `main` first, so `ATTACH` needs every reference qualified — the same
+    invasive rewrite.
+  - *Chosen:* `ProjectionRebuildTests.fs` already opens a fresh
+    `SqliteConnection("Data Source=:memory:")` and runs the exact, unmodified
+    `handler.Init` / replay against it — the mechanism exists and is proven,
+    with zero projection-source changes.
+  Write as **ADR-0030** — confirm the number is still free at write time (0029
+  is the latest as of this refinement). Suggested title: "Drift detector
+  replays into a throwaway SqliteConnection, not table-name prefixing or
+  ATTACH." Cite `Projection.fs`, the `FriendProjection.fs` cross-write as the
+  ordering evidence, `ProjectionRebuildTests.fs` as precedent, and ADR-0024 /
+  ADR-0025 as the reused guard patterns.
+- **New `Projection.fs` function needed:** a `conn`-decoupled sibling of
+  `rebuildProjection` that reads events from one connection
+  (`EventStore.readAllForward liveConn …`) and writes via the handler into
+  another (`handler.Handle shadowConn event`), skipping checkpoint writes
+  entirely — the shadow DB never needs `events` / `projection_checkpoints`,
+  only each handler's own owned tables.
+- `:memory:` vs. temp-file for the shadow connection is left to the worker
+  (not architecturally significant given ADR-0021's event-count numbers).
+- **Independent** of the unknown-event report (administration-gxd6e) — no
+  shared code or ordering dependency. The drift detector needs no knowledge of
+  which event types a handler recognizes; it runs the real, unmodified `Handle`
+  function, which does its own internal filtering.
