@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 4
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 18
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **administration-xjmda** — Compensating-event composer — append corrective events from the admin UI (feature) — `todo/administration-xjmda-compensating-event-composer.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **administration-xjmda** — Compensating-event composer — append corrective events from the admin UI (feature) — `doing/administration-xjmda-compensating-event-composer.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

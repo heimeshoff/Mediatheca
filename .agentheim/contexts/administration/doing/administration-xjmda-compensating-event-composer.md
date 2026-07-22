@@ -1,7 +1,7 @@
 ---
 id: administration-xjmda
 title: Compensating-event composer — append corrective events from the admin UI
-status: todo
+status: doing
 type: feature
 context: administration
 created: 2026-07-20

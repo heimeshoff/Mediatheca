@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 14:58 -- Batch started: [administration-xjmda]
+
+**Type:** Work / Batch start
+**Tasks:** administration-xjmda - Compensating-event composer — append corrective events from the admin UI
+**Parallel:** no (1 worker — final task of the sequential admin wave; base now includes all five prior tasks this session)
+
+---
+
 ## 2026-07-22 14:57 -- Task verified and completed: administration-btvqa - Shadow-table replay drift detector — verify projection read models exactly match the event log
 
 **Type:** Work / Task completion
