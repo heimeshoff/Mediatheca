@@ -5,6 +5,33 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 13:03 -- Modeling / Promoted: administration-btvqa - Shadow-table replay drift detector — verify projection read models exactly match the event log
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
+## 2026-07-22 13:03 -- Modeling / Promoted: administration-cx92m - Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
+## 2026-07-22 12:20 -- Modeling / Refined: administration-cx92m - Shared SqliteConnection request-concurrency audit
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Source-grounded architect pass on the shared `conn` spike. Confirmed the premise shifted since capture: ADR-0028 (tj8n2) fixed the job path and corrected the "one connection is thread-safe" premise, and a4d9b's Playwright specs empirically proved concurrent `addFriend` crashes the shared connection (`does not support nested transactions`) — so the "is it unsafe" finding is pre-answered. Builder chose to keep it a full spike. Architect enumerated the 3 `BeginTransaction` request-reachable choke points (`Api.executeCommand`, `GameJournal.save`, `EventStore.importNdjson`) vs. the broader accepted-residual read-race, and recommended (→ ADR-0030, next free) a narrow process-wide `SemaphoreSlim` gate over those 3 sites — generalizing ADR-0028's per-command-lock idiom — as the cheap inline mitigation, with the full per-request-connection migration split to a follow-up. Sharpened acceptance criteria (all machine-checkable, ADR-0061; concurrent-`addFriend` e2e as regression proof). related_adrs extended to [0003, 0024, 0026, 0028]. Auto-promoted to todo — the architect pass removed the ambiguity, so a worker can now write ADR-0030, add the narrow `SemaphoreSlim` gate, and prove it with the concurrent-`addFriend` e2e regression; the ADR+impl is the worker's output, not a readiness precondition.
+**Split into:** administration-mz6kp (per-request-connection migration — retires the ADR-0030 gate; filed to backlog, depends_on cx92m)
+**ADRs written:** none (ADR-0030 flagged in cx92m for the worker to write at implementation; confirm the number is free at write time)
+
+---
+
 ## 2026-07-22 13:05 -- Modeling / Refined: administration-wwc36 - Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag
 
 **Type:** Modeling / Refine

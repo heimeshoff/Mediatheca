@@ -10,14 +10,16 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 8
-- **Todo:** 1
+- **Backlog:** 6
+- **Todo:** 3
 - **Doing:** 0
 - **Done:** 13
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **administration-btvqa** — Shadow-table replay drift detector — verify projection read models exactly match the event log (feature) — `todo/administration-btvqa-projection-drift-integrity-checks.md`
+- **administration-cx92m** — Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate (spike) — `todo/administration-cx92m-shared-connection-request-concurrency-audit.md`
 - **administration-h4k2p** — Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure. (bug) — `todo/administration-h4k2p-sse-empty-payload-trailing-comma-bug.md`
 <!-- todo-list:end -->
 
@@ -46,8 +48,6 @@ research touching this BC, and concept synthesis pages.
 ### Backlog
 <!-- backlog-list:start -->
 - **administration-nf3wk** — Event Browser's "No matches" pagination-bar text is dead code — give the filter-empty state its own message instead (bugfix) — `backlog/administration-nf3wk-dead-no-matches-branch.md`
-- **administration-cx92m** — Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate (spike) — `backlog/administration-cx92m-shared-connection-request-concurrency-audit.md`
-- **administration-btvqa** — Shadow-table replay drift detector — verify projection read models exactly match the event log (feature) — `backlog/administration-btvqa-projection-drift-integrity-checks.md`
 - **administration-gxd6e** — Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples (feature) — `backlog/administration-gxd6e-unknown-event-report.md`
 - **administration-xjmda** — Compensating-event composer — append corrective events from the admin UI (feature) — `backlog/administration-xjmda-compensating-event-composer.md`
 - **administration-wwc36** — Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag (feature) — `backlog/administration-wwc36-event-surgery-guardrails.md`

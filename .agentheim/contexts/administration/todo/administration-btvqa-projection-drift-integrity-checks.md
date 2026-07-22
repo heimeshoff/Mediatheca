@@ -1,7 +1,7 @@
 ---
 id: administration-btvqa
 title: Shadow-table replay drift detector — verify projection read models exactly match the event log
-status: backlog
+status: todo
 type: feature
 context: administration
 created: 2026-07-20
