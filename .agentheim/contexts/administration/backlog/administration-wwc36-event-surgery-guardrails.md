@@ -6,34 +6,59 @@ type: feature
 context: administration
 created: 2026-07-20
 completed:
-depends_on: [administration-qjcp4, design-system-001]
-blocks: []
+depends_on: [administration-xjmda, administration-qjcp4, design-system-001]
+blocks: [administration-n8kqw]
 tags: [admin-console, event-store, surgery, backup]
-related_adrs: [0002, 0003]
+related_adrs: [0002, 0003, 0020, 0024, 0025]
 related_research: []
 prior_art: []
 ---
 
 ## Why
-Single-user app, owner is the operator: sometimes the honest fix is editing the log itself — a typo'd payload, an event appended by a buggy import, an event type renamed in code that left old names stranded in the store. This must exist, but only behind guardrails that make it hard to lose data.
+Single-user app, owner is the operator: sometimes the honest fix is editing the log itself — a typo'd payload, an event appended by a buggy import, an event type renamed in code that left old names stranded in the store. This must exist, but only behind guardrails that make it hard to lose data. The idiomatic append-only fix (compensating events, administration-xjmda) is the *first* safe path; this is the escape hatch for the cases append can't reach (a genuinely wrong-payload event, a stranded event-type name), and it hard-depends on xjmda so the safe path always ships first.
 
 ## What
-Surgery tab (`/admin/surgery`) operations, each with the same three-guardrail protocol:
-1. **Auto-backup first:** before any mutation, copy `mediatheca.db` (plus WAL checkpoint) to a timestamped backup file in the data dir; the operation aborts if backup fails.
-2. **Preview:** show exactly the affected rows (count + sample) and require explicit confirmation in a paper-overlay dialog.
-3. **Projections dirty:** after mutation, flag all projections dirty; the UI banners "projections out of sync — rebuild" until a rebuild (administration-qjcp4) runs.
+A Surgery tab (`/admin/surgery`, a new `Router.AdminTab` variant under the existing `/admin` shell) with three operations, each behind the **same three-guardrail protocol**:
+
+1. **Auto-backup first (`VACUUM INTO`, not file-copy).** Before any mutation, snapshot the live WAL-mode DB via a single `VACUUM INTO '<data-dir>/backups/mediatheca-<timestamp>.db'` on the app's existing shared `SqliteConnection` — the transactionally-consistent, WAL-aware, one-statement replacement for the checkpoint+copy dance (ADR-0003 explicitly warns raw `cp` is wrong here; `VACUUM INTO` also yields a plain non-WAL standalone file). No dedicated backup connection (surgery is an admin-triggered action, same category ADR-0024 keeps on the shared connection — *not* the ADR-0028 scheduled-jobs case). Then prove the backup by opening it on a **throwaway** connection and running `PRAGMA integrity_check` / a `COUNT(*)`; if `VACUUM INTO` throws or the verify fails, **abort with no row touched**.
+2. **Preview + confirm.** Show exactly the affected rows (edit/delete: the one targeted row by `global_position`; rename: exact count + a bounded sample of rows at the old `event_type`) and require explicit confirmation in a paper-overlay dialog. Cancel leaves `events`, `events_fts`, and `projection_checkpoints` byte-for-byte unchanged.
+3. **Projections dirty (reuse ADR-0025 detection, no new table).** After the mutation, `UPDATE projection_checkpoints SET last_position = 0` for the six checkpoint-tracked handlers. `Administration.isAnyProjectionDirty` (ADR-0025) then reads `head - 0 > 0` for every handler → dirty; rebuild's own drop+reinit+replay-from-0 is unaffected by the prior checkpoint value, so this purely flips the signal with no double-work. A new **"projections out of sync — rebuild" banner** in the Admin shell (above the tab bar, visible on every tab; client-derived from `getProjectionStats`'s `Lag` field — no new API method) shows until Rebuild-all (administration-qjcp4/ADR-0024) clears the lag. This is the "leave dirty, reuse Rebuild-all" precedent ADR-0029 set for import.
 
 Operations:
-- Edit a single event's `data` / `metadata` JSON.
-- Delete a single event (with the stream-position gap consequence stated in the preview).
-- Rename an event type store-wide (`UPDATE events SET event_type = ... WHERE event_type = ...`) — the schema-migration verb for DU renames.
+- **Edit** a single event's `data` / `metadata` JSON. **Must re-sync FTS:** `events_fts` is external-content FTS5 over `events.data` (ADR-0020) with only an `AFTER INSERT` trigger — an UPDATE of `data` leaves the index stale (false positives/negatives in search). Follow every edit with `INSERT INTO events_fts(events_fts) VALUES ('rebuild')` — the exact idiom `EventStore.createFtsIndex`'s own backfill path uses.
+- **Delete** a single event. Leaves `stream_position` / `global_position` **gaps** — no renumbering (verified safe: `appendToStream` re-reads `MAX(stream_position)` fresh immediately before each append via `Api.executeCommand`, and keyset-pagination (ADR-0020) + live-tail (ADR-0023) cursors use `<`/`>` only, never assuming contiguity). **Also re-syncs FTS** via the same `('rebuild')` insert (the "rows disappear" case the insert-only trigger doesn't cover). Preview states the gap consequence in its copy.
+- **Rename** an event type store-wide: `UPDATE events SET event_type = @new WHERE event_type = @old` — the schema-migration verb for DU renames. Reflected automatically in the explorer's event-type filter (`getDistinctEventTypes` is live `SELECT DISTINCT`, no cache) and the Health tab's type counts (also live). **No FTS action** (FTS indexes `data`, not `event_type`).
+
+Server API surface (plain `IAdminApi` Remoting — no SSE; each op is a fast single-statement mutation, the backup is a local file op with a boolean outcome, closer to `purgeOrphanedImages` than to the streamed rebuild/export):
+- Preview: `previewEventEdit` / `previewEventDelete` (`int64 -> Async<...>`, the one row) and `previewEventTypeRename` (`string -> Async<{| Count; Sample |}>`).
+- Commit: `editEvent` / `deleteEvent` / `renameEventType`, each returning a shared `SurgeryResult = BackupFailed of reason | Applied of backupPath * affectedRows` DU (mirrors the existing `OrphanScan`/`PurgeResult` typed-outcome idiom — backup failure is a typed case, not an exception).
+- Backup stats: `getBackupStats : unit -> Async<{| Count; TotalBytes |}>` — a directory walk over `backups/`, feeding the keep-all retention UI.
 
 ## Acceptance criteria
-- [ ] Every mutation path provably writes a backup file first (test: backup exists and opens as valid SQLite before mutation applied).
-- [ ] Preview counts match what actually changes; cancel changes nothing.
-- [ ] After a mutation, the dirty banner shows until rebuild-all completes.
-- [ ] Rename migrates all occurrences and is reflected in the explorer's event-type filter.
-- [ ] Deleting an event and rebuilding produces projections consistent with the edited log.
+- [ ] Every mutation path (edit, delete, rename) runs `VACUUM INTO` to a fresh timestamped path in the data dir before touching `events`; if `VACUUM INTO` throws or a post-backup open-and-query of the backup file fails, the operation aborts with no row touched. (Test: seed a store, trigger each op, assert the backup file opens and its event count matches the pre-mutation store.)
+- [ ] Preview for edit/delete returns exactly the one targeted row by `global_position`; preview for rename returns the exact count of rows matching the old `event_type` plus a bounded sample; cancelling the dialog leaves `events`, `events_fts`, and `projection_checkpoints` byte-for-byte unchanged. (Test: diff full-table dumps before/after a cancel.)
+- [ ] After edit or delete, `events_fts` is re-synced via `INSERT INTO events_fts(events_fts) VALUES ('rebuild')`: a search for the new/remaining text finds it, and a search for text present only in the pre-edit/pre-delete payload does not. (Test: edit an event's `data`, search old and new substrings via `queryEventPage`'s `Search` filter.)
+- [ ] After any surgery mutation, `projection_checkpoints.last_position` is 0 for all six checkpoint-tracked handlers and `Administration.isAnyProjectionDirty` returns them all non-empty immediately after. (Direct unit test against `Administration.fs`.)
+- [ ] The Admin shell renders a "projections out of sync — rebuild" banner whenever dirty state is non-empty (derived from `getProjectionStats`'s `Lag`), and it disappears once Rebuild-all completes. The dirty→clean transition is machine-checkable via `getProjectionStats` before/after Rebuild-all; the banner's visual placement / paper-overlay styling is `[human-eye]`.
+- [ ] Rename updates every occurrence; `getDistinctEventTypes`/`getEventTypes` reflects the new name and never the old one afterward, with zero rows remaining at the old `event_type`. (Direct SQL assertion.)
+- [ ] Deleting an event and running Rebuild-all produces projection state consistent with the edited log — the deleted event's effects are absent from every projection touching that stream, and no other stream's projection state is disturbed. (Test: seed a stream with N events, delete one mid-stream, rebuild, assert the projection matches replaying the remaining N-1 events directly.)
+- [ ] The delete confirmation dialog states the stream-position-gap consequence for that stream/event. Machine-checkable that the preview payload carries the stream's current position so the client *can* render that copy; the exact wording / paper-overlay presentation is `[human-eye]`.
+- [ ] Backup retention is keep-all: no backup file is ever deleted by this feature, and the Surgery UI's backup-stats panel shows cumulative count + total bytes matching an independent directory walk. (Test: trigger 3 surgeries, assert 3 backup files exist and stats match `Directory.GetFiles` sum.)
 
 ## Notes
-Needs refinement: backup retention policy (keep last N?); whether delete should renumber `stream_position` or leave gaps (leaving gaps is simpler and honest — but `appendToStream`'s expected-position check uses MAX, so gaps are tolerated; verify). Dirty flag can live in `projection_checkpoints` (e.g. reset checkpoints) or a separate flag table — decide during refinement. Build order: after compensating events (administration-xjmda) exists, so the safe path is always available first.
+**Builder decisions (locked during refinement 2026-07-22):** (1) one task carries all three ops — the three-guardrail protocol is the unit of work, splitting would triplicate the backup/preview/dirty scaffolding for no isolation benefit; (2) hard `depends_on administration-xjmda` so the safe append-only compensating-event path ships before raw log mutation is ever possible; (3) backup retention is **keep-all**, never auto-prune, with cumulative size + count surfaced in the Surgery UI.
+
+**Settled against source (via orchestrator/architect, 2026-07-22):**
+- Backup = `VACUUM INTO` on the shared connection (ADR-0003's WAL-backup caveat; ADR-0024's shared-connection-for-admin-actions precedent), verified by re-opening the file before mutating.
+- Dirty = rewind `projection_checkpoints.last_position` to 0, reusing `isAnyProjectionDirty` (ADR-0025) verbatim — no new flag table.
+- **FTS gap (the sharp finding):** `events_fts` has only an `AFTER INSERT` trigger (`EventStore.createFtsIndex` comment: *"there is no UPDATE/DELETE trigger… because rows in events never change or disappear"*) — surgery breaks that invariant for the first time. Edit + delete must issue `('rebuild')`; rename doesn't touch FTS. **Independently corroborated by administration-n8kqw**, which found the same staleness reading the same comment.
+- Delete leaves gaps, no renumber — verified against `EventStore.appendToStream` (MAX, read fresh in `Api.executeCommand`), `getMaxGlobalPosition` (MAX, deliberately gap-tolerant), and the keyset/live-tail cursors.
+- The cross-tab dirty banner does **not** exist yet — this task adds it in the Admin shell (`getProjectionStats.Lag` drives it; no new API method).
+
+**ADR to write at implementation:** propose **ADR-0030 — "Event surgery guardrails: `VACUUM INTO` backup on the shared connection, FTS5 rebuild-on-mutate, checkpoint-rewind dirty signal, and stream/global-position gap tolerance"** (0030 confirmed free on disk; confirm again at write time). It extends/qualifies ADR-0003 (WAL backup) and ADR-0025 (dirty detection) and records the delete-gap and FTS-staleness reasoning. Worker writes it — not pre-written here.
+
+**Residual open (non-blocking, worker-resolvable):**
+- Confirm `VACUUM INTO ?` accepts a bound filename parameter under `Microsoft.Data.Sqlite` 9.x (vs. requiring interpolation into the SQL text) — a two-line smoke test at implementation start, not a design question.
+- Whether the `('rebuild')` FTS re-sync shares the mutation's SQL transaction or runs immediately after — recommended: same transaction (matches `appendToStream`'s atomicity); a one-line worker choice.
+
+**Blocked in backlog:** not promotable until administration-xjmda (the hard dependency) itself lands — mirrors how administration-n8kqw waits on this task. Refined and ready in substance; sequencing gates promotion.

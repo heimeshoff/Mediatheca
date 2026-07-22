@@ -7,7 +7,7 @@ context: administration
 created: 2026-07-20
 completed:
 depends_on: [administration-v4y9g, design-system-001]
-blocks: []
+blocks: [administration-wwc36]
 tags: [admin-console, event-store, surgery]
 related_adrs: [0002]
 related_research: []

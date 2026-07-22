@@ -5,6 +5,39 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 13:05 -- Modeling / Refined: administration-wwc36 - Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** backlog
+**Summary:** Settled the task's three open decisions with the builder — (1) one task carries all three ops (shared three-guardrail protocol is the unit of work), (2) hard `depends_on administration-xjmda` so the safe compensating-event path ships before raw log mutation, (3) backup retention = keep-all with size/count surfaced in the UI. Orchestrator (architect-level, source-grounded) settled the technicals: backup via `VACUUM INTO` on the shared connection (ADR-0003 WAL caveat + ADR-0024 shared-connection precedent), verified by re-opening the file before mutating; dirty-flag via rewinding `projection_checkpoints.last_position` to 0, reusing `isAnyProjectionDirty` (ADR-0025) with no new table; delete leaves stream/global-position gaps (verified safe against `appendToStream`'s fresh MAX read and the keyset/live-tail cursors). Sharp finding: `events_fts` has only an AFTER INSERT trigger, so edit + delete leave the FTS index stale — both must issue `INSERT INTO events_fts(events_fts) VALUES ('rebuild')` (rename doesn't touch FTS); independently corroborated by administration-n8kqw. Added a cross-tab "projections out of sync" banner (new; Admin shell, `getProjectionStats.Lag`-driven). Sharpened acceptance criteria (2 marked `[human-eye]`: banner placement, delete-dialog wording — ADR-0061). related_adrs extended to [0002, 0003, 0020, 0024, 0025]; blocks administration-n8kqw; xjmda now blocks wwc36. ADR-0030 flagged for the worker to write at implementation (note: a concurrent btvqa refinement also eyes 0030 — both confirm at write time). **Not promoted** — hard dependency administration-xjmda is still in backlog (unbuilt); refined-and-ready in substance, sequencing gates promotion, mirroring how n8kqw waits on wwc36.
+**Split into:** none (builder chose one task; source confirmed no isolation benefit to splitting)
+**ADRs written:** none (ADR-0030 candidate flagged in wwc36 Notes for the implementing worker)
+
+---
+
+## 2026-07-22 12:58 -- Modeling / Refined: administration-btvqa - Shadow-table replay drift detector
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Split the original "Integrity checks" task (drift detector + unknown-event report bundled) into two by the builder's decision — btvqa keeps the shadow-table drift detector (Projections tab), new administration-gxd6e takes the unknown-event report (Health tab). Both display-only. Orchestrator (architect + tactical, source-grounded against `Projection.fs`/all six `*Projection.fs`/`Administration.fs`/`ProjectionRebuildTests.fs`) settled the drift detector's core mechanism: replay into a throwaway `SqliteConnection` (not table-name prefixing — table names are embedded in every handler SQL string, not just `Init`; not literal `ATTACH` — SQLite has no schema search-path), iterating `Composition.projectionHandlers` in registration order to reproduce the load-bearing `Friend_removed` cross-BC scrub, diffing against `Administration.projectionTables`, gated by the existing `isAnyProjectionDirty` guard (ADR-0025), streamed via an SSE route (ADR-0024 framing) with its own single-flight guard. Read-only-against-live is true by connection separation. Resolved the two tasks are independent (drift detector needs no handled-type declaration; the unknown-event report does, via a hand-maintained `handledEventTypes` registry per the `boundedContextPrefixes` pattern). All criteria machine-checkable except a [human-eye] visual-consistency bullet each. Both auto-promoted to todo.
+**Split into:** administration-gxd6e (Unknown-event report — distinct event types no handler recognizes or formatEvent can't render; Health tab; filed to backlog, depends_on design-system-001)
+**ADRs written:** none (candidate flagged in btvqa Notes for the worker to write at implementation — next free number ~0030, confirm at write time)
+
+---
+
+## 2026-07-22 12:58 -- Modeling / Refined: administration-nf3wk - Event Browser's "No matches" pagination-bar text is dead code
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Resolved the task's one open decision (its acceptance criteria said "remove the dead string OR restructure so it's reachable"). Builder chose to restructure: give the filter-empty state its own message — `"No matches for the current filters."` when any filter (Search/Stream/EventType/BC/Timestamp) is active, `"No events found."` when the store is genuinely empty — and delete `paginationBar`'s truly-unreachable `"No matches"` branch. Test home settled as the existing a4d9b Playwright spec (no client unit-test infra exists; the spec already drives the zero-match-filter scenario), whose assertion must flip from `"No events found."` to the filter message — flagged as a load-bearing cross-task coupling. Added `depends_on: [design-system-001]` (done, so met) per the BC frontend styleguide gate; extended prior_art to g5dfy (empty-state origin) + a4d9b (discovering task / spec to edit). All criteria machine-checkable (ADR-0061; no `[human-eye]`). Auto-promoted to todo.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-07-22 12:57 -- Modeling / Promoted: administration-h4k2p - Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure.
 
 **Type:** Modeling / Promote
