@@ -59,17 +59,12 @@ module GameJournal =
         |> Db.setParams [ "game_slug", SqlType.String gameSlug ]
         |> Db.query readBlock
 
-    // administration-cx92m (ADR-0030): `dbLock` is the same process-wide
-    // SemaphoreSlim guarding `Api.executeCommand` and
-    // `Administration.importEventsStreamHandler`'s import call — this
-    // function's `conn.BeginTransaction()` is one of the exact 3
-    // request-reachable transaction-opening choke points on the shared
-    // `conn` that ADR-0030 serializes to prevent the empirically-observed
-    // `SqliteConnection does not support nested transactions` crash under
-    // concurrent requests.
-    let save (conn: SqliteConnection) (dbLock: System.Threading.SemaphoreSlim) (gameSlug: string) (blocks: JournalBlockDto list) : Result<unit, string> =
-        dbLock.Wait()
-        try
+    // administration-mz6kp (ADR-0033): each request opens its own
+    // `SqliteConnection` via the shared factory, so this function's
+    // `conn.BeginTransaction()` no longer shares a connection object with any
+    // other in-flight request — the process-wide `dbLock` ADR-0030 threaded
+    // through here is retired along with the shared connection it guarded.
+    let save (conn: SqliteConnection) (gameSlug: string) (blocks: JournalBlockDto list) : Result<unit, string> =
             try
                 use tran = conn.BeginTransaction()
 
@@ -111,8 +106,6 @@ module GameJournal =
                 Ok ()
             with ex ->
                 Error $"Failed to save journal: {ex.Message}"
-        finally
-            dbLock.Release() |> ignore
 
     /// Delete a game's whole journal: its uploaded content images first, then
     /// the block rows. Called when the game itself is removed from the library.
@@ -237,7 +230,7 @@ module GameJournal =
     /// One-time, idempotent: convert old game content blocks into the new
     /// journal table (skipping games that already have a new journal), and
     /// write a markdown dump per migrated game for manual recovery.
-    let migrateFromContentBlocks (conn: SqliteConnection) (dbLock: System.Threading.SemaphoreSlim) (dataDir: string) : unit =
+    let migrateFromContentBlocks (conn: SqliteConnection) (dataDir: string) : unit =
         match SettingsStore.getSetting conn "game_journal_migrated" with
         | Some "1" -> ()
         | _ ->
@@ -251,7 +244,7 @@ module GameJournal =
                         System.IO.File.WriteAllText(
                             System.IO.Path.Combine(exportDir, slug + ".md"),
                             dumpToMarkdown slug oldBlocks)
-                        match save conn dbLock slug (convertOldBlocks oldBlocks) with
+                        match save conn slug (convertOldBlocks oldBlocks) with
                         | Ok () -> printfn "[GameJournal] Migrated %d blocks for %s" oldBlocks.Length slug
                         | Error e -> eprintfn "[GameJournal] Migration failed for %s: %s" slug e
                 SettingsStore.setSetting conn "game_journal_migrated" "1"

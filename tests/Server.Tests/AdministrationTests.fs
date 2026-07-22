@@ -7,9 +7,12 @@ open Microsoft.Data.Sqlite
 open Mediatheca.Server
 open Mediatheca.Shared
 
-let private createInMemoryConnection () =
-    let conn = new SqliteConnection("Data Source=:memory:")
-    conn.Open()
+/// administration-mz6kp (ADR-0033): schema-only bootstrap for a
+/// `TestDb.TempDb`'s single long-lived `Connection` — mirrors what the old
+/// `createInMemoryConnection` did on its single `:memory:` connection, now
+/// run once against the fixture's file-backed connection before the
+/// `Factory` is handed to `Administration.create`.
+let private bootstrapAdmin (conn: SqliteConnection) =
     EventStore.initialize conn
     // Stream drill-in's projection panel (administration-v4y9g) dispatches to
     // each BC's projection getBySlug, which — like the running server, which
@@ -31,7 +34,6 @@ let private createInMemoryConnection () =
     // same as Composition.fs's init sequence, so any test exercising
     // getJobStatuses/runJobNow has the table ready.
     Administration.initializeJobRuns conn
-    conn
 
 let private makeEvent eventType data : EventStore.EventData = {
     EventType = eventType
@@ -61,11 +63,11 @@ let private allProjectionHandlers = [
 // SemaphoreSlim that guards the (real-deployment) dedicated job connection —
 // a fresh, uncontended lock is enough for these tests, which don't exercise
 // job-connection concurrency (JobRunsTests.fs / JobConnectionConcurrencyTests.fs do).
-let private createApi conn =
-    Administration.create conn noStoragePath noImagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1))) (new SemaphoreSlim(1, 1))
+let private createApi (factory: unit -> SqliteConnection) =
+    Administration.create factory noStoragePath noImagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder (factory ()) (new SemaphoreSlim(1, 1)))
 
-let private createImageApi conn imagesDir =
-    Administration.create conn noStoragePath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1))) (new SemaphoreSlim(1, 1))
+let private createImageApi (factory: unit -> SqliteConnection) imagesDir =
+    Administration.create factory noStoragePath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder (factory ()) (new SemaphoreSlim(1, 1)))
 
 // ── Image cache admin (administration-xx3mw) test helpers ──
 
@@ -123,9 +125,10 @@ let administrationTests =
     testList "Administration" [
 
         testCase "getEventPage returns events served through IAdminApi" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn "movies-dune-2021" -1L [ makeEvent "MovieAdded" """{"name":"Dune"}""" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let query: EventPageQuery = { Filter = EventFilter.empty; Before = None; PageSize = 100 }
             let page = api.getEventPage query |> Async.RunSynchronously
@@ -137,10 +140,11 @@ let administrationTests =
             Expect.isFalse page.HasMore "Single event should not have more pages"
 
         testCase "getEventPage resolves BoundedContext filter to a stream_id prefix" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn "Movie-dune" -1L [ makeEvent "MovieAdded" "{}" ] |> ignore
             EventStore.appendToStream conn "Friend-alice" -1L [ makeEvent "FriendAdded" "{}" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let query: EventPageQuery = {
                 Filter = { EventFilter.empty with BoundedContext = Some "Movies" }
@@ -153,8 +157,9 @@ let administrationTests =
             Expect.equal page.Events.[0].StreamId "Movie-dune" "Should be the movie event"
 
         testCase "getBoundedContexts returns the known bounded context names" <| fun _ ->
-            let conn = createInMemoryConnection ()
-            let api = createApi conn
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
+            let api = createApi db.Factory
 
             let contexts = api.getBoundedContexts () |> Async.RunSynchronously
 
@@ -162,10 +167,11 @@ let administrationTests =
             Expect.contains contexts "Friends" "Should include Friends"
 
         testCase "getEventStreams returns distinct stream ids through IAdminApi" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn "movies-dune-2021" -1L [ makeEvent "MovieAdded" "{}" ] |> ignore
             EventStore.appendToStream conn "friends-alice" -1L [ makeEvent "FriendAdded" "{}" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let streams = api.getEventStreams () |> Async.RunSynchronously
 
@@ -173,9 +179,10 @@ let administrationTests =
             Expect.contains streams "friends-alice" "Should include friends stream"
 
         testCase "getEventsAfter returns only events after the given position through IAdminApi" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn "movies-dune-2021" -1L [ makeEvent "MovieAdded" "{}" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
             let firstPage = api.getEventPage { Filter = EventFilter.empty; Before = None; PageSize = 100 } |> Async.RunSynchronously
             let seenPosition = firstPage.Events.[0].GlobalPosition
 
@@ -187,10 +194,11 @@ let administrationTests =
             Expect.equal tail.[0].StreamId "friends-alice" "Should be the newly appended event"
 
         testCase "getEventsAfter resolves BoundedContext filter to a stream_id prefix" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn "Movie-dune" -1L [ makeEvent "MovieAdded" "{}" ] |> ignore
             EventStore.appendToStream conn "Friend-alice" -1L [ makeEvent "FriendAdded" "{}" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let tail = api.getEventsAfter { Filter = { EventFilter.empty with BoundedContext = Some "Movies" }; After = 0L; Limit = 100 } |> Async.RunSynchronously
 
@@ -198,10 +206,11 @@ let administrationTests =
             Expect.equal tail.[0].StreamId "Movie-dune" "Should be the movie event"
 
         testCase "getEventTypes returns distinct event types through IAdminApi" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn "movies-dune-2021" -1L [ makeEvent "MovieAdded" "{}" ] |> ignore
             EventStore.appendToStream conn "movies-dune-2021" 0L [ makeEvent "MovieRated" "{}" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let types = api.getEventTypes () |> Async.RunSynchronously
 
@@ -209,7 +218,8 @@ let administrationTests =
             Expect.contains types "MovieRated" "Should include MovieRated"
 
         testCase "getStreamDetail returns the stream's events in order with formatted labels and cross-links" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let streamId = Movies.streamId "the-matrix-1999"
             let addedData: Movies.MovieAddedData = {
                 Name = "The Matrix"; Year = 1999; Runtime = None; Overview = ""
@@ -219,7 +229,7 @@ let administrationTests =
             let recommendedEvent = Movies.Serialization.toEventData (Movies.Movie_recommended_by "alice")
             EventStore.appendToStream conn streamId -1L [ addedEvent ] |> ignore
             EventStore.appendToStream conn streamId 0L [ recommendedEvent ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let detail = api.getStreamDetail streamId |> Async.RunSynchronously
 
@@ -232,10 +242,11 @@ let administrationTests =
             Expect.equal detail.Entries.[1].CrossLinks [ { Kind = "Friend"; TargetStreamId = "Friend-alice" } ] "Recommendation event should cross-link to the friend's stream"
 
         testCase "getStreamDetail marks events with no known formatter as unformatted raw JSON" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let streamId = Movies.streamId "the-matrix-1999"
             EventStore.appendToStream conn streamId -1L [ makeEvent "Some_unknown_event" """{"foo":"bar"}""" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let detail = api.getStreamDetail streamId |> Async.RunSynchronously
 
@@ -244,11 +255,12 @@ let administrationTests =
             Expect.equal detail.Entries.[0].Data """{"foo":"bar"}""" "Raw data should still be available"
 
         testCase "getStreamDetail formats Game_rawg_id_set with the RAWG id and rating (administration-qk3f7)" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let streamId = Games.streamId "some-game"
             EventStore.appendToStream conn streamId -1L
                 [ Games.Serialization.toEventData (Games.Game_rawg_id_set (12345, Some 4.2)) ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let detail = api.getStreamDetail streamId |> Async.RunSynchronously
 
@@ -257,7 +269,8 @@ let administrationTests =
             Expect.equal detail.Entries.[0].FormattedDetails [ "RAWG ID: 12345"; $"Rating: {4.2}" ] "Details should reflect the RAWG id and rating"
 
         testCase "getStreamDetail dispatches the projection panel by stream prefix" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let streamId = Movies.streamId "the-matrix-1999"
             let addedData: Movies.MovieAddedData = {
                 Name = "The Matrix"; Year = 1999; Runtime = None; Overview = ""
@@ -265,7 +278,7 @@ let administrationTests =
             }
             EventStore.appendToStream conn streamId -1L [ Movies.Serialization.toEventData (Movies.Movie_added_to_library addedData) ] |> ignore
             Projection.runProjection conn MovieProjection.handler
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let detail = api.getStreamDetail streamId |> Async.RunSynchronously
 
@@ -276,20 +289,22 @@ let administrationTests =
             Expect.equal row.DetailLink (Some ("movies", "the-matrix-1999")) "Should link to the movie detail page"
 
         testCase "getStreamDetail returns no projection row for a stream prefix with no projection dispatch" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let streamId = "ContentBlocks-the-matrix-1999"
             EventStore.appendToStream conn streamId -1L [ makeEvent "Content_block_added" """{"blockType":"text"}""" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let detail = api.getStreamDetail streamId |> Async.RunSynchronously
 
             Expect.isEmpty detail.ProjectionRows "ContentBlocks streams have no projection panel dispatch"
 
         testCase "getHealthStats total event count matches a direct SQL count" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn "Movie-dune" -1L [ makeEvent "MovieAdded" "{}"; makeEvent "MovieRated" "{}" ] |> ignore
             EventStore.appendToStream conn "Friend-alice" -1L [ makeEvent "FriendAdded" "{}" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let stats = api.getHealthStats () |> Async.RunSynchronously
             use countCmd = conn.CreateCommand()
@@ -300,11 +315,12 @@ let administrationTests =
             Expect.equal stats.TotalEventCount 3 "Should be 3 events total"
 
         testCase "getHealthStats per-bounded-context counts are consistent with direct SQL and sum to the total" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn "Movie-dune" -1L [ makeEvent "MovieAdded" "{}"; makeEvent "MovieRated" "{}" ] |> ignore
             EventStore.appendToStream conn "Friend-alice" -1L [ makeEvent "FriendAdded" "{}" ] |> ignore
             EventStore.appendToStream conn "legacy-unprefixed-stream" -1L [ makeEvent "LegacyThing" "{}" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let stats = api.getHealthStats () |> Async.RunSynchronously
             let moviesCount = stats.BoundedContextCounts |> List.find (fun c -> c.BoundedContext = "Movies") |> fun c -> c.Count
@@ -317,10 +333,11 @@ let administrationTests =
             Expect.equal (stats.BoundedContextCounts |> List.sumBy (fun c -> c.Count)) stats.TotalEventCount "Per-BC counts should sum to the total"
 
         testCase "getHealthStats top streams are ordered by event count descending" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn "Movie-dune" -1L [ makeEvent "MovieAdded" "{}"; makeEvent "MovieRated" "{}"; makeEvent "MovieWatched" "{}" ] |> ignore
             EventStore.appendToStream conn "Friend-alice" -1L [ makeEvent "FriendAdded" "{}" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let stats = api.getHealthStats () |> Async.RunSynchronously
 
@@ -328,10 +345,11 @@ let administrationTests =
             Expect.equal stats.TopStreams.[0].Count 3 "Movie-dune has 3 events"
 
         testCase "getHealthStats distinct event type count and top event types match direct data" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn "Movie-dune" -1L [ makeEvent "MovieAdded" "{}"; makeEvent "MovieRated" "{}" ] |> ignore
             EventStore.appendToStream conn "Movie-arrival" -1L [ makeEvent "MovieAdded" "{}" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let stats = api.getHealthStats () |> Async.RunSynchronously
 
@@ -340,9 +358,10 @@ let administrationTests =
             Expect.equal stats.TopEventTypes.[0].Count 2 "MovieAdded occurs twice"
 
         testCase "getHealthStats daily counts cover a 90-day window and bucket today's events correctly" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn "Movie-dune" -1L [ makeEvent "MovieAdded" "{}"; makeEvent "MovieRated" "{}" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let stats = api.getHealthStats () |> Async.RunSynchronously
             let today = System.DateTime.UtcNow.Date.ToString("yyyy-MM-dd")
@@ -353,7 +372,8 @@ let administrationTests =
             Expect.isTrue (stats.DailyCounts |> List.forall (fun d -> d.Count >= 0)) "All counts should be non-negative"
 
         testCase "getHealthStats storage stats reflect the actual data dir" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let tempRoot = Path.Combine(Path.GetTempPath(), "mediatheca-health-test-" + System.Guid.NewGuid().ToString("N"))
             let imagesDir = Path.Combine(tempRoot, "images")
             Directory.CreateDirectory(imagesDir) |> ignore
@@ -363,7 +383,7 @@ let administrationTests =
             File.WriteAllBytes(Path.Combine(imagesDir, "poster2.jpg"), Array.create 256 0uy)
 
             try
-                let api = Administration.create conn dbPath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1))) (new SemaphoreSlim(1, 1))
+                let api = Administration.create db.Factory dbPath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1)))
                 let stats = api.getHealthStats () |> Async.RunSynchronously
 
                 Expect.equal stats.Storage.DbSizeBytes 1024L "DB size should match the file on disk"
@@ -376,7 +396,8 @@ let administrationTests =
         // ── Unknown-event report (administration-gxd6e) ──
 
         testCase "getHealthStats unhandled list flags a fabricated event type bypassing Serialization.toEventData, with the correct count" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             // makeEvent/appendToStream builds EventData directly — none of the
             // BCs' Serialization.toEventData helpers are involved, matching the
             // task's "bypassing all Serialization.toEventData helpers" phrasing.
@@ -384,7 +405,7 @@ let administrationTests =
                 makeEvent "Totally_unknown_event_type" "{}"
                 makeEvent "Totally_unknown_event_type" "{}"
             ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let stats = api.getHealthStats () |> Async.RunSynchronously
             let row = stats.UnhandledEventTypes |> List.tryFind (fun r -> r.EventType = "Totally_unknown_event_type")
@@ -393,14 +414,15 @@ let administrationTests =
             Expect.equal row.Value.Count 2 "Count should match the two occurrences inserted directly"
 
         testCase "getHealthStats a real, currently-handled event type appears in neither the unhandled nor the unformattable list" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let addedData: Movies.MovieAddedData = {
                 Name = "The Matrix"; Year = 1999; Runtime = None; Overview = ""
                 Genres = []; PosterRef = None; BackdropRef = None; TmdbId = 603; TmdbRating = None
             }
             EventStore.appendToStream conn (Movies.streamId "the-matrix-1999") -1L
                 [ Movies.Serialization.toEventData (Movies.Movie_added_to_library addedData) ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let stats = api.getHealthStats () |> Async.RunSynchronously
 
@@ -408,7 +430,8 @@ let administrationTests =
             Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Movie_added_to_library")) "A type with a real formatter case must not appear in the unformattable list"
 
         testCase "getHealthStats Game_rawg_id_set appears in neither the unhandled nor the unformattable list (administration-qk3f7: drift closed)" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             // Games.Serialization.handledEventTypes lists "Game_rawg_id_set" (the
             // deserializer recognizes it — Games.fs:555), and
             // EventFormatting.formatGameEvent now has a matching case
@@ -419,7 +442,7 @@ let administrationTests =
             // every real event type in the store.
             EventStore.appendToStream conn (Games.streamId "some-game") -1L
                 [ Games.Serialization.toEventData (Games.Game_rawg_id_set (12345, Some 4.2)) ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let stats = api.getHealthStats () |> Async.RunSynchronously
 
@@ -427,20 +450,22 @@ let administrationTests =
             Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Game_rawg_id_set")) "Game_rawg_id_set now has a formatter case, so it must not appear in the unformattable list"
 
         testCase "getHealthStats unhandled list flags an event type whose stream prefix matches no known bounded context" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn "legacy-unprefixed-stream" -1L [ makeEvent "LegacyThing" "{}" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let stats = api.getHealthStats () |> Async.RunSynchronously
 
             Expect.isNonEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "LegacyThing")) "An event type on a stream matching no known BC prefix should be flagged unhandled"
 
         testCase "getProjectionStats lists all registered projections with checkpoint, lag, and row counts" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let streamId = Friends.streamId "marco"
             EventStore.appendToStream conn streamId -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None }) ] |> ignore
             Projection.runProjection conn FriendProjection.handler
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let stats = api.getProjectionStats () |> Async.RunSynchronously
 
@@ -454,12 +479,13 @@ let administrationTests =
             Expect.equal friendListCount.RowCount 1 "friend_list should have the one row for Marco"
 
         testCase "getProjectionStats reports lag when a projection has not caught up to newer events" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn (Friends.streamId "marco") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None }) ] |> ignore
             Projection.runProjection conn FriendProjection.handler
             // A second event arrives, but the projection is never re-run to catch up on it.
             EventStore.appendToStream conn (Friends.streamId "alice") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Alice"; ImageRef = None }) ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let stats = api.getProjectionStats () |> Async.RunSynchronously
             let friendStats = stats |> List.find (fun s -> s.Name = "FriendProjection")
@@ -468,8 +494,9 @@ let administrationTests =
             Expect.equal friendStats.Lag 1L "Lag should be 1: store head (2) minus checkpoint (1)"
 
         testCase "getProjectionStats reports no checkpoint yet for a projection that has never caught up" <| fun _ ->
-            let conn = createInMemoryConnection ()
-            let api = createApi conn
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
+            let api = createApi db.Factory
 
             let stats = api.getProjectionStats () |> Async.RunSynchronously
             let friendStats = stats |> List.find (fun s -> s.Name = "FriendProjection")
@@ -480,7 +507,8 @@ let administrationTests =
         // ── Image cache admin (administration-xx3mw) — see ADR-0025 ──
 
         testCase "imageRefColumns covers every ref-bearing (table, column) pair with a column that exists in the schema" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
 
             Expect.equal (List.length Administration.imageRefColumns) 15 "Registry should list all fifteen ref-bearing columns"
 
@@ -492,13 +520,14 @@ let administrationTests =
                 Expect.contains columns column (sprintf "%s.%s should exist in the schema" table column)
 
         testCase "getImageCacheStats reports total size/count and a per-subfolder breakdown that sums to the total" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             withTempImagesDir (fun imagesDir ->
                 writeImageFile imagesDir "posters/a.jpg" 100
                 writeImageFile imagesDir "backdrops/b.jpg" 200
                 writeImageFile imagesDir "loose.txt" 50
 
-                let api = createImageApi conn imagesDir
+                let api = createImageApi db.Factory imagesDir
                 let stats = api.getImageCacheStats () |> Async.RunSynchronously
 
                 Expect.equal stats.TotalFileCount 3 "Three files total"
@@ -510,78 +539,85 @@ let administrationTests =
                 Expect.equal rootRow.Value.SizeBytes 50L "(root) row should report the loose file's size")
 
         testCase "listOrphanedImages is blocked while a checkpoint-tracked projection lags behind the store head" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn (Friends.streamId "marco") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None }) ] |> ignore
             Projection.runProjection conn FriendProjection.handler
             // A second event arrives, but the projection is never re-run — FriendProjection now lags.
             EventStore.appendToStream conn (Friends.streamId "alice") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Alice"; ImageRef = None }) ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             match api.listOrphanedImages () |> Async.RunSynchronously with
             | OrphanScanBlocked reason -> Expect.stringContains reason "FriendProjection" "Reason should name the lagging projection"
             | OrphanScanReady _ -> failwith "Expected the scan to be blocked while FriendProjection lags"
 
         testCase "purgeOrphanedImages is blocked while a checkpoint-tracked projection lags behind the store head" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn (Friends.streamId "marco") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None }) ] |> ignore
             Projection.runProjection conn FriendProjection.handler
             EventStore.appendToStream conn (Friends.streamId "alice") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Alice"; ImageRef = None }) ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             match api.purgeOrphanedImages PurgeAll |> Async.RunSynchronously with
             | PurgeBlocked reason -> Expect.stringContains reason "FriendProjection" "Reason should name the lagging projection"
             | PurgeDone _ -> failwith "Expected the purge to be blocked while FriendProjection lags"
 
         testCase "getImageCacheStats remains available while a projection is dirty — stats need no not-dirty guard" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn (Friends.streamId "marco") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None }) ] |> ignore
             // FriendProjection is never caught up — dirty by lag — but stats don't gate on it.
             withTempImagesDir (fun imagesDir ->
                 writeImageFile imagesDir "posters/a.jpg" 10
-                let api = createImageApi conn imagesDir
+                let api = createImageApi db.Factory imagesDir
                 let stats = api.getImageCacheStats () |> Async.RunSynchronously
                 Expect.equal stats.TotalFileCount 1 "Stats should compute normally despite the dirty projection")
 
         testCase "a content_blocks.image_ref (movie journal) is never flagged orphan" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             insertContentBlock conn "block-1" "dune" "content/movie-journal-1.jpg"
             withTempImagesDir (fun imagesDir ->
                 writeImageFile imagesDir "content/movie-journal-1.jpg" 10
-                let api = createImageApi conn imagesDir
+                let api = createImageApi db.Factory imagesDir
                 match api.listOrphanedImages () |> Async.RunSynchronously with
                 | OrphanScanReady (orphans, _) ->
                     Expect.isEmpty (orphans |> List.filter (fun o -> o.RelativePath = "content/movie-journal-1.jpg")) "Referenced movie journal image should not be orphan"
                 | OrphanScanBlocked reason -> failwith reason)
 
         testCase "a game_journal_blocks.image_ref (game journal) is never flagged orphan" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let block: JournalBlockDto = {
                 Id = "block-1"; ParentId = None; BlockType = JournalBlockTypes.image
                 Content = ""; Checked = false; Collapsed = false; Language = None; Url = None
                 ImageRef = Some "content/game-journal-1.jpg"; Caption = None; Position = 0; Width = 1.0
             }
-            GameJournal.save conn (new SemaphoreSlim(1, 1)) "some-game" [ block ] |> ignore
+            GameJournal.save conn "some-game" [ block ] |> ignore
             withTempImagesDir (fun imagesDir ->
                 writeImageFile imagesDir "content/game-journal-1.jpg" 10
-                let api = createImageApi conn imagesDir
+                let api = createImageApi db.Factory imagesDir
                 match api.listOrphanedImages () |> Async.RunSynchronously with
                 | OrphanScanReady (orphans, _) ->
                     Expect.isEmpty (orphans |> List.filter (fun o -> o.RelativePath = "content/game-journal-1.jpg")) "Referenced game journal image should not be orphan"
                 | OrphanScanBlocked reason -> failwith reason)
 
         testCase "a series_episodes.still_ref is never flagged orphan" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             insertSeriesEpisode conn "the-wire" 1 2 "stills/the-wire-s01e02.jpg"
             withTempImagesDir (fun imagesDir ->
                 writeImageFile imagesDir "stills/the-wire-s01e02.jpg" 10
-                let api = createImageApi conn imagesDir
+                let api = createImageApi db.Factory imagesDir
                 match api.listOrphanedImages () |> Async.RunSynchronously with
                 | OrphanScanReady (orphans, _) ->
                     Expect.isEmpty (orphans |> List.filter (fun o -> o.RelativePath = "stills/the-wire-s01e02.jpg")) "Referenced episode still should not be orphan"
                 | OrphanScanBlocked reason -> failwith reason)
 
         testCase "a cast/<id>.jpg is not flagged orphan while a cast_members row references it, and is flagged once no row does" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let castId = CastStore.upsertCastMember conn "Actor" 999 (Some "cast/999.jpg")
             // Shared by more than one movie — sharing doesn't change how liveness is derived
             // (cast_members.image_ref alone is the ref-bearing column per ADR-0025).
@@ -589,7 +625,7 @@ let administrationTests =
             CastStore.addMovieCast conn "Movie-arrival" castId "Self" 0 true
             withTempImagesDir (fun imagesDir ->
                 writeImageFile imagesDir "cast/999.jpg" 10
-                let api = createImageApi conn imagesDir
+                let api = createImageApi db.Factory imagesDir
 
                 match api.listOrphanedImages () |> Async.RunSynchronously with
                 | OrphanScanReady (orphans, _) ->
@@ -604,7 +640,8 @@ let administrationTests =
                 | OrphanScanBlocked reason -> failwith reason)
 
         testCase "path comparison is separator-normalized and case-sensitive: a case-mismatched name is treated as orphan" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             insertMoviePosterRef conn "dune" "posters/dune.jpg"
             withTempImagesDir (fun imagesDir ->
                 // The on-disk file's actual casing differs from the stored ref's —
@@ -613,7 +650,7 @@ let administrationTests =
                 // here (dev runs on a case-insensitive Windows filesystem, so writing
                 // both "dune.jpg" and "Dune.jpg" would collide onto the same file).
                 writeImageFile imagesDir "posters/Dune.jpg" 10
-                let api = createImageApi conn imagesDir
+                let api = createImageApi db.Factory imagesDir
 
                 match api.listOrphanedImages () |> Async.RunSynchronously with
                 | OrphanScanReady (orphans, _) ->
@@ -622,11 +659,12 @@ let administrationTests =
                 | OrphanScanBlocked reason -> failwith reason)
 
         testCase "a genuinely unreferenced file, including a stray non-image file, appears in the orphan list with correct path and size" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             withTempImagesDir (fun imagesDir ->
                 writeImageFile imagesDir "posters/orphan-poster.jpg" 100
                 writeImageFile imagesDir "notes.txt" 30
-                let api = createImageApi conn imagesDir
+                let api = createImageApi db.Factory imagesDir
 
                 match api.listOrphanedImages () |> Async.RunSynchronously with
                 | OrphanScanReady (orphans, totalBytes) ->
@@ -639,11 +677,12 @@ let administrationTests =
                 | OrphanScanBlocked reason -> failwith reason)
 
         testCase "purging a specific subset deletes exactly that subset and nothing else" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             withTempImagesDir (fun imagesDir ->
                 writeImageFile imagesDir "posters/orphan1.jpg" 10
                 writeImageFile imagesDir "posters/orphan2.jpg" 20
-                let api = createImageApi conn imagesDir
+                let api = createImageApi db.Factory imagesDir
 
                 match api.purgeOrphanedImages (PurgeSpecific [ "posters/orphan1.jpg" ]) |> Async.RunSynchronously with
                 | PurgeDone (deletedCount, bytesFreed, skipped) ->
@@ -655,13 +694,14 @@ let administrationTests =
                 | PurgeBlocked reason -> failwith reason)
 
         testCase "purging PurgeAll deletes every currently-detected orphan and leaves referenced files alone" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             insertMoviePosterRef conn "dune" "posters/dune.jpg"
             withTempImagesDir (fun imagesDir ->
                 writeImageFile imagesDir "posters/dune.jpg" 10
                 writeImageFile imagesDir "posters/orphan1.jpg" 20
                 writeImageFile imagesDir "posters/orphan2.jpg" 30
-                let api = createImageApi conn imagesDir
+                let api = createImageApi db.Factory imagesDir
 
                 match api.purgeOrphanedImages PurgeAll |> Async.RunSynchronously with
                 | PurgeDone (deletedCount, bytesFreed, skipped) ->
@@ -674,10 +714,11 @@ let administrationTests =
                 | PurgeBlocked reason -> failwith reason)
 
         testCase "purge re-derives at commit: a path that became referenced since the scan is skipped, not deleted" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             withTempImagesDir (fun imagesDir ->
                 writeImageFile imagesDir "posters/became-referenced.jpg" 10
-                let api = createImageApi conn imagesDir
+                let api = createImageApi db.Factory imagesDir
                 // Simulate the file becoming referenced after the client's held scan
                 // but before the purge call commits.
                 insertMoviePosterRef conn "newly-added" "posters/became-referenced.jpg"
@@ -690,9 +731,10 @@ let administrationTests =
                 | PurgeBlocked reason -> failwith reason)
 
         testCase "purge skips a requested path that's already vanished from disk, without erroring" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             withTempImagesDir (fun imagesDir ->
-                let api = createImageApi conn imagesDir
+                let api = createImageApi db.Factory imagesDir
 
                 match api.purgeOrphanedImages (PurgeSpecific [ "posters/gone.jpg" ]) |> Async.RunSynchronously with
                 | PurgeDone (deletedCount, bytesFreed, skipped) ->
@@ -702,10 +744,11 @@ let administrationTests =
                 | PurgeBlocked reason -> failwith reason)
 
         testCase "purge returns actual deleted count and bytes freed, and stats reflect the smaller total afterward" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             withTempImagesDir (fun imagesDir ->
                 writeImageFile imagesDir "posters/orphan.jpg" 100
-                let api = createImageApi conn imagesDir
+                let api = createImageApi db.Factory imagesDir
                 let statsBefore = api.getImageCacheStats () |> Async.RunSynchronously
 
                 match api.purgeOrphanedImages PurgeAll |> Async.RunSynchronously with
@@ -718,14 +761,15 @@ let administrationTests =
                 | PurgeBlocked reason -> failwith reason)
 
         testCase "purge is filesystem-only: total event count is unchanged across a purge" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             EventStore.appendToStream conn (Friends.streamId "marco") -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Marco"; ImageRef = None }) ] |> ignore
             Projection.runProjection conn FriendProjection.handler
             let eventCountBefore = EventStore.getTotalEventCount conn
 
             withTempImagesDir (fun imagesDir ->
                 writeImageFile imagesDir "posters/orphan.jpg" 10
-                let api = createImageApi conn imagesDir
+                let api = createImageApi db.Factory imagesDir
                 api.purgeOrphanedImages PurgeAll |> Async.RunSynchronously |> ignore
 
                 let eventCountAfter = EventStore.getTotalEventCount conn
@@ -734,12 +778,13 @@ let administrationTests =
         // ── Compensating-event composer (administration-xjmda, ADR-0032) ──
 
         testCase "getCompensatingEventTypes returns the union of event types across every stream sharing the same bounded-context prefix" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let streamA = Movies.streamId "movie-a"
             let streamB = Movies.streamId "movie-b"
             EventStore.appendToStream conn streamA -1L [ makeEvent "Movie_added_to_library" "{}" ] |> ignore
             EventStore.appendToStream conn streamB -1L [ makeEvent "Movie_categorized" "{}" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let typesFromA = api.getCompensatingEventTypes streamA |> Async.RunSynchronously
             let typesFromB = api.getCompensatingEventTypes streamB |> Async.RunSynchronously
@@ -749,12 +794,13 @@ let administrationTests =
             Expect.equal typesFromA typesFromB "The union is the same regardless of which stream in the BC is asked"
 
         testCase "getCompensatingEventTemplate pre-fills from the target stream itself when an instance exists there" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let streamA = Movies.streamId "movie-a"
             let streamB = Movies.streamId "movie-b"
             EventStore.appendToStream conn streamB -1L [ makeEvent "Personal_rating_set" """{"rating":5}""" ] |> ignore
             EventStore.appendToStream conn streamA -1L [ makeEvent "Personal_rating_set" """{"rating":8}""" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let template = api.getCompensatingEventTemplate streamA "Personal_rating_set" |> Async.RunSynchronously
 
@@ -763,12 +809,13 @@ let administrationTests =
             Expect.isFalse template.Value.FromOtherStream "Template came from the target stream itself"
 
         testCase "getCompensatingEventTemplate falls back to the most recent BC-prefix-wide instance when none exists on the target stream" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let streamA = Movies.streamId "movie-a"
             let streamB = Movies.streamId "movie-b"
             EventStore.appendToStream conn streamB -1L [ makeEvent "Personal_rating_set" """{"rating":5}""" ] |> ignore
             EventStore.appendToStream conn streamA -1L [ makeEvent "Movie_categorized" """{"genres":[]}""" ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             let template = api.getCompensatingEventTemplate streamA "Personal_rating_set" |> Async.RunSynchronously
 
@@ -777,9 +824,10 @@ let administrationTests =
             Expect.isTrue template.Value.FromOtherStream "Template came from a sibling stream, not the target"
 
         testCase "appendCompensatingEvent stores the re-serialized canonical form, not the operator's raw edited bytes" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let streamId = Games.streamId "some-game"
-            let api = createApi conn
+            let api = createApi db.Factory
             // Games.Serialization.deserialize's decodeGameStatus folds the legacy
             // wire value "Playing" into the InFocus case (Games.fs:361) — a real
             // divergence between what an operator might type and what the
@@ -799,9 +847,10 @@ let administrationTests =
                     Expect.notEqual stored.Data rawEdited "Stored bytes must differ from the operator's raw edited input"
 
         testCase "appendCompensatingEvent refuses a payload that fails to deserialize: no row inserted, error surfaced" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let streamId = Friends.streamId "alice"
-            let api = createApi conn
+            let api = createApi db.Factory
             let countBefore = EventStore.getTotalEventCount conn
 
             // Friend_added's decoder requires a "name" field (Friends.fs:105) —
@@ -814,10 +863,11 @@ let administrationTests =
             Expect.equal (EventStore.getTotalEventCount conn) countBefore "No row should have been inserted for a refused payload"
 
         testCase "appendCompensatingEvent surfaces a concurrency conflict rather than silently overwriting when another append lands between preview and commit" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let streamId = Friends.streamId "alice"
             EventStore.appendToStream conn streamId -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Alice"; ImageRef = None }) ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             match api.previewCompensatingEvent streamId "Friend_updated" """{"name":"Alice Corrected"}""" |> Async.RunSynchronously with
             | Error e -> failwith e
@@ -838,11 +888,12 @@ let administrationTests =
                 Expect.equal (List.length events) 2 "Only the 'another path' append should have landed; the stale commit must be refused"
 
         testCase "appendCompensatingEvent runs projection catch-up so the affected BC's projection reflects the new event with no separate rebuild step" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let streamId = Friends.streamId "alice"
             EventStore.appendToStream conn streamId -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Alice"; ImageRef = None }) ] |> ignore
             Projection.runProjection conn FriendProjection.handler
-            let api = createApi conn
+            let api = createApi db.Factory
 
             match api.previewCompensatingEvent streamId "Friend_updated" """{"name":"Alice Corrected"}""" |> Async.RunSynchronously with
             | Error e -> failwith e
@@ -858,12 +909,13 @@ let administrationTests =
                 Expect.equal name "Alice Corrected" "friend_list should reflect the corrective event with no manual rebuild call"
 
         testCase "a composer-appended event is indistinguishable from an organic one except for metadata" <| fun _ ->
-            let conn = createInMemoryConnection ()
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
             let organicStream = Friends.streamId "organic"
             let composerStream = Friends.streamId "composer-target"
             EventStore.appendToStream conn organicStream -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Organic"; ImageRef = None }) ] |> ignore
             EventStore.appendToStream conn composerStream -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Composer Target"; ImageRef = None }) ] |> ignore
-            let api = createApi conn
+            let api = createApi db.Factory
 
             match api.previewCompensatingEvent composerStream "Friend_updated" """{"name":"Composer Corrected"}""" |> Async.RunSynchronously with
             | Error e -> failwith e

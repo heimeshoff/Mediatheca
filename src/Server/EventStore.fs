@@ -33,7 +33,13 @@ module EventStore =
 
     // Database initialization
 
-    let private setPragmas (conn: SqliteConnection) =
+    /// Per-connection pragma block. Every `SqliteConnection` object defaults
+    /// to unsafe pragma values on open — this is NOT one-time database state,
+    /// it must be re-applied on **every** connection, whether the one-time
+    /// startup `conn` or a per-request `factory()` connection. Table/FTS
+    /// creation (below) is the true one-time step and must never be re-run
+    /// per request.
+    let configureConnection (conn: SqliteConnection) =
         use cmd = conn.CreateCommand()
         cmd.CommandText <- """
             PRAGMA journal_mode=WAL;
@@ -120,7 +126,7 @@ module EventStore =
             |> Db.exec
 
     let initialize (conn: SqliteConnection) =
-        setPragmas conn
+        configureConnection conn
         createTables conn
         createFtsIndex conn
 

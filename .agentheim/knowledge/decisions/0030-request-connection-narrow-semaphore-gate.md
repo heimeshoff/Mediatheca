@@ -2,10 +2,10 @@
 id: 0030
 title: A single process-wide SemaphoreSlim guards the 3 request-reachable transaction-opening choke points on the shared request SqliteConnection, generalizing ADR-0028's per-command-lock idiom
 scope: administration
-status: accepted
+status: superseded
 date: 2026-07-22
 supersedes: []
-superseded_by: []
+superseded_by: [0033]
 related_tasks: [administration-cx92m, administration-tj8n2]
 related_research: []
 ---

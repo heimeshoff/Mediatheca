@@ -14,18 +14,13 @@ module Api =
         if System.String.IsNullOrEmpty(html) then ""
         else Regex.Replace(html, "<[^>]+>", "")
 
-    // administration-cx92m (ADR-0030): every transaction-opening command path
-    // acquires this ONE process-wide `dbLock` (built once in Composition.fs,
-    // threaded down through every call site below) so two concurrent request
-    // threads never touch the single shared `conn` object's command list at
-    // the same instant — generalizing ADR-0028's per-command-lock idiom from
-    // the dedicated job connection to the shared request connection. Held
-    // only around this synchronous body (no `let!`/`do!` inside it); every
-    // caller's own awaited HTTP work happens outside this function, so
-    // concurrent requests' network calls still overlap and only their brief
-    // DB moments serialize.
+    // administration-mz6kp (ADR-0033): `conn` is a per-request connection
+    // opened by the caller via the shared factory (`use conn = factory()` at
+    // the record member/handler that reaches this function) — no other
+    // in-flight request shares this connection object, so the process-wide
+    // `dbLock` ADR-0030 threaded through here is retired along with the
+    // shared connection it guarded.
     let private executeCommandCore
-        (dbLock: System.Threading.SemaphoreSlim)
         (conn: SqliteConnection)
         (streamId: string)
         (fromStoredEvent: EventStore.StoredEvent -> 'Event option)
@@ -35,33 +30,29 @@ module Api =
         (command: 'Command)
         (projectionHandlers: Projection.ProjectionHandler list)
         : Result<unit, string> =
-        dbLock.Wait()
-        try
-            // 1. Read stream, deserialize, reconstitute
-            let storedEvents = EventStore.readStream conn streamId
-            let events = storedEvents |> List.choose fromStoredEvent
-            let state = reconstitute events
-            let currentPosition = EventStore.getStreamPosition conn streamId
+        // 1. Read stream, deserialize, reconstitute
+        let storedEvents = EventStore.readStream conn streamId
+        let events = storedEvents |> List.choose fromStoredEvent
+        let state = reconstitute events
+        let currentPosition = EventStore.getStreamPosition conn streamId
 
-            // 2. Decide
-            match decide state command with
-            | Error e -> Error e
-            | Ok newEvents ->
-                if List.isEmpty newEvents then
+        // 2. Decide
+        match decide state command with
+        | Error e -> Error e
+        | Ok newEvents ->
+            if List.isEmpty newEvents then
+                Ok ()
+            else
+                // 3. Serialize and append
+                let eventDataList = newEvents |> List.map toEventData
+                match EventStore.appendToStream conn streamId currentPosition eventDataList with
+                | EventStore.ConcurrencyConflict _ ->
+                    Error "Concurrency conflict, please retry"
+                | EventStore.Success _ ->
+                    // 4. Catch-up projections
+                    for handler in projectionHandlers do
+                        Projection.runProjection conn handler
                     Ok ()
-                else
-                    // 3. Serialize and append
-                    let eventDataList = newEvents |> List.map toEventData
-                    match EventStore.appendToStream conn streamId currentPosition eventDataList with
-                    | EventStore.ConcurrencyConflict _ ->
-                        Error "Concurrency conflict, please retry"
-                    | EventStore.Success _ ->
-                        // 4. Catch-up projections
-                        for handler in projectionHandlers do
-                            Projection.runProjection conn handler
-                        Ok ()
-        finally
-            dbLock.Release() |> ignore
 
     let private generateUniqueSlug (conn: SqliteConnection) (streamIdFn: string -> string) (baseSlug: string) : string =
         let mutable slug = baseSlug
@@ -86,21 +77,20 @@ module Api =
 
     let private addMovieToLibraryImpl
         (conn: SqliteConnection)
-        (dbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (imageBasePath: string)
         (movieProjections: Projection.ProjectionHandler list)
         (tmdbId: int)
         : Async<Result<string, string>> = async {
-            // administration-cx92m (ADR-0030): full eta-expansion is required
-            // here — a bare partial application (`executeCommandCore dbLock`)
+            // administration-mz6kp (ADR-0033): full eta-expansion is still
+            // required here — a bare partial application (`executeCommandCore`)
             // would collapse to the FIRST call site's concrete type
             // instantiation (F#'s value restriction on partially-applied
             // generic functions) and break every other event type this
             // function's sibling call sites use.
             let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
-                executeCommandCore dbLock conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
+                executeCommandCore conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
             try
                 let tmdbConfig = getTmdbConfig()
                 let! details = Tmdb.getMovieDetails httpClient tmdbConfig tmdbId
@@ -212,7 +202,6 @@ module Api =
     /// (Jellyfin auto-sync vs. manual add) create duplicate slugs for the same title.
     let private addMovieToLibrary
         (conn: SqliteConnection)
-        (dbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (imageBasePath: string)
@@ -221,12 +210,11 @@ module Api =
         : Async<Result<string, string>> = async {
             match tryFindMovieSlugByTmdbId conn tmdbId with
             | Some existing -> return Ok existing
-            | None -> return! addMovieToLibraryImpl conn dbLock httpClient getTmdbConfig imageBasePath movieProjections tmdbId
+            | None -> return! addMovieToLibraryImpl conn httpClient getTmdbConfig imageBasePath movieProjections tmdbId
         }
 
     let private addSeriesToLibraryImpl
         (conn: SqliteConnection)
-        (dbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (imageBasePath: string)
@@ -234,7 +222,7 @@ module Api =
         (tmdbId: int)
         : Async<Result<string, string>> = async {
             let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
-                executeCommandCore dbLock conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
+                executeCommandCore conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
             try
                 let tmdbConfig = getTmdbConfig()
                 let! detailsResult = Tmdb.getTvSeriesDetails httpClient tmdbConfig tmdbId
@@ -366,7 +354,6 @@ module Api =
     /// (Jellyfin auto-sync vs. manual add) create duplicate slugs for the same title.
     let private addSeriesToLibrary
         (conn: SqliteConnection)
-        (dbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (imageBasePath: string)
@@ -375,12 +362,11 @@ module Api =
         : Async<Result<string, string>> = async {
             match tryFindSeriesSlugByTmdbId conn tmdbId with
             | Some existing -> return Ok existing
-            | None -> return! addSeriesToLibraryImpl conn dbLock httpClient getTmdbConfig imageBasePath projectionHandlers tmdbId
+            | None -> return! addSeriesToLibraryImpl conn httpClient getTmdbConfig imageBasePath projectionHandlers tmdbId
         }
 
     let runSteamFamilyImport
         (conn: SqliteConnection)
-        (dbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (getRawgConfig: unit -> Rawg.RawgConfig)
         (getSteamConfig: unit -> Steam.SteamConfig)
@@ -389,7 +375,7 @@ module Api =
         (emit: SteamFamilyImportProgress -> unit)
         : Async<Result<SteamFamilyImportResult, string>> = async {
             let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
-                executeCommandCore dbLock conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
+                executeCommandCore conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
             try
                 let token =
                     SettingsStore.getSetting conn "steam_family_token"
@@ -702,8 +688,7 @@ module Api =
         }
 
     let steamFamilyImportHandler
-        (conn: SqliteConnection)
-        (dbLock: System.Threading.SemaphoreSlim)
+        (factory: unit -> SqliteConnection)
         (httpClient: HttpClient)
         (getRawgConfig: unit -> Rawg.RawgConfig)
         (getSteamConfig: unit -> Steam.SteamConfig)
@@ -712,6 +697,7 @@ module Api =
         : HttpHandler =
         fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
             task {
+                use conn = factory ()
                 ctx.Response.Headers.["Content-Type"] <- Microsoft.Extensions.Primitives.StringValues("text/event-stream")
                 ctx.Response.Headers.["Cache-Control"] <- Microsoft.Extensions.Primitives.StringValues("no-cache")
                 ctx.Response.Headers.["Connection"] <- Microsoft.Extensions.Primitives.StringValues("keep-alive")
@@ -734,7 +720,7 @@ module Api =
                     |> Async.AwaitTask |> Async.RunSynchronously
 
                 let! result =
-                    runSteamFamilyImport conn dbLock httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers emit
+                    runSteamFamilyImport conn httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers emit
                     |> Async.StartAsTask
 
                 match result with
@@ -755,7 +741,6 @@ module Api =
 
     let runJellyfinImport
         (conn: SqliteConnection)
-        (dbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (getJellyfinConfig: unit -> Jellyfin.JellyfinConfig)
@@ -763,7 +748,7 @@ module Api =
         (projectionHandlers: Projection.ProjectionHandler list)
         : Async<Result<JellyfinImportResult, string>> = async {
             let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
-                executeCommandCore dbLock conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
+                executeCommandCore conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
             try
                 let config = getJellyfinConfig ()
                 if System.String.IsNullOrWhiteSpace(config.AccessToken) || System.String.IsNullOrWhiteSpace(config.UserId) then
@@ -808,7 +793,7 @@ module Api =
                             match tmdbId with
                             | Some tid when not (Map.containsKey tid moviesByTmdbId) ->
                                 try
-                                    let! addResult = addMovieToLibrary conn dbLock httpClient getTmdbConfig imageBasePath movieProjections tid
+                                    let! addResult = addMovieToLibrary conn httpClient getTmdbConfig imageBasePath movieProjections tid
                                     match addResult with
                                     | Ok slug ->
                                         moviesByTmdbId <- Map.add tid (slug, item.Name) moviesByTmdbId
@@ -915,7 +900,7 @@ module Api =
                             match tmdbId with
                             | Some tid when not (Map.containsKey tid seriesByTmdbId) ->
                                 try
-                                    let! addResult = addSeriesToLibrary conn dbLock httpClient getTmdbConfig imageBasePath projectionHandlers tid
+                                    let! addResult = addSeriesToLibrary conn httpClient getTmdbConfig imageBasePath projectionHandlers tid
                                     match addResult with
                                     | Ok slug ->
                                         seriesByTmdbId <- Map.add tid (slug, seriesItem.Name) seriesByTmdbId
@@ -1054,7 +1039,6 @@ module Api =
     /// don't overwrite user edits.
     let private attachSteamToGameCore
         (conn: SqliteConnection)
-        (dbLock: System.Threading.SemaphoreSlim)
         (httpClient: HttpClient)
         (projectionHandlers: Projection.ProjectionHandler list)
         (slug: string)
@@ -1062,7 +1046,7 @@ module Api =
         : Async<Result<unit, string>> =
         async {
             let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
-                executeCommandCore dbLock conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
+                executeCommandCore conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
             let! storeDetails = Steam.getSteamStoreDetails httpClient appId
             match storeDetails with
             | Error e -> return Error (sprintf "Steam lookup failed: %s" e)
@@ -1133,8 +1117,7 @@ module Api =
         }
 
     let create
-        (conn: SqliteConnection)
-        (requestDbLock: System.Threading.SemaphoreSlim)
+        (factory: unit -> SqliteConnection)
         (httpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (getRawgConfig: unit -> Rawg.RawgConfig)
@@ -1147,33 +1130,33 @@ module Api =
         let movieProjections = projectionHandlers
         let friendProjections = projectionHandlers
 
-        // administration-cx92m (ADR-0030): shadow the module-private
-        // `executeCommandCore` with `requestDbLock` baked in, so every
-        // existing `executeCommand conn sid ...` call site below is
-        // unchanged — only this one binding differs from before the fix.
-        // Written as a full eta-expansion (not a bare partial application)
-        // because F#'s value restriction would otherwise collapse this
-        // generic function to whichever bounded context's event/state/
-        // command types its first call site instantiates, breaking every
-        // other bounded context's calls below.
+        // administration-mz6kp (ADR-0033): shadow the module-private
+        // `executeCommandCore` so every existing `executeCommand conn sid ...`
+        // call site below is unchanged. Written as a full eta-expansion (not
+        // a bare partial application) because F#'s value restriction would
+        // otherwise collapse this generic function to whichever bounded
+        // context's event/state/command types its first call site
+        // instantiates, breaking every other bounded context's calls below.
         let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
-            executeCommandCore requestDbLock conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
+            executeCommandCore conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
 
         // administration-tj8n2: PlaytimeTracker.runSync takes a per-command
         // lock (guarding its own connection against a concurrent scheduled
-        // fire on the JOB connection). `triggerPlaytimeSync` here runs on the
-        // request-serving `conn` instead — a different connection object from
-        // the job connection, so this lock is never contended by the
-        // scheduled job. It exists solely to satisfy runSync's signature and
-        // to keep two overlapping manual triggers on this request path from
-        // racing each other on `conn`; the broader request×request connection
-        // question is out of scope here (administration-cx92m).
+        // fire on the JOB connection). `triggerPlaytimeSync` here opens its
+        // own per-request connection via `factory` (administration-mz6kp,
+        // ADR-0033) — a different connection object from both the job
+        // connection and any other request's connection, so this lock is
+        // never contended by the scheduled job. It exists solely to satisfy
+        // runSync's signature and to keep two overlapping manual triggers
+        // from racing each other on the same manually-triggered sync's
+        // in-memory bookkeeping; out of scope here (administration-cx92m).
         let manualSyncTriggerLock = new System.Threading.SemaphoreSlim(1, 1)
 
         {
             healthCheck = fun () -> async { return "Mediatheca is running" }
 
             searchLibrary = fun query -> async {
+                use conn = factory ()
                 let movieResults = MovieProjection.search conn query
                 let seriesResults = SeriesProjection.search conn query
                 let gameResults = GameProjection.search conn query
@@ -1184,10 +1167,13 @@ module Api =
                 return! Tmdb.searchMovies httpClient (getTmdbConfig()) query year
             }
 
-            addMovie = fun tmdbId ->
-                addMovieToLibrary conn requestDbLock httpClient getTmdbConfig imageBasePath movieProjections tmdbId
+            addMovie = fun tmdbId -> async {
+                use conn = factory ()
+                return! addMovieToLibrary conn httpClient getTmdbConfig imageBasePath movieProjections tmdbId
+            }
 
             removeMovie = fun slug -> async {
+                use conn = factory ()
                 let sid = Movies.streamId slug
                 let result =
                     executeCommand
@@ -1222,14 +1208,17 @@ module Api =
             }
 
             getMovie = fun slug -> async {
+                use conn = factory ()
                 return MovieProjection.getBySlug conn slug
             }
 
             getMovies = fun () -> async {
+                use conn = factory ()
                 return MovieProjection.getAll conn
             }
 
             categorizeMovie = fun slug genres -> async {
+                use conn = factory ()
                 let sid = Movies.streamId slug
                 return
                     executeCommand
@@ -1243,6 +1232,7 @@ module Api =
             }
 
             replacePoster = fun slug posterRef -> async {
+                use conn = factory ()
                 let sid = Movies.streamId slug
                 return
                     executeCommand
@@ -1256,6 +1246,7 @@ module Api =
             }
 
             replaceBackdrop = fun slug backdropRef -> async {
+                use conn = factory ()
                 let sid = Movies.streamId slug
                 return
                     executeCommand
@@ -1269,6 +1260,7 @@ module Api =
             }
 
             recommendMovie = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Movies.streamId slug
                 return
                     executeCommand
@@ -1282,6 +1274,7 @@ module Api =
             }
 
             removeRecommendation = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Movies.streamId slug
                 return
                     executeCommand
@@ -1295,6 +1288,7 @@ module Api =
             }
 
             wantToWatchWith = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Movies.streamId slug
                 return
                     executeCommand
@@ -1308,6 +1302,7 @@ module Api =
             }
 
             removeWantToWatchWith = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Movies.streamId slug
                 return
                     executeCommand
@@ -1321,6 +1316,7 @@ module Api =
             }
 
             setPersonalRating = fun slug rating -> async {
+                use conn = factory ()
                 let sid = Movies.streamId slug
                 return
                     executeCommand
@@ -1334,6 +1330,7 @@ module Api =
             }
 
             setMovieInFocus = fun slug inFocus -> async {
+                use conn = factory ()
                 let sid = Movies.streamId slug
                 let command = if inFocus then Movies.Set_movie_in_focus else Movies.Clear_movie_in_focus
                 return
@@ -1349,6 +1346,7 @@ module Api =
 
             // Watch Sessions
             recordWatchSession = fun slug request -> async {
+                use conn = factory ()
                 let sid = Movies.streamId slug
                 let runtime =
                     conn
@@ -1380,6 +1378,7 @@ module Api =
             }
 
             updateWatchSessionDate = fun slug sessionId date -> async {
+                use conn = factory ()
                 let sid = Movies.streamId slug
                 return
                     executeCommand
@@ -1393,6 +1392,7 @@ module Api =
             }
 
             addFriendToWatchSession = fun slug sessionId friendSlug -> async {
+                use conn = factory ()
                 let sid = Movies.streamId slug
                 return
                     executeCommand
@@ -1406,6 +1406,7 @@ module Api =
             }
 
             removeFriendFromWatchSession = fun slug sessionId friendSlug -> async {
+                use conn = factory ()
                 let sid = Movies.streamId slug
                 return
                     executeCommand
@@ -1419,6 +1420,7 @@ module Api =
             }
 
             removeWatchSession = fun slug sessionId -> async {
+                use conn = factory ()
                 let sid = Movies.streamId slug
                 return
                     executeCommand
@@ -1432,11 +1434,13 @@ module Api =
             }
 
             getWatchSessions = fun slug -> async {
+                use conn = factory ()
                 return MovieProjection.getWatchSessions conn slug
             }
 
             // Content Blocks
             addContentBlock = fun slug sessionId request -> async {
+                use conn = factory ()
                 let sid = ContentBlocks.streamId slug
                 let blockId = System.Guid.NewGuid().ToString("N")
                 let blockData: ContentBlocks.ContentBlockData = {
@@ -1462,6 +1466,7 @@ module Api =
             }
 
             updateContentBlock = fun slug blockId request -> async {
+                use conn = factory ()
                 let sid = ContentBlocks.streamId slug
                 return
                     executeCommand
@@ -1475,6 +1480,7 @@ module Api =
             }
 
             removeContentBlock = fun slug blockId -> async {
+                use conn = factory ()
                 let sid = ContentBlocks.streamId slug
                 return
                     executeCommand
@@ -1488,6 +1494,7 @@ module Api =
             }
 
             changeContentBlockType = fun slug blockId blockType -> async {
+                use conn = factory ()
                 let sid = ContentBlocks.streamId slug
                 return
                     executeCommand
@@ -1501,6 +1508,7 @@ module Api =
             }
 
             reorderContentBlocks = fun slug sessionId blockIds -> async {
+                use conn = factory ()
                 let sid = ContentBlocks.streamId slug
                 return
                     executeCommand
@@ -1514,12 +1522,14 @@ module Api =
             }
 
             getContentBlocks = fun slug sessionId -> async {
+                use conn = factory ()
                 match sessionId with
                 | Some sid -> return ContentBlockProjection.getBySession conn slug sid
                 | None -> return ContentBlockProjection.getForMovieDetail conn slug
             }
 
             groupContentBlocksInRow = fun slug leftId rightId rowGroup -> async {
+                use conn = factory ()
                 let sid = ContentBlocks.streamId slug
                 return
                     executeCommand
@@ -1533,6 +1543,7 @@ module Api =
             }
 
             ungroupContentBlock = fun slug blockId -> async {
+                use conn = factory ()
                 let sid = ContentBlocks.streamId slug
                 return
                     executeCommand
@@ -1562,6 +1573,7 @@ module Api =
 
             // Catalogs
             createCatalog = fun request -> async {
+                use conn = factory ()
                 let baseSlug = Slug.catalogSlug request.Name
                 let slug = generateUniqueSlug conn Catalogs.streamId baseSlug
                 let sid = Catalogs.streamId slug
@@ -1585,6 +1597,7 @@ module Api =
             }
 
             updateCatalog = fun slug request -> async {
+                use conn = factory ()
                 let sid = Catalogs.streamId slug
                 let data: Catalogs.CatalogUpdatedData = {
                     Name = request.Name
@@ -1602,6 +1615,7 @@ module Api =
             }
 
             removeCatalog = fun slug -> async {
+                use conn = factory ()
                 let sid = Catalogs.streamId slug
                 return
                     executeCommand
@@ -1615,14 +1629,17 @@ module Api =
             }
 
             getCatalog = fun slug -> async {
+                use conn = factory ()
                 return CatalogProjection.getBySlug conn slug
             }
 
             getCatalogs = fun () -> async {
+                use conn = factory ()
                 return CatalogProjection.getAll conn
             }
 
             addCatalogEntry = fun slug request -> async {
+                use conn = factory ()
                 let sid = Catalogs.streamId slug
                 let entryId = System.Guid.NewGuid().ToString("N")
                 let data: Catalogs.EntryAddedData = {
@@ -1645,6 +1662,7 @@ module Api =
             }
 
             updateCatalogEntry = fun slug entryId request -> async {
+                use conn = factory ()
                 let sid = Catalogs.streamId slug
                 let data: Catalogs.EntryUpdatedData = {
                     EntryId = entryId
@@ -1662,6 +1680,7 @@ module Api =
             }
 
             removeCatalogEntry = fun slug entryId -> async {
+                use conn = factory ()
                 let sid = Catalogs.streamId slug
                 return
                     executeCommand
@@ -1675,6 +1694,7 @@ module Api =
             }
 
             reorderCatalogEntries = fun slug entryIds -> async {
+                use conn = factory ()
                 let sid = Catalogs.streamId slug
                 return
                     executeCommand
@@ -1688,11 +1708,13 @@ module Api =
             }
 
             getCatalogsForMovie = fun movieSlug -> async {
+                use conn = factory ()
                 return CatalogProjection.getCatalogsForMovie conn movieSlug
             }
 
             // Dashboard
             getDashboardStats = fun () -> async {
+                use conn = factory ()
                 let movieCount =
                     conn
                     |> Db.newCommand "SELECT COUNT(*) as cnt FROM movie_list"
@@ -1756,10 +1778,12 @@ module Api =
             }
 
             getRecentSeries = fun count -> async {
+                use conn = factory ()
                 return SeriesProjection.getRecentSeries conn count
             }
 
             getRecentActivity = fun count -> async {
+                use conn = factory ()
                 let events = EventStore.getRecentEvents conn count
                 return events |> List.map (fun e ->
                     let description =
@@ -1815,6 +1839,7 @@ module Api =
 
             // Dashboard Tabs
             getDashboardAllTab = fun () -> async {
+                use conn = factory ()
                 let seriesNextUp = SeriesProjection.getDashboardSeriesNextUp conn (Some 11)
                 let moviesToWatch = MovieProjection.getMoviesToWatch conn
                 let gamesInFocus = GameProjection.getGamesInFocus conn
@@ -1915,6 +1940,7 @@ module Api =
             }
 
             getDashboardMoviesTab = fun () -> async {
+                use conn = factory ()
                 let recentlyAdded = MovieProjection.getRecentlyAddedMovies conn 10
                 let totalMovies =
                     conn
@@ -1968,6 +1994,7 @@ module Api =
             }
 
             getDashboardSeriesTab = fun () -> async {
+                use conn = factory ()
                 let nextUp = SeriesProjection.getDashboardSeriesNextUp conn None
                 let recentlyFinished = SeriesProjection.getRecentlyFinished conn
                 let recentlyAbandoned = SeriesProjection.getRecentlyAbandoned conn
@@ -2025,6 +2052,7 @@ module Api =
             }
 
             getDashboardGamesTab = fun () -> async {
+                use conn = factory ()
                 let recentlyAdded = GameProjection.getRecentlyAddedGames conn 10
                 let recentlyPlayed = GameProjection.getGamesRecentlyPlayed conn 10
                 let totalGames =
@@ -2090,6 +2118,7 @@ module Api =
             }
 
             addFriend = fun name -> async {
+                use conn = factory ()
                 let slug = Slug.friendSlug name
                 let sid = Friends.streamId slug
                 let result =
@@ -2107,6 +2136,7 @@ module Api =
             }
 
             updateFriend = fun slug name imageRef -> async {
+                use conn = factory ()
                 let sid = Friends.streamId slug
                 return
                     executeCommand
@@ -2120,6 +2150,7 @@ module Api =
             }
 
             removeFriend = fun slug -> async {
+                use conn = factory ()
                 let sid = Friends.streamId slug
                 let imageRef = FriendProjection.getBySlug conn slug |> Option.bind (fun f -> f.ImageRef)
                 let result =
@@ -2139,10 +2170,12 @@ module Api =
             }
 
             getFriend = fun slug -> async {
+                use conn = factory ()
                 return FriendProjection.getBySlug conn slug
             }
 
             getFriendMedia = fun friendSlug -> async {
+                use conn = factory ()
                 let movieRec = MovieProjection.getMoviesRecommendedByFriend conn friendSlug
                 let seriesRec = SeriesProjection.getSeriesRecommendedByFriend conn friendSlug
                 let gameRec = GameProjection.getGamesRecommendedByFriend conn friendSlug
@@ -2161,10 +2194,12 @@ module Api =
             }
 
             getFriends = fun () -> async {
+                use conn = factory ()
                 return FriendProjection.getAll conn
             }
 
             uploadFriendImage = fun slug data filename -> async {
+                use conn = factory ()
                 let ext = System.IO.Path.GetExtension(filename).ToLowerInvariant()
                 let ref = sprintf "friends/%s%s" slug ext
                 ImageStore.saveImage imageBasePath ref data
@@ -2188,6 +2223,7 @@ module Api =
             }
 
             saveFriendCropSettings = fun slug cropSettings -> async {
+                use conn = factory ()
                 let sid = Friends.streamId slug
                 let result =
                     executeCommand
@@ -2204,6 +2240,7 @@ module Api =
             }
 
             getTmdbApiKey = fun () -> async {
+                use conn = factory ()
                 let key =
                     SettingsStore.getSetting conn "tmdb_api_key"
                     |> Option.defaultValue ""
@@ -2216,6 +2253,7 @@ module Api =
             }
 
             setTmdbApiKey = fun key -> async {
+                use conn = factory ()
                 try
                     SettingsStore.setSetting conn "tmdb_api_key" key
                     return Ok ()
@@ -2293,10 +2331,13 @@ module Api =
                 return! Tmdb.searchTvSeries httpClient (getTmdbConfig()) query year
             }
 
-            addSeries = fun tmdbId ->
-                addSeriesToLibrary conn requestDbLock httpClient getTmdbConfig imageBasePath projectionHandlers tmdbId
+            addSeries = fun tmdbId -> async {
+                use conn = factory ()
+                return! addSeriesToLibrary conn httpClient getTmdbConfig imageBasePath projectionHandlers tmdbId
+            }
 
             removeSeries = fun slug -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 let result =
                     executeCommand
@@ -2337,6 +2378,7 @@ module Api =
             }
 
             abandonSeries = fun slug -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2350,6 +2392,7 @@ module Api =
             }
 
             unabandonSeries = fun slug -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2363,14 +2406,17 @@ module Api =
             }
 
             getSeries = fun () -> async {
+                use conn = factory ()
                 return SeriesProjection.getAll conn
             }
 
             getSeriesDetail = fun slug rewatchId -> async {
+                use conn = factory ()
                 return SeriesProjection.getBySlug conn slug rewatchId
             }
 
             setSeriesPersonalRating = fun slug rating -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2384,6 +2430,7 @@ module Api =
             }
 
             setSeriesInFocus = fun slug inFocus -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 let command = if inFocus then Series.Set_series_in_focus else Series.Clear_series_in_focus
                 return
@@ -2398,6 +2445,7 @@ module Api =
             }
 
             addSeriesRecommendation = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2411,6 +2459,7 @@ module Api =
             }
 
             removeSeriesRecommendation = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2424,6 +2473,7 @@ module Api =
             }
 
             addSeriesWantToWatchWith = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2437,6 +2487,7 @@ module Api =
             }
 
             removeSeriesWantToWatchWith = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2450,6 +2501,7 @@ module Api =
             }
 
             refreshSeriesFromTmdb = fun slug -> async {
+                use conn = factory ()
                 let tmdbConfig = getTmdbConfig()
                 if System.String.IsNullOrWhiteSpace(tmdbConfig.ApiKey) then
                     return Error "TMDB API key not configured"
@@ -2464,6 +2516,7 @@ module Api =
 
             // Series Rewatch Sessions
             createRewatchSession = fun slug request -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 let rewatchId = System.Guid.NewGuid().ToString("N")
                 let data: Series.RewatchSessionCreatedData = {
@@ -2486,6 +2539,7 @@ module Api =
             }
 
             removeRewatchSession = fun slug rewatchId -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2499,6 +2553,7 @@ module Api =
             }
 
             setDefaultRewatchSession = fun slug rewatchId -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2512,6 +2567,7 @@ module Api =
             }
 
             addFriendToRewatchSession = fun slug rewatchId friendSlug -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2525,6 +2581,7 @@ module Api =
             }
 
             removeFriendFromRewatchSession = fun slug rewatchId friendSlug -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2539,6 +2596,7 @@ module Api =
 
             // Series Episode Progress
             markEpisodeWatched = fun slug request -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2557,6 +2615,7 @@ module Api =
             }
 
             markEpisodeUnwatched = fun slug request -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2574,6 +2633,7 @@ module Api =
             }
 
             markSeasonWatched = fun slug request -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2591,6 +2651,7 @@ module Api =
             }
 
             markEpisodesWatchedUpTo = fun slug request -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2609,6 +2670,7 @@ module Api =
             }
 
             markSeasonUnwatched = fun slug request -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2625,6 +2687,7 @@ module Api =
             }
 
             updateEpisodeWatchedDate = fun slug request -> async {
+                use conn = factory ()
                 let sid = Series.streamId slug
                 return
                     executeCommand
@@ -2644,10 +2707,12 @@ module Api =
 
             // Series Content Blocks + Catalogs
             getSeriesContentBlocks = fun slug -> async {
+                use conn = factory ()
                 return ContentBlockProjection.getForMovieDetail conn slug
             }
 
             addSeriesContentBlock = fun slug request -> async {
+                use conn = factory ()
                 let sid = ContentBlocks.streamId slug
                 let blockId = System.Guid.NewGuid().ToString("N")
                 let blockData: ContentBlocks.ContentBlockData = {
@@ -2673,6 +2738,7 @@ module Api =
             }
 
             updateSeriesContentBlock = fun slug blockId request -> async {
+                use conn = factory ()
                 let sid = ContentBlocks.streamId slug
                 return
                     executeCommand
@@ -2686,6 +2752,7 @@ module Api =
             }
 
             removeSeriesContentBlock = fun slug blockId -> async {
+                use conn = factory ()
                 let sid = ContentBlocks.streamId slug
                 return
                     executeCommand
@@ -2699,6 +2766,7 @@ module Api =
             }
 
             getCatalogsForSeries = fun slug -> async {
+                use conn = factory ()
                 return CatalogProjection.getCatalogsForSeriesWithChildren conn slug
             }
 
@@ -2708,6 +2776,7 @@ module Api =
             }
 
             addGame = fun request -> async {
+                use conn = factory ()
                 try
                     let year = request.Year
                     let baseSlug = Slug.gameSlug request.Name year
@@ -2814,7 +2883,7 @@ module Api =
                                             | next :: _ -> (top.Score - next.Score) >= 0.05
                                             | [] -> true
                                         if unambiguous then
-                                            let! _ = attachSteamToGameCore conn requestDbLock httpClient projectionHandlers slug top.AppId
+                                            let! _ = attachSteamToGameCore conn httpClient projectionHandlers slug top.AppId
                                             ()
                                     | _ -> ()
                                 with ex ->
@@ -2825,6 +2894,7 @@ module Api =
             }
 
             removeGame = fun slug -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 let result =
                     executeCommand
@@ -2860,14 +2930,17 @@ module Api =
             }
 
             getGames = fun () -> async {
+                use conn = factory ()
                 return GameProjection.getAll conn
             }
 
             getGameDetail = fun slug -> async {
+                use conn = factory ()
                 return GameProjection.getBySlug conn slug
             }
 
             setGameStatus = fun slug status -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -2881,6 +2954,7 @@ module Api =
             }
 
             setGamePersonalRating = fun slug rating -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -2894,6 +2968,7 @@ module Api =
             }
 
             setGameHltbHours = fun slug hours -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -2907,6 +2982,7 @@ module Api =
             }
 
             addGameRecommendation = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -2920,6 +2996,7 @@ module Api =
             }
 
             removeGameRecommendation = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -2933,6 +3010,7 @@ module Api =
             }
 
             addGameWantToPlayWith = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -2946,6 +3024,7 @@ module Api =
             }
 
             removeGameWantToPlayWith = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -2959,6 +3038,7 @@ module Api =
             }
 
             addGamePlayMode = fun slug playMode -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -2972,6 +3052,7 @@ module Api =
             }
 
             removeGamePlayMode = fun slug playMode -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -2985,10 +3066,12 @@ module Api =
             }
 
             getAllPlayModes = fun () -> async {
+                use conn = factory ()
                 return GameProjection.getAllPlayModes conn
             }
 
             markGameAsOwned = fun slug -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -3002,6 +3085,7 @@ module Api =
             }
 
             removeGameOwnership = fun slug -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -3015,6 +3099,7 @@ module Api =
             }
 
             addGameFamilyOwner = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -3028,6 +3113,7 @@ module Api =
             }
 
             removeGameFamilyOwner = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -3041,6 +3127,7 @@ module Api =
             }
 
             addGamePlayedWith = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -3054,6 +3141,7 @@ module Api =
             }
 
             removeGamePlayedWith = fun slug friendSlug -> async {
+                use conn = factory ()
                 let sid = Games.streamId slug
                 return
                     executeCommand
@@ -3068,19 +3156,23 @@ module Api =
 
             // Game Journal (Notion-style block document, plain storage)
             getGameJournal = fun slug -> async {
+                use conn = factory ()
                 return GameJournal.get conn slug
             }
 
             saveGameJournal = fun slug blocks -> async {
-                return GameJournal.save conn requestDbLock slug blocks
+                use conn = factory ()
+                return GameJournal.save conn slug blocks
             }
 
             // Game Content Blocks + Catalogs
             getGameContentBlocks = fun slug -> async {
+                use conn = factory ()
                 return ContentBlockProjection.getForMovieDetail conn slug
             }
 
             addGameContentBlock = fun slug request -> async {
+                use conn = factory ()
                 let sid = ContentBlocks.streamId slug
                 let blockId = System.Guid.NewGuid().ToString("N")
                 let blockData: ContentBlocks.ContentBlockData = {
@@ -3106,6 +3198,7 @@ module Api =
             }
 
             updateGameContentBlock = fun slug blockId request -> async {
+                use conn = factory ()
                 let sid = ContentBlocks.streamId slug
                 return
                     executeCommand
@@ -3119,6 +3212,7 @@ module Api =
             }
 
             removeGameContentBlock = fun slug blockId -> async {
+                use conn = factory ()
                 let sid = ContentBlocks.streamId slug
                 return
                     executeCommand
@@ -3132,10 +3226,12 @@ module Api =
             }
 
             getCatalogsForGame = fun slug -> async {
+                use conn = factory ()
                 return CatalogProjection.getCatalogsForMovie conn slug
             }
 
             getGameImageCandidates = fun slug -> async {
+                use conn = factory ()
                 match GameProjection.getBySlug conn slug with
                 | None -> return []
                 | Some game ->
@@ -3193,6 +3289,7 @@ module Api =
             }
 
             selectGameImage = fun slug sourceUrl imageKind -> async {
+                use conn = factory ()
                 try
                     let! response = httpClient.GetAsync(sourceUrl) |> Async.AwaitTask
                     response.EnsureSuccessStatusCode() |> ignore
@@ -3219,6 +3316,7 @@ module Api =
             }
 
             getGameTrailers = fun slug -> async {
+                use conn = factory ()
                 try
                     match GameProjection.getBySlug conn slug with
                     | None -> return []
@@ -3250,6 +3348,7 @@ module Api =
 
             // Games Settings
             getRawgApiKey = fun () -> async {
+                use conn = factory ()
                 let key =
                     SettingsStore.getSetting conn "rawg_api_key"
                     |> Option.defaultValue ""
@@ -3262,6 +3361,7 @@ module Api =
             }
 
             setRawgApiKey = fun key -> async {
+                use conn = factory ()
                 try
                     SettingsStore.setSetting conn "rawg_api_key" key
                     return Ok ()
@@ -3282,6 +3382,7 @@ module Api =
 
             // Steam Integration
             getSteamApiKey = fun () -> async {
+                use conn = factory ()
                 let key =
                     SettingsStore.getSetting conn "steam_api_key"
                     |> Option.defaultValue ""
@@ -3294,6 +3395,7 @@ module Api =
             }
 
             setSteamApiKey = fun key -> async {
+                use conn = factory ()
                 try
                     SettingsStore.setSetting conn "steam_api_key" key
                     return Ok ()
@@ -3317,12 +3419,14 @@ module Api =
             }
 
             getSteamId = fun () -> async {
+                use conn = factory ()
                 return
                     SettingsStore.getSetting conn "steam_id"
                     |> Option.defaultValue ""
             }
 
             setSteamId = fun steamId -> async {
+                use conn = factory ()
                 try
                     SettingsStore.setSetting conn "steam_id" steamId
                     return Ok ()
@@ -3339,6 +3443,7 @@ module Api =
             }
 
             importSteamLibrary = fun () -> async {
+                use conn = factory ()
                 try
                     let steamConfig = getSteamConfig()
                     if System.String.IsNullOrWhiteSpace(steamConfig.ApiKey) || System.String.IsNullOrWhiteSpace(steamConfig.SteamId) then
@@ -3639,6 +3744,7 @@ module Api =
             }
 
             getSteamFamilyToken = fun () -> async {
+                use conn = factory ()
                 let token =
                     SettingsStore.getSetting conn "steam_family_token"
                     |> Option.defaultValue ""
@@ -3651,6 +3757,7 @@ module Api =
             }
 
             setSteamFamilyToken = fun token -> async {
+                use conn = factory ()
                 try
                     SettingsStore.setSetting conn "steam_family_token" token
                     return Ok ()
@@ -3659,6 +3766,7 @@ module Api =
             }
 
             getSteamFamilyMembers = fun () -> async {
+                use conn = factory ()
                 let json =
                     SettingsStore.getSetting conn "steam_family_members"
                     |> Option.defaultValue "[]"
@@ -3681,6 +3789,7 @@ module Api =
             }
 
             setSteamFamilyMembers = fun members -> async {
+                use conn = factory ()
                 try
                     let json =
                         members
@@ -3700,6 +3809,7 @@ module Api =
             }
 
             fetchSteamFamilyMembers = fun () -> async {
+                use conn = factory ()
                 try
                     let token =
                         SettingsStore.getSetting conn "steam_family_token"
@@ -3790,11 +3900,13 @@ module Api =
             }
 
             importSteamFamily = fun () -> async {
-                return! runSteamFamilyImport conn requestDbLock httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers (fun _ -> ())
+                use conn = factory ()
+                return! runSteamFamilyImport conn httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers (fun _ -> ())
             }
 
             // Connect with Steam (manual attach)
             searchSteamForGame = fun slug -> async {
+                use conn = factory ()
                 match GameProjection.getBySlug conn slug with
                 | None -> return []
                 | Some game ->
@@ -3807,10 +3919,12 @@ module Api =
             }
 
             attachSteamToGame = fun (slug, appId) -> async {
-                return! attachSteamToGameCore conn requestDbLock httpClient projectionHandlers slug appId
+                use conn = factory ()
+                return! attachSteamToGameCore conn httpClient projectionHandlers slug appId
             }
 
             searchRawgForGame = fun slug -> async {
+                use conn = factory ()
                 match GameProjection.getBySlug conn slug with
                 | None -> return []
                 | Some game ->
@@ -3826,6 +3940,7 @@ module Api =
             }
 
             attachRawgToGame = fun (slug, rawgId) -> async {
+                use conn = factory ()
                 let rawgConfig = getRawgConfig()
                 if System.String.IsNullOrWhiteSpace(rawgConfig.ApiKey) then
                     return Error "RAWG API key not configured"
@@ -3853,10 +3968,12 @@ module Api =
 
             // Jellyfin Integration
             getJellyfinServerUrl = fun () -> async {
+                use conn = factory ()
                 return SettingsStore.getSetting conn "jellyfin_server_url" |> Option.defaultValue ""
             }
 
             setJellyfinServerUrl = fun url -> async {
+                use conn = factory ()
                 try
                     SettingsStore.setSetting conn "jellyfin_server_url" url
                     return Ok ()
@@ -3865,10 +3982,12 @@ module Api =
             }
 
             getJellyfinUsername = fun () -> async {
+                use conn = factory ()
                 return SettingsStore.getSetting conn "jellyfin_username" |> Option.defaultValue ""
             }
 
             setJellyfinCredentials = fun (username, password) -> async {
+                use conn = factory ()
                 try
                     SettingsStore.setSetting conn "jellyfin_username" username
                     SettingsStore.setSetting conn "jellyfin_password" password
@@ -3878,6 +3997,7 @@ module Api =
             }
 
             scanJellyfinLibrary = fun () -> async {
+                use conn = factory ()
                 try
                     let config = getJellyfinConfig ()
                     if System.String.IsNullOrWhiteSpace(config.AccessToken) || System.String.IsNullOrWhiteSpace(config.UserId) then
@@ -4022,13 +4142,24 @@ module Api =
                     return Error $"Jellyfin scan failed: {ex.Message}"
             }
 
-            importJellyfinWatchHistory = fun () ->
-                runJellyfinImport conn requestDbLock httpClient getTmdbConfig getJellyfinConfig imageBasePath projectionHandlers
+            importJellyfinWatchHistory = fun () -> async {
+                use conn = factory ()
+                return! runJellyfinImport conn httpClient getTmdbConfig getJellyfinConfig imageBasePath projectionHandlers
+            }
 
             // Jellyfin Auto-Sync
+            //
+            // administration-mz6kp (ADR-0033): `JellyfinSync.triggerSync`
+            // spawns the actual import as a genuinely detached background
+            // async (`Async.Start`) that keeps running after this member
+            // itself has returned — it cannot borrow a `use conn =
+            // factory()` scoped to this member (that connection would
+            // already be disposed by the time the background work runs), so
+            // `factory` is forwarded to `triggerSync` itself, which opens its
+            // own connection inside the spawned background async.
             triggerJellyfinSync = fun () ->
-                JellyfinSync.triggerSync conn httpClient getJellyfinConfig
-                    (fun () -> runJellyfinImport conn requestDbLock httpClient getTmdbConfig getJellyfinConfig imageBasePath projectionHandlers)
+                JellyfinSync.triggerSync factory httpClient getJellyfinConfig
+                    (fun conn -> runJellyfinImport conn httpClient getTmdbConfig getJellyfinConfig imageBasePath projectionHandlers)
 
             getJellyfinSyncStatus = fun () -> async {
                 return JellyfinSync.getSyncStatus ()
@@ -4036,10 +4167,12 @@ module Api =
 
             // Steam Family Last Sync
             getSteamFamilyLastSync = fun () -> async {
+                use conn = factory ()
                 return SettingsStore.getSetting conn "steam_family_last_sync"
             }
 
             testJellyfinConnection = fun (serverUrl, username, password) -> async {
+                use conn = factory ()
                 try
                     let! authResult = Jellyfin.authenticate httpClient serverUrl username password
                     match authResult with
@@ -4058,10 +4191,12 @@ module Api =
             }
 
             importFromCinemarco = fun request -> async {
+                use conn = factory ()
                 return CinemarcoImport.runImport conn imageBasePath projectionHandlers httpClient getTmdbConfig request
             }
 
             getViewSettings = fun key -> async {
+                use conn = factory ()
                 match SettingsStore.getSetting conn ("view:" + key) with
                 | Some json ->
                     try
@@ -4072,27 +4207,32 @@ module Api =
             }
 
             saveViewSettings = fun key settings -> async {
+                use conn = factory ()
                 let json = Newtonsoft.Json.JsonConvert.SerializeObject(settings, Fable.Remoting.Json.FableJsonConverter())
                 SettingsStore.setSetting conn ("view:" + key) json
             }
 
             getCollapsedSections = fun key -> async {
+                use conn = factory ()
                 match SettingsStore.getSetting conn ("collapsed:" + key) with
                 | Some csv when csv <> "" -> return csv.Split(',') |> Array.toList
                 | _ -> return []
             }
 
             saveCollapsedSections = fun key sections -> async {
+                use conn = factory ()
                 let csv = sections |> String.concat ","
                 SettingsStore.setSetting conn ("collapsed:" + key) csv
             }
 
             // Playtime Tracking
             getGamePlaySessions = fun slug -> async {
+                use conn = factory ()
                 return PlaytimeTracker.getPlaySessionsForGame conn slug
             }
 
             addManualPlaySession = fun (slug, date, minutes) -> async {
+                use conn = factory ()
                 let runCmd s c =
                     executeCommand conn (Games.streamId s)
                         Games.Serialization.fromStoredEvent
@@ -4105,6 +4245,7 @@ module Api =
             }
 
             updatePlaySession = fun (sessionId, newDate, newMinutes) -> async {
+                use conn = factory ()
                 let runCmd s c =
                     executeCommand conn (Games.streamId s)
                         Games.Serialization.fromStoredEvent
@@ -4117,6 +4258,7 @@ module Api =
             }
 
             deletePlaySession = fun sessionId -> async {
+                use conn = factory ()
                 let runCmd s c =
                     executeCommand conn (Games.streamId s)
                         Games.Serialization.fromStoredEvent
@@ -4129,15 +4271,19 @@ module Api =
             }
 
             getPlaytimeSummary = fun fromDate toDate -> async {
+                use conn = factory ()
                 return PlaytimeTracker.getPlaytimeSummary conn fromDate toDate
             }
 
             getPlaytimeSyncStatus = fun () -> async {
+                use conn = factory ()
                 return PlaytimeTracker.getSyncStatus conn
             }
 
-            triggerPlaytimeSync = fun () ->
-                PlaytimeTracker.runSync conn manualSyncTriggerLock httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers None
+            triggerPlaytimeSync = fun () -> async {
+                use conn = factory ()
+                return! PlaytimeTracker.runSync conn manualSyncTriggerLock httpClient getSteamConfig getRawgConfig imageBasePath projectionHandlers None
+            }
 
             // Steam Achievements
             getSteamRecentAchievements = fun () -> async {
@@ -4150,6 +4296,7 @@ module Api =
 
             // HowLongToBeat
             fetchHltbData = fun gameSlug -> async {
+                use conn = factory ()
                 try
                     // Look up the game name from the projection
                     match GameProjection.getBySlug conn gameSlug with
@@ -4202,6 +4349,7 @@ module Api =
             }
 
             getStreamEvents = fun streamPrefix -> async {
+                use conn = factory ()
                 // Determine which streams to read based on the prefix
                 let mainStreamId = streamPrefix
                 let contentBlocksStreamId =

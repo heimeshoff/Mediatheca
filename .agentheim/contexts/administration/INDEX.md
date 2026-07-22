@@ -10,10 +10,10 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
+- **Backlog:** 2
 - **Todo:** 1
-- **Doing:** 1
-- **Done:** 20
+- **Doing:** 0
+- **Done:** 21
 <!-- task-counts:end -->
 
 ### Todo
@@ -23,12 +23,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **administration-mz6kp** — Migrate Api.create/Administration.create and the raw Giraffe stream handlers from one shared SqliteConnection to per-request (factory-based) connections, retiring the ADR-0030 semaphore gate (refactor) — `doing/administration-mz6kp-per-request-connection-migration.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **administration-mz6kp** — Migrate Api.create/Administration.create and the raw Giraffe stream handlers from one shared SqliteConnection to per-request (factory-based) connections, retiring the ADR-0030 semaphore gate (refactor) — `done/administration-mz6kp-per-request-connection-migration.md`
 - **administration-qk3f7** — Add a formatEvent case for Game_rawg_id_set — the one real handled-but-unformattable drift the unknown-event report caught (bug) — `done/administration-qk3f7-game-rawg-id-set-formatter-gap.md`
 - **administration-xjmda** — Compensating-event composer — append corrective events from the admin UI (feature) — `done/administration-xjmda-compensating-event-composer.md`
 - **administration-btvqa** — Shadow-table replay drift detector — verify projection read models exactly match the event log (feature) — `done/administration-btvqa-projection-drift-integrity-checks.md`
@@ -53,12 +53,14 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **administration-jrflk** — Fix cross-file job-name collision flake between JobRunsTests.fs and JobConnectionConcurrencyTests.fs (bug) — `backlog/administration-jrflk-job-name-collision-test-flake.md`
 - **administration-n8kqw** — Event log import — wipe-first path for a non-empty store, gated behind wwc36's surgery-grade auto-backup (feature) — `backlog/administration-n8kqw-wipe-first-import.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0033** -- Each request and each long-running SSE operation opens and disposes its own `SqliteConnection` from a shared `unit -> SqliteConnection` factory (per-connection pragmas re-applied on open, pooled by connection string); retires ADR-0030's `requestDbLock` and closes the residual read×write race it accepted, while ADR-0028's `jobConn`/`jobDbLock` remain untouched. **Supersedes 0030.** -- 2026-07-22 -- `knowledge/decisions/0033-per-request-connection-factory.md`
 - **0032** -- Compensating-event composer validates and canonicalizes an operator's corrective event by round-tripping it through the owning BC's existing `serialize`/`deserialize` seam (prefix-dispatched like `formatEvent`, reflection and template-registries rejected); the re-serialized canonical bytes are what get appended (expected-position checked, under the ADR-0030 request lock), so a composer event is indistinguishable from an organic one except for `{"source":"admin-console"}` metadata. -- 2026-07-22 -- `knowledge/decisions/0032-compensating-event-composer-round-trip-validation.md`
 - **0031** -- Drift detector replays the event log into a throwaway `SqliteConnection` (temp/`:memory:`) per handler and diffs row-by-row against live projection tables, rather than table-name prefixing or `ATTACH` — so unmodified handler code runs verbatim and read-only-against-live holds by construction; gated by the not-dirty guard, streamed over its own single-flight SSE route. -- 2026-07-22 -- `knowledge/decisions/0031-projection-drift-detector-throwaway-shadow-connection.md`
 - **0030** -- A single process-wide `SemaphoreSlim(1,1)` (`requestDbLock`) guards the 3 request-reachable transaction-opening choke points on the shared request `SqliteConnection` (`Api.executeCommand`, `GameJournal.save`, `importNdjson`), generalizing ADR-0028's per-command-lock idiom to the request connection; the residual read×write race is accepted-not-closed, and the full per-request-connection migration is deferred to administration-mz6kp. -- 2026-07-22 -- `knowledge/decisions/0030-request-connection-narrow-semaphore-gate.md`

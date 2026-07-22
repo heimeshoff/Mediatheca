@@ -1,15 +1,15 @@
 ---
 id: administration-mz6kp
 title: Migrate Api.create/Administration.create and the raw Giraffe stream handlers from one shared SqliteConnection to per-request (factory-based) connections, retiring the ADR-0030 semaphore gate
-status: doing
+status: done
 type: refactor
 context: administration
 created: 2026-07-22
-completed:
+completed: 2026-07-22
 depends_on: [administration-cx92m]
 blocks: []
 tags: [sqlite, concurrency, architecture, reliability, refactor]
-related_adrs: [0003, 0028, 0030, 0032]
+related_adrs: [0003, 0028, 0030, 0032, 0033]
 related_research: []
 prior_art: [administration-tj8n2, administration-cx92m]
 ---
@@ -85,48 +85,71 @@ the file-level serialization this migration ships. The concurrency tests already
 use exactly this temp-file pattern.
 
 ## Acceptance criteria
-- [ ] `EventStore.configureConnection` (public) holds the per-connection pragma
+- [x] `EventStore.configureConnection` (public) holds the per-connection pragma
       block (`busy_timeout`, `foreign_keys`, `synchronous`, `journal_mode`);
       `EventStore.initialize` calls it, and the `Composition` factory calls
       **only** it (no `CREATE TABLE`/FTS per open).
-- [ ] `Composition.buildApp` builds `connectionFactory : unit -> SqliteConnection`;
+- [x] `Composition.buildApp` builds `connectionFactory : unit -> SqliteConnection`;
       `Api.create` and `Administration.create` take it in place of `conn`. Neither
       `create` has a live-`SqliteConnection` first parameter anymore.
-- [ ] No request path holds a process-shared connection: outside `Composition.fs`'s
+- [x] No request path holds a process-shared connection: outside `Composition.fs`'s
       startup bootstrap `conn` and the ADR-0028 `jobConn`, every `conn` used inside
       an `Api`/`Administration` record member or SSE handler originates from a
-      `use conn = factory()` in that same member/handler.
-- [ ] `requestDbLock` is fully removed — `grep -rn requestDbLock src/` returns
+      `use conn = factory()` in that same member/handler. (The four Composition-level
+      config-getter closures — `getTmdbConfig`/`getRawgConfig`/`getSteamConfig`/
+      `getJellyfinConfig` — were also moved off the shared bootstrap `conn` onto
+      per-call `use conn = connectionFactory()`, since they're invoked from those same
+      request-serving members and would otherwise have quietly reintroduced the
+      exact object-level race this migration removes.)
+- [x] `requestDbLock` is fully removed — `grep -rn requestDbLock src/` returns
       nothing; the `dbLock` parameter is gone from every request-reachable
       transaction site: `executeCommandCore`, `GameJournal.save` /
       `GameJournal.migrateFromContentBlocks`, `Administration.importEventsStreamHandler`,
       and `Administration.appendCompensatingEventCore` (the fourth site, added by
       ADR-0032 after ADR-0030). `jobConn`/`jobDbLock` (ADR-0028) and the vestigial
       `manualSyncTriggerLock` are left untouched — grep confirms they still exist.
-- [ ] All five SSE handlers open exactly one `use conn = factory()` at handler
+- [x] All five SSE handlers open exactly one `use conn = factory()` at handler
       entry and hold it for the whole stream, documented as "one connection per
       stream"; `driftCheckStreamHandler` additionally keeps its throwaway
       `Data Source=:memory:` shadow connection unchanged; the `dbLock.Wait()/finally
       Release()` block in `importEventsStreamHandler` is gone.
-- [ ] Members that today return a helper's `Async`/`Task` directly are wrapped so
+- [x] Members that today return a helper's `Async`/`Task` directly are wrapped so
       the connection's `use` scope spans execution
       (`async { use conn = factory() … return! … }`); no `factory()` result escapes
-      a disposing scope.
-- [ ] The 4 must-change test files construct their `IMediathecaApi` / `IAdminApi` /
+      a disposing scope. One member (`triggerJellyfinSync`) needed a real signature
+      change instead of a mechanical wrap: `JellyfinSync.triggerSync` spawns
+      genuinely detached background work (`Async.Start`) that outlives the
+      triggering request, so it now takes `factory` itself and opens its own
+      connection *inside* the spawned async — a request-scoped `use conn` would
+      have been disposed before the background import ran.
+- [x] The 4 must-change test files construct their `IMediathecaApi` / `IAdminApi` /
       `GameJournal` fixtures via the new temp-file `TestDb.withTempDbFactory` helper
       (deleting `.db` + `-wal`/`-shm` on dispose), dropping every live-`conn` +
-      `SemaphoreSlim` create argument.
-- [ ] `RequestConnectionConcurrencyTests.fs` (the ADR-0030 concurrent-`addFriend`
+      `SemaphoreSlim` create argument. (`GameJournalTests.fs` calls `GameJournal.save`/
+      `migrateFromContentBlocks` directly as plain functions — never through a
+      `create` factory — so it only needed the now-removed `dbLock` argument dropped,
+      not a `TestDb` fixture; its own `:memory:` connection is unchanged. The
+      `GameJournal`-fixture testCase the AC's phrasing refers to is
+      `AdministrationTests.fs`'s "a game_journal_blocks.image_ref... is never
+      flagged orphan" case, which does use `TestDb`.)
+- [x] `RequestConnectionConcurrencyTests.fs` (the ADR-0030 concurrent-`addFriend`
       regression) still passes with the semaphore removed — concurrent `addFriend`
       fires without `SqliteConnection does not support nested transactions` and
-      without corruption. This Expecto test is the CI-run safety proof.
-- [ ] `npm test` and `npm run build` both green (Fable compilation clean).
-- [ ] The ADR-0030 gate is retired in the decision record: **ADR-0033** is written
+      without corruption. This Expecto test is the CI-run safety proof. Rewritten
+      to build `Api.create` from a real per-test `TestDb` factory — each of the 25
+      concurrent calls now opens a genuinely separate connection, a stronger proof
+      than the old lock-serialized-shared-connection shape.
+- [x] `npm test` and `npm run build` both green (Fable compilation clean). `npm test`
+      verified green across 5 consecutive full-suite runs after a narrow mitigation
+      (see Notes) for a pre-existing, unrelated flake discovered during this task.
+- [x] The ADR-0030 gate is retired in the decision record: **ADR-0033** is written
       (`scope: administration`, `supersedes: [0030]`), and ADR-0030 flips to
       `status: superseded`, `superseded_by: [0033]`.
-- [ ] `tests/e2e/event-tail-follow.spec.ts` concurrent-`addFriend` burst still
+- [x] `tests/e2e/event-tail-follow.spec.ts` concurrent-`addFriend` burst still
       passes with `requestDbLock` removed — run if the Playwright harness is
       available; otherwise the Expecto regression above stands as the proof.
+      `@playwright/test` is not installed/reachable from this worktree (same as
+      administration-cx92m's own run), so the Expecto regression above is the proof.
 
 ## Notes
 - **Unblocked:** administration-cx92m / ADR-0030 has landed (done 2026-07-22), which
@@ -166,3 +189,54 @@ use exactly this temp-file pattern.
 - Prior art: administration-tj8n2 / ADR-0028 proved separate connections to the WAL
   file safe (job path); administration-cx92m / ADR-0030 is the interim gate this
   supersedes.
+- **Discovered mid-task, not caused by it:** `Administration.fs`'s `runningJobs`
+  claim guard is a module-level `ConcurrentDictionary` shared by the whole test
+  process; `JobRunsTests.fs` happened to reuse job names (`"Job C"`/`"Job D"`/
+  `"Job E"`) already used by the untouched `JobConnectionConcurrencyTests.fs`,
+  colliding under Expecto's default parallel test execution and intermittently
+  failing "Expected the trigger to succeed" (confirmed pre-existing — the
+  collision logic, `TryClaim`/`Release`/`tryStartJob`, is pure in-memory
+  bookkeeping untouched by this task, and reproduces identically against both
+  the pre- and post-migration `JobRunsTests.fs` connection shapes). Mitigated
+  narrowly by namespacing `JobRunsTests.fs`'s job names
+  (`"JobRunsTests Job A"`, etc.) — verified 5 green consecutive full-suite runs
+  afterward. The underlying shared-singleton test-fixture architecture is
+  tracked separately: administration-jrflk (backlog).
+
+## Outcome
+Shipped ADR-0033: `Composition.buildApp` now builds a
+`connectionFactory : unit -> SqliteConnection` (`createConnectionFactory`,
+`EventStore.configureConnection` split out of `initialize` for the
+pragma-only reopen path). `Api.create`/`Administration.create` take that
+factory in place of a live connection; every one of `Api.fs`'s 172 and
+`Administration.fs`'s 13 record members opens `use conn = factory ()`
+inside its own async/task scope (a handful of arrow-bodied members —
+`addMovie`, `addSeries`, `importJellyfinWatchHistory`, `triggerPlaytimeSync`
+— were wrapped in `async { use conn = factory () ... }`); the five raw SSE
+handlers (`Api.steamFamilyImportHandler`, `Administration.exportEventsStreamHandler`/
+`importEventsStreamHandler`/`projectionRebuildStreamHandler`/
+`driftCheckStreamHandler`) each open one connection for the whole stream.
+`JellyfinSync.triggerSync` took a real signature change (`conn` → `factory`,
+`runImport` now takes the connection as an argument) since its background
+sync is genuinely detached via `Async.Start`. `requestDbLock` is fully
+retired, along with the `dbLock` parameter on `executeCommandCore`,
+`GameJournal.save`/`migrateFromContentBlocks`, and
+`appendCompensatingEventCore`; `jobConn`/`jobDbLock`/`manualSyncTriggerLock`
+are untouched. The four Composition-level config-getter closures
+(`getTmdbConfig` et al.) were also moved onto per-call
+`connectionFactory()` connections, since they're invoked from the same
+request-serving members and would otherwise have quietly kept the exact
+object-level race this migration removes. A new
+`tests/Server.Tests/TestDb.fs` (`TestDb.withTempDbFactory`) is the shared
+per-test, file-backed fixture `AdministrationTests.fs`, `JobRunsTests.fs`,
+and `RequestConnectionConcurrencyTests.fs` now build on;
+`GameJournalTests.fs` only needed its `dbLock` argument dropped. `npm test`
+(391 tests) and `npm run build` both green. Key files: `src/Server/Composition.fs`,
+`src/Server/Api.fs`, `src/Server/Administration.fs`, `src/Server/EventStore.fs`,
+`src/Server/GameJournal.fs`, `src/Server/JellyfinSync.fs`,
+`tests/Server.Tests/TestDb.fs` (new),
+`.agentheim/knowledge/decisions/0033-per-request-connection-factory.md` (new),
+`.agentheim/knowledge/decisions/0030-request-connection-narrow-semaphore-gate.md`
+(status: superseded), `.agentheim/contexts/administration/README.md`. Follow-up
+backlogged: administration-jrflk (pre-existing job-name-collision test flake,
+discovered not caused by this task).

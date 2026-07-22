@@ -15,6 +15,7 @@
     <Compile Include="EventStoreTests.fs" />
     <Compile Include="EventStoreNdjsonTests.fs" />
     <Compile Include="SseTests.fs" />
+    <Compile Include="TestDb.fs" />
     <Compile Include="AdministrationTests.fs" />
     <Compile Include="JobRunsTests.fs" />
     <Compile Include="JobConnectionConcurrencyTests.fs" />

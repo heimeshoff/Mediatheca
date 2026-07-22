@@ -91,15 +91,13 @@ module Administration =
     /// `expectedPosition` is caller-supplied rather than freshly read here:
     /// it is the position an earlier preview observed, so a stale value
     /// correctly surfaces as `EventStore.ConcurrencyConflict` if another
-    /// append landed on this stream since. `dbLock` is the same process-wide
-    /// gate ADR-0030 threads through `Api.executeCommandCore`/`GameJournal.save`
-    /// /`importEventsStreamHandler` — this is a fourth request-reachable
-    /// `conn.BeginTransaction()` site of that exact class (via
-    /// `EventStore.appendToStream`), so it acquires the same lock around its
-    /// synchronous append+catch-up body.
+    /// append landed on this stream since. administration-mz6kp (ADR-0033):
+    /// `conn` is now a per-request connection opened by the caller via the
+    /// shared factory — no other in-flight request shares this connection
+    /// object, so the process-wide `dbLock` ADR-0030 threaded through here is
+    /// retired along with the shared connection it guarded.
     let private appendCompensatingEventCore
         (conn: SqliteConnection)
-        (dbLock: SemaphoreSlim)
         (projectionHandlers: Projection.ProjectionHandler list)
         (streamId: string)
         (eventType: string)
@@ -110,22 +108,18 @@ module Administration =
         | None ->
             Error (sprintf "Payload does not deserialize as a valid '%s' event - refusing to append" eventType)
         | Some (canonicalEventType, canonicalData) ->
-            dbLock.Wait()
-            try
-                let eventData : EventStore.EventData = {
-                    EventType = canonicalEventType
-                    Data = canonicalData
-                    Metadata = "{\"source\":\"admin-console\"}"
-                }
-                match EventStore.appendToStream conn streamId expectedPosition [ eventData ] with
-                | EventStore.ConcurrencyConflict(expected, actual) ->
-                    Error (sprintf "Concurrency conflict: expected stream position %d but it is now %d - reload and retry" expected actual)
-                | EventStore.Success _ ->
-                    for handler in projectionHandlers do
-                        Projection.runProjection conn handler
-                    Ok ()
-            finally
-                dbLock.Release() |> ignore
+            let eventData : EventStore.EventData = {
+                EventType = canonicalEventType
+                Data = canonicalData
+                Metadata = "{\"source\":\"admin-console\"}"
+            }
+            match EventStore.appendToStream conn streamId expectedPosition [ eventData ] with
+            | EventStore.ConcurrencyConflict(expected, actual) ->
+                Error (sprintf "Concurrency conflict: expected stream position %d but it is now %d - reload and retry" expected actual)
+            | EventStore.Success _ ->
+                for handler in projectionHandlers do
+                    Projection.runProjection conn handler
+                Ok ()
 
     /// Bounded-context name -> the hand-maintained `handledEventTypes` list
     /// mirroring that BC's `Serialization.deserialize` match arms
@@ -582,12 +576,15 @@ module Administration =
     /// mirroring `projectionRebuildStreamHandler`'s `progress`/`complete`/
     /// `rejected` framing (ADR-0024), gated by the not-dirty guard (ADR-0025)
     /// since shadow-at-head vs. live-behind-head would report false drift.
-    /// Never touches `conn` — the shadow copy lives entirely in its own
-    /// throwaway `:memory:` connection (ADR-0031), so the live tables are
-    /// provably read-only for the whole run.
-    let driftCheckStreamHandler (conn: SqliteConnection) (projectionHandlers: Projection.ProjectionHandler list) : HttpHandler =
+    /// Never touches a shared `conn` — the live connection is opened once,
+    /// scoped to this handler's whole run (administration-mz6kp, ADR-0033),
+    /// and the shadow copy lives entirely in its own throwaway `:memory:`
+    /// connection (ADR-0031), so the live tables are provably read-only for
+    /// the whole run.
+    let driftCheckStreamHandler (factory: unit -> SqliteConnection) (projectionHandlers: Projection.ProjectionHandler list) : HttpHandler =
         fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
             task {
+                use conn = factory ()
                 ctx.Response.Headers.["Content-Type"] <- Microsoft.Extensions.Primitives.StringValues("text/event-stream")
                 ctx.Response.Headers.["Cache-Control"] <- Microsoft.Extensions.Primitives.StringValues("no-cache")
                 ctx.Response.Headers.["Connection"] <- Microsoft.Extensions.Primitives.StringValues("keep-alive")
@@ -749,9 +746,10 @@ module Administration =
     /// actual work; this handler is a thin wrapper over `ctx.Response.Body`
     /// so the round-trip logic stays plain-Expecto testable with no HTTP
     /// pipeline (see `EventStoreNdjsonTests.fs`).
-    let exportEventsStreamHandler (conn: SqliteConnection) : HttpHandler =
+    let exportEventsStreamHandler (factory: unit -> SqliteConnection) : HttpHandler =
         fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
             task {
+                use conn = factory ()
                 allowSynchronousIO ctx
                 ctx.Response.Headers.["Content-Type"] <- Microsoft.Extensions.Primitives.StringValues("application/x-ndjson")
                 ctx.Response.Headers.["Content-Disposition"] <- Microsoft.Extensions.Primitives.StringValues("attachment; filename=\"mediatheca-events.ndjson\"")
@@ -780,16 +778,15 @@ module Administration =
     /// holds. Import that overwrites a non-empty store by wiping first is a
     /// separate, more dangerous operation (administration-n8kqw), out of
     /// scope here.
-    // administration-cx92m (ADR-0030): `dbLock` is the same process-wide
-    // SemaphoreSlim guarding `Api.executeCommand` and `GameJournal.save` —
-    // `EventStore.importNdjson`'s `conn.BeginTransaction()` is the third of
-    // the exact 3 request-reachable transaction-opening choke points on the
-    // shared `conn` that ADR-0030 serializes. Acquired only around the
-    // synchronous import call itself (never across the awaited SSE
-    // `writeEvent` writes before/after it).
-    let importEventsStreamHandler (conn: SqliteConnection) (dbLock: SemaphoreSlim) : HttpHandler =
+    // administration-mz6kp (ADR-0033): `conn` is a per-request connection
+    // opened by this handler alone from the shared factory — no other
+    // in-flight request shares it, so the process-wide `dbLock` ADR-0030
+    // threaded through here is retired along with the shared connection it
+    // guarded.
+    let importEventsStreamHandler (factory: unit -> SqliteConnection) : HttpHandler =
         fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
             task {
+                use conn = factory ()
                 allowSynchronousIO ctx
                 ctx.Response.Headers.["Content-Type"] <- Microsoft.Extensions.Primitives.StringValues("text/event-stream")
                 ctx.Response.Headers.["Cache-Control"] <- Microsoft.Extensions.Primitives.StringValues("no-cache")
@@ -805,10 +802,7 @@ module Administration =
                 }
 
                 use reader = new StreamReader(ctx.Request.Body)
-                let importResult =
-                    dbLock.Wait()
-                    try EventStore.importNdjson conn reader
-                    finally dbLock.Release() |> ignore
+                let importResult = EventStore.importNdjson conn reader
                 match importResult with
                 | Ok outcome ->
                     do! writeEvent "complete" (sprintf "{\"eventsImported\":%d}" outcome.EventsImported)
@@ -831,12 +825,13 @@ module Administration =
     /// instead of running concurrently, per the task's explicit
     /// single-writer-safety acceptance criterion.
     let projectionRebuildStreamHandler
-        (conn: SqliteConnection)
+        (factory: unit -> SqliteConnection)
         (projectionHandlers: Projection.ProjectionHandler list)
         : HttpHandler =
         routef "/api/stream/rebuild-projection/%s" (fun projectionName ->
             fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
                 task {
+                    use conn = factory ()
                     ctx.Response.Headers.["Content-Type"] <- Microsoft.Extensions.Primitives.StringValues("text/event-stream")
                     ctx.Response.Headers.["Cache-Control"] <- Microsoft.Extensions.Primitives.StringValues("no-cache")
                     ctx.Response.Headers.["Connection"] <- Microsoft.Extensions.Primitives.StringValues("keep-alive")
@@ -1043,22 +1038,22 @@ module Administration =
     /// `recorder` is the SAME `ScheduledJobs.JobRunRecorder` instance passed
     /// to `startAll`, so a manual "Run now" and the scheduled timer share one
     /// guard dictionary and one connection (ADR-0026).
-    /// `dbLock` is the same process-wide `requestDbLock` (ADR-0030)
-    /// Composition.fs threads through `Api.create`/`GameJournal.save`
-    /// /`importEventsStreamHandler` — `appendCompensatingEvent` below is a
-    /// fourth request-reachable transaction-opening site on the shared
-    /// `conn` of that exact class, so it acquires the same lock.
+    /// administration-mz6kp (ADR-0033): `factory` builds one fresh
+    /// `SqliteConnection` per record member invocation (`use conn = factory()`
+    /// at the top of each member below), retiring ADR-0030's process-wide
+    /// `requestDbLock` — there is no longer a shared connection object for it
+    /// to guard.
     let create
-        (conn: SqliteConnection)
+        (factory: unit -> SqliteConnection)
         (dbPath: string)
         (imagesDir: string)
         (projectionHandlers: Projection.ProjectionHandler list)
         (scheduledJobs: ScheduledJobs.JobSpec list)
         (recorder: ScheduledJobs.JobRunRecorder)
-        (dbLock: SemaphoreSlim)
         : IAdminApi =
         {
             getEventPage = fun query -> async {
+                use conn = factory ()
                 let filter: EventStore.QueryFilter = {
                     Search = query.Filter.Search
                     StreamFilter = query.Filter.StreamFilter
@@ -1077,6 +1072,7 @@ module Administration =
             }
 
             getEventsAfter = fun query -> async {
+                use conn = factory ()
                 let filter: EventStore.QueryFilter = {
                     Search = query.Filter.Search
                     StreamFilter = query.Filter.StreamFilter
@@ -1091,12 +1087,14 @@ module Administration =
             }
 
             getCompensatingEventTypes = fun streamId -> async {
+                use conn = factory ()
                 match prefixForStreamId streamId with
                 | None -> return []
                 | Some prefix -> return EventStore.getDistinctEventTypesForPrefix conn prefix
             }
 
             getCompensatingEventTemplate = fun streamId eventType -> async {
+                use conn = factory ()
                 match prefixForStreamId streamId with
                 | None -> return None
                 | Some prefix ->
@@ -1106,6 +1104,7 @@ module Administration =
             }
 
             previewCompensatingEvent = fun streamId eventType rawData -> async {
+                use conn = factory ()
                 match canonicalizeCompensatingEvent streamId eventType rawData with
                 | None ->
                     return Error (sprintf "Payload does not deserialize as a valid '%s' event" eventType)
@@ -1119,14 +1118,17 @@ module Administration =
             }
 
             appendCompensatingEvent = fun streamId eventType rawData expectedPosition -> async {
-                return appendCompensatingEventCore conn dbLock projectionHandlers streamId eventType rawData expectedPosition
+                use conn = factory ()
+                return appendCompensatingEventCore conn projectionHandlers streamId eventType rawData expectedPosition
             }
 
             getEventStreams = fun () -> async {
+                use conn = factory ()
                 return EventStore.getDistinctStreams conn
             }
 
             getEventTypes = fun () -> async {
+                use conn = factory ()
                 return EventStore.getDistinctEventTypes conn
             }
 
@@ -1135,6 +1137,7 @@ module Administration =
             }
 
             getStreamDetail = fun streamId -> async {
+                use conn = factory ()
                 let entries =
                     EventStore.readStream conn streamId
                     |> List.map toTimelineEntry
@@ -1148,10 +1151,12 @@ module Administration =
             }
 
             getHealthStats = fun () -> async {
+                use conn = factory ()
                 return buildHealthStats conn dbPath imagesDir
             }
 
             getProjectionStats = fun () -> async {
+                use conn = factory ()
                 return buildProjectionStats conn projectionHandlers
             }
 
@@ -1160,6 +1165,7 @@ module Administration =
             }
 
             listOrphanedImages = fun () -> async {
+                use conn = factory ()
                 match isAnyProjectionDirty conn projectionHandlers with
                 | dirty when not (List.isEmpty dirty) ->
                     return OrphanScanBlocked (sprintf "Blocked: waiting on %s to catch up" (String.concat ", " dirty))
@@ -1175,6 +1181,7 @@ module Administration =
             /// or already vanished between scan and confirm is skipped
             /// rather than wrongly deleted.
             purgeOrphanedImages = fun selection -> async {
+                use conn = factory ()
                 match isAnyProjectionDirty conn projectionHandlers with
                 | dirty when not (List.isEmpty dirty) ->
                     return PurgeBlocked (sprintf "Blocked: waiting on %s to catch up" (String.concat ", " dirty))
@@ -1207,6 +1214,7 @@ module Administration =
             }
 
             getJobStatuses = fun () -> async {
+                use conn = factory ()
                 return
                     scheduledJobs
                     |> List.map (fun spec ->

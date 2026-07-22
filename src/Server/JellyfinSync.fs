@@ -89,11 +89,22 @@ module JellyfinSync =
         )
 
     /// Trigger a background sync. Returns immediately.
+    ///
+    /// administration-mz6kp (ADR-0033): `triggerSync` spawns the actual import
+    /// via `Async.Start` — a genuinely detached computation that keeps running
+    /// after this function (and the request that called it) has already
+    /// returned. It cannot borrow a request-scoped `use conn = factory()`
+    /// connection from its caller (that connection would already be disposed
+    /// by the time the background work runs — a `factory()` result must never
+    /// escape a disposing scope). So `triggerSync` takes the `factory` itself
+    /// and opens its own connection *inside* the spawned background async,
+    /// scoped to exactly that async's lifetime; `runImport` is threaded that
+    /// same connection so the import and the sync-result persistence share it.
     let triggerSync
-        (conn: SqliteConnection)
+        (factory: unit -> SqliteConnection)
         (httpClient: HttpClient)
         (getJellyfinConfig: unit -> Jellyfin.JellyfinConfig)
-        (runImport: unit -> Async<Result<JellyfinImportResult, string>>)
+        (runImport: SqliteConnection -> Async<Result<JellyfinImportResult, string>>)
         : Async<JellyfinSyncTriggerResult> =
         async {
             return
@@ -114,9 +125,10 @@ module JellyfinSync =
                             syncInProgress <- true
                             // Spawn background sync
                             async {
+                                use conn = factory ()
                                 try
                                     eprintfn "[JellyfinSync] Starting background sync..."
-                                    let! result = runImport ()
+                                    let! result = runImport conn
                                     lock syncLock (fun () ->
                                         syncInProgress <- false
                                         lastSyncTime <- Some DateTime.UtcNow

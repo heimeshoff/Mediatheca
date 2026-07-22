@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 17:39 -- Task verified and completed: administration-mz6kp - Migrate Api.create/Administration.create and the raw Giraffe stream handlers from one shared SqliteConnection to per-request (factory-based) connections, retiring the ADR-0030 semaphore gate
+
+**Type:** Work / Task completion
+**Task:** administration-mz6kp - Migrate Api.create/Administration.create and the raw Giraffe stream handlers from one shared SqliteConnection to per-request (factory-based) connections, retiring the ADR-0030 semaphore gate
+**Summary:** Migrated Api.create/Administration.create, the five raw Giraffe SSE stream handlers, and JellyfinSync from one shared SqliteConnection to a per-request/per-operation unit->SqliteConnection factory, retiring ADR-0030 requestDbLock and closing the residual read/write race it accepted (ADR-0033)
+**Duration:** ~35m
+**Verification:** PASS (iteration 1)
+**Files changed:** 16
+**Tests added:** 0
+**ADRs written:** 0033-per-request-connection-factory.md
+
+---
+
 ## 2026-07-22 17:00 -- Task verified and completed: administration-qk3f7 - Add a formatEvent case for Game_rawg_id_set — the one real handled-but-unformattable drift the unknown-event report caught
 
 **Type:** Work / Task completion

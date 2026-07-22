@@ -26,6 +26,19 @@ let createConnection (dbPath: string) =
     EventStore.initialize conn
     conn
 
+/// A raw, uninitialized `SqliteConnection` factory (administration-mz6kp,
+/// ADR-0033) — pragmas only (`EventStore.configureConnection`), never table/
+/// FTS creation, which stays a one-time startup step on the bootstrap `conn`
+/// (`createConnection` above). Pooling (Microsoft.Data.Sqlite pools physical
+/// connections per connection string) makes `use conn = factory()` cheap: a
+/// warm pooled handle, not a real file-open, on every call.
+let createConnectionFactory (dbPath: string) : unit -> SqliteConnection =
+    fun () ->
+        let conn = new SqliteConnection($"Data Source={dbPath}")
+        conn.Open()
+        EventStore.configureConnection conn
+        conn
+
 /// Build (but do not run) the app. `urls` overrides Kestrel's bind address
 /// (ASPNETCORE_URLS / default) — used by the desktop shell to force a
 /// loopback-only, ephemeral-port bind (ADR-0007: no auth, so the desktop
@@ -52,21 +65,17 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
 
     let conn = createConnection dbPath
 
-    // administration-cx92m (ADR-0030): a single process-wide SemaphoreSlim
-    // guarding every request-reachable transaction-opening call site on the
-    // shared `conn` (Api.executeCommand's body, GameJournal.save,
-    // Administration.importEventsStreamHandler's call into
-    // EventStore.importNdjson) — generalizing ADR-0028's dedicated-job-
-    // connection-plus-per-command-lock idiom from `jobConn`/`jobDbLock` to
-    // the request-serving `conn`. Acquired only around each call's
-    // synchronous DB-touching body, never across an awaited HTTP call, so
-    // concurrent requests' network I/O still overlaps and only their brief
-    // DB moments serialize. Read/plain-write races on `conn` outside these
-    // three transaction-opening sites remain open (ADR-0030: accepted, not
-    // closed) — request×request concurrency does not otherwise use one
-    // shared `conn` object safely per ADR-0028's correction, but no crash
-    // from those broader paths has been reproduced here.
-    let requestDbLock = new SemaphoreSlim(1, 1)
+    // administration-mz6kp (ADR-0033): every request/SSE-handler opens and
+    // disposes its own `SqliteConnection` from this factory instead of
+    // sharing the bootstrap `conn` above — removing the shared mutable
+    // connection object by construction, so the ADR-0028-class object-level
+    // command-creation/disposal race cannot arise on the request path at
+    // all. Supersedes ADR-0030's process-wide `requestDbLock`, which guarded
+    // that shared object and is retired along with it. `conn` itself is no
+    // longer shared with request threads — it remains only for this
+    // function's own single-threaded startup work (seeds, backfill,
+    // migrations, projection catch-up).
+    let connectionFactory = createConnectionFactory dbPath
 
     // Initialize CastStore tables
     CastStore.initialize conn
@@ -127,8 +136,15 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         | Some _ -> ()
     | _ -> ()
 
-    // Dynamic TMDB config provider (reads from DB, falls back to env var)
+    // Dynamic TMDB config provider (reads from DB, falls back to env var).
+    // administration-mz6kp (ADR-0033): these providers are invoked from
+    // request-serving record members (potentially concurrently), so each
+    // call opens its own short-lived connection via `connectionFactory`
+    // rather than closing over the single-threaded startup `conn` above —
+    // the same reasoning that moved every other request-reachable DB touch
+    // off that shared connection.
     let getTmdbConfig () : Tmdb.TmdbConfig =
+        use conn = connectionFactory ()
         let apiKey =
             SettingsStore.getSetting conn "tmdb_api_key"
             |> Option.orElse envTmdbKey
@@ -138,6 +154,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
 
     // Dynamic RAWG config provider (reads from DB, falls back to env var)
     let getRawgConfig () : Rawg.RawgConfig =
+        use conn = connectionFactory ()
         let apiKey =
             SettingsStore.getSetting conn "rawg_api_key"
             |> Option.orElse envRawgKey
@@ -146,6 +163,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
 
     // Dynamic Jellyfin config provider (reads from DB)
     let getJellyfinConfig () : Jellyfin.JellyfinConfig =
+        use conn = connectionFactory ()
         { ServerUrl = SettingsStore.getSetting conn "jellyfin_server_url" |> Option.defaultValue ""
           Username = SettingsStore.getSetting conn "jellyfin_username" |> Option.defaultValue ""
           Password = SettingsStore.getSetting conn "jellyfin_password" |> Option.defaultValue ""
@@ -154,6 +172,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
 
     // Dynamic Steam config provider (reads from DB, falls back to env var)
     let getSteamConfig () : Steam.SteamConfig =
+        use conn = connectionFactory ()
         let apiKey =
             SettingsStore.getSetting conn "steam_api_key"
             |> Option.orElse envSteamKey
@@ -191,7 +210,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     // Game journal (Notion-style blocks, plain storage) — table + one-time
     // migration of the old event-sourced game content blocks
     GameJournal.initialize conn
-    GameJournal.migrateFromContentBlocks conn requestDbLock dataDir
+    GameJournal.migrateFromContentBlocks conn dataDir
 
     // Backfill director/crew data for existing movies
     let backfillDirectors () =
@@ -303,8 +322,8 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     let jobRunRecorder = Administration.makeJobRunRecorder jobConn jobDbLock
 
     // Create API
-    let api = Api.create conn requestDbLock httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig imageBasePath projectionHandlers
-    let adminApi = Administration.create conn dbPath imageBasePath projectionHandlers scheduledJobs jobRunRecorder requestDbLock
+    let api = Api.create connectionFactory httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig imageBasePath projectionHandlers
+    let adminApi = Administration.create connectionFactory dbPath imageBasePath projectionHandlers scheduledJobs jobRunRecorder
 
     let remotingHandler =
         Remoting.createApi ()
@@ -328,14 +347,14 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         choose [
             route "/health" >=> text "ok"
             route "/api/stream/import-steam-family"
-                >=> Api.steamFamilyImportHandler conn requestDbLock httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers
+                >=> Api.steamFamilyImportHandler connectionFactory httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers
             route "/api/stream/export-events"
-                >=> Administration.exportEventsStreamHandler conn
+                >=> Administration.exportEventsStreamHandler connectionFactory
             route "/api/stream/import-events"
-                >=> Administration.importEventsStreamHandler conn requestDbLock
-            Administration.projectionRebuildStreamHandler conn projectionHandlers
+                >=> Administration.importEventsStreamHandler connectionFactory
+            Administration.projectionRebuildStreamHandler connectionFactory projectionHandlers
             route "/api/stream/drift-check"
-                >=> Administration.driftCheckStreamHandler conn projectionHandlers
+                >=> Administration.driftCheckStreamHandler connectionFactory projectionHandlers
             remotingHandler
             adminRemotingHandler
         ]
