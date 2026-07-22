@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 4
-- **Todo:** 5
+- **Backlog:** 3
+- **Todo:** 6
 - **Doing:** 0
 - **Done:** 13
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **administration-nf3wk** — "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead" (bugfix) — `todo/administration-nf3wk-dead-no-matches-branch.md`
 - **administration-xjmda** — Compensating-event composer — append corrective events from the admin UI (feature) — `todo/administration-xjmda-compensating-event-composer.md`
 - **administration-gxd6e** — Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples (feature) — `todo/administration-gxd6e-unknown-event-report.md`
 - **administration-btvqa** — Shadow-table replay drift detector — verify projection read models exactly match the event log (feature) — `todo/administration-btvqa-projection-drift-integrity-checks.md`
@@ -49,7 +50,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **administration-nf3wk** — Event Browser's "No matches" pagination-bar text is dead code — give the filter-empty state its own message instead (bugfix) — `backlog/administration-nf3wk-dead-no-matches-branch.md`
 - **administration-wwc36** — Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag (feature) — `backlog/administration-wwc36-event-surgery-guardrails.md`
 - **administration-n8kqw** — Event log import — wipe-first path for a non-empty store, gated behind wwc36's surgery-grade auto-backup (feature) — `backlog/administration-n8kqw-wipe-first-import.md`
 - **administration-mz6kp** — Migrate Api.create/Administration.create and the raw Giraffe stream handlers from one shared SqliteConnection to per-request (factory-based) connections, retiring the ADR-0030 semaphore gate (refactor) — `backlog/administration-mz6kp-per-request-connection-migration.md`

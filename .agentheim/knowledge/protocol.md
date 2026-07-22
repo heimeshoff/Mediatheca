@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 13:17 -- Modeling / Promoted: administration-nf3wk - "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead"
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-22 13:07 -- Modeling / Promoted: administration-xjmda - Compensating-event composer — append corrective events from the admin UI
 
 **Type:** Modeling / Promote
