@@ -1,7 +1,7 @@
 ---
 id: administration-wwc36
 title: Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag
-status: todo
+status: doing
 type: feature
 context: administration
 created: 2026-07-20

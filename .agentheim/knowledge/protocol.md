@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 18:17 -- Batch started: [administration-wwc36]
+
+**Type:** Work / Batch start
+**Tasks:** administration-wwc36 - Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag
+**Parallel:** no (1 worker — single ready task; wwc36 concurrency reconciled to ADR-0033 per the 2026-07-22 REFINE, all three depends_on satisfied)
+
+---
+
 ## 2026-07-22 18:03 -- Modeling / Refined: administration-wwc36 - Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag
 
 **Type:** Modeling / Refine
