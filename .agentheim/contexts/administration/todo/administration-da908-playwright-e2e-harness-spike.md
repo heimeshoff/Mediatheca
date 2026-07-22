@@ -1,7 +1,7 @@
 ---
 id: administration-da908
 title: Prove a Playwright harness can drive the full Mediatheca stack and observe network traffic
-status: backlog
+status: todo
 type: spike
 context: administration
 created: 2026-07-21

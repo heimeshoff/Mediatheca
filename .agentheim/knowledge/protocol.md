@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 09:26 -- Modeling / Promoted: administration-da908 - Prove a Playwright harness can drive the full Mediatheca stack and observe network traffic
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-22 09:26 -- Modeling / Refined: administration-da908 - Prove a Playwright harness can drive the full Mediatheca stack and observe network traffic
 
 **Type:** Modeling / Refine
