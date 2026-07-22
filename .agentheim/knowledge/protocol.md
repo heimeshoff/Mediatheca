@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 16:57 -- Batch started: [administration-mz6kp]
+
+**Type:** Work / Batch start
+**Tasks:** administration-mz6kp - Migrate Api.create/Administration.create and the raw Giraffe stream handlers from one shared SqliteConnection to per-request (factory-based) connections, retiring the ADR-0030 semaphore gate
+**Parallel:** no (1 worker — mz6kp dispatched alone; wwc36 held for modeling REFINE because mz6kp retires the requestDbLock that wwc36 was refined to acquire, per builder sequencing decision)
+**Planning advisory:** Builder chose mz6kp-first (per-request connection migration) over wwc36; wwc36 to be re-refined afterward against the new factory model
+
+---
+
 ## 2026-07-22 16:40 -- Batch started: [administration-qk3f7]
 
 **Type:** Work / Batch start
