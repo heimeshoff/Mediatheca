@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 15:55 -- Modeling / Promoted: administration-wwc36 - Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-22 15:53 -- Modeling / Refined: administration-wwc36 - Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag
 
 **Type:** Modeling / Refine
