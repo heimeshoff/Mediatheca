@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 13:04 -- Modeling / Promoted: administration-gxd6e - Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-22 13:03 -- Modeling / Promoted: administration-btvqa - Shadow-table replay drift detector — verify projection read models exactly match the event log
 
 **Type:** Modeling / Promote
