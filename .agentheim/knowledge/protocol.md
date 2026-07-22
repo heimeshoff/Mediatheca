@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 15:53 -- Modeling / Promoted: administration-qk3f7 - Add a formatEvent case for Game_rawg_id_set — the one real handled-but-unformattable drift the unknown-event report caught
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-22 16:00 -- Modeling / Refined: administration-qk3f7 - Add a formatEvent case for Game_rawg_id_set
 
 **Type:** Modeling / Refine
