@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 13:32 -- Task verified and completed: administration-nf3wk - "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead"
+
+**Type:** Work / Task completion
+**Task:** administration-nf3wk - "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead"
+**Summary:** Gave the Event Browser zero-results empty state a filter-aware message via pure State.anyFilterActive/emptyStateMessage, removed paginationBar dead No-matches branch, and updated the a4d9b Playwright spec in lock-step
+**Duration:** 10m0s
+**Verification:** PASS (iteration 1)
+**Files changed:** 4
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-07-22 13:31 -- Task verified and completed: administration-h4k2p - Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure.
 
 **Type:** Work / Task completion

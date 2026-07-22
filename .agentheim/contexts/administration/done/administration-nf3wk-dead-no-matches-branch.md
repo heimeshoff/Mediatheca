@@ -1,11 +1,11 @@
 ---
 id: administration-nf3wk
 title: "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead"
-status: doing
+status: done
 type: bugfix
 context: administration
 created: 2026-07-22
-completed:
+completed: 2026-07-22
 depends_on: [design-system-001]
 blocks: []
 tags: [event-store, admin-console, ui, bug]
@@ -130,3 +130,40 @@ let emptyStateMessage (m: Model) =
 - `depends_on: [design-system-001]` per the BC's frontend styleguide gate
   (README "Frontend gate"); that task is **done**, so the dependency is met
   and non-blocking.
+
+## Outcome
+Implemented the chosen direction exactly as specified. `EventBrowser/State.fs`
+gained two pure functions, `anyFilterActive` and `emptyStateMessage`, keying
+off the six string filter fields on `Model`. `EventBrowser/Views.fs`'s `view`
+empty arm now calls `State.emptyStateMessage model` instead of a hardcoded
+`"No events found."`; `paginationBar`'s unreachable `if model.TotalMatches = 0
+then "No matches"` branch (and the now-moot `firstShown` zero-guard) were
+removed — it renders only `"Showing {firstShown}-{lastShown} of
+{model.TotalMatches}"`, since it's only ever reached once `model.Events` is
+non-empty.
+
+`tests/e2e/event-tail-follow.spec.ts`'s filter-respecting-live-rows test
+(administration-a4d9b) was updated: the zero-match-filter assertion now
+expects `"No matches for the current filters."` instead of `"No events
+found."`, and the stale "unreachable dead code" comment was corrected to
+describe the fix rather than the bug.
+
+Updated the administration BC README's Playwright-harness bullet to describe
+the resolution instead of the open discrepancy.
+
+`npm run build` (Fable compile) and `npm test` (Expecto, 368/368) both pass.
+`npm run test:e2e` could not be executed in this environment — neither the
+worktree nor the parent repo has `@playwright/test`/the `playwright` CLI
+installed in `node_modules` (`npx playwright test` and `npm run test:e2e`
+both fail with `Cannot find module '@playwright/test'` /
+`'playwright' is not recognized`). Statically verified instead: the rendered
+string in `State.fs` (`"No matches for the current filters."`) and the
+Playwright assertion in the updated spec are character-for-character
+identical (grep-confirmed). A human/verifier with a Playwright-capable
+environment should run `npm run test:e2e -- tests/e2e/event-tail-follow.spec.ts`
+to confirm end-to-end.
+
+Key files: `src/Client/Pages/EventBrowser/State.fs`,
+`src/Client/Pages/EventBrowser/Views.fs`,
+`tests/e2e/event-tail-follow.spec.ts`,
+`.agentheim/contexts/administration/README.md`.

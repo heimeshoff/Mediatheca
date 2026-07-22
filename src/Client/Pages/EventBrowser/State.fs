@@ -51,6 +51,20 @@ let init () : Model * Cmd<Msg> =
 let private startOfDay (date: string) = date + "T00:00:00.0000000+00:00"
 let private endOfDay (date: string) = date + "T23:59:59.9999999+00:00"
 
+/// True iff any of the six filter fields is non-empty. Used to distinguish
+/// "the store is genuinely empty" from "a filter is active and matched
+/// nothing" (administration-nf3wk) — both used to render "No events found."
+let anyFilterActive (m: Model) =
+    [ m.Search; m.StreamFilter; m.EventTypeFilter
+      m.BoundedContextFilter; m.TimestampFrom; m.TimestampTo ]
+    |> List.exists (System.String.IsNullOrEmpty >> not)
+
+/// The message shown in view's empty arm (model.Events = []). A zero-match
+/// filter reads distinctly from a genuinely empty store (administration-nf3wk).
+let emptyStateMessage (m: Model) =
+    if anyFilterActive m then "No matches for the current filters."
+    else "No events found."
+
 /// The active filter set, shared as-is between the paged explorer query and
 /// the live-tail query (administration-mtf1f) — see EventFilter's doc comment.
 let private buildFilter (model: Model) : EventFilter =

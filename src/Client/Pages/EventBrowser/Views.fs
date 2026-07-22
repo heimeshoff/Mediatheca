@@ -3,6 +3,7 @@ module Mediatheca.Client.Pages.EventBrowser.Views
 open Feliz
 open Feliz.DaisyUI
 open Mediatheca.Client.Pages.EventBrowser.Types
+open Mediatheca.Client.Pages.EventBrowser
 open Mediatheca.Client
 open Mediatheca.Client.Components
 open Mediatheca.Client.Router
@@ -207,9 +208,10 @@ let private filterBar (model: Model) (dispatch: Msg -> unit) =
     ]
 
 let private paginationBar (model: Model) (dispatch: Msg -> unit) =
-    let firstShown =
-        if model.TotalMatches = 0 then 0
-        else (model.CursorStack |> List.length) * model.PageSize + 1
+    // Only ever rendered from view's non-empty arm (model.Events non-empty),
+    // so model.TotalMatches > 0 here — the zero-matches case is handled by
+    // view's empty-state message instead (see State.emptyStateMessage).
+    let firstShown = (model.CursorStack |> List.length) * model.PageSize + 1
     let lastShown = firstShown + (List.length model.Events) - 1
     Html.div [
         prop.className "flex items-center justify-between mt-4 text-sm text-base-content/40 font-mono"
@@ -222,10 +224,7 @@ let private paginationBar (model: Model) (dispatch: Msg -> unit) =
                 prop.text "Prev"
             ]
             Html.span [
-                prop.text (
-                    if model.TotalMatches = 0 then "No matches"
-                    else $"Showing {firstShown}-{lastShown} of {model.TotalMatches}"
-                )
+                prop.text $"Showing {firstShown}-{lastShown} of {model.TotalMatches}"
             ]
             Daisy.button.button [
                 button.outline
@@ -265,7 +264,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 Html.div [
                     prop.className "text-center py-20 text-base-content/30"
                     prop.children [
-                        Html.p [ prop.className "font-medium"; prop.text "No events found." ]
+                        Html.p [ prop.className "font-medium"; prop.text (State.emptyStateMessage model) ]
                     ]
                 ]
             else

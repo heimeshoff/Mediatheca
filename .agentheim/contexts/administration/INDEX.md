@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 3
 - **Todo:** 3
-- **Doing:** 2
-- **Done:** 14
+- **Doing:** 1
+- **Done:** 15
 <!-- task-counts:end -->
 
 ### Todo
@@ -26,12 +26,12 @@ research touching this BC, and concept synthesis pages.
 ### Doing
 <!-- doing-list:start -->
 - **administration-cx92m** — Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate (spike) — `doing/administration-cx92m-shared-connection-request-concurrency-audit.md`
-- **administration-nf3wk** — "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead" (bugfix) — `doing/administration-nf3wk-dead-no-matches-branch.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **administration-nf3wk** — "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead" (bugfix) — `done/administration-nf3wk-dead-no-matches-branch.md`
 - **administration-h4k2p** — Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure. (bug) — `done/administration-h4k2p-sse-empty-payload-trailing-comma-bug.md`
 - **administration-vrc56** — Event log export/import as NDJSON — stream out/in via plain Giraffe routes, preserving exact global_position, into an empty store only (feature) — `done/administration-vrc56-ndjson-export-import.md`
 - **administration-tj8n2** — Scheduled-job timers race on the shared SqliteConnection and crash the process — fix with a dedicated job connection plus a per-command lock (bug) — `done/administration-tj8n2-scheduled-job-catchup-connection-race.md`

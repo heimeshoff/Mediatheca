@@ -114,13 +114,12 @@ test.describe("Events tab Follow toggle — ADR-0023 live-tail behaviors", () =>
         const searchTerm = `E2EFilterMatch${Date.now()}`;
         await page.getByPlaceholder("Search event payloads...").fill(searchTerm);
         // The filter reload (Search_changed -> Load_page) lands on the
-        // zero-results empty state before either friend below exists.
-        // Note: `paginationBar`'s own "No matches" string (for
-        // `TotalMatches = 0`) is actually unreachable dead code — the
-        // `List.isEmpty model.Events` branch in `view` always wins first for
-        // a zero-match filter, rendering "No events found." instead. Filed
-        // as administration-nf3wk rather than silently patched here.
-        await expect(page.getByText("No events found.")).toBeVisible();
+        // zero-results empty state before either friend below exists. A
+        // zero-match filter now renders its own message, distinct from the
+        // genuinely-empty-store message (administration-nf3wk); paginationBar's
+        // former "No matches" string was unreachable dead code and has been
+        // removed.
+        await expect(page.getByText("No matches for the current filters.")).toBeVisible();
 
         await expect(followButton(page)).toBeVisible();
         await followButton(page).click();
