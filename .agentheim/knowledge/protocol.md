@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 16:40 -- Batch started: [administration-qk3f7]
+
+**Type:** Work / Batch start
+**Tasks:** administration-qk3f7 - Add a formatEvent case for Game_rawg_id_set — the one real handled-but-unformattable drift the unknown-event report caught
+**Parallel:** yes (1 worker this wave — qk3f7 is independent; mz6kp + wwc36 held pending a builder sequencing decision, they carry contradictory requestDbLock/ADR-0033 assumptions)
+
+---
+
 ## 2026-07-22 16:31 -- Modeling / Promoted: administration-mz6kp - Migrate Api.create/Administration.create and the raw Giraffe stream handlers from one shared SqliteConnection to per-request (factory-based) connections, retiring the ADR-0030 semaphore gate
 
 **Type:** Modeling / Promote

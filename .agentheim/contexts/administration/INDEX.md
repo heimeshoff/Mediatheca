@@ -11,8 +11,8 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 1
-- **Todo:** 3
-- **Doing:** 0
+- **Todo:** 2
+- **Doing:** 1
 - **Done:** 19
 <!-- task-counts:end -->
 
@@ -20,11 +20,11 @@ research touching this BC, and concept synthesis pages.
 <!-- todo-list:start -->
 - **administration-mz6kp** — Migrate Api.create/Administration.create and the raw Giraffe stream handlers from one shared SqliteConnection to per-request (factory-based) connections, retiring the ADR-0030 semaphore gate (refactor) — `todo/administration-mz6kp-per-request-connection-migration.md`
 - **administration-wwc36** — Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag (feature) — `todo/administration-wwc36-event-surgery-guardrails.md`
-- **administration-qk3f7** — Add a formatEvent case for Game_rawg_id_set — the one real handled-but-unformattable drift the unknown-event report caught (bug) — `todo/administration-qk3f7-game-rawg-id-set-formatter-gap.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **administration-qk3f7** — Add a formatEvent case for Game_rawg_id_set — the one real handled-but-unformattable drift the unknown-event report caught (bug) — `doing/administration-qk3f7-game-rawg-id-set-formatter-gap.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

@@ -1,7 +1,7 @@
 ---
 id: administration-qk3f7
 title: Add a formatEvent case for Game_rawg_id_set — the one real handled-but-unformattable drift the unknown-event report caught
-status: todo
+status: doing
 type: bug
 context: administration
 created: 2026-07-22
