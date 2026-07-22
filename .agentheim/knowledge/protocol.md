@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 10:58 -- Modeling / Promoted: administration-a4d9b - Assert the Events-tab Follow toggle's three live-tail behaviors via committed Playwright specs
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-22 10:57 -- Modeling / Refined: administration-a4d9b - Assert the Events-tab Follow toggle's three live-tail behaviors via committed Playwright specs
 
 **Type:** Modeling / Refine
