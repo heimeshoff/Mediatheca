@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 15:23 -- Task verified and completed: administration-xjmda - Compensating-event composer — append corrective events from the admin UI
+
+**Type:** Work / Task completion
+**Task:** administration-xjmda - Compensating-event composer — append corrective events from the admin UI
+**Summary:** Added the compensating-event composer (ADR-0032) — a stream drill-in Append corrective event action that clones a real event, validates-by-round-trip through each BC serialize/deserialize seam (canonicalization + validation in one), appends with expected-position concurrency check under the ADR-0030 requestDbLock, and runs projection catch-up
+**Duration:** 24m27s
+**Verification:** PASS (iteration 1)
+**Files changed:** 12
+**Tests added:** 7
+**ADRs written:** 0032-compensating-event-composer-round-trip-validation.md
+
+---
+
 ## 2026-07-22 14:58 -- Batch started: [administration-xjmda]
 
 **Type:** Work / Batch start

@@ -304,7 +304,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
 
     // Create API
     let api = Api.create conn requestDbLock httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig imageBasePath projectionHandlers
-    let adminApi = Administration.create conn dbPath imageBasePath projectionHandlers scheduledJobs jobRunRecorder
+    let adminApi = Administration.create conn dbPath imageBasePath projectionHandlers scheduledJobs jobRunRecorder requestDbLock
 
     let remotingHandler =
         Remoting.createApi ()

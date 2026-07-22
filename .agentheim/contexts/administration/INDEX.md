@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 4
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 18
+- **Doing:** 0
+- **Done:** 19
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **administration-xjmda** — Compensating-event composer — append corrective events from the admin UI (feature) — `doing/administration-xjmda-compensating-event-composer.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **administration-xjmda** — Compensating-event composer — append corrective events from the admin UI (feature) — `done/administration-xjmda-compensating-event-composer.md`
 - **administration-btvqa** — Shadow-table replay drift detector — verify projection read models exactly match the event log (feature) — `done/administration-btvqa-projection-drift-integrity-checks.md`
 - **administration-gxd6e** — Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples (feature) — `done/administration-gxd6e-unknown-event-report.md`
 - **administration-cx92m** — Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate (spike) — `done/administration-cx92m-shared-connection-request-concurrency-audit.md`
@@ -59,6 +59,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0032** -- Compensating-event composer validates and canonicalizes an operator's corrective event by round-tripping it through the owning BC's existing `serialize`/`deserialize` seam (prefix-dispatched like `formatEvent`, reflection and template-registries rejected); the re-serialized canonical bytes are what get appended (expected-position checked, under the ADR-0030 request lock), so a composer event is indistinguishable from an organic one except for `{"source":"admin-console"}` metadata. -- 2026-07-22 -- `knowledge/decisions/0032-compensating-event-composer-round-trip-validation.md`
 - **0031** -- Drift detector replays the event log into a throwaway `SqliteConnection` (temp/`:memory:`) per handler and diffs row-by-row against live projection tables, rather than table-name prefixing or `ATTACH` — so unmodified handler code runs verbatim and read-only-against-live holds by construction; gated by the not-dirty guard, streamed over its own single-flight SSE route. -- 2026-07-22 -- `knowledge/decisions/0031-projection-drift-detector-throwaway-shadow-connection.md`
 - **0030** -- A single process-wide `SemaphoreSlim(1,1)` (`requestDbLock`) guards the 3 request-reachable transaction-opening choke points on the shared request `SqliteConnection` (`Api.executeCommand`, `GameJournal.save`, `importNdjson`), generalizing ADR-0028's per-command-lock idiom to the request connection; the residual read×write race is accepted-not-closed, and the full per-request-connection migration is deferred to administration-mz6kp. -- 2026-07-22 -- `knowledge/decisions/0030-request-connection-narrow-semaphore-gate.md`
 - **0029** -- Event-log NDJSON export/import: opaque JSON-escaped-string payload embedding for byte-stable round-trips, explicit-position INSERT bypassing `appendToStream` to preserve `global_position` into an empty store only, "leave projections dirty, reuse Rebuild-all" over self-rebuilding, and an asymmetric transport (plain stream out, SSE-progress in). -- 2026-07-22 -- `knowledge/decisions/0029-ndjson-event-log-export-import.md`

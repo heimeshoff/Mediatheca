@@ -547,6 +547,37 @@ type StreamDetailDto = {
     ProjectionRows: ProjectionStateRow list
 }
 
+// Compensating-event composer (administration-xjmda, ADR-0032): the stream
+// drill-in's "Append corrective event" action. The idiomatic event-sourcing
+// fix for bad data is a corrective event, not mutating history (ADR-0002).
+// The operator picks a real event type seen under the stream's bounded
+// context, clones its most recent payload as a starting point, edits it,
+// then previews and confirms the exact canonicalized (round-tripped)
+// payload that will be appended.
+
+/// Pre-fill for the composer's payload editor: the cloned event's raw JSON.
+/// `FromOtherStream` is true when no instance of the chosen event type
+/// exists on this stream itself and the template was cloned from a sibling
+/// stream sharing the same bounded-context prefix instead — the composer UI
+/// surfaces this so the operator knows the payload may need edits (e.g. IDs)
+/// specific to this stream.
+type CompensatingEventTemplate = {
+    Data: string
+    FromOtherStream: bool
+}
+
+/// Result of `previewCompensatingEvent`: the canonicalized (post-round-trip,
+/// not the operator's raw edit) payload that would actually be written, plus
+/// the stream position the eventual `appendCompensatingEvent` call must
+/// still match. `ExpectedPosition` is captured here (not re-read at commit
+/// time) so a concurrent append landing on this stream between preview and
+/// commit surfaces as a concurrency conflict rather than a silent overwrite.
+type CompensatingEventPreview = {
+    CanonicalEventType: string
+    CanonicalData: string
+    ExpectedPosition: int64
+}
+
 /// Live-tail query for the event explorer's Follow mode (administration-mtf1f):
 /// "everything after global position `After`, matching `Filter`" — the
 /// ascending direction ADR-0020 deliberately left off `EventPageQuery`.
@@ -1553,6 +1584,27 @@ type IAdminApi = {
     getStreamDetail: string -> Async<StreamDetailDto>
     /// Live-tail poll for Follow mode (administration-mtf1f) — see EventTailQuery.
     getEventsAfter: EventTailQuery -> Async<EventDto list>
+    // Compensating-event composer (administration-xjmda, ADR-0032)
+    /// Every event type seen anywhere under `streamId`'s bounded-context
+    /// prefix — the "clone a real event" type picker. Empty if the stream's
+    /// prefix matches no known bounded context.
+    getCompensatingEventTypes: string -> Async<string list>
+    /// Pre-fill payload for a chosen event type on `streamId` — see
+    /// `CompensatingEventTemplate`. None if no instance of that type exists
+    /// anywhere under the stream's bounded-context prefix.
+    getCompensatingEventTemplate: string -> string -> Async<CompensatingEventTemplate option>
+    /// Round-trip-validates and canonicalizes an edited payload without
+    /// appending anything — feeds the confirmation dialog's exact preview
+    /// and captures `ExpectedPosition` for the eventual commit. `Error` when
+    /// the payload doesn't deserialize as a valid instance of the event type.
+    previewCompensatingEvent: string -> string -> string -> Async<Result<CompensatingEventPreview, string>>
+    /// Commits a compensating event: re-validates the edited payload
+    /// (independently of any earlier preview), appends the re-serialized
+    /// canonical form via `EventStore.appendToStream` with
+    /// `expectedPosition` (optimistic concurrency — `Error` on conflict),
+    /// then runs every registered projection's catch-up. Arguments are
+    /// (streamId, eventType, editedPayload, expectedPosition).
+    appendCompensatingEvent: string -> string -> string -> int64 -> Async<Result<unit, string>>
     // Health
     getHealthStats: unit -> Async<HealthStats>
     // Projections (administration-qjcp4)

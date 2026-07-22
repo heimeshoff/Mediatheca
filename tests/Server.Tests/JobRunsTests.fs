@@ -132,7 +132,7 @@ let jobRunsTests =
             let recorder = makeRecorder conn
             use gate = new ManualResetEventSlim(false)
             let spec = blockingSpec "Job C" gate
-            let api = Administration.create conn noStoragePath noImagesDir [] [ spec ] recorder
+            let api = Administration.create conn noStoragePath noImagesDir [] [ spec ] recorder (new SemaphoreSlim(1, 1))
 
             match api.runJobNow "Job C" |> Async.RunSynchronously with
             | RunJobRejected -> failwith "Expected the run to start"
@@ -245,7 +245,7 @@ let jobRunsTests =
                 Async.Start body
                 // A read-path call (getJobStatuses) must not itself reconcile —
                 // only initializeJobRuns does, and only at startup.
-                let api = Administration.create conn noStoragePath noImagesDir [] [ spec ] recorder
+                let api = Administration.create conn noStoragePath noImagesDir [] [ spec ] recorder (new SemaphoreSlim(1, 1))
                 api.getJobStatuses () |> Async.RunSynchronously |> ignore
 
                 match readRows conn "Job H" with
@@ -263,7 +263,7 @@ let jobRunsTests =
             | Error () -> failwith "Expected the trigger to succeed"
             | Ok (_, body) -> body |> Async.RunSynchronously
 
-            let api = Administration.create conn noStoragePath noImagesDir [] [ spec ] recorder
+            let api = Administration.create conn noStoragePath noImagesDir [] [ spec ] recorder (new SemaphoreSlim(1, 1))
             let statuses = api.getJobStatuses () |> Async.RunSynchronously
 
             Expect.equal (List.length statuses) 1 "Should report exactly the one registered job"
@@ -277,7 +277,7 @@ let jobRunsTests =
         testCase "runJobNow for an unregistered job name is rejected" <| fun _ ->
             let conn = createConn ()
             let recorder = makeRecorder conn
-            let api = Administration.create conn noStoragePath noImagesDir [] [] recorder
+            let api = Administration.create conn noStoragePath noImagesDir [] [] recorder (new SemaphoreSlim(1, 1))
 
             match api.runJobNow "No such job" |> Async.RunSynchronously with
             | RunJobRejected -> ()

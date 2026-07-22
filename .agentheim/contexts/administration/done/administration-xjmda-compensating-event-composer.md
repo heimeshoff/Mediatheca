@@ -1,15 +1,15 @@
 ---
 id: administration-xjmda
 title: Compensating-event composer — append corrective events from the admin UI
-status: doing
+status: done
 type: feature
 context: administration
 created: 2026-07-20
-completed:
+completed: 2026-07-22
 depends_on: [administration-v4y9g, design-system-001]
 blocks: [administration-wwc36]
 tags: [admin-console, event-store, surgery]
-related_adrs: [0002]
+related_adrs: [0002, 0032]
 related_research: []
 prior_art: []
 ---
@@ -52,3 +52,59 @@ On a stream's drill-in page (administration-v4y9g, `src/Client/Pages/StreamDetai
 **ADR at implementation:** warranted — "Compensating events via round-trip validation through each BC's existing serialize/deserialize seam, prefix-dispatched like `formatEvent`". This constrains how administration-wwc36's raw-surgery tooling is framed (wwc36 is the escape hatch for when this pattern does *not* apply). Worker takes the next free number at write time (latest committed is 0029; 0030 is contested by two other in-flight refinements per protocol.md — do not hardcode).
 
 **Scope stays one task** — the server compose/validate/append endpoints and the client drill-in UI are one client/server capability seam and are only reviewable/testable together (contrast wwc36, correctly separate as a higher-risk raw-surgery capability).
+
+## Outcome
+
+Shipped the compensating-event composer end to end, as ADR-0032 (accepted) describes.
+
+**Server** (`src/Server/Administration.fs`):
+- `eventCodecs` — a codec per bounded context, each composing that BC's public
+  `Serialization.deserialize eventType data |> Option.map Serialization.serialize` into a
+  BC-agnostic `eventType -> rawData -> (canonicalEventType * canonicalData) option`.
+  Dispatched by stream-id prefix (`canonicalizeCompensatingEvent`), mirroring
+  `EventFormatting.formatEvent`'s `if/elif StartsWith` idiom, prefix strings kept in sync
+  with `boundedContextPrefixes` (documented like `projectionTables`).
+- `appendCompensatingEventCore` — re-validates the payload via the codec (never trusts a
+  prior preview), appends via `EventStore.appendToStream` with a caller-supplied
+  `expectedPosition` (optimistic concurrency), tags metadata `{"source":"admin-console"}`,
+  runs catch-up over every `projectionHandlers` entry. Acquires the same `requestDbLock`
+  (ADR-0030) `Administration.create` now threads through as a new `dbLock` parameter — a
+  fourth request-reachable transaction-opening site of that exact class.
+- Four new `IAdminApi` methods: `getCompensatingEventTypes`, `getCompensatingEventTemplate`
+  (this-stream-first, then BC-prefix-wide fallback pre-fill), `previewCompensatingEvent`
+  (round-trip validate + canonicalize + capture `expectedPosition`), `appendCompensatingEvent`
+  (commit). Two-call (preview/commit) shape chosen — see ADR-0032's rationale — over a
+  single round-trip call.
+- Two new `EventStore.fs` reads: `getDistinctEventTypesForPrefix`, `getMostRecentEventOfType`.
+
+**Shared** (`src/Shared/Shared.fs`): `CompensatingEventTemplate`, `CompensatingEventPreview`
+DTOs; four new `IAdminApi` method signatures.
+
+**Client** (`src/Client/Pages/StreamDetail/`): `ComposerState` nested model, an "Append
+corrective event" button in the header, an inline editor panel (velvet-card, type picker +
+payload textarea + template-source note), and a paper-overlay (ADR-0016, via
+`Components.ModalPanel`) confirmation dialog showing the exact canonicalized payload before
+commit. On success, reloads the stream detail (no separate rebuild step needed — the server
+already ran catch-up).
+
+**Tests** (`tests/Server.Tests/AdministrationTests.fs`): 7 new Expecto tests, one per
+machine-checkable acceptance criterion — types-seen union, pre-fill both branches
+(this-stream / BC-wide fallback), canonical-form-not-raw-bytes (exercised via `Games`'
+`Game_status_changed` legacy-value folding, a real wire-format divergence), deserialize-None
+refusal, concurrency conflict via a stale `expectedPosition`, projection catch-up with no
+manual rebuild, and organic-vs-composer indistinguishability except metadata. All pass,
+`--sequenced` (391/391); the known pre-existing `JobRunsTests.fs` flakiness under parallel
+runs was reproduced and confirmed unrelated (vanishes under `--sequenced`, same as the task
+noted). `JobRunsTests.fs`'s own `Administration.create` call sites were updated for the new
+`dbLock` parameter (mechanical, no behavior change).
+
+The two `[human-eye]` acceptance criteria (rating-correction round-trip in the movie detail
+page; paper-overlay dialog rendering) were verified via `npm run build` (clean Fable
+compile) and a static design-system self-audit against `.claude/skills/design-check`'s rule
+set (paper overlay via `ModalPanel`/`DesignSystem.modalPanel`, `velvetCard` for the
+page-flush editor panel, DaisyUI 5 components throughout, no hardcoded colors/backdrop-filter)
+— not a live browser click-through, since no browser-automation tool was available in this
+worker's toolset. A full interactive/e2e pass is recommended before this ships to a user.
+
+ADR-0032 also explicitly frames administration-wwc36 (which this task blocks) as the escape
+hatch for event types/payloads this round-trip pattern cannot cover.

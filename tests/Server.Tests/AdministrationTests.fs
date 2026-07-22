@@ -62,10 +62,10 @@ let private allProjectionHandlers = [
 // a fresh, uncontended lock is enough for these tests, which don't exercise
 // job-connection concurrency (JobRunsTests.fs / JobConnectionConcurrencyTests.fs do).
 let private createApi conn =
-    Administration.create conn noStoragePath noImagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1)))
+    Administration.create conn noStoragePath noImagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1))) (new SemaphoreSlim(1, 1))
 
 let private createImageApi conn imagesDir =
-    Administration.create conn noStoragePath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1)))
+    Administration.create conn noStoragePath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1))) (new SemaphoreSlim(1, 1))
 
 // ── Image cache admin (administration-xx3mw) test helpers ──
 
@@ -350,7 +350,7 @@ let administrationTests =
             File.WriteAllBytes(Path.Combine(imagesDir, "poster2.jpg"), Array.create 256 0uy)
 
             try
-                let api = Administration.create conn dbPath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1)))
+                let api = Administration.create conn dbPath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1))) (new SemaphoreSlim(1, 1))
                 let stats = api.getHealthStats () |> Async.RunSynchronously
 
                 Expect.equal stats.Storage.DbSizeBytes 1024L "DB size should match the file on disk"
@@ -717,4 +717,158 @@ let administrationTests =
 
                 let eventCountAfter = EventStore.getTotalEventCount conn
                 Expect.equal eventCountAfter eventCountBefore "Purge must never touch the event store")
+
+        // ── Compensating-event composer (administration-xjmda, ADR-0032) ──
+
+        testCase "getCompensatingEventTypes returns the union of event types across every stream sharing the same bounded-context prefix" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let streamA = Movies.streamId "movie-a"
+            let streamB = Movies.streamId "movie-b"
+            EventStore.appendToStream conn streamA -1L [ makeEvent "Movie_added_to_library" "{}" ] |> ignore
+            EventStore.appendToStream conn streamB -1L [ makeEvent "Movie_categorized" "{}" ] |> ignore
+            let api = createApi conn
+
+            let typesFromA = api.getCompensatingEventTypes streamA |> Async.RunSynchronously
+            let typesFromB = api.getCompensatingEventTypes streamB |> Async.RunSynchronously
+
+            Expect.contains typesFromA "Movie_added_to_library" "Should include the type only present on stream A"
+            Expect.contains typesFromA "Movie_categorized" "Should include the type only present on sibling stream B"
+            Expect.equal typesFromA typesFromB "The union is the same regardless of which stream in the BC is asked"
+
+        testCase "getCompensatingEventTemplate pre-fills from the target stream itself when an instance exists there" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let streamA = Movies.streamId "movie-a"
+            let streamB = Movies.streamId "movie-b"
+            EventStore.appendToStream conn streamB -1L [ makeEvent "Personal_rating_set" """{"rating":5}""" ] |> ignore
+            EventStore.appendToStream conn streamA -1L [ makeEvent "Personal_rating_set" """{"rating":8}""" ] |> ignore
+            let api = createApi conn
+
+            let template = api.getCompensatingEventTemplate streamA "Personal_rating_set" |> Async.RunSynchronously
+
+            Expect.isSome template "Should find a template"
+            Expect.equal template.Value.Data """{"rating":8}""" "Should clone the target stream's own instance, not the sibling's"
+            Expect.isFalse template.Value.FromOtherStream "Template came from the target stream itself"
+
+        testCase "getCompensatingEventTemplate falls back to the most recent BC-prefix-wide instance when none exists on the target stream" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let streamA = Movies.streamId "movie-a"
+            let streamB = Movies.streamId "movie-b"
+            EventStore.appendToStream conn streamB -1L [ makeEvent "Personal_rating_set" """{"rating":5}""" ] |> ignore
+            EventStore.appendToStream conn streamA -1L [ makeEvent "Movie_categorized" """{"genres":[]}""" ] |> ignore
+            let api = createApi conn
+
+            let template = api.getCompensatingEventTemplate streamA "Personal_rating_set" |> Async.RunSynchronously
+
+            Expect.isSome template "Should fall back to the BC-wide instance"
+            Expect.equal template.Value.Data """{"rating":5}""" "Should clone the sibling stream's instance"
+            Expect.isTrue template.Value.FromOtherStream "Template came from a sibling stream, not the target"
+
+        testCase "appendCompensatingEvent stores the re-serialized canonical form, not the operator's raw edited bytes" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let streamId = Games.streamId "some-game"
+            let api = createApi conn
+            // Games.Serialization.deserialize's decodeGameStatus folds the legacy
+            // wire value "Playing" into the InFocus case (Games.fs:361) — a real
+            // divergence between what an operator might type and what the
+            // canonical re-serialized form is (Games.fs:351's encodeGameStatus).
+            let rawEdited = """{"status":"Playing"}"""
+
+            match api.previewCompensatingEvent streamId "Game_status_changed" rawEdited |> Async.RunSynchronously with
+            | Error e -> failwith e
+            | Ok preview ->
+                Expect.equal preview.CanonicalData """{"status":"InFocus"}""" "Preview should show the canonicalized form, not the raw legacy value"
+
+                match api.appendCompensatingEvent streamId "Game_status_changed" rawEdited preview.ExpectedPosition |> Async.RunSynchronously with
+                | Error e -> failwith e
+                | Ok () ->
+                    let stored = EventStore.readStream conn streamId |> List.head
+                    Expect.equal stored.Data """{"status":"InFocus"}""" "Stored bytes must be the round-tripped canonical form"
+                    Expect.notEqual stored.Data rawEdited "Stored bytes must differ from the operator's raw edited input"
+
+        testCase "appendCompensatingEvent refuses a payload that fails to deserialize: no row inserted, error surfaced" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let streamId = Friends.streamId "alice"
+            let api = createApi conn
+            let countBefore = EventStore.getTotalEventCount conn
+
+            // Friend_added's decoder requires a "name" field (Friends.fs:105) —
+            // an empty object never deserializes.
+            let result = api.appendCompensatingEvent streamId "Friend_added" "{}" -1L |> Async.RunSynchronously
+
+            match result with
+            | Ok () -> failwith "Expected refusal for an undeserializable payload"
+            | Error _ -> ()
+            Expect.equal (EventStore.getTotalEventCount conn) countBefore "No row should have been inserted for a refused payload"
+
+        testCase "appendCompensatingEvent surfaces a concurrency conflict rather than silently overwriting when another append lands between preview and commit" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let streamId = Friends.streamId "alice"
+            EventStore.appendToStream conn streamId -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Alice"; ImageRef = None }) ] |> ignore
+            let api = createApi conn
+
+            match api.previewCompensatingEvent streamId "Friend_updated" """{"name":"Alice Corrected"}""" |> Async.RunSynchronously with
+            | Error e -> failwith e
+            | Ok preview ->
+                Expect.equal preview.ExpectedPosition 0L "Expected position should be the stream's current position (one event so far)"
+
+                // Another path appends to the stream between the preview's read
+                // and the eventual commit.
+                EventStore.appendToStream conn streamId 0L
+                    [ Friends.Serialization.toEventData (Friends.Friend_updated { Name = "Alice Elsewhere"; ImageRef = None; CropOffsetX = None; CropOffsetY = None; CropZoom = None }) ]
+                |> ignore
+
+                match api.appendCompensatingEvent streamId "Friend_updated" """{"name":"Alice Corrected"}""" preview.ExpectedPosition |> Async.RunSynchronously with
+                | Ok () -> failwith "Expected a concurrency conflict, not a silent overwrite"
+                | Error msg -> Expect.stringContains msg "position" "Error should describe the concurrency conflict"
+
+                let events = EventStore.readStream conn streamId
+                Expect.equal (List.length events) 2 "Only the 'another path' append should have landed; the stale commit must be refused"
+
+        testCase "appendCompensatingEvent runs projection catch-up so the affected BC's projection reflects the new event with no separate rebuild step" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let streamId = Friends.streamId "alice"
+            EventStore.appendToStream conn streamId -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Alice"; ImageRef = None }) ] |> ignore
+            Projection.runProjection conn FriendProjection.handler
+            let api = createApi conn
+
+            match api.previewCompensatingEvent streamId "Friend_updated" """{"name":"Alice Corrected"}""" |> Async.RunSynchronously with
+            | Error e -> failwith e
+            | Ok preview ->
+                api.appendCompensatingEvent streamId "Friend_updated" """{"name":"Alice Corrected"}""" preview.ExpectedPosition
+                |> Async.RunSynchronously |> ignore
+
+                use cmd = conn.CreateCommand()
+                cmd.CommandText <- "SELECT name FROM friend_list WHERE slug = @slug"
+                cmd.Parameters.AddWithValue("@slug", "alice") |> ignore
+                let name = cmd.ExecuteScalar() :?> string
+
+                Expect.equal name "Alice Corrected" "friend_list should reflect the corrective event with no manual rebuild call"
+
+        testCase "a composer-appended event is indistinguishable from an organic one except for metadata" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            let organicStream = Friends.streamId "organic"
+            let composerStream = Friends.streamId "composer-target"
+            EventStore.appendToStream conn organicStream -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Organic"; ImageRef = None }) ] |> ignore
+            EventStore.appendToStream conn composerStream -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Composer Target"; ImageRef = None }) ] |> ignore
+            let api = createApi conn
+
+            match api.previewCompensatingEvent composerStream "Friend_updated" """{"name":"Composer Corrected"}""" |> Async.RunSynchronously with
+            | Error e -> failwith e
+            | Ok preview ->
+                api.appendCompensatingEvent composerStream "Friend_updated" """{"name":"Composer Corrected"}""" preview.ExpectedPosition
+                |> Async.RunSynchronously |> ignore
+
+                // The organic counterpart: the SAME event type, appended the normal way.
+                EventStore.appendToStream conn organicStream 0L
+                    [ Friends.Serialization.toEventData (Friends.Friend_updated { Name = "Organic Corrected"; ImageRef = None; CropOffsetX = None; CropOffsetY = None; CropZoom = None }) ]
+                |> ignore
+
+                let organicRow = EventStore.readStream conn organicStream |> List.last
+                let composerRow = EventStore.readStream conn composerStream |> List.last
+
+                Expect.equal composerRow.EventType organicRow.EventType "Same event type"
+                Expect.equal composerRow.StreamPosition organicRow.StreamPosition "Same stream-position sequencing (position 1, the second event on each stream)"
+                Expect.equal organicRow.Metadata "{}" "Organic event carries the normal empty metadata"
+                Expect.equal composerRow.Metadata "{\"source\":\"admin-console\"}" "Composer event is marked with admin-console provenance"
+                Expect.notEqual composerRow.Metadata organicRow.Metadata "Metadata is the only permitted difference between an organic and a composer-appended event"
     ]

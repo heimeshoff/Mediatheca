@@ -33,6 +33,100 @@ module Administration =
     let private prefixForBoundedContext (bc: string option) : string option =
         bc |> Option.bind (fun name -> boundedContextPrefixes |> List.tryFind (fun (n, _) -> n = name) |> Option.map snd)
 
+    /// The inverse direction of `prefixForBoundedContext`: which known prefix
+    /// (if any) a concrete `streamId` starts with. Same
+    /// `boundedContextPrefixes` registry, same "admin-console-only knowledge
+    /// of a BC's stream-id naming convention" as everywhere else this list
+    /// is consulted (`EventFormatting.formatEvent`'s own `if/elif StartsWith`
+    /// chain is the domain-formatting sibling of this lookup).
+    let private prefixForStreamId (streamId: string) : string option =
+        boundedContextPrefixes
+        |> List.tryFind (fun (_, prefix) -> streamId.StartsWith(prefix))
+        |> Option.map snd
+
+    /// Compensating-event composer (administration-xjmda, ADR-0032): one
+    /// BC-agnostic codec per bounded context, each wrapping that BC's own
+    /// PUBLIC `Serialization.serialize`/`deserialize` seam (no reflection
+    /// over event DUs — the wire format can diverge from the DU shape, e.g.
+    /// `Games.Serialization`'s `Game_status_changed` encodes `GameStatus` as
+    /// a nested string via `encodeGameStatus`, not the DU's own shape; see
+    /// `EventFormatting.fs`'s `formatGameEvent` for why reflection would be
+    /// dishonest about that). Composing `deserialize eventType data |>
+    /// Option.map serialize` is simultaneously the validation gate (a
+    /// payload that doesn't parse yields `None`) and the canonicalization
+    /// step (the re-serialized form is what actually gets appended) — see
+    /// `canonicalizeCompensatingEvent` below. Prefix strings are the SAME
+    /// literal strings as `boundedContextPrefixes` — keep in sync if a BC's
+    /// stream-id prefix ever changes (same convention `projectionTables`
+    /// documents).
+    let private eventCodecs : (string * (string -> string -> (string * string) option)) list = [
+        "Movie-", fun eventType data -> Movies.Serialization.deserialize eventType data |> Option.map Movies.Serialization.serialize
+        "Series-", fun eventType data -> Series.Serialization.deserialize eventType data |> Option.map Series.Serialization.serialize
+        "Game-", fun eventType data -> Games.Serialization.deserialize eventType data |> Option.map Games.Serialization.serialize
+        "Friend-", fun eventType data -> Friends.Serialization.deserialize eventType data |> Option.map Friends.Serialization.serialize
+        "Catalog-", fun eventType data -> Catalogs.Serialization.deserialize eventType data |> Option.map Catalogs.Serialization.serialize
+        "ContentBlocks-", fun eventType data -> ContentBlocks.Serialization.deserialize eventType data |> Option.map ContentBlocks.Serialization.serialize
+    ]
+
+    /// Round-trip validate + canonicalize `rawData` as an instance of
+    /// `eventType`, dispatched to the right BC's codec by `streamId`'s
+    /// prefix (mirrors `EventFormatting.formatEvent`'s dispatch idiom).
+    /// `None` when the prefix matches no known bounded context, or when
+    /// that BC's `deserialize` refuses the payload — either way the caller
+    /// must refuse to append, never fall back to storing the raw edit.
+    let private canonicalizeCompensatingEvent (streamId: string) (eventType: string) (rawData: string) : (string * string) option =
+        eventCodecs
+        |> List.tryFind (fun (prefix, _) -> streamId.StartsWith(prefix))
+        |> Option.bind (fun (_, codec) -> codec eventType rawData)
+
+    /// Commits a compensating event (administration-xjmda, ADR-0032): the
+    /// idiomatic event-sourcing fix for bad data is appending a corrective
+    /// event, not mutating history (ADR-0002). Mirrors `Api.fs`'s
+    /// `executeCommandCore` idiom — expected-position append via
+    /// `EventStore.appendToStream` (never the explicit-rowid path importNdjson
+    /// uses), then catch-up over every registered `projectionHandlers` entry
+    /// — but re-validates `rawData` here too (independent of any earlier
+    /// `previewCompensatingEvent` call) so this function alone guarantees the
+    /// "never stores an unparseable payload" invariant regardless of caller.
+    /// `expectedPosition` is caller-supplied rather than freshly read here:
+    /// it is the position an earlier preview observed, so a stale value
+    /// correctly surfaces as `EventStore.ConcurrencyConflict` if another
+    /// append landed on this stream since. `dbLock` is the same process-wide
+    /// gate ADR-0030 threads through `Api.executeCommandCore`/`GameJournal.save`
+    /// /`importEventsStreamHandler` — this is a fourth request-reachable
+    /// `conn.BeginTransaction()` site of that exact class (via
+    /// `EventStore.appendToStream`), so it acquires the same lock around its
+    /// synchronous append+catch-up body.
+    let private appendCompensatingEventCore
+        (conn: SqliteConnection)
+        (dbLock: SemaphoreSlim)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (streamId: string)
+        (eventType: string)
+        (rawData: string)
+        (expectedPosition: int64)
+        : Result<unit, string> =
+        match canonicalizeCompensatingEvent streamId eventType rawData with
+        | None ->
+            Error (sprintf "Payload does not deserialize as a valid '%s' event - refusing to append" eventType)
+        | Some (canonicalEventType, canonicalData) ->
+            dbLock.Wait()
+            try
+                let eventData : EventStore.EventData = {
+                    EventType = canonicalEventType
+                    Data = canonicalData
+                    Metadata = "{\"source\":\"admin-console\"}"
+                }
+                match EventStore.appendToStream conn streamId expectedPosition [ eventData ] with
+                | EventStore.ConcurrencyConflict(expected, actual) ->
+                    Error (sprintf "Concurrency conflict: expected stream position %d but it is now %d - reload and retry" expected actual)
+                | EventStore.Success _ ->
+                    for handler in projectionHandlers do
+                        Projection.runProjection conn handler
+                    Ok ()
+            finally
+                dbLock.Release() |> ignore
+
     /// Bounded-context name -> the hand-maintained `handledEventTypes` list
     /// mirroring that BC's `Serialization.deserialize` match arms
     /// (administration-gxd6e). Same admin-console-only-knowledge shape as
@@ -949,6 +1043,11 @@ module Administration =
     /// `recorder` is the SAME `ScheduledJobs.JobRunRecorder` instance passed
     /// to `startAll`, so a manual "Run now" and the scheduled timer share one
     /// guard dictionary and one connection (ADR-0026).
+    /// `dbLock` is the same process-wide `requestDbLock` (ADR-0030)
+    /// Composition.fs threads through `Api.create`/`GameJournal.save`
+    /// /`importEventsStreamHandler` — `appendCompensatingEvent` below is a
+    /// fourth request-reachable transaction-opening site on the shared
+    /// `conn` of that exact class, so it acquires the same lock.
     let create
         (conn: SqliteConnection)
         (dbPath: string)
@@ -956,6 +1055,7 @@ module Administration =
         (projectionHandlers: Projection.ProjectionHandler list)
         (scheduledJobs: ScheduledJobs.JobSpec list)
         (recorder: ScheduledJobs.JobRunRecorder)
+        (dbLock: SemaphoreSlim)
         : IAdminApi =
         {
             getEventPage = fun query -> async {
@@ -988,6 +1088,38 @@ module Administration =
                 let limit = max 1 query.Limit
                 let events = EventStore.queryEventsAfter conn filter query.After limit
                 return events |> List.map toEventDto
+            }
+
+            getCompensatingEventTypes = fun streamId -> async {
+                match prefixForStreamId streamId with
+                | None -> return []
+                | Some prefix -> return EventStore.getDistinctEventTypesForPrefix conn prefix
+            }
+
+            getCompensatingEventTemplate = fun streamId eventType -> async {
+                match prefixForStreamId streamId with
+                | None -> return None
+                | Some prefix ->
+                    match EventStore.getMostRecentEventOfType conn streamId prefix eventType with
+                    | None -> return None
+                    | Some e -> return Some { Data = e.Data; FromOtherStream = e.StreamId <> streamId }
+            }
+
+            previewCompensatingEvent = fun streamId eventType rawData -> async {
+                match canonicalizeCompensatingEvent streamId eventType rawData with
+                | None ->
+                    return Error (sprintf "Payload does not deserialize as a valid '%s' event" eventType)
+                | Some (canonicalEventType, canonicalData) ->
+                    let expectedPosition = EventStore.getStreamPosition conn streamId
+                    return Ok {
+                        CanonicalEventType = canonicalEventType
+                        CanonicalData = canonicalData
+                        ExpectedPosition = expectedPosition
+                    }
+            }
+
+            appendCompensatingEvent = fun streamId eventType rawData expectedPosition -> async {
+                return appendCompensatingEventCore conn dbLock projectionHandlers streamId eventType rawData expectedPosition
             }
 
             getEventStreams = fun () -> async {

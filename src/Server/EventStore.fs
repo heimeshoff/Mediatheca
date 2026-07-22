@@ -308,6 +308,38 @@ module EventStore =
         |> Db.newCommand "SELECT DISTINCT event_type FROM events ORDER BY event_type"
         |> Db.query (fun rd -> rd.ReadString "event_type")
 
+    /// Every distinct event type seen anywhere under a stream_id `prefix`
+    /// (e.g. "Movie-") — the compensating-event composer's "types seen"
+    /// picker (administration-xjmda): an operator composing a corrective
+    /// event on one stream may clone a type that only exists on a sibling
+    /// stream of the same bounded context. `prefix%` is index-backed via
+    /// `idx_events_stream_id` (a plain prefix LIKE, no leading wildcard).
+    let getDistinctEventTypesForPrefix (conn: SqliteConnection) (prefix: string) : string list =
+        conn
+        |> Db.newCommand "SELECT DISTINCT event_type FROM events WHERE stream_id LIKE @prefix ORDER BY event_type"
+        |> Db.setParams [ "prefix", SqlType.String (prefix + "%") ]
+        |> Db.query (fun rd -> rd.ReadString "event_type")
+
+    /// "Clone a real event" pre-fill for the compensating-event composer
+    /// (administration-xjmda): the most recent instance of `eventType` on
+    /// `streamId` itself if one exists, else the most recent instance
+    /// anywhere under `streamId`'s own bounded-context `prefix`. Two
+    /// separate queries (not one UNION+ORDER) so the this-stream-first
+    /// tiebreak is explicit rather than implied by ordering.
+    let getMostRecentEventOfType (conn: SqliteConnection) (streamId: string) (prefix: string) (eventType: string) : StoredEvent option =
+        let onThisStream =
+            conn
+            |> Db.newCommand "SELECT global_position, stream_id, stream_position, event_type, data, metadata, timestamp FROM events WHERE stream_id = @stream_id AND event_type = @event_type ORDER BY global_position DESC LIMIT 1"
+            |> Db.setParams [ "stream_id", SqlType.String streamId; "event_type", SqlType.String eventType ]
+            |> Db.querySingle readEvent
+        match onThisStream with
+        | Some _ -> onThisStream
+        | None ->
+            conn
+            |> Db.newCommand "SELECT global_position, stream_id, stream_position, event_type, data, metadata, timestamp FROM events WHERE stream_id LIKE @prefix AND event_type = @event_type ORDER BY global_position DESC LIMIT 1"
+            |> Db.setParams [ "prefix", SqlType.String (prefix + "%"); "event_type", SqlType.String eventType ]
+            |> Db.querySingle readEvent
+
     let getRecentEvents (conn: SqliteConnection) (count: int) : StoredEvent list =
         conn
         |> Db.newCommand "SELECT global_position, stream_id, stream_position, event_type, data, metadata, timestamp FROM events ORDER BY global_position DESC LIMIT @count"
