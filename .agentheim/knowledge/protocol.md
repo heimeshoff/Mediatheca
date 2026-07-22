@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 16:30 -- Modeling / Refined: administration-mz6kp - Per-request SqliteConnection migration
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Firmed up the per-request connection-factory refactor now that its blocker (administration-cx92m / ADR-0030) has landed. Architect pass resolved the three open decisions: per-test **temp-file DB** fixture (not shared-cache `:memory:`), **one-connection-per-stream** SSE lifetime, and a **new ADR-0033 superseding ADR-0030**. Corrected the capture's blast radius — 4 must-change test files (not 8) and a fourth transaction site (`appendCompensatingEventCore`, ADR-0032) — and replaced the provisional criteria with machine-checkable ones. Added related_adrs 0030/0032 and prior_art cx92m. Auto-promoted to todo.
+**Split into:** none
+**ADRs written:** none (ADR-0033 is to be written by the worker at execution time)
+
+---
+
 ## 2026-07-22 15:55 -- Modeling / Promoted: administration-wwc36 - Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag
 
 **Type:** Modeling / Promote
