@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 13:06 -- Modeling / Refined: administration-xjmda - Compensating-event composer
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Closed the task's central open question (valid-event-type + payload-template source). Builder decided against DU reflection (dishonest — the wire format diverges from the DU shape, e.g. `Game_status_changed`'s nested `"Case"` field) and against a hand-maintained template registry (a second source of truth that drifts), in favor of "clone a real event" over each BC's existing `Serialization.serialize`/`deserialize` seam. Scope = all stream-scoped event types that already exist under the BC prefix. Architect (source-grounded) firmed up: a per-BC codec registry in `Administration.fs` prefix-dispatched like `EventFormatting.formatEvent`; validate-by-round-trip (store the re-serialized canonical bytes, guaranteeing indistinguishability from an organic event); pure expected-position `appendToStream` (never the explicit-rowid path); catch-up via the app-wide `projectionHandlers` list already injected into `Administration.create`; two new `EventStore.fs` reads; `{"source":"admin-console"}` audit metadata. Acceptance criteria rewritten to 7 machine-checkable + 2 `[human-eye]` (ADR-0061). Stays one task (server+client capability seam). ADR flagged for the worker to write at implementation. Auto-promoted to todo.
+**Split into:** none
+**ADRs written:** none (candidate flagged in Notes for the worker — next free number after 0029, do not hardcode)
+
+---
+
 ## 2026-07-22 13:04 -- Modeling / Promoted: administration-gxd6e - Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples
 
 **Type:** Modeling / Promote
