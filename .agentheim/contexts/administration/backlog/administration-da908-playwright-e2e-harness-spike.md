@@ -66,10 +66,21 @@ below.
 - Is there an existing API method to seed a single movie into an empty store, or does a fixture/import path need adding first?
 - Does `getEventsAfter` traverse the vite `/api` proxy in a form observable on :5173, or must the test watch :5000 directly?
 
+**Stop-loss (spike):** if, mid-spike, the mitigation is already known and cheap,
+record it and stop. Concretely — if the harness proves out trivially, or one of
+the open unknowns resolves to an obviously-cheap fix (e.g. `dotnet run` non-watch
+is plainly the answer, or `getEventsAfter` is plainly observable on :5173), write
+the finding into the ADR and end the spike rather than exhaustively hardening all
+six acceptance criteria. The spike exists to retire harness risk, not to gold-
+plate the harness.
+
 **Expected ADR output:** working this spike (with the follow-on feature) should
-produce **ADR-0025** — *Playwright e2e harness*, `scope: global` (a first-of-its-
-kind, project-wide test-infrastructure choice, pre-assigned; latest ADR on disk
-is 0024). The ADR should record: the Playwright choice and why not the
+produce a `scope: global` ADR — *Playwright e2e harness* — a first-of-its-kind,
+project-wide test-infrastructure choice. Use the **next free ADR number at
+authoring time** (as of 2026-07-22 that is **0027** — the originally pre-assigned
+0025 was consumed by administration-xx3mw and 0026 by administration-yamm5, so
+confirm the max on disk before minting rather than trusting a stale reservation).
+The ADR should record: the Playwright choice and why not the
 alternatives; the `webServer` dev-stack lifecycle + the `dotnet watch` teardown
 caveat; per-run temp `DATA_DIR` isolation; the direct-API-call event-triggering
 convention; the "no CI in this repo today, `reuseExistingServer: !CI`, designed

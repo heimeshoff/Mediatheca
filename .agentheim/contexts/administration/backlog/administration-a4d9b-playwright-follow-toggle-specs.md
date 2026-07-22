@@ -45,7 +45,9 @@ can start/stop the stack, isolate the DB, fire an API-triggered event, and see
 network traffic) and on administration-h4br2 (the one-time smoke pass that
 confirms the exact flows/selectors before they're codified).
 
-ADR-0025 (Playwright e2e harness, `scope: global`) is expected to be authored by
+The Playwright e2e harness ADR (`scope: global`, next free number at authoring
+time — 0027 as of 2026-07-22, since the originally pre-assigned 0025/0026 were
+consumed by administration-xx3mw/yamm5) is expected to be authored by
 administration-da908; this task consumes that harness rather than re-deciding it.
 Shaped via the orchestrator (architect) during the administration-h4br2
 refinement, 2026-07-21.

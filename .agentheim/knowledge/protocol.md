@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 09:26 -- Modeling / Refined: administration-da908 - Prove a Playwright harness can drive the full Mediatheca stack and observe network traffic
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Added the ADR-0065 spike stop-loss clause (was missing — spike was malformed); corrected the stale pre-assigned ADR number (0025/0026 were consumed by xx3mw/yamm5, so the harness ADR is now "next free at authoring time" — 0027 today), fixing the same stale reference in downstream administration-a4d9b. Dependency administration-h4br2 is now `done/`, so the spike is unblocked. Auto-promoted to todo.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-07-21 21:32 -- Work session ended
 
 **Type:** Work / Session end
