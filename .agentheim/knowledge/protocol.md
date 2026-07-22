@@ -5,6 +5,23 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 17:42 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~45m
+**Completed:** 2 (first-try PASS: 2, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** administration-qk3f7: 1, administration-mz6kp: 1
+**Commits:** 5
+**Vision-conformance:** none — batch aligns with vision. qk3f7 (Game_rawg_id_set formatter arm) is the recognized Operability/admin-console Health-tab integrity workstream; mz6kp (per-request connection migration, ADR-0033) is event-store reliability infrastructure under ADR-0002/0003. Neither touches a v1 Out-of-Scope non-goal (Books, Trakt/Jellyfin sync, yearly reports, friend intelligence, trailer playback). Standing context, not a flag: like last session, the whole batch is admin/infra; the media-experience v1 arc (In Focus, Unified Dashboard, Steam import, HLTB) — which the vision's Boundary says wins when it competes with admin tooling — remains the larger unbuilt work.
+**Batch mix:** 0% product-facing / 100% harness (2 tasks) by the type heuristic (bug + refactor both fall to harness). In substance both are admin-console/event-store reliability work, not meta/tooling/bookkeeping; qk3f7's formatter fix is operator-facing in the stream drill-in.
+**Carry-over:** "Mediatheca Directions.html": left behind (user WIP, 1 file — pre-existing untracked at session start). No .agentheim/-owned files stranded. No registered non-main git worktrees — this session's two worktrees (qk3f7, mz6kp) were both cleanly torn down. Separately, 6 stale directories persist under .worktrees/ (administration-da908, -qjcp4, -v4y9g, -yamm5, infrastructure-w8fnp, intelligence-p9m4t) — orphans from prior sessions, NOT git-registered worktrees (git worktree list shows only main), so the worktree-carry-over mechanism does not act on them; re-surfaced for manual cleanup per the surface-don't-delete posture, as last session did.
+**Held (not dispatched):** administration-wwc36 (event surgery) is DAG-ready but was deliberately held. Builder chose mz6kp-first; mz6kp retired the requestDbLock that wwc36 was refined to acquire, so wwc36's Concurrency section is now stale. It needs a `modeling` REFINE against the per-request factory model (its three commit ops become `use conn = factory()`, no semaphore) before it can be worked. Its reserved ADR number should also move off 0033 (now taken by mz6kp).
+
+---
+
 ## 2026-07-22 17:39 -- Task verified and completed: administration-mz6kp - Migrate Api.create/Administration.create and the raw Giraffe stream handlers from one shared SqliteConnection to per-request (factory-based) connections, retiring the ADR-0030 semaphore gate
 
 **Type:** Work / Task completion
