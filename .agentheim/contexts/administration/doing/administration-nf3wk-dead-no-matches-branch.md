@@ -1,7 +1,7 @@
 ---
 id: administration-nf3wk
 title: "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead"
-status: todo
+status: doing
 type: bugfix
 context: administration
 created: 2026-07-22

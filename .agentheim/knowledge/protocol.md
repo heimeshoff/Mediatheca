@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 13:21 -- Batch started: [administration-h4k2p, administration-nf3wk, administration-cx92m]
+
+**Type:** Work / Batch start
+**Tasks:** administration-h4k2p - Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure., administration-nf3wk - "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead", administration-cx92m - Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate
+**Parallel:** yes (3 workers — administration-btvqa, administration-gxd6e, administration-xjmda held to next wave: all three edit src/Server/Administration.fs and would risk merge conflicts against h4k2p and each other; this batch touches disjoint server files)
+
+---
+
 ## 2026-07-22 13:17 -- Modeling / Promoted: administration-nf3wk - "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead"
 
 **Type:** Modeling / Promote

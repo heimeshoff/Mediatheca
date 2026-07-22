@@ -1,7 +1,7 @@
 ---
 id: administration-cx92m
 title: Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate
-status: todo
+status: doing
 type: spike
 context: administration
 created: 2026-07-22

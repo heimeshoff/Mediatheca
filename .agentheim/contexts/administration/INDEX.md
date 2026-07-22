@@ -11,23 +11,23 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 3
-- **Todo:** 6
-- **Doing:** 0
+- **Todo:** 3
+- **Doing:** 3
 - **Done:** 13
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **administration-nf3wk** — "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead" (bugfix) — `todo/administration-nf3wk-dead-no-matches-branch.md`
 - **administration-xjmda** — Compensating-event composer — append corrective events from the admin UI (feature) — `todo/administration-xjmda-compensating-event-composer.md`
 - **administration-gxd6e** — Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples (feature) — `todo/administration-gxd6e-unknown-event-report.md`
 - **administration-btvqa** — Shadow-table replay drift detector — verify projection read models exactly match the event log (feature) — `todo/administration-btvqa-projection-drift-integrity-checks.md`
-- **administration-cx92m** — Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate (spike) — `todo/administration-cx92m-shared-connection-request-concurrency-audit.md`
-- **administration-h4k2p** — Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure. (bug) — `todo/administration-h4k2p-sse-empty-payload-trailing-comma-bug.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **administration-cx92m** — Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate (spike) — `doing/administration-cx92m-shared-connection-request-concurrency-audit.md`
+- **administration-nf3wk** — "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead" (bugfix) — `doing/administration-nf3wk-dead-no-matches-branch.md`
+- **administration-h4k2p** — Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure. (bug) — `doing/administration-h4k2p-sse-empty-payload-trailing-comma-bug.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
