@@ -5,6 +5,26 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 11:09 -- Modeling / Refined: administration-tj8n2 - Scheduled-job timers race on the shared SqliteConnection and crash the process
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo (auto-promoted)
+**Summary:** Reframed via an architect pass. Verified in source that the crash is not a startup-only artifact: both jobs default to `Hour = 4` and `nextRun` has no jitter, so the two daily timers also collide at exactly 04:00:00 local every night — and the race extends past `insertRunningRow` into the job bodies (both run on the shared `conn`). Chose the fix (dedicated job `SqliteConnection` + a `SemaphoreSlim(1,1)` per command, covering recorder AND both job bodies); rejected stagger-the-delays (misses the nightly collision) and recorder-only (insufficient). Sharpened acceptance criteria to a machine-checkable concurrent-execution regression test incl. the same-hour case; marked the `MEDIATHECA_DISABLE_SCHEDULED_JOBS` retirement `[human-eye]`. Fix warrants an ADR (number assigned at authoring time). related_adrs → [0003, 0024, 0026, 0027].
+**Split into:** none (spun off a related non-blocking task — see below — not a split of tj8n2's scope)
+**ADRs written:** none (fix's ADR to be authored during `work`)
+
+---
+
+## 2026-07-22 11:09 -- Modeling / Captured: administration-cx92m - Audit whether the single shared SqliteConnection is safe under request×request concurrency
+
+**Type:** Modeling / Capture
+**BC:** administration
+**Filed to:** backlog
+**Summary:** Spun off from tj8n2's refinement. The entire server runs on one shared `SqliteConnection`; tj8n2 fixes only the scheduled-job races (job×job, job×request). This spike investigates request×request safety across the whole app and decides per-operation/pooled connections vs. a global gate, producing an ADR. Non-blocking; references tj8n2's fix as its motivation.
+
+---
+
 ## 2026-07-22 10:58 -- Modeling / Promoted: administration-a4d9b - Assert the Events-tab Follow toggle's three live-tail behaviors via committed Playwright specs
 
 **Type:** Modeling / Promote
