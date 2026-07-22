@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 10:09 -- Batch started: [administration-da908]
+
+**Type:** Work / Batch start
+**Tasks:** administration-da908 - Prove a Playwright harness can drive the full Mediatheca stack and observe network traffic
+**Parallel:** no (1 worker — only ready task; da908 unblocked now that dependency administration-h4br2 is done)
+
+---
+
 ## 2026-07-22 09:26 -- Modeling / Promoted: administration-da908 - Prove a Playwright harness can drive the full Mediatheca stack and observe network traffic
 
 **Type:** Modeling / Promote
