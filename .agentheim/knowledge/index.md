@@ -36,6 +36,7 @@ For BC-scoped artifacts, see each BC's `INDEX.md`.
 - **0007** -- Single-user app, no authentication -- 2026-05-12 -- `knowledge/decisions/0007-single-user-no-auth.md`
 - **0008** -- Ten bounded contexts for Mediatheca -- 2026-05-12 -- `knowledge/decisions/0008-bounded-contexts-mediatheca.md`
 - **0018** -- Photino.NET desktop shell — in-process Kestrel, loopback-only, self-contained publish -- 2026-07-20 -- `knowledge/decisions/0018-photino-desktop-shell.md`
+- **0027** -- Playwright e2e harness — the project's first browser/e2e harness (`@playwright/test`); `webServer` drives the full dev stack (`dotnet run`, not watch, for reliable Windows teardown) against a per-run temp `DATA_DIR`, triggers events via direct Fable.Remoting calls, and asserts on `getEventsAfter` traffic. Establishes the spike-then-feature precedent for e2e work. -- 2026-07-22 -- `knowledge/decisions/0027-playwright-e2e-harness.md`
 <!-- adr-global:end -->
 
 ## Cross-BC research

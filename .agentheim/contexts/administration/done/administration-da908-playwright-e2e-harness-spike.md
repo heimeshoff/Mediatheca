@@ -1,15 +1,15 @@
 ---
 id: administration-da908
 title: Prove a Playwright harness can drive the full Mediatheca stack and observe network traffic
-status: doing
+status: done
 type: spike
 context: administration
 created: 2026-07-21
-completed:
+completed: 2026-07-22
 depends_on: [administration-h4br2]
 blocks: [administration-a4d9b]
 tags: [admin-console, event-store, live, testing, e2e]
-related_adrs: [0023]
+related_adrs: [0023, 0027]
 related_research: []
 prior_art: [administration-mtf1f]
 ---
@@ -90,3 +90,48 @@ e2e-worthy work.
 
 Decomposition and harness choice shaped via the orchestrator (architect) during
 the administration-h4br2 refinement, 2026-07-21.
+
+## Outcome
+Stood up `@playwright/test` as the project's first e2e harness and proved
+all three acceptance-critical unknowns empirically (not guessed) — see
+ADR-0027 for the full writeup:
+
+1. **`dotnet watch` orphans its process tree on Windows teardown** (repro'd:
+   killing the spawned child leaves `dotnet watch`/`dotnet-watch.dll`
+   running); **plain `dotnet run` (non-watch) tears down cleanly** — used in
+   `playwright.config.ts`'s server `webServer` entry.
+2. **No seeding needed.** `IMediathecaApi.addFriend` needs no pre-existing
+   entity and no external network (unlike `addMovie`'s TMDB dependency), so
+   it's the hermetic direct-API-call trigger for the smoke spec's happy path.
+3. **`getEventsAfter` is plainly observable via the `:5173` vite-proxied
+   origin** — confirmed via a real request against a running dev stack; no
+   need to watch `:5000` separately. Carried into administration-a4d9b.
+
+**New finding along the way (out of this task's scope to fix):** a real,
+previously-unknown production bug — `administration-tj8n2` — where the two
+`ScheduledJobs` catch-up timers race on the shared `SqliteConnection` and
+crash a freshly cold-started server ~5s after startup. Worked around for
+e2e runs only via an opt-in `MEDIATHECA_DISABLE_SCHEDULED_JOBS=1` env var
+(`Composition.fs`); filed as its own backlog bug for a real fix.
+
+Also worked around, empirically, a Windows-specific transient file lock on
+the temp `DATA_DIR`'s SQLite files after server teardown (`tests/e2e/global-teardown.ts`
+retries for a bounded budget, then warns and moves on rather than failing
+the run — the leftover directory is harmless and OS-reclaimed regardless).
+
+`npm run build` (Fable compile) and the Expecto suite (`npm test`, 358
+tests) both remain green. The one smoke spec
+(`tests/e2e/event-tail-follow.smoke.spec.ts`) passes reliably (~4-5s test
+time; ~45-60s including cold-start webServer boot) via `npm run test:e2e`.
+
+Stop-loss applied: the three open unknowns each resolved to a clear,
+documented answer without needing to harden all six acceptance criteria
+beyond what the happy-path smoke spec requires — administration-a4d9b picks
+up the actual ADR-0023 behavioral assertions on top of this proven harness.
+
+Key files: `playwright.config.ts`, `tests/e2e/global-teardown.ts`,
+`tests/e2e/event-tail-follow.smoke.spec.ts`, `package.json` (`test:e2e`
+script, `@playwright/test` devDependency), `src/Server/Composition.fs`
+(`MEDIATHECA_DISABLE_SCHEDULED_JOBS` gate), `.gitignore` (Playwright
+artifacts). ADR: `.agentheim/knowledge/decisions/0027-playwright-e2e-harness.md`.
+Follow-up bug: `administration-tj8n2` (backlog).

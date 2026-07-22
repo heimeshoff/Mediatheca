@@ -35,5 +35,10 @@ uploads/
 .agentheim/.dashboard
 .agentheim/state
 
+## Playwright e2e (ADR-0027)
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
 ## Spike credentials (never commit — long-lived Steam refresh token)
 spikes/steam-family-token-spike/refresh-token.local.txt

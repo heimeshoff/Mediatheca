@@ -329,6 +329,21 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     // Scheduled jobs: registry, hours, and the job-runs recorder are all
     // built above (before Administration.create) per ADR-0026 — start the
     // timers here, sharing the same recorder instance.
-    let _scheduledJobTimers = ScheduledJobs.startAll jobRunRecorder scheduledJobs
+    //
+    // MEDIATHECA_DISABLE_SCHEDULED_JOBS is an opt-in escape hatch for the
+    // Playwright e2e harness (administration-da908 / ADR-0027): the two
+    // catch-up timers both fire ~5s after startup and both call
+    // `Administration.insertRunningRow` on the same shared `conn`, which is
+    // not safe for concurrent use — an unhandled exception on either timer's
+    // background thread crashes the whole process (see the harness spike's
+    // ADR and its companion backlog bug for the real fix). Skipping job
+    // startup entirely sidesteps the race for e2e runs, which don't exercise
+    // scheduled jobs anyway. Unset (or any other value) preserves today's
+    // behavior exactly — normal dev/Docker runs are unaffected.
+    let disableScheduledJobs =
+        Environment.GetEnvironmentVariable("MEDIATHECA_DISABLE_SCHEDULED_JOBS") = "1"
+    let _scheduledJobTimers =
+        if disableScheduledJobs then []
+        else ScheduledJobs.startAll jobRunRecorder scheduledJobs
 
     app
