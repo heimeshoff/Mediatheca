@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 10:57 -- Modeling / Refined: administration-a4d9b - Assert the Events-tab Follow toggle's three live-tail behaviors via committed Playwright specs
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Both dependencies (administration-da908 harness spike, administration-h4br2 smoke pass) are now done and the ADR-0027 harness has shipped, so the readiness bar is met. Folded the harness's empirically-resolved conventions into the task so the worker arrives non-isolated: the `addFriend` hermetic trigger + JSON-array wire protocol, `getEventsAfter` observability on the `:5173` proxy, and the concrete selectors (`Follow`/`Following`, `animate-highlight` arrival class, `/#/admin/events`, `"Prev"`/`"Next"`, search placeholder). Resolved the open "confirm the exact class" placeholder against `EventBrowser/Views.fs`/`State.fs`. Added an explicit additive/read-only acceptance criterion for the `reuseExistingServer` real-DB caveat, added ADR-0027 to related_adrs, and classified all criteria machine-checkable (ADR-0061; no `[human-eye]`). Auto-promoted to todo.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-07-22 10:44 -- Work session ended
 
 **Type:** Work / Session end
