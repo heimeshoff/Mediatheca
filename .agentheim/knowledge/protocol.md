@@ -5,6 +5,25 @@ Newest entries on top.
 
 ---
 
+## 2026-07-22 11:10 -- Modeling / Promoted: administration-tj8n2 - Scheduled-job timers race on the shared SqliteConnection and crash the process — fix with a dedicated job connection plus a per-command lock
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
+## 2026-07-22 11:09 -- Modeling / Refined: administration-vrc56 - Event log export/import as NDJSON
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Settled the three open decisions in the task's Notes via the builder: (1) scope narrowed to export + import-into-an-*empty*-store only, refusing a non-empty store — the destructive wipe-first path is split out to new task administration-n8kqw (depends_on vrc56 + wwc36's surgery-grade auto-backup); (2) import preserves exact `global_position` via explicit-rowid INSERT so the round-trip is byte-stable and keyset cursors stay valid across environments; (3) transport is plain Giraffe streaming routes (`/api/stream/export-events` streamed NDJSON out, `/api/stream/import-events` SSE-progress in) per the `steamFamilyImportHandler` precedent, not Fable.Remoting byte arrays. Orchestrator (architect-level, source-grounded) added: opaque JSON-escaped-string payload embedding for lossless round-trip, `appendToStream` bypass with whole-import transaction, "leave projections dirty, reuse the existing Rebuild-all control (qjcp4/ADR-0025)" instead of self-triggering a rebuild, and the `events_fts` insert-trigger-covers-import-but-not-wipe finding (the wipe case lands in n8kqw). Backlinked the open import-concurrency-guard question to the concurrently-captured app-wide audit administration-cx92m. related_adrs extended to [0002, 0003, 0024, 0025]. All acceptance criteria machine-checkable (ADR-0061; no `[human-eye]`). Auto-promoted to todo.
+**Split into:** administration-n8kqw (Event log import — wipe-first path for a non-empty store, gated behind wwc36's auto-backup; filed to backlog, depends_on vrc56 + wwc36)
+**ADRs written:** none (candidate flagged in vrc56 Notes for the worker to write at implementation — next free number ~0028, confirm at write time)
+
+---
+
 ## 2026-07-22 11:09 -- Modeling / Refined: administration-tj8n2 - Scheduled-job timers race on the shared SqliteConnection and crash the process
 
 **Type:** Modeling / Refine
