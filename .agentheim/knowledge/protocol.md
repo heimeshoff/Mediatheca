@@ -13,6 +13,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 16:05 -- Modeling / Refined: administration-jrflk - Retire Administration.fs's three ambient module-level guards in favour of composition-root-owned per-instance state
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Grounded the task against current code and found its premise had moved: administration-mz6kp already shipped the `"JobRunsTests "` job-name prefix as a stopgap (JobRunsTests.fs:11-20 points here for the real fix), so jrflk is now "remove the class", not "stop a failing suite". Widened scope at the builder's call from the one flaking guard to all three module-level `ConcurrentDictionary` guards in `Administration.fs` (`runningJobs` :880, `rebuildingProjections` :402, `driftCheckInProgress` :444) — the latter two are the same defect, currently latent only because no test reaches the SSE handlers that hold them. Settled two different ownership mechanisms: the job guard moves into `makeJobRunRecorder`'s closure (no signature change; `Composition.fs:322` builds exactly one recorder, and every existing test shares one recorder within a test, so both production and test semantics survive intact), while the two projection guards become an `AdminGuards` record threaded through its five consumers (`buildProjectionStats`, `isAnyProjectionDirty`, `driftCheckStreamHandler`, `projectionRebuildStreamHandler`, `create`) from a single `makeGuards ()` at the composition root. Enumerated all 11 call sites that gain a parameter, flagged `isAnyProjectionDirty` as the load-bearing ADR-0025 not-dirty guard whose computation must not change, rejected the `testSequenced` and rename-by-convention alternatives, and made deleting the mz6kp prefix an acceptance criterion so the re-collided names prove the structural fix carries it. Added a by-construction criterion (two independently-built recorders / two independently-built `AdminGuards` both claiming the same key) as the one that survives future test files. Verification set to structural + one clean run per the builder's choice, not a 10x loop. Reserved ADR-0035; populated related_adrs (0024/0025/0026/0028/0031/0033) and prior_art (yamm5, qjcp4, btvqa, tj8n2, mz6kp). No split.
+**Split into:** none
+**ADRs written:** none (ADR-0035 reserved, to be written by the worker)
+
+---
+
 ## 2026-07-31 15:10 -- Modeling / Promoted: administration-svq3t - Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
 
 **Type:** Modeling / Promote

@@ -54,7 +54,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **administration-jrflk** — Fix cross-file job-name collision flake between JobRunsTests.fs and JobConnectionConcurrencyTests.fs (bug) — `backlog/administration-jrflk-job-name-collision-test-flake.md`
+- **administration-jrflk** — Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over (bug) — `backlog/administration-jrflk-job-name-collision-test-flake.md`
 - **administration-n8kqw** — Event log import — wipe-first path for a non-empty store, gated behind wwc36's surgery-grade auto-backup (feature) — `backlog/administration-n8kqw-wipe-first-import.md`
 <!-- backlog-list:end -->
 
