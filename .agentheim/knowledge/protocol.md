@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 19:05 -- Task verified and completed: infrastructure-npyhb - "Pin Feliz.DaisyUI to the exact 5.2.0 — 5.3.0's prebuilt dll needs Feliz 3.1.1, NuGet downgrades it to the pinned 2.9.0 (NU1605), and `dotnet build` then fails FS0193 on the missing `HtmlHelper`. 5.2.0's Fable sources are byte-identical, so nothing shipped changes."
+
+**Type:** Work / Task completion
+**Task:** infrastructure-npyhb - "Pin Feliz.DaisyUI to the exact 5.2.0 — 5.3.0's prebuilt dll needs Feliz 3.1.1, NuGet downgrades it to the pinned 2.9.0 (NU1605), and `dotnet build` then fails FS0193 on the missing `HtmlHelper`. 5.2.0's Fable sources are byte-identical, so nothing shipped changes."
+**Summary:** Pinned Feliz.DaisyUI to the exact 5.2.0 in Client.fsproj, clearing the NU1605 downgrade and the FS0193 HtmlHelper binding failure it caused on the MSBuild pathway, with the emitted bundle measured unchanged (identical Vite content hashes)
+**Duration:** 14m30s
+**Verification:** PASS (iteration 1)
+**Files changed:** 2
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-07-31 19:05 -- Task verified and completed: design-system-q4ebg - "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)"
 
 **Type:** Work / Task completion

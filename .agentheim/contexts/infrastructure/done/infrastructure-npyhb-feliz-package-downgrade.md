@@ -1,11 +1,11 @@
 ---
 id: infrastructure-npyhb
 title: "Pin Feliz.DaisyUI to the exact 5.2.0 — 5.3.0's prebuilt dll needs Feliz 3.1.1, NuGet downgrades it to the pinned 2.9.0 (NU1605), and `dotnet build` then fails FS0193 on the missing `HtmlHelper`. 5.2.0's Fable sources are byte-identical, so nothing shipped changes."
-status: doing
+status: done
 type: chore
 context: infrastructure
 created: 2026-07-31
-completed:
+completed: 2026-07-31
 depends_on: []
 blocks: [infrastructure-p1h9a]
 tags: [nuget, packages, feliz, daisyui, build-health, tech-debt]
@@ -105,26 +105,78 @@ not as a side effect of clearing a build warning.
 
 ## Acceptance criteria
 
-- [ ] `src/Client/Client.fsproj` pins `Feliz.DaisyUI` to the exact `5.2.0`
+- [x] `src/Client/Client.fsproj` pins `Feliz.DaisyUI` to the exact `5.2.0`
       (no floating `5.*`).
-- [ ] `dotnet build src/Client/Client.fsproj` emits **zero** `NU1605` lines.
-- [ ] `dotnet build src/Client/Client.fsproj` emits **zero** `error FS0193`
+- [x] `dotnet build src/Client/Client.fsproj` emits **zero** `NU1605` lines.
+- [x] `dotnet build src/Client/Client.fsproj` emits **zero** `error FS0193`
       lines. (If other pre-existing `FS` errors remain, record them and their
       count — this task owns FS0193 and NU1605 only.)
-- [ ] `npm run build` still exits 0 and still emits the bundle to
+- [x] `npm run build` still exits 0 and still emits the bundle to
       `deploy/public/`, with zero `ERROR FS` lines.
-- [ ] The emitted bundle is unchanged in substance versus a pre-change build —
+- [x] The emitted bundle is unchanged in substance versus a pre-change build —
       expected by construction, since the Fable sources are byte-identical.
       Record the observed comparison (e.g. matching bundle byte sizes, or a
       `deploy/public/assets/` diff) rather than asserting it.
-- [ ] `npm test` still passes (416 tests green at last run).
-- [ ] The infrastructure README's ubiquitous language records the pinning rule:
+- [x] `npm test` still passes (416 tests green at last run).
+- [x] The infrastructure README's ubiquitous language records the pinning rule:
       Feliz.DaisyUI is pinned exactly because a floating `5.*` silently pulled a
       Feliz-3-built assembly into a Feliz-2 project, and taking a future DaisyUI
       release is now an explicit decision. **Prose-only, unenforced** (ADR-0059):
       `NU1605` is a warning, so `infrastructure-p1h9a`'s errors-only build gate
       will not catch a future re-float. Noted deliberately rather than mechanized —
       the exact pin is itself the structural guard.
+
+## Outcome
+
+Pinned `Feliz.DaisyUI` to the exact `5.2.0` in `src/Client/Client.fsproj`,
+replacing the floating `5.*`.
+
+**Criterion 2 (zero `NU1605`) — verified directly.** Baseline `dotnet build`
+(pre-change) emitted 3 `NU1605` lines (Feliz 3.1.1 → 2.9.0 downgrade). Post-change,
+zero `NU1605` lines, confirmed by grep over full build output.
+
+**Criterion 3 (zero `FS0193`) — verified via the sanctioned temporary aid, then
+reverted.** The tree carries `design-system-q4ebg`'s 16 pre-existing `FS0039`
+`.bordered` errors (out of scope, running in a separate worktree/BC), which abort
+the compile before reaching FS0193 either way — so a plain build in this tree
+never shows FS0193 regardless of the pin. To get the real signal, I temporarily
+applied only the two `.bordered`-deletion hunks from
+`.agentheim/salvage/design-system-q4ebg-bounced.patch` (`StreamDetail/Views.fs`,
+`AdminSurgery/Views.fs`) atop both fsproj states:
+- Floating `5.*` + `.bordered` fix applied → `FSC : error FS0193: ... HtmlHelper` (1 error), confirming the mechanism.
+- Pinned `5.2.0` + `.bordered` fix applied → **Build succeeded, 0 errors.**
+Both Views.fs files were reverted (`git checkout --`) immediately after; final
+diff carries only `Client.fsproj` and this task's own files, confirmed via
+`git status`/`git diff --stat`.
+
+**Remaining pre-existing `FS` errors in the actual (un-aided) tree, post-pin:**
+16 `FS0039` lines (4 distinct call sites × duplicate resolution passes) —
+`StreamDetail/Views.fs:234` (`select.bordered`), `StreamDetail/Views.fs:258`
+(`textarea.bordered`, ×2 sites), `AdminSurgery/Views.fs:92` and `:105`
+(`textarea.bordered`). These belong to `design-system-q4ebg`, not this task.
+1 pre-existing `FS0020` warning (`AdminProjections/Views.fs:199`), unrelated and
+unchanged by this task.
+
+**Criterion 5 (bundle unchanged) — measured, not asserted.** Ran `npm run build`
+with the pin applied, then `git stash`/rebuild/`git stash pop` to compare against
+the floating-`5.*` baseline. Emitted filenames and sizes were identical in both
+runs: `assets/index-C921bzMz.js` (1,780.79 kB / 413.95 kB gzip) and
+`assets/index-Dnf1E92D.css` (175.97 kB / 28.02 kB gzip) — Vite content-hashes
+filenames, so identical hashes across both builds is strong evidence the emitted
+bytes are identical, not just the same size.
+
+**Criterion 6 (`npm test`)** — 416/416 tests passed, 0 failed, 0 errored.
+
+**Criterion 7 (README)** — added a "Client package pinning rule" entry to
+`.agentheim/contexts/infrastructure/README.md`'s ubiquitous language section,
+recording the mechanism, the ADR-0036 pointer, and the prose-only/unenforced
+caveat (ADR-0059).
+
+No new ADR was written — ADR-0036 was already accepted and pre-loaded; this
+task applied and verified it per the task's own instruction.
+
+Key files: `src/Client/Client.fsproj`,
+`.agentheim/contexts/infrastructure/README.md`.
 
 ## Notes
 

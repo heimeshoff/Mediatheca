@@ -105,7 +105,7 @@
     <PackageReference Include="Feliz" Version="2.*" />
     <PackageReference Include="Feliz.UseElmish" Version="2.*" />
     <PackageReference Include="Feliz.Router" Version="4.*" />
-    <PackageReference Include="Feliz.DaisyUI" Version="5.*" />
+    <PackageReference Include="Feliz.DaisyUI" Version="5.2.0" />
     <PackageReference Include="Fable.Elmish" Version="4.*" />
     <PackageReference Include="Fable.Elmish.React" Version="4.*" />
     <PackageReference Include="Fable.Elmish.HMR" Version="7.*" />
