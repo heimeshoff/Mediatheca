@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 2
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 22
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **administration-svq3t** — Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner) (feature) — `todo/administration-svq3t-surgery-tab-e2e-spec.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **administration-svq3t** — Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner) (feature) — `doing/administration-svq3t-surgery-tab-e2e-spec.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

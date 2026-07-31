@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 15:46 -- Batch started: [administration-svq3t]
+
+**Type:** Work / Batch start
+**Tasks:** administration-svq3t - Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
+**Parallel:** no (1 worker — the only DAG-ready task in the project; nothing held back)
+
+---
+
 ## 2026-07-31 15:10 -- Modeling / Promoted: administration-svq3t - Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
 
 **Type:** Modeling / Promote
