@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 18:48 -- Batch started: [design-system-q4ebg, infrastructure-npyhb]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-q4ebg - "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)", infrastructure-npyhb - "Pin Feliz.DaisyUI to the exact 5.2.0 — 5.3.0's prebuilt dll needs Feliz 3.1.1, NuGet downgrades it to the pinned 2.9.0 (NU1605), and `dotnet build` then fails FS0193 on the missing `HtmlHelper`. 5.2.0's Fable sources are byte-identical, so nothing shipped changes."
+**Parallel:** yes (2 workers) — full ready set, nothing held back. No file overlap: q4ebg deletes four .bordered modifiers in two Client view files + design-system README; npyhb edits one line of Client.fsproj + infrastructure README. Merge order q4ebg then npyhb (advisory only).
+
+---
+
 ## 2026-07-31 18:43 -- Modeling / Promoted: design-system-q4ebg - "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)"
 
 **Type:** Modeling / Promote
