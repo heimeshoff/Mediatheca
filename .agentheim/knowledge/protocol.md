@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 18:00 -- Task bounced: design-system-q4ebg - DaisyUI 5 `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites
+
+**Type:** Work / Task bounced
+**Task:** design-system-q4ebg - "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root"
+**Reason:** The deletion itself was done and verified correct — all four `.bordered` sites removed, `grep -rn "\.bordered" src/Client --include=*.fs` clean, and `npm run build` (the pathway that actually ships) fully clean at zero `ERROR FS` lines, fixing the real runtime crash. The bounce is on **acceptance criterion 2** (`dotnet build src/Client/Client.fsproj` exits 0), which cannot be satisfied by this task alone: once the four `FS0039`s are cleared, the build fails on a different, previously-masked, pre-existing error — `FSC : error FS0193: The module/namespace 'Feliz' from compilation unit 'Feliz' did not contain the namespace, module or type 'HtmlHelper'` — rooted in the `NU1605` Feliz/Feliz.DaisyUI version downgrade tracked as `infrastructure-npyhb`. Confirmed deterministic via `git stash`/`pop`: reverting the deletion reproduces the documented 16-`FS0039` baseline with no `FS0193`; reapplying it reproduces `FS0193` across repeated rebuilds. The 16 `.bordered` errors were failing the build earlier in the same run, hiding it.
+**Consequence for two sibling tasks:** `infrastructure-npyhb`'s stated premise ("Nothing is currently known to be broken by this") is falsified — the downgrade breaks `dotnet build` fatally, not just as a NuGet warning. And `infrastructure-p1h9a`'s Notes assumption that its build gate "lands on an already-clean tree" post-q4ebg does not hold.
+**Moved to:** backlog
+**Salvage (ADR-0063):** `.agentheim/salvage/design-system-q4ebg-bounced.patch` — holds the two verified-correct `Views.fs` deletions **and** a discovery task the worker drafted (`design-system-vh931`) capturing the `FS0193` finding. Per BOUNCE integration doctrine, neither was merged to `main`: only the task file's `doing → backlog` move rode in this commit. Both survive in the patch; the deletion does not need redoing once the criterion-2 dependency question is resolved.
+
+---
+
 ## 2026-07-31 17:47 -- Batch started: [administration-jrflk, design-system-q4ebg]
 
 **Type:** Work / Batch start

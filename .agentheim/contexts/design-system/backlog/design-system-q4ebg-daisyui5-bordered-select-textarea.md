@@ -1,7 +1,7 @@
 ---
 id: design-system-q4ebg
 title: "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)"
-status: doing
+status: backlog
 type: bug
 context: design-system
 created: 2026-07-31
@@ -100,6 +100,76 @@ here — it is globally-true build tooling, split out as `infrastructure-p1h9a`
       that distinction is precisely what let `design-system-dib4q`'s fix regress.
 - [ ] The affected controls still read as bordered and consistent with the
       design system in the running app. [human-eye]
+
+## Worker note
+
+Bounced, not because the deletion itself was under-specified — it was exact,
+mechanical, and verified correct — but because **acceptance criterion 2
+(`dotnet build src/Client/Client.fsproj` exits 0 with zero `error FS` lines)
+cannot be satisfied by this task alone**, and that was only discoverable by
+actually doing the deletion.
+
+**What was done and verified (evidence, left uncommitted in the worktree —
+`src/Client/Pages/StreamDetail/Views.fs`, `src/Client/Pages/AdminSurgery/Views.fs`):**
+the four `select.bordered` / `textarea.bordered` modifiers named in the task
+were deleted exactly as specified.
+- `grep -rn "\.bordered" src/Client --include=*.fs` → zero matches. ✅
+- `npm run build` (the actual deploy pathway) → `✓ built`, exit 0, **zero**
+  `ERROR FS` / ` error FS` lines (confirmed via `grep -c "ERROR FS"` on full
+  output → 0). This is the pathway that ships, and it is now fully clean —
+  the runtime crash this task exists to fix (`throw 1` placeholder blanking
+  `#feliz-app`) is fixed. ✅
+- Runtime criteria (loading `/#/admin/streams/<id>` and `/#/admin/surgery`
+  with no `pageerror`) were **not** exercised — no `chrome-devtools` MCP tool
+  was available in this worker's toolset (Read/Write/Edit/Grep/Glob/Bash/Agent
+  only). Build-level verification only; say so plainly per the task's own
+  runtime-criteria guidance.
+
+**What blocks the task:** with the four sites deleted, `dotnet build
+src/Client/Client.fsproj` does **not** exit 0. It fails with a single,
+different, pre-existing error that was previously masked by the 16 `FS0039`
+`.bordered` errors:
+
+```
+FSC : error FS0193: The module/namespace 'Feliz' from compilation unit
+'Feliz' did not contain the namespace, module or type 'HtmlHelper'
+```
+
+This is the exact latent hazard `infrastructure-npyhb` already describes and
+filed as a spike: `Client.fsproj` pins `Feliz 2.*` while `Feliz.DaisyUI 5.3.0`
+requires `Feliz >= 3.1.1`, so NuGet silently resolves `Feliz` down to `2.9.0`
+(`NU1605`, currently a warning-only build note). Confirmed deterministic, not
+flaky: `git stash` (reverting the deletion) reproduces the documented
+baseline — exactly 16 `FS0039` errors, **no** `FS0193` — and `git stash pop`
++ rebuild reproduces `FS0193` consistently across repeated runs. The
+`FS0039` errors were apparently aborting `dotnet build`'s compile pass before
+it reached whatever triggers the `HtmlHelper` resolution failure; clearing
+them exposes it.
+
+**This invalidates two adjacent tasks' stated assumptions**, which the next
+refinement pass should reconcile:
+- `infrastructure-npyhb` states "Nothing is currently known to be broken by
+  this" — that is no longer true. The downgrade actively breaks
+  `dotnet build`, not just a NuGet warning, once the `.bordered` errors are
+  out of the way.
+- `infrastructure-p1h9a` (the build gate, `depends_on: [design-system-q4ebg]`)
+  assumes this task leaves it "an already-clean tree" — it does not; `dotnet
+  build` still fails, now on `FS0193`.
+
+**Recommendation for re-refinement:** either (a) resequence so
+`infrastructure-npyhb` lands before this task closes and this task formally
+`depends_on` it for criterion 2, or (b) narrow criterion 2's wording to the
+`.bordered`/`FS0039` errors this task actually owns (matching what `npm run
+build`, the real deploy pathway, already fully clears) and let `FS0193`
+travel with `infrastructure-npyhb`/`infrastructure-p1h9a` instead. Filed
+`design-system-<new>` (see conductor's `NEW_BACKLOG_ITEMS`) to carry this
+finding forward without touching either infrastructure task file directly
+(worker scope rule: don't touch task files other than the one assigned).
+
+The two edited view files are left as-is (uncommitted) in this worktree as
+verified-correct evidence for whoever re-refines and re-dispatches this task
+— the deletion does not need to be redone, only the `dotnet build` criterion
+needs to be reconciled with `infrastructure-npyhb`.
 
 ## Notes
 
