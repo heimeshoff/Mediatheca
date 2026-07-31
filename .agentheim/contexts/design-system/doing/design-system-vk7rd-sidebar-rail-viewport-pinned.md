@@ -1,7 +1,7 @@
 ---
 id: design-system-vk7rd
 title: Sidebar bottom group (Admin/Settings) must pin to the bottom of the viewport, not the bottom of the document — the rail is `min-h-screen` and stretches with page content, so on any scrolling page the group sits below the fold
-status: todo
+status: doing
 type: bug
 context: design-system
 created: 2026-08-01

@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 01:13 -- Batch started: [design-system-vk7rd]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-vk7rd - Sidebar bottom group (Admin/Settings) must pin to the bottom of the viewport, not the bottom of the document — the rail is `min-h-screen` and stretches with page content, so on any scrolling page the group sits below the fold
+**Parallel:** no (1 worker) - the ready set is exactly one task; nothing held back
+
+---
+
 ## 2026-08-01 -- Modeling / Captured: design-system-vk7rd - Sidebar bottom group must pin to the viewport, not the document
 
 **Type:** Modeling / Capture
