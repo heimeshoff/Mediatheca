@@ -1,7 +1,7 @@
 ---
 id: infrastructure-p1h9a
 title: "Fail the client build on Fable compile errors — `vite build` exits 0 while emitting throwing placeholders for FS-level errors, so broken UI ships silently (twice already)"
-status: todo
+status: doing
 type: chore
 context: infrastructure
 created: 2026-07-31

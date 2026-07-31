@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 19:35 -- Batch started: [infrastructure-p1h9a]
+
+**Type:** Work / Batch start
+**Tasks:** infrastructure-p1h9a - "Fail the client build on Fable compile errors — `vite build` exits 0 while emitting throwing placeholders for FS-level errors, so broken UI ships silently (twice already)"
+**Parallel:** no (1 worker) - builder hard constraint: maximum one worker instance at a time. Ready set was 3 (infrastructure-p1h9a, administration-svq3t, administration-n8kqw), all dependency-unblocked with no file overlap; svq3t and n8kqw are held to subsequent waves solely by that constraint, not by the DAG or any conflict.
+
+---
+
 ## 2026-07-31 19:34 -- Modeling / Promoted: administration-n8kqw - Event log import — wipe-first path for a non-empty store: backup, preview + confirm, then wipe and re-import in one transaction
 
 **Type:** Modeling / Promote
