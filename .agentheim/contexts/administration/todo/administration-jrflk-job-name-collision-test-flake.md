@@ -7,7 +7,7 @@ context: administration
 created: 2026-07-22
 completed:
 depends_on: []
-blocks: []
+blocks: [administration-n8kqw]
 tags: [testing, flaky, jobs, expecto, concurrency, projections]
 related_adrs: [0024, 0025, 0026, 0028, 0031, 0033]
 related_research: []

@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 16:17 -- Modeling / Refined: administration-n8kqw - Event log import — wipe-first path for a non-empty store: backup, preview + confirm, then wipe and re-import in one transaction
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Grounded the task against the now-shipped vrc56/wwc36 code plus an architect pass. Builder settled three forks up front: (1) **one transaction** — `EventStore.importNdjson` splits into a tx-free `importNdjsonRows` core plus its unchanged wrapper, so backup → `DELETE FROM events` → import core → `rebuildFtsIndex` → checkpoint rewind all share one transaction and a malformed line rolls back the wipe too (the transaction, not the backup file, is the primary restore path — the one inversion of wwc36's precedent); (2) **preview** = server-side discard stats (count / distinct streams / date range, via a new `getWipeImportPreview` + `EventStore.getEventStoreSummary`) alongside a client-side non-blank line count of the chosen `File`, no staging area; (3) **placement** = the Projections tab's existing Backup section, where the dirty banner already reacts via `Import_completed`'s `Cmd.ofMsg Load`. Settled the server surface as a *new* SSE route (`/api/stream/wipe-import-events`, not a flag — keeps the safe route's non-empty refusal literally true) with a four-event vocabulary (`rejected`/`backup`/`error`/`complete`), the `backup` path streamed early so it survives every failure mode. Discovered a genuinely new concurrency need: a rebuild started against the pre-wipe log would checkpoint into a discarded log and leave `isAnyProjectionDirty` reporting clean — a *coherence* guard, the first documented bound on ADR-0033's "WAL + busy_timeout is sufficient". That guard must be read by two handlers, so it has to be born inside administration-jrflk's `AdminGuards` record, making **jrflk a hard new dependency** (replacing the now-cleared vrc56/wwc36 gate; `design-system-001` added per the BC frontend gate). Fixed three stale premises: the `What`'s self-contradiction on checkpoints (only rewind-to-0 is correct), wwc36's already-settled keep-all backup retention, and the hand-inlined FTS rebuild (reuse `EventStore.rebuildFtsIndex`). Rewrote the criteria from five to twelve — adding the mid-import-failure rollback proof the old set missed entirely, the negative FTS direction, both directions of the new mutual exclusion, and the `sqlite_sequence`-not-reset consequence — one classified `[human-eye]` (ADR-0061). Scoped testing to plain Expecto, explicitly ruling out a Playwright spec (svq3t's destructive-spec gate has a total blast radius here for little unique coverage). No split; ADR-0036 reserved and drafted for the worker.
+**Split into:** none
+**ADRs written:** none (ADR-0036 reserved, to be written by the worker)
+
+---
+
 ## 2026-07-31 15:54 -- Modeling / Promoted: administration-jrflk - Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over
 
 **Type:** Modeling / Promote
