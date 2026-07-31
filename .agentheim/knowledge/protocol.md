@@ -5,7 +5,23 @@ Newest entries on top.
 
 ---
 
-## 2026-07-31 18:54 -- Modeling / Refined: infrastructure-npyhb - Pin Feliz.DaisyUI to the exact 5.2.0
+## 2026-07-31 18:43 -- Modeling / Promoted: design-system-q4ebg - "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)"
+
+**Type:** Modeling / Promote
+**BC:** design-system
+**From → To:** backlog → todo
+
+---
+
+## 2026-07-31 18:43 -- Modeling / Promoted: infrastructure-npyhb - "Pin Feliz.DaisyUI to the exact 5.2.0 — 5.3.0's prebuilt dll needs Feliz 3.1.1, NuGet downgrades it to the pinned 2.9.0 (NU1605), and `dotnet build` then fails FS0193 on the missing `HtmlHelper`. 5.2.0's Fable sources are byte-identical, so nothing shipped changes."
+
+**Type:** Modeling / Promote
+**BC:** infrastructure
+**From → To:** backlog → todo
+
+---
+
+## 2026-07-31 18:41 -- Modeling / Refined: infrastructure-npyhb - Pin Feliz.DaisyUI to the exact 5.2.0
 
 **Type:** Modeling / Refine
 **BC:** infrastructure

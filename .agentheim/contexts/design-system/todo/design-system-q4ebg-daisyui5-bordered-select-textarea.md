@@ -1,7 +1,7 @@
 ---
 id: design-system-q4ebg
 title: "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)"
-status: backlog
+status: todo
 type: bug
 context: design-system
 created: 2026-07-31
@@ -113,75 +113,46 @@ mechanism is `dotnet build`, which stays red on `FS0193` until
 - [ ] The affected controls still read as bordered and consistent with the
       design system in the running app. [human-eye]
 
-## Worker note
+## Bounce record — resolved 2026-07-31
 
-Bounced, not because the deletion itself was under-specified — it was exact,
-mechanical, and verified correct — but because **acceptance criterion 2
-(`dotnet build src/Client/Client.fsproj` exits 0 with zero `error FS` lines)
-cannot be satisfied by this task alone**, and that was only discoverable by
-actually doing the deletion.
+Bounced not because the deletion was under-specified — it was exact, mechanical,
+and verified correct — but because the then-criterion 2 (`dotnet build` exits 0
+with zero `error FS` lines) **could not be satisfied by this task alone**, which
+was only discoverable by doing the deletion. That is now settled: criterion 2 has
+been narrowed to the `FS0039`s this task owns, `FS0193` travels with
+`infrastructure-npyhb` (ADR-0036), and **this task gains no `depends_on` edge**.
+It is workable as it stands.
 
-**What was done and verified (evidence, left uncommitted in the worktree —
-`src/Client/Pages/StreamDetail/Views.fs`, `src/Client/Pages/AdminSurgery/Views.fs`):**
-the four `select.bordered` / `textarea.bordered` modifiers named in the task
-were deleted exactly as specified.
+### The deletion is already done — recover it, don't redo it
+
+The worker's four-line deletion survives whole. **The worktree it was written in
+was torn down at the 18:06 session end** — the earlier claim that the files were
+"left uncommitted in the worktree" is stale and must not be relied on. The
+evidence lives in the salvage patch (ADR-0063), and this recovery command was
+verified against current `main` this session (`git apply --check` exits 0):
+
+```bash
+git apply --include=src/Client/Pages/StreamDetail/Views.fs \
+          --include=src/Client/Pages/AdminSurgery/Views.fs \
+          .agentheim/salvage/design-system-q4ebg-bounced.patch
+```
+
+The `--include` filter is **load-bearing**: the patch also carries a task-file
+move and a drafted `design-system-vh931` task file that must not be applied
+(see Notes).
+
+### What the worker verified
+
 - `grep -rn "\.bordered" src/Client --include=*.fs` → zero matches. ✅
-- `npm run build` (the actual deploy pathway) → `✓ built`, exit 0, **zero**
-  `ERROR FS` / ` error FS` lines (confirmed via `grep -c "ERROR FS"` on full
-  output → 0). This is the pathway that ships, and it is now fully clean —
-  the runtime crash this task exists to fix (`throw 1` placeholder blanking
-  `#feliz-app`) is fixed. ✅
-- Runtime criteria (loading `/#/admin/streams/<id>` and `/#/admin/surgery`
-  with no `pageerror`) were **not** exercised — no `chrome-devtools` MCP tool
-  was available in this worker's toolset (Read/Write/Edit/Grep/Glob/Bash/Agent
-  only). Build-level verification only; say so plainly per the task's own
-  runtime-criteria guidance.
-
-**What blocks the task:** with the four sites deleted, `dotnet build
-src/Client/Client.fsproj` does **not** exit 0. It fails with a single,
-different, pre-existing error that was previously masked by the 16 `FS0039`
-`.bordered` errors:
-
-```
-FSC : error FS0193: The module/namespace 'Feliz' from compilation unit
-'Feliz' did not contain the namespace, module or type 'HtmlHelper'
-```
-
-This is the exact latent hazard `infrastructure-npyhb` already describes and
-filed as a spike: `Client.fsproj` pins `Feliz 2.*` while `Feliz.DaisyUI 5.3.0`
-requires `Feliz >= 3.1.1`, so NuGet silently resolves `Feliz` down to `2.9.0`
-(`NU1605`, currently a warning-only build note). Confirmed deterministic, not
-flaky: `git stash` (reverting the deletion) reproduces the documented
-baseline — exactly 16 `FS0039` errors, **no** `FS0193` — and `git stash pop`
-+ rebuild reproduces `FS0193` consistently across repeated runs. The
-`FS0039` errors were apparently aborting `dotnet build`'s compile pass before
-it reached whatever triggers the `HtmlHelper` resolution failure; clearing
-them exposes it.
-
-**This invalidates two adjacent tasks' stated assumptions**, which the next
-refinement pass should reconcile:
-- `infrastructure-npyhb` states "Nothing is currently known to be broken by
-  this" — that is no longer true. The downgrade actively breaks
-  `dotnet build`, not just a NuGet warning, once the `.bordered` errors are
-  out of the way.
-- `infrastructure-p1h9a` (the build gate, `depends_on: [design-system-q4ebg]`)
-  assumes this task leaves it "an already-clean tree" — it does not; `dotnet
-  build` still fails, now on `FS0193`.
-
-**Recommendation for re-refinement:** either (a) resequence so
-`infrastructure-npyhb` lands before this task closes and this task formally
-`depends_on` it for criterion 2, or (b) narrow criterion 2's wording to the
-`.bordered`/`FS0039` errors this task actually owns (matching what `npm run
-build`, the real deploy pathway, already fully clears) and let `FS0193`
-travel with `infrastructure-npyhb`/`infrastructure-p1h9a` instead. Filed
-`design-system-<new>` (see conductor's `NEW_BACKLOG_ITEMS`) to carry this
-finding forward without touching either infrastructure task file directly
-(worker scope rule: don't touch task files other than the one assigned).
-
-The two edited view files are left as-is (uncommitted) in this worktree as
-verified-correct evidence for whoever re-refines and re-dispatches this task
-— the deletion does not need to be redone, only the `dotnet build` criterion
-needs to be reconciled with `infrastructure-npyhb`.
+- `npm run build` → `✓ built`, exit 0, **zero** `ERROR FS` lines (`grep -c
+  "ERROR FS"` → 0). The pathway that ships is fully clean, so the `throw 1`
+  placeholder blanking `#feliz-app` is fixed. ✅
+- The `FS0193` discovery was confirmed deterministic, not flaky: `git stash`
+  reproduces the 16-`FS0039` baseline with **no** `FS0193`; `git stash pop` +
+  rebuild reproduces `FS0193` across repeated runs. The `FS0039`s were aborting
+  the compile pass before it reached the binding failure.
+- The two runtime criteria were **not** exercised — that worker's toolset had no
+  `chrome-devtools` MCP. Still open; see Notes for how to close them.
 
 ## Notes
 
@@ -198,6 +169,25 @@ needs to be reconciled with `infrastructure-npyhb`.
   (ADR-0015 frontend gate).
 - Low-risk and mechanical. No new ADR expected — this is removal of an API
   surface that no longer exists, not a design decision.
-- Adjacent but deliberately out of scope: `NU1605` reports Feliz downgraded
-  `3.1.1 → 2.9.0` (Feliz.DaisyUI 5.3.0 wants `>= 3.1.1`; `Client.fsproj` pins
-  `Feliz 2.*`). Filed as `infrastructure-npyhb`.
+- **Closing the two runtime criteria.** The bounced worker had no browser
+  tooling and correctly reported them unverified rather than proxying them.
+  A worker likewise without `chrome-devtools` must do the same — say "not
+  exercised", never infer them from a green build, since a clean bundle is
+  exactly what this bug already had. The project's `chrome-devtools` MCP is
+  available in a main session, so the practical close is a builder/main-session
+  pass over `/#/admin/streams/<id>` and `/#/admin/surgery` after the deletion
+  lands.
+- **Do not create `design-system-vh931`.** The bounced worker drafted such a
+  task (it is inside the salvage patch, never landed on `main`, and exists in no
+  BC) to carry the `FS0193` finding forward. That finding has since been folded
+  into `infrastructure-npyhb` — retargeted from spike to chore, with ADR-0036 —
+  and into this task's narrowed criterion 2. Creating vh931 now would duplicate
+  both.
+- Adjacent and deliberately out of scope, now fully diagnosed:
+  `infrastructure-npyhb` (ADR-0036) re-pins `Feliz.DaisyUI` to the exact `5.2.0`,
+  the last release built against the Feliz 2 line, clearing both `NU1605` and the
+  `FS0193` it causes. Its Fable sources are byte-identical to 5.3.0's, so the
+  shipped bundle is provably unchanged — and `.bordered` is absent from
+  `select`/`textarea` in **both** versions, so the re-pin does not resurrect the
+  member this task deletes. The two tasks are independent and can land in either
+  order.

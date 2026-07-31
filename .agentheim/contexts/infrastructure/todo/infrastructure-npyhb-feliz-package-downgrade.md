@@ -1,7 +1,7 @@
 ---
 id: infrastructure-npyhb
 title: "Pin Feliz.DaisyUI to the exact 5.2.0 — 5.3.0's prebuilt dll needs Feliz 3.1.1, NuGet downgrades it to the pinned 2.9.0 (NU1605), and `dotnet build` then fails FS0193 on the missing `HtmlHelper`. 5.2.0's Fable sources are byte-identical, so nothing shipped changes."
-status: backlog
+status: todo
 type: chore
 context: infrastructure
 created: 2026-07-31
