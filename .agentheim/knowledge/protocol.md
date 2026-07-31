@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 18:00 -- Task verified and completed: administration-jrflk - Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over
+
+**Type:** Work / Task completion
+**Task:** administration-jrflk - Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over
+**Summary:** Retire Administration.fs's three ambient module-level single-flight guards in favour of composition-root-owned per-instance state (job guard into makeJobRunRecorder's closure, projection guards into a threaded AdminGuards record), closing the cross-file test-collision class by construction
+**Duration:** 13m10s
+**Verification:** PASS (iteration 1)
+**Files changed:** 11
+**Tests added:** 2
+**ADRs written:** 0035-admin-guard-composition-root-ownership.md
+
+---
+
 ## 2026-07-31 18:00 -- Task bounced: design-system-q4ebg - DaisyUI 5 `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites
 
 **Type:** Work / Task bounced

@@ -1,15 +1,15 @@
 ---
 id: administration-jrflk
 title: Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over
-status: doing
+status: done
 type: bug
 context: administration
 created: 2026-07-22
-completed:
+completed: 2026-07-31
 depends_on: []
 blocks: [administration-n8kqw]
 tags: [testing, flaky, jobs, expecto, concurrency, projections]
-related_adrs: [0024, 0025, 0026, 0028, 0031, 0033]
+related_adrs: [0024, 0025, 0026, 0028, 0031, 0033, 0035]
 related_research: []
 prior_art: [administration-yamm5, administration-qjcp4, administration-btvqa, administration-tj8n2, administration-mz6kp]
 ---
@@ -200,3 +200,39 @@ and ADR-0031 without changing any of their concurrency semantics.
 - No frontend surface — the design-system styleguide gate does not apply.
 - ADR-0059's convention check does not apply: the scope is product source
   (`src/Server`, `tests/Server.Tests`), not a doctrine-bearing path.
+
+## Outcome
+
+All three ambient module-level guards are gone from `Administration.fs`.
+`runningJobs` now lives inside `makeJobRunRecorder`'s closure (no signature
+change) — each independently-built recorder gets its own dictionary.
+`rebuildingProjections`/`driftCheckInProgress` became fields of a new
+`AdminGuards` record built once by `Administration.makeGuards ()` and
+threaded explicitly through `buildProjectionStats`, `isAnyProjectionDirty`,
+`driftCheckStreamHandler`, `projectionRebuildStreamHandler`, and `create`;
+`Composition.fs` builds exactly one `adminGuards` value and passes it to all
+three consumers that need it. `JobRunsTests.fs`'s `"JobRunsTests "` mitigation
+prefix and its collision comment block are deleted — job names are bare
+`"Job A"`..`"Job H"` again, with `"Job C"`/`"Job D"`/`"Job E"` once more
+literally shared with `JobConnectionConcurrencyTests.fs`. A new
+`AdminGuardOwnershipTests.fs` proves the class is closed by construction:
+two independently-built `JobRunRecorder`s and two independently-built
+`AdminGuards` both successfully claim the same name concurrently. Full
+`npm test` (416 tests) passes clean. ADR-0035 records the guard-ownership
+rule and amends ADR-0024/0025/0026/0031 on that axis only. The administration
+BC README gained an "Admin guard ownership" ubiquitous-language entry
+recording the rule for future admin features, plus updated references to the
+renamed guard fields throughout.
+
+Key files: `src/Server/Administration.fs` (`AdminGuards`, `makeGuards`, all
+five threaded consumers, `makeJobRunRecorder`'s closure-owned `runningJobs`),
+`src/Server/Composition.fs` (`adminGuards` built once, wired to `create`/
+`projectionRebuildStreamHandler`/`driftCheckStreamHandler`),
+`tests/Server.Tests/AdminGuardOwnershipTests.fs` (new),
+`tests/Server.Tests/JobRunsTests.fs`,
+`tests/Server.Tests/AdministrationTests.fs`,
+`tests/Server.Tests/AdminSurgeryTests.fs`,
+`tests/Server.Tests/ProjectionDriftTests.fs`,
+`tests/Server.Tests/Server.Tests.fsproj`,
+`.agentheim/knowledge/decisions/0035-admin-guard-composition-root-ownership.md`,
+`.agentheim/contexts/administration/README.md`.

@@ -180,7 +180,7 @@ let projectionDriftTests =
             // A second event arrives, but the projection is never re-run — FriendProjection now lags.
             appendFriendAdded conn "Alice"
 
-            let dirty = Administration.isAnyProjectionDirty conn allProjectionHandlers
+            let dirty = Administration.isAnyProjectionDirty conn allProjectionHandlers (Administration.makeGuards ())
             Expect.contains dirty "FriendProjection" "FriendProjection should be reported dirty while it lags behind the store head"
 
             let message = Administration.driftCheckRejectionMessage dirty

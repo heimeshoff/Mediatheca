@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 2
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 22
+- **Doing:** 0
+- **Done:** 23
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **administration-jrflk** — Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over (bug) — `doing/administration-jrflk-job-name-collision-test-flake.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **administration-jrflk** — Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over (bug) — `done/administration-jrflk-job-name-collision-test-flake.md`
 - **administration-wwc36** — Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag (feature) — `done/administration-wwc36-event-surgery-guardrails.md`
 - **administration-mz6kp** — Migrate Api.create/Administration.create and the raw Giraffe stream handlers from one shared SqliteConnection to per-request (factory-based) connections, retiring the ADR-0030 semaphore gate (refactor) — `done/administration-mz6kp-per-request-connection-migration.md`
 - **administration-qk3f7** — Add a formatEvent case for Game_rawg_id_set — the one real handled-but-unformattable drift the unknown-event report caught (bug) — `done/administration-qk3f7-game-rawg-id-set-formatter-gap.md`
@@ -61,6 +61,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0035** -- Ambient module-level single-flight guards in `Administration.fs` become explicitly-owned values constructed once at the composition root: `runningJobs` moves into `makeJobRunRecorder`'s closure, `rebuildingProjections`/`driftCheckInProgress` become a threaded `AdminGuards` record. Amends the guard-ownership axis of ADR-0024/0025/0026/0031; concurrency semantics unchanged. -- 2026-07-31 -- `knowledge/decisions/0035-admin-guard-composition-root-ownership.md`
 - **0034** -- Event surgery (raw edit/delete/rename) guardrail protocol: `VACUUM INTO` backup on the op's own per-request connection (verified before any mutation, abort-with-no-row-touched on failure), the mutation + FTS5 `('rebuild')` re-sync + `projection_checkpoints`-rewind-to-0 dirty signal sharing one transaction, and deliberate stream/global-position gap tolerance on delete. -- 2026-07-22 -- `knowledge/decisions/0034-event-surgery-guardrails.md`
 - **0033** -- Each request and each long-running SSE operation opens and disposes its own `SqliteConnection` from a shared `unit -> SqliteConnection` factory (per-connection pragmas re-applied on open, pooled by connection string); retires ADR-0030's `requestDbLock` and closes the residual read×write race it accepted, while ADR-0028's `jobConn`/`jobDbLock` remain untouched. **Supersedes 0030.** -- 2026-07-22 -- `knowledge/decisions/0033-per-request-connection-factory.md`
 - **0032** -- Compensating-event composer validates and canonicalizes an operator's corrective event by round-tripping it through the owning BC's existing `serialize`/`deserialize` seam (prefix-dispatched like `formatEvent`, reflection and template-registries rejected); the re-serialized canonical bytes are what get appended (expected-position checked, under the ADR-0030 request lock), so a composer event is indistinguishable from an organic one except for `{"source":"admin-console"}` metadata. -- 2026-07-22 -- `knowledge/decisions/0032-compensating-event-composer-round-trip-validation.md`

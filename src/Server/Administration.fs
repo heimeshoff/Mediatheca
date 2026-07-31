@@ -394,14 +394,33 @@ module Administration =
         let position, _ = Projection.getCheckpointInfo conn handler.Name
         max 0L (head - position)
 
-    /// Names of projections currently mid-rebuild. Guards the "reject a
-    /// second concurrent rebuild of the same projection" acceptance
-    /// criterion. Module-level mutable state, scoped to the server process's
-    /// lifetime — same shape as other singleton server state in this
-    /// codebase (e.g. JellyfinSync's last-sync-time cache).
-    let private rebuildingProjections = System.Collections.Concurrent.ConcurrentDictionary<string, unit>()
+    /// Per-instance single-flight guards for the two projection-guard
+    /// families (rebuild + drift-check). Constructed once at the
+    /// composition root and threaded explicitly to every consumer
+    /// (ADR-0035) rather than held as module-level ambient state shared by
+    /// the whole process regardless of which caller is asking — that shape
+    /// is invisible in a server process (there's only ever one), but in the
+    /// test assembly, where Expecto runs test cases across files in
+    /// parallel, module-level singletons collide across unrelated test
+    /// files that happen to reuse the same projection name. See
+    /// `makeJobRunRecorder` below for the job-guard half, which has a
+    /// different natural owner (the recorder's own closure) and so isn't
+    /// folded into this record.
+    type AdminGuards = {
+        RebuildingProjections: System.Collections.Concurrent.ConcurrentDictionary<string, unit>
+        DriftCheckInProgress: System.Collections.Concurrent.ConcurrentDictionary<string, unit>
+    }
 
-    let private buildProjectionStats (conn: SqliteConnection) (projectionHandlers: Projection.ProjectionHandler list) : ProjectionStatRow list =
+    /// Builds one fresh, independently-owned `AdminGuards`. The composition
+    /// root calls this exactly once and passes the same value to `create`,
+    /// `projectionRebuildStreamHandler`, and `driftCheckStreamHandler`, so
+    /// "one guard per process" is a property of the wiring rather than of
+    /// this module.
+    let makeGuards () : AdminGuards =
+        { RebuildingProjections = System.Collections.Concurrent.ConcurrentDictionary<string, unit>()
+          DriftCheckInProgress = System.Collections.Concurrent.ConcurrentDictionary<string, unit>() }
+
+    let private buildProjectionStats (conn: SqliteConnection) (projectionHandlers: Projection.ProjectionHandler list) (guards: AdminGuards) : ProjectionStatRow list =
         let head = EventStore.getMaxGlobalPosition conn
         projectionHandlers
         |> List.map (fun handler ->
@@ -416,7 +435,7 @@ module Administration =
               Lag = checkpointLag conn head handler
               UpdatedAt = updatedAt
               TableCounts = tables |> List.map (fun t -> { TableName = t; RowCount = tableRowCount conn t })
-              IsRebuilding = rebuildingProjections.ContainsKey(handler.Name) })
+              IsRebuilding = guards.RebuildingProjections.ContainsKey(handler.Name) })
 
     // ── Image cache admin (administration-xx3mw) ──
 
@@ -426,22 +445,21 @@ module Administration =
     /// ref set. `cast_members`/`game_journal_blocks` are imperative writes
     /// (CastStore.fs/GameJournal.fs) — never rebuilt, never lag — so they
     /// need no gating here.
-    let isAnyProjectionDirty (conn: SqliteConnection) (projectionHandlers: Projection.ProjectionHandler list) : string list =
+    let isAnyProjectionDirty (conn: SqliteConnection) (projectionHandlers: Projection.ProjectionHandler list) (guards: AdminGuards) : string list =
         let head = EventStore.getMaxGlobalPosition conn
         projectionHandlers
         |> List.filter (fun handler ->
-            rebuildingProjections.ContainsKey(handler.Name) || checkpointLag conn head handler > 0L)
+            guards.RebuildingProjections.ContainsKey(handler.Name) || checkpointLag conn head handler > 0L)
         |> List.map (fun handler -> handler.Name)
 
     // ── Shadow-table replay drift detector (administration-btvqa, ADR-0031) ──
 
-    /// Own single-flight guard for the drift check — NOT `rebuildingProjections`,
-    /// whose meaning ("live tables are being written") is never true here (the
-    /// live connection is only ever read from). Same TryAdd/TryRemove shape as
-    /// `rebuildingProjections`, keyed on a single fixed name since the whole
-    /// check (all six projections) runs as one operation, not one per
-    /// projection.
-    let private driftCheckInProgress = System.Collections.Concurrent.ConcurrentDictionary<string, unit>()
+    /// The drift-check single-flight guard lives on `AdminGuards.DriftCheckInProgress`
+    /// — NOT `RebuildingProjections`, whose meaning ("live tables are being
+    /// written") is never true here (the live connection is only ever read
+    /// from). Same TryAdd/TryRemove shape, keyed on a single fixed name since
+    /// the whole check (all six projections) runs as one operation, not one
+    /// per projection.
     let private driftCheckKey = "drift-check"
 
     let private escapeJson (s: string) = s.Replace("\\", "\\\\").Replace("\"", "\\\"")
@@ -581,7 +599,7 @@ module Administration =
     /// and the shadow copy lives entirely in its own throwaway `:memory:`
     /// connection (ADR-0031), so the live tables are provably read-only for
     /// the whole run.
-    let driftCheckStreamHandler (factory: unit -> SqliteConnection) (projectionHandlers: Projection.ProjectionHandler list) : HttpHandler =
+    let driftCheckStreamHandler (factory: unit -> SqliteConnection) (projectionHandlers: Projection.ProjectionHandler list) (guards: AdminGuards) : HttpHandler =
         fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
             task {
                 use conn = factory ()
@@ -598,10 +616,10 @@ module Administration =
                     do! writer.Body.FlushAsync()
                 }
 
-                let dirty = isAnyProjectionDirty conn projectionHandlers
+                let dirty = isAnyProjectionDirty conn projectionHandlers guards
                 if not (List.isEmpty dirty) then
                     do! writeEvent "rejected" (sprintf "{\"message\":\"%s\"}" (escapeJson (driftCheckRejectionMessage dirty)))
-                elif not (driftCheckInProgress.TryAdd(driftCheckKey, ())) then
+                elif not (guards.DriftCheckInProgress.TryAdd(driftCheckKey, ())) then
                     do! writeEvent "rejected" "{\"message\":\"A drift check is already running\"}"
                 else
                     try
@@ -618,7 +636,7 @@ module Administration =
                         with ex ->
                             do! writeEvent "error" (sprintf "{\"message\":\"%s\"}" (escapeJson ex.Message))
                     finally
-                        driftCheckInProgress.TryRemove(driftCheckKey) |> ignore
+                        guards.DriftCheckInProgress.TryRemove(driftCheckKey) |> ignore
 
                 return! earlyReturn ctx
             }
@@ -827,6 +845,7 @@ module Administration =
     let projectionRebuildStreamHandler
         (factory: unit -> SqliteConnection)
         (projectionHandlers: Projection.ProjectionHandler list)
+        (guards: AdminGuards)
         : HttpHandler =
         routef "/api/stream/rebuild-projection/%s" (fun projectionName ->
             fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
@@ -849,7 +868,7 @@ module Administration =
                     | None ->
                         do! writeEvent "error" (sprintf "{\"message\":\"Unknown projection '%s'\"}" projectionName)
                     | Some handler ->
-                        if not (rebuildingProjections.TryAdd(projectionName, ())) then
+                        if not (guards.RebuildingProjections.TryAdd(projectionName, ())) then
                             do! writeEvent "rejected" (sprintf "{\"message\":\"%s is already rebuilding\"}" projectionName)
                         else
                             try
@@ -864,20 +883,13 @@ module Administration =
                                     let escaped = ex.Message.Replace("\\", "\\\\").Replace("\"", "\\\"")
                                     do! writeEvent "error" (sprintf "{\"message\":\"%s\"}" escaped)
                             finally
-                                rebuildingProjections.TryRemove(projectionName) |> ignore
+                                guards.RebuildingProjections.TryRemove(projectionName) |> ignore
 
                     return! earlyReturn ctx
                 }
         )
 
     // ── Job runs console (administration-yamm5, ADR-0026) ──
-
-    /// Names of jobs currently mid-run, for either trigger. Exact structural
-    /// copy of `rebuildingProjections` above — same "name-keyed in-memory
-    /// guard" shape, module-level, process-lifetime. The single source of
-    /// truth for the concurrent-trigger refusal: a scheduled fire and a
-    /// manual "Run now" of the SAME job name can never both hold it.
-    let private runningJobs = System.Collections.Concurrent.ConcurrentDictionary<string, unit>()
 
     let private ensureJobRunsTable (conn: SqliteConnection) : unit =
         use cmd = conn.CreateCommand()
@@ -977,13 +989,20 @@ module Administration =
         finally
             jobLock.Release() |> ignore
 
-    /// Builds the `ScheduledJobs.JobRunRecorder` seam. Closures over `conn`,
-    /// `jobLock`, and the private `runningJobs` guard above, so every recorder
-    /// built from the same `conn`/`jobLock` pair shares the same guard state
-    /// and the same per-command serialization (Composition.fs builds exactly
-    /// one recorder — over the dedicated job connection and its lock — and
-    /// passes it to both `ScheduledJobs.startAll` and `create`, per ADR-0026).
+    /// Builds the `ScheduledJobs.JobRunRecorder` seam. Owns a fresh
+    /// `runningJobs` guard in its own closure (ADR-0035) — names of jobs
+    /// currently mid-run, for either trigger; the single source of truth
+    /// for the concurrent-trigger refusal, so a scheduled fire and a manual
+    /// "Run now" of the SAME job name can never both hold it. Also closures
+    /// over `conn`/`jobLock`, so every recorder built from the same
+    /// `conn`/`jobLock` pair shares the same guard state and the same
+    /// per-command serialization (Composition.fs builds exactly one
+    /// recorder — over the dedicated job connection and its lock — and
+    /// passes it to both `ScheduledJobs.startAll` and `create`, per
+    /// ADR-0026). Each independently-built recorder gets its own guard, so
+    /// two recorders never collide on a shared job name.
     let makeJobRunRecorder (conn: SqliteConnection) (jobLock: SemaphoreSlim) : ScheduledJobs.JobRunRecorder =
+        let runningJobs = System.Collections.Concurrent.ConcurrentDictionary<string, unit>()
         { TryClaim = fun jobName -> runningJobs.TryAdd(jobName, ())
           Release = fun jobName -> runningJobs.TryRemove(jobName) |> ignore
           BeginRun = fun jobName trigger -> insertRunningRow jobLock conn jobName trigger
@@ -1133,6 +1152,11 @@ module Administration =
     /// at the top of each member below), retiring ADR-0030's process-wide
     /// `requestDbLock` — there is no longer a shared connection object for it
     /// to guard.
+    /// `guards` is the SAME `AdminGuards` value the composition root also
+    /// passes to `projectionRebuildStreamHandler`/`driftCheckStreamHandler`
+    /// (ADR-0035), so a rebuild/drift-check started via the SSE handlers and
+    /// the not-dirty guard read here (`isAnyProjectionDirty`) share one
+    /// guard state.
     let create
         (factory: unit -> SqliteConnection)
         (dbPath: string)
@@ -1140,6 +1164,7 @@ module Administration =
         (projectionHandlers: Projection.ProjectionHandler list)
         (scheduledJobs: ScheduledJobs.JobSpec list)
         (recorder: ScheduledJobs.JobRunRecorder)
+        (guards: AdminGuards)
         : IAdminApi =
         {
             getEventPage = fun query -> async {
@@ -1247,7 +1272,7 @@ module Administration =
 
             getProjectionStats = fun () -> async {
                 use conn = factory ()
-                return buildProjectionStats conn projectionHandlers
+                return buildProjectionStats conn projectionHandlers guards
             }
 
             getImageCacheStats = fun () -> async {
@@ -1256,7 +1281,7 @@ module Administration =
 
             listOrphanedImages = fun () -> async {
                 use conn = factory ()
-                match isAnyProjectionDirty conn projectionHandlers with
+                match isAnyProjectionDirty conn projectionHandlers guards with
                 | dirty when not (List.isEmpty dirty) ->
                     return OrphanScanBlocked (sprintf "Blocked: waiting on %s to catch up" (String.concat ", " dirty))
                 | _ ->
@@ -1272,7 +1297,7 @@ module Administration =
             /// rather than wrongly deleted.
             purgeOrphanedImages = fun selection -> async {
                 use conn = factory ()
-                match isAnyProjectionDirty conn projectionHandlers with
+                match isAnyProjectionDirty conn projectionHandlers guards with
                 | dirty when not (List.isEmpty dirty) ->
                     return PurgeBlocked (sprintf "Blocked: waiting on %s to catch up" (String.concat ", " dirty))
                 | _ ->

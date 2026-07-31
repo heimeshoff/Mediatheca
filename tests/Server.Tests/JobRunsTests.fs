@@ -8,16 +8,10 @@ module Mediatheca.Tests.JobRunsTests
 // table/reconciliation directly, plus `IAdminApi.runJobNow`/`getJobStatuses`
 // for the fire-and-forget + poll shape.
 //
-// Job names below are prefixed "JobRunsTests " (found during
-// administration-mz6kp): `Administration.fs`'s `runningJobs` claim guard is
-// a single module-level `ConcurrentDictionary` shared by the whole test
-// process, and Expecto runs test cases across the assembly in parallel by
-// default — an unprefixed "Job C"/"Job D"/"Job E" here collided with the
-// same literal names in `JobConnectionConcurrencyTests.fs`, intermittently
-// losing the `TryClaim` race and failing with "Expected the trigger to
-// succeed". See administration-jrflk (backlog) for the real fix (the guard
-// itself should not be a bare cross-file-shared singleton); this prefix is
-// the narrow, in-scope mitigation.
+// Job names below are bare ("Job A".."Job H", including "Job C"/"Job D"/
+// "Job E", literally shared with JobConnectionConcurrencyTests.fs) — safe
+// under Expecto's cross-file parallelism because every recorder's claim
+// guard is per-instance (ADR-0035), not a shared module-level singleton.
 
 open System
 open System.Threading
@@ -112,13 +106,13 @@ let jobRunsTests =
             use db = TestDb.withTempDbFactory bootstrapJobRuns
             let conn = db.Connection
             let recorder = makeRecorder conn
-            let spec = okSpec "JobRunsTests Job A"
+            let spec = okSpec "Job A"
 
             match ScheduledJobs.tryStartJob recorder spec "scheduled" with
             | Error () -> failwith "Expected the trigger to succeed"
             | Ok (_, body) ->
                 body |> Async.RunSynchronously
-                match readRows conn "JobRunsTests Job A" with
+                match readRows conn "Job A" with
                 | [ (trigger, status, summary, startedAt, finishedAt) ] ->
                     Expect.equal trigger "scheduled" "Trigger should be scheduled"
                     Expect.equal status "ok" "Status should resolve to ok"
@@ -131,13 +125,13 @@ let jobRunsTests =
             use db = TestDb.withTempDbFactory bootstrapJobRuns
             let conn = db.Connection
             let recorder = makeRecorder conn
-            let spec = okSpec "JobRunsTests Job B"
+            let spec = okSpec "Job B"
 
             match ScheduledJobs.tryStartJob recorder spec "manual" with
             | Error () -> failwith "Expected the trigger to succeed"
             | Ok (_, body) ->
                 body |> Async.RunSynchronously
-                match readRows conn "JobRunsTests Job B" with
+                match readRows conn "Job B" with
                 | [ (trigger, status, _, _, _) ] ->
                     Expect.equal trigger "manual" "Trigger should be manual"
                     Expect.equal status "ok" "Status should resolve to ok"
@@ -148,15 +142,15 @@ let jobRunsTests =
             let conn = db.Connection
             let recorder = makeRecorder conn
             use gate = new ManualResetEventSlim(false)
-            let spec = blockingSpec "JobRunsTests Job C" gate
-            let api = Administration.create db.Factory noStoragePath noImagesDir [] [ spec ] recorder
+            let spec = blockingSpec "Job C" gate
+            let api = Administration.create db.Factory noStoragePath noImagesDir [] [ spec ] recorder (Administration.makeGuards ())
 
-            match api.runJobNow "JobRunsTests Job C" |> Async.RunSynchronously with
+            match api.runJobNow "Job C" |> Async.RunSynchronously with
             | RunJobRejected -> failwith "Expected the run to start"
             | RunJobStarted _runId ->
                 // Fire-and-forget: runJobNow already returned, but the gated
                 // body hasn't run yet — the row must still be `running`.
-                match readRows conn "JobRunsTests Job C" with
+                match readRows conn "Job C" with
                 | [ (_, status, summary, _, finishedAt) ] ->
                     Expect.equal status "running" "Row should still be running right after runJobNow returns"
                     Expect.isNone summary "Summary should be empty while running"
@@ -164,8 +158,8 @@ let jobRunsTests =
                 | rows -> failwithf "Expected exactly one row, got %d" (List.length rows)
 
                 gate.Set()
-                Expect.isTrue (waitForTerminal conn "JobRunsTests Job C") "Row should resolve to a terminal status after the job finishes"
-                match readRows conn "JobRunsTests Job C" with
+                Expect.isTrue (waitForTerminal conn "Job C") "Row should resolve to a terminal status after the job finishes"
+                match readRows conn "Job C" with
                 | [ (_, status, summary, _, finishedAt) ] ->
                     Expect.equal status "ok" "Status should resolve to ok"
                     Expect.equal summary (Some "done") "Summary should be recorded"
@@ -176,13 +170,13 @@ let jobRunsTests =
             use db = TestDb.withTempDbFactory bootstrapJobRuns
             let conn = db.Connection
             let recorder = makeRecorder conn
-            let spec = skippedSpec "JobRunsTests Job D"
+            let spec = skippedSpec "Job D"
 
             match ScheduledJobs.tryStartJob recorder spec "scheduled" with
             | Error () -> failwith "Expected the trigger to succeed"
             | Ok (_, body) ->
                 body |> Async.RunSynchronously
-                match readRows conn "JobRunsTests Job D" with
+                match readRows conn "Job D" with
                 | [ (_, status, summary, _, _) ] ->
                     Expect.equal status "skipped" "Status should be skipped, not error"
                     Expect.notEqual status "error" "Skipped must render distinctly from error"
@@ -193,13 +187,13 @@ let jobRunsTests =
             use db = TestDb.withTempDbFactory bootstrapJobRuns
             let conn = db.Connection
             let recorder = makeRecorder conn
-            let spec = throwingSpec "JobRunsTests Job E"
+            let spec = throwingSpec "Job E"
 
             match ScheduledJobs.tryStartJob recorder spec "scheduled" with
             | Error () -> failwith "Expected the trigger to succeed"
             | Ok (_, body) ->
                 body |> Async.RunSynchronously
-                match readRows conn "JobRunsTests Job E" with
+                match readRows conn "Job E" with
                 | [ (_, status, summary, _, finishedAt) ] ->
                     Expect.equal status "error" "Status should be error"
                     Expect.equal summary (Some "boom") "Summary should carry the exception message"
@@ -211,7 +205,7 @@ let jobRunsTests =
             let conn = db.Connection
             let recorder = makeRecorder conn
             use gate = new ManualResetEventSlim(false)
-            let spec = blockingSpec "JobRunsTests Job F" gate
+            let spec = blockingSpec "Job F" gate
 
             match ScheduledJobs.tryStartJob recorder spec "scheduled" with
             | Error () -> failwith "Expected the first (scheduled) trigger to succeed"
@@ -224,13 +218,13 @@ let jobRunsTests =
                 let secondAttempt = ScheduledJobs.tryStartJob recorder spec "manual"
                 Expect.isTrue (Result.isError secondAttempt) "A concurrent manual trigger of the same job should be refused"
 
-                match readRows conn "JobRunsTests Job F" with
+                match readRows conn "Job F" with
                 | [ (_, status, _, _, _) ] ->
                     Expect.equal status "running" "The single row should still be the first run, still running"
                 | rows -> failwithf "Expected exactly one row (no second row written), got %d" (List.length rows)
 
                 gate.Set()
-                Expect.isTrue (waitForTerminal conn "JobRunsTests Job F") "The first run should still resolve to a terminal status once released"
+                Expect.isTrue (waitForTerminal conn "Job F") "The first run should still resolve to a terminal status once released"
 
         testCase "on server startup, any running row is reconciled to interrupted with a finished timestamp" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapJobRuns
@@ -259,7 +253,7 @@ let jobRunsTests =
             let conn = db.Connection
             let recorder = makeRecorder conn
             use gate = new ManualResetEventSlim(false)
-            let spec = blockingSpec "JobRunsTests Job H" gate
+            let spec = blockingSpec "Job H" gate
 
             match ScheduledJobs.tryStartJob recorder spec "manual" with
             | Error () -> failwith "Expected the trigger to succeed"
@@ -267,31 +261,31 @@ let jobRunsTests =
                 Async.Start body
                 // A read-path call (getJobStatuses) must not itself reconcile —
                 // only initializeJobRuns does, and only at startup.
-                let api = Administration.create db.Factory noStoragePath noImagesDir [] [ spec ] recorder
+                let api = Administration.create db.Factory noStoragePath noImagesDir [] [ spec ] recorder (Administration.makeGuards ())
                 api.getJobStatuses () |> Async.RunSynchronously |> ignore
 
-                match readRows conn "JobRunsTests Job H" with
+                match readRows conn "Job H" with
                 | [ (_, status, _, _, _) ] -> Expect.equal status "running" "A genuinely in-flight run must not be reconciled by a mere read"
                 | rows -> failwithf "Expected exactly one row, got %d" (List.length rows)
 
                 gate.Set()
-                Expect.isTrue (waitForTerminal conn "JobRunsTests Job H") "The run should still resolve normally afterward"
+                Expect.isTrue (waitForTerminal conn "Job H") "The run should still resolve normally afterward"
 
         testCase "getJobStatuses reports next-fire time, last outcome, and recent-run history per job" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapJobRuns
             let conn = db.Connection
             let recorder = makeRecorder conn
-            let spec = okSpec "JobRunsTests Job G"
+            let spec = okSpec "Job G"
             match ScheduledJobs.tryStartJob recorder spec "scheduled" with
             | Error () -> failwith "Expected the trigger to succeed"
             | Ok (_, body) -> body |> Async.RunSynchronously
 
-            let api = Administration.create db.Factory noStoragePath noImagesDir [] [ spec ] recorder
+            let api = Administration.create db.Factory noStoragePath noImagesDir [] [ spec ] recorder (Administration.makeGuards ())
             let statuses = api.getJobStatuses () |> Async.RunSynchronously
 
             Expect.equal (List.length statuses) 1 "Should report exactly the one registered job"
             let status = statuses.[0]
-            Expect.equal status.JobName "JobRunsTests Job G" "Job name should match"
+            Expect.equal status.JobName "Job G" "Job name should match"
             Expect.isNotEmpty status.NextFireAt "NextFireAt should be populated"
             Expect.isSome status.LastRun "LastRun should be the run just recorded"
             Expect.equal status.LastRun.Value.Status RunStatusOk "Last run's status should be ok"
@@ -301,7 +295,7 @@ let jobRunsTests =
             use db = TestDb.withTempDbFactory bootstrapJobRuns
             let conn = db.Connection
             let recorder = makeRecorder conn
-            let api = Administration.create db.Factory noStoragePath noImagesDir [] [] recorder
+            let api = Administration.create db.Factory noStoragePath noImagesDir [] [] recorder (Administration.makeGuards ())
 
             match api.runJobNow "No such job" |> Async.RunSynchronously with
             | RunJobRejected -> ()

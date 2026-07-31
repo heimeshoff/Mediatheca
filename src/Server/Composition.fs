@@ -321,9 +321,14 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     Administration.initializeJobRuns conn
     let jobRunRecorder = Administration.makeJobRunRecorder jobConn jobDbLock
 
+    // Per-instance projection guards (ADR-0035): built exactly once here and
+    // passed to every consumer below, so "one guard per process" is a
+    // property of this wiring rather than of Administration.fs.
+    let adminGuards = Administration.makeGuards ()
+
     // Create API
     let api = Api.create connectionFactory httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig imageBasePath projectionHandlers
-    let adminApi = Administration.create connectionFactory dbPath imageBasePath projectionHandlers scheduledJobs jobRunRecorder
+    let adminApi = Administration.create connectionFactory dbPath imageBasePath projectionHandlers scheduledJobs jobRunRecorder adminGuards
 
     let remotingHandler =
         Remoting.createApi ()
@@ -352,9 +357,9 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
                 >=> Administration.exportEventsStreamHandler connectionFactory
             route "/api/stream/import-events"
                 >=> Administration.importEventsStreamHandler connectionFactory
-            Administration.projectionRebuildStreamHandler connectionFactory projectionHandlers
+            Administration.projectionRebuildStreamHandler connectionFactory projectionHandlers adminGuards
             route "/api/stream/drift-check"
-                >=> Administration.driftCheckStreamHandler connectionFactory projectionHandlers
+                >=> Administration.driftCheckStreamHandler connectionFactory projectionHandlers adminGuards
             remotingHandler
             adminRemotingHandler
         ]

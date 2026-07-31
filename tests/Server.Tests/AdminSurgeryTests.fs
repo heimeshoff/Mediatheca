@@ -57,7 +57,7 @@ let private noImagesDir = "test-fixtures-do-not-exist/images"
 /// sibling `backups/` directory lands somewhere real and cleans up with the
 /// rest of the fixture.
 let private createSurgeryApi (factory: unit -> SqliteConnection) (dbPath: string) : IAdminApi =
-    Administration.create factory dbPath noImagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder (factory ()) (new SemaphoreSlim(1, 1)))
+    Administration.create factory dbPath noImagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder (factory ()) (new SemaphoreSlim(1, 1))) (Administration.makeGuards ())
 
 let private backupsDirFor (dbPath: string) = Path.Combine(Path.GetDirectoryName(dbPath), "backups")
 
@@ -246,13 +246,13 @@ let adminSurgeryTests =
                 EventStore.appendToStream conn "Friend-alice" -1L [ Friends.Serialization.toEventData (Friends.Friend_added { Name = "Alice"; ImageRef = None }) ] |> ignore
                 for handler in allProjectionHandlers do
                     Projection.runProjection conn handler
-                Expect.isEmpty (Administration.isAnyProjectionDirty conn allProjectionHandlers) "Precondition: projections should be caught up before the mutation"
+                Expect.isEmpty (Administration.isAnyProjectionDirty conn allProjectionHandlers (Administration.makeGuards ())) "Precondition: projections should be caught up before the mutation"
 
                 let api = createSurgeryApi db.Factory db.Path
                 let target = (EventStore.readStream conn "Friend-alice").[0]
                 api.editEvent target.GlobalPosition target.Data "{}" |> Async.RunSynchronously |> ignore
 
-                let dirty = Administration.isAnyProjectionDirty conn allProjectionHandlers
+                let dirty = Administration.isAnyProjectionDirty conn allProjectionHandlers (Administration.makeGuards ())
                 for handler in allProjectionHandlers do
                     Expect.contains dirty handler.Name (sprintf "%s should be reported dirty after the surgery mutation" handler.Name)
 

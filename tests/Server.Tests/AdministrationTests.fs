@@ -64,10 +64,10 @@ let private allProjectionHandlers = [
 // a fresh, uncontended lock is enough for these tests, which don't exercise
 // job-connection concurrency (JobRunsTests.fs / JobConnectionConcurrencyTests.fs do).
 let private createApi (factory: unit -> SqliteConnection) =
-    Administration.create factory noStoragePath noImagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder (factory ()) (new SemaphoreSlim(1, 1)))
+    Administration.create factory noStoragePath noImagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder (factory ()) (new SemaphoreSlim(1, 1))) (Administration.makeGuards ())
 
 let private createImageApi (factory: unit -> SqliteConnection) imagesDir =
-    Administration.create factory noStoragePath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder (factory ()) (new SemaphoreSlim(1, 1)))
+    Administration.create factory noStoragePath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder (factory ()) (new SemaphoreSlim(1, 1))) (Administration.makeGuards ())
 
 // ── Image cache admin (administration-xx3mw) test helpers ──
 
@@ -383,7 +383,7 @@ let administrationTests =
             File.WriteAllBytes(Path.Combine(imagesDir, "poster2.jpg"), Array.create 256 0uy)
 
             try
-                let api = Administration.create db.Factory dbPath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1)))
+                let api = Administration.create db.Factory dbPath imagesDir allProjectionHandlers [] (Administration.makeJobRunRecorder conn (new SemaphoreSlim(1, 1))) (Administration.makeGuards ())
                 let stats = api.getHealthStats () |> Async.RunSynchronously
 
                 Expect.equal stats.Storage.DbSizeBytes 1024L "DB size should match the file on disk"
