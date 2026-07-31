@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 24
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **administration-n8kqw** — Event log import — wipe-first path for a non-empty store: backup, preview + confirm, then wipe and re-import in one transaction (feature) — `todo/administration-n8kqw-wipe-first-import.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **administration-n8kqw** — Event log import — wipe-first path for a non-empty store: backup, preview + confirm, then wipe and re-import in one transaction (feature) — `doing/administration-n8kqw-wipe-first-import.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 20:11 -- Batch started: [administration-n8kqw]
+
+**Type:** Work / Batch start
+**Tasks:** administration-n8kqw - Event log import — wipe-first path for a non-empty store: backup, preview + confirm, then wipe and re-import in one transaction
+**Parallel:** no (1 worker) - builder hard constraint: maximum one worker instance at a time. This is the last ready task; the constraint no longer holds anything back.
+
+---
+
 ## 2026-07-31 20:10 -- Task verified and completed: administration-svq3t - Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
 
 **Type:** Work / Task completion

@@ -1,7 +1,7 @@
 ---
 id: administration-n8kqw
 title: Event log import — wipe-first path for a non-empty store: backup, preview + confirm, then wipe and re-import in one transaction
-status: todo
+status: doing
 type: feature
 context: administration
 created: 2026-07-22
