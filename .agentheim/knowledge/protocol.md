@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 15:54 -- Modeling / Promoted: administration-jrflk - Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-31 15:46 -- Batch started: [administration-svq3t]
 
 **Type:** Work / Batch start

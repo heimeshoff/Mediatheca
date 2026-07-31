@@ -1,7 +1,7 @@
 ---
 id: administration-jrflk
 title: Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over
-status: backlog
+status: todo
 type: bug
 context: administration
 created: 2026-07-22

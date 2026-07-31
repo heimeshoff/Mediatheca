@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 2
-- **Todo:** 0
+- **Backlog:** 1
+- **Todo:** 1
 - **Doing:** 1
 - **Done:** 22
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **administration-jrflk** — Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over (bug) — `todo/administration-jrflk-job-name-collision-test-flake.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -54,7 +55,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **administration-jrflk** — Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over (bug) — `backlog/administration-jrflk-job-name-collision-test-flake.md`
 - **administration-n8kqw** — Event log import — wipe-first path for a non-empty store, gated behind wwc36's surgery-grade auto-backup (feature) — `backlog/administration-n8kqw-wipe-first-import.md`
 <!-- backlog-list:end -->
 
