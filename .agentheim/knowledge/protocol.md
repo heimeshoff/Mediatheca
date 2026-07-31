@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 19:48 -- Task verified and completed: infrastructure-p1h9a - "Fail the client build on Fable compile errors — `vite build` exits 0 while emitting throwing placeholders for FS-level errors, so broken UI ships silently (twice already)"
+
+**Type:** Work / Task completion
+**Task:** infrastructure-p1h9a - "Fail the client build on Fable compile errors — `vite build` exits 0 while emitting throwing placeholders for FS-level errors, so broken UI ships silently (twice already)"
+**Summary:** npm run build now gates on a real dotnet build typecheck of Client.fsproj and exits non-zero on any F# compile error, closing the gap where vite-plugin-fable emitted throwing placeholders behind a green build; re-proven independently by construction with the emitted bundle measured unchanged
+**Duration:** 9m30s
+**Verification:** PASS (iteration 1)
+**Files changed:** 4
+**Tests added:** 0
+**ADRs written:** 0037
+
+---
+
 ## 2026-07-31 19:35 -- Batch started: [infrastructure-p1h9a]
 
 **Type:** Work / Batch start

@@ -1,12 +1,12 @@
 ---
 id: infrastructure-p1h9a
 title: "Fail the client build on Fable compile errors — `vite build` exits 0 while emitting throwing placeholders for FS-level errors, so broken UI ships silently (twice already)"
-status: doing
+status: done
 type: chore
 context: infrastructure
 created: 2026-07-31
 depends_on: [design-system-q4ebg, infrastructure-npyhb]
-completed:
+completed: 2026-07-31
 blocks: []
 tags: [build-health, fable, vite, tooling, ci]
 related_adrs: [0036, 0037]
@@ -91,28 +91,59 @@ the two edges existed, not as an open precondition.
 
 ## Acceptance criteria
 
-- [ ] `npm run typecheck` exists and runs a real F# compile of
+- [x] `npm run typecheck` exists and runs a real F# compile of
       `src/Client/Client.fsproj`.
-- [ ] `npm run build` invokes the typecheck first and **exits non-zero** when
+- [x] `npm run build` invokes the typecheck first and **exits non-zero** when
       the client has any F# compile error.
-- [ ] Proven by construction, not by assertion: temporarily reintroduce one
+- [x] Proven by construction, not by assertion: temporarily reintroduce one
       `textarea.bordered` (or any deliberate FS error), show `npm run build`
       exits non-zero, then revert. Record the observed exit code in the task's
       Outcome. After reverting, confirm via `git status` / `git diff --stat` that
       the tree carries no leftover changes from the reintroduced error (the same
       verification discipline `infrastructure-npyhb` used for its own temporary-aid
       check).
-- [ ] On the clean tree, `npm run build` still exits 0 and still emits the same
+- [x] On the clean tree, `npm run build` still exits 0 and still emits the same
       bundle to `deploy/public/` — the existing 1 warning (`FS0020`) does not
       fail it.
-- [ ] `npm run dev:client` is unchanged (no typecheck added to the watch loop).
-- [ ] The infrastructure README (or an inline comment beside the `typecheck`
+- [x] `npm run dev:client` is unchanged (no typecheck added to the watch loop).
+- [x] The infrastructure README (or an inline comment beside the `typecheck`
       script in `package.json`) records the gate's known blind spot per ADR-0036:
       `dotnet build` typechecks this project's own F# but is not proof of what
       Fable will emit, since the two pathways consume different inputs (prebuilt
       `.dll` vs Fable-compiled `.fs` sources) — confirmed `FS0193`-class failures
       can happen on the MSBuild side with zero effect on the shipped bundle, and
       in principle a Fable-source-only issue could go uncaught by this gate.
+
+## Outcome
+
+Added `"typecheck": "dotnet build src/Client/Client.fsproj"` to
+`package.json` and changed `"build"` to
+`"npm run typecheck && vite build"`. `dev:client` is untouched.
+
+**Proven by construction:** temporarily added `textarea.bordered` to
+`Daisy.textarea` in `src/Client/Pages/AdminSurgery/Views.fs` (line 91-96).
+`npm run build` exited **1**, printing
+`error FS0039: The type 'textarea' does not define the field, constructor or
+member 'bordered'` and `2 Error(s)`. Reverted the edit; `git status --porcelain`
+and `git diff --stat` on that file both returned empty, confirming no residue.
+Re-ran `npm run build` on the clean tree: exited **0** with `1 Warning(s)  0
+Error(s)` (the pre-existing `FS0020` at `AdminProjections/Views.fs(199,13)`,
+left unfixed as scoped). Bundle content hashes were measured identical across
+the pre-error and post-revert builds:
+`assets/index-Dnf1E92D.css` and `assets/index-UcBhDRFf.js`, both times.
+
+Recorded the ADR-0036-inherited blind spot (MSBuild binds prebuilt `.dll`
+assemblies, Fable compiles `.fs` sources directly — the gate typechecks this
+project's own F# but is not proof of what Fable will emit) in the
+infrastructure BC README under a new "Client build gate" bullet, and wrote
+ADR-0037 documenting the full decision, the ruled-out plugin-option and
+log-scraping alternatives, and the same blind spot.
+
+`npm test` (Expecto, 416 tests) passed unaffected after the change.
+
+Key files: `package.json`,
+`.agentheim/contexts/infrastructure/README.md`,
+`.agentheim/knowledge/decisions/0037-client-build-fails-on-fable-compile-errors.md`.
 
 ## Notes
 

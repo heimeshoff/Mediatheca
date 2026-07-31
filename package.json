@@ -5,7 +5,8 @@
     "start": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "dotnet watch run --project src/Server/Server.fsproj",
     "dev:client": "vite",
-    "build": "vite build",
+    "typecheck": "dotnet build src/Client/Client.fsproj",
+    "build": "npm run typecheck && vite build",
     "test": "dotnet run --project tests/Server.Tests/Server.Tests.fsproj",
     "test:e2e": "playwright test",
     "deploy": "docker build -t mediatheca:latest . && docker save mediatheca:latest -o mediatheca.tar"
