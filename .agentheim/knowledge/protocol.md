@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 18:06 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 19m (batch start 17:47 → session end 18:06)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 1 (design-system-q4ebg)
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** administration-jrflk: 1, design-system-q4ebg: 1
+**Commits:** 4 (batch start `635d0bc`, task bounced `f7007fb`, task completed `9cff9ba`, this session-end entry)
+**Session-start churn reconciliation:** 1 recognized machine-shape commit, 3 human commits since the 2026-07-31 17:22 boundary. The three human commits (`449bbb0` gitignore salvage, `dedd76f` remove broken gitlink, `7fd96d5` housekeeping record) touch `.gitignore` and `.worktrees/` — surfaces ADR-0063 and ADR-0032 describe — but each *implements* those ADRs' own prescriptions and is already documented in the 17:31 housekeeping entry. No governed-surface divergence flagged.
+**Vision-conformance:** **FLAGGED** — `administration-jrflk`: diverges from the Operability workstream's stated **Boundary** ("When admin-console scope competes with the media-experience roadmap (In Focus, Unified Dashboard, Steam Import, HLTB), the media experience wins"). The task itself is sound and unblocks `administration-n8kqw`; what diverges is the **cumulative allocation** — this is the third consecutive work session spent entirely in the admin/operability workstream while the whole media-experience v1 arc remains unbuilt. The 16:37 and 17:22 entries both recorded this as "standing context, not a flag"; recording it a third time without flagging would let the drift go unlogged. Advisory only, never a gate — surfaced to `.agentheim/state/whats-next.md` for an explicit builder decision.
+**Batch mix:** 100% harness (1 task). Recorded mechanically per `classifyTask`, but the classification is misleading here and is noted rather than trusted: `administration-jrflk` is `type: bug` and its substance is product source (`src/Server/Administration.fs`, `src/Server/Composition.fs`, `tests/Server.Tests/`), which would classify **product-facing** — it tips to `harness` solely because its `FILE_LIST` includes the ADR it wrote under `.agentheim/knowledge/decisions/`. In a consumer project (as opposed to the agentheim harness repo itself) that path is governance output of ordinary product work, so the heuristic reads it backwards. Surfaced, not worked around.
+**Carry-over:** left behind (user WIP, 1 file — `"Mediatheca Directions.html"`, untracked and pre-existing). No `.agentheim/`-owned stranded files: `.agentheim/salvage/` no longer appears as stranded — the `449bbb0` gitignore line committed at 17:31 closed the leak the prior three sessions kept re-recording. No git-registered non-main worktrees remain (`git worktree list` shows only `main`).
+**Worktree husks:** none left this session. Both worktrees created here (`administration-jrflk`, `design-system-q4ebg`) were torn down, and the gitignored MSBuild `obj/Debug/net9.0/` husks each left behind (3 files apiece — `.NETCoreApp,Version=v9.0.AssemblyAttributes.fs`, `*.AssemblyInfo.fs`, `*.AssemblyInfoInputs.cache`) were verified as zero-project-content and deleted, along with the now-empty `.worktrees/` directory. This session created them minutes earlier, so removing its own byproduct is not a disposition on pre-existing builder state; it follows the builder's explicit 17:31 cleanup of the earlier seven.
+
+**Harness defects found mid-run (surfaced, not fixed — all in the installed `agentheim` plugin v0.9.2, not this project):**
+
+1. **`administration-jrflk`'s task id is malformed and breaks every mechanized lifecycle call.** Its suffix `jrflk` contains `l`, outside the id grammar's ambiguity-safe alphabet `[0-9a-hjkmnp-tv-z]` (which drops `i`/`l`/`o`/`u`). `deriveContext("administration-jrflk")` therefore returns the *whole id* as the BC name, so `claim` and `complete` both rejected with `not-found` until given an explicit `contexts`/`context` override. The same break will hit the dashboard and any other id-grammar consumer. A rename is the real fix and was **not** done unilaterally — it would touch the filename, frontmatter `id:`, `administration-n8kqw`'s `depends_on`, both INDEX lines, and historical protocol entries. Needs a `modeling` pass.
+2. **`checkpoint` does not fold in the vacated lifecycle path.** ADR-0057/agentic-workflow-w2njd specify that when `fileList` names a task file's new location, `checkpoint` detects the move and adds the moved-from path to `changed` so the deletion stages too. Plugin 0.9.2 does not do this — verified on **both** tasks, including `design-system-q4ebg` whose id is grammar-valid, so this is independent of defect 1. The conductor staged each vacated `doing/` path by hand; without that, a stale `doing/` duplicate would have survived the squash.
+3. **The ADR-0063 salvage capture misses untracked files.** The prescribed `git diff <fork-point>` does not see untracked additions, so the first capture for `design-system-q4ebg` silently omitted both the moved task file and the worker-drafted `design-system-vh931` — precisely the artifacts a bounce most needs preserved. Worked around by `git add -N`-ing the untracked paths, re-diffing, then `git reset`-ing the index back. The final patch holds all 4 files (231 lines).
+
+---
+
 ## 2026-07-31 18:00 -- Task verified and completed: administration-jrflk - Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over
 
 **Type:** Work / Task completion
