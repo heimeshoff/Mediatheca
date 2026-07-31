@@ -5,6 +5,23 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 17:22 -- Work session ended
+
+**Type:** Work / Session end
+**Completed:** 0 — no dispatch. The ready set held exactly one task (`administration-jrflk`, `depends_on: []`); at the builder's direction the session stopped instead of dispatching it, so `administration-bq4tw` (still in `administration/backlog/`) can be refined and promoted via `modeling` and worked first. This honours the same direction recorded at the close of the 16:37 session, which `bq4tw` remaining unpromoted had left unactioned.
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** none
+**Commits:** 1 (this session-end entry)
+**Session-start churn reconciliation:** 0 recognized machine-shape commits, 0 human commits since the 2026-07-31 16:37 boundary — nothing to surface, no governed-surface hits.
+**Vision-conformance:** none — no tasks completed this session, so there is nothing shipped to evaluate.
+**Batch mix:** none — no tasks completed this session.
+**Carry-over:** `.agentheim/salvage/`: left behind (owner: ADR-0063 salvage convention, a gitignore-intended advisory rescue artifact — holds `administration-svq3t-bounced.patch`, 2/4 e2e flows empirically green, preserved for re-verification once `administration-bq4tw` is fixed). **Gap still open from the prior session:** `.agentheim/salvage/` remains absent from `.gitignore` (which covers only `.agentheim/.dashboard` and `.agentheim/state`), so it will keep re-appearing as stranded every session until a line is added — not done unilaterally. Plus: left behind (user WIP, 1 file — `"Mediatheca Directions.html"`, untracked and pre-existing). No git-registered non-main worktrees exist (`git worktree list` shows only `main`).
+**Stale `.worktrees/` husks (unchanged, still not deleted):** the same 7 directories persist (administration-da908, -qjcp4, -svq3t, -v4y9g, -yamm5, infrastructure-w8fnp, intelligence-p9m4t) — each holding only gitignored MSBuild `obj/Debug/net9.0/` droppings that `git worktree remove --force` does not clean. Zero project content, safe to delete, surfaced rather than removed per the surface-don't-delete posture.
+
+---
+
 ## 2026-07-31 17:20 -- Modeling / Promoted: design-system-q4ebg - "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)"
 
 **Type:** Modeling / Promote
