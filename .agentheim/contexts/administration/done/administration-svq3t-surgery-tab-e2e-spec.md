@@ -1,11 +1,11 @@
 ---
 id: administration-svq3t
 title: Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
-status: doing
+status: done
 type: feature
 context: administration
 created: 2026-07-22
-completed:
+completed: 2026-07-31
 depends_on: [administration-wwc36, design-system-q4ebg]
 blocks: []
 tags: [admin-console, surgery, testing, playwright, e2e]
@@ -312,3 +312,44 @@ No split (the four flows share one `git apply`, one file, and one load-bearing
 test order — splitting could not even let the halves verify separately). No new
 ADR; still rides ADR-0027/0034. The ADR-0059 "prose-only, unenforced" marker in
 Notes was re-checked and is correctly worded as-is.
+
+## Outcome
+
+Recovered the salvage patch cleanly (`git apply --include=tests/e2e/admin-surgery.spec.ts`,
+`--check` and real apply both exited 0), confirmed `npm run build` typechecks
+clean (zero `ERROR FS`, q4ebg's `.bordered` fix holds), and ran the spec
+under `CI=1`.
+
+All four flows passed except Edit, which failed on first run for a genuine
+**spec bug**, not a product bug: `editCard.getByLabel("Data")` substring-matched
+the sibling "Metadata" textarea's label (strict-mode violation, 2 elements).
+Adding `{ exact: true }` then surfaced a second, more interesting issue —
+`getByLabel` resolved to **zero** elements even with the exact accessible
+name confirmed via `ariaSnapshot()` to be `"Data"`: the `<span>Data</span>`
+sits inside a wrapping `<label>` as a *sibling* of the `<textarea>` (not
+`for`/`id`-associated, not `aria-labelledby`), and Playwright's `getByLabel`
+does not resolve that shape to a locator even though the shape is a valid
+implicit label association per the accessible-name computation. Switched to
+`getByRole("textbox", { name: "Data", exact: true })`, which does resolve it
+correctly (verified via a throwaway debug spec, then removed). Fixed in the
+recovered spec, both isolated (`admin-surgery.spec.ts` alone) and full-suite
+(`CI=1 npm run test:e2e`, 11/11 passing across `admin-surgery.spec.ts` +
+`event-tail-follow.spec.ts`) runs now green with all tests actually
+executing (not skipped — confirmed 4/4 then 11/11 in the runner's own
+output, never a 0-executed false-green).
+
+`npm test` (Expecto, 416 tests) passes unchanged — no server code touched.
+
+Added the two required README findings to the existing "Playwright e2e
+harness" bullet: the destructive-spec `process.env.CI` gate precedent (why
+that env var specifically, not an inferred-isolation check) and the
+`IAdminApi` int64-over-the-wire signed-string encoding
+(`GlobalPosition`/`StreamPosition` arrive as `"+0"`/`"+1"` strings, not JSON
+numbers).
+
+Key files:
+- `tests/e2e/admin-surgery.spec.ts` — new spec, 4 tests (Edit, Delete,
+  Rename + HTTP rename-back cleanup, cross-tab dirty banner + Rebuild-all)
+- `.agentheim/contexts/administration/README.md` — "Playwright e2e harness"
+  bullet extended with the CI-gate precedent and the int64-signed-string
+  wire quirk

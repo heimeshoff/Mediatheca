@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 20:10 -- Task verified and completed: administration-svq3t - Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
+
+**Type:** Work / Task completion
+**Task:** administration-svq3t - Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
+**Summary:** Recovered the salvaged Surgery-tab Playwright spec, fixed a spec-side locator bug on the Data textarea, and confirmed all four flows (edit, delete, rename with HTTP rename-back cleanup, cross-tab dirty banner) pass headlessly under CI=1 - with the CI-gate precedent and the IAdminApi int64-as-signed-string wire quirk recorded in the BC README
+**Duration:** 20m
+**Verification:** PASS (iteration 1)
+**Files changed:** 2
+**Tests added:** 4
+**ADRs written:** none
+
+---
+
 ## 2026-07-31 19:49 -- Batch started: [administration-svq3t]
 
 **Type:** Work / Batch start
