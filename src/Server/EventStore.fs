@@ -530,75 +530,92 @@ module EventStore =
             get.Required.Field "timestamp" Decode.string
         )
 
+    /// Read-line/decode/explicit-rowid-INSERT loop, extracted from
+    /// `importNdjson` (administration-n8kqw) so the wipe-first re-import path
+    /// can share it: this function does NOT open its own transaction — the
+    /// caller owns commit/rollback, since `runWipeAndImport` needs this same
+    /// loop to share ONE transaction with `deleteAllEvents`/`rebuildFtsIndex`/
+    /// the checkpoint rewind. The inline try/with that wraps a mid-loop
+    /// exception as `MalformedLine(lineNumber, ex.Message)` is load-bearing
+    /// and moved here with the loop — it protects only the read/decode/insert
+    /// loop itself; a caller-side transaction commit/rollback is the caller's
+    /// own responsibility. Preserves each line's `global_position` exactly
+    /// via an explicit-rowid INSERT (bypassing `appendToStream`, which
+    /// recomputes stream position and timestamp and has no notion of
+    /// "preserve this exact position"); SQLite's AUTOINCREMENT bookkeeping
+    /// (`sqlite_sequence`) advances to match the highest explicit rowid
+    /// inserted.
+    let importNdjsonRows (conn: SqliteConnection) (reader: TextReader) : Result<ImportOutcome, ImportFailure> =
+        let mutable lineNumber = 0
+        let mutable count = 0
+        try
+            let mutable outcome : Result<ImportOutcome, ImportFailure> option = None
+
+            while outcome.IsNone do
+                match reader.ReadLine() with
+                | null ->
+                    outcome <- Some (Ok { EventsImported = count })
+                | line when line.Trim() = "" ->
+                    lineNumber <- lineNumber + 1
+                | line ->
+                    lineNumber <- lineNumber + 1
+                    match Decode.fromString ndjsonLineDecoder line with
+                    | Error err ->
+                        outcome <- Some (Error (MalformedLine(lineNumber, err)))
+                    | Ok (globalPosition, streamId, streamPosition, eventType, data, metadata, timestamp) ->
+                        conn
+                        |> Db.newCommand """
+                            INSERT INTO events (global_position, stream_id, stream_position, event_type, data, metadata, timestamp)
+                            VALUES (@global_position, @stream_id, @stream_position, @event_type, @data, @metadata, @timestamp)
+                        """
+                        |> Db.setParams [
+                            "global_position", SqlType.Int64 globalPosition
+                            "stream_id", SqlType.String streamId
+                            "stream_position", SqlType.Int64 streamPosition
+                            "event_type", SqlType.String eventType
+                            "data", SqlType.String data
+                            "metadata", SqlType.String metadata
+                            "timestamp", SqlType.String timestamp
+                        ]
+                        |> Db.exec
+                        count <- count + 1
+
+            match outcome with
+            | Some result -> result
+            | None ->
+                // Unreachable: the loop only exits via one of the two
+                // `outcome <- Some ...` assignments above.
+                Error (MalformedLine(lineNumber, "Unexpected end of import"))
+        with ex ->
+            Error (MalformedLine(lineNumber, ex.Message))
+
     /// Imports an NDJSON event log produced by `exportNdjson` into the target
     /// store, reading `reader` line-by-line so the upload is never buffered
     /// whole. Refuses immediately (`StoreNotEmpty`) if the target store
-    /// already has events, before a single line is read from `reader`.
-    /// Preserves each line's `global_position` exactly via an explicit-rowid
-    /// INSERT (bypassing `appendToStream`, which recomputes stream position
-    /// and timestamp and has no notion of "preserve this exact position");
-    /// SQLite's AUTOINCREMENT bookkeeping (`sqlite_sequence`) advances to
-    /// match the highest explicit rowid inserted, so a subsequent ordinary
-    /// append continues from `(imported max global_position) + 1`. The whole
-    /// import runs in one transaction: a malformed line partway through rolls
-    /// back everything, leaving the target store empty rather than partially
-    /// populated. Does not touch `projection_checkpoints` — the store reads
-    /// as dirty via the existing lag-detection until the operator runs the
-    /// existing Rebuild-all control (administration-qjcp4, ADR-0025).
+    /// already has events, before a single line is read from `reader`. The
+    /// whole import runs in one transaction around `importNdjsonRows` (see
+    /// its doc comment for the extracted loop and position-preservation
+    /// details): a malformed line partway through rolls back everything,
+    /// leaving the target store empty rather than partially populated. Does
+    /// not touch `projection_checkpoints` — the store reads as dirty via the
+    /// existing lag-detection until the operator runs the existing
+    /// Rebuild-all control (administration-qjcp4, ADR-0025). On THIS
+    /// empty-store path, SQLite's AUTOINCREMENT bookkeeping continues a
+    /// subsequent ordinary append from `(imported max global_position) + 1`
+    /// — the wipe-first path (administration-n8kqw) deliberately does not
+    /// reset `sqlite_sequence`, so that claim holds only here, not there.
     let importNdjson (conn: SqliteConnection) (reader: TextReader) : Result<ImportOutcome, ImportFailure> =
         if getTotalEventCount conn > 0 then
             Error StoreNotEmpty
         else
-            let mutable lineNumber = 0
-            let mutable count = 0
             use tx = conn.BeginTransaction()
-            try
-                let mutable outcome : Result<ImportOutcome, ImportFailure> option = None
-
-                while outcome.IsNone do
-                    match reader.ReadLine() with
-                    | null ->
-                        outcome <- Some (Ok { EventsImported = count })
-                    | line when line.Trim() = "" ->
-                        lineNumber <- lineNumber + 1
-                    | line ->
-                        lineNumber <- lineNumber + 1
-                        match Decode.fromString ndjsonLineDecoder line with
-                        | Error err ->
-                            outcome <- Some (Error (MalformedLine(lineNumber, err)))
-                        | Ok (globalPosition, streamId, streamPosition, eventType, data, metadata, timestamp) ->
-                            conn
-                            |> Db.newCommand """
-                                INSERT INTO events (global_position, stream_id, stream_position, event_type, data, metadata, timestamp)
-                                VALUES (@global_position, @stream_id, @stream_position, @event_type, @data, @metadata, @timestamp)
-                            """
-                            |> Db.setParams [
-                                "global_position", SqlType.Int64 globalPosition
-                                "stream_id", SqlType.String streamId
-                                "stream_position", SqlType.Int64 streamPosition
-                                "event_type", SqlType.String eventType
-                                "data", SqlType.String data
-                                "metadata", SqlType.String metadata
-                                "timestamp", SqlType.String timestamp
-                            ]
-                            |> Db.exec
-                            count <- count + 1
-
-                match outcome with
-                | Some (Ok result) ->
-                    tx.Commit()
-                    Ok result
-                | Some (Error failure) ->
-                    tx.Rollback()
-                    Error failure
-                | None ->
-                    // Unreachable: the loop only exits via one of the two
-                    // `outcome <- Some ...` assignments above.
-                    tx.Rollback()
-                    Error (MalformedLine(lineNumber, "Unexpected end of import"))
-            with ex ->
+            match importNdjsonRows conn reader with
+            | Ok result ->
+                tx.Commit()
+                Ok result
+            | Error failure ->
                 tx.Rollback()
-                Error (MalformedLine(lineNumber, ex.Message))
+                Error failure
 
     // Event surgery (administration-wwc36, ADR-0034) — the raw-log escape
     // hatch for cases the compensating-event composer (ADR-0032) can't reach:
@@ -724,3 +741,58 @@ module EventStore =
                 Ok ()
         with ex ->
             Error ex.Message
+
+    // ── Wipe-first event log import (administration-n8kqw, ADR-0038) ──
+    // Overwriting a non-empty store: `deleteAllEvents` + `importNdjsonRows`
+    // (above) + `rebuildFtsIndex` (above) share ONE transaction, orchestrated
+    // by `Administration.runWipeAndImport`. This module owns only the
+    // storage-layer verbs; the guardrail protocol (VACUUM INTO backup first,
+    // preview+confirm, the wipe-import/rebuild mutual-exclusion guard) lives
+    // in `Administration.fs`, which needs `dbPath`/`projectionHandlers` —
+    // neither a storage-layer concept.
+
+    /// `DELETE FROM events` (administration-n8kqw) — clears the log while
+    /// preserving schema, the `events_fts` shadow tables, and the
+    /// `events_fts_ai` AFTER-INSERT trigger. Deliberately NOT drop/recreate:
+    /// a wipe-first re-import runs `rebuildFtsIndex` afterward, in the SAME
+    /// transaction, to resync `events_fts` against the newly-imported rows —
+    /// mirroring the mutate-then-rebuild order ADR-0034 established for
+    /// edit/delete. Does NOT touch `sqlite_sequence` — see
+    /// `Administration.runWipeAndImport`'s doc comment for why that's
+    /// deliberate. Returns rows deleted.
+    let deleteAllEvents (conn: SqliteConnection) : int =
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- "DELETE FROM events"
+        cmd.ExecuteNonQuery()
+
+    /// Discard-side aggregate stats for the wipe-import confirm dialog
+    /// (administration-n8kqw): exact event count, distinct stream count, and
+    /// oldest/newest timestamp — one indexed-scan query, not a `getHealthStats`-
+    /// shaped (90-day-bounded, images-directory-walking) or `getDistinctStreams`-
+    /// shaped (materializes every stream id) query, both of which are the
+    /// wrong cost/shape for a confirm dialog that just needs four numbers.
+    /// `MIN`/`MAX` over the `timestamp` TEXT column ARE chronologically
+    /// correct here, not merely lexicographic coincidence: every writer
+    /// stamps `DateTimeOffset.ToString("o")` (ISO-8601 round-trip, fixed-
+    /// width, lexicographically sortable in timestamp order) — do not "fix"
+    /// this into `datetime()`, which would not change correctness but would
+    /// lose the free index-friendliness of a plain TEXT comparison. `None`
+    /// timestamps and a zero count for an empty store (an aggregate query
+    /// with no `GROUP BY` always returns exactly one row, with `NULL`
+    /// `MIN`/`MAX` over zero matching rows).
+    type EventStoreSummary = {
+        EventCount: int
+        DistinctStreamCount: int
+        OldestTimestamp: string option
+        NewestTimestamp: string option
+    }
+
+    let getEventStoreSummary (conn: SqliteConnection) : EventStoreSummary =
+        conn
+        |> Db.newCommand "SELECT COUNT(*) as cnt, COUNT(DISTINCT stream_id) as streams, MIN(timestamp) as oldest, MAX(timestamp) as newest FROM events"
+        |> Db.querySingle (fun rd ->
+            { EventCount = rd.ReadInt32 "cnt"
+              DistinctStreamCount = rd.ReadInt32 "streams"
+              OldestTimestamp = if rd.IsDBNull(rd.GetOrdinal("oldest")) then None else Some (rd.ReadString "oldest")
+              NewestTimestamp = if rd.IsDBNull(rd.GetOrdinal("newest")) then None else Some (rd.ReadString "newest") })
+        |> Option.defaultValue { EventCount = 0; DistinctStreamCount = 0; OldestTimestamp = None; NewestTimestamp = None }

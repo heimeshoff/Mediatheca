@@ -3,6 +3,7 @@ module Mediatheca.Client.Pages.AdminProjections.Views
 open Feliz
 open Feliz.DaisyUI
 open Mediatheca.Client
+open Mediatheca.Client.Components
 open Mediatheca.Shared
 open Mediatheca.Client.Pages.AdminProjections.Types
 
@@ -108,17 +109,20 @@ let private projectionCard (model: Model) (dispatch: Msg -> unit) (row: Projecti
         ]
     ]
 
-/// Backup section (administration-vrc56, ADR-0029): export the full event
-/// log as NDJSON (a plain `<a href>` download — the server sets
-/// Content-Disposition, no client state needed), or import an NDJSON export
-/// into an empty store. After a successful import, projections are left
-/// untouched on purpose (checkpoints stay put, so the store reads as dirty
-/// via the existing lag detection above) — the operator runs "Rebuild all"
-/// next, reusing the same control rather than growing a second rebuild
-/// path. Import into a non-empty store is refused server-side and surfaced
-/// here as a visible message, not a raw error.
+/// Backup section (administration-vrc56, ADR-0029; extended by
+/// administration-n8kqw, ADR-0038): export the full event log as NDJSON (a
+/// plain `<a href>` download — the server sets Content-Disposition, no
+/// client state needed), import an NDJSON export into an empty store, or
+/// wipe-and-reimport over a store that already has events (a separate
+/// route/control, since the safe Import above always refuses a non-empty
+/// store). After a successful import, projections are left untouched on
+/// purpose (checkpoints stay put, so the store reads as dirty via the
+/// existing lag detection above) — the operator runs "Rebuild all" next,
+/// reusing the same control rather than growing a second rebuild path.
 let private backupSection (model: Model) (dispatch: Msg -> unit) =
     let importInputId = "admin-import-events-input"
+    let wipeImportInputId = "admin-wipe-import-events-input"
+    let wipeImportBusy = model.IsWipeImporting || model.WipeImportPreviewLoading
     Html.div [
         prop.className (DesignSystem.velvetCard + " p-4 flex flex-col gap-3")
         prop.children [
@@ -166,8 +170,110 @@ let private backupSection (model: Model) (dispatch: Msg -> unit) =
             match model.ImportMessage with
             | Some message -> Html.p [ prop.className "text-xs text-warning"; prop.text message ]
             | None -> Html.none
+
+            Html.div [ prop.className "divider my-0" ]
+
+            Html.p [
+                prop.className DesignSystem.mutedText
+                prop.text "Wipe & re-import replaces the ENTIRE event log with the uploaded file, after taking a backup — unlike Import above, this works even when the store already has events."
+            ]
+            Html.div [
+                prop.className "flex items-center gap-3"
+                prop.children [
+                    Html.label [
+                        prop.htmlFor wipeImportInputId
+                        prop.className ("btn btn-outline btn-error btn-sm" + (if wipeImportBusy then " btn-disabled" else ""))
+                        prop.text (
+                            if model.IsWipeImporting then "Wiping & importing..."
+                            elif model.WipeImportPreviewLoading then "Loading preview..."
+                            else "Wipe & re-import")
+                    ]
+                    Html.input [
+                        prop.id wipeImportInputId
+                        prop.type' "file"
+                        prop.accept ".ndjson,application/x-ndjson,text/plain"
+                        prop.className "hidden"
+                        prop.disabled wipeImportBusy
+                        prop.onChange (fun (e: Browser.Types.Event) ->
+                            let input: Browser.Types.HTMLInputElement = unbox e.target
+                            let files = input.files
+                            if files.length > 0 then
+                                dispatch (WipeImport_file_selected files.[0])
+                                input.value <- "")
+                    ]
+                    if wipeImportBusy then Daisy.loading [ loading.spinner; loading.xs ]
+                ]
+            ]
+            match model.WipeImportBackupPath with
+            | Some path -> Html.p [ prop.className (DesignSystem.dataText + " text-xs"); prop.text (sprintf "Backup taken: %s" path) ]
+            | None -> Html.none
+            match model.WipeImportResult with
+            | Some (eventsImported, eventsDiscarded) ->
+                Html.p [
+                    prop.className "text-xs text-success"
+                    prop.text (sprintf "Wiped %d event%s, imported %d. Run Rebuild all below to bring projections up to date." eventsDiscarded (if eventsDiscarded = 1 then "" else "s") eventsImported)
+                ]
+            | None -> Html.none
+            match model.WipeImportMessage with
+            | Some message -> Html.p [ prop.className "text-xs text-warning"; prop.text message ]
+            | None -> Html.none
         ]
     ]
+
+/// Wipe-import confirm dialog (administration-n8kqw, ADR-0038; paper-overlay,
+/// ADR-0016, same `ModalPanel` the Surgery tab's confirm dialogs use): shows
+/// both the discard-side server stats and the incoming-side client-computed
+/// line count, so the operator sees what's about to be thrown away and what
+/// it's being replaced with in one place. Cancel is model-only — dispatched
+/// straight to `WipeImport_cancel`, no `Cmd.ofEffect`, so "untouched" holds
+/// by construction rather than by any rollback. An empty incoming file is
+/// allowed to proceed (net effect: wipe to empty) — called out explicitly
+/// rather than silently blocked or silently proceeding.
+let private wipeImportConfirmDialog (model: Model) (dispatch: Msg -> unit) =
+    match model.WipeImportPendingFile, model.WipeImportPreview with
+    | Some file, Some preview ->
+        ModalPanel.viewWithFooter
+            "Confirm Wipe & Import"
+            (fun () -> dispatch WipeImport_cancel)
+            [
+                Html.p [
+                    prop.className DesignSystem.bodyText
+                    prop.text "This replaces the entire event log. A backup is taken first (VACUUM INTO); the wipe and re-import share one transaction, so a malformed line rolls back everything, leaving the store exactly as it was before."
+                ]
+                Html.div [
+                    prop.className "grid grid-cols-2 gap-3 mt-3"
+                    prop.children [
+                        Html.div [
+                            prop.children [
+                                Html.span [ prop.className DesignSystem.eyebrow; prop.text "Currently in store (to be discarded)" ]
+                                Html.div [
+                                    prop.className (DesignSystem.dataText + " text-sm")
+                                    prop.text (sprintf "%d event%s across %d stream%s" preview.EventCount (if preview.EventCount = 1 then "" else "s") preview.DistinctStreamCount (if preview.DistinctStreamCount = 1 then "" else "s"))
+                                ]
+                            ]
+                        ]
+                        Html.div [
+                            prop.children [
+                                Html.span [ prop.className DesignSystem.eyebrow; prop.text "Incoming file" ]
+                                Html.div [
+                                    prop.className (DesignSystem.dataText + " text-sm")
+                                    prop.text (sprintf "%s: %d line%s" file.name model.WipeImportClientLineCount (if model.WipeImportClientLineCount = 1 then "" else "s"))
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+                if model.WipeImportClientLineCount = 0 then
+                    Html.p [
+                        prop.className "text-sm text-warning mt-2"
+                        prop.text "The incoming file has no events — confirming will wipe the store to empty."
+                    ]
+            ]
+            [
+                Daisy.button.button [ button.ghost; prop.onClick (fun _ -> dispatch WipeImport_cancel); prop.text "Cancel" ]
+                Daisy.button.button [ button.error; prop.onClick (fun _ -> dispatch WipeImport_confirm); prop.text "Wipe & import" ]
+            ]
+    | _ -> Html.none
 
 /// One row-level discrepancy in the drift-check results (administration-btvqa,
 /// ADR-0031): table, primary key, kind (only-in-live / only-in-shadow /
@@ -302,5 +408,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     prop.className "flex flex-col gap-3"
                     prop.children [ for row in model.Stats -> projectionCard model dispatch row ]
                 ]
+
+            wipeImportConfirmDialog model dispatch
         ]
     ]

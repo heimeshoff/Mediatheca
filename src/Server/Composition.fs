@@ -357,6 +357,8 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
                 >=> Administration.exportEventsStreamHandler connectionFactory
             route "/api/stream/import-events"
                 >=> Administration.importEventsStreamHandler connectionFactory
+            route "/api/stream/wipe-import-events"
+                >=> Administration.wipeImportEventsStreamHandler connectionFactory dbPath projectionHandlers adminGuards
             Administration.projectionRebuildStreamHandler connectionFactory projectionHandlers adminGuards
             route "/api/stream/drift-check"
                 >=> Administration.driftCheckStreamHandler connectionFactory projectionHandlers adminGuards

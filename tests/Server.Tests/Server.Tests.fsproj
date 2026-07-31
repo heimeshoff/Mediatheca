@@ -23,6 +23,7 @@
     <Compile Include="JobConnectionConcurrencyTests.fs" />
     <Compile Include="RequestConnectionConcurrencyTests.fs" />
     <Compile Include="AdminSurgeryTests.fs" />
+    <Compile Include="AdminWipeImportTests.fs" />
     <Compile Include="ProjectionRebuildTests.fs" />
     <Compile Include="ProjectionDriftTests.fs" />
     <Compile Include="MoviesIntegrationTests.fs" />

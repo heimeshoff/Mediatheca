@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 20:39 -- Task verified and completed: administration-n8kqw - Event log import — wipe-first path for a non-empty store: backup, preview + confirm, then wipe and re-import in one transaction
+
+**Type:** Work / Task completion
+**Task:** administration-n8kqw - Event log import — wipe-first path for a non-empty store: backup, preview + confirm, then wipe and re-import in one transaction
+**Summary:** Shipped the wipe-first event log import - a sibling SSE route that backs up via VACUUM INTO, then wipes and re-imports the whole log in one transaction (the transaction, not the backup, is the primary restore path), mutually exclusive with projection rebuild via a new AdminGuards coherence guard, behind a Projections-tab preview and confirm dialog
+**Duration:** 28m
+**Verification:** PASS (iteration 1)
+**Files changed:** 12
+**Tests added:** 11
+**ADRs written:** 0038
+
+---
+
 ## 2026-07-31 20:11 -- Batch started: [administration-n8kqw]
 
 **Type:** Work / Batch start

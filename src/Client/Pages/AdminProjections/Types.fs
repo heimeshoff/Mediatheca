@@ -78,6 +78,33 @@ type Model = {
     /// Rejection (dirty projection) or error message, cleared on the next
     /// "Run check" click.
     DriftCheckMessage: string option
+    // Wipe-first event log import (administration-n8kqw, ADR-0038):
+    // overwriting a non-empty store. `WipeImportPendingFile` + `WipeImportPreview`
+    // both `Some` is what the view treats as "the confirm dialog is showing" —
+    // Cancel clears both with no network request ever sent ("untouched" holds
+    // by construction, not rollback).
+    /// The file picked, held until Cancel/Confirm resolves it. `None` means
+    /// no confirm dialog is showing.
+    WipeImportPendingFile: Browser.Types.File option
+    /// Non-blank line count of the picked file, computed client-side (via
+    /// `File.text()`) before the preview request — no staging area, no
+    /// second upload phase.
+    WipeImportClientLineCount: int
+    /// True between file selection and the preview response landing.
+    WipeImportPreviewLoading: bool
+    /// Discard-side stats from `getWipeImportPreview` — what's currently in
+    /// the store, i.e. what a Wipe & Import would throw away. `Some` (along
+    /// with `WipeImportPendingFile`) is what makes the confirm dialog show.
+    WipeImportPreview: WipeImportPreview option
+    /// The `backup` SSE event's path, rendered as soon as it arrives —
+    /// before the transaction that could still fail even starts.
+    WipeImportBackupPath: string option
+    IsWipeImporting: bool
+    /// (eventsImported, eventsDiscarded) from a committed `complete` event.
+    WipeImportResult: (int * int) option
+    /// Rejection or error message (backup failure or malformed-line
+    /// rollback), cleared on the next wipe-import attempt.
+    WipeImportMessage: string option
 }
 
 type Msg =
@@ -99,3 +126,12 @@ type Msg =
     | Drift_check_completed of DriftCheckResult
     | Drift_check_rejected of string
     | Drift_check_failed of string
+    | WipeImport_file_selected of Browser.Types.File
+    | WipeImport_file_counted of Browser.Types.File * int
+    | WipeImport_preview_loaded of WipeImportPreview
+    | WipeImport_cancel
+    | WipeImport_confirm
+    | WipeImport_backup_received of string
+    | WipeImport_completed of eventsImported: int * eventsDiscarded: int
+    | WipeImport_rejected of string
+    | WipeImport_failed of string

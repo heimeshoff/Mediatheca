@@ -15,6 +15,13 @@ let private jsFetchPostFile (url: string) (file: Browser.Types.File) : JS.Promis
 [<Emit("new TextDecoder().decode($0)")>]
 let private decodeBytes (value: obj) : string = jsNative
 
+/// `File.text()` — the standard File API's own whole-file-as-string read,
+/// used only for the wipe-import confirm dialog's client-side non-blank
+/// line count (administration-n8kqw); the actual upload still streams the
+/// raw `File` object via `jsFetchPostFile`, never this decoded string.
+[<Emit("$0.text()")>]
+let private fileText (file: Browser.Types.File) : JS.Promise<string> = jsNative
+
 let init () : Model * Cmd<Msg> =
     { Stats = []
       IsLoading = true
@@ -29,7 +36,15 @@ let init () : Model * Cmd<Msg> =
       IsDriftChecking = false
       DriftCheckProgress = None
       DriftCheckResult = None
-      DriftCheckMessage = None },
+      DriftCheckMessage = None
+      WipeImportPendingFile = None
+      WipeImportClientLineCount = 0
+      WipeImportPreviewLoading = false
+      WipeImportPreview = None
+      WipeImportBackupPath = None
+      IsWipeImporting = false
+      WipeImportResult = None
+      WipeImportMessage = None },
     Cmd.ofMsg Load
 
 /// Consumes the SSE stream from `/api/stream/rebuild-projection/{name}`
@@ -131,6 +146,77 @@ let private runImportStream (file: Browser.Types.File) : Cmd<Msg> =
                             idx <- buffer.IndexOf("\n\n")
             with ex ->
                 dispatch (Import_failed ex.Message)
+        } |> Async.StartImmediate
+    )
+
+/// Non-blank line count — the same "one NDJSON line per event" shape the
+/// server's `importNdjsonRows` counts, computed client-side so the confirm
+/// dialog can show it alongside the server's discard-side stats with no
+/// staging area or second upload phase (administration-n8kqw).
+let private countNonBlankLines (text: string) : int =
+    text.Split('\n')
+    |> Array.filter (fun l -> l.Trim() <> "")
+    |> Array.length
+
+let private countFileLines (file: Browser.Types.File) : Cmd<Msg> =
+    Cmd.ofEffect (fun dispatch ->
+        async {
+            try
+                let! text = fileText file |> Async.AwaitPromise
+                dispatch (WipeImport_file_counted (file, countNonBlankLines text))
+            with ex ->
+                dispatch (WipeImport_failed ex.Message)
+        } |> Async.StartImmediate
+    )
+
+/// Consumes the SSE stream from `/api/stream/wipe-import-events`
+/// (Administration.wipeImportEventsStreamHandler, administration-n8kqw,
+/// ADR-0038), the file's raw bytes POSTed directly as the request body —
+/// same reader/buffer/`data: ` framing as `runImportStream`, plus the
+/// `backup` event (rendered immediately, before the transaction that could
+/// still fail even starts) and `error`'s richer `phase`/`lineNumber` payload
+/// (only the message is surfaced client-side; the phase distinction is for
+/// server-side diagnostics).
+let private runWipeImportStream (file: Browser.Types.File) : Cmd<Msg> =
+    Cmd.ofEffect (fun dispatch ->
+        async {
+            try
+                let! response = jsFetchPostFile "/api/stream/wipe-import-events" file |> Async.AwaitPromise
+                let reader: obj = response?body?getReader()
+                let mutable buffer = ""
+                let mutable reading = true
+                while reading do
+                    let! chunk = (reader?read() : JS.Promise<obj>) |> Async.AwaitPromise
+                    let isDone: bool = chunk?``done``
+                    if isDone then
+                        reading <- false
+                    else
+                        let value: obj = chunk?value
+                        let text = decodeBytes value
+                        buffer <- buffer + text
+                        let mutable idx = buffer.IndexOf("\n\n")
+                        while idx >= 0 do
+                            let message = buffer.[0..idx-1]
+                            buffer <- buffer.[idx+2..]
+                            let dataLine =
+                                if message.StartsWith("data: ") then message.[6..]
+                                else message
+                            if dataLine <> "" then
+                                let parsed: obj = JS.JSON.parse dataLine
+                                let eventType: string = parsed?``type``
+                                match eventType with
+                                | "backup" ->
+                                    dispatch (WipeImport_backup_received (parsed?backupPath |> string))
+                                | "rejected" ->
+                                    dispatch (WipeImport_rejected (parsed?message |> string))
+                                | "complete" ->
+                                    dispatch (WipeImport_completed (parsed?eventsImported |> int, parsed?eventsDiscarded |> int))
+                                | "error" ->
+                                    dispatch (WipeImport_failed (parsed?message |> string))
+                                | _ -> ()
+                            idx <- buffer.IndexOf("\n\n")
+            with ex ->
+                dispatch (WipeImport_failed ex.Message)
         } |> Async.StartImmediate
     )
 
@@ -295,3 +381,59 @@ let update (api: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Drift_check_failed message ->
         { model with IsDriftChecking = false; DriftCheckProgress = None; DriftCheckMessage = Some message }, Cmd.none
+
+    | WipeImport_file_selected file ->
+        { model with
+            WipeImportPreviewLoading = true
+            WipeImportPreview = None
+            WipeImportBackupPath = None
+            WipeImportResult = None
+            WipeImportMessage = None },
+        countFileLines file
+
+    | WipeImport_file_counted (file, count) ->
+        { model with WipeImportPendingFile = Some file; WipeImportClientLineCount = count },
+        Cmd.OfAsync.perform api.getWipeImportPreview () WipeImport_preview_loaded
+
+    | WipeImport_preview_loaded preview ->
+        { model with WipeImportPreviewLoading = false; WipeImportPreview = Some preview }, Cmd.none
+
+    | WipeImport_cancel ->
+        // Model-only — no request is ever sent, so "untouched" holds by
+        // construction rather than by any rollback.
+        { model with
+            WipeImportPendingFile = None
+            WipeImportPreview = None
+            WipeImportPreviewLoading = false
+            WipeImportClientLineCount = 0 },
+        Cmd.none
+
+    | WipeImport_confirm ->
+        match model.WipeImportPendingFile with
+        | None -> model, Cmd.none
+        | Some file ->
+            { model with
+                IsWipeImporting = true
+                WipeImportPendingFile = None
+                WipeImportPreview = None
+                WipeImportBackupPath = None
+                WipeImportResult = None
+                WipeImportMessage = None },
+            runWipeImportStream file
+
+    | WipeImport_backup_received backupPath ->
+        { model with WipeImportBackupPath = Some backupPath }, Cmd.none
+
+    | WipeImport_completed (eventsImported, eventsDiscarded) ->
+        // Mirrors Import_completed: no auto-navigation, rely on the
+        // cross-tab dirty banner (client-derived from Stats' Lag) reacting
+        // once Stats reloads — same as ordinary import and every surgery
+        // mutation already do.
+        { model with IsWipeImporting = false; WipeImportResult = Some (eventsImported, eventsDiscarded) },
+        Cmd.ofMsg Load
+
+    | WipeImport_rejected message ->
+        { model with IsWipeImporting = false; WipeImportMessage = Some message }, Cmd.none
+
+    | WipeImport_failed message ->
+        { model with IsWipeImporting = false; WipeImportMessage = Some message }, Cmd.none

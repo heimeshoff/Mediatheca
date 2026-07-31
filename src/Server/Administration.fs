@@ -409,16 +409,71 @@ module Administration =
     type AdminGuards = {
         RebuildingProjections: System.Collections.Concurrent.ConcurrentDictionary<string, unit>
         DriftCheckInProgress: System.Collections.Concurrent.ConcurrentDictionary<string, unit>
+        /// Wipe-first event log import single-flight (administration-n8kqw,
+        /// ADR-0038) — a coherence guard, not merely a safety one: WAL +
+        /// busy_timeout (ADR-0033) already makes concurrent writers safe, but
+        /// this transaction is uniquely long-lived and store-wide, so a
+        /// projection rebuild started against the pre-wipe log and still
+        /// replaying when a wipe-import commits would write a checkpoint
+        /// pointing into a discarded log, leaving `isAnyProjectionDirty`
+        /// silently reporting clean over content that no longer exists.
+        /// Mutually exclusive with `RebuildingProjections` in both
+        /// directions — see `wipeImportEventsStreamHandler` and
+        /// `projectionRebuildStreamHandler`.
+        WipeImportInProgress: System.Collections.Concurrent.ConcurrentDictionary<string, unit>
     }
 
     /// Builds one fresh, independently-owned `AdminGuards`. The composition
     /// root calls this exactly once and passes the same value to `create`,
-    /// `projectionRebuildStreamHandler`, and `driftCheckStreamHandler`, so
-    /// "one guard per process" is a property of the wiring rather than of
-    /// this module.
+    /// `projectionRebuildStreamHandler`, `driftCheckStreamHandler`, and
+    /// `wipeImportEventsStreamHandler`, so "one guard per process" is a
+    /// property of the wiring rather than of this module.
     let makeGuards () : AdminGuards =
         { RebuildingProjections = System.Collections.Concurrent.ConcurrentDictionary<string, unit>()
-          DriftCheckInProgress = System.Collections.Concurrent.ConcurrentDictionary<string, unit>() }
+          DriftCheckInProgress = System.Collections.Concurrent.ConcurrentDictionary<string, unit>()
+          WipeImportInProgress = System.Collections.Concurrent.ConcurrentDictionary<string, unit>() }
+
+    /// Single-flight key for `AdminGuards.WipeImportInProgress` — one
+    /// wipe-import for the whole store at a time (there is only ever one
+    /// store), mirroring `driftCheckKey`'s single-key shape (below).
+    let private wipeImportKey = "wipe-import"
+
+    /// Outcome of `decideAndClaimWipeImportGuard` — see there.
+    type WipeImportGuardDecision =
+        | RefusedRebuildInFlight
+        | RefusedAlreadyImporting
+        | ClaimedWipeImport
+
+    /// The wipe-import half of the ADR-0038 mutual-exclusion guard
+    /// (administration-n8kqw), extracted from `wipeImportEventsStreamHandler`
+    /// as a plain, directly-testable function — no SSE/HTTP needed to
+    /// exercise it, mirroring how `driftCheckRejectionMessage` (below) is
+    /// tested independently of `driftCheckStreamHandler`. Order is
+    /// deliberate and was corrected at refinement: checks
+    /// `guards.RebuildingProjections` non-empty FIRST — refusing with NO
+    /// claim on `WipeImportInProgress` ever made — and only THEN attempts
+    /// `TryAdd` on `WipeImportInProgress`; never claims-then-releases. This
+    /// mirrors `driftCheckStreamHandler` (below), which also checks its
+    /// cross-cutting condition before touching its own guard and never
+    /// claims-then-releases. MUTATING on the `ClaimedWipeImport` path
+    /// (claims `WipeImportInProgress`) — callers that get `ClaimedWipeImport`
+    /// MUST release via `WipeImportInProgress.TryRemove` in a `finally`
+    /// block, same as every other guard in this module.
+    let decideAndClaimWipeImportGuard (guards: AdminGuards) : WipeImportGuardDecision =
+        if not guards.RebuildingProjections.IsEmpty then
+            RefusedRebuildInFlight
+        elif not (guards.WipeImportInProgress.TryAdd(wipeImportKey, ())) then
+            RefusedAlreadyImporting
+        else
+            ClaimedWipeImport
+
+    /// True when a wipe-import (ADR-0038) is currently in flight — the
+    /// `projectionRebuildStreamHandler` half of the mutual exclusion,
+    /// checked before that handler's own `RebuildingProjections.TryAdd`.
+    /// Extracted alongside `decideAndClaimWipeImportGuard` so both
+    /// directions of the mutual exclusion are independently testable.
+    let wipeImportInFlight (guards: AdminGuards) : bool =
+        not guards.WipeImportInProgress.IsEmpty
 
     let private buildProjectionStats (conn: SqliteConnection) (projectionHandlers: Projection.ProjectionHandler list) (guards: AdminGuards) : ProjectionStatRow list =
         let head = EventStore.getMaxGlobalPosition conn
@@ -786,16 +841,18 @@ module Administration =
     /// up front, so this is a single outcome event rather than a percentage
     /// bar (there is no separate "start" event: unlike those two precedents,
     /// import here is one atomic transaction with no intermediate progress
-    /// to report, and an empty-payload `{}` "start" event would round-trip
-    /// through this same handler's `{"type":"...",%s}` template as
-    /// `{"type":"start",}` — a trailing comma that breaks `JSON.parse` on
-    /// the client). A non-empty target store gets a "rejected" event (same
+    /// to report before its one all-or-nothing transaction resolves, so
+    /// there is nothing meaningful for a "start" event to say — not, as an
+    /// earlier version of this comment claimed, because an empty-payload
+    /// event would break `JSON.parse`; `Sse.sseFrame` (administration-h4k2p)
+    /// now special-cases the empty-payload case correctly, so that reasoning
+    /// is stale). A non-empty target store gets a "rejected" event (same
     /// vocabulary `projectionRebuildStreamHandler` uses for its
     /// concurrent-rebuild guard) before a single line of the body is read —
     /// see `EventStore.importNdjson`'s doc comment for why that ordering
     /// holds. Import that overwrites a non-empty store by wiping first is a
-    /// separate, more dangerous operation (administration-n8kqw), out of
-    /// scope here.
+    /// separate, more dangerous operation (administration-n8kqw,
+    /// `wipeImportEventsStreamHandler` below), out of scope here.
     // administration-mz6kp (ADR-0033): `conn` is a per-request connection
     // opened by this handler alone from the shared factory — no other
     // in-flight request shares it, so the process-wide `dbLock` ADR-0030
@@ -868,7 +925,12 @@ module Administration =
                     | None ->
                         do! writeEvent "error" (sprintf "{\"message\":\"Unknown projection '%s'\"}" projectionName)
                     | Some handler ->
-                        if not (guards.RebuildingProjections.TryAdd(projectionName, ())) then
+                        if wipeImportInFlight guards then
+                            // Mutual exclusion with wipe-import (ADR-0038):
+                            // checked before touching this handler's own
+                            // guard, same shape as the check below it.
+                            do! writeEvent "rejected" "{\"message\":\"An event log import is in flight\"}"
+                        elif not (guards.RebuildingProjections.TryAdd(projectionName, ())) then
                             do! writeEvent "rejected" (sprintf "{\"message\":\"%s is already rebuilding\"}" projectionName)
                         else
                             try
@@ -1134,6 +1196,146 @@ module Administration =
             { Count = files.Length
               TotalBytes = files |> Array.sumBy (fun f -> (FileInfo(f)).Length) }
 
+    // ── Wipe-first event log import (administration-n8kqw, ADR-0038) ──
+    // Overwriting a non-empty store — reuses ADR-0034's three-guardrail
+    // protocol (VACUUM INTO backup first, preview + explicit confirm,
+    // projections-dirty signal) with one deliberate inversion: here the
+    // TRANSACTION, not the backup file, is the primary restore path — the
+    // wipe, the re-import, the FTS rebuild, and the checkpoint rewind all
+    // share ONE transaction, so a malformed line anywhere rolls back the
+    // wipe too and leaves the store byte-identical to before. The backup
+    // remains a redundant safety net, taken and reported to the operator
+    // before anything is touched, whatever happens next. Exposed as a
+    // separate route (`wipeImportEventsStreamHandler`, wired as a sibling of
+    // `/api/stream/import-events` in Composition.fs) rather than a flag on
+    // the safe import route, so that route's "refuses any non-empty store"
+    // invariant stays literally true and never acquires the
+    // `dbPath`/`projectionHandlers` dependencies needed to destroy a store.
+
+    /// Server-internal outcome of a wipe-and-import — nothing here crosses
+    /// the wire as a typed value (SSE payloads are hand-built JSON, see
+    /// `wipeImportEventsStreamHandler`). Not a reuse of
+    /// `EventStore.ImportFailure`/`ImportOutcome`: `StoreNotEmpty` is
+    /// meaningless here (the whole point is overwriting a non-empty store),
+    /// and neither existing type has a case for "backup failed, nothing
+    /// touched".
+    type WipeImportResult =
+        | WipeBackupFailed of reason: string
+        | WipeImportFailed of backupPath: string * lineNumber: int * message: string
+        | WipeImportApplied of backupPath: string * eventsDiscarded: int * eventsImported: int
+
+    /// The wipe-and-reimport protocol (ADR-0038): `VACUUM INTO` backup
+    /// first, in autocommit, before any `BeginTransaction` (SQLite refuses
+    /// VACUUM inside a transaction) — `onBackup` fires on success so the
+    /// operator learns the safety-net path before anything is touched,
+    /// whatever happens next. Then ONE transaction: count the pre-wipe
+    /// total (for the `complete` payload's `eventsDiscarded`) ->
+    /// `EventStore.deleteAllEvents` -> `EventStore.importNdjsonRows` ->
+    /// (on success) `EventStore.rebuildFtsIndex` (reusing wwc36's shipped
+    /// helper, not re-inlining the `('rebuild')` insert) ->
+    /// `Projection.saveCheckpoint conn handler.Name 0L` for every registered
+    /// handler. A malformed line anywhere rolls back the wipe too, so the
+    /// store ends byte-identical to before. `deleteAllEvents` deliberately
+    /// does NOT reset `sqlite_sequence` — if the discarded log's max
+    /// `global_position` exceeded the imported log's, a later ordinary
+    /// append continues from `(discarded max) + 1`, leaving a permanent gap
+    /// — harmless by the same reasoning ADR-0034 established for
+    /// delete-gaps (every cursor uses strict `<`/`>`; lag uses `MAX`, not
+    /// `COUNT`).
+    let runWipeAndImport
+        (conn: SqliteConnection)
+        (dbPath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (onBackup: string -> unit)
+        (reader: TextReader)
+        : WipeImportResult =
+        let backupPath = newBackupPath dbPath
+        match EventStore.vacuumIntoBackup conn backupPath with
+        | Error reason -> WipeBackupFailed reason
+        | Ok () ->
+            onBackup backupPath
+            use tx = conn.BeginTransaction()
+            try
+                let eventsDiscarded = EventStore.getTotalEventCount conn
+                EventStore.deleteAllEvents conn |> ignore
+                match EventStore.importNdjsonRows conn reader with
+                | Ok outcome ->
+                    EventStore.rebuildFtsIndex conn
+                    for handler in projectionHandlers do
+                        Projection.saveCheckpoint conn handler.Name 0L
+                    tx.Commit()
+                    WipeImportApplied(backupPath, eventsDiscarded, outcome.EventsImported)
+                | Error (EventStore.MalformedLine(lineNumber, message)) ->
+                    tx.Rollback()
+                    WipeImportFailed(backupPath, lineNumber, message)
+                | Error EventStore.StoreNotEmpty ->
+                    // Unreachable: `importNdjsonRows` never checks or
+                    // produces this case — only `importNdjson`'s own
+                    // empty-store guard does, which this composite never
+                    // calls (the wipe itself makes an empty-store check
+                    // moot). Handled for exhaustiveness only.
+                    tx.Rollback()
+                    WipeImportFailed(backupPath, 0, "unreachable: StoreNotEmpty from importNdjsonRows")
+            with _ ->
+                tx.Rollback()
+                reraise ()
+
+    /// The wipe-first import route's Giraffe SSE wrapper (administration-
+    /// n8kqw, ADR-0038) — a thin wrapper over `decideAndClaimWipeImportGuard`
+    /// and `runWipeAndImport` above. Same SSE envelope (`Sse.sseFrame`) every
+    /// other admin SSE route uses. Reads the request body as the raw NDJSON
+    /// (no multipart wrapper), same convention `importEventsStreamHandler`
+    /// uses.
+    let wipeImportEventsStreamHandler
+        (factory: unit -> SqliteConnection)
+        (dbPath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (guards: AdminGuards)
+        : HttpHandler =
+        fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
+            task {
+                use conn = factory ()
+                allowSynchronousIO ctx
+                ctx.Response.Headers.["Content-Type"] <- Microsoft.Extensions.Primitives.StringValues("text/event-stream")
+                ctx.Response.Headers.["Cache-Control"] <- Microsoft.Extensions.Primitives.StringValues("no-cache")
+                ctx.Response.Headers.["Connection"] <- Microsoft.Extensions.Primitives.StringValues("keep-alive")
+
+                let writer = ctx.Response
+
+                let writeEvent (eventType: string) (json: string) = task {
+                    let line = Sse.sseFrame eventType json
+                    let bytes = System.Text.Encoding.UTF8.GetBytes(line)
+                    do! writer.Body.WriteAsync(bytes, 0, bytes.Length)
+                    do! writer.Body.FlushAsync()
+                }
+
+                match decideAndClaimWipeImportGuard guards with
+                | RefusedRebuildInFlight ->
+                    do! writeEvent "rejected" "{\"message\":\"A projection rebuild is in flight - wait for it to finish\"}"
+                | RefusedAlreadyImporting ->
+                    do! writeEvent "rejected" "{\"message\":\"An event log import is already running\"}"
+                | ClaimedWipeImport ->
+                    try
+                        try
+                            use reader = new StreamReader(ctx.Request.Body)
+                            let onBackup (backupPath: string) =
+                                writeEvent "backup" (sprintf "{\"backupPath\":\"%s\"}" (escapeJson backupPath))
+                                |> Async.AwaitTask |> Async.RunSynchronously
+                            match runWipeAndImport conn dbPath projectionHandlers onBackup reader with
+                            | WipeBackupFailed reason ->
+                                do! writeEvent "error" (sprintf "{\"phase\":\"backup\",\"lineNumber\":0,\"message\":\"%s\"}" (escapeJson reason))
+                            | WipeImportFailed(_, lineNumber, message) ->
+                                do! writeEvent "error" (sprintf "{\"phase\":\"import\",\"lineNumber\":%d,\"message\":\"%s\"}" lineNumber (escapeJson message))
+                            | WipeImportApplied(_, eventsDiscarded, eventsImported) ->
+                                do! writeEvent "complete" (sprintf "{\"eventsImported\":%d,\"eventsDiscarded\":%d}" eventsImported eventsDiscarded)
+                        with ex ->
+                            do! writeEvent "error" (sprintf "{\"phase\":\"import\",\"lineNumber\":0,\"message\":\"%s\"}" (escapeJson ex.Message))
+                    finally
+                        guards.WipeImportInProgress.TryRemove(wipeImportKey) |> ignore
+
+                return! earlyReturn ctx
+            }
+
     /// `dbPath`/`imagesDir` are the same paths Program.fs computes from
     /// DATA_DIR (mediatheca.db and the images/ cache) — passed through here
     /// so the Health tab's storage stats reflect the actual data dir rather
@@ -1394,5 +1596,19 @@ module Administration =
 
             getBackupStats = fun () -> async {
                 return computeBackupStats dbPath
+            }
+
+            /// Wipe-first event log import (administration-n8kqw, ADR-0038):
+            /// discard-side stats for the confirm dialog — what's currently
+            /// in the store, i.e. what a Wipe & Import would throw away.
+            getWipeImportPreview = fun () -> async {
+                use conn = factory ()
+                let summary = EventStore.getEventStoreSummary conn
+                return {
+                    EventCount = summary.EventCount
+                    DistinctStreamCount = summary.DistinctStreamCount
+                    OldestTimestamp = summary.OldestTimestamp
+                    NewestTimestamp = summary.NewestTimestamp
+                }
             }
         }

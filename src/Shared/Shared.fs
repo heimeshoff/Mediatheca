@@ -1628,6 +1628,26 @@ type SurgeryResult =
 /// — this is purely a directory-walk stat for the Surgery tab's backup panel.
 type BackupStats = { Count: int; TotalBytes: int64 }
 
+// Wipe-first event log import (administration-n8kqw, ADR-0038): overwriting a
+// non-empty store, reusing ADR-0034's three-guardrail protocol (VACUUM INTO
+// backup first, preview + explicit confirm, projections-dirty signal) with
+// one inversion — the transaction, not the backup, is the primary restore
+// path. Route: raw Giraffe SSE `POST /api/stream/wipe-import-events`, a
+// sibling of `/api/stream/import-events`, not a flag on it (keeps the safe
+// route's "refuses any non-empty store" invariant literally true).
+
+/// The discard-side stats for the wipe-import confirm dialog — what's about
+/// to be thrown away, from `Administration.getWipeImportPreview` /
+/// `EventStore.getEventStoreSummary`. The incoming-side line count is
+/// computed client-side from the `File` object before upload; there is no
+/// staging area or second upload phase.
+type WipeImportPreview = {
+    EventCount: int
+    DistinctStreamCount: int
+    OldestTimestamp: string option
+    NewestTimestamp: string option
+}
+
 type IAdminApi = {
     // Event Store Browser
     getEventPage: EventPageQuery -> Async<EventPage>
@@ -1695,4 +1715,10 @@ type IAdminApi = {
     /// Cumulative count + total bytes of every backup ever taken by this
     /// feature — keep-all retention, no pruning.
     getBackupStats: unit -> Async<BackupStats>
+    // Wipe-first event log import (administration-n8kqw, ADR-0038)
+    /// Discard-side stats for the wipe-import confirm dialog — a fast
+    /// aggregate read (plain Async, not SSE): exact event count, distinct
+    /// stream count, oldest/newest timestamp of what's currently in the
+    /// store, i.e. what would be discarded by a Wipe & Import.
+    getWipeImportPreview: unit -> Async<WipeImportPreview>
 }

@@ -1,11 +1,11 @@
 ---
 id: administration-n8kqw
 title: Event log import — wipe-first path for a non-empty store: backup, preview + confirm, then wipe and re-import in one transaction
-status: doing
+status: done
 type: feature
 context: administration
 created: 2026-07-22
-completed:
+completed: 2026-07-31
 depends_on: [administration-jrflk, design-system-001]
 blocks: []
 tags: [admin-console, event-store, backup, import, surgery, concurrency-guard]
@@ -98,18 +98,18 @@ Not the Surgery tab. In `AdminProjections/{Types,State,Views}.fs`, beside the ex
 - On `complete`, `Cmd.ofMsg Load` — exactly what the existing `Import_completed` handler does. That is what flips the cross-tab "projections out of sync" banner (client-derived from `ProjectionsModel.Stats`'s `Lag`, ADR-0034) with no tab revisit and no new plumbing.
 
 ## Acceptance criteria
-- [ ] `EventStore.importNdjson` keeps its exact current signature and semantics after the `importNdjsonRows` extraction; `EventStoreNdjsonTests.fs` and `importEventsStreamHandler` need zero changes.
-- [ ] Wipe & Import creates a valid backup file — opens on a throwaway connection, `PRAGMA integrity_check` returns `ok`, and its `events` content matches the pre-wipe store's full content (not merely the count) — before any deletion.
-- [ ] A malformed line anywhere in the uploaded NDJSON rolls back the whole wipe-and-import transaction: a full dump of `events` + `projection_checkpoints` before vs. after is byte-for-byte identical.
-- [ ] After a successful Wipe & Import, `events` content matches the imported NDJSON exactly (fidelity + `global_position` preservation, the same guarantee vrc56 proved for the empty-store path), and the `complete` payload's `eventsDiscarded`/`eventsImported` match the pre-wipe count and the NDJSON's row count.
-- [ ] A subsequent ordinary append after Wipe & Import succeeds with a `global_position` strictly greater than every imported position — not necessarily `(imported max) + 1`, since `sqlite_sequence` is deliberately not reset.
-- [ ] `events_fts` is searchable for newly imported content **and not** searchable for discarded content; the negative direction is what catches a missing `rebuildFtsIndex`.
-- [ ] After Wipe & Import, every registered projection's checkpoint is `0` and `Administration.isAnyProjectionDirty` reports all of them dirty.
-- [ ] `getWipeImportPreview` returns discard-side stats matching a direct query against the store, and returns `None` timestamps for an empty store.
-- [ ] A wipe-import already in flight refuses a second concurrent wipe-import (`rejected`, and no backup is taken for the second request).
-- [ ] A wipe-import in flight refuses a concurrent projection rebuild, and a rebuild in flight refuses a wipe-import — both directions of the `WipeImportInProgress` ↔ `RebuildingProjections` mutual exclusion.
-- [ ] `/api/stream/import-events` is unaffected: still refuses any non-empty store, with its existing tests passing unchanged.
-- [ ] The confirm modal shows both the server discard-side stats and the client-computed incoming line count before Confirm is enabled; Cancel produces zero network requests; Confirm renders the `backup` path and then both `complete` counts, and the cross-tab "projections out of sync" banner appears without a tab revisit. [human-eye]
+- [x] `EventStore.importNdjson` keeps its exact current signature and semantics after the `importNdjsonRows` extraction; `EventStoreNdjsonTests.fs` and `importEventsStreamHandler` need zero changes.
+- [x] Wipe & Import creates a valid backup file — opens on a throwaway connection, `PRAGMA integrity_check` returns `ok`, and its `events` content matches the pre-wipe store's full content (not merely the count) — before any deletion.
+- [x] A malformed line anywhere in the uploaded NDJSON rolls back the whole wipe-and-import transaction: a full dump of `events` + `projection_checkpoints` before vs. after is byte-for-byte identical.
+- [x] After a successful Wipe & Import, `events` content matches the imported NDJSON exactly (fidelity + `global_position` preservation, the same guarantee vrc56 proved for the empty-store path), and the `complete` payload's `eventsDiscarded`/`eventsImported` match the pre-wipe count and the NDJSON's row count.
+- [x] A subsequent ordinary append after Wipe & Import succeeds with a `global_position` strictly greater than every imported position — not necessarily `(imported max) + 1`, since `sqlite_sequence` is deliberately not reset.
+- [x] `events_fts` is searchable for newly imported content **and not** searchable for discarded content; the negative direction is what catches a missing `rebuildFtsIndex`.
+- [x] After Wipe & Import, every registered projection's checkpoint is `0` and `Administration.isAnyProjectionDirty` reports all of them dirty.
+- [x] `getWipeImportPreview` returns discard-side stats matching a direct query against the store, and returns `None` timestamps for an empty store.
+- [x] A wipe-import already in flight refuses a second concurrent wipe-import (`rejected`, and no backup is taken for the second request).
+- [x] A wipe-import in flight refuses a concurrent projection rebuild, and a rebuild in flight refuses a wipe-import — both directions of the `WipeImportInProgress` ↔ `RebuildingProjections` mutual exclusion.
+- [x] `/api/stream/import-events` is unaffected: still refuses any non-empty store, with its existing tests passing unchanged.
+- [ ] The confirm modal shows both the server discard-side stats and the client-computed incoming line count before Confirm is enabled; Cancel produces zero network requests; Confirm renders the `backup` path and then both `complete` counts, and the cross-tab "projections out of sync" banner appears without a tab revisit. [human-eye] — implemented and Fable-typechecked (`npm run build`), but not live-browser-verified in this session; same gap wwc36 left for the Surgery tab (closed there by administration-svq3t's Playwright spec).
 
 ## Notes
 
@@ -144,3 +144,71 @@ Not the Surgery tab. In `AdminProjections/{Types,State,Views}.fs`, beside the ex
 > Overwriting a non-empty event store is exposed as its own SSE route rather than a flag on `/api/stream/import-events`, so the safe route's refusal stays literally true and the harmless endpoint never receives the dependencies needed to destroy a store. The operation runs ADR-0034's three-guardrail protocol with one inversion: `VACUUM INTO` still takes a verified backup first, in autocommit, and streams its path as a `backup` event before any mutation — but the primary restore path is the transaction itself, since the wipe, the re-import, the FTS rebuild and the checkpoint rewind all share one transaction. Because that transaction is long-lived and store-wide, ADR-0033's WAL + `busy_timeout` serialization is no longer sufficient alone: it keeps concurrent writes *safe* but not *coherent*, since a rebuild started against the pre-wipe log would checkpoint into a discarded log and leave projections reading as clean. Wipe-import and projection rebuild are therefore mutually exclusive via a `WipeImportInProgress` guard on the composition-root-owned `AdminGuards` record (ADR-0035), with the microsecond check-and-claim race knowingly accepted for a single-operator app.
 >
 > Consequences to record: `sqlite_sequence` is deliberately not reset; concurrent writers may legitimately hit `SQLITE_BUSY` for the duration of a large import; `importNdjson`'s "continues from `(imported max) + 1`" claim holds only on the empty-store path.
+
+## Outcome
+
+Shipped exactly as specified. Server: `EventStore.importNdjsonRows` extracted
+(no transaction of its own; `importNdjson`'s own signature/semantics/
+`StoreNotEmpty` behaviour unchanged — verified by `EventStoreNdjsonTests.fs`
+needing zero edits), `EventStore.deleteAllEvents` (`DELETE FROM events`,
+`sqlite_sequence` deliberately untouched), `EventStore.getEventStoreSummary`/
+`EventStoreSummary` (the preview query). `Administration.fs`:
+`AdminGuards.WipeImportInProgress`, `WipeImportResult`, `runWipeAndImport`
+(VACUUM INTO backup in autocommit → one transaction: delete → import rows →
+FTS rebuild → checkpoint rewind), `wipeImportEventsStreamHandler` at
+`POST /api/stream/wipe-import-events` (sibling route to
+`/api/stream/import-events`, wired in `Composition.fs`), and
+`IAdminApi.getWipeImportPreview`. The mutual-exclusion guard (both
+directions of `WipeImportInProgress` ↔ `RebuildingProjections`) was
+extracted as two plain, directly-testable functions —
+`decideAndClaimWipeImportGuard` (the corrected order: `RebuildingProjections`
+checked first with no claim ever made, then `TryAdd` on
+`WipeImportInProgress`, never claim-then-release) and `wipeImportInFlight`
+(the `projectionRebuildStreamHandler`-side check) — specifically so the
+guard order is unit-testable without SSE/HTTP, which the task's own
+"no SSE-handler-level test" exclusion would otherwise have left unverifiable;
+this is documented as a deliberate design choice in ADR-0038 (not itself an
+acceptance criterion, but load-bearing for satisfying criteria 9–10 within
+the stated testing constraints). Client: a second file-input control in
+`AdminProjections`' existing Backup section (Types/State/Views), a
+paper-overlay confirm dialog (`Components.ModalPanel`) showing both the
+discard-side server stats and the client-computed incoming line count
+(explicitly calling out a 0-line file as "wipes to empty"), Cancel as a
+model-only `Msg`, Confirm streaming `backup` then the terminal outcome with
+no auto-navigation on success (reloads `ProjectionsModel.Stats`, flipping
+the existing cross-tab dirty banner).
+
+Both drive-by doc-comment corrections were made: `importNdjson`'s
+"(imported max) + 1" claim is now scoped to the empty-store path only, and
+`importEventsStreamHandler`'s stale "empty-payload SSE breaks JSON.parse"
+reasoning is corrected to note `Sse.sseFrame` (administration-h4k2p) already
+special-cases that.
+
+Tests: `tests/Server.Tests/AdminWipeImportTests.fs`, 11 new Expecto tests
+covering backup fidelity (full content match, not just count), malformed-
+line rollback (byte-for-byte `events`+`projection_checkpoints` dump),
+post-wipe content/global-position/FTS/checkpoint-rewind correctness, the
+`sqlite_sequence`-not-reset gap behaviour, `getWipeImportPreview` against a
+direct query (both non-empty and empty-store cases), both directions of the
+mutual-exclusion guard, and a regression check that
+`EventStore.importNdjson`'s `StoreNotEmpty` refusal is unaffected. Full
+suite: 427/427 passing (416 baseline + 11 new). `npm run build` (client
+Fable typecheck + bundle) green.
+
+ADR: `.agentheim/knowledge/decisions/0038-wipe-first-event-log-import.md`
+(0038 was confirmed free — 0036/0037 were already taken by same-day tasks).
+
+BC README updated: the Event log export/import bullet now points at the
+wipe-first path instead of calling it out of scope; a new Wipe-first event
+log import bullet; the Admin guard ownership bullet mentions the third
+`AdminGuards` field; the `IAdminApi` method list gained
+`getWipeImportPreview`; the "Backup / restore into a non-empty store" open
+question is resolved and removed.
+
+Key files: `src/Server/EventStore.fs`, `src/Server/Administration.fs`,
+`src/Server/Composition.fs`, `src/Shared/Shared.fs`,
+`src/Client/Pages/AdminProjections/{Types,State,Views}.fs`,
+`tests/Server.Tests/AdminWipeImportTests.fs`,
+`tests/Server.Tests/Server.Tests.fsproj`,
+`.agentheim/knowledge/decisions/0038-wipe-first-event-log-import.md`,
+`.agentheim/contexts/administration/README.md`.
