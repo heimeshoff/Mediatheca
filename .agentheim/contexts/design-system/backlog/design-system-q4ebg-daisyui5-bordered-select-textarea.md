@@ -72,18 +72,30 @@ has something to hit: DaisyUI 5 retired the `bordered` modifier on `input`,
 `file-input-bordered` is the sole survivor.
 
 The build gate that would have caught this is deliberately **not** in scope
-here — it is globally-true build tooling, split out as `infrastructure-p1h9a`
-(which `depends_on` this task, so the gate lands on an already-clean tree).
+here — it is globally-true build tooling, split out as `infrastructure-p1h9a`,
+which `depends_on` this task. Note that this task alone no longer leaves that
+gate "an already-clean tree", as p1h9a's Notes originally assumed: p1h9a's
+mechanism is `dotnet build`, which stays red on `FS0193` until
+`infrastructure-npyhb` lands. p1h9a has been given the matching second
+`depends_on` edge; nothing about that changes this task's own scope.
 
 ## Acceptance criteria
 
 - [ ] `grep -rn "\.bordered" src/Client --include=*.fs` returns zero matches
       (any `file.bordered` introduced later is exempt and must be called out).
-- [ ] `dotnet build src/Client/Client.fsproj` exits 0 with zero `error FS`
-      lines. (Baseline today: exit 1, 16 errors — all four sites, each
-      reported multiple times.)
-- [ ] `npm run build` output contains zero `ERROR FS` lines. (Baseline today:
-      exit 0 *despite* the errors — which is exactly the hole
+- [ ] `dotnet build src/Client/Client.fsproj` emits zero `error FS0039` lines.
+      (Baseline today: 16, all four sites, each reported multiple times.)
+      **Narrowed 2026-07-31 — this criterion no longer requires exit 0.** With
+      the `FS0039`s cleared, the build fails on a pre-existing, previously-masked
+      `FS0193` that this task does not own and cannot fix: `Feliz.DaisyUI` 5.3.0's
+      prebuilt dll was compiled against Feliz 3.1.1 and binds against the pinned
+      Feliz 2.9.0. That is `infrastructure-npyhb`'s (ADR-0036). This task is
+      **not** blocked on it and gains no `depends_on` edge.
+- [ ] `npm run build` output contains zero `ERROR FS` lines. **This is the
+      pathway that ships** — vite-plugin-fable compiles DaisyUI from
+      `fable/*.fs` sources and never links the dll that carries the `FS0193`,
+      so a clean `npm run build` is the real proof the runtime crash is fixed.
+      (Baseline today: exit 0 *despite* the errors — which is exactly the hole
       `infrastructure-p1h9a` closes.)
 - [ ] Loading `/#/admin/streams/<any-stream-id>` and opening the
       compensating-event composer's type picker renders the picker and payload

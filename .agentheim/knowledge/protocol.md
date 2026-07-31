@@ -5,6 +5,22 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 18:54 -- Modeling / Refined: infrastructure-npyhb - Pin Feliz.DaisyUI to the exact 5.2.0
+
+**Type:** Modeling / Refine
+**BC:** infrastructure
+**Status after:** todo (auto-promoted)
+**Summary:** The spike's investigation was completed during refinement from the local NuGet cache alone — no build, no network beyond two version queries — so ADR-0065's stop-loss fired and the task collapsed **spike → chore**. Three findings did the work. **(1) The mechanism:** `HtmlHelper` exists only in `feliz.daisyui/5.3.0/lib/netstandard2.1/Feliz.DaisyUI.dll` (built against Feliz 3.x) and **nowhere in that package's `fable/*.fs` sources**; Feliz 2.9.0 has no `HtmlHelper` at all. `dotnet build` links the dll → FS0193; vite-plugin-fable compiles DaisyUI from source → never sees it. That explains q4ebg's "npm run build clean, dotnet build fails" with a cause rather than a coincidence, and establishes that **the shipped bundle was never affected**. **(2) The fix is provably behavior-neutral:** `diff -rq` across `feliz.daisyui/{5.2.0,5.3.0}/fable/` reports a difference in `Feliz.DaisyUI.fsproj` only — `DaisyUI.fs`, `Modifiers.fs`, `Operators.fs` are byte-identical. 5.2.0 depends on Feliz 2.9.0, 5.3.0 on Feliz 3.1.1, so pinning `Feliz.DaisyUI` to exactly `5.2.0` makes the graph coherent and kills NU1605 and FS0193 at the root, changing nothing that ships. It also independently reconfirms q4ebg's finding that `.bordered` is absent from both versions. **(3) Two of the original spike's four investigation bullets were non-issues:** `Feliz.UseElmish 2.5.0` declares no `Feliz` dependency whatsoever, and `Feliz.Router 4.0.0` declares `Feliz >= 2.3.0` — a floor, not a ceiling. Latest published: DaisyUI 5.3.0, Feliz 3.3.3; both needed packages already cached, so the fix needs no restore.
+**Premise correction:** the task's "Nothing is currently known to be broken by this" is struck — falsified by q4ebg's bounce. Replaced with the corrected severity *and* the corrected scope: fatal on the MSBuild pathway, invisible on the shipping one.
+**Builder decisions taken this session:** (a) **re-pin DaisyUI to 5.2.0** over bumping Feliz to 3.3.3 — the bump is ~90 client files, needs a restore, and would put `Feliz.Router 4.0.0` into the same FS0193-class position DaisyUI 5.3.0 occupies today; deferred deliberately, not rejected. (b) **narrow `design-system-q4ebg`'s criterion 2** rather than giving it a `depends_on` edge.
+**Split into:** none.
+**ADRs written:** 0036 (`0036-feliz-daisyui-pinned-to-feliz-2-line.md`, scope: infrastructure).
+**Sibling task files reconciled (bodies only — no INDEX or count changes in either BC):**
+- `design-system-q4ebg` — criterion 2 narrowed to zero `error FS0039` (no longer "exits 0"), with the `FS0193` explicitly assigned to npyhb; criterion 3 gained the reason `npm run build` is the authoritative proof. **q4ebg is now unblocked** and can land on its already-verified salvage patch, which unblocks `administration-svq3t` behind it.
+- `infrastructure-p1h9a` — gained `depends_on: infrastructure-npyhb` alongside its existing q4ebg edge. Not a judgment call: p1h9a's gate *is* `dotnet build src/Client/Client.fsproj`, which cannot exit 0 until the re-pin lands. Its Notes also gained the pathway-fidelity limit (MSBuild binds prebuilt assemblies, Fable compiles sources — so the gate is a real typecheck of this project's own F# but is not evidence about what Fable emits), which strengthens its own open question about making vite-plugin-fable's FS errors fatal directly. Left for p1h9a's own refinement rather than rewritten here.
+
+---
+
 ## 2026-07-31 18:32 -- Modeling / Refined: administration-svq3t - Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
 
 **Type:** Modeling / Refine

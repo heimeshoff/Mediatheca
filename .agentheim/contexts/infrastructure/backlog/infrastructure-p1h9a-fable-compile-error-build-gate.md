@@ -5,7 +5,7 @@ status: backlog
 type: chore
 context: infrastructure
 created: 2026-07-31
-depends_on: [design-system-q4ebg]
+depends_on: [design-system-q4ebg, infrastructure-npyhb]
 completed:
 blocks: []
 tags: [build-health, fable, vite, tooling, ci]
@@ -76,8 +76,15 @@ errors. Do not reach for `TreatWarningsAsErrors`; the `NU1605` downgrade is a
 real but separate issue tracked as `infrastructure-npyhb`, and coupling the two
 would block this gate on a package-version investigation.
 
-`depends_on: design-system-q4ebg` is load-bearing — the gate must land on an
-already-clean tree, or `npm run build` breaks for everyone the moment it merges.
+Both `depends_on` edges are load-bearing — the gate must land on an already-clean
+tree, or `npm run build` breaks for everyone the moment it merges:
+
+- `design-system-q4ebg` clears the sixteen `.bordered` `FS0039`s.
+- `infrastructure-npyhb` clears the `FS0193` that q4ebg's fix *exposes* — the
+  gate's own mechanism (`dotnet build src/Client/Client.fsproj`) cannot exit 0
+  until `Feliz.DaisyUI` is pinned to 5.2.0 (ADR-0036). This edge was added
+  2026-07-31 during npyhb's refinement; the "3 warnings, errors-only" premise
+  below was written before the `FS0193` was known.
 
 ## Acceptance criteria
 
@@ -111,4 +118,12 @@ already-clean tree, or `npm run build` breaks for everyone the moment it merges.
   exposes an option to make FS errors fatal directly. If it does, that is a
   cleaner mechanism than a second MSBuild pass and should be preferred — note
   the finding either way, since a second full compile adds ~20s to
-  `npm run build`.
+  `npm run build`. **This is now more than a nicety** (established during
+  `infrastructure-npyhb`'s refinement, ADR-0036): `dotnet build` and Fable
+  consume *different inputs* — prebuilt `lib/*.dll` assemblies versus
+  `fable/*.fs` sources. An MSBuild pass is a genuine typecheck of *this
+  project's own F#*, which is what this gate wants from it, but it is **not**
+  evidence about what Fable will emit: it can fail on assembly-binding problems
+  that never reach the bundle (`FS0193` is the worked example) and in principle
+  could miss a Fable-source-only problem. Worth recording that limit in whatever
+  the gate ends up being.
