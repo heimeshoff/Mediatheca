@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 15:10 -- Modeling / Refined: administration-svq3t - Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Orchestrator pass grounded the four flows against the shipped AdminSurgery/Admin/AdminProjections UI: added a load-bearing destructive-spec safety gate as criterion 1 (first destructive e2e spec; `reuseExistingServer` could otherwise aim real edit/delete/rename at a developer's live dev DB with no restore path — n8kqw still open), concretized every assertion (exact preview/dialog/banner copy, `.velvet-card`+heading locator scoping for the byte-identical Edit/Delete panel inputs, `getEventPage` position discovery), pinned the store-wide rename's HTTP rename-back cleanup and last-position dirty-banner test ordering, and recorded the CI-gate precedent as prose-only/unenforced (ADR-0059) with a README-sentence criterion. Populated prior_art (a4d9b, da908, wwc36). No split, no new ADR.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-07-22 23:24 -- Work session ended
 
 **Type:** Work / Session end
