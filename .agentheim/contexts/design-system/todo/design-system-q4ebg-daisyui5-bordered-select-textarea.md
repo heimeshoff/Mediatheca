@@ -1,7 +1,7 @@
 ---
 id: design-system-q4ebg
 title: "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)"
-status: backlog
+status: todo
 type: bug
 context: design-system
 created: 2026-07-31
@@ -93,7 +93,11 @@ here — it is globally-true build tooling, split out as `infrastructure-p1h9a`
       line + both textareas) with no `pageerror` and a non-empty `#feliz-app`.
 - [ ] The design-system README's DaisyUI component-pattern language states the
       family-level rule (`bordered` retired on input/select/textarea;
-      `file-input-bordered` the exception).
+      `file-input-bordered` the exception). **Prose-only, unenforced** in this
+      task by design (ADR-0059): the standing enforcement is the build gate in
+      `infrastructure-p1h9a`, which `depends_on` this task and therefore cannot
+      ship inside it. The grep criterion above is a one-time check, not a lint —
+      that distinction is precisely what let `design-system-dib4q`'s fix regress.
 - [ ] The affected controls still read as bordered and consistent with the
       design system in the running app. [human-eye]
 

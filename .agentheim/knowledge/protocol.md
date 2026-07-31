@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 17:20 -- Modeling / Promoted: design-system-q4ebg - "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)"
+
+**Type:** Modeling / Promote
+**BC:** design-system
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-31 17:20 -- Modeling / Refined: administration-bq4tw - DaisyUI select.bordered/textarea.bordered crash
 
 **Type:** Modeling / Refine
