@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 19:34 -- Modeling / Promoted: administration-n8kqw - Event log import — wipe-first path for a non-empty store: backup, preview + confirm, then wipe and re-import in one transaction
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-31 19:34 -- Modeling / Promoted: administration-svq3t - Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
 
 **Type:** Modeling / Promote
