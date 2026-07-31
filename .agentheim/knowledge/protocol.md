@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 17:31 -- Housekeeping: closed both carry-over gaps the 17:22 session-end entry left open
+
+**Type:** Work / Housekeeping (post-session, at the builder's explicit request)
+**Closes:** the two items the 17:22 session-end entry recorded as surfaced-but-not-actioned.
+
+1. **`.agentheim/salvage/` is now gitignored** (`449bbb0`). Added `.agentheim/salvage` to `.gitignore` alongside `.agentheim/.dashboard` and `.agentheim/state`, and moved all three out from under the unrelated `## Docker` heading into a named "Agentheim advisory artifacts (ADR-0027 family)" section. This closes the leak where the salvage dir re-surfaced as stranded carry-over in every session (flagged at 16:37, still open at 17:22). `administration-svq3t-bounced.patch` is untouched on disk and still available for re-verification once `administration-bq4tw` is fixed.
+2. **The 7 stale `.worktrees/` husks are deleted.** Contents verified before removal: 21 files total, all gitignored MSBuild `obj/Debug/net9.0/` droppings (`*.AssemblyAttributes.fs`, `*.AssemblyInfo.fs`, `*.AssemblyInfoInputs.cache`), zero project content. `.worktrees/` is now empty and `git worktree list` shows only `main`.
+
+**Correction to the 17:22 entry (and to the two sessions before it, which repeated the same claim):** the husks were described as "NOT git-registered worktrees" with "zero project content". That held for six of the seven, but **`.worktrees/intelligence-p9m4t` was tracked** — a broken **gitlink** (mode `160000`) committed by accident on 2026-07-07 in `e52baaf` ("Journal component"), when a live worker worktree was `git add`ed and git recorded it as a submodule-style pointer to that worktree's then-HEAD. There is no `.gitmodules`, and the referenced commit `8f3ae8df` is not an object in this repo (the worktree's branch was deleted at teardown), so the pointer was unresolvable — a fresh clone would carry a dangling submodule entry. Removed from the index rather than restored (`dedd76f`). This is why the husks kept being diagnosed as inert: `git status` stayed silent about the gitlink for as long as the directory existed on disk.
+
+**Preventive note (surfaced, not actioned):** nothing stops a future `git add -A` from re-committing a live worktree as a gitlink. The scoped-add rule (ADR-0026 §5) is the standing defence and it held here — the bad commit predates it in this repo's practice. Adding `.worktrees/` to `.gitignore` was considered and **not** done: git-registered worktrees are already invisible to `git status`, so it would buy nothing and would mask exactly this class of accident next time.
+
+---
+
 ## 2026-07-31 17:22 -- Work session ended
 
 **Type:** Work / Session end
