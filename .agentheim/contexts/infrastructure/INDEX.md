@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 2
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 1
@@ -32,7 +32,8 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-<!-- no tasks in backlog -->
+- **infrastructure-p1h9a** — Fail the client build on Fable compile errors — `vite build` exits 0 while emitting throwing placeholders for FS-level errors, so broken UI ships silently (twice already) (chore) — `backlog/infrastructure-p1h9a-fable-compile-error-build-gate.md`
+- **infrastructure-npyhb** — NU1605 — Client.fsproj pins Feliz 2.* while Feliz.DaisyUI 5.3.0 requires >= 3.1.1, so NuGet silently downgrades 3.1.1 → 2.9.0 and the client compiles against a Feliz surface its dependency does not expect (spike) — `backlog/infrastructure-npyhb-feliz-package-downgrade.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC

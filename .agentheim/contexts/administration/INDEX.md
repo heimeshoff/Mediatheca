@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 3
+- **Backlog:** 2
 - **Todo:** 1
 - **Doing:** 0
 - **Done:** 22
@@ -54,7 +54,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **administration-bq4tw** — DaisyUI `select.bordered`/`textarea.bordered` don't exist on Feliz.DaisyUI 5.x — Fable's FS0039 placeholder throws at render and unmounts the whole SPA root (bug) — `backlog/administration-bq4tw-daisyui-bordered-crash.md`
 - **administration-svq3t** — Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner) (feature) — `backlog/administration-svq3t-surgery-tab-e2e-spec.md`
 - **administration-n8kqw** — Event log import — wipe-first path for a non-empty store: backup, preview + confirm, then wipe and re-import in one transaction (feature) — `backlog/administration-n8kqw-wipe-first-import.md`
 <!-- backlog-list:end -->

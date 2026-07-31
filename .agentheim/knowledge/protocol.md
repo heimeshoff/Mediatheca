@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 17:20 -- Modeling / Refined: administration-bq4tw - DaisyUI select.bordered/textarea.bordered crash
+
+**Type:** Modeling / Refine
+**BC:** administration -> design-system (relocated)
+**Status after:** backlog (design-system-q4ebg); administration-bq4tw no longer exists
+**Summary:** Verified the report against the tree and corrected its root cause. The crash is NOT a 5.2.0 -> 5.3.0 regression: `bordered` is absent from `select`/`textarea` in the cached 5.2.0 too, and Client.fsproj has pinned `Feliz.DaisyUI 5.*` since the first commit, so the four lines were never valid. Found the decisive prior art the capture missed -- design-system-dib4q (done 2026-07-21) cleared every `input.bordered` and warned the errors could mask future ones; administration-xjmda and administration-wwc36 reintroduced the same class on sibling element types on 2026-07-22, leaving both features dead on arrival for nine days behind a green build. Also confirmed `dotnet build src/Client/Client.fsproj` already catches it (exit 1, 16 errors), so the missing gate needs no log-scraping. Relocated the fix to design-system per dib4q's explicit precedent (DaisyUI component-pattern concerns are design-system-owned even when every call site is in another BC), split the build gate and the NU1605 Feliz downgrade out to infrastructure at the builder's direction, and rewrote administration-svq3t's backlinks.
+**Split into:** design-system-q4ebg (relocated fix, was administration-bq4tw), infrastructure-p1h9a (build gate), infrastructure-npyhb (NU1605 Feliz downgrade spike)
+**ADRs written:** none
+
+---
+
 ## 2026-07-31 16:37 -- Work session ended
 
 **Type:** Work / Session end

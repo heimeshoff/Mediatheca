@@ -6,7 +6,7 @@ type: feature
 context: administration
 created: 2026-07-22
 completed:
-depends_on: [administration-wwc36, administration-bq4tw]
+depends_on: [administration-wwc36, design-system-q4ebg]
 blocks: []
 tags: [admin-console, surgery, testing, playwright, e2e]
 related_adrs: [0027, 0034]
@@ -164,7 +164,8 @@ administration-wwc36), and at runtime Fable's placeholder for the
 unresolved member throws, which — with no error boundary anywhere in this
 app's React tree — unmounts the entire `#feliz-app` root. Confirmed
 independent of Playwright via a bare `npx vite` dev server. Filed as
-**administration-bq4tw** (`type: bug`), with the exact 4 call sites, the
+**administration-bq4tw** (`type: bug`) — since relocated to
+**design-system-q4ebg**, see the modeling note below — with the exact 4 call sites, the
 captured `pageerror`, and a very-likely-trivial fix (grep confirms these are
 the *only* four `.bordered` usages in the whole client — probably a pure
 deletion, DaisyUI v5 having dropped the v4-era modifier). Per this task's
@@ -181,6 +182,20 @@ bug is fixed, this task should need only a quick re-verification pass (the
 spec file is already written and 50% empirically green) rather than a
 rewrite — re-running `CI=1 npm run test:e2e -- tests/e2e/admin-surgery.spec.ts`
 after the fix is the fastest way to confirm.
+
+**Modeling note (2026-07-31, refinement of the blocker):** `administration-bq4tw`
+was relocated to **`design-system-q4ebg`** and this task's `depends_on` now
+points there. Two corrections to the worker's account above, both established
+by verification rather than disagreement: (1) the crash is *not* a `5.2.0 →
+5.3.0` regression — `bordered` is absent from `select`/`textarea` in 5.2.0 too,
+and `Client.fsproj` has pinned `Feliz.DaisyUI 5.*` since the first commit, so
+those four lines were never valid; (2) it is the unfixed half of
+`design-system-dib4q`, which cleared every `input.bordered` on 2026-07-21 —
+`administration-xjmda` and `administration-wwc36` reintroduced the same class
+on sibling element types the very next day. The worker's diagnosis of the
+*mechanism* (non-fatal FS0039 → throwing placeholder → unmounted root) was
+exactly right and is what made the rest findable. The missing build gate is now
+`infrastructure-p1h9a`.
 
 Remaining acceptance criteria not yet done for this same reason: the BC
 README destructive-spec-gate sentence (criterion 6) and the `npm test`
