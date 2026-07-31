@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 19:34 -- Modeling / Promoted: infrastructure-p1h9a - "Fail the client build on Fable compile errors — `vite build` exits 0 while emitting throwing placeholders for FS-level errors, so broken UI ships silently (twice already)"
+
+**Type:** Modeling / Promote
+**BC:** infrastructure
+**From → To:** backlog → todo
+
+---
+
 ## 2026-07-31 19:32 -- Modeling / Refined: administration-n8kqw - Event log import, wipe-first path for a non-empty store
 
 **Type:** Modeling / Refine

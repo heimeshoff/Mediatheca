@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
-- **Todo:** 0
+- **Backlog:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 2
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **infrastructure-p1h9a** — "Fail the client build on Fable compile errors — `vite build` exits 0 while emitting throwing placeholders for FS-level errors, so broken UI ships silently (twice already)" (chore) — `todo/infrastructure-p1h9a-fable-compile-error-build-gate.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -33,7 +34,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **infrastructure-p1h9a** — Fail the client build on Fable compile errors — `vite build` exits 0 while emitting throwing placeholders for FS-level errors, so broken UI ships silently (twice already) (chore) — `backlog/infrastructure-p1h9a-fable-compile-error-build-gate.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
