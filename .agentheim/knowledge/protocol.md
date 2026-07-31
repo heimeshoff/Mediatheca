@@ -13,6 +13,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 18:43 -- Modeling / Refined: design-system-q4ebg - DaisyUI 5 `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites
+
+**Type:** Modeling / Refine
+**BC:** design-system
+**Status after:** todo (auto-promoted)
+**Summary:** Second refinement, post-bounce, settling the single thing that bounced this task: acceptance criterion 2. The builder chose to **narrow** it rather than resequence — it now asserts zero `FS0039` from `dotnet build` plus a fully clean `npm run build` (the pathway that actually ships), while explicitly acknowledging that `dotnet build` still exits 1 on the pre-existing `FS0193` this deletion *unmasks but does not cause*. The task therefore gains **no** `depends_on` edge and lands independently of the Feliz knot — which is what unblocks it, and downstream `administration-svq3t`, without waiting on a package decision. Reconciled three stale pointers, each of which would have cost the next worker real time: **(1)** the bounce note claimed the verified deletion sat "uncommitted in the worktree", but that worktree was torn down at the 18:06 session end — the deletion in fact survives whole in `.agentheim/salvage/design-system-q4ebg-bounced.patch`, and the task now carries the two-file `git apply --include=…` recovery command verified this session (`git apply --check` exits 0 against current `main`), flagging the `--include` filter as load-bearing since the patch also holds a task-file move and a never-landed draft task. **(2)** `## What` still asserted this task leaves `infrastructure-p1h9a` "an already-clean tree" — it does not, and p1h9a's second `depends_on` edge is now named there. **(3)** Recorded **do not create `design-system-vh931`** — the bounced worker drafted it inside the salvage patch to carry the `FS0193` finding forward, but that finding now lives in `infrastructure-npyhb` + ADR-0036 and in this task's narrowed criterion, so creating it would duplicate both. Also recorded how to close the two runtime criteria the bounced worker correctly left unverified for lack of `chrome-devtools` in its toolset: a worker likewise without browser tooling must report them unexercised rather than infer them from a green build — a clean bundle is exactly what this bug already had.
+**Split into:** none — still a four-line deletion plus a README rule.
+**ADRs written:** none by this pass; rides ADR-0015/0016. The adjacent ADR-0036 (pin `Feliz.DaisyUI` to exact 5.2.0) was authored by the concurrent `infrastructure-npyhb` refinement, not here.
+**Concurrency:** a concurrent modeling session was refining `infrastructure-npyhb`/`infrastructure-p1h9a` against this same bounce finding, and had independently narrowed this task's criterion 2 to the shape the builder chose here. That work was left in place rather than redone; this pass added only the q4ebg-scoped prose reconciliation above. The two sessions' commits interleaved — `6b7c2d4` (npyhb's promotion) deliberately carried this task's promotion with it rather than strand a protocol entry whose file move was absent. This entry is the remaining half of that record.
+**Dependency standing:** `depends_on: [design-system-001]` (done) — met, so ADR-0038's fail-closed gate passed and auto-promotion proceeded. `administration-svq3t`, which `depends_on` this task, correctly stays in `backlog/`: Ruling A requires a dependency in `done/`, and this task is only in `todo/`. It promotes when this one lands.
+
+---
+
 ## 2026-07-31 18:43 -- Modeling / Promoted: infrastructure-npyhb - "Pin Feliz.DaisyUI to the exact 5.2.0 — 5.3.0's prebuilt dll needs Feliz 3.1.1, NuGet downgrades it to the pinned 2.9.0 (NU1605), and `dotnet build` then fails FS0193 on the missing `HtmlHelper`. 5.2.0's Fable sources are byte-identical, so nothing shipped changes."
 
 **Type:** Modeling / Promote
