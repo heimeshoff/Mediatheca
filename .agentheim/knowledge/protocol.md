@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 19:05 -- Task verified and completed: design-system-q4ebg - "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)"
+
+**Type:** Work / Task completion
+**Task:** design-system-q4ebg - "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)"
+**Summary:** Removed the four remaining select.bordered/textarea.bordered call sites (an invalid DaisyUI 5 API surface whose FS0039 placeholder threw at render and blanked the SPA root) and recorded the family-level bordered-retired rule in the design-system README
+**Duration:** 11m30s
+**Verification:** PASS (iteration 1)
+**Files changed:** 3
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-07-31 18:48 -- Batch started: [design-system-q4ebg, infrastructure-npyhb]
 
 **Type:** Work / Batch start

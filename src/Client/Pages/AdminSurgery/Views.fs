@@ -89,7 +89,6 @@ let private editPanel (model: Model) (dispatch: Msg -> unit) =
                         prop.children [
                             Html.span [ prop.className DesignSystem.eyebrow; prop.text "Data" ]
                             Daisy.textarea [
-                                textarea.bordered
                                 prop.className "font-mono text-xs w-full"
                                 prop.rows 6
                                 prop.value model.EditDataInput
@@ -102,7 +101,6 @@ let private editPanel (model: Model) (dispatch: Msg -> unit) =
                         prop.children [
                             Html.span [ prop.className DesignSystem.eyebrow; prop.text "Metadata" ]
                             Daisy.textarea [
-                                textarea.bordered
                                 prop.className "font-mono text-xs w-full"
                                 prop.rows 3
                                 prop.value model.EditMetadataInput

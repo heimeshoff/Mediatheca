@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 15
+- **Doing:** 0
+- **Done:** 16
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **design-system-q4ebg** — "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)" (bug) — `doing/design-system-q4ebg-daisyui5-bordered-select-textarea.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **design-system-q4ebg** — "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)" (bug) — `done/design-system-q4ebg-daisyui5-bordered-select-textarea.md`
 - **design-system-dib4q** — DaisyUI 5 input-bordered migration — remove the removed modifier from all inputs (bug) — `done/design-system-dib4q-daisyui5-input-bordered-migration.md`
 - **design-system-k9p3v** — Underline tab pattern — reusable DesignSystem component (dir 3a header tabs) (feature) — `done/design-system-k9p3v-underline-tab-pattern.md`
 - **design-system-pv3mq** -- Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006) -- `done/design-system-pv3mq-retire-glassmorphism-paper-material.md`

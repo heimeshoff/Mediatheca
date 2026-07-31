@@ -231,7 +231,6 @@ let private composerPanel (composer: ComposerState) (dispatch: Msg -> unit) =
                             prop.className "flex flex-col gap-3"
                             prop.children [
                                 Daisy.select [
-                                    select.bordered
                                     prop.value (composer.SelectedType |> Option.defaultValue "")
                                     prop.onChange (fun (value: string) ->
                                         if value <> "" then dispatch (Select_event_type value))
@@ -255,7 +254,6 @@ let private composerPanel (composer: ComposerState) (dispatch: Msg -> unit) =
                                                         prop.text "No instance of this type exists on this stream — cloned from a sibling stream. Review before appending."
                                                     ]
                                                 Daisy.textarea [
-                                                    textarea.bordered
                                                     prop.className "font-mono text-xs w-full"
                                                     prop.rows 8
                                                     prop.value composer.Payload

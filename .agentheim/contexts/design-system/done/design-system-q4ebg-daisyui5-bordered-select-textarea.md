@@ -1,11 +1,11 @@
 ---
 id: design-system-q4ebg
 title: "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)"
-status: doing
+status: done
 type: bug
 context: design-system
 created: 2026-07-31
-completed:
+completed: 2026-07-31
 depends_on: [design-system-001]
 blocks: [administration-svq3t]
 tags: [daisyui, feliz, forms, build-health, tech-debt, runtime-crash]
@@ -153,6 +153,63 @@ move and a drafted `design-system-vh931` task file that must not be applied
   the compile pass before it reached the binding failure.
 - The two runtime criteria were **not** exercised — that worker's toolset had no
   `chrome-devtools` MCP. Still open; see Notes for how to close them.
+
+## Outcome
+
+Recovered the verified four-line deletion from the salvage patch
+(`.agentheim/salvage/design-system-q4ebg-bounced.patch`, `--include`-filtered
+to just the two view files) rather than redoing it — `git apply --check`
+confirmed clean, then applied. Diff matched exactly the four lines named in
+`## What`: `select.bordered` (`StreamDetail/Views.fs:234`) and
+`textarea.bordered` (`StreamDetail/Views.fs:258`, `AdminSurgery/Views.fs:92`,
+`:105`), no other lines touched.
+
+Criteria verified this session:
+- [x] `grep -rn "\.bordered" src/Client --include=*.fs` → zero matches.
+- [x] `dotnet build src/Client/Client.fsproj` → zero `error FS0039` lines
+  (baseline 16, all four sites, now gone). Build still exits 1 on the
+  pre-existing `error FS0193` (`Feliz`/`HtmlHelper` binding failure) per the
+  narrowed criterion's explicit expectation — that's `infrastructure-npyhb`
+  (ADR-0036), not this task's to fix.
+- [x] `npm run build` → `✓ built`, exit 0, zero `ERROR FS` lines. This is the
+  pathway that ships (vite-plugin-fable compiles DaisyUI from `fable/*.fs`
+  sources, never links the dll carrying `FS0193`), so the runtime crash
+  (`throw 1` placeholder blanking `#feliz-app`) is fixed.
+- [x] `npm test` → 416/416 Expecto tests passing (no server code touched by
+  this task; confirms no collateral breakage).
+- [ ] **NOT EXERCISED** — Loading `/#/admin/streams/<id>` and opening the
+  compensating-event composer's type picker. This worker's toolset had no
+  `chrome-devtools` MCP / browser automation available. Per the task's own
+  instruction, reporting this unexercised rather than inferring it from the
+  green build — a clean bundle is exactly what this bug already had before
+  the fix. Needs a browser-tooling pass (main session with `chrome-devtools`
+  MCP) to close.
+- [ ] **NOT EXERCISED** — Loading `/#/admin/surgery`, entering a valid
+  `global_position` and clicking Load. Same reason as above.
+- [x] BC README's DaisyUI component-pattern language now states the
+  family-level rule (prose-only, per ADR-0059 — no lint added; that's
+  `infrastructure-p1h9a`'s to ship).
+- [ ] **NOT EXERCISED** [human-eye] — visual/consistency review of the
+  affected controls in the running app; requires a human or browser session.
+
+Ran the `design-check` skill's rule set against both touched files
+(`StreamDetail/Views.fs`, `AdminSurgery/Views.fs`): both pass all 8 categories,
+zero violations. The deletion removes an invalid modifier only — DaisyUI 5
+form controls are bordered by default, so no visual regression, and all
+surrounding chrome already used `DesignSystem` helpers correctly.
+
+Updated the design-system BC README's Ubiquitous-language section with a new
+"`bordered` retired across the whole form-control family" entry recording the
+family-level rule (verified absent from `Modifiers.fs` in both Feliz.DaisyUI
+5.2.0 and 5.3.0) so a third reintroduction — the exact failure mode dib4q's
+narrower fix left open — has README prose to hit.
+
+Files touched: `src/Client/Pages/StreamDetail/Views.fs`,
+`src/Client/Pages/AdminSurgery/Views.fs`,
+`.agentheim/contexts/design-system/README.md`.
+
+No new ADR — this is removal of an API surface that no longer exists, not a
+design decision, per the task's own Notes.
 
 ## Notes
 
