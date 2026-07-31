@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 19:49 -- Batch started: [administration-svq3t]
+
+**Type:** Work / Batch start
+**Tasks:** administration-svq3t - Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
+**Parallel:** no (1 worker) - builder hard constraint: maximum one worker instance at a time. Ready set is 2 (administration-svq3t, administration-n8kqw); n8kqw held to the next wave solely by that constraint, not by the DAG or any file conflict.
+
+---
+
 ## 2026-07-31 19:48 -- Task verified and completed: infrastructure-p1h9a - "Fail the client build on Fable compile errors — `vite build` exits 0 while emitting throwing placeholders for FS-level errors, so broken UI ships silently (twice already)"
 
 **Type:** Work / Task completion

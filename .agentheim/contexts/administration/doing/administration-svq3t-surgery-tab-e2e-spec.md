@@ -1,7 +1,7 @@
 ---
 id: administration-svq3t
 title: Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
-status: todo
+status: doing
 type: feature
 context: administration
 created: 2026-07-22
