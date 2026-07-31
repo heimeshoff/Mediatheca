@@ -32,8 +32,11 @@ uploads/
 
 ## Docker
 *.tar
+
+## Agentheim advisory artifacts (ADR-0027 family — never versioned project knowledge)
 .agentheim/.dashboard
 .agentheim/state
+.agentheim/salvage
 
 ## Playwright e2e (ADR-0027)
 /test-results/
