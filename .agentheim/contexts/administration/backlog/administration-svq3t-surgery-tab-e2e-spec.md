@@ -1,12 +1,12 @@
 ---
 id: administration-svq3t
 title: Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
-status: doing
+status: backlog
 type: feature
 context: administration
 created: 2026-07-22
 completed:
-depends_on: [administration-wwc36]
+depends_on: [administration-wwc36, administration-bq4tw]
 blocks: []
 tags: [admin-console, surgery, testing, playwright, e2e]
 related_adrs: [0027, 0034]
@@ -133,3 +133,56 @@ runs next in the same shared server process.
   flows share one page, one seeding harness, and one precedent spec file;
   splitting would fragment shared setup for no isolation benefit. No new
   ADR — rides ADR-0027/0034 conventions.
+
+## Worker note (2026-07-31, bounced)
+The environment blocker from the first pass (missing `@playwright/test` in
+the shared `node_modules`) was fixed by the conductor mid-task (a real
+`npm install` at the main-tree level, confirmed via
+`require.resolve('@playwright/test')`). Resumed and wrote/iterated the full
+spec (`tests/e2e/admin-surgery.spec.ts`, left in place in the worktree, all
+four flows plus the CI gate).
+
+**2 of 4 flows are fully written and empirically verified passing** against
+a real cold-started (`CI=1`) server: Delete and Rename (including the
+load-bearing HTTP rename-back cleanup). Along the way, fixed a real spec bug
+of my own: `getEventPage`'s `GlobalPosition`/`StreamPosition` come back over
+the wire as **signed STRINGS** (`"+0"`, `"+1"`), not JSON numbers — an
+empirically-confirmed `Fable.Remoting.Json`/`FableJsonConverter` int64
+encoding quirk, not documented anywhere I could find; normalized via
+`Number(...)` in the spec (see the `RawEventDto` comment in the spec file).
+
+**The other 2 required flows (Edit, and the cross-tab dirty banner, which
+also drives an Edit) cannot pass — not because the spec is wrong, but
+because the Surgery tab's Edit panel genuinely crashes the whole app at
+runtime** on this checkout. Root-caused via a `page.on("pageerror")`
+listener (not guessed): `select.bordered`/`textarea.bordered` (used in
+`StreamDetail/Views.fs` and `AdminSurgery/Views.fs`) don't exist on the
+resolved `Feliz.DaisyUI 5.3.0`, Fable treats the FS0039 as non-fatal to
+bundle emission (present in `npm run build`'s own log too — just easy to
+miss past the asset-size tail — so it silently shipped with
+administration-wwc36), and at runtime Fable's placeholder for the
+unresolved member throws, which — with no error boundary anywhere in this
+app's React tree — unmounts the entire `#feliz-app` root. Confirmed
+independent of Playwright via a bare `npx vite` dev server. Filed as
+**administration-bq4tw** (`type: bug`), with the exact 4 call sites, the
+captured `pageerror`, and a very-likely-trivial fix (grep confirms these are
+the *only* four `.bordered` usages in the whole client — probably a pure
+deletion, DaisyUI v5 having dropped the v4-era modifier). Per this task's
+own scope (a test-writing task, not a production-code task) and explicit
+conductor guidance mid-task ("prefer fixing the spec... if you find a
+genuine product bug, file it, do NOT patch it here"), I did not touch
+`AdminSurgery/Views.fs` or `StreamDetail/Views.fs`.
+
+Bouncing rather than failing outright because this is squarely the
+"genuinely unworkable as specified" case the conductor's own message
+pre-authorized a BOUNCE for — not an under-refined task, a newly-discovered
+external blocker. Added `administration-bq4tw` to `depends_on`. Once that
+bug is fixed, this task should need only a quick re-verification pass (the
+spec file is already written and 50% empirically green) rather than a
+rewrite — re-running `CI=1 npm run test:e2e -- tests/e2e/admin-surgery.spec.ts`
+after the fix is the fastest way to confirm.
+
+Remaining acceptance criteria not yet done for this same reason: the BC
+README destructive-spec-gate sentence (criterion 6) and the `npm test`
+Expecto sanity check (deferred — no code under test changed, low risk, but
+left for the next pass since the task isn't complete).

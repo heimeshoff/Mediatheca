@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 16:34 -- Task bounced: administration-svq3t - Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
+
+**Type:** Work / Task bounced
+**Task:** administration-svq3t - Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
+**Reason:** The spec was written and iterated to green for 2 of the 4 required flows (Delete, Rename — passing against a real `CI=1` cold-started server, including the load-bearing HTTP rename-back cleanup). The remaining 2 (Edit, and the cross-tab dirty banner, which also drives an Edit) cannot pass because of a newly-discovered production bug, not a spec defect: `select.bordered` / `textarea.bordered` (`AdminSurgery/Views.fs` 92,105; `StreamDetail/Views.fs` 234,258) do not exist on the resolved Feliz.DaisyUI 5.x, and Fable's FS0039 placeholder **throws at runtime**, unmounting the entire `#feliz-app` root (no React error boundary anywhere in the app) whenever the Surgery tab's Edit panel or the Stream-detail composer renders. Root-caused via a `page.on("pageerror")` listener and reproduced independently of Playwright on a bare `npx vite` dev server. Conductor independently confirmed: `npm run build` prints these as `ERROR FS0039` yet still exits `✓ built` — so the project's documented Fable-verification command silently passes on this class of error, which is why administration-wwc36's `[human-eye]` client UI shipped broken. Filed as **administration-bq4tw** rather than patched (test-writing task, a4d9b's don't-patch-what-you-find precedent). Task moved to backlog with `administration-bq4tw` added to `depends_on`.
+**Moved to:** backlog
+
+---
+
 ## 2026-07-31 16:17 -- Modeling / Refined: administration-n8kqw - Event log import — wipe-first path for a non-empty store: backup, preview + confirm, then wipe and re-import in one transaction
 
 **Type:** Modeling / Refine
