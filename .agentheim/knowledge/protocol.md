@@ -5,6 +5,36 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 19:07 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 19m (batch start 18:48 → session end 19:07)
+**Completed:** 2 (first-try PASS: 2, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** design-system-q4ebg: 1, infrastructure-npyhb: 1
+**Commits:** 4 (batch start `db0b351`, q4ebg `b59728c`, npyhb `ab58ec9`, this session-end entry)
+**Session-start churn reconciliation:** 0 recognized machine-shape commits, 1 human commit since the 2026-07-31 18:06 boundary (`060c529`, "record design-system-q4ebg refine entry"). It touches only `.agentheim/knowledge/protocol.md` with an ordinary diary entry — no governed-surface divergence flagged, nothing written to `whats-next.md`.
+**Vision-conformance:** none — batch aligns with vision. Recorded with the standing context deliberately *not* re-flagged: the 18:06 entry escalated cumulative allocation toward the admin/operability workstream against the Operability **Boundary** ("when admin-console scope competes with the media-experience roadmap … the media experience wins"). Neither task this session is admin-console scope. `design-system-q4ebg` is a design-system-owned crash fix on a DaisyUI 5 form-control API that applies app-wide (its call sites merely happen to be admin views, and the two features it un-breaks were dead on arrival, not new scope); `infrastructure-npyhb` is globally-true build tooling. The Boundary governs *new* admin scope competing for the roadmap, not repairing already-shipped surface, so flagging these two would be manufacturing drift. What remains true and is surfaced in the end-of-run summary instead: the media-experience v1 arc (In Focus, Unified Dashboard, Steam Import, HLTB) is still entirely unbuilt, and `todo/` is now empty across every BC.
+**Batch mix:** 50% product-facing / 50% harness (2 tasks). Classified by hand against `classifyTask`'s documented heuristic — the installed plugin (0.9.2) predates `lib/vacuum-guard.mjs`, so `formatBatchMixLine` could not be invoked and its absence is recorded rather than papered over. `design-system-q4ebg` (`type: bug`, files entirely product surfaces: two `src/Client/Pages/**/Views.fs` + a BC README) → **product-facing**; `infrastructure-npyhb` (`type: chore`, touching `src/Client/Client.fsproj`, not purely bookkeeping surfaces) → **harness**.
+**Carry-over:** left behind (user WIP, 1 file — `"Mediatheca Directions.html"`, untracked and pre-existing). No `.agentheim/`-owned stranded files. No git-registered non-main worktrees remain.
+**Worktree husks:** none left this session. Both worktrees (`design-system-q4ebg`, `infrastructure-npyhb`) were torn down — `node_modules` junctions unlinked first via `cmd /c rmdir` (never `Remove-Item -Recurse`, which follows the junction), with the shared real `node_modules` verified intact afterward — and the gitignored MSBuild `obj/Debug/net9.0/` husks each left behind (3 auto-generated files apiece) were verified zero-project-content and deleted along with the now-empty `.worktrees/` directory. This session created them minutes earlier, so removing its own byproduct is not a disposition on pre-existing builder state; it follows the 18:06 precedent.
+
+**Notes carried out of this run:**
+
+1. **Two backlog tasks are now dependency-unblocked and neither was auto-promoted** (promotion is `modeling`'s job, not `work`'s): `administration-svq3t` (Playwright e2e spec for the Surgery tab) `depends_on design-system-q4ebg`, now done; `infrastructure-p1h9a` (the errors-fatal client build gate) `depends_on` **both** tasks completed this session, so both its edges are now met. `todo/` is empty precisely because these sit in `backlog/`.
+2. **Three of `design-system-q4ebg`'s acceptance criteria remain unclosed and were correctly reported unexercised, not inferred.** Criteria 4 and 5 (loading `/#/admin/streams/<id>` and `/#/admin/surgery`, asserting no `pageerror` with a non-empty `#feliz-app`) and the `[human-eye]` visual criterion need browser tooling neither the worker nor the verifier had. The task's own Notes mandate exactly this reporting discipline — a clean bundle is what this bug already had. The verifier did add one genuinely new piece of evidence for the crash mechanism: the shipped bundle now contains **zero `throw 1;` placeholders**, the specific construct that was blanking the SPA root. `administration-svq3t` will exercise the Surgery half as a side effect once it lands.
+3. **The `infrastructure-npyhb` verification needed a cross-task aid, and got one honestly.** Because `design-system-q4ebg`'s deletion was not in npyhb's worktree, its 16 `FS0039`s abort the compile before it reaches the binding stage — so "zero `FS0193`" was vacuously true on a naive build and proved nothing. Worker and verifier independently applied the two `.bordered` hunks from the salvage patch as a temporary aid, observed `FS0193` present under the floating `5.*` and **Build succeeded, 0 errors** under the `5.2.0` pin, then reverted both files and confirmed a clean worktree. Criterion 2 (zero `NU1605`) was verified unaided and is the non-vacuous signal. Criterion 5's bundle comparison was measured, not asserted: identical Vite content-hashed filenames across both builds (`index-C921bzMz.js`, `index-Dnf1E92D.css`).
+
+**Harness defects observed (in the installed `agentheim` plugin 0.9.2, not this project):**
+
+1. **`checkpoint` still does not fold in the vacated lifecycle path** — the same defect the 18:06 session recorded (ADR-0057 / `agentic-workflow-w2njd` specify that naming a task file's new location should add the moved-from path to `changed`). Reproduced on both tasks; the conductor staged each vacated `doing/` path by hand. Without that, a stale `doing/` duplicate would have survived the squash.
+2. **`lib/vacuum-guard.mjs` is absent from plugin 0.9.2**, so the session-end batch-mix classification (`formatBatchMixLine`) and the Phase 2 vacuum guard (`extractOpenQuestions`) could not be invoked. Batch mix was classified by hand against the documented heuristic; the vacuum guard was moot this session (the ready set was non-empty).
+3. **The `task-lifecycle-cli.mjs` JSON opts argument cannot carry Windows backslash paths** — `{"fileList":["C:\\src\\..."]}` fails with `invalid-opts-json` because Windows command-line argument parsing collapses `\\` to `\` before node's JSON parse sees it. Forward slashes (`C:/src/...`) work and are the reliable form on Windows.
+
+---
+
 ## 2026-07-31 19:05 -- Task verified and completed: infrastructure-npyhb - "Pin Feliz.DaisyUI to the exact 5.2.0 — 5.3.0's prebuilt dll needs Feliz 3.1.1, NuGet downgrades it to the pinned 2.9.0 (NU1605), and `dotnet build` then fails FS0193 on the missing `HtmlHelper`. 5.2.0's Fable sources are byte-identical, so nothing shipped changes."
 
 **Type:** Work / Task completion
