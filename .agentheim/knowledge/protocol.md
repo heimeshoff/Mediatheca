@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 -- Modeling / Captured: design-system-vk7rd - Sidebar bottom group must pin to the viewport, not the document
+
+**Type:** Modeling / Capture
+**BC:** design-system
+**Filed to:** todo
+**Summary:** The rail's Admin/Settings group sits below the fold on any scrolling page — `Sidebar.fs`'s aside is `min-h-screen` inside `Layout.fs`'s stretching flex row, so it grows to document height and `mt-auto` pins the group to the foot of the document rather than the viewport. Fix is a viewport-height, `sticky top-0` rail plus internal nav scroll for short viewports; filed straight to todo as a well-understood layout defect.
+
+---
+
 ## 2026-07-31 20:40 -- Work session ended
 
 **Type:** Work / Session end
