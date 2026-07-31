@@ -5,6 +5,18 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 18:32 -- Modeling / Refined: administration-svq3t - Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner)
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Second refinement, post-bounce. Corrected a stale pointer that would have cost a rewrite: the bounce note claimed the 291-line spec was "left in place in the worktree", but that worktree was torn down at the 18:06 session end -- the spec in fact survives whole in `.agentheim/salvage/administration-svq3t-bounced.patch`, and `## What` now carries the verified `git apply --include=tests/e2e/admin-surgery.spec.ts ...` recovery command (`git apply --check` exits 0 against current `main`; the `--include` filter is load-bearing, the patch also holds two stale task-file moves). Settled criterion 1's open shape with the builder: `test.skip(!process.env.CI, ...)` is kept deliberately, with the declined alternative (inferred-isolation gate) recorded so it is not re-proposed -- and with the consequence stated plainly, since this repo has no CI pipeline and the four flows are therefore opt-in-only, contributing nothing to a default `npm run test:e2e`. Criterion 5 gained its literal `CI=1 npm run test:e2e` command, closing a hole where a bare run would skip the whole gated file and still report green. Promoted the empirically-established int64 wire-format finding (`GlobalPosition`/`StreamPosition` arrive from Fable.Remoting as signed strings `"+0"`/`"+1"`, undocumented upstream) out of the bounce note into criterion 6's README requirement, since it is a property of the `IAdminApi` transport that will bite every future position-reading spec.
+**Split into:** none -- the four flows still share one page, one seeding harness, and one spec file.
+**ADRs written:** none -- rides ADR-0027/0034.
+**Dependency standing:** unchanged (`administration-wwc36` done, `design-system-q4ebg` backlog), but recorded as narrower than it reads: this task needs only q4ebg's four-line `.bordered` deletion on `main`, and is insensitive to the `FS0193` knot (`dotnet build` health is not on the vite/Fable pathway Playwright loads). Narrowing q4ebg's criterion 2 unblocks this immediately; resequencing it behind `infrastructure-npyhb` parks it behind a Feliz major bump. That decision belongs to q4ebg/npyhb -- surfaced here so the sequencing cost is visible when it is made.
+
+---
+
 ## 2026-07-31 18:06 -- Work session ended
 
 **Type:** Work / Session end

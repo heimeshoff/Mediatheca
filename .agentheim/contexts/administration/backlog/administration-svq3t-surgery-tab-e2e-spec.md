@@ -39,6 +39,22 @@ must self-gate against ever running on a reused developer server (see
 criterion 1); unlike `addFriend`-only specs there is no restore path
 (administration-n8kqw, wipe-first import, is still open).
 
+**Start from the salvage patch, do not rewrite from scratch.** The full
+291-line spec from the bounced pass survives in
+`.agentheim/salvage/administration-svq3t-bounced.patch` (ADR-0063 rescue
+artifact) with Delete and Rename already empirically green. Verified
+2026-07-31 to apply cleanly against current `main`:
+
+```
+git apply --include=tests/e2e/admin-surgery.spec.ts \
+  .agentheim/salvage/administration-svq3t-bounced.patch
+```
+
+The `--include` filter is load-bearing — the patch also carries two stale
+task-file moves (a `doing/` path that no longer exists, and the pre-relocation
+`administration-bq4tw` file), so an unfiltered `git apply` fails outright.
+Recover the spec first, then work the two remaining flows.
+
 Test order inside the file: Edit → Delete → Rename (+ HTTP rename-back
 cleanup) → dirty-banner/Rebuild-all last, so the file ends with clean
 projections and an unpolluted event-type namespace for whatever spec file
@@ -46,10 +62,17 @@ runs next in the same shared server process.
 
 ## Acceptance criteria
 - [ ] **Destructive-spec safety gate:** the spec skips unless the server run
-      is guaranteed isolated — `test.skip(!process.env.CI, ...)` (or an
-      equivalent explicit gate) at the top of the file/describe block, so
-      the destructive flows can never hit a developer's live dev DB via
-      ADR-0027's `reuseExistingServer` convenience path.
+      is guaranteed isolated — `test.skip(!process.env.CI, ...)` at the top of
+      the file/describe block, so the destructive flows can never hit a
+      developer's live dev DB via ADR-0027's `reuseExistingServer` convenience
+      path. `process.env.CI` is the deliberate choice, not a placeholder: it is
+      the exact inverse of the `reuseExistingServer: !process.env.CI` switch in
+      `playwright.config.ts` that creates the hazard, so gate and hazard can
+      never drift apart. **This repo has no CI pipeline** (no
+      `.github/workflows`), so the consequence — accepted by the builder on
+      2026-07-31 — is that these four flows are opt-in only and contribute
+      nothing to a default `npm run test:e2e` run. Do not "improve" this into
+      an inferred-isolation check; that alternative was considered and declined.
 - [ ] **Edit flow:** seed a friend via `addFriend`, discover its
       `GlobalPosition`/`StreamId`/`StreamPosition` via direct
       `POST /api/admin/getEventPage` (one-element JSON-array body carrying an
@@ -87,13 +110,19 @@ runs next in the same shared server process.
       "Rebuild all" (the completion signal — there is no done-toast).
       Generous `test.setTimeout` (~60s): ADR-0034 rewinds every checkpoint
       to 0 and Rebuild-all replays handlers sequentially over SSE.
-- [ ] All four flows pass headlessly via `npm run test:e2e` (with the gate
-      env set), seeding only their own isolated events into the harness's
-      per-run temp `DATA_DIR`, per ADR-0027's existing convention.
-- [ ] The BC README's "Playwright e2e harness" bullet gains a sentence
-      recording the destructive-spec CI-gate precedent (same place the
-      tj8n2/cx92m/nf3wk harness findings are recorded), so the next
-      destructive spec doesn't rediscover it.
+- [ ] All four flows pass headlessly via `CI=1 npm run test:e2e` — the literal
+      command, since without `CI` set criterion 1's gate skips the whole file
+      and a green run proves nothing. Seeds only its own isolated events into
+      the harness's per-run temp `DATA_DIR`, per ADR-0027's existing convention.
+- [ ] The BC README's "Playwright e2e harness" bullet gains sentences recording
+      **two** harness findings (same place the tj8n2/cx92m/nf3wk findings are
+      recorded), so neither is rediscovered: (a) the destructive-spec CI-gate
+      precedent and why `process.env.CI` specifically; (b) that
+      `IAdminApi`'s int64 fields (`GlobalPosition`, `StreamPosition`) arrive
+      over Fable.Remoting as **signed strings** (`"+0"`, `"+1"`), not JSON
+      numbers, so any spec reading them must `Number(...)`-normalize. (b) was
+      established empirically in the bounced pass and is undocumented upstream —
+      it will bite every future spec that touches positions, not just this one.
 
 ## Notes
 - **Locator ambiguity is a real shipped-UI hazard:** Edit and Delete panels
@@ -139,8 +168,13 @@ The environment blocker from the first pass (missing `@playwright/test` in
 the shared `node_modules`) was fixed by the conductor mid-task (a real
 `npm install` at the main-tree level, confirmed via
 `require.resolve('@playwright/test')`). Resumed and wrote/iterated the full
-spec (`tests/e2e/admin-surgery.spec.ts`, left in place in the worktree, all
-four flows plus the CI gate).
+spec (`tests/e2e/admin-surgery.spec.ts`, all four flows plus the CI gate).
+
+> **Stale-pointer correction (modeling, 2026-07-31):** this note originally
+> said the spec was "left in place in the worktree". That worktree was torn
+> down at the 18:06 session end. The spec is **not** lost — it survives whole
+> in `.agentheim/salvage/administration-svq3t-bounced.patch`. See the recovery
+> command in `## What`.
 
 **2 of 4 flows are fully written and empirically verified passing** against
 a real cold-started (`CI=1`) server: Delete and Rename (including the
@@ -201,3 +235,45 @@ Remaining acceptance criteria not yet done for this same reason: the BC
 README destructive-spec-gate sentence (criterion 6) and the `npm test`
 Expecto sanity check (deferred — no code under test changed, low risk, but
 left for the next pass since the task isn't complete).
+
+## Modeling note (2026-07-31, second refinement)
+
+Refined after the bounce. No split, no new ADR — the four flows still share one
+page, one seeding harness, and one spec file, and the task still rides
+ADR-0027/0034. Four things changed:
+
+1. **The spec was recovered, not rewritten.** `## What` now carries the exact
+   `git apply --include=…` command, verified against current `main` on
+   2026-07-31 (`git apply --check` exits 0). Roughly half the remaining work
+   was at risk of being redone from scratch on the strength of a stale
+   "in the worktree" pointer.
+2. **The CI gate is now a recorded decision, not an open shape.** The builder
+   was asked directly and chose to keep `test.skip(!process.env.CI, …)`, in
+   full knowledge that this repo has no CI and the flows are therefore
+   opt-in-only. The declined alternative (gate on an inferred isolation
+   invariant — empty store / planted marker — so the flows run by default on
+   any cold start) is recorded in criterion 1 so it isn't re-proposed as an
+   improvement by the next worker or verifier.
+3. **The int64-over-the-wire finding was promoted out of the bounce note** into
+   criterion 6. `"+0"`/`"+1"` signed-string encoding of `GlobalPosition`/
+   `StreamPosition` is a property of the `IAdminApi` transport, not of this
+   spec, and belongs in the README where the next spec author will find it.
+4. **Criterion 5 gained its literal command** (`CI=1 npm run test:e2e`). With
+   criterion 1's gate in place, a bare `npm run test:e2e` skips the entire file
+   and still reports green — a verifier running the old wording could have
+   passed the task without executing a single flow.
+
+**Dependency standing — deliberately unchanged, but narrower than it reads.**
+`depends_on` stays `[administration-wwc36 (done), design-system-q4ebg]`. What
+this task actually needs from `q4ebg` is only the four-line `.bordered`
+deletion landing on `main`: the Edit-panel crash that blocked flows 3 and 4 is
+a *runtime* failure on the vite/Fable pathway Playwright loads, and that
+pathway is already clean under the deletion (`npm run build`: zero `ERROR FS`).
+This task is **insensitive to the `FS0193` knot** — `dotnet build`'s health is
+not on any path Playwright exercises. So whether `svq3t` unblocks quickly or
+slowly is entirely a function of how `q4ebg`'s acceptance criterion 2 is
+resolved: narrowing it to the `FS0039`/`.bordered` scope it owns unblocks this
+task immediately, while resequencing it behind `infrastructure-npyhb` parks
+this task behind a Feliz major-version bump. That decision belongs to `q4ebg`
+and `infrastructure-npyhb`, not here — recorded so the sequencing cost is
+visible when it gets made (see `.agentheim/state/whats-next.md`, 18:06).
