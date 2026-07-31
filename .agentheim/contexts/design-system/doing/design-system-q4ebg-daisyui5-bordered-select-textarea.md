@@ -1,7 +1,7 @@
 ---
 id: design-system-q4ebg
 title: "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)"
-status: todo
+status: doing
 type: bug
 context: design-system
 created: 2026-07-31

@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 2
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 22
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **administration-jrflk** — Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over (bug) — `todo/administration-jrflk-job-name-collision-test-flake.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **administration-jrflk** — Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over (bug) — `doing/administration-jrflk-job-name-collision-test-flake.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

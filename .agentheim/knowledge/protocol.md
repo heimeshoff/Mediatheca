@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-07-31 17:47 -- Batch started: [administration-jrflk, design-system-q4ebg]
+
+**Type:** Work / Batch start
+**Tasks:** administration-jrflk - Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over, design-system-q4ebg - "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)"
+**Parallel:** yes (2 workers — the entire ready set; no task held back)
+
+---
+
 ## 2026-07-31 17:31 -- Housekeeping: closed both carry-over gaps the 17:22 session-end entry left open
 
 **Type:** Work / Housekeeping (post-session, at the builder's explicit request)
