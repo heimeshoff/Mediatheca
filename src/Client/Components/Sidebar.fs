@@ -56,7 +56,10 @@ let private navItem (currentPage: Page) (item: NavItem) =
 
 let view (currentPage: Page) =
     Html.aside [
-        prop.className "hidden lg:flex flex-col w-64 min-h-screen bg-base-200 border-r border-base-300/50"
+        // sticky + h-screen (not min-h-screen) pins the rail to the viewport rather than
+        // stretching to document height (design-system-vk7rd) — this is what lets
+        // navGroupBottom's mt-auto resolve against the viewport instead of the page foot.
+        prop.className "hidden lg:flex flex-col w-64 lg:sticky lg:top-0 lg:h-screen bg-base-200 border-r border-base-300/50"
         prop.children [
             // Logo header with subtle bottom border — Velvet Lobby wordmark (brief 3a):
             // "Media" in Instrument Serif ink + italic gold "theca", plus the
@@ -89,7 +92,9 @@ let view (currentPage: Page) =
             // Navigation — top group (primary destinations) + bottom group
             // (Events/Settings, pinned via mt-auto).
             Html.nav [
-                prop.className "flex-1 flex flex-col px-3 py-4"
+                // overflow-y-auto: on viewports too short to fit every item, the nav column
+                // scrolls internally rather than clipping the bottom group off the end.
+                prop.className "flex-1 flex flex-col px-3 py-4 overflow-y-auto"
                 prop.children [
                     Html.ul [
                         prop.className DesignSystem.navGroupTop

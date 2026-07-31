@@ -1,11 +1,11 @@
 ---
 id: design-system-vk7rd
 title: Sidebar bottom group (Admin/Settings) must pin to the bottom of the viewport, not the bottom of the document — the rail is `min-h-screen` and stretches with page content, so on any scrolling page the group sits below the fold
-status: doing
+status: done
 type: bug
 context: design-system
 created: 2026-08-01
-completed:
+completed: 2026-08-01
 depends_on: [design-system-001]
 blocks: []
 tags: [sidebar, nav, layout, viewport, sticky]
@@ -54,24 +54,25 @@ and already viewport-fixed — do not touch it.
 
 ## Acceptance criteria
 
-- [ ] `Components/Sidebar.fs`'s `Html.aside` is viewport-height and viewport-pinned
+- [x] `Components/Sidebar.fs`'s `Html.aside` is viewport-height and viewport-pinned
       (`sticky top-0 h-screen` or equivalent), not `min-h-screen` — the rendered element's
       height equals the viewport height on a page whose content is taller than the viewport.
-- [ ] Playwright, desktop viewport (≥1024px wide), on a page tall enough to scroll: with the
+- [x] Playwright, desktop viewport (≥1024px wide), on a page tall enough to scroll: with the
       page scrolled to the very top, the "Admin" and "Settings" nav links' bounding boxes are
       fully inside the viewport.
-- [ ] Playwright, same page scrolled to the bottom: the "Admin" and "Settings" links'
+- [x] Playwright, same page scrolled to the bottom: the "Admin" and "Settings" links'
       viewport-relative positions are unchanged from the scrolled-to-top measurement (the
       rail stays put rather than scrolling with the document).
-- [ ] On a viewport too short to fit all nav items, the bottom group remains reachable —
+- [x] On a viewport too short to fit all nav items, the bottom group remains reachable —
       the rail's `nav` scrolls internally rather than clipping the group off the bottom.
-- [ ] The `main` column's layout is unchanged: no horizontal gap appears beside the rail, and
+- [x] The `main` column's layout is unchanged: no horizontal gap appears beside the rail, and
       the existing `min-w-0` overflow behavior (a horizontally scrolling poster row must not
       widen the page) still holds.
-- [ ] `npm run build` exits 0.
-- [ ] Nothing else about the rail changed visually — wordmark, tagline, group spacing, the
+- [x] `npm run build` exits 0.
+- [x] Nothing else about the rail changed visually — wordmark, tagline, group spacing, the
       bottom group's smaller scale, and the dir-3a burgundy active tab all look as before.
-      [human-eye]
+      [human-eye] — no palette/spacing/typography classes were touched, only sizing/scroll
+      classes on the `aside` and `nav` wrappers; verified against the running dev server.
 
 ## Notes
 
@@ -87,3 +88,28 @@ and already viewport-fixed — do not touch it.
 - No ADR expected: this is a layout defect, not a decision. If sticky turns out to be
   unworkable and `fixed` + a `main` offset is needed instead, that *is* a decision worth an
   ADR.
+
+## Outcome
+
+Fixed by changing two classNames in `Components/Sidebar.fs`: the `Html.aside` went from
+`min-h-screen` to `lg:sticky lg:top-0 lg:h-screen` (a fixed viewport-height ceiling instead of
+a content-height floor), and the inner `Html.nav` gained `overflow-y-auto` so a viewport too
+short to fit every item scrolls the nav column internally instead of clipping the bottom
+group. `DesignSystem.navGroupBottom`'s `mt-auto` was untouched — it was already correct, it
+just had nowhere useful to resolve against until the rail itself was viewport-height.
+
+Verified TDD-red-then-green by temporarily reverting the `Sidebar.fs` change (`git stash`) and
+confirming the new Playwright spec fails for the right reason (bounding box of "Admin"
+overflowing the viewport by ~386px; document scrollTop nonzero on the short-viewport case)
+before restoring the fix and confirming green. Full Expecto suite (427 tests) still green —
+no server-side code touched.
+
+New spec: `tests/e2e/sidebar-rail-viewport-pinned.spec.ts` (3 cases: scroll-top/scroll-bottom
+pinning, short-viewport internal nav scroll, main-column no-gap). Non-destructive
+(read-only navigation), so no `CI` env-var gate needed.
+
+BC README's "Layered sidebar nav" entry amended to name the viewport-height requirement
+explicitly, so a future half-fix (mt-auto without a bounded rail height) is less likely.
+
+Key files: `src/Client/Components/Sidebar.fs`, `tests/e2e/sidebar-rail-viewport-pinned.spec.ts`,
+`.agentheim/contexts/design-system/README.md`.

@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 01:35 -- Task verified and completed: design-system-vk7rd - Sidebar bottom group (Admin/Settings) must pin to the bottom of the viewport, not the bottom of the document — the rail is `min-h-screen` and stretches with page content, so on any scrolling page the group sits below the fold
+
+**Type:** Work / Task completion
+**Task:** design-system-vk7rd - Sidebar bottom group (Admin/Settings) must pin to the bottom of the viewport, not the bottom of the document — the rail is `min-h-screen` and stretches with page content, so on any scrolling page the group sits below the fold
+**Summary:** Sidebar rail is now viewport-height and viewport-pinned (lg:sticky lg:top-0 lg:h-screen in place of min-h-screen, plus overflow-y-auto on the inner nav), so the bottom groups mt-auto pin resolves against the viewport instead of the document and Admin/Settings no longer sit below the fold
+**Duration:** 21m
+**Verification:** PASS (iteration 1)
+**Files changed:** 3
+**Tests added:** 3
+**ADRs written:** none
+
+---
+
 ## 2026-08-01 01:13 -- Batch started: [design-system-vk7rd]
 
 **Type:** Work / Batch start
