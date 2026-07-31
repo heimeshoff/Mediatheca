@@ -9,7 +9,7 @@ depends_on: [design-system-q4ebg, infrastructure-npyhb]
 completed:
 blocks: []
 tags: [build-health, fable, vite, tooling, ci]
-related_adrs: []
+related_adrs: [0036, 0037]
 related_research: []
 prior_art: [infrastructure-w8fnp]
 ---
@@ -69,22 +69,25 @@ exits non-zero. Preferred shape:
 - Leave `dev:client` alone — the dev loop should stay fast and tolerant; this
   gate is for the build, not the watch.
 
-Confirm the gate is not itself noisy: the client currently carries 3 warnings
-(two `NU1605` package-downgrade pairs, one `FS0020` implicit-ignore in
-`AdminProjections/Views.fs:199`). Warnings must **not** fail the gate — only
-errors. Do not reach for `TreatWarningsAsErrors`; the `NU1605` downgrade is a
-real but separate issue tracked as `infrastructure-npyhb`, and coupling the two
-would block this gate on a package-version investigation.
+Confirm the gate is not itself noisy: `dotnet build src/Client/Client.fsproj -v q
+--nologo` now exits 0 with exactly `1 Warning(s)  0 Error(s)`. The single
+remaining warning is `FS0020` (implicitly-ignored `ReactElement`) at
+`src/Client/Pages/AdminProjections/Views.fs(199,13)`. The two `NU1605`
+package-downgrade warnings that existed when this task was captured are gone —
+`infrastructure-npyhb`'s `Feliz.DaisyUI` 5.2.0 pin (ADR-0036) cleared them along
+with the `FS0193` error they had been masking. Warnings must **not** fail the
+gate — only errors; there is no remaining reason to reach for
+`TreatWarningsAsErrors`. Leave the `FS0020` unfixed (see Notes) — it is a real
+but separate one-line cleanup, not this gate's job.
 
-Both `depends_on` edges are load-bearing — the gate must land on an already-clean
-tree, or `npm run build` breaks for everyone the moment it merges:
-
-- `design-system-q4ebg` clears the sixteen `.bordered` `FS0039`s.
-- `infrastructure-npyhb` clears the `FS0193` that q4ebg's fix *exposes* — the
-  gate's own mechanism (`dotnet build src/Client/Client.fsproj`) cannot exit 0
-  until `Feliz.DaisyUI` is pinned to 5.2.0 (ADR-0036). This edge was added
-  2026-07-31 during npyhb's refinement; the "3 warnings, errors-only" premise
-  below was written before the `FS0193` was known.
+Both `depends_on` edges were load-bearing preconditions and are now met.
+`design-system-q4ebg` (done 2026-07-31) cleared the sixteen `.bordered`
+`FS0039`s. `infrastructure-npyhb` (done 2026-07-31) pinned `Feliz.DaisyUI` to the
+exact `5.2.0` (ADR-0036), clearing the `FS0193` that q4ebg's fix had exposed once
+the `FS0039`s stopped masking it. `dotnet build src/Client/Client.fsproj -v q
+--nologo` now exits 0 — the tree is clean, and the gate's chosen mechanism is
+confirmed able to succeed on it. This paragraph is retained as a record of why
+the two edges existed, not as an open precondition.
 
 ## Acceptance criteria
 
@@ -95,10 +98,21 @@ tree, or `npm run build` breaks for everyone the moment it merges:
 - [ ] Proven by construction, not by assertion: temporarily reintroduce one
       `textarea.bordered` (or any deliberate FS error), show `npm run build`
       exits non-zero, then revert. Record the observed exit code in the task's
-      Outcome.
+      Outcome. After reverting, confirm via `git status` / `git diff --stat` that
+      the tree carries no leftover changes from the reintroduced error (the same
+      verification discipline `infrastructure-npyhb` used for its own temporary-aid
+      check).
 - [ ] On the clean tree, `npm run build` still exits 0 and still emits the same
-      bundle to `deploy/public/` — the existing 3 warnings do not fail it.
+      bundle to `deploy/public/` — the existing 1 warning (`FS0020`) does not
+      fail it.
 - [ ] `npm run dev:client` is unchanged (no typecheck added to the watch loop).
+- [ ] The infrastructure README (or an inline comment beside the `typecheck`
+      script in `package.json`) records the gate's known blind spot per ADR-0036:
+      `dotnet build` typechecks this project's own F# but is not proof of what
+      Fable will emit, since the two pathways consume different inputs (prebuilt
+      `.dll` vs Fable-compiled `.fs` sources) — confirmed `FS0193`-class failures
+      can happen on the MSBuild side with zero effect on the shipped bundle, and
+      in principle a Fable-source-only issue could go uncaught by this gate.
 
 ## Notes
 
@@ -114,16 +128,38 @@ tree, or `npm run build` breaks for everyone the moment it merges:
 - Deliberately out of scope: adding CI. This project has no CI pipeline; the
   gate belongs in the build script that already exists, and remains useful the
   day CI does arrive.
-- Worth checking while here, but not a criterion: whether `vite-plugin-fable`
-  exposes an option to make FS errors fatal directly. If it does, that is a
-  cleaner mechanism than a second MSBuild pass and should be preferred — note
-  the finding either way, since a second full compile adds ~20s to
-  `npm run build`. **This is now more than a nicety** (established during
-  `infrastructure-npyhb`'s refinement, ADR-0036): `dotnet build` and Fable
-  consume *different inputs* — prebuilt `lib/*.dll` assemblies versus
-  `fable/*.fs` sources. An MSBuild pass is a genuine typecheck of *this
-  project's own F#*, which is what this gate wants from it, but it is **not**
-  evidence about what Fable will emit: it can fail on assembly-binding problems
-  that never reach the bundle (`FS0193` is the worked example) and in principle
-  could miss a Fable-source-only problem. Worth recording that limit in whatever
-  the gate ends up being.
+- **Checked and closed: `vite-plugin-fable` (installed `0.1.1`) has no option to
+  make FS errors fatal.** Established during this refinement by reading
+  `node_modules/vite-plugin-fable/index.js` in full. Its `PluginOptions` typedef
+  exposes only `fsproj`, `jsx`, `noReflection`, `exclude` — nothing
+  severity-related. `logDiagnostics` logs every diagnostic via
+  `console.log`/`warn`/`error` regardless of `"error"`/`"warning"` severity and
+  never throws, never calls Rollup's `this.error(...)`, never sets
+  `process.exitCode`. The two `throw new Error(...)` sites fire only on a daemon
+  RPC-transport failure — a compile that succeeds but *contains* FS errors still
+  returns the `Success` case (`Fable.Daemon/Types.fs`'s
+  `ProjectChangedResult.Success` carries `diagnostics` as a normal, non-failing
+  field), so those errors flow into `logDiagnostics` rather than the throwing
+  path. `transform` returns `state.compilableFiles` unconditionally — that is the
+  exact mechanism emitting the `throw 1` placeholder with no severity check.
+  Grepping for `this.error`, `exitCode`, `process.exit`, `strict`, `fatal`,
+  `failOn` returns zero matches. The package README describes it as pre-alpha and
+  "up for adoption" (unmaintained). **Conclusion: the secondary `dotnet build`
+  pass is not a stopgap, it is the only available mechanism today.** Do not
+  re-open this question; if the plugin later gains such an option it should
+  supersede this gate (recorded in the ADR below).
+- The `dotnet build` pass's blind spot stands (ADR-0036): `dotnet build` and Fable
+  consume *different inputs* — prebuilt `lib/*.dll` assemblies versus `fable/*.fs`
+  sources. An MSBuild pass is a genuine typecheck of *this project's own F#*,
+  which is what this gate wants from it, but it is **not** evidence about what
+  Fable will emit: it can fail on assembly-binding problems that never reach the
+  bundle (`FS0193` is the worked example, now closed) and in principle could miss
+  a Fable-source-only problem. Acceptance criterion 6 makes recording this limit
+  a deliverable rather than only prose here.
+- Measured cost: the `dotnet build` pass takes ~27s warm on the dev machine (the
+  earlier "~20s" estimate was close but unmeasured).
+- **ADR-0037 to be written by the worker** — the errors-fatal client build gate,
+  its rejected alternatives (log-scraping; a plugin option, now definitively ruled
+  out), and its ADR-0036-inherited blind spot. `0036` is the highest ADR on disk;
+  `administration-n8kqw` nominally claims `0038`, so re-confirm the next free
+  number at write time in case that task lands first.

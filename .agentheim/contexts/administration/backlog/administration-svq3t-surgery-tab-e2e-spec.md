@@ -110,10 +110,15 @@ runs next in the same shared server process.
       "Rebuild all" (the completion signal — there is no done-toast).
       Generous `test.setTimeout` (~60s): ADR-0034 rewinds every checkpoint
       to 0 and Rebuild-all replays handlers sequentially over SSE.
-- [ ] All four flows pass headlessly via `CI=1 npm run test:e2e` — the literal
-      command, since without `CI` set criterion 1's gate skips the whole file
-      and a green run proves nothing. Seeds only its own isolated events into
-      the harness's per-run temp `DATA_DIR`, per ADR-0027's existing convention.
+- [ ] All four flows pass headlessly with `CI` truthy — `$env:CI=1; npm run test:e2e`
+      in PowerShell (this project's primary dev shell) or `CI=1 npm run test:e2e`
+      in POSIX shell / Git Bash. **The env var, not the shell syntax, is what is
+      load-bearing:** `CI=1 npm run …` is POSIX-only and silently fails as a
+      command prefix in PowerShell, and without `CI` set criterion 1's gate skips
+      the whole file and a green run proves nothing. There is no `cross-env`
+      dependency in this project, so both forms are documented rather than one
+      being picked. Seeds only its own isolated events into the harness's per-run
+      temp `DATA_DIR`, per ADR-0027's existing convention.
 - [ ] The BC README's "Playwright e2e harness" bullet gains sentences recording
       **two** harness findings (same place the tj8n2/cx92m/nf3wk findings are
       recorded), so neither is rediscovered: (a) the destructive-spec CI-gate
@@ -263,17 +268,47 @@ ADR-0027/0034. Four things changed:
    and still reports green — a verifier running the old wording could have
    passed the task without executing a single flow.
 
-**Dependency standing — deliberately unchanged, but narrower than it reads.**
-`depends_on` stays `[administration-wwc36 (done), design-system-q4ebg]`. What
-this task actually needs from `q4ebg` is only the four-line `.bordered`
-deletion landing on `main`: the Edit-panel crash that blocked flows 3 and 4 is
-a *runtime* failure on the vite/Fable pathway Playwright loads, and that
-pathway is already clean under the deletion (`npm run build`: zero `ERROR FS`).
-This task is **insensitive to the `FS0193` knot** — `dotnet build`'s health is
-not on any path Playwright exercises. So whether `svq3t` unblocks quickly or
-slowly is entirely a function of how `q4ebg`'s acceptance criterion 2 is
-resolved: narrowing it to the `FS0039`/`.bordered` scope it owns unblocks this
-task immediately, while resequencing it behind `infrastructure-npyhb` parks
-this task behind a Feliz major-version bump. That decision belongs to `q4ebg`
-and `infrastructure-npyhb`, not here — recorded so the sequencing cost is
-visible when it gets made (see `.agentheim/state/whats-next.md`, 18:06).
+**Dependency now satisfied.** Both `depends_on` edges are met:
+`administration-wwc36` and `design-system-q4ebg` are in `done/`.
+`design-system-q4ebg` landed the four-line `.bordered` deletion on `main`
+(commit `b59728c`, 2026-07-31), which is exactly the runtime fix this task
+needed — the Edit-panel crash that blocked flows 3 and 4 was purely on the
+vite/Fable pathway Playwright loads, and that pathway is now clean
+(`npm run build`: zero `ERROR FS`). q4ebg's criterion 2 was narrowed to the
+`FS0039` scope it owned and resolved independently of `infrastructure-npyhb`'s
+separate `FS0193` fix, exactly as anticipated. Nothing left to resolve here.
+
+## Modeling note (2026-07-31, third refinement — post-unblock)
+
+**This is a recover-and-re-verify task, not a write-the-spec task.** Verified
+this pass by reading the salvage patch's spec content directly: **all four
+flows are already fully written** in
+`.agentheim/salvage/administration-svq3t-bounced.patch` — Edit (patch lines
+326–356), Delete (358–387), Rename (389–433), and the cross-tab dirty banner
+(435–492), each a complete `test(...)` body with real assertions, not a stub.
+The bounced worker's own framing confirms it: the flows "cannot pass — *not
+because the spec is wrong*, but because the Surgery tab's Edit panel genuinely
+crashes." That blocker is now fixed.
+
+Every selector and text string the Edit and banner tests depend on was
+re-checked against the **current** `src/Client/Pages/AdminSurgery/Views.fs` and
+still matches exactly (panel heading "Edit event", "Data"/"Metadata" labels,
+"Save edit…" button, `"Edit event %d on %s"` dialog body, the
+`/^Applied — 1 row affected\. Backup: .+/` banner regex). q4ebg's fix deleted
+only the `.bordered` modifier from two `Daisy.textarea` calls — no text, no
+labels, no structure changed. So nothing the spec asserts on has drifted.
+
+**The only genuinely unstarted work is the last criterion** (the two BC README
+sentences) — confirmed still unfulfilled: the README's "Playwright e2e harness"
+bullet records the tj8n2/cx92m/nf3wk findings but says nothing yet about the
+destructive-spec CI-gate precedent or the signed-string wire quirk.
+
+**Criterion numbering:** this task has **seven** checkbox criteria, not six.
+Earlier prose in this file refers to "criterion 6" meaning the README addition —
+that is bullet **7** in the actual list (1 safety gate, 2 Edit, 3 Delete,
+4 Rename, 5 banner, 6 headless run, 7 README). Read by description, not number.
+
+No split (the four flows share one `git apply`, one file, and one load-bearing
+test order — splitting could not even let the halves verify separately). No new
+ADR; still rides ADR-0027/0034. The ADR-0059 "prose-only, unenforced" marker in
+Notes was re-checked and is correctly worded as-is.

@@ -9,9 +9,9 @@ completed:
 depends_on: [administration-jrflk, design-system-001]
 blocks: []
 tags: [admin-console, event-store, backup, import, surgery, concurrency-guard]
-related_adrs: [0016, 0025, 0029, 0033, 0034, 0035, 0036]
+related_adrs: [0016, 0025, 0029, 0033, 0034, 0035, 0038]
 related_research: []
-prior_art: [administration-vrc56, administration-wwc36, administration-mz6kp]
+prior_art: [administration-vrc56, administration-wwc36, administration-jrflk]
 ---
 
 ## Why
@@ -80,7 +80,7 @@ administration-jrflk is retiring `Administration.fs`'s module-level `ConcurrentD
 Once jrflk lands, the work here is one record field plus two checks:
 
 - `AdminGuards` gains `WipeImportInProgress: ConcurrentDictionary<string, unit>`.
-- `wipeImportEventsStreamHandler`: `TryAdd` fails → `rejected` "An event log import is already running"; else if `RebuildingProjections` is non-empty → release and `rejected` "A projection rebuild is in flight — wait for it to finish"; `try/finally TryRemove` around the whole body (same shape as `driftCheckStreamHandler`).
+- `wipeImportEventsStreamHandler`: check `guards.RebuildingProjections` non-empty **first** → `rejected` "A projection rebuild is in flight — wait for it to finish", with no claim ever made; **then** `TryAdd` on `WipeImportInProgress` fails → `rejected` "An event log import is already running"; else `try/finally TryRemove` around the whole body. This order is deliberate and was corrected at refinement: `driftCheckStreamHandler` (`Administration.fs:602-641`) checks its cross-cutting condition *before* touching its own guard and never claims-then-releases, so the original "TryAdd first, release if blocked" wording was not in fact "the same shape as `driftCheckStreamHandler`" — it invented a claim-then-release pattern no existing handler uses, with one more release path to get wrong. It also now mirrors the check this task already specifies for `projectionRebuildStreamHandler`'s side.
 - `projectionRebuildStreamHandler`: gains a check — `WipeImportInProgress` non-empty → `rejected` "An event log import is in flight", before its existing `TryAdd`.
 - No mutex beyond the two dictionaries. The check-and-claim pair is TOCTOU-racy in the abstract, but the losing interleaving needs two clicks landing within microseconds in two tabs. **Document the accepted window; don't engineer around it.**
 
@@ -127,15 +127,17 @@ Not the Surgery tab. In `AdminProjections/{Types,State,Views}.fs`, beside the ex
 
 **Not split.** The `importNdjsonRows` extraction is mechanical, has no independent user-visible value, and is fully regression-gated by vrc56's existing tests — a separate task would carry exactly one criterion ("existing tests still pass"), which isn't a task boundary. The only available seam is server vs. client, which is worse: a server-only half ships a destructive endpoint with no confirm dialog in front of it.
 
-**File-order gotcha:** `ensureBackupsDir`/`newBackupPath` are private helpers around `Administration.fs:1043`, *after* the import/export handlers (~750–816). The new composite and handler therefore can't sit next to `importEventsStreamHandler` — open a new section (`// ── Wipe-first event log import (administration-n8kqw, ADR-0036) ──`) after `computeBackupStats` and before `create`.
+**File-order gotcha:** `ensureBackupsDir`/`newBackupPath` are private helpers (currently `Administration.fs:1062`/`:1072` — **anchor by symbol name at implementation time, not by these line numbers; they have already drifted once since capture**), *after* the import/export handlers (~750–816). The new composite and handler therefore can't sit next to `importEventsStreamHandler` — open a new section (`// ── Wipe-first event log import (administration-n8kqw, ADR-0038) ──`, matching whatever number the ADR actually lands on) after `computeBackupStats` and before `create`.
 
-**Two open UX calls, non-blocking, worker's judgment:**
-- Should an empty incoming file be allowed to proceed (net effect: wipe to empty)? Recommendation: allow it, but state that outcome explicitly in the confirm-dialog copy rather than silently blocking.
-- Should a successful Wipe & Import auto-navigate anywhere? Recommendation: no — rely on the existing cross-tab dirty banner, consistent with how ordinary import and the surgery mutations already surface their aftermath.
+**Two UX calls, settled at refinement (2026-07-31) — directives, not recommendations:**
+- An empty incoming file **is allowed** to proceed (net effect: wipe to empty). Nothing objects — the guardrail protocol's backup plus explicit confirm already make this exactly as safe as any other wipe-import. The confirm-dialog copy **must state that outcome explicitly** when the client-computed incoming line count is 0, rather than silently blocking or silently proceeding.
+- A successful Wipe & Import **does not auto-navigate** anywhere — rely on the existing cross-tab dirty banner, consistent with how ordinary import and every surgery mutation already surface their aftermath.
+
+**Vision-boundary acknowledgment (non-blocking, informational).** This is Administration-BC (generic, operator-tooling) work while the media-experience v1 arc (In Focus, Unified Dashboard, Steam Import, HLTB) remains entirely unbuilt. Per `vision.md`'s Operability **Boundary**, media-experience scope would normally win a competing-priority call; this task is refined and promoted on the builder's explicit direction, which is the documented override path.
 
 **Drive-by, not an acceptance criterion:** `importEventsStreamHandler`'s doc comment argues there is no `start` event because an empty-payload SSE event would emit `{"type":"start",}` and break `JSON.parse`. `Sse.sseFrame` now special-cases the empty payload, so that reasoning is stale — worth a one-line correction while in the file.
 
-**ADR-0036 to be written by the worker** (0035 is reserved by administration-jrflk; re-confirm the next free number at write time):
+**ADR-0038 to be written by the worker.** `0035` is `administration-jrflk` (admin-guard composition-root ownership) and `0036` is `infrastructure-npyhb` (Feliz.DaisyUI pin) — both already on disk, so the draft below is **not** ADR-0036 as originally written. `0036` is the highest ADR on disk; `infrastructure-p1h9a` nominally claims `0037`, so re-confirm the next free number at write time in case that task lands first. Only the number changes — the draft body's cross-references (0033/0034/0035) are all still accurate:
 
 > **Wipe-first event log import — a separate route, one transaction, and mutual exclusion with projection rebuild.**
 >
