@@ -5,6 +5,39 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 21:09 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 2h26m (batch start 18:43 → session end 21:09)
+**Completed:** 7 (first-try PASS: 7, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 2 — both verified PASS (iteration 1) but stranded at squash-merge by real conflicts with already-landed siblings; never a verifier failure. (1) administration-kv7dp: conflicts with administration-t9bzx in `src/Server/Administration.fs` (derived `projectionTables` vs `lossyRebuildProjections` guard, same region) and the administration README; work preserved on `aw/administration-kv7dp` @ 1b8ccbb, worktree `.worktrees/administration-kv7dp` kept, task stays in doing/. (2) games-p6vkz: conflicts with administration-c3nvp in `src/Server/Composition.fs` and with games-w4tzc in `tests/Server.Tests/GamesTests.fs`; work preserved on `aw/games-p6vkz` @ d0d292b, worktree `.worktrees/games-p6vkz` kept, task stays in doing/. Both worktrees are clean (all work committed) — nothing uncommitted to salvage. Builder resolves manually or asks for a re-run against current main; series-d5tpn / journal-w3sbq / games-h4mrd stay blocked behind them.
+**Dispatches:** infrastructure-e4kwm: 1, administration-t9bzx: 1, administration-kv7dp: 1, administration-c3nvp: 1, games-p6vkz: 1, games-w4tzc: 1, series-m7fdk: 1, series-r2xhv: 1, series-q8jwc: 1
+**Commits:** 14 (1 session-start reconcile of stranded refine edits, 5 batch starts, 7 task integrations, this session-end entry)
+**Session-start churn reconciliation:** 2 recognized machine-shape commits (the 17:25 capture and 17:52 refine, each matched to its own protocol entry), 0 human commits since the 2026-08-01 15:55 boundary. Nothing flagged, no whats-next write. Additionally found the 17:52 refine session's sync-gate edits to games-p6vkz/h4mrd uncommitted in the working tree — committed as `0e71afa` before batch 1 so worktrees (which fork from committed HEAD) would carry the current specs. Done by hand (`lib/session-start-churn.mjs` still absent from plugin 0.9.2).
+**Vision-conformance:** none — batch aligns with vision. The entire batch executes the deterministic-rebuild workstream: it serves the vision's Operability & Observability arc (the event substrate must be inspectable and trustworthy) and infrastructure-e4kwm added the "Replayable" Design Principle the rest of the batch enforces. No task pulls toward an Out of Scope (v1) item; no media-experience work was displaced (none was ready). Judged by hand — `lib/vision-conformance.mjs` is now present in 0.9.2 but this vision has no "What success looks like"/"Non-goals" sections for `extractVisionSections` to find (eighth consecutive session judged manually).
+**Batch mix:** 100% product-facing (7 tasks). Classified by hand and on substance: every task changed production code, tests, or the project's own domain doctrine (ADRs/vision/context-map for e4kwm). By `classifyTask`'s letter, the six tasks whose FILE_LIST includes an ADR under `.agentheim/knowledge/decisions/` would read harness — same known heuristic quirk as prior session-end entries.
+**Carry-over:** `.agentheim/contexts/games/todo/{games-p6vkz,games-h4mrd}` refine edits: committed at session START (`0e71afa`, chore(games): reconcile stranded refine edits) — orphaned bookkeeping from the 17:52 modeling session, committed so worker worktrees saw current specs. No `.agentheim/`-owned files stranded at session end. left behind (user WIP, 2 files — modified `src/Client/Pages/Settings/Views.fs`, untracked `Mediatheca Directions.html`, both pre-existing at session start; protected through both merge aborts via `git reset --merge`). `.worktrees/administration-kv7dp`: kept (owner: administration-kv7dp, verified PASS but merge-conflicted, branch @ 1b8ccbb, nothing uncommitted). `.worktrees/games-p6vkz`: kept (owner: games-p6vkz, verified PASS but merge-conflicted, branch @ d0d292b, nothing uncommitted).
+
+**Notes carried out of this run:**
+
+1. **Three workers independently numbered their ADR 0043** (e4kwm, t9bzx, kv7dp) and two later workers claimed 0045 (c3nvp, p6vkz) — parallel-provisional numbering worked as designed; conductor renumbered t9bzx→0044 at integration (`lib/adr-allocation.mjs` absent from 0.9.2, done by hand); kv7dp's and p6vkz's renumbering is pending their conflict resolution (kv7dp's provisional 0043 and p6vkz's provisional 0045 both collide with landed ADRs — renumber to the then-free numbers when integrating).
+2. **games-w4tzc's premise was stale**: the idempotence guards it was filed to add have existed since 2026-02-15 (`git blame`: a4d1697/2dcfca4); the 1019-events-per-1019-streams evidence was historical accumulation from before those guards. Worker correctly shipped tests-only. **Follow-up advisory:** backlog task `administration-z6ymt` (event-log purge) cites the same disproven "~1000 duplicates" premise — re-check before promoting.
+3. **Merge-conflict lesson for parallel same-BC batches:** both stranded tasks conflicted exactly where the Phase 3 pre-scan predicted overlap (same-file adjacent regions). Sequential merge ordering surfaced the conflicts safely, but landing order determines who strands. An automatic rebase-and-reverify path (ADR-0032's named future enhancement) would have closed both without builder involvement.
+4. **Human-eye checks pending for the builder:** (a) games-p6vkz's GameDetail prior-playtime line (in the stranded worktree); (b) series-q8jwc's series list / detail / dashboard Next Up render parity (landed on main).
+5. **Doc-drift backlog candidates surfaced by verifiers (none blocking):** series README's "Next Up" wording (any-rewatch vs default-rewatch, predates workstream); series README's ubiquitous-language "Status — Active / Finished / Abandoned" entry contradicting `SeriesStatus`; `game_metadata_cache.cover_ref`/`backdrop_ref` must join `Administration.imageRefColumns` in the same commit that drops the projection columns (games-a7dqx).
+6. **Until series-t3jkv lands** (new backlog item from q8jwc), series added after the one-time cache seed read `Overview = ""` / `TmdbRating = None` — disclosed in ADR-0048's accepted-tradeoffs and the series README.
+
+**Harness defects observed (installed `agentheim` plugin 0.9.2, not this project):**
+
+1. **`checkpoint` still does not fold in the vacated `doing/` lifecycle path** (ADR-0057 / agentic-workflow-w2njd) — staged by hand on all 7 checkpoints; git recorded clean renames every time. Tenth consecutive session.
+2. **`lib/session-start-churn.mjs`, `lib/vacuum-guard.mjs`, `lib/adr-allocation.mjs`, `lib/worktree-salvage.mjs`, `lib/index-entry-length.mjs` absent from 0.9.2** — churn reconciliation, batch-mix, and ADR renumbering done by hand. (`lib/vision-conformance.mjs`, `lib/protocol-rotation.mjs`, `lib/index-rotation.mjs` ARE present — the prior session-end note understated 0.9.2's contents.)
+3. **PowerShell 5.1 mangles JSON args to the lifecycle CLI** (inner double quotes stripped → `invalid-opts-json`); Git Bash with forward-slash paths works. All CLI invocations this session went through Bash.
+4. **CWD-drift near-miss confirmed the doctrine's warning verbatim:** a squash-merge run while the shell sat inside a worktree produced the predicted "Already up to date" self-merge no-op; caught by the doctrine's own first-check (`git rev-parse --abbrev-ref HEAD`) and re-run from the main tree. No damage.
+
+---
+
 ## 2026-08-01 21:08 -- Task verified and completed: series-q8jwc - Compose Series read models from the metadata cache — join in the query function, not the API layer — keeping every Shared DTO and the whole client unchanged
 
 **Type:** Work / Task completion
