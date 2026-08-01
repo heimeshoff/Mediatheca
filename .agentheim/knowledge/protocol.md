@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 12:19 -- Modeling / Refined: administration-k3vmt - Dissolve the /admin console into Settings
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** All six open mechanics settled against the real code, and three things the capture had not noticed were found and resolved. **Criteria 7 and 8 as captured contradicted each other:** the ADR-0034 dirty banner is client-derived from `AdminProjections.Model.Stats`, which today is always populated because `Admin.State.init` eagerly fires all six children's `Load` — under lazy sections a store left dirty by an earlier session would show no warning at all. Resolved at the builder's direction with a single named exception: `getProjectionStats` fires on every `/settings` visit regardless of collapse state; every other section stays lazy. **A second trap: `Settings.State.init`'s `Cmd` is batched by root `State.init` unconditionally**, so a naive absorption would fire admin queries at every app cold start, not just on visiting Settings — `Admin.State.init`'s `Cmd`, by contrast, is deliberately created-and-dropped at root init today. The eager stats load is therefore specified into root `State.Url_changed`'s `Settings` branch, never into `Settings.State.init`, with its own criterion. **Third: the banner's link target is asserted by URL in a committed spec** (`admin-surgery.spec.ts:292`, `toHaveURL(/#\/admin\/projections$/)`), and a **third** e2e spec the capture didn't name (`event-tail-follow.smoke.spec.ts`) also navigates `/#/admin/events`. **Builder decisions:** `Pages/Admin/Types.fs`+`State.fs` survive as a headless composite child (only `Views.fs`'s header+`tabBar` deleted), preserving the `Surgery_msg` → Projections-reload handler ADR-0034 depends on; per-section deep-linkability **dropped** — `/settings` is the only address, the banner's "Go to Projections" becomes an in-page expand+scroll, and the `Settings of section option` route alternative was declined; all six sections render on mobile, nothing viewport-hidden. **Settled without a question:** load-on-first-expand with no refetch (all six children already return exactly one load `Cmd` from `init`, so deferral is mechanical); both teardown triggers call the one exported idempotent `EventBrowser.State.stopFollowing`; Settings' existing DaisyUI collapse idiom is *uncontrolled* and cannot be reused as-is — lazy loading and collapse-stops-the-poll both need the open state in the model. Two criteria added the capture missed entirely: re-pointing `Stream_detail`'s "← Back to Event Store" link and the sidebar-highlight predicate (`Route.isAdminSection`) at `Settings`, so the drill-in doesn't orphan itself. Acceptance criteria went 10 → 16. No split. ADR judged warranted (retracts p0jka's shell shape, amends ADR-0023's trigger and adds a second, moves ADR-0034's banner, drops deep-linkability, establishes the lazy-section convention) — the worker writes it.
+**Split into:** none
+**ADRs written:** none (one judged warranted at execution time)
+
+---
+
 ## 2026-08-01 11:12 -- Modeling / Captured: administration-k3vmt - Dissolve the /admin console into Settings
 
 **Type:** Modeling / Capture

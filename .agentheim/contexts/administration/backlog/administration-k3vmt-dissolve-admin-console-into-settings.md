@@ -33,99 +33,130 @@ Settings destination fixes that as a side effect.
 offered at capture (a section of links into an unchanged `/admin/*`, or re-parenting the
 routes to `/settings/admin/*`). Both were declined; admin stops being its own page.
 
-- `src/Client/Pages/Admin/` shell dissolves. Its page header ("Administration") and
-  `tabBar` disappear; the six tab views render as **collapsible sections on the Settings
-  page**, placed below the existing Data Imports section, in the tab bar's current order:
-  Events, Projections, Health, Images, Jobs, Surgery.
-- `Router.Page.Admin of AdminTab` is removed. `/admin`, `/admin/<tab>` and the legacy
-  `/events` alias all resolve to `Settings` — no dead route, no orphaned `AdminTab` DU.
+- `Pages/Admin/` **survives as a headless composite child**, not as a page: `Types.fs` and
+  `State.fs` stay exactly as they are, Settings holds the whole `AdminModel` in one field
+  with one `Admin_msg` wrapper, and only `Views.fs`'s shell chrome — the "Administration"
+  `h1` and `tabBar` — is deleted. This preserves `Admin.State`'s `Surgery_msg` handler, which
+  reloads `ProjectionsModel.Stats` immediately after every committed mutation so the dirty
+  banner reacts (ADR-0034), and keeps Settings' already-72-field `Model` from absorbing six
+  more child models plus six `Msg` wrappers.
+- The six tab views render as **collapsible sections on the Settings page**, below the
+  existing Data Imports section, in the tab bar's current order: Events, Projections,
+  Health, Images, Jobs, Surgery.
+- `Router.Page.Admin of AdminTab` is removed, and the `AdminTab` DU with it. `/admin`,
+  `/admin/<tab>` and the legacy `/events` alias all resolve to `Settings`. **`/settings` is
+  the only address the settings page has** — no section route, no fragment. Per-section
+  deep-linkability is deliberately dropped (see Notes).
 - `Sidebar.bottomNavItems` drops to a single entry (Settings). `BottomNav.dockItems` is
-  already Settings-only and needs no change.
+  already Settings-only and needs no change. All six sections render on mobile — nothing is
+  viewport-hidden.
 - **`Stream_detail` (`/admin/streams/<streamId>`) survives as its own page.** It is
   parameterized — one page per stream — and cannot be a section. It was already a
   top-level `Page` case rather than an `AdminTab` variant (administration-v4y9g), so it
-  outlives the shell cleanly; only its "back to admin" affordances need re-pointing.
-- Collapsed sections must not fetch. Settings is where the builder goes to paste an API
-  key; that visit must not trigger a health scan, a projection-stats query, a job-status
-  poll and an event page.
+  outlives the shell cleanly; only its "back to admin" affordance and its sidebar-highlight
+  predicate need re-pointing at `Settings`.
+- **Lazy sections, with one deliberate exception.** A collapsed section fetches nothing —
+  Settings is where the builder goes to paste an API key, and that visit must not trigger a
+  health scan, an image-orphan scan, a job-status poll and an event page. The single
+  exception is `getProjectionStats`, which must fire on every `/settings` visit regardless of
+  collapse state, because the ADR-0034 dirty banner is client-derived from it and would
+  otherwise never appear for a store left dirty by an earlier session.
 
 ## Acceptance criteria
 
 - [ ] `Sidebar.bottomNavItems` contains exactly one item, `Settings`; no `Admin` entry
       remains anywhere in `src/Client/Components/Sidebar.fs`.
+- [ ] The sidebar still highlights Settings while on a stream drill-in — `Route.isAdminSection`
+      (or its successor) resolves `Stream_detail _` to the Settings nav item, so the drill-in
+      doesn't leave the whole rail unhighlighted once `Admin` is gone.
 - [ ] `/settings` renders the six administration sections below the Data Imports section,
       in order: Events, Projections, Health, Images, Jobs, Surgery.
-- [ ] `Router.Page` has no `Admin` case, and `Route.parseUrl` maps `["admin"]`,
-      `["admin"; <tab>]` and the legacy `["events"]` to `Settings` — every former admin URL
-      still resolves to something, none to `Not_found`.
+- [ ] `Router.Page` has no `Admin` case and the `AdminTab` DU is gone; `Route.parseUrl` maps
+      `["admin"]`, all six `["admin"; <tab>]` segments, and the legacy `["events"]` to
+      `Settings` — every former admin URL still resolves to something, none to `Not_found`.
 - [ ] `Stream_detail` still parses at `/admin/streams/<id>`, still renders its timeline +
-      projection panel, and the event browser's clickable stream ids still reach it.
+      projection panel, the event browser's clickable stream ids still reach it, and its
+      "← Back to Event Store" link (`Pages/StreamDetail/Views.fs`) points at `Settings`.
 - [ ] Navigating away from `/settings` tears down the Events live-tail poll: ADR-0023's
       Follow-epoch bump is re-keyed from "leaving `Admin _`" to "leaving `Settings`", proven
       by a test that asserts no `getEventsAfter` traffic after the navigation — not by
       static inspection.
-- [ ] Collapsing the Events section without navigating also stops the live-tail poll (a
-      teardown trigger with no equivalent in today's code).
-- [ ] The projections-dirty banner (ADR-0034) still appears after a committed surgery
-      mutation and still clears once every projection's `Lag` returns to 0, from its new
-      home inside the Settings page.
-- [ ] Visiting `/settings` issues **no** admin data query for a section that is collapsed —
-      the page's initial network cost is unchanged from today's Settings page.
+- [ ] Collapsing the Events section without navigating also stops the live-tail poll, via
+      the **same** `EventBrowser.State.stopFollowing` call the navigation path uses — one
+      idempotent function, two triggers, not two epoch-bumping code paths.
+- [ ] Visiting `/settings` issues exactly **one** admin query — `getProjectionStats` — and no
+      other admin query for any collapsed section.
+- [ ] That one query fires on a `/settings` **visit**, not at app cold start: it is wired
+      into root `State.Url_changed`'s `Settings` branch, never into `Settings.State.init`
+      (whose `Cmd` root `init` batches unconditionally on every page, which is why today's
+      six admin loads correctly never fire at cold start). Proven by a test asserting no
+      `getProjectionStats` traffic on a cold start at a non-Settings URL.
+- [ ] Expanding a section for the first time issues that section's load; re-expanding an
+      already-loaded section issues none.
+- [ ] The projections-dirty banner (ADR-0034) appears on a `/settings` visit whenever any
+      projection's `Lag > 0` — **including while the Projections section is collapsed** —
+      still appears after a committed surgery mutation, and still clears once every
+      projection's `Lag` returns to 0.
+- [ ] The banner's "Go to Projections" affordance is an in-page action that expands and
+      scrolls to the Projections section; no navigation, no URL change.
 - [ ] `npm run build` succeeds (Fable compiles) and `npm test` is green.
-- [ ] `tests/e2e/event-tail-follow.spec.ts` and `tests/e2e/admin-surgery.spec.ts` pass
-      against the new location, with `admin-surgery.spec.ts`'s
+- [ ] All three e2e specs pass against the new location: `tests/e2e/event-tail-follow.spec.ts`,
+      `tests/e2e/event-tail-follow.smoke.spec.ts` (which also navigates `/#/admin/events`),
+      and `tests/e2e/admin-surgery.spec.ts` — the last with its `toHaveURL(/#\/admin\/projections$/)`
+      assertion replaced by a DOM assertion on the expanded Projections section, and its
       `test.skip(!process.env.CI, ...)` gate preserved verbatim.
+- [ ] All six sections render on mobile; no section is hidden below a breakpoint, and
+      `BottomNav.dockItems` is unchanged.
 - [ ] The Settings page reads as one coherent page rather than two apps stapled together —
       the administration sections are visibly subordinate to Settings' own chrome, not
       competing with it. [human-eye]
 
 ## Notes
 
-Under-refined on purpose — the shape is chosen but six mechanics are open. Refinement
-should settle these before promotion:
+Refinement settled all six mechanics the capture left open, against the real code.
 
-1. **MVU shape — the biggest open question.** `Pages/Settings/Types.fs`'s `Model` is
-   already large (four integrations + two importers, with per-field input/saving/result
-   triples). Does Settings absorb the six admin child models and six `Msg` wrappers
-   directly, or does `Pages/Admin/State.fs` survive as a *headless composite child* — an
-   `AdministrationModel` Settings holds in one field — with only `Views.fs`'s shell chrome
-   (header + `tabBar`) deleted? The second keeps the diff far smaller and preserves
-   `Admin.State`'s existing `Surgery_msg` handler, which reloads `ProjectionsModel.Stats`
-   immediately after every committed mutation so the dirty banner reacts (ADR-0034).
+1. **MVU shape — headless composite child** (builder's call, on the evidence below).
+   `Pages/Admin/State.fs`'s `Surgery_msg` handler is the only thing that makes ADR-0034's
+   banner react without a tab revisit; absorbing the six children into Settings would mean
+   re-implementing that cross-child reload inside an already-72-field `Model`. Keeping the
+   composite intact makes the diff mostly deletion (shell chrome) plus one field.
 
-2. **Deep-linkability, and what the dirty banner links to.** `/admin/projections` is
-   bookmarkable today, and `Admin.Views.dirtyBanner` renders a "Go to Projections" link
-   built from `Route.toUrl (Admin AdminProjections)`. Inline sections lose both unless
-   Settings takes a section address — `/settings#projections`, or a `Settings of section`
-   route. The banner needs *some* target; decide whether the general deep-link capability
-   comes with it or is dropped.
+2. **Deep-linkability dropped** (builder's call). `/admin/projections` is bookmarkable today
+   and `Admin.Views.dirtyBanner` links to it via `Route.toUrl (Admin AdminProjections)` — an
+   assertion `admin-surgery.spec.ts:292` makes by URL. Both go: the banner becomes an in-page
+   expand+scroll, and that spec assertion becomes a DOM assertion. The alternative
+   (`Settings of section option` → `/settings/projections`) was offered and declined.
 
-3. **Live-tail teardown re-keying (ADR-0023).** The Follow epoch is bumped in root
-   `State.Url_changed` when leaving `Admin _` for any other page. Two changes: the trigger
-   becomes "leaving `Settings`", and a second, genuinely new trigger is needed for
-   section-collapse-without-navigation (criterion 6). Worth checking whether the epoch
-   guard can be driven from one place for both.
+3. **Live-tail teardown re-keying (ADR-0023).** Root `State.fs` currently matches
+   `| Admin _, Admin _ -> model | Admin _, _ -> stopFollowing`. The tab-to-tab arm becomes
+   unnecessary; the trigger is simply "leaving `Settings`". The section-collapse trigger
+   (criterion 7) calls the same exported `EventBrowser.State.stopFollowing`, which is already
+   documented idempotent — so the epoch guard genuinely is driven from one place.
 
-4. **Section-load trigger.** Load-on-first-expand, or refetch on every expand? Affects
-   criterion 8 and whether re-expanding Health shows stale stats. Note that Settings
-   already uses the `collapse collapse-arrow` idiom for its integration cards, so the
-   collapsible mechanism itself is established — but those cards' content is already in
-   `Model` at page load, which is exactly what must **not** happen here.
+4. **Section-load trigger — load on first expand, no refetch on re-expand.** All six children
+   already return exactly one load `Cmd` from their `init` (`Cmd.ofMsg Load` for Health /
+   Projections / Images / Jobs, `Cmd.ofMsg Load_backup_stats` for Surgery, a two-message
+   `Cmd.batch` for EventBrowser), so deferral is mechanical: keep the model `init` returns,
+   drop its `Cmd`, re-issue it on first expand. Each section keeps whatever manual refresh
+   affordance it already has for staleness.
 
-5. **E2E spec rework scope.** Both specs navigate `/admin/*` URLs and click the tab bar to
-   switch tabs. `admin-surgery.spec.ts` is destructive and gated by
-   `test.skip(!process.env.CI, ...)` — the deliberate inverse of `playwright.config.ts`'s
-   `reuseExistingServer: !process.env.CI` — a precedent administration-svq3t established
-   for every future destructive spec, to be preserved exactly.
+5. **The existing collapse idiom cannot be reused as-is.** Settings' integration cards use
+   DaisyUI's *uncontrolled* `collapse collapse-arrow` with a bare
+   `Html.input [ prop.type' "checkbox" ]` and no MVU state. Lazy loading and
+   collapse-stops-the-poll both need the open/closed state **in the model** — controlled
+   `prop.isChecked` + `prop.onChange` dispatching a toggle. Reuse the classes, not the
+   mechanism. (Those cards' content is also already in `Model` at page load, which is exactly
+   what must not happen here.)
 
-6. **Does this warrant an ADR?** It retracts the `/admin` tabbed-shell shape
-   administration-p0jka established alongside ADR-0017 (the `IAdminApi` contract itself is
-   untouched — only its client shell), amends ADR-0023's teardown trigger, and moves
-   ADR-0034's cross-tab banner. Three governing decisions nudged by one change; likely yes.
+6. **ADR: yes.** It retracts the `/admin` tabbed-shell shape administration-p0jka established
+   alongside ADR-0017 (the `IAdminApi` contract itself is untouched — only its client shell),
+   amends ADR-0023's teardown trigger and adds a second one, moves ADR-0034's cross-tab
+   banner and converts its navigation affordance to an in-page action, drops per-tab
+   deep-linkability, and establishes a lazy-section-load convention with one named exception.
 
-7. **Mobile.** `BottomNav`'s Settings item now reaches the whole admin console for the
-   first time. Wanted, or should the heavier sections (Events browser, Surgery) be
-   desktop-only?
+7. **Mobile** (builder's call): all six sections render. `BottomNav`'s Settings item reaches
+   the whole admin console for the first time; the Events browser and Surgery forms will be
+   cramped on a phone, and that is accepted over hiding them.
 
 **Design-system touch.** `Sidebar.fs`'s bottom group is design-system-governed chrome
 (styleguide § 4 Sidebar nav — design-system-t4b9k, reverted by design-system-grtw7,
