@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 02:04 -- Modeling / Refined: integration-007 - Fetch Jellyfin episode stills when materializing a missing season
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** todo
+**Summary:** Resolved the implementation shape against the real code. The load-bearing finding: storing the Jellyfin still at TMDB's canonical `stills/{slug}-sXXeYY.jpg` path would have silently violated the task's own third acceptance criterion — `SeriesRefresh.fs:99-110` short-circuits its download on `ImageStore.imageExists`, so a Jellyfin file at that path would make TMDB skip its own download and keep the Jellyfin bytes permanently. Refined to a distinct `-jellyfin.jpg` suffix, which needs zero changes to `SeriesRefresh`/`Tmdb`. Also pinned down: a new binary sibling to `fetchJsonWithAuth` (Jellyfin's adapter is JSON-only today) reached through the existing `withReauthRetry` policy; an unconditional fetch attempt rather than a `PrimaryImageTag` pre-check (materialization only touches episodes missing from the projection, so the attempt is cheap and robust against `ImageTags` not being populated); the sync seam is synchronous so the fetch runs via `Async.RunSynchronously` per existing precedent; and a pure injected-effect `fetchEpisodeStill` as the testable unit. `materializeMissingEpisodes` stays untouched. Criteria went 3 → 6, five machine-checkable plus one `[human-eye]` for the rendered thumbnail.
+**Split into:** none
+**ADRs written:** none — no new decision beyond ADR 0012's already-recorded deferral; the path-collision resolution is an implementation detail recorded in the task.
+
 ## 2026-08-01 01:37 -- Work session ended
 
 **Type:** Work / Session end
