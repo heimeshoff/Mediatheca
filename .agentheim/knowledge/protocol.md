@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 10:03 -- Modeling / Promoted: integration-q7wv3 - Episodes materialized before integration-007 never get a still — the backfill gap
+
+**Type:** Modeling / Promote
+**BC:** integration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-08-01 10:43 -- Modeling / Refined: integration-q7wv3 - Episodes materialized before integration-007 never get a still — the backfill gap
 
 **Type:** Modeling / Refine

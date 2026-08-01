@@ -1,7 +1,7 @@
 ---
 id: integration-q7wv3
 title: Episodes materialized before integration-007 never get a still — the backfill gap
-status: backlog
+status: todo
 type: bug
 context: integration
 created: 2026-08-01

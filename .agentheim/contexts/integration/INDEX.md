@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 2
-- **Todo:** 0
+- **Backlog:** 1
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 9
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **integration-q7wv3** — Episodes materialized before integration-007 never get a still — the backfill gap (bug) — `todo/integration-q7wv3-backfill-jellyfin-stills-for-existing-materialized-episodes.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -40,7 +41,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **integration-q7wv3** -- Episodes materialized before integration-007 never get a still — the backfill gap -- `bug` -- `backlog/integration-q7wv3-backfill-jellyfin-stills-for-existing-materialized-episodes.md`
 - **integration-hebjs** -- One-click Steam Family import — automatic access-token acquisition -- `feature` -- `backlog/integration-hebjs-one-click-steam-family-import.md`
 <!-- backlog-list:end -->
 
