@@ -37,13 +37,17 @@ module EventFormatting =
         | Error _ -> []
 
     let private formatGameStatus (status: string) =
+        // Reads the raw historical event payload — old events legitimately still say
+        // "Completed"/"OnHold"/"Playing" (no event rewriting, games-status-vocabulary-reconcile),
+        // so this display keeps those legacy labels rather than the new upcast vocabulary.
         match status with
         | "Backlog" -> "Backlog"
         | "InFocus" -> "In Focus"
         | "Playing" -> "In Focus"  // legacy — folded into InFocus by task 048
-        | "Completed" -> "Completed"
+        | "Retired" -> "Retired"
+        | "Completed" -> "Completed"  // legacy label — see games-status-vocabulary-reconcile
         | "Abandoned" -> "Abandoned"
-        | "OnHold" -> "On Hold"
+        | "OnHold" -> "On Hold"  // legacy label — see games-status-vocabulary-reconcile
         | "Dismissed" -> "Dismissed"
         | other -> other
 

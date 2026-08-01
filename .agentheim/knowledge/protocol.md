@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 15:43 -- Task verified and completed: games-status-vocabulary-reconcile - Remodel the game lifecycle to five states — Backlog, InFocus, Retired (né Completed), Abandoned, Dismissed; OnHold removed, Playing never added — and unify DesignSystem.LifecycleStatus 1:1, wiring statusBadge into the Games pages
+
+**Type:** Work / Task completion
+**Task:** games-status-vocabulary-reconcile - Remodel the game lifecycle to five states — Backlog, InFocus, Retired (né Completed), Abandoned, Dismissed; OnHold removed, Playing never added — and unify DesignSystem.LifecycleStatus 1:1, wiring statusBadge into the Games pages
+**Summary:** Remodeled the Games lifecycle to five states (Backlog/InFocus/Retired/Abandoned/Dismissed) — OnHold removed, Completed renamed Retired, Playing never added — with parse-time-only legacy upcast in both server mappers, and unified DesignSystem.LifecycleStatus 1:1 with Shared.GameStatus, wiring DesignSystem.statusBadge into the Games list, GameDetail, StyleGuide, and Dashboard
+**Duration:** 41m (dispatch 15:17 → PASS verdict 15:58, incl. one verifier-fail re-dispatch)
+**Verification:** PASS (iteration 2)
+**Files changed:** 17
+**Tests added:** 4
+**ADRs written:** 0042-games-lifecycle-remodeled-to-five-states.md
+
+---
+
+## 2026-08-01 15:41 -- Verification failed: games-status-vocabulary-reconcile - Remodel the game lifecycle to five states
+
+**Type:** Work / Verification failure
+**Task:** games-status-vocabulary-reconcile - Remodel the game lifecycle to five states — Backlog, InFocus, Retired (né Completed), Abandoned, Dismissed
+**Iteration:** 1 of 3
+**Reasons:** design-system BC README's "Lifecycle status vocabulary" entry still documents the six-state vocabulary and advertises the now-closed reconciliation as outstanding, journal BC README still says "(Playing/Completed transitions)" — cross-BC ubiquitous-language rot with no sanctioned handoff filed (NEW_BACKLOG_ITEMS: none). Tests (445/445) and npm run build both green; scope otherwise clean.
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-08-01 15:17 -- Batch started: [games-status-vocabulary-reconcile]
 
 **Type:** Work / Batch start

@@ -87,13 +87,13 @@ let gameTests =
             | Ok _ -> failtest "Expected error"
 
         testCase "Changing game status" <| fun _ ->
-            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Change_status OnHold)
+            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Change_status Abandoned)
             match result with
             | Ok events ->
                 Expect.equal (List.length events) 1 "Should produce one event"
                 let state = applyEvents ([ Game_added_to_library sampleGameData ] @ events)
                 match state with
-                | Active game -> Expect.equal game.Status OnHold "Status should be OnHold"
+                | Active game -> Expect.equal game.Status Abandoned "Status should be Abandoned"
                 | _ -> failtest "Expected Active state"
             | Error e -> failtest $"Expected success but got: {e}"
 
@@ -108,16 +108,16 @@ let gameTests =
                 | _ -> failtest "Expected Active state"
             | Error e -> failtest $"Expected success but got: {e}"
 
-        testCase "Transition InFocus to Completed" <| fun _ ->
+        testCase "Transition InFocus to Retired" <| fun _ ->
             let result = givenWhenThen
                             [ Game_added_to_library sampleGameData; Game_status_changed InFocus ]
-                            (Change_status Completed)
+                            (Change_status Retired)
             match result with
             | Ok events ->
                 Expect.equal (List.length events) 1 "Should produce one event"
                 let state = applyEvents ([ Game_added_to_library sampleGameData; Game_status_changed InFocus ] @ events)
                 match state with
-                | Active game -> Expect.equal game.Status Completed "Status should be Completed"
+                | Active game -> Expect.equal game.Status Retired "Status should be Retired"
                 | _ -> failtest "Expected Active state"
             | Error e -> failtest $"Expected success but got: {e}"
 
@@ -384,7 +384,7 @@ let gameTests =
                 Replace_cover "x"
                 Replace_backdrop "x"
                 Set_personal_rating (Some 3)
-                Change_status OnHold
+                Change_status Retired
                 Set_hltb_hours (Some 10.0, None, None)
                 Add_family_owner "marco"
                 Remove_family_owner "marco"
@@ -435,7 +435,7 @@ let gameSerializationTests =
             Expect.equal deserialized (Some event) "Should round-trip"
 
         testCase "Game_status_changed round-trips" <| fun _ ->
-            let event = Game_status_changed OnHold
+            let event = Game_status_changed Retired
             let eventType, data = Serialization.serialize event
             let deserialized = Serialization.deserialize eventType data
             Expect.equal deserialized (Some event) "Should round-trip"
@@ -446,6 +446,22 @@ let gameSerializationTests =
             let legacyData = """{"status":"Playing"}"""
             let deserialized = Serialization.deserialize "Game_status_changed" legacyData
             Expect.equal deserialized (Some (Game_status_changed InFocus)) "Legacy Playing should map to InFocus"
+
+        testCase "Legacy 'OnHold' status payload deserializes to InFocus" <| fun _ ->
+            // games-status-vocabulary-reconcile: OnHold was removed from GameStatus; events /
+            // projection rows that still contain the literal string "OnHold" must upcast to
+            // InFocus on read (no event rewriting).
+            let legacyData = """{"status":"OnHold"}"""
+            let deserialized = Serialization.deserialize "Game_status_changed" legacyData
+            Expect.equal deserialized (Some (Game_status_changed InFocus)) "Legacy OnHold should map to InFocus"
+
+        testCase "Legacy 'Completed' status payload deserializes to Retired" <| fun _ ->
+            // games-status-vocabulary-reconcile: Completed was renamed Retired; events /
+            // projection rows that still contain the literal string "Completed" must upcast
+            // to Retired on read (no event rewriting).
+            let legacyData = """{"status":"Completed"}"""
+            let deserialized = Serialization.deserialize "Game_status_changed" legacyData
+            Expect.equal deserialized (Some (Game_status_changed Retired)) "Legacy Completed should map to Retired"
 
         testCase "Game_status_changed InFocus round-trips" <| fun _ ->
             let event = Game_status_changed InFocus
@@ -529,9 +545,8 @@ let gameSerializationTests =
                 Game_personal_rating_set (Some 4)
                 Game_personal_rating_set None
                 Game_status_changed InFocus
-                Game_status_changed Completed
+                Game_status_changed Retired
                 Game_status_changed Abandoned
-                Game_status_changed OnHold
                 Game_status_changed Backlog
                 Game_status_changed Dismissed
                 Game_hltb_hours_set (Some 50.5, Some 80.0, Some 120.0)

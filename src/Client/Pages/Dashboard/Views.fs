@@ -3484,7 +3484,7 @@ let private gameStatsRow (stats: DashboardGameStats) =
         prop.children [
             statBadge "Games" (string stats.TotalGames)
             statBadge "Play Time" (formatPlayTime stats.TotalPlayTimeMinutes)
-            statBadge "Completed" (string stats.GamesCompleted)
+            statBadge "Retired" (string stats.GamesCompleted)
             statBadge "In Progress" (string stats.GamesInProgress)
             if stats.BacklogSize > 0 then
                 statBadge "Backlog" (string stats.BacklogSize)
@@ -3555,9 +3555,8 @@ let private gameStatusColors (status: string) =
     match status with
     | "Backlog" -> "bg-base-content/30"
     | "InFocus" -> "bg-warning"
-    | "Completed" -> "bg-success"
+    | "Retired" -> "bg-success"
     | "Abandoned" -> "bg-error"
-    | "OnHold" -> "bg-base-content/50"
     | "Dismissed" -> "bg-base-content/20"
     | _ -> "bg-primary"
 
@@ -4337,7 +4336,7 @@ let private gamesTabView (data: DashboardGamesTab) (achievementsState: Achieveme
                         gameRatingsDistributionChart data.Stats.RatingDistribution
                     ]
                     if not (List.isEmpty data.Stats.CompletedPerYear) then
-                        sectionCard Icons.trophy "Games Completed Per Year" [
+                        sectionCard Icons.trophy "Games Retired Per Year" [
                             gamesCompletedPerYearChart data.Stats.CompletedPerYear
                         ]
                 ]

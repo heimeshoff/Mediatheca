@@ -1495,10 +1495,9 @@ let private velvetLobbyPatternsSection () =
                 prop.children [
                     DesignSystem.statusBadge DesignSystem.Backlog
                     DesignSystem.statusBadge DesignSystem.InFocus
-                    DesignSystem.statusBadge DesignSystem.Playing
-                    DesignSystem.statusBadge DesignSystem.Completed
+                    DesignSystem.statusBadge DesignSystem.Retired
                     DesignSystem.statusBadge DesignSystem.Abandoned
-                    DesignSystem.statusBadge DesignSystem.OnHold
+                    DesignSystem.statusBadge DesignSystem.Dismissed
                 ]
             ]
 
@@ -1508,7 +1507,7 @@ let private velvetLobbyPatternsSection () =
                     Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "DesignSystem.statusBadge DesignSystem.InFocus" ]
                     Html.p [
                         prop.className DesignSystem.faintText
-                        prop.text "DesignSystem.LifecycleStatus is the pattern's own vocabulary (Backlog/InFocus/Playing/Completed/Abandoned/OnHold) -- not Shared.GameStatus, which has no Playing state and adds Dismissed. See the design-system BC README for the discrepancy this surfaced."
+                        prop.text "DesignSystem.LifecycleStatus unifies 1:1 with Shared.GameStatus (Backlog/InFocus/Retired/Abandoned/Dismissed) as of games-status-vocabulary-reconcile -- Playing never existed as a status (InFocus covers it) and OnHold was removed. LifecycleStatus stays the pattern's own type; a BC's status enum maps onto it case-for-case."
                     ]
                 ]
             ]

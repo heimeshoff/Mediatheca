@@ -73,6 +73,20 @@ module GameProjection =
         try
             conn |> Db.newCommand "UPDATE game_detail SET status = 'InFocus' WHERE status = 'Playing'" |> Db.exec
         with _ -> ()
+        // games-status-vocabulary-reconcile: OnHold removed (upcast to InFocus),
+        // Completed renamed Retired. Idempotent.
+        try
+            conn |> Db.newCommand "UPDATE game_list SET status = 'InFocus' WHERE status = 'OnHold'" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "UPDATE game_detail SET status = 'InFocus' WHERE status = 'OnHold'" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "UPDATE game_list SET status = 'Retired' WHERE status = 'Completed'" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "UPDATE game_detail SET status = 'Retired' WHERE status = 'Completed'" |> Db.exec
+        with _ -> ()
 
     let private dropTables (conn: SqliteConnection) : unit =
         conn
@@ -86,9 +100,8 @@ module GameProjection =
         match status with
         | Backlog -> "Backlog"
         | InFocus -> "InFocus"
-        | Completed -> "Completed"
+        | Retired -> "Retired"
         | Abandoned -> "Abandoned"
-        | OnHold -> "OnHold"
         | Dismissed -> "Dismissed"
 
     let private parseGameStatus (s: string) : GameStatus =
@@ -96,9 +109,10 @@ module GameProjection =
         | "Backlog" -> Backlog
         | "InFocus" -> InFocus
         | "Playing" -> InFocus  // legacy — folded into InFocus by task 048
-        | "Completed" -> Completed
+        | "Retired" -> Retired
+        | "Completed" -> Retired  // legacy — Completed renamed Retired (games-status-vocabulary-reconcile)
         | "Abandoned" -> Abandoned
-        | "OnHold" -> OnHold
+        | "OnHold" -> InFocus  // legacy — OnHold removed, upcast to InFocus (games-status-vocabulary-reconcile)
         | "Dismissed" -> Dismissed
         | _ -> Backlog
 
@@ -718,7 +732,7 @@ module GameProjection =
     let getGameCompletionRate (conn: SqliteConnection) : float option =
         let completed =
             conn
-            |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list WHERE status = 'Completed'"
+            |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list WHERE status = 'Retired'"
             |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
             |> Option.defaultValue 0
         let nonBacklog =
@@ -790,7 +804,7 @@ module GameProjection =
         |> Db.newCommand """
             SELECT gl.slug, gl.name, gl.cover_ref, gl.total_play_time, gl.hltb_hours
             FROM game_list gl
-            WHERE gl.status = 'Completed'
+            WHERE gl.status = 'Retired'
               AND gl.hltb_hours IS NOT NULL
               AND gl.total_play_time > 0
             ORDER BY gl.rowid DESC
@@ -858,7 +872,7 @@ module GameProjection =
             )) AS INTEGER) as completion_year, COUNT(*) as count
             FROM game_list gl
             LEFT JOIN game_detail gd ON gd.slug = gl.slug
-            WHERE gl.status = 'Completed'
+            WHERE gl.status = 'Retired'
               AND COALESCE(
                 (SELECT MAX(date) FROM game_play_session WHERE game_slug = gl.slug),
                 gd.steam_last_played
@@ -883,7 +897,7 @@ module GameProjection =
             SELECT COUNT(*) as cnt
             FROM game_list gl
             LEFT JOIN game_detail gd ON gd.slug = gl.slug
-            WHERE gl.status = 'Completed'
+            WHERE gl.status = 'Retired'
               AND COALESCE(
                 (SELECT MAX(date) FROM game_play_session WHERE game_slug = gl.slug),
                 gd.steam_last_played

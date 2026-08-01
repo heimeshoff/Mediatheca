@@ -8,14 +8,14 @@ open Mediatheca.Client.Pages.Games.Types
 open Mediatheca.Client
 open Mediatheca.Client.Components
 
-let private statusLabel (status: GameStatus) =
+/// GameStatus unifies 1:1 with DesignSystem.LifecycleStatus (games-status-vocabulary-reconcile).
+let private toLifecycleStatus (status: GameStatus) : DesignSystem.LifecycleStatus =
     match status with
-    | Backlog -> "Backlog"
-    | InFocus -> "In Focus"
-    | Completed -> "Completed"
-    | Abandoned -> "Abandoned"
-    | OnHold -> "On Hold"
-    | Dismissed -> "Dismissed"
+    | Backlog -> DesignSystem.Backlog
+    | InFocus -> DesignSystem.InFocus
+    | Retired -> DesignSystem.Retired
+    | Abandoned -> DesignSystem.Abandoned
+    | Dismissed -> DesignSystem.Dismissed
 
 let private formatPlayTime (minutes: int) =
     if minutes = 0 then ""
@@ -25,15 +25,6 @@ let private formatPlayTime (minutes: int) =
         let m = minutes % 60
         if m = 0 then $"{h}h"
         else $"{h}h {m}m"
-
-let private statusTextClass (status: GameStatus) =
-    match status with
-    | Backlog -> "text-base-content/50"
-    | InFocus -> "text-info"
-    | Completed -> "text-success"
-    | Abandoned -> "text-error"
-    | OnHold -> "text-warning"
-    | Dismissed -> "text-neutral"
 
 let private gameCard (game: GameListItem) =
     Html.a [
@@ -86,10 +77,7 @@ let private gameCard (game: GameListItem) =
                                     prop.className "text-xs text-base-content/30"
                                     prop.text "No sessions"
                                 ]
-                            Html.p [
-                                prop.className ("text-xs font-medium " + statusTextClass game.Status)
-                                prop.text (statusLabel game.Status)
-                            ]
+                            DesignSystem.statusBadge (toLifecycleStatus game.Status)
                         ]
                     ]
                 ]
@@ -98,7 +86,7 @@ let private gameCard (game: GameListItem) =
     ]
 
 let private statusFilterBadges (currentFilter: GameStatus option) (dispatch: Msg -> unit) =
-    let allStatuses = [ Backlog; InFocus; Completed; Abandoned; OnHold; Dismissed ]
+    let allStatuses = [ Backlog; InFocus; Retired; Abandoned; Dismissed ]
     Html.div [
         prop.className "flex flex-wrap gap-2"
         prop.children [
@@ -115,7 +103,7 @@ let private statusFilterBadges (currentFilter: GameStatus option) (dispatch: Msg
                     prop.onClick (fun _ ->
                         if isActive then dispatch (Status_filter_changed None)
                         else dispatch (Status_filter_changed (Some status)))
-                    prop.text (statusLabel status)
+                    prop.text (DesignSystem.statusBadgeLabel (toLifecycleStatus status))
                 ]
         ]
     ]

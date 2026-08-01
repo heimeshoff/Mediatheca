@@ -799,9 +799,8 @@ type UpdateEpisodeWatchedDateRequest = {
 type GameStatus =
     | Backlog
     | InFocus
-    | Completed
+    | Retired
     | Abandoned
-    | OnHold
     | Dismissed
 
 type RawgSearchResult = {

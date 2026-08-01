@@ -2076,7 +2076,7 @@ module Api =
                     |> Option.defaultValue 0
                 let gamesCompleted =
                     conn
-                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list WHERE status = 'Completed'"
+                    |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list WHERE status = 'Retired'"
                     |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
                     |> Option.defaultValue 0
                 let gamesInProgress =

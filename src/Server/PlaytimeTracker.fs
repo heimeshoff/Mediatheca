@@ -322,7 +322,7 @@ module PlaytimeTracker =
     /// If the game's status is anything other than InFocus, emit Change_status InFocus.
     /// Returns true if the helper actually emitted the event.
     /// Task 048: any new play activity (Steam sync OR manual session) bumps the game back into focus,
-    /// regardless of prior status (Backlog, OnHold, Completed, Abandoned, Dismissed all get pulled in).
+    /// regardless of prior status (Backlog, Retired, Abandoned, Dismissed all get pulled in).
     let promoteToInFocusIfNeeded
         (conn: SqliteConnection)
         (slug: string)

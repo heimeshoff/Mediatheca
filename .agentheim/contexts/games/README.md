@@ -12,7 +12,18 @@ Single user.
 ## Ubiquitous language
 
 - **Game** — a video game in the library. Carries a RAWG id (canonical metadata) and optionally a Steam appId.
-- **Status** — lifecycle position. Per vision: `Backlog → InFocus → Playing → Completed | Abandoned | OnHold | Dismissed`. The single source of `In Focus` for games (unlike Movies/Series where it's a separate flag).
+- **Status** — lifecycle position, exactly five states (remodeled 2026-08-01,
+  games-status-vocabulary-reconcile): `Backlog | InFocus | Retired | Abandoned | Dismissed`.
+  `Playing` never exists as a status — `InFocus` covers "actively playing" alongside
+  near-future intent and want-to-recommend. `OnHold` was removed as a distinction that
+  never mattered (existing OnHold games upcast to InFocus). `Retired` (renamed from
+  `Completed`) means "played enough for now" — a contented stop, not necessarily beaten,
+  return possible; distinct from `Abandoned` (stopped because it's actively boring).
+  `Dismissed` is a Backlog game never intended to be played, soft-hidden from default
+  lists, rendered as a muted badge variant. Any recognized play session (Steam sync or
+  manual) promotes a game from **any** non-InFocus status — including Retired, Abandoned,
+  Dismissed — to InFocus (task 048, reaffirmed in the same remodel). The single source of
+  `In Focus` for games (unlike Movies/Series where it's a separate flag).
 - **Play time** — total minutes played (often sourced from Steam).
 - **Family owner** — a friend who owns the game in their library / on shared accounts. Multiple allowed.
 - **Played with (friend)** — friend has played this with the user.
@@ -47,4 +58,3 @@ Frontend tasks in this BC **must** `depends_on` the design-system styleguide tas
 ## Open questions
 
 - The `Game_play_time_set` / `Game_steam_last_played_set` events double as a poor man's play-session feed. Whether to model real play sessions as first-class events (vs. derived from totals) is open.
-- `Dismissed` was added late (task 020) — verify it's covered in every Status pattern match.

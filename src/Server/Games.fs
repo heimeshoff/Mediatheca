@@ -349,9 +349,8 @@ module Games =
             match status with
             | Backlog -> "Backlog"
             | InFocus -> "InFocus"
-            | Completed -> "Completed"
+            | Retired -> "Retired"
             | Abandoned -> "Abandoned"
-            | OnHold -> "OnHold"
             | Dismissed -> "Dismissed"
 
         let private decodeGameStatus (s: string) : GameStatus =
@@ -359,9 +358,10 @@ module Games =
             | "Backlog" -> Backlog
             | "InFocus" -> InFocus
             | "Playing" -> InFocus  // legacy — folded into InFocus by task 048
-            | "Completed" -> Completed
+            | "Retired" -> Retired
+            | "Completed" -> Retired  // legacy — Completed renamed Retired (games-status-vocabulary-reconcile)
             | "Abandoned" -> Abandoned
-            | "OnHold" -> OnHold
+            | "OnHold" -> InFocus  // legacy — OnHold removed, upcast to InFocus (games-status-vocabulary-reconcile)
             | "Dismissed" -> Dismissed
             | _ -> Backlog
 

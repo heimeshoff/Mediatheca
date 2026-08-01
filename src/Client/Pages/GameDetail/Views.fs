@@ -62,23 +62,14 @@ let private friendAvatar (size: string) (fr: FriendRef) (extraClass: string) =
         ]
     ]
 
-let private statusBadgeClass (status: GameStatus) =
+/// GameStatus unifies 1:1 with DesignSystem.LifecycleStatus (games-status-vocabulary-reconcile).
+let private toLifecycleStatus (status: GameStatus) : DesignSystem.LifecycleStatus =
     match status with
-    | Backlog -> "badge-ghost"
-    | InFocus -> "badge-info"
-    | Completed -> "badge-success"
-    | Abandoned -> "badge-error"
-    | OnHold -> "badge-warning"
-    | Dismissed -> "badge-neutral"
-
-let private statusLabel (status: GameStatus) =
-    match status with
-    | Backlog -> "Backlog"
-    | InFocus -> "In Focus"
-    | Completed -> "Completed"
-    | Abandoned -> "Abandoned"
-    | OnHold -> "On Hold"
-    | Dismissed -> "Dismissed"
+    | Backlog -> DesignSystem.Backlog
+    | InFocus -> DesignSystem.InFocus
+    | Retired -> DesignSystem.Retired
+    | Abandoned -> DesignSystem.Abandoned
+    | Dismissed -> DesignSystem.Dismissed
 
 let private formatPlayTime (minutes: int) =
     if minutes = 0 then "No sessions"
@@ -284,7 +275,7 @@ let private HeroRating (rawgRating: float option, personalRating: int option, is
 let private HeroStatus (currentStatus: GameStatus, isOpen: bool, dispatch: Msg -> unit) =
     let triggerRef = React.useElementRef()
     let pos, setPos = React.useState {| top = 0.0; left = 0.0 |}
-    let allStatuses = [ Backlog; InFocus; Completed; Abandoned; OnHold; Dismissed ]
+    let allStatuses = [ Backlog; InFocus; Retired; Abandoned; Dismissed ]
 
     React.useEffect ((fun () ->
         if isOpen then
@@ -305,10 +296,7 @@ let private HeroStatus (currentStatus: GameStatus, isOpen: bool, dispatch: Msg -
                         prop.className "cursor-pointer hover:opacity-80 transition-opacity"
                         prop.onClick (fun _ -> dispatch Toggle_status_dropdown)
                         prop.children [
-                            Daisy.badge [
-                                prop.className (statusBadgeClass currentStatus)
-                                prop.text (statusLabel currentStatus)
-                            ]
+                            DesignSystem.statusBadge (toLifecycleStatus currentStatus)
                         ]
                     ]
                 ]
@@ -331,11 +319,7 @@ let private HeroStatus (currentStatus: GameStatus, isOpen: bool, dispatch: Msg -
                                 prop.className itemClass
                                 prop.onClick (fun _ -> dispatch (Set_game_status status))
                                 prop.children [
-                                    Daisy.badge [
-                                        badge.sm
-                                        prop.className (statusBadgeClass status)
-                                        prop.text (statusLabel status)
-                                    ]
+                                    DesignSystem.statusBadge (toLifecycleStatus status)
                                 ]
                             ]
                     ]

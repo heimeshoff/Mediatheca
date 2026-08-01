@@ -302,7 +302,7 @@ let playtimeTrackerTests =
 [<Tests>]
 let promoteToInFocusTests =
     // Task 048: any newly recorded play session promotes the game to InFocus,
-    // regardless of prior status (Backlog, OnHold, Completed, Abandoned, Dismissed all qualify).
+    // regardless of prior status (Backlog, Retired, Abandoned, Dismissed all qualify).
     // Already-InFocus games are skipped to avoid emitting redundant events.
     testList "PlaytimeTracker auto-promote to InFocus" [
 
@@ -317,11 +317,11 @@ let promoteToInFocusTests =
             Expect.isTrue promoted "Should report promotion"
             Expect.equal (getStatus conn gameSlug) (Some InFocus) "Status now InFocus"
 
-        testCase "Completed game with new playtime is promoted to InFocus" <| fun _ ->
+        testCase "Retired game with new playtime is promoted to InFocus" <| fun _ ->
             let conn = createInMemoryConnection ()
             seedGame conn
-            setStatus conn gameSlug Completed
-            Expect.equal (getStatus conn gameSlug) (Some Completed) "Starts in Completed"
+            setStatus conn gameSlug Retired
+            Expect.equal (getStatus conn gameSlug) (Some Retired) "Starts in Retired"
 
             let promoted = PlaytimeTracker.promoteToInFocusIfNeeded conn gameSlug (runCmd conn)
 
@@ -332,14 +332,6 @@ let promoteToInFocusTests =
             let conn = createInMemoryConnection ()
             seedGame conn
             setStatus conn gameSlug Abandoned
-            let promoted = PlaytimeTracker.promoteToInFocusIfNeeded conn gameSlug (runCmd conn)
-            Expect.isTrue promoted "Should report promotion"
-            Expect.equal (getStatus conn gameSlug) (Some InFocus) "Status now InFocus"
-
-        testCase "OnHold game is promoted to InFocus on new play" <| fun _ ->
-            let conn = createInMemoryConnection ()
-            seedGame conn
-            setStatus conn gameSlug OnHold
             let promoted = PlaytimeTracker.promoteToInFocusIfNeeded conn gameSlug (runCmd conn)
             Expect.isTrue promoted "Should report promotion"
             Expect.equal (getStatus conn gameSlug) (Some InFocus) "Status now InFocus"
@@ -382,17 +374,82 @@ let promoteToInFocusTests =
             let after = countStatusChangeEvents conn gameSlug
             Expect.equal after before "No new Game_status_changed event emitted"
 
-        testCase "Manual session edit on a Completed game promotes to InFocus" <| fun _ ->
+        testCase "Manual session edit on a Retired game promotes to InFocus" <| fun _ ->
             let conn = createInMemoryConnection ()
             seedGame conn
             // Add a session first while still in Backlog (which itself promotes to InFocus),
-            // then move to Completed, then edit the session — should re-promote.
+            // then move to Retired, then edit the session — should re-promote.
             let added = PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-01" 60 (runCmd conn)
-            setStatus conn gameSlug Completed
-            Expect.equal (getStatus conn gameSlug) (Some Completed) "Now Completed"
+            setStatus conn gameSlug Retired
+            Expect.equal (getStatus conn gameSlug) (Some Retired) "Now Retired"
             match added with
             | Ok dto ->
                 PlaytimeTracker.updatePlaySessionApi conn dto.Id "2024-06-02" 90 (runCmd conn) |> ignore
                 Expect.equal (getStatus conn gameSlug) (Some InFocus) "Edit promotes back to InFocus"
             | Error e -> failtest $"Setup failed: {e}"
+    ]
+
+/// Appends a raw Game_status_changed event carrying a literal legacy status string,
+/// bypassing Games.Serialization.toEventData's encoder (which would only ever emit
+/// current-vocabulary strings). Simulates an event actually written before
+/// games-status-vocabulary-reconcile, since the migration is upcast-only — no event
+/// rewriting.
+let private appendLegacyStatusChangedEvent (conn: SqliteConnection) (slug: string) (legacyStatus: string) =
+    let eventData: EventStore.EventData =
+        { EventType = "Game_status_changed"
+          Data = sprintf """{"status":"%s"}""" legacyStatus
+          Metadata = "{}" }
+    let streamId = Games.streamId slug
+    let position = EventStore.getStreamPosition conn streamId
+    EventStore.appendToStream conn streamId position [ eventData ] |> ignore
+
+[<Tests>]
+let legacyStatusUpcastTests =
+    testList "GameProjection legacy status upcast (games-status-vocabulary-reconcile)" [
+
+        testCase "Replaying a store with legacy 'OnHold' status events lands the game in InFocus" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            appendLegacyStatusChangedEvent conn gameSlug "OnHold"
+            Projection.runProjection conn GameProjection.handler
+
+            Expect.equal (getStatus conn gameSlug) (Some InFocus) "Legacy OnHold upcasts to InFocus on replay"
+
+        testCase "Replaying a store with legacy 'Completed' status events lands the game in Retired" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            appendLegacyStatusChangedEvent conn gameSlug "Completed"
+            Projection.runProjection conn GameProjection.handler
+
+            Expect.equal (getStatus conn gameSlug) (Some Retired) "Legacy Completed upcasts to Retired on replay"
+
+        testCase "Rebuilding a projection over a store containing legacy strings leaves no legacy status strings in game_list" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            appendLegacyStatusChangedEvent conn gameSlug "OnHold"
+
+            let onHoldSlug = "on-hold-game"
+            let completedSlug = "completed-game"
+            let addGame (slug: string) (name: string) =
+                let event = Games.Game_added_to_library { sampleGameData with Name = name }
+                let eventData = Games.Serialization.toEventData event
+                EventStore.appendToStream conn (Games.streamId slug) -1L [ eventData ] |> ignore
+            addGame onHoldSlug "On Hold Game"
+            appendLegacyStatusChangedEvent conn onHoldSlug "OnHold"
+            addGame completedSlug "Completed Game"
+            appendLegacyStatusChangedEvent conn completedSlug "Completed"
+
+            let progressSnapshots = System.Collections.Generic.List<Projection.RebuildProgress>()
+            Projection.rebuildProjectionWithProgress conn GameProjection.handler (fun p -> progressSnapshots.Add p)
+
+            Expect.equal (getStatus conn gameSlug) (Some InFocus) "Legacy OnHold upcasts to InFocus after rebuild"
+            Expect.equal (getStatus conn onHoldSlug) (Some InFocus) "Legacy OnHold upcasts to InFocus after rebuild"
+            Expect.equal (getStatus conn completedSlug) (Some Retired) "Legacy Completed upcasts to Retired after rebuild"
+
+            let rawStatuses =
+                conn
+                |> Db.newCommand "SELECT status FROM game_list"
+                |> Db.query (fun rd -> rd.ReadString "status")
+            Expect.isFalse (rawStatuses |> List.contains "OnHold") "No legacy 'OnHold' strings remain in game_list"
+            Expect.isFalse (rawStatuses |> List.contains "Completed") "No legacy 'Completed' strings remain in game_list"
     ]

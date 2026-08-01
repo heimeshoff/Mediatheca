@@ -269,36 +269,35 @@ let crossFade = "cross-fade"
 
 // ── Status badges (§ 4 Status badges) ──
 
-/// The six-state lifecycle vocabulary the status-badge pattern renders.
-/// Generic to the pattern — not `Shared.GameStatus` (which has no `Playing`
-/// state and adds `Dismissed`). Mapping a BC's real status enum onto this
-/// vocabulary (or vice versa) is a BC-level concern; see the design-system
-/// BC README for the discrepancy this surfaced.
+/// The five-state lifecycle vocabulary the status-badge pattern renders.
+/// Unified 1:1 with `Shared.GameStatus` as of games-status-vocabulary-reconcile
+/// (Playing never existed as a status — InFocus covers "actively playing";
+/// OnHold was removed; Completed was renamed Retired). `LifecycleStatus`
+/// stays a pattern-owned type — series/movie compositions consume it too —
+/// but a BC's real status enum now maps onto it trivially, one case to one
+/// case.
 type LifecycleStatus =
     | Backlog
     | InFocus
-    | Playing
-    | Completed
+    | Retired
     | Abandoned
-    | OnHold
+    | Dismissed
 
 let private statusBadgeClass (status: LifecycleStatus) =
     match status with
     | Backlog -> "status-badge status-badge-backlog"
     | InFocus -> "status-badge status-badge-in-focus " + goldLeafSweep
-    | Playing -> "status-badge status-badge-playing"
-    | Completed -> "status-badge status-badge-completed"
+    | Retired -> "status-badge status-badge-retired"
     | Abandoned -> "status-badge status-badge-abandoned"
-    | OnHold -> "status-badge status-badge-on-hold"
+    | Dismissed -> "status-badge status-badge-dismissed"
 
-let private statusBadgeLabel (status: LifecycleStatus) =
+let statusBadgeLabel (status: LifecycleStatus) =
     match status with
     | Backlog -> "Backlog"
     | InFocus -> "In focus"
-    | Playing -> "Playing"
-    | Completed -> "Completed"
+    | Retired -> "Retired"
     | Abandoned -> "Abandoned"
-    | OnHold -> "On hold"
+    | Dismissed -> "Dismissed"
 
 /// Status badge pill (§ 4 Status badges) — uppercase, `0.14em` tracking, one
 /// hue per lifecycle state. "In focus" is the only variant that animates.
