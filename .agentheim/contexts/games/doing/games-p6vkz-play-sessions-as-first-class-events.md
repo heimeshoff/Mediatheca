@@ -1,7 +1,7 @@
 ---
 id: games-p6vkz
 title: Model play sessions and pre-tracking playtime as first-class Games events — replacing the non-event-sourced game_play_session table, the republished-SUM Game_play_time_set, and the unrebuildable steam_playtime_snapshot cursor
-status: todo
+status: doing
 type: feature
 context: games
 created: 2026-08-01

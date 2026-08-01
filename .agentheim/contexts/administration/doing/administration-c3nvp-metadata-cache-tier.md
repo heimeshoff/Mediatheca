@@ -1,7 +1,7 @@
 ---
 id: administration-c3nvp
 title: Stand up the metadata cache tier — per-BC typed tables that survive Drop/Init/replay, seeded once from current projections, following the ImageStore and JellyfinStore precedents
-status: todo
+status: doing
 type: feature
 context: administration
 created: 2026-08-01

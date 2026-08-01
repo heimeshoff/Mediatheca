@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 19:05 -- Batch started: [administration-c3nvp, games-p6vkz, games-w4tzc]
+
+**Type:** Work / Batch start
+**Tasks:** administration-c3nvp - Stand up the metadata cache tier — per-BC typed tables that survive Drop/Init/replay, seeded once from current projections, following the ImageStore and JellyfinStore precedents, games-p6vkz - Model play sessions and pre-tracking playtime as first-class Games events — replacing the non-event-sourced game_play_session table, the republished-SUM Game_play_time_set, and the unrebuildable steam_playtime_snapshot cursor, games-w4tzc - Make the retained external-identity Game events idempotent — Set_steam_app_id and Add_family_owner re-emit on every sync for values that never change, unlike Set_steam_library_date which already guards
+**Parallel:** yes (3 workers - the entire ready set of 3; nothing held back. games-p6vkz and games-w4tzc annotated for sequential merge ordering (both edit Games.decide and the games README); administration-c3nvp and games-p6vkz both touch Administration.tableRegistry entries - merge those sequentially too. administration-kv7dp excluded: PASSED verification but its squash-merge conflicts with landed administration-t9bzx in Administration.fs + README - preserved in its worktree for manual resolution, task remains in doing/)
+
+---
+
 ## 2026-08-01 19:00 -- Task verified and completed: administration-t9bzx - Classify every durable table as Projected, Cache or Imperative in one registry, and derive projectionTables from it — replacing tribal knowledge currently encoded as scattered comments explaining omissions
 
 **Type:** Work / Task completion

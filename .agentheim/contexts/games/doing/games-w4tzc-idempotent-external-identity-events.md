@@ -1,7 +1,7 @@
 ---
 id: games-w4tzc
 title: Make the retained external-identity Game events idempotent — Set_steam_app_id and Add_family_owner re-emit on every sync for values that never change, unlike Set_steam_library_date which already guards
-status: todo
+status: doing
 type: bug
 context: games
 created: 2026-08-01
