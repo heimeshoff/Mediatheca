@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 18:43 -- Batch started: [administration-kv7dp, administration-t9bzx, infrastructure-e4kwm]
+
+**Type:** Work / Batch start
+**Tasks:** administration-kv7dp - Block projection rebuild for handlers with out-of-band writers — rebuilding SeriesProjection today permanently destroys 780 refreshes' worth of TMDB metadata plus 23 Jellyfin-materialized episodes, administration-t9bzx - Classify every durable table as Projected, Cache or Imperative in one registry, and derive projectionTables from it — replacing tribal knowledge currently encoded as scattered comments explaining omissions, infrastructure-e4kwm - Record the event-worthiness doctrine — an event records an observation of the user's own engagement, a cache records a third party's description — and amend ADR-0012's retracted justification
+**Parallel:** yes (3 workers - the entire ready set of 3; nothing held back. administration-kv7dp and administration-t9bzx annotated for sequential merge ordering - both touch src/Server/Administration.fs and the administration README)
+
+---
+
 ## 2026-08-01 17:52 -- Modeling / Refined: games-p6vkz, games-h4mrd - pre-tracking playtime becomes its own dateless event, and the Steam sync cursor is retired
 
 **Type:** Modeling / Refine

@@ -1,7 +1,7 @@
 ---
 id: infrastructure-e4kwm
 title: Record the event-worthiness doctrine — an event records an observation of the user's own engagement, a cache records a third party's description — and amend ADR-0012's retracted justification
-status: todo
+status: doing
 type: decision
 context: infrastructure
 created: 2026-08-01

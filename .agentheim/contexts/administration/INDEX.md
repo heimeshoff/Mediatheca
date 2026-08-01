@@ -11,20 +11,20 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 1
-- **Todo:** 3
-- **Doing:** 0
+- **Todo:** 1
+- **Doing:** 2
 - **Done:** 26
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **administration-kv7dp** — Block projection rebuild for handlers with out-of-band writers — rebuilding SeriesProjection today permanently destroys 780 refreshes' worth of TMDB metadata plus 23 Jellyfin-materialized episodes (bug) — `todo/administration-kv7dp-block-lossy-projection-rebuild.md`
-- **administration-t9bzx** — Classify every durable table as Projected, Cache or Imperative in one registry, and derive projectionTables from it — replacing tribal knowledge currently encoded as scattered comments explaining omissions (refactor) — `todo/administration-t9bzx-table-classification-registry.md`
 - **administration-c3nvp** — Stand up the metadata cache tier — per-BC typed tables that survive Drop/Init/replay, seeded once from current projections, following the ImageStore and JellyfinStore precedents (feature) — `todo/administration-c3nvp-metadata-cache-tier.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **administration-t9bzx** — Classify every durable table as Projected, Cache or Imperative in one registry, and derive projectionTables from it — replacing tribal knowledge currently encoded as scattered comments explaining omissions (refactor) — `doing/administration-t9bzx-table-classification-registry.md`
+- **administration-kv7dp** — Block projection rebuild for handlers with out-of-band writers — rebuilding SeriesProjection today permanently destroys 780 refreshes' worth of TMDB metadata plus 23 Jellyfin-materialized episodes (bug) — `doing/administration-kv7dp-block-lossy-projection-rebuild.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

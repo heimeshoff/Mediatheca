@@ -1,7 +1,7 @@
 ---
 id: administration-kv7dp
 title: Block projection rebuild for handlers with out-of-band writers — rebuilding SeriesProjection today permanently destroys 780 refreshes' worth of TMDB metadata plus 23 Jellyfin-materialized episodes
-status: todo
+status: doing
 type: bug
 context: administration
 created: 2026-08-01

@@ -1,7 +1,7 @@
 ---
 id: administration-t9bzx
 title: Classify every durable table as Projected, Cache or Imperative in one registry, and derive projectionTables from it — replacing tribal knowledge currently encoded as scattered comments explaining omissions
-status: todo
+status: doing
 type: refactor
 context: administration
 created: 2026-08-01
