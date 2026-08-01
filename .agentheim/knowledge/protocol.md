@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 19:21 -- Task verified and completed: administration-c3nvp - Stand up the metadata cache tier — per-BC typed tables that survive Drop/Init/replay, seeded once from current projections, following the ImageStore and JellyfinStore precedents
+
+**Type:** Work / Task completion
+**Task:** administration-c3nvp - Stand up the metadata cache tier — per-BC typed tables that survive Drop/Init/replay, seeded once from current projections, following the ImageStore and JellyfinStore precedents
+**Summary:** Stood up the metadata cache tier - MetadataCache.fs creates game_metadata_cache (typed RAWG/HLTB columns, seeded once from game_detail behind a settings marker) and the movie_metadata_cache stub, wired into Composition.buildApp outside every ProjectionHandler and registered Cache in tableRegistry
+**Duration:** 20m
+**Verification:** PASS (iteration 1)
+**Files changed:** 8
+**Tests added:** 5
+**ADRs written:** 0045-metadata-cache-tier-typed-per-bc-tables.md
+
+---
+
 ## 2026-08-01 19:17 -- Task verified and completed: games-w4tzc - Make the retained external-identity Game events idempotent — Set_steam_app_id and Add_family_owner re-emit on every sync for values that never change, unlike Set_steam_library_date which already guards
 
 **Type:** Work / Task completion

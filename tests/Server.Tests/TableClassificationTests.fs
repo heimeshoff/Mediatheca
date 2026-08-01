@@ -19,6 +19,7 @@ let private bootstrapEverything (conn: SqliteConnection) =
     EventStore.initialize conn
     CastStore.initialize conn
     JellyfinStore.initialize conn
+    MetadataCache.initialize conn
     GameJournal.initialize conn
     SettingsStore.initialize conn
     PlaytimeTracker.initialize conn

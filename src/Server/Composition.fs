@@ -111,6 +111,10 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     // Migrate Jellyfin data from old projection tables (one-time, idempotent)
     JellyfinStore.migrateFromProjections conn
 
+    // Initialize the metadata cache tier (administration-c3nvp) — schema
+    // only; seeding happens below, after projection tables exist.
+    MetadataCache.initialize conn
+
     // Initialize PlaytimeTracker tables
     PlaytimeTracker.initialize conn
 
@@ -228,6 +232,11 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     // (Administration.projectionRebuildStreamHandler) rather than something
     // startup forces on every boot.
     Projection.startAllProjections conn projectionHandlers
+
+    // Seed the metadata cache tier from the now-guaranteed-to-exist
+    // game_detail projection snapshot (administration-c3nvp) — gated on the
+    // metadata_cache_seeded marker, so this is a no-op after the first run.
+    MetadataCache.seedFromProjections conn
 
     // Game journal (Notion-style blocks, plain storage) — table + one-time
     // migration of the old event-sourced game content blocks

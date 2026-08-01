@@ -27,6 +27,7 @@
     <Compile Include="AdminWipeImportTests.fs" />
     <Compile Include="ProjectionRebuildTests.fs" />
     <Compile Include="ProjectionDriftTests.fs" />
+    <Compile Include="MetadataCacheTests.fs" />
     <Compile Include="MoviesIntegrationTests.fs" />
     <Compile Include="FriendIntegrationTests.fs" />
     <Compile Include="SeriesTests.fs" />

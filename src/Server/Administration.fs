@@ -413,6 +413,15 @@ module Administration =
         "jellyfin_series", Cache "JellyfinSync"
         "jellyfin_episode", Cache "JellyfinSync"
 
+        // Cache — the metadata cache tier (administration-c3nvp, ADR-0043):
+        // third-party descriptions re-derivable from RAWG/HowLongToBeat,
+        // never checkpoint-tracked, never drift-checked. game_metadata_cache
+        // is seeded once from game_detail (MetadataCache.seedFromProjections);
+        // movie_metadata_cache ships empty and unread until movies-v2gkh cuts
+        // over a real refresh path for it.
+        "game_metadata_cache", Cache "MetadataCache"
+        "movie_metadata_cache", Cache "(none yet)"
+
         // Imperative — written directly by non-event-sourced storage
         // modules, never through a ProjectionHandler's catch-up.
         "cast_members", Imperative "CastStore"

@@ -1,15 +1,15 @@
 ---
 id: administration-c3nvp
 title: Stand up the metadata cache tier — per-BC typed tables that survive Drop/Init/replay, seeded once from current projections, following the ImageStore and JellyfinStore precedents
-status: doing
+status: done
 type: feature
 context: administration
 created: 2026-08-01
-completed:
+completed: 2026-08-01
 depends_on: [infrastructure-e4kwm, administration-t9bzx]
 blocks: []
 tags: [metadata, cache, projection, determinism]
-related_adrs: [0012, 0025, 0031, 0033]
+related_adrs: [0012, 0025, 0031, 0033, 0045]
 related_research: []
 prior_art: [administration-xx3mw, integration-m4k7p]
 ---
@@ -52,13 +52,34 @@ detect it).
 
 ## Acceptance criteria
 
-- [ ] Expecto: after `initialize` on a fresh fixture, all cache tables exist with the declared primary keys, asserted via `PRAGMA table_info`.
-- [ ] Expecto: `initialize` is idempotent — running it twice changes no schema and throws nothing.
-- [ ] Expecto: `seedFromProjections` run twice inserts rows only on the first run and sets the `metadata_cache_seeded` marker.
-- [ ] Expecto: `checkProjectionDrift` returns results identical to before with the cache tables present (they are classified `Cache` and are never diffed).
-- [ ] Expecto: `Projection.rebuildProjection` over every handler leaves every cache table's row count unchanged.
-- [ ] `grep -rn "MetadataCache" src/Server/*Projection.fs` returns zero matches — no projection handler reads the cache.
-- [ ] `npm test` passes; `npm run build` passes.
+- [x] Expecto: after `initialize` on a fresh fixture, all cache tables exist with the declared primary keys, asserted via `PRAGMA table_info`.
+- [x] Expecto: `initialize` is idempotent — running it twice changes no schema and throws nothing.
+- [x] Expecto: `seedFromProjections` run twice inserts rows only on the first run and sets the `metadata_cache_seeded` marker.
+- [x] Expecto: `checkProjectionDrift` returns results identical to before with the cache tables present (they are classified `Cache` and are never diffed).
+- [x] Expecto: `Projection.rebuildProjection` over every handler leaves every cache table's row count unchanged.
+- [x] `grep -rn "MetadataCache" src/Server/*Projection.fs` returns zero matches — no projection handler reads the cache.
+- [x] `npm test` passes; `npm run build` passes.
+
+## Outcome
+
+Stood up `src/Server/MetadataCache.fs` (inserted in `Server.fsproj` immediately after
+`JellyfinStore.fs`): `MetadataCache.initialize` creates `game_metadata_cache` (typed columns mirroring
+`game_detail`'s RAWG/HowLongToBeat-sourced fields — description, short_description, website_url,
+cover_ref, backdrop_ref, rawg_id, rawg_rating, hltb_hours, hltb_main_plus_hours,
+hltb_completionist_hours, fetched_at) and `movie_metadata_cache` (movie_slug PK + fetched_at only —
+ships empty and unread, per the task's Notes, until `movies-v2gkh`). `MetadataCache.seedFromProjections`
+copies `game_detail`'s current values into `game_metadata_cache` once, gated on a `SettingsStore`
+`metadata_cache_seeded` marker (never re-seeds after the marker is set, even if new games are added).
+Wired into `Composition.buildApp`: `initialize` beside `JellyfinStore.initialize`; `seedFromProjections`
+after `Projection.startAllProjections` (so `game_detail` is guaranteed to exist). Both tables registered
+`Cache` in `Administration.tableRegistry` (`game_metadata_cache` → `"MetadataCache"`,
+`movie_metadata_cache` → `"(none yet)"`); `TableClassificationTests.fs`'s `bootstrapEverything` updated
+to call `MetadataCache.initialize` so the registry-coverage test stays honest. New
+`tests/Server.Tests/MetadataCacheTests.fs` (5 tests) covers schema/idempotence/seeding-once-with-marker/
+zero-drift-with-cache-present/rebuild-leaves-cache-untouched. `grep -rn "MetadataCache"
+src/Server/*Projection.fs` returns zero matches. Full suite: 454/454 passing (`--sequenced`).
+`npm run build` passes. ADR-0045 records the typed-DDL-not-EAV decision and the marker-gated seeding
+choice; BC README's ubiquitous language gained a "Metadata cache tier" entry.
 
 ## Notes
 
