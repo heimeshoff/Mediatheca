@@ -33,6 +33,7 @@
     <Compile Include="SeriesTests.fs" />
     <Compile Include="SeriesRefreshTests.fs" />
     <Compile Include="SeriesRefreshCacheTests.fs" />
+    <Compile Include="SeriesProjectionReadsTests.fs" />
     <Compile Include="GamesTests.fs" />
     <Compile Include="GameJournalTests.fs" />
     <Compile Include="PlaytimeTrackerTests.fs" />

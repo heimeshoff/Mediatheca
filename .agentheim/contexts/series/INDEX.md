@@ -10,10 +10,10 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 2
 - **Todo:** 1
-- **Doing:** 1
-- **Done:** 2
+- **Doing:** 0
+- **Done:** 3
 <!-- task-counts:end -->
 
 ### Todo
@@ -23,24 +23,26 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **series-q8jwc** — Compose Series read models from the metadata cache — join in the query function, not the API layer — keeping every Shared DTO and the whole client unchanged (refactor) — `doing/series-q8jwc-compose-reads-from-metadata-cache.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **series-q8jwc** — Compose Series read models from the metadata cache — join in the query function, not the API layer — keeping every Shared DTO and the whole client unchanged (refactor) — `done/series-q8jwc-compose-reads-from-metadata-cache.md`
 - **series-r2xhv** — Cut Series refresh and Jellyfin materialization over to cache-only writes, and narrow Series_refreshed to fire only on a real airing-status transition — making status replayable from the log for the first time (refactor) — `done/series-r2xhv-refresh-writes-cache-only-narrow-series-refreshed.md`
 - **series-m7fdk** — Rename the Series season/episode tree into the metadata cache tier (ALTER TABLE RENAME, zero data movement) and replace the materialized next-up/count columns with SQL views (refactor) — `done/series-m7fdk-rename-episode-tree-into-cache.md`
 <!-- done-list:end -->
 
 ### Backlog
 <!-- backlog-list:start -->
-<!-- no tasks in backlog -->
+- **series-t3jkv** — Wire series_metadata_cache's write path — nothing keeps it fresh after the one-time seed, so refreshed and newly-added series never get real TmdbRating/Overview/EpisodeRuntime (feature) — `backlog/series-t3jkv-wire-series-metadata-cache-write-path.md`
+- **series-x9mfp** — Retarget getRecentlyAbandoned's TmdbRating/SeasonCount/EpisodeCount/NextUp onto the metadata cache and views, same as its sibling getRecentlyFinished (refactor) — `backlog/series-x9mfp-getrecentlyabandoned-cache-composition.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0048** -- Series read composition joins `series_metadata_cache` and the `series_next_up`/`series_episode_counts` views at query time, never at the API layer — DTOs and client stay byte-identical. -- 2026-08-01 -- `../../knowledge/decisions/0048-series-reads-composed-from-metadata-cache-at-query-time.md`
 - **0047** -- `Series_refreshed` narrowed to real airing-status transitions (previousStatus from the aggregate; projection handler applies it); all other TMDB metadata leaves the log for the cache tier. Backward-compatible with all 780 historical events. -- 2026-08-01 -- `../../knowledge/decisions/0047-series-refreshed-narrowed-to-real-airing-status-transitions.md`
 - **0046** -- Series season/episode tree renamed into the cache tier (`series_episode_cache`/`series_season_cache`, idempotent ALTER TABLE RENAME, zero data movement); SQL views `series_next_up`/`series_episode_counts` replace the materialized columns. -- 2026-08-01 -- `../../knowledge/decisions/0046-series-episode-tree-renamed-into-cache-views-replace-materialized-columns.md`
 <!-- no ADRs scoped to this BC -->

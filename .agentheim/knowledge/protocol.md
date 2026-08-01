@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 21:08 -- Task verified and completed: series-q8jwc - Compose Series read models from the metadata cache — join in the query function, not the API layer — keeping every Shared DTO and the whole client unchanged
+
+**Type:** Work / Task completion
+**Task:** series-q8jwc - Compose Series read models from the metadata cache — join in the query function, not the API layer — keeping every Shared DTO and the whole client unchanged
+**Summary:** SeriesProjection query functions now compose DTOs by joining series_metadata_cache and the series_next_up/series_episode_counts views at query time - closing the stale-but-read gap left by series-r2xhv with every Shared DTO and the whole client byte-identical
+**Duration:** 29m
+**Verification:** PASS (iteration 1)
+**Files changed:** 9
+**Tests added:** 9
+**ADRs written:** 0048-series-reads-composed-from-metadata-cache-at-query-time.md
+
+---
+
 ## 2026-08-01 20:37 -- Batch started: [series-q8jwc]
 
 **Type:** Work / Batch start

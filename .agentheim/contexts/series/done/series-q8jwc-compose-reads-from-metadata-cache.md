@@ -1,15 +1,15 @@
 ---
 id: series-q8jwc
 title: Compose Series read models from the metadata cache — join in the query function, not the API layer — keeping every Shared DTO and the whole client unchanged
-status: doing
+status: done
 type: refactor
 context: series
 created: 2026-08-01
-completed:
+completed: 2026-08-01
 depends_on: [series-r2xhv, design-system-001]
 blocks: []
 tags: [series, metadata, cache, read-model, projection]
-related_adrs: [0012, 0031]
+related_adrs: [0012, 0031, 0048]
 related_research: []
 prior_art: [integration-m4k7p]
 ---
@@ -67,3 +67,38 @@ recognizable library item; `TmdbRating` / `Overview` / `EpisodeRuntime` return `
 `MetadataPending` already has a design-system badge from ADR-0012, so no new visual vocabulary is
 introduced — hence `depends_on: design-system-001` (already done) satisfies the frontend gate without
 new styleguide work. If the badge needs a new state, stop and file a design-system task first.
+
+**ADR:** `.agentheim/knowledge/decisions/0048-series-reads-composed-from-metadata-cache-at-query-time.md`
+
+## Outcome
+
+`SeriesProjection.fs`'s query functions (`getAll`, `getBySlug`, `getRecentSeries`,
+`getRecentlyFinished`, `getDashboardSeriesNextUp`) now `LEFT JOIN series_metadata_cache` (for
+`TmdbRating`/`Overview`/`EpisodeRuntime`) and the `series_next_up`/`series_episode_counts` views (for
+`NextUp`/`SeasonCount`/`EpisodeCount`) directly inside their own query bodies — every join lives in
+`SeriesProjection.fs`, never at the API layer. `recalculateProgress` was simplified to only maintain
+`watched_episode_count`; the `next_up_*` half moved entirely to the view. `getBySlug`'s per-season
+episode read now composes `IsWatched`/`WatchedDate` via a direct `LEFT JOIN series_episode_progress`
+(scoped to the active rewatch session) instead of a precomputed whole-series `Map`. Every identity-card
+field (`Name`/`Year`/`PosterRef`/`BackdropRef`/`Genres`/`Status`) still reads straight from
+`series_list`/`series_detail`, unaffected — each is driven by its own explicit event. A cache miss
+degrades gracefully (`None`/`""`/empty seasons), never a synchronous TMDB fetch on the read path.
+
+`src/Shared/Shared.fs` and `src/Client/` are untouched (`git diff --stat` confirms zero changed files).
+9 new Expecto tests in `tests/Server.Tests/SeriesProjectionReadsTests.fs` cover: a populated cache
+winning over `series_detail`'s own stale columns, a cache-miss cold-entry degrading gracefully (with the
+vacuous "all episodes pending" invariant over an empty season list), the next-up tuple matching
+pre-refactor semantics across multiple rewatch sessions, and a `CountingConnection`-based proof that
+`getAll`'s cache/view composition adds zero per-row queries (the pre-existing, unrelated
+`NextAirDate` per-row seam is unchanged). Two existing test fixtures (`JellyfinStillTests.fs`,
+`JellyfinMaterializeTests.fs`) needed `MetadataCache.initialize` added to their setup, since `getBySlug`
+now requires `series_metadata_cache` to exist.
+
+Two gaps discovered mid-task were filed as backlog rather than fixed here (out of this task's explicit
+read-composition scope): `series-t3jkv` (nothing writes `series_metadata_cache` going forward — only a
+one-time seed) and `series-x9mfp` (`getRecentlyAbandoned` wasn't retargeted like its sibling
+`getRecentlyFinished`).
+
+Key files: `src/Server/SeriesProjection.fs`, `tests/Server.Tests/SeriesProjectionReadsTests.fs`,
+`tests/Server.Tests/JellyfinStillTests.fs`, `tests/Server.Tests/JellyfinMaterializeTests.fs`,
+`.agentheim/knowledge/decisions/0048-series-reads-composed-from-metadata-cache-at-query-time.md`.

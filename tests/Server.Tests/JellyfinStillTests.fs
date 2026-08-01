@@ -21,6 +21,10 @@ let private newConn () =
     let conn = new SqliteConnection("Data Source=:memory:")
     conn.Open()
     EventStore.initialize conn
+    // series-q8jwc: getBySlug now LEFT JOINs series_metadata_cache
+    // (MetadataCache.fs) — must exist before SeriesProjection's own Init,
+    // mirroring Composition.buildApp's real startup order.
+    MetadataCache.initialize conn
     CastStore.initialize conn
     JellyfinStore.initialize conn
     ContentBlockProjection.handler.Init conn

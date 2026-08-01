@@ -163,6 +163,15 @@ module SeriesProjection =
         """
         |> Db.exec
 
+    /// series-q8jwc: only the watched-count half survives here — a pure
+    /// aggregate over `series_episode_progress` (a Projected table), fully
+    /// re-derivable from the event log. The next-up half moved to the
+    /// `series_next_up` view (`MetadataCache.fs`, series-m7fdk): a
+    /// `ProjectionHandler` may never read the cache tier (ADR-0045), and
+    /// `series_episode_cache` is cache-classified now, so this function can no
+    /// longer join against it to materialize `next_up_*` — the view computes
+    /// the same answer at read time instead, structurally incapable of
+    /// drifting from `recalculateProgress`'s own timing.
     let private recalculateProgress (conn: SqliteConnection) (slug: string) : unit =
         // Count distinct (season_number, episode_number) across ALL rewatch sessions
         let watchedCount =
@@ -178,63 +187,13 @@ module SeriesProjection =
             |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "cnt")
             |> Option.defaultValue 0
 
-        // Find first unwatched episode (next up) - ordered by season then episode
-        let nextUp =
-            conn
-            |> Db.newCommand """
-                SELECT e.season_number, e.episode_number, e.name
-                FROM series_episode_cache e
-                WHERE e.series_slug = @slug
-                AND NOT EXISTS (
-                    SELECT 1 FROM series_episode_progress p
-                    WHERE p.series_slug = @slug
-                    AND p.season_number = e.season_number
-                    AND p.episode_number = e.episode_number
-                )
-                ORDER BY e.season_number, e.episode_number
-                LIMIT 1
-            """
-            |> Db.setParams [ "slug", SqlType.String slug ]
-            |> Db.querySingle (fun (rd: IDataReader) ->
-                rd.ReadInt32 "season_number",
-                rd.ReadInt32 "episode_number",
-                rd.ReadString "name"
-            )
-
-        match nextUp with
-        | Some (seasonNum, epNum, epName) ->
-            conn
-            |> Db.newCommand """
-                UPDATE series_list
-                SET watched_episode_count = @watched_count,
-                    next_up_season = @next_season,
-                    next_up_episode = @next_episode,
-                    next_up_title = @next_title
-                WHERE slug = @slug
-            """
-            |> Db.setParams [
-                "slug", SqlType.String slug
-                "watched_count", SqlType.Int32 watchedCount
-                "next_season", SqlType.Int32 seasonNum
-                "next_episode", SqlType.Int32 epNum
-                "next_title", SqlType.String epName
-            ]
-            |> Db.exec
-        | None ->
-            conn
-            |> Db.newCommand """
-                UPDATE series_list
-                SET watched_episode_count = @watched_count,
-                    next_up_season = NULL,
-                    next_up_episode = NULL,
-                    next_up_title = NULL
-                WHERE slug = @slug
-            """
-            |> Db.setParams [
-                "slug", SqlType.String slug
-                "watched_count", SqlType.Int32 watchedCount
-            ]
-            |> Db.exec
+        conn
+        |> Db.newCommand "UPDATE series_list SET watched_episode_count = @watched_count WHERE slug = @slug"
+        |> Db.setParams [
+            "slug", SqlType.String slug
+            "watched_count", SqlType.Int32 watchedCount
+        ]
+        |> Db.exec
 
     let private handleEvent (conn: SqliteConnection) (event: EventStore.StoredEvent) : unit =
         if not (event.StreamId.StartsWith("Series-")) then ()
@@ -776,21 +735,41 @@ module SeriesProjection =
                   Name = name
                   ImageRef = imageRef })
 
+    /// series-q8jwc: reads the identity card (name/year/poster/genres/status)
+    /// straight off `series_list`, and composes the TMDB-sourced rating and
+    /// the derived season/episode/next-up figures via a `LEFT JOIN` against
+    /// `series_metadata_cache` and the two `series_next_up`/
+    /// `series_episode_counts` views (`MetadataCache.fs`) — one statement,
+    /// same as before the cutover. A cache miss (no row in
+    /// `series_metadata_cache`, or a series with nothing in
+    /// `series_episode_cache` yet) degrades gracefully: `TmdbRating = None`,
+    /// `SeasonCount`/`EpisodeCount = 0`, `NextUp = None` — never a synchronous
+    /// fetch on the read path.
     let getAll (conn: SqliteConnection) : Mediatheca.Shared.SeriesListItem list =
         conn
-        |> Db.newCommand "SELECT slug, name, year, poster_ref, genres, tmdb_rating, status, season_count, episode_count, watched_episode_count, next_up_season, next_up_episode, next_up_title, abandoned, in_focus FROM series_list ORDER BY name"
+        |> Db.newCommand """
+            SELECT sl.slug, sl.name, sl.year, sl.poster_ref, sl.genres, sl.status, sl.watched_episode_count, sl.abandoned, sl.in_focus,
+                   c.tmdb_rating AS c_tmdb_rating,
+                   ec.season_count AS ec_season_count, ec.episode_count AS ec_episode_count,
+                   nu.season_number AS nu_season, nu.episode_number AS nu_episode, nu.name AS nu_title
+            FROM series_list sl
+            LEFT JOIN series_metadata_cache c ON c.series_slug = sl.slug
+            LEFT JOIN series_episode_counts ec ON ec.series_slug = sl.slug
+            LEFT JOIN series_next_up nu ON nu.series_slug = sl.slug
+            ORDER BY sl.name
+        """
         |> Db.query (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
             let genres =
                 Decode.fromString (Decode.list Decode.string) genresJson
                 |> Result.defaultValue []
             let nextUp =
-                if rd.IsDBNull(rd.GetOrdinal("next_up_season")) then None
+                if rd.IsDBNull(rd.GetOrdinal("nu_season")) then None
                 else
                     Some {
-                        Mediatheca.Shared.NextUpDto.SeasonNumber = rd.ReadInt32 "next_up_season"
-                        Mediatheca.Shared.NextUpDto.EpisodeNumber = rd.ReadInt32 "next_up_episode"
-                        Mediatheca.Shared.NextUpDto.EpisodeName = rd.ReadString "next_up_title"
+                        Mediatheca.Shared.NextUpDto.SeasonNumber = rd.ReadInt32 "nu_season"
+                        Mediatheca.Shared.NextUpDto.EpisodeNumber = rd.ReadInt32 "nu_episode"
+                        Mediatheca.Shared.NextUpDto.EpisodeName = rd.ReadString "nu_title"
                     }
             let slug = rd.ReadString "slug"
             { Mediatheca.Shared.SeriesListItem.Slug = slug
@@ -801,11 +780,15 @@ module SeriesProjection =
                 else Some (rd.ReadString "poster_ref")
               Genres = genres
               TmdbRating =
-                if rd.IsDBNull(rd.GetOrdinal("tmdb_rating")) then None
-                else Some (rd.ReadDouble "tmdb_rating")
+                if rd.IsDBNull(rd.GetOrdinal("c_tmdb_rating")) then None
+                else Some (rd.ReadDouble "c_tmdb_rating")
               Status = parseStatus (rd.ReadString "status")
-              SeasonCount = rd.ReadInt32 "season_count"
-              EpisodeCount = rd.ReadInt32 "episode_count"
+              SeasonCount =
+                if rd.IsDBNull(rd.GetOrdinal("ec_season_count")) then 0
+                else rd.ReadInt32 "ec_season_count"
+              EpisodeCount =
+                if rd.IsDBNull(rd.GetOrdinal("ec_episode_count")) then 0
+                else rd.ReadInt32 "ec_episode_count"
               WatchedEpisodeCount = rd.ReadInt32 "watched_episode_count"
               NextUp = nextUp
               IsAbandoned = rd.ReadInt32 "abandoned" = 1
@@ -813,9 +796,27 @@ module SeriesProjection =
               NextAirDate = getNextAirDate conn slug }
         )
 
+    /// series-q8jwc: `Overview`/`TmdbRating`/`EpisodeRuntime` are TMDB-sourced
+    /// fields that a refresh no longer keeps fresh on `series_detail`
+    /// (series-r2xhv/ADR-0047) — reading them straight off that table would
+    /// silently serve whatever was frozen there at add time. They're composed
+    /// here via a `LEFT JOIN` against `series_metadata_cache`
+    /// (`MetadataCache.fs`) instead; a cache miss degrades to `""`/`None`/
+    /// `None` rather than a synchronous TMDB fetch. `Name`/`Year`/`PosterRef`/
+    /// `BackdropRef`/`Genres` stay identity-card fields straight off
+    /// `series_detail` — each is driven by its own explicit event
+    /// (`Series_added_to_library`, `Series_poster_replaced`,
+    /// `Series_backdrop_replaced`, `Series_categorized`), not a TMDB refresh.
     let getBySlug (conn: SqliteConnection) (slug: string) (rewatchId: string option) : Mediatheca.Shared.SeriesDetail option =
         conn
-        |> Db.newCommand "SELECT slug, name, year, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, episode_runtime, status, personal_rating, recommended_by, want_to_watch_with, abandoned, in_focus FROM series_detail WHERE slug = @slug"
+        |> Db.newCommand """
+            SELECT sd.slug, sd.name, sd.year, sd.genres, sd.poster_ref, sd.backdrop_ref, sd.tmdb_id, sd.status,
+                   sd.personal_rating, sd.recommended_by, sd.want_to_watch_with, sd.abandoned, sd.in_focus,
+                   c.overview AS c_overview, c.tmdb_rating AS c_tmdb_rating, c.episode_runtime AS c_episode_runtime
+            FROM series_detail sd
+            LEFT JOIN series_metadata_cache c ON c.series_slug = sd.slug
+            WHERE sd.slug = @slug
+        """
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
@@ -842,18 +843,6 @@ module SeriesProjection =
                     |> Db.querySingle (fun (rd2: IDataReader) -> rd2.ReadString "rewatch_id")
                     |> Option.defaultValue "default"
 
-            // Get watched episodes for active session
-            let activeWatched =
-                conn
-                |> Db.newCommand "SELECT season_number, episode_number, watched_date FROM series_episode_progress WHERE series_slug = @slug AND rewatch_id = @rewatch_id"
-                |> Db.setParams [ "slug", SqlType.String slug; "rewatch_id", SqlType.String activeRewatchId ]
-                |> Db.query (fun (rd2: IDataReader) ->
-                    (rd2.ReadInt32 "season_number", rd2.ReadInt32 "episode_number"),
-                    if rd2.IsDBNull(rd2.GetOrdinal("watched_date")) then None
-                    else Some (rd2.ReadString "watched_date")
-                )
-                |> Map.ofList
-
             // Get all watched episodes across ALL sessions for overall counts
             let overallWatched =
                 conn
@@ -875,14 +864,36 @@ module SeriesProjection =
                 |> Db.setParams [ "slug", SqlType.String slug ]
                 |> Db.query (fun (rd2: IDataReader) ->
                     let seasonNumber = rd2.ReadInt32 "season_number"
-                    // Get episodes for this season
+                    // Get episodes for this season. `series-q8jwc`: watched
+                    // state for the active rewatch session is composed via a
+                    // direct `LEFT JOIN` against `series_episode_progress`
+                    // (scoped to `@rewatch_id`) rather than a precomputed
+                    // whole-series Map — same per-season query count as
+                    // before (the existing per-season N+1 here is neither
+                    // improved nor worsened by this task).
                     let episodes =
                         conn
-                        |> Db.newCommand "SELECT episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating, source FROM series_episode_cache WHERE series_slug = @slug AND season_number = @season_number ORDER BY episode_number"
-                        |> Db.setParams [ "slug", SqlType.String slug; "season_number", SqlType.Int32 seasonNumber ]
+                        |> Db.newCommand """
+                            SELECT e.episode_number, e.name, e.overview, e.runtime, e.air_date, e.still_ref, e.tmdb_rating, e.source,
+                                   p.season_number AS progress_marker, p.watched_date
+                            FROM series_episode_cache e
+                            LEFT JOIN series_episode_progress p
+                                ON p.series_slug = e.series_slug AND p.rewatch_id = @rewatch_id
+                               AND p.season_number = e.season_number AND p.episode_number = e.episode_number
+                            WHERE e.series_slug = @slug AND e.season_number = @season_number
+                            ORDER BY e.episode_number
+                        """
+                        |> Db.setParams [
+                            "slug", SqlType.String slug
+                            "season_number", SqlType.Int32 seasonNumber
+                            "rewatch_id", SqlType.String activeRewatchId
+                        ]
                         |> Db.query (fun (rd3: IDataReader) ->
                             let epNum = rd3.ReadInt32 "episode_number"
-                            let watchInfo = activeWatched |> Map.tryFind (seasonNumber, epNum)
+                            let isWatched = not (rd3.IsDBNull(rd3.GetOrdinal("progress_marker")))
+                            let watchedDate =
+                                if rd3.IsDBNull(rd3.GetOrdinal("watched_date")) then None
+                                else Some (rd3.ReadString "watched_date")
                             { Mediatheca.Shared.EpisodeDto.EpisodeNumber = epNum
                               Mediatheca.Shared.EpisodeDto.Name = rd3.ReadString "name"
                               Mediatheca.Shared.EpisodeDto.Overview = rd3.ReadString "overview"
@@ -898,8 +909,8 @@ module SeriesProjection =
                               Mediatheca.Shared.EpisodeDto.TmdbRating =
                                 if rd3.IsDBNull(rd3.GetOrdinal("tmdb_rating")) then None
                                 else Some (rd3.ReadDouble "tmdb_rating")
-                              Mediatheca.Shared.EpisodeDto.IsWatched = watchInfo.IsSome
-                              Mediatheca.Shared.EpisodeDto.WatchedDate = watchInfo |> Option.bind id
+                              Mediatheca.Shared.EpisodeDto.IsWatched = isWatched
+                              Mediatheca.Shared.EpisodeDto.WatchedDate = watchedDate
                               Mediatheca.Shared.EpisodeDto.MetadataPending = (rd3.ReadString "source" = "jellyfin") }
                         )
                     let watchedCount =
@@ -974,7 +985,9 @@ module SeriesProjection =
             { Mediatheca.Shared.SeriesDetail.Slug = rd.ReadString "slug"
               Name = rd.ReadString "name"
               Year = rd.ReadInt32 "year"
-              Overview = rd.ReadString "overview"
+              Overview =
+                if rd.IsDBNull(rd.GetOrdinal("c_overview")) then ""
+                else rd.ReadString "c_overview"
               Genres = genres
               Status = parseStatus (rd.ReadString "status")
               PosterRef =
@@ -985,11 +998,11 @@ module SeriesProjection =
                 else Some (rd.ReadString "backdrop_ref")
               TmdbId = rd.ReadInt32 "tmdb_id"
               TmdbRating =
-                if rd.IsDBNull(rd.GetOrdinal("tmdb_rating")) then None
-                else Some (rd.ReadDouble "tmdb_rating")
+                if rd.IsDBNull(rd.GetOrdinal("c_tmdb_rating")) then None
+                else Some (rd.ReadDouble "c_tmdb_rating")
               EpisodeRuntime =
-                if rd.IsDBNull(rd.GetOrdinal("episode_runtime")) then None
-                else Some (rd.ReadInt32 "episode_runtime")
+                if rd.IsDBNull(rd.GetOrdinal("c_episode_runtime")) then None
+                else Some (rd.ReadInt32 "c_episode_runtime")
               PersonalRating =
                 if rd.IsDBNull(rd.GetOrdinal("personal_rating")) then None
                 else Some (rd.ReadInt32 "personal_rating")
@@ -1005,18 +1018,30 @@ module SeriesProjection =
               NextSeasonAirDate = getNextSeasonAirDate conn slug }
         )
 
+    /// series-q8jwc: `EpisodeCount`/`NextUp` composed via the
+    /// `series_episode_counts`/`series_next_up` views (`MetadataCache.fs`) —
+    /// no `TmdbRating` field on this DTO, so no `series_metadata_cache` join
+    /// is needed here.
     let getRecentSeries (conn: SqliteConnection) (count: int) : Mediatheca.Shared.RecentSeriesItem list =
         conn
-        |> Db.newCommand "SELECT slug, name, year, poster_ref, episode_count, watched_episode_count, next_up_season, next_up_episode, next_up_title FROM series_list ORDER BY rowid DESC LIMIT @count"
+        |> Db.newCommand """
+            SELECT sl.slug, sl.name, sl.year, sl.poster_ref, sl.watched_episode_count,
+                   ec.episode_count AS ec_episode_count,
+                   nu.season_number AS nu_season, nu.episode_number AS nu_episode, nu.name AS nu_title
+            FROM series_list sl
+            LEFT JOIN series_episode_counts ec ON ec.series_slug = sl.slug
+            LEFT JOIN series_next_up nu ON nu.series_slug = sl.slug
+            ORDER BY sl.rowid DESC LIMIT @count
+        """
         |> Db.setParams [ "count", SqlType.Int32 count ]
         |> Db.query (fun (rd: IDataReader) ->
             let nextUp =
-                if rd.IsDBNull(rd.GetOrdinal("next_up_season")) then None
+                if rd.IsDBNull(rd.GetOrdinal("nu_season")) then None
                 else
                     Some {
-                        Mediatheca.Shared.NextUpDto.SeasonNumber = rd.ReadInt32 "next_up_season"
-                        Mediatheca.Shared.NextUpDto.EpisodeNumber = rd.ReadInt32 "next_up_episode"
-                        Mediatheca.Shared.NextUpDto.EpisodeName = rd.ReadString "next_up_title"
+                        Mediatheca.Shared.NextUpDto.SeasonNumber = rd.ReadInt32 "nu_season"
+                        Mediatheca.Shared.NextUpDto.EpisodeNumber = rd.ReadInt32 "nu_episode"
+                        Mediatheca.Shared.NextUpDto.EpisodeName = rd.ReadString "nu_title"
                     }
             { Mediatheca.Shared.RecentSeriesItem.Slug = rd.ReadString "slug"
               Name = rd.ReadString "name"
@@ -1026,7 +1051,9 @@ module SeriesProjection =
                 else Some (rd.ReadString "poster_ref")
               NextUp = nextUp
               WatchedEpisodeCount = rd.ReadInt32 "watched_episode_count"
-              EpisodeCount = rd.ReadInt32 "episode_count" }
+              EpisodeCount =
+                if rd.IsDBNull(rd.GetOrdinal("ec_episode_count")) then 0
+                else rd.ReadInt32 "ec_episode_count" }
         )
 
     let getSeriesRecommendedByFriend (conn: SqliteConnection) (friendSlug: string) : Mediatheca.Shared.FriendMediaItem list =
@@ -1199,6 +1226,13 @@ module SeriesProjection =
 
     // Dashboard queries
 
+    /// series-q8jwc: `next_up_season/episode/title` and `episode_count`
+    /// retarget from `series_list`'s (soon-to-be-dropped, series-d5tpn)
+    /// materialized columns to the `series_next_up`/`series_episode_counts`
+    /// views (`MetadataCache.fs`). The existing `ep`/`jej` joins retarget
+    /// their `ON` clause from `sl.next_up_season/episode` to
+    /// `nu.season_number/episode_number` — still one statement, no extra
+    /// round trip.
     let getDashboardSeriesNextUp (conn: SqliteConnection) (limit: int option) : Mediatheca.Shared.DashboardSeriesNextUp list =
         let limitClause =
             match limit with
@@ -1206,8 +1240,10 @@ module SeriesProjection =
             | None -> ""
         conn
         |> Db.newCommand (sprintf """
-            SELECT sl.slug, sl.name, sl.poster_ref, sl.next_up_season, sl.next_up_episode, sl.next_up_title,
-                   sl.in_focus, sl.abandoned, sl.episode_count, sl.watched_episode_count,
+            SELECT sl.slug, sl.name, sl.poster_ref,
+                   nu.season_number AS nu_season, nu.episode_number AS nu_episode, nu.name AS nu_title,
+                   sl.in_focus, sl.abandoned, sl.watched_episode_count,
+                   ec.episode_count AS ec_episode_count,
                    rs.friends,
                    (SELECT MAX(watched_date) FROM series_episode_progress WHERE series_slug = sl.slug) as last_watched_date,
                    sd.backdrop_ref,
@@ -1215,15 +1251,17 @@ module SeriesProjection =
                    ep.overview as episode_overview,
                    jej.jellyfin_id as jellyfin_episode_id
             FROM series_list sl
+            LEFT JOIN series_episode_counts ec ON ec.series_slug = sl.slug
+            LEFT JOIN series_next_up nu ON nu.series_slug = sl.slug
             LEFT JOIN series_rewatch_sessions rs ON rs.series_slug = sl.slug AND rs.is_default = 1
             LEFT JOIN series_detail sd ON sd.slug = sl.slug
-            LEFT JOIN series_episode_cache ep ON ep.series_slug = sl.slug AND ep.season_number = sl.next_up_season AND ep.episode_number = sl.next_up_episode
-            LEFT JOIN jellyfin_episode jej ON jej.series_slug = sl.slug AND jej.season_number = sl.next_up_season AND jej.episode_number = sl.next_up_episode
+            LEFT JOIN series_episode_cache ep ON ep.series_slug = sl.slug AND ep.season_number = nu.season_number AND ep.episode_number = nu.episode_number
+            LEFT JOIN jellyfin_episode jej ON jej.series_slug = sl.slug AND jej.season_number = nu.season_number AND jej.episode_number = nu.episode_number
             WHERE sl.abandoned = 0
-              AND (sl.next_up_season IS NOT NULL
+              AND (nu.season_number IS NOT NULL
                OR sl.in_focus = 1
-               OR (sl.episode_count > 0
-                   AND sl.watched_episode_count >= sl.episode_count
+               OR (COALESCE(ec.episode_count, 0) > 0
+                   AND sl.watched_episode_count >= COALESCE(ec.episode_count, 0)
                    AND (SELECT MAX(watched_date) FROM series_episode_progress
                         WHERE series_slug = sl.slug) >= date('now', '-7 days')))
             ORDER BY sl.in_focus DESC, last_watched_date DESC NULLS LAST
@@ -1237,7 +1275,9 @@ module SeriesProjection =
             let friendSlugs =
                 Decode.fromString (Decode.list Decode.string) friendsJson
                 |> Result.defaultValue []
-            let episodeCount = rd.ReadInt32 "episode_count"
+            let episodeCount =
+                if rd.IsDBNull(rd.GetOrdinal("ec_episode_count")) then 0
+                else rd.ReadInt32 "ec_episode_count"
             let watchedCount = rd.ReadInt32 "watched_episode_count"
             let isFinished = episodeCount > 0 && watchedCount >= episodeCount
             { Mediatheca.Shared.DashboardSeriesNextUp.Slug = slug
@@ -1257,14 +1297,14 @@ module SeriesProjection =
                     let ov = rd.ReadString "episode_overview"
                     if System.String.IsNullOrWhiteSpace(ov) then None else Some ov
               NextUpSeason =
-                if rd.IsDBNull(rd.GetOrdinal("next_up_season")) then 0
-                else rd.ReadInt32 "next_up_season"
+                if rd.IsDBNull(rd.GetOrdinal("nu_season")) then 0
+                else rd.ReadInt32 "nu_season"
               NextUpEpisode =
-                if rd.IsDBNull(rd.GetOrdinal("next_up_episode")) then 0
-                else rd.ReadInt32 "next_up_episode"
+                if rd.IsDBNull(rd.GetOrdinal("nu_episode")) then 0
+                else rd.ReadInt32 "nu_episode"
               NextUpTitle =
-                if rd.IsDBNull(rd.GetOrdinal("next_up_title")) then ""
-                else rd.ReadString "next_up_title"
+                if rd.IsDBNull(rd.GetOrdinal("nu_title")) then ""
+                else rd.ReadString "nu_title"
               WatchWithFriends = resolveFriendRefs conn friendSlugs
               InFocus = rd.ReadInt32 "in_focus" <> 0
               IsFinished = isFinished
@@ -1288,18 +1328,29 @@ module SeriesProjection =
                 avgRt |> Option.flatten }
         )
 
+    /// series-q8jwc: same composition as `getAll` (`TmdbRating` from
+    /// `series_metadata_cache`, `SeasonCount`/`EpisodeCount`/`NextUp` from the
+    /// two views), plus retargeting the "is this series finished" filter from
+    /// `sl.episode_count` to the view's count so a series can still surface
+    /// here once the materialized column stops being maintained.
     let getRecentlyFinished (conn: SqliteConnection) : Mediatheca.Shared.SeriesListItem list =
         conn
         |> Db.newCommand """
-            SELECT sl.slug, sl.name, sl.year, sl.poster_ref, sl.genres, sl.tmdb_rating, sl.status, sl.season_count, sl.episode_count,
-                   sl.watched_episode_count, sl.next_up_season, sl.next_up_episode, sl.next_up_title, sl.abandoned, sl.in_focus
+            SELECT sl.slug, sl.name, sl.year, sl.poster_ref, sl.genres, sl.status,
+                   sl.watched_episode_count, sl.abandoned, sl.in_focus,
+                   c.tmdb_rating AS c_tmdb_rating,
+                   ec.season_count AS ec_season_count, ec.episode_count AS ec_episode_count,
+                   nu.season_number AS nu_season, nu.episode_number AS nu_episode, nu.name AS nu_title
             FROM series_list sl
+            LEFT JOIN series_metadata_cache c ON c.series_slug = sl.slug
+            LEFT JOIN series_episode_counts ec ON ec.series_slug = sl.slug
+            LEFT JOIN series_next_up nu ON nu.series_slug = sl.slug
             LEFT JOIN (
                 SELECT series_slug, MAX(watched_date) as last_watched_date
                 FROM series_episode_progress
                 GROUP BY series_slug
             ) lw ON lw.series_slug = sl.slug
-            WHERE sl.episode_count > 0 AND sl.watched_episode_count >= sl.episode_count AND sl.abandoned = 0
+            WHERE COALESCE(ec.episode_count, 0) > 0 AND sl.watched_episode_count >= COALESCE(ec.episode_count, 0) AND sl.abandoned = 0
             ORDER BY lw.last_watched_date DESC NULLS LAST
             LIMIT 10
         """
@@ -1309,12 +1360,12 @@ module SeriesProjection =
                 Decode.fromString (Decode.list Decode.string) genresJson
                 |> Result.defaultValue []
             let nextUp =
-                if rd.IsDBNull(rd.GetOrdinal("next_up_season")) then None
+                if rd.IsDBNull(rd.GetOrdinal("nu_season")) then None
                 else
                     Some {
-                        Mediatheca.Shared.NextUpDto.SeasonNumber = rd.ReadInt32 "next_up_season"
-                        Mediatheca.Shared.NextUpDto.EpisodeNumber = rd.ReadInt32 "next_up_episode"
-                        Mediatheca.Shared.NextUpDto.EpisodeName = rd.ReadString "next_up_title"
+                        Mediatheca.Shared.NextUpDto.SeasonNumber = rd.ReadInt32 "nu_season"
+                        Mediatheca.Shared.NextUpDto.EpisodeNumber = rd.ReadInt32 "nu_episode"
+                        Mediatheca.Shared.NextUpDto.EpisodeName = rd.ReadString "nu_title"
                     }
             let slug = rd.ReadString "slug"
             { Mediatheca.Shared.SeriesListItem.Slug = slug
@@ -1325,11 +1376,15 @@ module SeriesProjection =
                 else Some (rd.ReadString "poster_ref")
               Genres = genres
               TmdbRating =
-                if rd.IsDBNull(rd.GetOrdinal("tmdb_rating")) then None
-                else Some (rd.ReadDouble "tmdb_rating")
+                if rd.IsDBNull(rd.GetOrdinal("c_tmdb_rating")) then None
+                else Some (rd.ReadDouble "c_tmdb_rating")
               Status = parseStatus (rd.ReadString "status")
-              SeasonCount = rd.ReadInt32 "season_count"
-              EpisodeCount = rd.ReadInt32 "episode_count"
+              SeasonCount =
+                if rd.IsDBNull(rd.GetOrdinal("ec_season_count")) then 0
+                else rd.ReadInt32 "ec_season_count"
+              EpisodeCount =
+                if rd.IsDBNull(rd.GetOrdinal("ec_episode_count")) then 0
+                else rd.ReadInt32 "ec_episode_count"
               WatchedEpisodeCount = rd.ReadInt32 "watched_episode_count"
               NextUp = nextUp
               IsAbandoned = rd.ReadInt32 "abandoned" = 1
