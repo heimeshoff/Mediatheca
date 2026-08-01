@@ -23,7 +23,6 @@ let init (api: IMediathecaApi) (adminApi: IAdminApi) () : Model * Cmd<Msg> =
     let friendDetailModel, friendDetailCmd = Pages.FriendDetail.State.init ""
     let catalogListModel, catalogListCmd = Pages.Catalogs.State.init ()
     let catalogDetailModel, catalogDetailCmd = Pages.CatalogDetail.State.init ""
-    let adminModel, adminCmd = Pages.Admin.State.init AdminEvents
     let streamDetailModel, streamDetailCmd = Pages.StreamDetail.State.init ""
     let settingsModel, settingsCmd = Pages.Settings.State.init ()
     let styleGuideModel, styleGuideCmd = Pages.StyleGuide.State.init ()
@@ -44,7 +43,6 @@ let init (api: IMediathecaApi) (adminApi: IAdminApi) () : Model * Cmd<Msg> =
         FriendDetailModel = friendDetailModel
         CatalogListModel = catalogListModel
         CatalogDetailModel = catalogDetailModel
-        AdminModel = adminModel
         StreamDetailModel = streamDetailModel
         SettingsModel = settingsModel
         StyleGuideModel = styleGuideModel
@@ -403,16 +401,25 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
                 | Not_found -> model.NavigationHistory
                 | _ -> pushHistory prevPage model.NavigationHistory
         let model = { model with CurrentPage = page; NavigationHistory = newHistory; SuppressNextHistoryPush = false }
-        // Leaving the Admin page entirely (as opposed to switching tabs within
-        // it) stops any live Follow poll in the Event Browser. Every other
-        // page branch below replaces only its own child model and leaves
-        // AdminModel untouched, so without this a Follow session started
-        // before navigating away would keep polling indefinitely
-        // (administration-mtf1f iteration 2 — see ADR-0023).
+        // Leaving the Settings page entirely stops any live Follow poll in
+        // the Events section's Event Browser. Every other page branch below
+        // replaces only its own child model and leaves SettingsModel
+        // untouched, so without this a Follow session started before
+        // navigating away would keep polling indefinitely
+        // (administration-mtf1f iteration 2 — see ADR-0023). Re-keyed from
+        // "leaving Admin _" to "leaving Settings" by administration-k3vmt,
+        // which dissolved the /admin console into Settings; collapsing the
+        // Events section without navigating stops it too, via the same
+        // idempotent `stopFollowing` call (Settings.State's
+        // Toggle_events_section).
         let model =
             match prevPage, page with
-            | Admin _, Admin _ -> model
-            | Admin _, _ -> { model with AdminModel = Pages.Admin.State.stopFollowing model.AdminModel }
+            | Settings, Settings -> model
+            | Settings, _ ->
+                { model with
+                    SettingsModel =
+                        { model.SettingsModel with
+                            AdminModel = Pages.Admin.State.stopFollowing model.SettingsModel.AdminModel } }
             | _ -> model
         match page with
         | Movie_list ->
@@ -455,10 +462,6 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
             let childModel, childCmd = Pages.CatalogDetail.State.init slug
             { model with CatalogDetailModel = childModel },
             Cmd.map Catalog_detail_msg childCmd
-        | Admin tab ->
-            let childModel, childCmd = Pages.Admin.State.init tab
-            { model with AdminModel = childModel },
-            Cmd.map Admin_msg childCmd
         | Stream_detail streamId ->
             let childModel, childCmd = Pages.StreamDetail.State.init streamId
             { model with StreamDetailModel = childModel },
@@ -466,7 +469,18 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
         | Settings ->
             let childModel, childCmd = Pages.Settings.State.init ()
             { model with SettingsModel = childModel },
-            Cmd.map Settings_msg childCmd
+            Cmd.batch [
+                Cmd.map Settings_msg childCmd
+                // Fires on every /settings VISIT (this branch), never from
+                // Settings.State.init itself — root init batches that Cmd
+                // unconditionally on every page load, and the six admin
+                // sections must stay silent at cold start (administration-
+                // k3vmt). getProjectionStats is the one section load that
+                // isn't gated behind its section being expanded: the
+                // ADR-0034 dirty banner is client-derived from it and must
+                // react even if the operator never opens Projections.
+                Cmd.map Settings_msg Pages.Settings.State.loadProjectionStatsCmd
+            ]
         | Styleguide ->
             let childModel, childCmd = Pages.StyleGuide.State.init ()
             { model with StyleGuideModel = childModel },
@@ -598,16 +612,12 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
         let childModel, childCmd = Pages.CatalogDetail.State.update api childMsg model.CatalogDetailModel
         { model with CatalogDetailModel = childModel }, Cmd.map Catalog_detail_msg childCmd
 
-    | Admin_msg childMsg ->
-        let childModel, childCmd = Pages.Admin.State.update adminApi childMsg model.AdminModel
-        { model with AdminModel = childModel }, Cmd.map Admin_msg childCmd
-
     | Stream_detail_msg childMsg ->
         let childModel, childCmd = Pages.StreamDetail.State.update adminApi childMsg model.StreamDetailModel
         { model with StreamDetailModel = childModel }, Cmd.map Stream_detail_msg childCmd
 
     | Settings_msg childMsg ->
-        let childModel, childCmd = Pages.Settings.State.update api childMsg model.SettingsModel
+        let childModel, childCmd = Pages.Settings.State.update api adminApi childMsg model.SettingsModel
         { model with SettingsModel = childModel }, Cmd.map Settings_msg childCmd
 
     | Styleguide_msg childMsg ->

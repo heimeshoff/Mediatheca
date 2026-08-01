@@ -2,18 +2,21 @@ module Mediatheca.Client.Pages.Admin.State
 
 open Elmish
 open Mediatheca.Shared
-open Mediatheca.Client.Router
 open Mediatheca.Client.Pages.Admin.Types
 
-let init (tab: AdminTab) : Model * Cmd<Msg> =
+/// Constructs the composite's initial model plus the eager Cmd every child
+/// page returns from its own `init`. Callers that want lazy, per-section
+/// loading (Settings.State, administration-k3vmt) keep only the model and
+/// discard this Cmd, re-issuing each child's load message on that section's
+/// first expand instead.
+let init () : Model * Cmd<Msg> =
     let eventBrowserModel, eventBrowserCmd = Mediatheca.Client.Pages.EventBrowser.State.init ()
     let healthModel, healthCmd = Mediatheca.Client.Pages.AdminHealth.State.init ()
     let projectionsModel, projectionsCmd = Mediatheca.Client.Pages.AdminProjections.State.init ()
     let imagesModel, imagesCmd = Mediatheca.Client.Pages.AdminImages.State.init ()
     let jobsModel, jobsCmd = Mediatheca.Client.Pages.AdminJobs.State.init ()
     let surgeryModel, surgeryCmd = Mediatheca.Client.Pages.AdminSurgery.State.init ()
-    { ActiveTab = tab
-      EventBrowserModel = eventBrowserModel
+    { EventBrowserModel = eventBrowserModel
       HealthModel = healthModel
       ProjectionsModel = projectionsModel
       ImagesModel = imagesModel
@@ -28,13 +31,17 @@ let init (tab: AdminTab) : Model * Cmd<Msg> =
         Cmd.map Surgery_msg surgeryCmd
     ]
 
-/// Called from root `State.Url_changed` when the user navigates away from the
-/// Admin page entirely (administration-mtf1f iteration 2). Bumps the Event
-/// Browser's Follow epoch so any Follow poll already scheduled — or a
-/// `getEventsAfter` request already in flight at the moment of navigation —
-/// is stale by the time it (re)dispatches, and is dropped by the existing
+/// Bumps the Event Browser's Follow epoch so any Follow poll already
+/// scheduled — or a `getEventsAfter` request already in flight — is stale by
+/// the time it (re)dispatches, and is dropped by the existing
 /// `Poll_tail`/`Tail_loaded` epoch guard instead of rescheduling. Idempotent:
-/// a no-op when Follow was already off.
+/// a no-op when Follow was already off. Originally called only from root
+/// `State.Url_changed` on navigating away from the Admin page
+/// (administration-mtf1f iteration 2); administration-k3vmt re-keys that
+/// trigger to "leaving Settings" and adds a second trigger — collapsing the
+/// Events section without navigating (`Settings.State`'s
+/// `Toggle_events_section`) — both calling this same idempotent function
+/// rather than duplicating the epoch-bump logic.
 let stopFollowing (model: Model) : Model =
     { model with EventBrowserModel = Mediatheca.Client.Pages.EventBrowser.State.stopFollowing model.EventBrowserModel }
 

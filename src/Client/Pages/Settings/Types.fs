@@ -69,6 +69,30 @@ type Model = {
     CinemarcoImagesPath: string
     IsImporting: bool
     ImportResult: Result<ImportResult, string> option
+    // Administration (administration-k3vmt): the former /admin console's six
+    // tabs, dissolved into inline collapsible sections below Data Imports.
+    // `AdminModel` is the headless composite child (Pages/Admin) unchanged
+    // in shape; the twelve Open/Loaded pairs below are Settings' own state —
+    // each section starts collapsed and unloaded, and issues its one load
+    // message on first expand only (never on re-expand). Projections is the
+    // one deliberate exception: `Url_changed`'s Settings branch (not this
+    // page's own `init`) fires its load unconditionally on every /settings
+    // visit regardless of collapse state, since the ADR-0034 dirty banner is
+    // client-derived from it and must react even if the operator never opens
+    // that section.
+    AdminModel: Mediatheca.Client.Pages.Admin.Types.Model
+    EventsSectionOpen: bool
+    EventsSectionLoaded: bool
+    ProjectionsSectionOpen: bool
+    ProjectionsSectionLoaded: bool
+    HealthSectionOpen: bool
+    HealthSectionLoaded: bool
+    ImagesSectionOpen: bool
+    ImagesSectionLoaded: bool
+    JobsSectionOpen: bool
+    JobsSectionLoaded: bool
+    SurgerySectionOpen: bool
+    SurgerySectionLoaded: bool
 }
 
 type Msg =
@@ -149,3 +173,15 @@ type Msg =
     | Cinemarco_images_path_changed of string
     | Start_cinemarco_import
     | Import_completed of Result<ImportResult, string>
+    // Administration (administration-k3vmt)
+    | Admin_msg of Mediatheca.Client.Pages.Admin.Types.Msg
+    | Toggle_events_section
+    | Toggle_projections_section
+    | Toggle_health_section
+    | Toggle_images_section
+    | Toggle_jobs_section
+    | Toggle_surgery_section
+    /// The dirty banner's "Go to Projections" affordance (in-page, replacing
+    /// the old `/admin/projections` navigation): expands the Projections
+    /// section (a no-op if already open) and scrolls it into view.
+    | Go_to_projections_section

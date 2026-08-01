@@ -149,6 +149,66 @@ let private integrationCard (icon: unit -> ReactElement) (title: string) (descri
         ]
     ]
 
+// ── Administration Section Wrapper ──
+//
+// Same `.collapse.collapse-arrow` shell + classes as `integrationCard`
+// above, but CONTROLLED rather than uncontrolled (administration-k3vmt):
+// lazy loading and "collapsing stops the live-tail poll" both need the
+// open/closed state to live in the model, which DaisyUI's bare
+// `<input type="checkbox">` idiom can't give us. `sectionId` is the scroll
+// target the dirty banner's "Go to Projections" affordance targets.
+//
+// Deliberately NOT `DesignSystem.velvetCard` (`.velvet-card`) here, even
+// though that's the class every other page-chrome card in this file uses:
+// the Surgery section's own content nests three more `.velvet-card` panels
+// (`AdminSurgery/Views.fs`'s `sectionCard`, e.g. "Edit event") inside this
+// wrapper, and `tests/e2e/admin-surgery.spec.ts`'s `panelCard` helper
+// locates them via `.velvet-card` + a heading filter — stacking the same
+// class two levels deep make that locator ambiguous (it would match both
+// the outer Surgery wrapper and each inner panel, since `.filter({has})`
+// matches any ancestor whose subtree contains the heading). The card look
+// is reproduced with the same underlying design tokens instead of the class
+// name, so it stays visually identical.
+let private adminSectionCard (sectionId: string) (title: string) (description: string) (isOpen: bool) (onToggle: unit -> unit) (content: ReactElement) =
+    Html.div [
+        prop.id sectionId
+        prop.className ("bg-base-100 rounded-[var(--radius-card)] shadow-[var(--shadow-card)] " + DesignSystem.cardHover + " overflow-hidden")
+        prop.children [
+            Html.div [
+                prop.className "collapse collapse-arrow"
+                prop.children [
+                    Html.input [
+                        prop.type' "checkbox"
+                        prop.isChecked isOpen
+                        prop.onChange (fun (_: bool) -> onToggle ())
+                    ]
+                    Html.div [
+                        prop.className "collapse-title p-5"
+                        prop.children [
+                            Html.h3 [
+                                prop.className "font-bold font-display"
+                                prop.text title
+                            ]
+                            Html.p [
+                                prop.className DesignSystem.secondaryText
+                                prop.text description
+                            ]
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "collapse-content px-5 pb-5"
+                        prop.children [
+                            Html.div [
+                                prop.className "border-t border-base-content/10 pt-4"
+                                prop.children [ content ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+
 // ── Per-Integration Detail Functions ──
 
 let private tmdbDetail (model: Model) (dispatch: Msg -> unit) =
@@ -1420,6 +1480,70 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         "One-time legacy data migration"
                         (Daisy.badge [ badge.info; prop.className "gap-1 text-xs"; prop.text "Available" ])
                         (cinemarcoDetail model dispatch)
+                ]
+            ]
+
+            // Administration section (administration-k3vmt): the former
+            // /admin console's six tabs, now inline collapsible sections
+            // below Data Imports, in the tabs' former order. The dirty
+            // banner sits above all six so it's visible regardless of which
+            // (if any) are expanded — the same "visible on every tab"
+            // guarantee ADR-0034 established, just moved.
+            Html.h2 [
+                prop.className (DesignSystem.subtitle + " text-base-content/50 mb-4 mt-8")
+                prop.text "Administration"
+            ]
+            Mediatheca.Client.Pages.Admin.Views.dirtyBanner model.AdminModel.ProjectionsModel (fun () -> dispatch Go_to_projections_section)
+            Html.div [
+                prop.className "flex flex-col gap-4"
+                prop.children [
+                    adminSectionCard
+                        "settings-admin-events"
+                        "Events"
+                        "Search and inspect the event store, including live-tail follow."
+                        model.EventsSectionOpen
+                        (fun () -> dispatch Toggle_events_section)
+                        (Mediatheca.Client.Pages.Admin.Views.eventsSection model.AdminModel (Admin_msg >> dispatch))
+
+                    adminSectionCard
+                        Mediatheca.Client.Pages.Settings.State.projectionsSectionElementId
+                        "Projections"
+                        "Checkpoint/lag/row counts per projection, rebuild controls, drift check, event log backup."
+                        model.ProjectionsSectionOpen
+                        (fun () -> dispatch Toggle_projections_section)
+                        (Mediatheca.Client.Pages.Admin.Views.projectionsSection model.AdminModel (Admin_msg >> dispatch))
+
+                    adminSectionCard
+                        "settings-admin-health"
+                        "Health"
+                        "Store-wide diagnostics: event counts, activity, storage sizes, unknown-event report."
+                        model.HealthSectionOpen
+                        (fun () -> dispatch Toggle_health_section)
+                        (Mediatheca.Client.Pages.Admin.Views.healthSection model.AdminModel (Admin_msg >> dispatch))
+
+                    adminSectionCard
+                        "settings-admin-images"
+                        "Images"
+                        "Image cache stats, orphan detection, and purge."
+                        model.ImagesSectionOpen
+                        (fun () -> dispatch Toggle_images_section)
+                        (Mediatheca.Client.Pages.Admin.Views.imagesSection model.AdminModel (Admin_msg >> dispatch))
+
+                    adminSectionCard
+                        "settings-admin-jobs"
+                        "Jobs"
+                        "Scheduled job history and manual triggers."
+                        model.JobsSectionOpen
+                        (fun () -> dispatch Toggle_jobs_section)
+                        (Mediatheca.Client.Pages.Admin.Views.jobsSection model.AdminModel (Admin_msg >> dispatch))
+
+                    adminSectionCard
+                        "settings-admin-surgery"
+                        "Surgery"
+                        "Raw event-log escape hatch: edit, delete, rename event types."
+                        model.SurgerySectionOpen
+                        (fun () -> dispatch Toggle_surgery_section)
+                        (Mediatheca.Client.Pages.Admin.Views.surgerySection model.AdminModel (Admin_msg >> dispatch))
                 ]
             ]
         ]

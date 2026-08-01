@@ -26,9 +26,13 @@ let private topNavItems = [
     { Label = "Friends"; Page = Friend_list; IsActive = Route.isFriendsSection; Icon = Icons.friends; Href = Router.format "friends" }
 ]
 
+// The former Admin/Settings split (two buttons for what read as one
+// destination) is gone (administration-k3vmt): the whole admin console
+// dissolved into inline sections on Settings, so this group is down to one
+// item. Also fixes BottomNav's mobile dock, which never carried an Admin
+// item — Settings now reaches the entire console there too.
 let private bottomNavItems = [
-    { Label = "Admin"; Page = Admin AdminEvents; IsActive = Route.isAdminSection; Icon = Icons.events; Href = Router.format ("admin", "events") }
-    { Label = "Settings"; Page = Settings; IsActive = (fun p -> p = Settings); Icon = Icons.settings; Href = Router.format "settings" }
+    { Label = "Settings"; Page = Settings; IsActive = Route.isSettingsSection; Icon = Icons.settings; Href = Router.format "settings" }
 ]
 
 let private navItem (currentPage: Page) (item: NavItem) =

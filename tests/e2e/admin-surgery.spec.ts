@@ -98,9 +98,38 @@ function confirmDialog(page: Page) {
     return page.locator(".paper-overlay");
 }
 
-/** Cross-tab "projections out of sync" banner (administration-wwc36):
- * rendered above the tab bar on every Admin tab, client-derived from
- * `AdminProjectionsModel.Stats`'s `Lag` field. */
+/** administration-k3vmt: every former /admin tab is now an inline
+ * collapsible section on Settings (`Pages/Settings/Views.fs`'s
+ * `adminSectionCard`). Located by the outer wrapper's own DOM id
+ * (`settings-admin-<name>` — also the dirty banner's scroll target for
+ * Projections) rather than a class + heading filter: the Surgery section's
+ * content nests three more `.velvet-card` panels (`AdminSurgery/Views.fs`'s
+ * `sectionCard`, e.g. "Edit event") inside this wrapper, and the outer
+ * wrapper deliberately does NOT reuse `.velvet-card` itself so `panelCard`
+ * above stays unambiguous — see that class-choice comment in
+ * `Pages/Settings/Views.fs`. */
+function adminSectionCard(page: Page, sectionId: string) {
+    return page.locator(`#${sectionId}`);
+}
+
+/** Sections are collapsed and unloaded by default (administration-k3vmt) —
+ * every URL under old `/admin/*` now lands on the one Settings page with no
+ * section pre-expanded, so specs must expand the section they need before
+ * interacting with its content. Toggles the section's own controlled
+ * checkbox (`prop.isChecked`/`prop.onChange`), the same element DaisyUI's
+ * `collapse` idiom uses to drive open/closed — checking it fires this
+ * section's lazy-load on first expand. Idempotent: a no-op if already open. */
+async function expandAdminSection(page: Page, sectionId: string) {
+    const checkbox = adminSectionCard(page, sectionId).locator('input[type="checkbox"]');
+    if (!(await checkbox.isChecked())) {
+        await checkbox.check();
+    }
+}
+
+/** Cross-section "projections out of sync" banner (administration-wwc36,
+ * moved by administration-k3vmt): rendered above all six administration
+ * sections on Settings regardless of which are expanded/collapsed,
+ * client-derived from `AdminProjectionsModel.Stats`'s `Lag` field. */
 const dirtyBanner = (page: Page) => page.getByText(/Projections out of sync — rebuild/);
 
 /** Matches both "Rebuild all" (idle/enabled) and "Rebuilding all..."
@@ -130,6 +159,7 @@ test.describe("Surgery tab — edit/delete/rename + confirm dialogs + dirty bann
         const event = await findFriendAddedEvent(request, baseURL!, slug);
 
         await page.goto("/#/admin/surgery");
+        await expandAdminSection(page, "settings-admin-surgery");
 
         const editCard = panelCard(page, "Edit event");
         await editCard.getByPlaceholder("global_position").fill(String(event.GlobalPosition));
@@ -170,6 +200,7 @@ test.describe("Surgery tab — edit/delete/rename + confirm dialogs + dirty bann
         const event = await findFriendAddedEvent(request, baseURL!, slug);
 
         await page.goto("/#/admin/surgery");
+        await expandAdminSection(page, "settings-admin-surgery");
 
         const deleteCard = panelCard(page, "Delete event");
         await deleteCard.getByPlaceholder("global_position").fill(String(event.GlobalPosition));
@@ -204,6 +235,7 @@ test.describe("Surgery tab — edit/delete/rename + confirm dialogs + dirty bann
         const slug = await addFriend(request, baseURL!, `E2E Surgery Rename ${Date.now()}`);
 
         await page.goto("/#/admin/surgery");
+        await expandAdminSection(page, "settings-admin-surgery");
 
         const disposableType = `Friend_added_e2e_disposable_${Date.now()}`;
         const renameCard = panelCard(page, "Rename event type");
@@ -255,6 +287,7 @@ test.describe("Surgery tab — edit/delete/rename + confirm dialogs + dirty bann
         // — required because prior tests in this file already left
         // projections dirty.
         await page.goto("/#/admin/projections");
+        await expandAdminSection(page, "settings-admin-projections");
         await expect(rebuildAllButton(page)).toBeEnabled({ timeout: 15_000 });
         await rebuildAllButton(page).click();
         await expect(rebuildAllButton(page)).toHaveText("Rebuild all", { timeout: 60_000 });
@@ -263,6 +296,7 @@ test.describe("Surgery tab — edit/delete/rename + confirm dialogs + dirty bann
         // Move to the Surgery tab and confirm the clean baseline holds there
         // too (the banner is rendered above the tab bar on every tab).
         await page.goto("/#/admin/surgery");
+        await expandAdminSection(page, "settings-admin-surgery");
         await expect(dirtyBanner(page)).toHaveCount(0);
 
         // Commit one fresh surgery mutation while staying on this page —
@@ -284,13 +318,21 @@ test.describe("Surgery tab — edit/delete/rename + confirm dialogs + dirty bann
 
         await expect(dirtyBanner(page)).toBeVisible({ timeout: 15_000 });
 
-        // Follow the banner's own link, then clear it via Rebuild all again
-        // — the completion signal is the banner disappearing and the
-        // button's accessible name reverting to exactly "Rebuild all"; there
-        // is no done-toast.
+        // Follow the banner's own link — an in-page expand+scroll
+        // (administration-k3vmt), not a navigation, since per-section
+        // deep-linking is gone. Proven by DOM state (the Projections
+        // section's own checkbox flips to checked and its content becomes
+        // interactable) rather than a URL change: the hash stays exactly
+        // where it already was (still on the Surgery section, per this
+        // test's own `page.goto` above).
+        await expect(page).toHaveURL(/#\/admin\/surgery$/);
         await page.getByRole("link", { name: "Go to Projections" }).click();
-        await expect(page).toHaveURL(/#\/admin\/projections$/);
+        await expect(page).toHaveURL(/#\/admin\/surgery$/);
+        await expect(adminSectionCard(page, "settings-admin-projections").locator('input[type="checkbox"]')).toBeChecked();
 
+        // Then clear it via Rebuild all — the completion signal is the
+        // banner disappearing and the button's accessible name reverting to
+        // exactly "Rebuild all"; there is no done-toast.
         await expect(rebuildAllButton(page)).toBeEnabled({ timeout: 15_000 });
         await rebuildAllButton(page).click();
         await expect(dirtyBanner(page)).toHaveCount(0, { timeout: 60_000 });

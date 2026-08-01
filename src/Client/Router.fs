@@ -2,18 +2,6 @@ module Mediatheca.Client.Router
 
 open Feliz.Router
 
-/// Sub-tabs of the /admin section. URL-addressable — each tab is its own route
-/// (/admin/events, /admin/projections, ...) so later admin-console tasks
-/// (explorer upgrades, projection dashboard, health, jobs, surgery) slot in
-/// without reworking the shell.
-type AdminTab =
-    | AdminEvents
-    | AdminProjections
-    | AdminHealth
-    | AdminImages
-    | AdminJobs
-    | AdminSurgery
-
 type Page =
     | Dashboard
     | Movie_list
@@ -26,11 +14,12 @@ type Page =
     | Friend_detail of slug: string
     | Catalog_list
     | Catalog_detail of slug: string
-    | Admin of AdminTab
     /// Stream drill-in (administration-v4y9g): full history + current
-    /// projection state for one event stream. Sibling to the Admin tab
-    /// routes but parameterized, so it's a top-level Page case (like the
-    /// other *_detail pages) rather than an AdminTab variant.
+    /// projection state for one event stream. Every other admin-console
+    /// surface dissolved into inline sections on Settings
+    /// (administration-k3vmt) — this stays a top-level `Page` case (like the
+    /// other *_detail pages) because it's parameterized (one page per
+    /// stream) and can't be a fixed section.
     | Stream_detail of streamId: string
     | Settings
     | Styleguide
@@ -50,28 +39,24 @@ module Route =
         | [ "friends"; slug ] -> Friend_detail slug
         | [ "catalogs" ] -> Catalog_list
         | [ "catalogs"; slug ] -> Catalog_detail slug
-        | [ "admin" ] -> Admin AdminEvents
-        | [ "admin"; "events" ] -> Admin AdminEvents
-        | [ "admin"; "projections" ] -> Admin AdminProjections
-        | [ "admin"; "health" ] -> Admin AdminHealth
-        | [ "admin"; "images" ] -> Admin AdminImages
-        | [ "admin"; "jobs" ] -> Admin AdminJobs
-        | [ "admin"; "surgery" ] -> Admin AdminSurgery
         | [ "admin"; "streams"; streamId ] -> Stream_detail streamId
-        // Legacy alias — old /events bookmarks still resolve to the Events tab.
-        | [ "events" ] -> Admin AdminEvents
+        // The /admin console dissolved into inline sections on Settings
+        // (administration-k3vmt) — every former admin URL, including the six
+        // per-tab segments and the legacy /events alias, resolves to Settings.
+        // Settings has no section-level route: none of these carry which
+        // section to open (see Settings.State for the lazy-load/expand
+        // convention that replaces per-tab deep-linking).
+        | [ "admin" ] -> Settings
+        | [ "admin"; "events" ] -> Settings
+        | [ "admin"; "projections" ] -> Settings
+        | [ "admin"; "health" ] -> Settings
+        | [ "admin"; "images" ] -> Settings
+        | [ "admin"; "jobs" ] -> Settings
+        | [ "admin"; "surgery" ] -> Settings
+        | [ "events" ] -> Settings
         | [ "settings" ] -> Settings
         | [ "styleguide" ] -> Styleguide
         | _ -> Not_found
-
-    let private adminTabSegment (tab: AdminTab) =
-        match tab with
-        | AdminEvents -> "events"
-        | AdminProjections -> "projections"
-        | AdminHealth -> "health"
-        | AdminImages -> "images"
-        | AdminJobs -> "jobs"
-        | AdminSurgery -> "surgery"
 
     let toUrl (page: Page) =
         match page with
@@ -86,7 +71,6 @@ module Route =
         | Friend_detail slug -> Router.format ("friends", slug)
         | Catalog_list -> Router.format "catalogs"
         | Catalog_detail slug -> Router.format ("catalogs", slug)
-        | Admin tab -> Router.format ("admin", adminTabSegment tab)
         | Stream_detail streamId -> Router.format ("admin", "streams", streamId)
         | Settings -> Router.format "settings"
         | Styleguide -> Router.format "styleguide"
@@ -105,15 +89,18 @@ module Route =
         | Friend_detail slug -> Router.navigate ("friends", slug)
         | Catalog_list -> Router.navigate "catalogs"
         | Catalog_detail slug -> Router.navigate ("catalogs", slug)
-        | Admin tab -> Router.navigate ("admin", adminTabSegment tab)
         | Stream_detail streamId -> Router.navigate ("admin", "streams", streamId)
         | Settings -> Router.navigate "settings"
         | Styleguide -> Router.navigate "styleguide"
         | Not_found -> Router.navigate "not-found"
 
-    let isAdminSection (page: Page) =
+    /// The sidebar's single Settings nav item stays highlighted while on a
+    /// stream drill-in too, since Stream_detail is Settings' own "drill
+    /// deeper" page (reached from the Events section) rather than an
+    /// unrelated destination (administration-k3vmt, formerly isAdminSection).
+    let isSettingsSection (page: Page) =
         match page with
-        | Admin _ | Stream_detail _ -> true
+        | Settings | Stream_detail _ -> true
         | _ -> false
 
     let isMoviesSection (page: Page) =

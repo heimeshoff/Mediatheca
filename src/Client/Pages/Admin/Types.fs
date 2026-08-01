@@ -1,15 +1,15 @@
 module Mediatheca.Client.Pages.Admin.Types
 
-open Mediatheca.Client.Router
-
-// The Admin console tab shell. Events is a fully wired tab (delegates to the
-// existing EventBrowser page), Health delegates to AdminHealth
-// (administration-hw74a), Projections delegates to AdminProjections
-// (administration-qjcp4), Images delegates to AdminImages
-// (administration-xx3mw), Jobs delegates to AdminJobs (administration-yamm5),
-// Surgery delegates to AdminSurgery (administration-wwc36).
+// The Admin composite (administration-k3vmt): a headless child holding the
+// six former /admin tab models, now rendered as inline collapsible sections
+// on Settings rather than as a tabbed page in its own right (see
+// Pages/Admin/Views.fs's per-section render functions and
+// Pages/Settings/State.fs's lazy-load/expand wiring). Events delegates to
+// EventBrowser, Health to AdminHealth (administration-hw74a), Projections to
+// AdminProjections (administration-qjcp4), Images to AdminImages
+// (administration-xx3mw), Jobs to AdminJobs (administration-yamm5), Surgery
+// to AdminSurgery (administration-wwc36).
 type Model = {
-    ActiveTab: AdminTab
     EventBrowserModel: Mediatheca.Client.Pages.EventBrowser.Types.Model
     HealthModel: Mediatheca.Client.Pages.AdminHealth.Types.Model
     ProjectionsModel: Mediatheca.Client.Pages.AdminProjections.Types.Model

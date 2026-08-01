@@ -44,6 +44,22 @@ function friendRowLocator(page: Page, slug: string) {
 const followButton = (page: Page) => page.getByRole("button", { name: /^Follow$/ });
 const followingButton = (page: Page) => page.getByRole("button", { name: /^Following$/ });
 
+/** administration-k3vmt: the /admin console dissolved into inline
+ * collapsible sections on Settings — every former `/admin/*` URL, including
+ * `/#/admin/events`, now lands on the one Settings page with the Events
+ * section collapsed (and unloaded) by default. Toggles that section's own
+ * controlled checkbox (`Pages/Settings/Views.fs`'s `adminSectionCard`,
+ * located by its wrapper's `#settings-admin-events` id), which fires its
+ * lazy-load on first expand — the same mechanism the section itself uses to
+ * trigger `Load_filter_options`/`Load_page`. Idempotent: a no-op if already
+ * open. */
+async function expandEventsSection(page: Page) {
+    const checkbox = page.locator("#settings-admin-events").locator('input[type="checkbox"]');
+    if (!(await checkbox.isChecked())) {
+        await checkbox.check();
+    }
+}
+
 /** Waits for the page's own initial `Load_page` fetch (dispatched at mount,
  * unfiltered) to settle before the test drives any further filter/action —
  * otherwise a same-shape `Load_page` triggered moments later by the test
@@ -78,6 +94,7 @@ test.describe("Events tab Follow toggle — ADR-0023 live-tail behaviors", () =>
     }) => {
         trackTailRequests(page);
         await page.goto("/#/admin/events");
+        await expandEventsSection(page);
         await waitForEventsLoaded(page);
 
         await expect(followButton(page)).toBeVisible();
@@ -108,6 +125,7 @@ test.describe("Events tab Follow toggle — ADR-0023 live-tail behaviors", () =>
     }) => {
         trackTailRequests(page);
         await page.goto("/#/admin/events");
+        await expandEventsSection(page);
         await waitForEventsLoaded(page);
 
         const searchTerm = `E2EFilterMatch${Date.now()}`;
@@ -141,6 +159,7 @@ test.describe("Events tab Follow toggle — ADR-0023 live-tail behaviors", () =>
         test.setTimeout(45_000);
         const tailRequests = trackTailRequests(page);
         await page.goto("/#/admin/events");
+        await expandEventsSection(page);
         await waitForEventsLoaded(page);
 
         await expect(followButton(page)).toBeVisible();
@@ -185,6 +204,7 @@ test.describe("Events tab Follow toggle — ADR-0023 live-tail behaviors", () =>
         );
 
         await page.goto("/#/admin/events");
+        await expandEventsSection(page);
         await waitForEventsLoaded(page);
         await page.getByPlaceholder("Search event payloads...").fill(term);
         await expect(page.getByText("Showing 1-25 of 26")).toBeVisible();
@@ -217,6 +237,7 @@ test.describe("Events tab Follow toggle — ADR-0023 live-tail behaviors", () =>
         test.setTimeout(45_000);
         const tailRequests = trackTailRequests(page);
         await page.goto("/#/admin/events");
+        await expandEventsSection(page);
         await waitForEventsLoaded(page);
 
         await expect(followButton(page)).toBeVisible();

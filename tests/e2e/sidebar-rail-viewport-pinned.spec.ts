@@ -1,13 +1,15 @@
 import { test, expect } from "@playwright/test";
 
 // design-system-vk7rd (ADR-0014/ADR-0015 context; prior art t4b9k/grtw7):
-// the desktop rail's bottom nav group (Admin, Settings) was pinned via
-// `mt-auto` against the rail's own box, but the rail itself was
-// `min-h-screen` inside a stretching flex row — so on any page taller than
-// the viewport the rail grew to document height and the "pinned" group
-// scrolled out of sight along with everything else. The fix makes the rail
-// `sticky top-0 h-screen`, a real viewport-height ceiling, so `mt-auto`
-// resolves against the viewport instead of the document.
+// the desktop rail's bottom nav group — originally Admin + Settings, down to
+// a single Settings item since administration-k3vmt dissolved the /admin
+// console into Settings — was pinned via `mt-auto` against the rail's own
+// box, but the rail itself was `min-h-screen` inside a stretching flex row
+// — so on any page taller than the viewport the rail grew to document
+// height and the "pinned" group scrolled out of sight along with everything
+// else. The fix makes the rail `sticky top-0 h-screen`, a real
+// viewport-height ceiling, so `mt-auto` resolves against the viewport
+// instead of the document.
 //
 // The `/#/styleguide` route is used as the tall page: it renders a long,
 // fixed set of design-system specimens, so it is reliably taller than a
@@ -21,12 +23,10 @@ import { test, expect } from "@playwright/test";
 test.describe("Sidebar rail: bottom nav group stays pinned to the viewport", () => {
     test.use({ viewport: { width: 1280, height: 720 } });
 
-    test("Admin/Settings links stay within the viewport at scroll-top and scroll-bottom", async ({ page }) => {
+    test("the Settings link stays within the viewport at scroll-top and scroll-bottom", async ({ page }) => {
         await page.goto("/#/styleguide");
 
-        const adminLink = page.getByRole("link", { name: "Admin" });
         const settingsLink = page.getByRole("link", { name: "Settings" });
-        await expect(adminLink).toBeVisible();
         await expect(settingsLink).toBeVisible();
 
         // Confirm the page is actually taller than the viewport, otherwise
@@ -36,29 +36,20 @@ test.describe("Sidebar rail: bottom nav group stays pinned to the viewport", () 
         const viewportHeight = 720;
         expect(scrollHeight).toBeGreaterThan(viewportHeight);
 
-        const boxAtTop = {
-            admin: (await adminLink.boundingBox())!,
-            settings: (await settingsLink.boundingBox())!,
-        };
-        expect(boxAtTop.admin.y).toBeGreaterThanOrEqual(0);
-        expect(boxAtTop.admin.y + boxAtTop.admin.height).toBeLessThanOrEqual(viewportHeight);
-        expect(boxAtTop.settings.y).toBeGreaterThanOrEqual(0);
-        expect(boxAtTop.settings.y + boxAtTop.settings.height).toBeLessThanOrEqual(viewportHeight);
+        const boxAtTop = (await settingsLink.boundingBox())!;
+        expect(boxAtTop.y).toBeGreaterThanOrEqual(0);
+        expect(boxAtTop.y + boxAtTop.height).toBeLessThanOrEqual(viewportHeight);
 
         // Scroll the document (not the rail) to the very bottom.
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
         await expect(page.locator("html")).toHaveJSProperty("scrollTop", await page.evaluate(() => document.documentElement.scrollTop));
 
-        const boxAtBottom = {
-            admin: (await adminLink.boundingBox())!,
-            settings: (await settingsLink.boundingBox())!,
-        };
+        const boxAtBottom = (await settingsLink.boundingBox())!;
 
         // The rail stays put — viewport-relative position is unchanged from
         // the scrolled-to-top measurement, rather than scrolling away with
         // the document.
-        expect(boxAtBottom.admin.y).toBeCloseTo(boxAtTop.admin.y, 0);
-        expect(boxAtBottom.settings.y).toBeCloseTo(boxAtTop.settings.y, 0);
+        expect(boxAtBottom.y).toBeCloseTo(boxAtTop.y, 0);
     });
 
     test("On a short viewport, the nav scrolls internally so the bottom group remains reachable", async ({ page }) => {

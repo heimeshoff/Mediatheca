@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 13:42 -- Task verified and completed: administration-k3vmt - Dissolve the /admin console into Settings — its six tabs become inline collapsible sections below Data Imports, and the sidebar's bottom group drops to a single Settings button
+
+**Type:** Work / Task completion
+**Task:** administration-k3vmt - Dissolve the /admin console into Settings — its six tabs become inline collapsible sections below Data Imports, and the sidebar's bottom group drops to a single Settings button
+**Summary:** The /admin console dissolved into Settings as six lazy-loaded collapsible inline sections below Data Imports; the sidebar bottom nav drops to a single Settings button, the ADR-0023 Follow-teardown re-keys to leaving-Settings plus a new collapse trigger, and the ADR-0034 dirty banner Go-to-Projections becomes an in-page expand+scroll
+**Duration:** 44m
+**Verification:** PASS (iteration 1)
+**Files changed:** 20
+**Tests added:** 4
+**ADRs written:** 0041
+
+---
+
 ## 2026-08-01 12:57 -- Batch started: [administration-k3vmt]
 
 **Type:** Work / Batch start

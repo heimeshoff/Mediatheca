@@ -36,7 +36,7 @@ let private header (streamId: string) (dispatch: Msg -> unit) =
         prop.children [
             Html.div [
                 prop.children [
-                    navLink (Admin AdminEvents) "← Back to Event Store" (DesignSystem.mutedText + " hover:text-base-content transition-colors")
+                    navLink Settings "← Back to Event Store" (DesignSystem.mutedText + " hover:text-base-content transition-colors")
                     Html.h1 [
                         prop.className "text-2xl font-bold font-display text-gradient-primary mt-2 break-all"
                         prop.text streamId

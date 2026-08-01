@@ -12,7 +12,69 @@ let private jsFetch (url: string) : JS.Promise<obj> = jsNative
 [<Emit("new TextDecoder().decode($0)")>]
 let private decodeBytes (value: obj) : string = jsNative
 
+/// DOM id of the Projections section's outer card — the dirty banner's
+/// "Go to Projections" scroll target (administration-k3vmt).
+let projectionsSectionElementId = "settings-admin-projections"
+
+// Administration section load Cmds (administration-k3vmt): each mirrors the
+// exact Cmd the corresponding child page's own `init` returns (see
+// Pages/Admin/State.init, whose Cmd is discarded on construction below in
+// favor of firing these lazily on first expand instead). Kept next to each
+// other so the "one Cmd per section, matching that section's own init" shape
+// stays obviously true at a glance.
+let private loadEventsCmd : Cmd<Msg> =
+    Cmd.batch [
+        Cmd.ofMsg Mediatheca.Client.Pages.EventBrowser.Types.Load_filter_options
+        Cmd.ofMsg (Mediatheca.Client.Pages.EventBrowser.Types.Load_page (None, []))
+    ]
+    |> Cmd.map Mediatheca.Client.Pages.Admin.Types.Event_browser_msg
+    |> Cmd.map Admin_msg
+
+let private loadHealthCmd : Cmd<Msg> =
+    Cmd.ofMsg Mediatheca.Client.Pages.AdminHealth.Types.Load
+    |> Cmd.map Mediatheca.Client.Pages.Admin.Types.Health_msg
+    |> Cmd.map Admin_msg
+
+/// Public: this is the one section whose load also fires eagerly, from root
+/// `State.Url_changed`'s Settings branch rather than only on first expand —
+/// see the Model doc comment for why.
+let loadProjectionStatsCmd : Cmd<Msg> =
+    Cmd.ofMsg Mediatheca.Client.Pages.AdminProjections.Types.Load
+    |> Cmd.map Mediatheca.Client.Pages.Admin.Types.Projections_msg
+    |> Cmd.map Admin_msg
+
+let private loadImagesCmd : Cmd<Msg> =
+    Cmd.ofMsg Mediatheca.Client.Pages.AdminImages.Types.Load
+    |> Cmd.map Mediatheca.Client.Pages.Admin.Types.Images_msg
+    |> Cmd.map Admin_msg
+
+let private loadJobsCmd : Cmd<Msg> =
+    Cmd.ofMsg Mediatheca.Client.Pages.AdminJobs.Types.Load
+    |> Cmd.map Mediatheca.Client.Pages.Admin.Types.Jobs_msg
+    |> Cmd.map Admin_msg
+
+let private loadSurgeryCmd : Cmd<Msg> =
+    Cmd.ofMsg Mediatheca.Client.Pages.AdminSurgery.Types.Load_backup_stats
+    |> Cmd.map Mediatheca.Client.Pages.Admin.Types.Surgery_msg
+    |> Cmd.map Admin_msg
+
+/// Scrolls the Projections section's card into view once the DOM has had a
+/// tick to reflect the just-set `ProjectionsSectionOpen = true` (the collapse
+/// content needs to actually be laid out before `scrollIntoView` has
+/// anything meaningful to measure).
+let private scrollToProjectionsCmd : Cmd<Msg> =
+    Cmd.ofEffect (fun _ ->
+        Fable.Core.JS.setTimeout
+            (fun () ->
+                let el = Browser.Dom.document.getElementById projectionsSectionElementId
+                if not (isNull el) then
+                    el?scrollIntoView ({| behavior = "smooth"; block = "start" |})
+            )
+            50
+        |> ignore)
+
 let init () : Model * Cmd<Msg> =
+    let adminModel, _ = Mediatheca.Client.Pages.Admin.State.init ()
     { TmdbApiKey = ""
       TmdbKeyInput = ""
       IsTesting = false
@@ -72,10 +134,23 @@ let init () : Model * Cmd<Msg> =
       CinemarcoDbPath = ""
       CinemarcoImagesPath = ""
       IsImporting = false
-      ImportResult = None },
+      ImportResult = None
+      AdminModel = adminModel
+      EventsSectionOpen = false
+      EventsSectionLoaded = false
+      ProjectionsSectionOpen = false
+      ProjectionsSectionLoaded = false
+      HealthSectionOpen = false
+      HealthSectionLoaded = false
+      ImagesSectionOpen = false
+      ImagesSectionLoaded = false
+      JobsSectionOpen = false
+      JobsSectionLoaded = false
+      SurgerySectionOpen = false
+      SurgerySectionLoaded = false },
     Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync ]
 
-let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
+let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
     | Load_tmdb_key ->
         model, Cmd.OfAsync.perform api.getTmdbApiKey () Tmdb_key_loaded
@@ -500,3 +575,81 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Import_completed result ->
         { model with IsImporting = false; ImportResult = Some result }, Cmd.none
+
+    // Administration (administration-k3vmt)
+    | Admin_msg childMsg ->
+        let childModel, childCmd = Mediatheca.Client.Pages.Admin.State.update adminApi childMsg model.AdminModel
+        let model = { model with AdminModel = childModel }
+        // Single source of truth for "this section has loaded once": flip
+        // the matching flag whenever that section's own load message flows
+        // through here, whether it was dispatched by a Toggle_*_section
+        // handler below (first expand) or, for Projections only, by root
+        // `Url_changed`'s eager `loadProjectionStatsCmd` on every /settings
+        // visit. Every other admin child message is a no-op here.
+        let model =
+            match childMsg with
+            | Mediatheca.Client.Pages.Admin.Types.Event_browser_msg Mediatheca.Client.Pages.EventBrowser.Types.Load_filter_options ->
+                { model with EventsSectionLoaded = true }
+            | Mediatheca.Client.Pages.Admin.Types.Health_msg Mediatheca.Client.Pages.AdminHealth.Types.Load ->
+                { model with HealthSectionLoaded = true }
+            | Mediatheca.Client.Pages.Admin.Types.Projections_msg Mediatheca.Client.Pages.AdminProjections.Types.Load ->
+                { model with ProjectionsSectionLoaded = true }
+            | Mediatheca.Client.Pages.Admin.Types.Images_msg Mediatheca.Client.Pages.AdminImages.Types.Load ->
+                { model with ImagesSectionLoaded = true }
+            | Mediatheca.Client.Pages.Admin.Types.Jobs_msg Mediatheca.Client.Pages.AdminJobs.Types.Load ->
+                { model with JobsSectionLoaded = true }
+            | Mediatheca.Client.Pages.Admin.Types.Surgery_msg Mediatheca.Client.Pages.AdminSurgery.Types.Load_backup_stats ->
+                { model with SurgerySectionLoaded = true }
+            | _ -> model
+        model, Cmd.map Admin_msg childCmd
+
+    | Toggle_events_section ->
+        let opening = not model.EventsSectionOpen
+        let model = { model with EventsSectionOpen = opening }
+        if not opening then
+            // Collapsing without navigating away stops the live-tail poll
+            // via the same idempotent `stopFollowing` the Settings-departure
+            // path (root State.Url_changed) uses — one function, two
+            // triggers (ADR-0023, amended by administration-k3vmt).
+            { model with
+                AdminModel =
+                    { model.AdminModel with
+                        EventBrowserModel = Mediatheca.Client.Pages.EventBrowser.State.stopFollowing model.AdminModel.EventBrowserModel } },
+            Cmd.none
+        elif model.EventsSectionLoaded then
+            model, Cmd.none
+        else
+            model, loadEventsCmd
+
+    | Toggle_projections_section ->
+        let opening = not model.ProjectionsSectionOpen
+        let model = { model with ProjectionsSectionOpen = opening }
+        if opening && not model.ProjectionsSectionLoaded then model, loadProjectionStatsCmd
+        else model, Cmd.none
+
+    | Toggle_health_section ->
+        let opening = not model.HealthSectionOpen
+        let model = { model with HealthSectionOpen = opening }
+        if opening && not model.HealthSectionLoaded then model, loadHealthCmd
+        else model, Cmd.none
+
+    | Toggle_images_section ->
+        let opening = not model.ImagesSectionOpen
+        let model = { model with ImagesSectionOpen = opening }
+        if opening && not model.ImagesSectionLoaded then model, loadImagesCmd
+        else model, Cmd.none
+
+    | Toggle_jobs_section ->
+        let opening = not model.JobsSectionOpen
+        let model = { model with JobsSectionOpen = opening }
+        if opening && not model.JobsSectionLoaded then model, loadJobsCmd
+        else model, Cmd.none
+
+    | Toggle_surgery_section ->
+        let opening = not model.SurgerySectionOpen
+        let model = { model with SurgerySectionOpen = opening }
+        if opening && not model.SurgerySectionLoaded then model, loadSurgeryCmd
+        else model, Cmd.none
+
+    | Go_to_projections_section ->
+        { model with ProjectionsSectionOpen = true }, scrollToProjectionsCmd

@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 25
+- **Doing:** 0
+- **Done:** 26
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **administration-k3vmt** — Dissolve the /admin console into Settings — its six tabs become inline collapsible sections below Data Imports, and the sidebar's bottom group drops to a single Settings button (refactor) — `doing/administration-k3vmt-dissolve-admin-console-into-settings.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **administration-k3vmt** — Dissolve the /admin console into Settings — its six tabs become inline collapsible sections below Data Imports, and the sidebar's bottom group drops to a single Settings button (refactor) — `done/administration-k3vmt-dissolve-admin-console-into-settings.md`
 - **administration-n8kqw** — Event log import — wipe-first path for a non-empty store: backup, preview + confirm, then wipe and re-import in one transaction (feature) — `done/administration-n8kqw-wipe-first-import.md`
 - **administration-svq3t** — Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner) (feature) — `done/administration-svq3t-surgery-tab-e2e-spec.md`
 - **administration-jrflk** — Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over (bug) — `done/administration-jrflk-job-name-collision-test-flake.md`
@@ -62,6 +62,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0041** -- The `/admin` tabbed shell (ADR-0017's client shape) dissolves into Settings as six lazy collapsible sections; ADR-0023's Follow-teardown re-keys to "leaving Settings" plus a section-collapse trigger, ADR-0034's dirty banner becomes an in-page expand+scroll, and per-tab deep-linking is dropped. `IAdminApi` untouched. -- 2026-08-01 -- `knowledge/decisions/0041-admin-console-dissolved-into-settings.md`
 - **0038** -- Wipe-first event log import is its own SSE route, not a flag on `/api/stream/import-events`, so the safe route's refusal stays literally true. `VACUUM INTO` still backs up first, but the primary restore path is the single transaction carrying the wipe, re-import, FTS rebuild and checkpoint rewind — so it must be mutually exclusive with projection rebuild, via a new `AdminGuards` field. -- 2026-07-31 -- `knowledge/decisions/0038-wipe-first-event-log-import.md`
 - **0035** -- Ambient module-level single-flight guards in `Administration.fs` become explicitly-owned values constructed once at the composition root: `runningJobs` moves into `makeJobRunRecorder`'s closure, `rebuildingProjections`/`driftCheckInProgress` become a threaded `AdminGuards` record. Amends the guard-ownership axis of ADR-0024/0025/0026/0031; concurrency semantics unchanged. -- 2026-07-31 -- `knowledge/decisions/0035-admin-guard-composition-root-ownership.md`
 - **0034** -- Event surgery (raw edit/delete/rename) guardrail protocol: `VACUUM INTO` backup on the op's own per-request connection (verified before any mutation, abort-with-no-row-touched on failure), the mutation + FTS5 `('rebuild')` re-sync + `projection_checkpoints`-rewind-to-0 dirty signal sharing one transaction, and deliberate stream/global-position gap tolerance on delete. -- 2026-07-22 -- `knowledge/decisions/0034-event-surgery-guardrails.md`
