@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 15:51 -- Batch started: [design-system-x7k2p]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-x7k2p - Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042)
+**Parallel:** no (1 worker - the ready set was exactly one task; MAX_PARALLEL never bound and nothing was held back)
+
+---
+
 ## 2026-08-01 15:48 -- Modeling / Promoted: design-system-x7k2p - Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042)
 
 **Type:** Modeling / Promote

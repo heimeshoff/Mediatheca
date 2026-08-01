@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 17
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **design-system-x7k2p** — Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042) (chore) — `todo/design-system-x7k2p-lifecycle-status-vocabulary-readme-sync.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **design-system-x7k2p** — Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042) (chore) — `doing/design-system-x7k2p-lifecycle-status-vocabulary-readme-sync.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
