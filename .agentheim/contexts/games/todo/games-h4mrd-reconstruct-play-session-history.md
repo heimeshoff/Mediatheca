@@ -106,6 +106,13 @@ the first drift check reports all 42 rows as `onlyInLive`.
 containing a `Play_session_*` or `Prior_play_time_recorded` event, so a crash mid-run leaves a state a
 re-run completes and can never double-append.
 
+**The completion marker is also the Steam-sync gate** (`games-p6vkz`, `syncGateOpen`): until it is
+set on a store containing `Game_play_time_set` events, `runSync` refuses to dispatch. This closes the
+deploy-to-migration window race in which a scheduled sync would append `Prior_play_time_recorded` to
+untouched streams that this migration's per-stream refusal would then skip. Write the marker **only
+after** the migration transaction commits — a marker written early would open the sync onto a
+half-migrated store.
+
 The dry-run preview must report: streams to be touched, events to be appended, games covered by the
 table vs by reconstruction, prior-playtime lumps to be recorded, cursor reconciliations to be emitted,
 negative deltas skipped, and any slug failing the `Σ table rows = t_last` integrity gate.
@@ -124,6 +131,7 @@ negative deltas skipped, and any slug failing the `Σ table rows = t_last` integ
 - [ ] `SELECT COUNT(*) FROM game_play_session WHERE source NOT IN ('steam','manual')` returns 0 — no `Imported` case exists.
 - [ ] **`checkProjectionDrift` returns an empty discrepancy list for `PlaySessionProjection` and `GameProjection` after Rebuild-all.**
 - [ ] A second run appends 0 events, changes 0 rows, and leaves `getMaxGlobalPosition` unchanged.
+- [ ] Expecto: with legacy `Game_play_time_set` events present and no completion marker, the sync gate refuses; after a successful migration run the marker exists and the gate opens — the deploy-window race, end to end.
 - [ ] `tests/Server.Tests/PlaySessionMigrationTests.fs` exercises `plan` as a pure function, including a fixture reproducing Grounded's full 509→570→…→2952→2282 sequence alongside its 8-row table slice and its snapshot row.
 - [ ] `npm test` passes; `npm run build` passes.
 

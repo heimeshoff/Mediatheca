@@ -102,7 +102,25 @@ and the existing code already dates it correctly from `rtime_last_played`; above
 one sitting, so it is accumulated history.
 
 Putting the threshold in `decide` rather than the adapter makes the whole Steam policy a pure,
-directly-testable function; the adapter's only remaining job is supplying `(observedMinutes, gamingDay)`.
+directly-testable function; the adapter's remaining jobs are supplying `(observedMinutes, gamingDay)`
+and enforcing the migration gate below.
+
+### The sync is gated until the history migration has run
+
+`runSync` must not dispatch `Record_steam_observed_total` while the store still contains
+`Game_play_time_set` events and the `play_session_migration_completed` setting (written by
+`games-h4mrd` on success) is absent. The race it closes: on a legacy store every game reconstitutes
+with `SteamObservedMinutes = 0`, so an ungated sync in the deploy-to-migration window treats all 157
+games as first sight and appends `Prior_play_time_recorded` lumps to untouched streams — and
+`games-h4mrd`'s per-stream idempotency refusal then skips exactly those streams, permanently leaving
+their real history unreconstructed. The window is not hypothetical: the migration is
+operator-triggered, so scheduled syncs fire inside it unless gated.
+
+Shape: a pure `PlaytimeTracker.syncGateOpen : hasLegacyPlayTimeEvents: bool -> migrationCompleted: bool -> bool`,
+called once at the top of `runSync` (a store-level condition, so it lives in the adapter, not
+`decide`), skipping the run with an `eprintfn` naming the un-gate condition. The gate self-retires:
+a fresh install has no `Game_play_time_set` events and is never gated; an existing install un-gates
+the moment the migration completes. No setting, no UI, nothing to remove later.
 
 ### Two folds, not one — the trap that makes the cursor derivable
 
@@ -209,6 +227,7 @@ vanishing into a rewritten row.
 - [ ] Expecto: `Record_steam_observed_total` on an unseen game with `observedMinutes = 180` emits one `Play_session_recorded` dated at the supplied gaming day, plus promotion.
 - [ ] Expecto: boundary — `observedMinutes = 960` emits a session; `961` emits `Prior_play_time_recorded`.
 - [ ] Expecto: after prior playtime of 30000, a later `Record_steam_observed_total 30120` emits one 120-minute session.
+- [ ] Expecto: `syncGateOpen` (pure) — refuses with legacy events present and the marker absent; permits with the marker set; permits with no legacy events regardless of the marker.
 - [ ] **Expecto (the phantom-session regression): record 509 prior, then sessions summing to 2443 (total 2952), then remove a 670-minute session. `TotalPlayTimeMinutes` = 2282 and `SteamObservedMinutes` = 2952; a subsequent `Record_steam_observed_total 2952` emits nothing.**
 - [ ] Expecto: `Steam_observed_total_reconciled 2952` on a game whose sessions sum to 2282 leaves `TotalPlayTimeMinutes` at 2282 and sets `SteamObservedMinutes` to 2952; a following `Record_steam_observed_total 2952` then emits nothing.
 - [ ] Expecto: `Record_prior_play_time` on a game that already has prior playtime returns `Error`.
