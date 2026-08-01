@@ -169,6 +169,19 @@ let gameTests =
             | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
             | Error e -> failtest $"Expected success but got: {e}"
 
+        testCase "Adding a different family owner is not idempotent" <| fun _ ->
+            let result = givenWhenThen
+                            [ Game_added_to_library sampleGameData; Game_family_owner_added "marco" ]
+                            (Add_family_owner "sophie")
+            match result with
+            | Ok events -> Expect.equal (List.length events) 1 "A different friend slug should produce one event"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Reconstitute yields identical state with and without a duplicate family owner event" <| fun _ ->
+            let withoutDuplicate = reconstitute [ Game_added_to_library sampleGameData; Game_family_owner_added "marco" ]
+            let withDuplicate = reconstitute [ Game_added_to_library sampleGameData; Game_family_owner_added "marco"; Game_family_owner_added "marco" ]
+            Expect.equal withDuplicate withoutDuplicate "State should be identical regardless of duplicate Game_family_owner_added events"
+
         testCase "Removing a family owner" <| fun _ ->
             let result = givenWhenThen
                             [ Game_added_to_library sampleGameData; Game_family_owner_added "marco" ]
@@ -317,6 +330,19 @@ let gameTests =
             match result with
             | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
             | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Setting a different steam app id is not idempotent" <| fun _ ->
+            let result = givenWhenThen
+                            [ Game_added_to_library sampleGameData; Game_steam_app_id_set 292030 ]
+                            (Set_steam_app_id 292031)
+            match result with
+            | Ok events -> Expect.equal (List.length events) 1 "A different appId should produce one event"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Reconstitute yields identical state with and without a duplicate steam app id event" <| fun _ ->
+            let withoutDuplicate = reconstitute [ Game_added_to_library sampleGameData; Game_steam_app_id_set 292030 ]
+            let withDuplicate = reconstitute [ Game_added_to_library sampleGameData; Game_steam_app_id_set 292030; Game_steam_app_id_set 292030 ]
+            Expect.equal withDuplicate withoutDuplicate "State should be identical regardless of duplicate Game_steam_app_id_set events"
 
         testCase "Setting play time" <| fun _ ->
             let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Set_play_time 3600)

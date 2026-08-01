@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 19:17 -- Task verified and completed: games-w4tzc - Make the retained external-identity Game events idempotent — Set_steam_app_id and Add_family_owner re-emit on every sync for values that never change, unlike Set_steam_library_date which already guards
+
+**Type:** Work / Task completion
+**Task:** games-w4tzc - Make the retained external-identity Game events idempotent — Set_steam_app_id and Add_family_owner re-emit on every sync for values that never change, unlike Set_steam_library_date which already guards
+**Summary:** Confirmed the Set_steam_app_id and Add_family_owner idempotence guards already exist in Games.decide (predating this session) and added the four missing Expecto cases making the acceptance criteria explicit - no production change needed, the re-emission premise was stale
+**Duration:** 12m
+**Verification:** PASS (iteration 1)
+**Files changed:** 1
+**Tests added:** 4
+**ADRs written:** none
+
+---
+
 ## 2026-08-01 19:05 -- Batch started: [administration-c3nvp, games-p6vkz, games-w4tzc]
 
 **Type:** Work / Batch start

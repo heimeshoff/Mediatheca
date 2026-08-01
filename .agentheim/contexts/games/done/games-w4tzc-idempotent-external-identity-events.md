@@ -1,11 +1,11 @@
 ---
 id: games-w4tzc
 title: Make the retained external-identity Game events idempotent — Set_steam_app_id and Add_family_owner re-emit on every sync for values that never change, unlike Set_steam_library_date which already guards
-status: doing
+status: done
 type: bug
 context: games
 created: 2026-08-01
-completed:
+completed: 2026-08-01
 depends_on: [infrastructure-e4kwm]
 blocks: []
 tags: [games, steam, idempotence, event-log]
@@ -48,3 +48,35 @@ the existing `Set_steam_library_date` idiom at `Games.fs:294-296`.
 
 This does not remove the ~1000 existing duplicates — that is `administration-z6ymt`'s job, deferred.
 It stops the bleeding.
+
+## Outcome
+
+Investigated `Games.decide` (`src/Server/Games.fs`) before writing any production code, per this
+worker's TDD discipline. Both guards described in the "What" section **already existed**:
+
+- `Set_steam_app_id` (`Games.fs:272-274`, `if game.SteamAppId = Some steamAppId then Ok [] else ...`)
+  — introduced in commit `a4d16977` (2026-02-15), predating this session.
+- `Add_family_owner` (`Games.fs:244-246`, `if game.FamilyOwners |> Set.contains friendSlug then Ok []
+  else ...`) — introduced in commit `2dcfca42` (2026-02-15), predating this session.
+
+Both guards are structurally identical to the `Set_steam_library_date` idiom this task cites as the
+model (`Games.fs:294-296`). The event-count skew in the Why section (964/908 for family owner) reads
+as legitimate multi-owner families (a game can have more than one family owner slug) rather than a
+missing-guard symptom — `Set_steam_app_id`'s own count (1019/1019, exactly 1:1) confirms no live
+duplication is occurring under current code.
+
+No production code change was made — there was nothing to fix. Per the worker's TDD-skip provisions,
+this counts as the acceptance criteria already being true rather than an under-refined task: all three
+stated Expecto criteria are testable and were added/verified in
+`tests/Server.Tests/GamesTests.fs` (some already existed, e.g. "Adding same family owner is
+idempotent" and "Setting same steam app id is idempotent"; this task added the "different value ⇒
+new event" and "reconstitute identical with/without duplicate" cases for both commands):
+
+- `Adding a different family owner is not idempotent`
+- `Reconstitute yields identical state with and without a duplicate family owner event`
+- `Setting a different steam app id is not idempotent`
+- `Reconstitute yields identical state with and without a duplicate steam app id event`
+
+All 59 `Games` Expecto tests and the full 453-test suite pass (`npm test -- --sequenced`); `npm run
+build` succeeds. The ~1000 historical duplicate events remain in the event log untouched, as intended
+— `administration-z6ymt` still owns their cleanup.
