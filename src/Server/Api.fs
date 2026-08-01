@@ -963,15 +963,22 @@ module Api =
                         // before the watch-history sync below so the row exists when
                         // Mark_episode_watched recomputes progress / next-up. TMDB stays
                         // authoritative: rows are tagged source='jellyfin' and a later TMDB
-                        // refresh enriches them in place. Still images are deferred to a
-                        // follow-up (integration-007) — best-effort fetch returns None for now,
-                        // so materialized stills are NULL until TMDB enriches.
+                        // refresh enriches them in place. Stills are fetched best-effort
+                        // (integration-007, closes the ADR 0012 deferral): downloaded via
+                        // Jellyfin.getPrimaryImageWithReauth (reuses the ADR 0011 re-auth
+                        // policy) and saved under a distinct `-jellyfin.jpg` suffix so a
+                        // later TMDB refresh is never short-circuited into keeping the
+                        // Jellyfin bytes. Any failure degrades to None, never an error.
                         let materializeResult =
                             JellyfinImport.materializeMissingEpisodes
                                 seriesBatch
                                 (SeriesProjection.getExistingEpisodeKeys conn)
                                 (SeriesProjection.getExistingSeasonNumbers conn)
-                                (fun _slug _season _ep _jellyfinId -> None)
+                                (JellyfinImport.fetchEpisodeStill
+                                    (fun jellyfinItemId ->
+                                        Jellyfin.getPrimaryImageWithReauth httpClient config persistAuth jellyfinItemId
+                                        |> Async.RunSynchronously)
+                                    (fun ref bytes -> ImageStore.saveImage imageBasePath ref bytes))
                                 (fun slug seasonNum ->
                                     try SeriesProjection.materializeSeason conn slug seasonNum; Ok ()
                                     with ex -> Error ex.Message)

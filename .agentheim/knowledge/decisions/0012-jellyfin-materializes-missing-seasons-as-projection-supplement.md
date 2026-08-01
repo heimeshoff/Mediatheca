@@ -4,7 +4,7 @@ title: Jellyfin materializes missing seasons as a projection-only supplement, TM
 scope: integration
 status: accepted
 date: 2026-06-26
-related_tasks: [integration-m4k7p]
+related_tasks: [integration-m4k7p, integration-007]
 ---
 
 # ADR 0012: Jellyfin materializes missing seasons as a projection-only supplement, TMDB stays authoritative
@@ -65,9 +65,12 @@ keeping TMDB authoritative.
   dependency cost, and self-heal (enrich + clear the badge) once TMDB adds the season.
 - Materialized rows are projection-only: a full projection rebuild drops them and the next
   sync re-creates them — identical to how TMDB-refreshed episodes already behave.
-- Still images are deferred (integration-007): the materialization seam fetches stills
-  best-effort but the v1 wiring returns `None`, so materialized stills are `NULL` until TMDB
-  enriches. This was sanctioned by the task's scope note.
+- Still images were initially deferred: the materialization seam's `fetchStill` lambda existed
+  but the v1 wiring returned `None`, so materialized stills were `NULL` until TMDB enriched
+  them. **Closed by integration-007** — the seam is now wired to a real Jellyfin fetch, storing
+  the still under a path distinct from TMDB's canonical one so TMDB enrichment still overwrites
+  it correctly, at the cost of an accepted, reclaimable orphan file after enrichment. See
+  ADR 0039 for the full decision and its interaction with the ADR-0025 orphan scanner.
 - Provenance caveat: the fix rests on the empirical fact that the user's Jellyfin holds the
   missing season. If a future Jellyfin library runs only the default TMDB scraper it could
   share TMDB's lag — non-blocking, since the fallback still strictly improves on TMDB-only.

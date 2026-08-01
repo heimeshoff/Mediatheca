@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 1
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 8
+- **Doing:** 0
+- **Done:** 9
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **integration-007** — Fetch Jellyfin episode stills when materializing a missing season (feature) — `doing/integration-007-fetch-jellyfin-episode-stills-on-materialize.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **integration-007** — Fetch Jellyfin episode stills when materializing a missing season (feature) — `done/integration-007-fetch-jellyfin-episode-stills-on-materialize.md`
 - **integration-ygwsa** — Spike — mint Steam Family access tokens from a stored refresh token (SteamKit2) (spike) — `done/integration-ygwsa-steam-family-token-spike.md`
 - **integration-m4k7p** -- Materialize a missing season/episode from Jellyfin when TMDB lacks it -- `feature` -- `done/integration-m4k7p-materialize-missing-season-from-jellyfin.md`
 - **integration-006** -- Nightly series refresh skips Ended series, so a TMDB-added season is never auto-picked-up -- `bug` -- `done/integration-006-nightly-refresh-skips-ended-series.md`
@@ -46,6 +46,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0039** -- Jellyfin-materialized stills use a distinct `-jellyfin.jpg` storage path, not TMDB's canonical one, so a later TMDB refresh is never short-circuited into keeping the Jellyfin bytes; the resulting post-enrichment orphan is accepted and reclaimed via the ADR-0025 orphan scan -- 2026-08-01 -- `knowledge/decisions/0039-jellyfin-still-distinct-storage-path-accepted-orphan.md`
 - **0019** -- Steam Family token refresh — pure mint-and-retry seam shipped, live audience/scope verification deferred to integration-hebjs -- 2026-07-20 -- `knowledge/decisions/0019-steam-family-token-refresh-seam-pending-audience-verification.md`
 - **0012** -- Jellyfin materializes missing seasons as a projection-only supplement, TMDB stays authoritative -- 2026-06-26 -- `knowledge/decisions/0012-jellyfin-materializes-missing-seasons-as-projection-supplement.md`
 - **0011** -- Jellyfin self-heals a rejected token via a pure re-auth-and-retry orchestration -- 2026-05-27 -- `knowledge/decisions/0011-jellyfin-reauth-on-401.md`

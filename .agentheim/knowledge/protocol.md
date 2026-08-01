@@ -5,6 +5,31 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 02:29 -- Task verified and completed: integration-007 - Fetch Jellyfin episode stills when materializing a missing season
+
+**Type:** Work / Task completion
+**Task:** integration-007 - Fetch Jellyfin episode stills when materializing a missing season
+**Summary:** Materialized Jellyfin episodes now get a real thumbnail — fetched best-effort from Jellyfins primary-image endpoint through the existing re-auth policy and stored at a distinct stills/{slug}-sXXeYY-jellyfin.jpg path so a later TMDB refresh still overwrites it with its own canonical still
+**Duration:** 26m
+**Verification:** PASS (iteration 2)
+**Files changed:** 9
+**Tests added:** 8
+**ADRs written:** 0039
+
+---
+
+## 2026-08-01 02:23 -- Verification failed: integration-007 - Fetch Jellyfin episode stills when materializing a missing season
+
+**Type:** Work / Verification failure
+**Task:** integration-007 - Fetch Jellyfin episode stills when materializing a missing season
+**Iteration:** 1 of 3
+**Reasons:** Check 6 (ADRs for decisions) — two embedded decisions went unrecorded with `ADRS_WRITTEN: none`: the deliberate `-jellyfin.jpg` storage-path divergence from TMDB's canonical path (whose entire purpose is defeating `SeriesRefresh`'s `imageExists` short-circuit, so a maintainer "tidying" the suffix would silently break acceptance criterion 3 with no test-visible failure), and the accepted-orphan tradeoff and its ADR-0025 orphan-scanner interaction; the task's `## Outcome` declined the ADR on the grounds the shape was already recorded in the task file's own "Resolved implementation shape" section, which is exactly the task-file-narration-for-ADR substitution check 6 forbids; and ADR 0012's Consequences is now actively stale — it still states materialized stills are `NULL` because the wiring returns `None`, the very deferral this diff closes.
+**Not in dispute:** checks 1-5 passed; `npm test` 435 passed / 0 failed (427 + 8 added), `npm run build` green, `materializeMissingEpisodes` confirmed purely additive (`numstat` 33/0 and 47/0). The `[human-eye]` criterion 6 was correctly left unchecked — builder eye-check pending.
+**Iteration hint:** likely-fixable (documentation only — no production-code change needed)
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-08-01 02:06 -- Batch started: [integration-007]
 
 **Type:** Work / Batch start

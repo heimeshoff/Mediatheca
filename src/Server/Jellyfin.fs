@@ -290,3 +290,50 @@ module Jellyfin =
             (fun token -> fetchEpisodeItems httpClient config.ServerUrl config.UserId token seriesId)
             (reauthThunk httpClient config)
             persistAuth
+
+    /// Binary sibling of `fetchJsonWithAuth` (integration-007): identical auth
+    /// header and 401/403 -> `Unauthorized` mapping, but reads the response body
+    /// as bytes for the image endpoint instead of as a string.
+    let private fetchImageBytesWithAuth (httpClient: HttpClient) (url: string) (token: string) : Async<Result<byte[], FetchError>> =
+        async {
+            try
+                use request = new HttpRequestMessage(HttpMethod.Get, url)
+                request.Headers.Add("Authorization", authHeader token)
+                let! response = httpClient.SendAsync(request) |> Async.AwaitTask
+                let status = int response.StatusCode
+                if status = 401 || status = 403 then
+                    return Error Unauthorized
+                elif not response.IsSuccessStatusCode then
+                    return Error (OtherFailure (sprintf "HTTP %d" status))
+                else
+                    let! bytes = response.Content.ReadAsByteArrayAsync() |> Async.AwaitTask
+                    return Ok bytes
+            with ex ->
+                return Error (OtherFailure ex.Message)
+        }
+
+    /// An episode/movie's primary image, sized near TMDB's `w300`-class stills
+    /// (600 for retina) and forced to Jpg so the bytes match the `.jpg`
+    /// extension materialized stills are stored under (integration-007). No
+    /// `PrimaryImageTag` pre-check: materialization only runs for the handful of
+    /// episodes missing from the projection per sync, so an unconditional
+    /// attempt is cheap and robust against `ImageTags` not being populated on
+    /// the `/Shows/{id}/Episodes` response. A missing image (404) surfaces as
+    /// `OtherFailure "HTTP 404"`.
+    let private fetchPrimaryImage (httpClient: HttpClient) (serverUrl: string) (token: string) (itemId: string) : Async<Result<byte[], FetchError>> =
+        let url = sprintf "%s/Items/%s/Images/Primary?maxWidth=600&format=Jpg" (serverUrl.TrimEnd('/')) itemId
+        fetchImageBytesWithAuth httpClient url token
+
+    /// Self-healing episode-still fetch (integration-007): built on
+    /// `withReauthRetry` exactly like `getEpisodesWithReauth`, so a 401/403 on
+    /// the image endpoint re-authenticates once, persists the fresh token, and
+    /// retries exactly once (ADR 0011 policy, unchanged — no new auth path).
+    /// Strictly best-effort by design: callers (`JellyfinImport.fetchEpisodeStill`)
+    /// degrade any `Error` — missing image, non-2xx, or a failed re-auth — to
+    /// `None` rather than surfacing it as a sync error.
+    let getPrimaryImageWithReauth (httpClient: HttpClient) (config: JellyfinConfig) (persistAuth: JellyfinAuthResult -> unit) (itemId: string) : Async<Result<byte[], string>> =
+        withReauthRetry
+            config.AccessToken
+            (fun token -> fetchPrimaryImage httpClient config.ServerUrl token itemId)
+            (reauthThunk httpClient config)
+            persistAuth

@@ -108,6 +108,39 @@ module JellyfinImport =
     let private ticksToMinutes (ticks: int64) : int =
         int (ticks / 600_000_000L)
 
+    /// Compose a still download + save into a `still_ref`, strictly best-effort
+    /// (integration-007, closes the deferral recorded in ADR 0012). Pure
+    /// orchestration over injected effects — `Api.fs` injects the real fetch
+    /// (`Jellyfin.getPrimaryImageWithReauth`, run synchronously) and
+    /// `ImageStore.saveImage`; tests inject plain lambdas. Any failure — a
+    /// download `Error`, or an exception thrown by either lambda — degrades to
+    /// `None` and never throws, matching how `materializeMissingEpisodes`
+    /// already treats its `fetchStill` parameter (see the `try ... with _ ->
+    /// None` around the call below).
+    ///
+    /// The storage path is deliberately NOT TMDB's canonical
+    /// `stills/{slug}-sXXeYY.jpg`: a distinct `-jellyfin` suffix keeps
+    /// `SeriesRefresh`'s `ImageStore.imageExists` short-circuit from ever seeing
+    /// a Jellyfin-sourced file at TMDB's path, so a later TMDB refresh still
+    /// downloads its own still and `INSERT OR REPLACE` repoints `still_ref` at
+    /// the canonical path (acceptance criterion 3).
+    let fetchEpisodeStill
+        (download: string -> Result<byte[], string>)
+        (save: string -> byte[] -> unit)
+        (slug: string)
+        (season: int)
+        (episode: int)
+        (jellyfinId: string)
+        : string option =
+        try
+            match download jellyfinId with
+            | Ok bytes ->
+                let ref = sprintf "stills/%s-s%02de%02d-jellyfin.jpg" slug season episode
+                save ref bytes
+                Some ref
+            | Error _ -> None
+        with _ -> None
+
     /// Materialize season/episode metadata from Jellyfin for episodes the
     /// TMDB-fed projection lacks (integration-m4k7p). TMDB stays authoritative:
     /// rows are written with provenance `'jellyfin'` (handled by the injected
