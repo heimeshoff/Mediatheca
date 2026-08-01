@@ -28,7 +28,14 @@ let private findFreeLoopbackPort () : int =
     listener.Stop()
     port
 
-[<EntryPoint>]
+// WebView2 is COM-based: CreateCoreWebView2EnvironmentWithOptions must be
+// called from a single-threaded apartment. .NET defaults the main thread to
+// MTA, and without this attribute Photino still creates the native window but
+// the webview never attaches to it — the window renders as a black rectangle,
+// no msedgewebview2 child process spawns, and no WebView2 user-data folder is
+// created. The failure is silent (the COM error is swallowed inside Photino's
+// async environment-creation handler), so this attribute is load-bearing.
+[<EntryPoint; STAThread>]
 let main args =
     // Composition.buildApp resolves `deploy/public` relative to the process's
     // current directory (see Composition.fs), and self-contained publish

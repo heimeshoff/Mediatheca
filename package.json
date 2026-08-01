@@ -9,6 +9,10 @@
     "build": "npm run typecheck && vite build",
     "test": "dotnet run --project tests/Server.Tests/Server.Tests.fsproj",
     "test:e2e": "playwright test",
+    "serve": "npm run build && dotnet run --project src/Server/Server.fsproj",
+    "desktop": "npm run build && dotnet run --project src/Desktop/Desktop.fsproj",
+    "desktop:publish": "npm run build && dotnet publish src/Desktop/Desktop.fsproj -c Release -r win-x64 --self-contained true -o deploy/desktop/win-x64",
+    "desktop:publish:mac": "npm run build && dotnet publish src/Desktop/Desktop.fsproj -c Release -r osx-arm64 --self-contained true -o deploy/desktop/osx-arm64",
     "deploy": "docker build -t mediatheca:latest . && docker save mediatheca:latest -o mediatheca.tar"
   },
   "dependencies": {
