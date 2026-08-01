@@ -100,7 +100,12 @@ let tests =
                 "FriendProjection", [ "friend_list" ]
                 "ContentBlockProjection", [ "content_blocks" ]
                 "CatalogProjection", [ "catalog_list"; "catalog_entries" ]
-                "SeriesProjection", [ "series_list"; "series_detail"; "series_seasons"; "series_episodes"; "series_rewatch_sessions"; "series_episode_progress" ]
+                // series-m7fdk: series_season_cache/series_episode_cache (the
+                // renamed former series_seasons/series_episodes) moved to the
+                // Cache classification below — SeriesProjection's own
+                // Projected set shrinks to the tables it still owns as a
+                // checkpoint-tracked projection.
+                "SeriesProjection", [ "series_list"; "series_detail"; "series_rewatch_sessions"; "series_episode_progress" ]
                 "GameProjection", [ "game_list"; "game_detail" ]
             ]
             let derivedFromRegistry =

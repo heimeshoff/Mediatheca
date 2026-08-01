@@ -68,7 +68,7 @@ let private seedSeriesDetail (conn: SqliteConnection) (slug: string) (tmdbId: in
 let private tmdbUpsertEpisode (conn: SqliteConnection) (slug: string) (season: int) (ep: int) =
     conn
     |> Db.newCommand """
-        INSERT OR REPLACE INTO series_episodes (series_slug, season_number, episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating)
+        INSERT OR REPLACE INTO series_episode_cache (series_slug, season_number, episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating)
         VALUES (@slug, @season, @ep, 'TMDB Title', 'TMDB overview', 42, '2026-05-26', NULL, 8.1)
     """
     |> Db.setParams [

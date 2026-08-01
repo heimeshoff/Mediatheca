@@ -47,7 +47,7 @@ module SeriesRefresh =
     /// projection for a given series.
     let private existingEpisodeKeys (conn: SqliteConnection) (slug: string) : Set<int * int> =
         conn
-        |> Db.newCommand "SELECT season_number, episode_number FROM series_episodes WHERE series_slug = @slug"
+        |> Db.newCommand "SELECT season_number, episode_number FROM series_episode_cache WHERE series_slug = @slug"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.query (fun (rd: IDataReader) ->
             rd.ReadInt32 "season_number", rd.ReadInt32 "episode_number")
@@ -235,7 +235,7 @@ module SeriesRefresh =
         for season in result.Seasons do
             conn
             |> Db.newCommand """
-                INSERT OR REPLACE INTO series_seasons (series_slug, season_number, name, overview, poster_ref, air_date, episode_count)
+                INSERT OR REPLACE INTO series_season_cache (series_slug, season_number, name, overview, poster_ref, air_date, episode_count)
                 VALUES (@series_slug, @season_number, @name, @overview, @poster_ref, @air_date, @episode_count)
             """
             |> Db.setParams [
@@ -251,7 +251,7 @@ module SeriesRefresh =
             for episode in season.Episodes do
                 conn
                 |> Db.newCommand """
-                    INSERT OR REPLACE INTO series_episodes (series_slug, season_number, episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating)
+                    INSERT OR REPLACE INTO series_episode_cache (series_slug, season_number, episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating)
                     VALUES (@series_slug, @season_number, @episode_number, @name, @overview, @runtime, @air_date, @still_ref, @tmdb_rating)
                 """
                 |> Db.setParams [

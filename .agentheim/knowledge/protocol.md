@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 20:09 -- Task verified and completed: series-m7fdk - Rename the Series season/episode tree into the metadata cache tier (ALTER TABLE RENAME, zero data movement) and replace the materialized next-up/count columns with SQL views
+
+**Type:** Work / Task completion
+**Task:** series-m7fdk - Rename the Series season/episode tree into the metadata cache tier (ALTER TABLE RENAME, zero data movement) and replace the materialized next-up/count columns with SQL views
+**Summary:** Renamed the Series season/episode tree into the metadata cache tier (series_episode_cache/series_season_cache) via idempotent ALTER TABLE RENAME with zero data movement, retargeted the ADR-0025 image-ref and ADR-0044 drift registries, and replaced the materialized next-up/count columns with two read-time SQL views
+**Duration:** 25m
+**Verification:** PASS (iteration 1)
+**Files changed:** 13
+**Tests added:** 11
+**ADRs written:** 0046-series-episode-tree-renamed-into-cache-views-replace-materialized-columns.md
+
+---
+
 ## 2026-08-01 19:44 -- Batch started: [series-m7fdk]
 
 **Type:** Work / Batch start

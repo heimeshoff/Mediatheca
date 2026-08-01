@@ -231,14 +231,14 @@ module CatalogProjection =
             FROM parsed p
             LEFT JOIN movie_list ml ON ml.slug = p.movie_slug
             LEFT JOIN series_list sl ON sl.slug = p.base_slug
-            LEFT JOIN series_seasons ss ON ss.series_slug = p.base_slug
+            LEFT JOIN series_season_cache ss ON ss.series_slug = p.base_slug
                 AND p.suffix LIKE 's%'
                 AND ss.season_number = CAST(
                     CASE WHEN INSTR(p.suffix, 'e') > 0
                     THEN SUBSTR(p.suffix, 2, INSTR(p.suffix, 'e') - 2)
                     ELSE SUBSTR(p.suffix, 2)
                     END AS INTEGER)
-            LEFT JOIN series_episodes se ON se.series_slug = p.base_slug
+            LEFT JOIN series_episode_cache se ON se.series_slug = p.base_slug
                 AND INSTR(p.suffix, 'e') > 0
                 AND se.season_number = CAST(SUBSTR(p.suffix, 2, INSTR(p.suffix, 'e') - 2) AS INTEGER)
                 AND se.episode_number = CAST(SUBSTR(p.suffix, INSTR(p.suffix, 'e') + 1) AS INTEGER)

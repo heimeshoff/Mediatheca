@@ -399,8 +399,6 @@ module Administration =
         "catalog_entries", Projected "CatalogProjection"
         "series_list", Projected "SeriesProjection"
         "series_detail", Projected "SeriesProjection"
-        "series_seasons", Projected "SeriesProjection"
-        "series_episodes", Projected "SeriesProjection"
         "series_rewatch_sessions", Projected "SeriesProjection"
         "series_episode_progress", Projected "SeriesProjection"
         "game_list", Projected "GameProjection"
@@ -421,6 +419,23 @@ module Administration =
         // over a real refresh path for it.
         "game_metadata_cache", Cache "MetadataCache"
         "movie_metadata_cache", Cache "(none yet)"
+
+        // Cache — the Series season/episode tree (series-m7fdk, ADR-0043/
+        // ADR-0045): renamed via ALTER TABLE from the former projection
+        // tables `series_seasons`/`series_episodes` — same rows, same
+        // provenance (`source`) and `still_ref`/`poster_ref` values, zero
+        // data movement. No longer checkpoint-tracked or drift-checked; a
+        // `ProjectionHandler` must never read these (see `MetadataCache.fs`'s
+        // module doc). `SeriesProjection` still writes them directly today
+        // (`series-r2xhv`, not yet landed, cuts that write path over to a
+        // command-time cache seed).
+        "series_season_cache", Cache "MetadataCache"
+        "series_episode_cache", Cache "MetadataCache"
+        // The flat per-series fields (overview, backdrop_ref, tmdb_rating,
+        // episode_runtime) seeded once from series_detail — same shape as
+        // game_metadata_cache above, ready for whichever future task cuts a
+        // reader over to it.
+        "series_metadata_cache", Cache "MetadataCache"
 
         // Imperative — written directly by non-event-sourced storage
         // modules, never through a ProjectionHandler's catch-up.
@@ -823,8 +838,8 @@ module Administration =
         "series_list", "poster_ref"
         "series_detail", "poster_ref"
         "series_detail", "backdrop_ref"
-        "series_seasons", "poster_ref"
-        "series_episodes", "still_ref"
+        "series_season_cache", "poster_ref"
+        "series_episode_cache", "still_ref"
         "game_list", "cover_ref"
         "game_detail", "cover_ref"
         "game_detail", "backdrop_ref"
@@ -839,7 +854,17 @@ module Administration =
     /// orphan diff. Missing tables (guarded by `tableExists`) contribute no
     /// refs rather than erroring, since minimal/test fixtures may not have
     /// initialized `cast_members`/`game_journal_blocks`.
-    let private getReferencedImageRefs (conn: SqliteConnection) : Set<string> =
+    ///
+    /// Not private — `series-m7fdk`'s direct test seam (AdministrationTests.fs)
+    /// asserts this returns a non-empty set for a fixture holding episode
+    /// stills/season posters after the `series_episodes`/`series_seasons` →
+    /// `series_episode_cache`/`series_season_cache` rename, the same "test the
+    /// underlying function, not just the route" shape `ProjectionDriftTests.fs`
+    /// established for `checkProjectionDrift`. A stale `imageRefColumns` entry
+    /// here would make this return an empty set for every still/poster,
+    /// which the ADR-0025 orphan purge would read as "nothing references
+    /// these" and hard-delete the entire stills/poster cache.
+    let getReferencedImageRefs (conn: SqliteConnection) : Set<string> =
         imageRefColumns
         |> List.collect (fun (table, column) ->
             if not (tableExists conn table) then

@@ -103,11 +103,21 @@ let private insertContentBlock (conn: SqliteConnection) (blockId: string) (movie
 
 let private insertSeriesEpisode (conn: SqliteConnection) (seriesSlug: string) (season: int) (episode: int) (stillRef: string) : unit =
     use cmd = conn.CreateCommand()
-    cmd.CommandText <- "INSERT INTO series_episodes (series_slug, season_number, episode_number, still_ref) VALUES (@s, @se, @ep, @ref)"
+    cmd.CommandText <- "INSERT INTO series_episode_cache (series_slug, season_number, episode_number, still_ref) VALUES (@s, @se, @ep, @ref)"
     cmd.Parameters.AddWithValue("@s", seriesSlug) |> ignore
     cmd.Parameters.AddWithValue("@se", season) |> ignore
     cmd.Parameters.AddWithValue("@ep", episode) |> ignore
     cmd.Parameters.AddWithValue("@ref", stillRef) |> ignore
+    cmd.ExecuteNonQuery() |> ignore
+
+/// series-m7fdk: the season-poster counterpart to `insertSeriesEpisode`,
+/// against the renamed `series_season_cache` (formerly `series_seasons`).
+let private insertSeriesSeasonPoster (conn: SqliteConnection) (seriesSlug: string) (season: int) (posterRef: string) : unit =
+    use cmd = conn.CreateCommand()
+    cmd.CommandText <- "INSERT INTO series_season_cache (series_slug, season_number, poster_ref) VALUES (@s, @se, @ref)"
+    cmd.Parameters.AddWithValue("@s", seriesSlug) |> ignore
+    cmd.Parameters.AddWithValue("@se", season) |> ignore
+    cmd.Parameters.AddWithValue("@ref", posterRef) |> ignore
     cmd.ExecuteNonQuery() |> ignore
 
 /// Simulates a cast member's image being dropped (the realistic path to "no
@@ -603,7 +613,7 @@ let administrationTests =
                     Expect.isEmpty (orphans |> List.filter (fun o -> o.RelativePath = "content/game-journal-1.jpg")) "Referenced game journal image should not be orphan"
                 | OrphanScanBlocked reason -> failwith reason)
 
-        testCase "a series_episodes.still_ref is never flagged orphan" <| fun _ ->
+        testCase "a series_episode_cache.still_ref is never flagged orphan" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapAdmin
             let conn = db.Connection
             insertSeriesEpisode conn "the-wire" 1 2 "stills/the-wire-s01e02.jpg"
@@ -614,6 +624,33 @@ let administrationTests =
                 | OrphanScanReady (orphans, _) ->
                     Expect.isEmpty (orphans |> List.filter (fun o -> o.RelativePath = "stills/the-wire-s01e02.jpg")) "Referenced episode still should not be orphan"
                 | OrphanScanBlocked reason -> failwith reason)
+
+        // series-m7fdk (data-loss regression, deliberately its own standalone
+        // assertion, not folded into the orphan-scan test above): a stale
+        // `imageRefColumns` entry still naming `series_episodes`/
+        // `series_seasons` after the rename would make `tableExists` report
+        // false for both, so `getReferencedImageRefs` would silently return
+        // an empty set for every episode still and season poster in the
+        // library — and the ADR-0025 orphan purge reads "referenced by
+        // nothing" as license to hard-delete the file. This test calls
+        // `getReferencedImageRefs` directly against the renamed cache tables
+        // and asserts it is non-empty, so a regression here fails loudly
+        // instead of only showing up as "my episode stills vanished after a
+        // purge".
+        testCase "getReferencedImageRefs (ADR-0025 data-loss regression) returns a non-empty set for a renamed episode still and season poster" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
+            insertSeriesEpisode conn "the-wire" 1 2 "stills/the-wire-s01e02.jpg"
+            insertSeriesSeasonPoster conn "the-wire" 1 "posters/the-wire-s01.jpg"
+
+            let referenced = Administration.getReferencedImageRefs conn
+
+            Expect.isNonEmpty referenced
+                "getReferencedImageRefs must return a non-empty set once series_episode_cache/series_season_cache hold live stills/posters"
+            Expect.isTrue (Set.contains "stills/the-wire-s01e02.jpg" referenced)
+                "series_episode_cache.still_ref must be counted as a live reference after the rename"
+            Expect.isTrue (Set.contains "posters/the-wire-s01.jpg" referenced)
+                "series_season_cache.poster_ref must be counted as a live reference after the rename"
 
         testCase "a cast/<id>.jpg is not flagged orphan while a cast_members row references it, and is flagged once no row does" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapAdmin

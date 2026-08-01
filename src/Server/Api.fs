@@ -1764,7 +1764,7 @@ module Api =
                     |> Db.newCommand """
                         SELECT COALESCE(SUM(e.runtime), 0) as total
                         FROM (SELECT DISTINCT series_slug, season_number, episode_number FROM series_episode_progress) p
-                        JOIN series_episodes e ON e.series_slug = p.series_slug AND e.season_number = p.season_number AND e.episode_number = p.episode_number
+                        JOIN series_episode_cache e ON e.series_slug = p.series_slug AND e.season_number = p.season_number AND e.episode_number = p.episode_number
                     """
                     |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
                     |> Option.defaultValue 0
@@ -2022,7 +2022,7 @@ module Api =
                     |> Db.newCommand """
                         SELECT COALESCE(SUM(e.runtime), 0) as total
                         FROM (SELECT DISTINCT series_slug, season_number, episode_number FROM series_episode_progress) p
-                        JOIN series_episodes e ON e.series_slug = p.series_slug AND e.season_number = p.season_number AND e.episode_number = p.episode_number
+                        JOIN series_episode_cache e ON e.series_slug = p.series_slug AND e.season_number = p.season_number AND e.episode_number = p.episode_number
                     """
                     |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
                     |> Option.defaultValue 0

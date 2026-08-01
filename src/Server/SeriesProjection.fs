@@ -47,7 +47,7 @@ module SeriesProjection =
                 in_focus INTEGER NOT NULL DEFAULT 0
             );
 
-            CREATE TABLE IF NOT EXISTS series_seasons (
+            CREATE TABLE IF NOT EXISTS series_season_cache (
                 series_slug TEXT NOT NULL,
                 season_number INTEGER NOT NULL,
                 name TEXT NOT NULL DEFAULT '',
@@ -59,7 +59,7 @@ module SeriesProjection =
                 PRIMARY KEY (series_slug, season_number)
             );
 
-            CREATE TABLE IF NOT EXISTS series_episodes (
+            CREATE TABLE IF NOT EXISTS series_episode_cache (
                 series_slug TEXT NOT NULL,
                 season_number INTEGER NOT NULL,
                 episode_number INTEGER NOT NULL,
@@ -119,12 +119,12 @@ module SeriesProjection =
         // "metadata pending" flag for free, no second code path.
         try
             conn
-            |> Db.newCommand "ALTER TABLE series_episodes ADD COLUMN source TEXT NOT NULL DEFAULT 'tmdb'"
+            |> Db.newCommand "ALTER TABLE series_episode_cache ADD COLUMN source TEXT NOT NULL DEFAULT 'tmdb'"
             |> Db.exec
         with _ -> () // Column already exists
         try
             conn
-            |> Db.newCommand "ALTER TABLE series_seasons ADD COLUMN source TEXT NOT NULL DEFAULT 'tmdb'"
+            |> Db.newCommand "ALTER TABLE series_season_cache ADD COLUMN source TEXT NOT NULL DEFAULT 'tmdb'"
             |> Db.exec
         with _ -> () // Column already exists
 
@@ -139,13 +139,25 @@ module SeriesProjection =
         with ex ->
             eprintfn "[SeriesProjection] Could not create UNIQUE index on series_detail.tmdb_id (likely duplicate rows present): %s" ex.Message
 
+        // series-m7fdk: `series_next_up`'s (MetadataCache.fs) LEFT JOIN against
+        // series_episode_progress can't use that table's PK — its PK is
+        // (series_slug, rewatch_id, season_number, episode_number), but the
+        // view joins on (series_slug, season_number, episode_number) only, to
+        // find episodes unwatched across every rewatch session. Indexes are
+        // invisible to `PRAGMA table_info`, so this doesn't show up in
+        // ADR-0031's drift diff, and exists identically in the shadow
+        // connection used there.
+        conn
+        |> Db.newCommand "CREATE INDEX IF NOT EXISTS idx_series_progress_slug_episode ON series_episode_progress (series_slug, season_number, episode_number)"
+        |> Db.exec
+
     let private dropTables (conn: SqliteConnection) : unit =
         conn
         |> Db.newCommand """
             DROP TABLE IF EXISTS series_list;
             DROP TABLE IF EXISTS series_detail;
-            DROP TABLE IF EXISTS series_seasons;
-            DROP TABLE IF EXISTS series_episodes;
+            DROP TABLE IF EXISTS series_season_cache;
+            DROP TABLE IF EXISTS series_episode_cache;
             DROP TABLE IF EXISTS series_rewatch_sessions;
             DROP TABLE IF EXISTS series_episode_progress;
         """
@@ -171,7 +183,7 @@ module SeriesProjection =
             conn
             |> Db.newCommand """
                 SELECT e.season_number, e.episode_number, e.name
-                FROM series_episodes e
+                FROM series_episode_cache e
                 WHERE e.series_slug = @slug
                 AND NOT EXISTS (
                     SELECT 1 FROM series_episode_progress p
@@ -294,7 +306,7 @@ module SeriesProjection =
                         for season in data.Seasons do
                             conn
                             |> Db.newCommand """
-                                INSERT OR REPLACE INTO series_seasons (series_slug, season_number, name, overview, poster_ref, air_date, episode_count)
+                                INSERT OR REPLACE INTO series_season_cache (series_slug, season_number, name, overview, poster_ref, air_date, episode_count)
                                 VALUES (@series_slug, @season_number, @name, @overview, @poster_ref, @air_date, @episode_count)
                             """
                             |> Db.setParams [
@@ -311,7 +323,7 @@ module SeriesProjection =
                             for episode in season.Episodes do
                                 conn
                                 |> Db.newCommand """
-                                    INSERT OR REPLACE INTO series_episodes (series_slug, season_number, episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating)
+                                    INSERT OR REPLACE INTO series_episode_cache (series_slug, season_number, episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating)
                                     VALUES (@series_slug, @season_number, @episode_number, @name, @overview, @runtime, @air_date, @still_ref, @tmdb_rating)
                                 """
                                 |> Db.setParams [
@@ -346,11 +358,11 @@ module SeriesProjection =
                     |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.exec
                     conn
-                    |> Db.newCommand "DELETE FROM series_seasons WHERE series_slug = @slug"
+                    |> Db.newCommand "DELETE FROM series_season_cache WHERE series_slug = @slug"
                     |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.exec
                     conn
-                    |> Db.newCommand "DELETE FROM series_episodes WHERE series_slug = @slug"
+                    |> Db.newCommand "DELETE FROM series_episode_cache WHERE series_slug = @slug"
                     |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.exec
                     conn
@@ -575,10 +587,10 @@ module SeriesProjection =
                     recalculateProgress conn slug
 
                 | Series.Season_marked_watched data ->
-                    // Get all episodes in this season from series_episodes
+                    // Get all episodes in this season from series_episode_cache
                     let episodes =
                         conn
-                        |> Db.newCommand "SELECT episode_number FROM series_episodes WHERE series_slug = @slug AND season_number = @season_number"
+                        |> Db.newCommand "SELECT episode_number FROM series_episode_cache WHERE series_slug = @slug AND season_number = @season_number"
                         |> Db.setParams [ "slug", SqlType.String slug; "season_number", SqlType.Int32 data.SeasonNumber ]
                         |> Db.query (fun (rd: IDataReader) -> rd.ReadInt32 "episode_number")
                     for epNum in episodes do
@@ -712,7 +724,7 @@ module SeriesProjection =
         let today = todayLocal()
         conn
         |> Db.newCommand """
-            SELECT air_date FROM series_episodes
+            SELECT air_date FROM series_episode_cache
             WHERE series_slug = @slug AND air_date IS NOT NULL AND air_date >= @today
             ORDER BY air_date
             LIMIT 1
@@ -728,12 +740,12 @@ module SeriesProjection =
         conn
         |> Db.newCommand """
             SELECT s.air_date
-            FROM series_seasons s
+            FROM series_season_cache s
             WHERE s.series_slug = @slug
               AND s.air_date IS NOT NULL
               AND s.air_date >= @today
               AND NOT EXISTS (
-                SELECT 1 FROM series_episodes e
+                SELECT 1 FROM series_episode_cache e
                 WHERE e.series_slug = s.series_slug
                   AND e.season_number = s.season_number
                   AND e.air_date IS NOT NULL
@@ -874,14 +886,14 @@ module SeriesProjection =
             // Get seasons
             let seasons =
                 conn
-                |> Db.newCommand "SELECT series_slug, season_number, name, overview, poster_ref, air_date, episode_count FROM series_seasons WHERE series_slug = @slug ORDER BY season_number"
+                |> Db.newCommand "SELECT series_slug, season_number, name, overview, poster_ref, air_date, episode_count FROM series_season_cache WHERE series_slug = @slug ORDER BY season_number"
                 |> Db.setParams [ "slug", SqlType.String slug ]
                 |> Db.query (fun (rd2: IDataReader) ->
                     let seasonNumber = rd2.ReadInt32 "season_number"
                     // Get episodes for this season
                     let episodes =
                         conn
-                        |> Db.newCommand "SELECT episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating, source FROM series_episodes WHERE series_slug = @slug AND season_number = @season_number ORDER BY episode_number"
+                        |> Db.newCommand "SELECT episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating, source FROM series_episode_cache WHERE series_slug = @slug AND season_number = @season_number ORDER BY episode_number"
                         |> Db.setParams [ "slug", SqlType.String slug; "season_number", SqlType.Int32 seasonNumber ]
                         |> Db.query (fun (rd3: IDataReader) ->
                             let epNum = rd3.ReadInt32 "episode_number"
@@ -1114,7 +1126,7 @@ module SeriesProjection =
     /// (season, episode) keys currently in the projection for a series.
     let getExistingEpisodeKeys (conn: SqliteConnection) (slug: string) : Set<int * int> =
         conn
-        |> Db.newCommand "SELECT season_number, episode_number FROM series_episodes WHERE series_slug = @slug"
+        |> Db.newCommand "SELECT season_number, episode_number FROM series_episode_cache WHERE series_slug = @slug"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.query (fun (rd: IDataReader) -> rd.ReadInt32 "season_number", rd.ReadInt32 "episode_number")
         |> Set.ofList
@@ -1122,7 +1134,7 @@ module SeriesProjection =
     /// Season numbers currently in the projection for a series.
     let getExistingSeasonNumbers (conn: SqliteConnection) (slug: string) : Set<int> =
         conn
-        |> Db.newCommand "SELECT season_number FROM series_seasons WHERE series_slug = @slug"
+        |> Db.newCommand "SELECT season_number FROM series_season_cache WHERE series_slug = @slug"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.query (fun (rd: IDataReader) -> rd.ReadInt32 "season_number")
         |> Set.ofList
@@ -1135,7 +1147,7 @@ module SeriesProjection =
     let getJellyfinEpisodesMissingStill (conn: SqliteConnection) (slug: string) : Set<int * int> =
         conn
         |> Db.newCommand
-            "SELECT season_number, episode_number FROM series_episodes
+            "SELECT season_number, episode_number FROM series_episode_cache
              WHERE series_slug = @slug AND source = 'jellyfin' AND still_ref IS NULL"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.query (fun (rd: IDataReader) -> rd.ReadInt32 "season_number", rd.ReadInt32 "episode_number")
@@ -1143,11 +1155,11 @@ module SeriesProjection =
 
     /// Insert a synthetic, number-only season row sourced from Jellyfin. INSERT OR
     /// IGNORE so a real TMDB season is never clobbered. Without this row the detail
-    /// read (which iterates series_seasons) would orphan the episode.
+    /// read (which iterates series_season_cache) would orphan the episode.
     let materializeSeason (conn: SqliteConnection) (slug: string) (seasonNumber: int) : unit =
         conn
         |> Db.newCommand """
-            INSERT OR IGNORE INTO series_seasons (series_slug, season_number, name, overview, poster_ref, air_date, episode_count, source)
+            INSERT OR IGNORE INTO series_season_cache (series_slug, season_number, name, overview, poster_ref, air_date, episode_count, source)
             VALUES (@series_slug, @season_number, @name, '', NULL, NULL, 0, 'jellyfin')
         """
         |> Db.setParams [
@@ -1162,7 +1174,7 @@ module SeriesProjection =
     let materializeEpisode (conn: SqliteConnection) (slug: string) (ep: JellyfinImport.MaterializedEpisode) : unit =
         conn
         |> Db.newCommand """
-            INSERT OR IGNORE INTO series_episodes (series_slug, season_number, episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating, source)
+            INSERT OR IGNORE INTO series_episode_cache (series_slug, season_number, episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating, source)
             VALUES (@series_slug, @season_number, @episode_number, @name, @overview, @runtime, @air_date, @still_ref, NULL, 'jellyfin')
         """
         |> Db.setParams [
@@ -1189,7 +1201,7 @@ module SeriesProjection =
     let backfillEpisodeStill (conn: SqliteConnection) (slug: string) (season: int) (episode: int) (stillRef: string) : unit =
         conn
         |> Db.newCommand
-            "UPDATE series_episodes SET still_ref = @still_ref
+            "UPDATE series_episode_cache SET still_ref = @still_ref
              WHERE series_slug = @slug AND season_number = @season AND episode_number = @episode
                AND source = 'jellyfin' AND still_ref IS NULL"
         |> Db.setParams [
@@ -1220,7 +1232,7 @@ module SeriesProjection =
             FROM series_list sl
             LEFT JOIN series_rewatch_sessions rs ON rs.series_slug = sl.slug AND rs.is_default = 1
             LEFT JOIN series_detail sd ON sd.slug = sl.slug
-            LEFT JOIN series_episodes ep ON ep.series_slug = sl.slug AND ep.season_number = sl.next_up_season AND ep.episode_number = sl.next_up_episode
+            LEFT JOIN series_episode_cache ep ON ep.series_slug = sl.slug AND ep.season_number = sl.next_up_season AND ep.episode_number = sl.next_up_episode
             LEFT JOIN jellyfin_episode jej ON jej.series_slug = sl.slug AND jej.season_number = sl.next_up_season AND jej.episode_number = sl.next_up_episode
             WHERE sl.abandoned = 0
               AND (sl.next_up_season IS NOT NULL
@@ -1283,7 +1295,7 @@ module SeriesProjection =
               AverageRuntimeMinutes =
                 let avgRt =
                     conn
-                    |> Db.newCommand "SELECT AVG(runtime) as avg_rt FROM series_episodes WHERE series_slug = @slug AND runtime IS NOT NULL"
+                    |> Db.newCommand "SELECT AVG(runtime) as avg_rt FROM series_episode_cache WHERE series_slug = @slug AND runtime IS NOT NULL"
                     |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.querySingle (fun rd2 ->
                         if rd2.IsDBNull(rd2.GetOrdinal("avg_rt")) then None
@@ -1538,7 +1550,7 @@ module SeriesProjection =
         |> Db.newCommand """
             SELECT COALESCE(SUM(e.runtime), 0) as total
             FROM (SELECT DISTINCT series_slug, season_number, episode_number FROM series_episode_progress) p
-            JOIN series_episodes e ON e.series_slug = p.series_slug AND e.season_number = p.season_number AND e.episode_number = p.episode_number
+            JOIN series_episode_cache e ON e.series_slug = p.series_slug AND e.season_number = p.season_number AND e.episode_number = p.episode_number
         """
         |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
         |> Option.defaultValue 0
@@ -1628,7 +1640,7 @@ module SeriesProjection =
             SELECT strftime('%Y-%m', sep.watched_date) as month,
                    COALESCE(SUM(e.runtime), 0) as minutes
             FROM series_episode_progress sep
-            JOIN series_episodes e ON e.series_slug = sep.series_slug
+            JOIN series_episode_cache e ON e.series_slug = sep.series_slug
                 AND e.season_number = sep.season_number
                 AND e.episode_number = sep.episode_number
             WHERE sep.watched_date >= date('now', '-12 months')

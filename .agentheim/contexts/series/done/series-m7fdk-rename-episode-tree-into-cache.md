@@ -1,15 +1,15 @@
 ---
 id: series-m7fdk
 title: Rename the Series season/episode tree into the metadata cache tier (ALTER TABLE RENAME, zero data movement) and replace the materialized next-up/count columns with SQL views
-status: doing
+status: done
 type: refactor
 context: series
 created: 2026-08-01
-completed:
+completed: 2026-08-01
 depends_on: [administration-c3nvp]
 blocks: []
 tags: [series, metadata, cache, drift, tmdb, jellyfin]
-related_adrs: [0012, 0025, 0031, 0039, 0040]
+related_adrs: [0012, 0025, 0031, 0039, 0040, 0046]
 related_research: [tv-series-metadata-fallback-sources]
 prior_art: [integration-m4k7p, integration-q7wv3, integration-007]
 ---
@@ -81,3 +81,35 @@ into a broader assertion.
 `series_seasons` and `series_episodes` cease to exist as projection tables. `SeriesProjection` stops
 writing them in `series-r2xhv`; the `Series_added_to_library` snapshot's tree becomes a **cache seed
 written at the command path**, not by replay.
+
+## Outcome
+
+`series_episodes`/`series_seasons` renamed to `series_episode_cache`/`series_season_cache` via
+`ALTER TABLE ... RENAME` in `MetadataCache.initialize` (zero data movement, idempotent, statement order
+load-bearing both within the function and against `Composition.buildApp`'s existing call order). Every
+literal SQL reference to the old names across `SeriesProjection.fs`, `SeriesRefresh.fs`,
+`CatalogProjection.fs`, `Api.fs`, and `Administration.fs` was mechanically renamed to match — not just
+the two ADR-0040 functions the task named, since leaving any other reference on the old name would fail
+at runtime the moment the rename ran. Added `series_metadata_cache` (seeded from `series_detail`),
+`fetched_at` on both renamed tables, and two read-time SQL views (`series_next_up`,
+`series_episode_counts`) replacing the materialized `series_list` columns a `ProjectionHandler` can no
+longer maintain now that its source tables left the `Projected` set. Added
+`idx_series_progress_slug_episode` to `SeriesProjection.createTables` to back the view's join.
+Retargeted `Administration.imageRefColumns` and reclassified the renamed tables (plus the new
+`series_metadata_cache`) `Cache "MetadataCache"` in `Administration.tableRegistry`; updated
+`TableClassificationTests.fs`'s coverage assertions to match. Made `Administration.getReferencedImageRefs`
+a non-private test seam (matching `checkProjectionDrift`'s existing pattern) so the data-loss regression
+test could call it directly.
+
+Key files: `src/Server/MetadataCache.fs`, `src/Server/SeriesProjection.fs`, `src/Server/SeriesRefresh.fs`,
+`src/Server/CatalogProjection.fs`, `src/Server/Api.fs`, `src/Server/JellyfinImport.fs`,
+`src/Server/Administration.fs`, `tests/Server.Tests/MetadataCacheTests.fs`,
+`tests/Server.Tests/AdministrationTests.fs`, `tests/Server.Tests/TableClassificationTests.fs`,
+`tests/Server.Tests/JellyfinStillTests.fs`, `tests/Server.Tests/JellyfinMaterializeTests.fs`.
+
+No BC README change: this task moved a persistence tier, not any ubiquitous language, aggregate,
+event/command, or invariant — "Season", "Episode", and "Next Up" mean exactly what the README already
+says. See `.agentheim/knowledge/decisions/0046-series-episode-tree-renamed-into-cache-views-replace-materialized-columns.md`
+for the full design rationale.
+
+All 464 Expecto tests pass (`--sequenced`); `npm run build` passes.

@@ -221,7 +221,8 @@ module JellyfinImport =
                         else
                             try
                                 // A synthetic season row must exist first or the
-                                // detail read (which iterates series_seasons) would
+                                // detail read (which iterates series_season_cache,
+                                // formerly series_seasons — series-m7fdk) would
                                 // orphan the episode and never render it.
                                 let seasonReady =
                                     if ensuredSeasons |> Set.contains seasonNum then
