@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 10:42 -- Modeling / Captured: integration-q7wv3 - Episodes materialized before integration-007 never get a still — the backfill gap
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** backlog
+**Summary:** The builder performed `integration-007`'s pending `[human-eye]` criterion 6 against the live Jellyfin server and found *Interview with the Vampire* S3 still showing the placeholder TV icon. Root-caused during this session against the running code and the live DB: `materializeMissingEpisodes` skips any `(season, episode)` already in `getExistingEpisodeKeys` — a query that ignores `still_ref` — so `fetchStill` is unreachable for the seven `source='jellyfin'`, `still_ref=NULL` rows an earlier sync created while the fetch was still ADR 0012's stub; and `materializeEpisode` is `INSERT OR IGNORE`, so no UPDATE path exists to fill the column even if the skip were lifted. Zero `*-jellyfin.jpg` files exist on disk — the fetch has never run in production, and every series synced before `366defb` is affected. `integration-007`'s code is correct; its scope never reached pre-existing rows. Captured to `backlog/` rather than `todo/`: the builder scoped the fix to Jellyfin-sourced rows only (keeping ADR 0012's supplement boundary intact) but deliberately left two shape questions for refinement — how to bound refetch attempts against an episode Jellyfin genuinely has no image for, and whether the backfill widens `materializeMissingEpisodes`' skip predicate or runs as a separate sweep.
+
+---
+
 ## 2026-08-01 02:34 -- Work session ended
 
 **Type:** Work / Session end
