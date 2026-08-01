@@ -11,20 +11,20 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 3
-- **Doing:** 0
+- **Todo:** 2
+- **Doing:** 1
 - **Done:** 1
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **series-r2xhv** — Cut Series refresh and Jellyfin materialization over to cache-only writes, and narrow Series_refreshed to fire only on a real airing-status transition — making status replayable from the log for the first time (refactor) — `todo/series-r2xhv-refresh-writes-cache-only-narrow-series-refreshed.md`
 - **series-q8jwc** — Compose Series read models from the metadata cache — join in the query function, not the API layer — keeping every Shared DTO and the whole client unchanged (refactor) — `todo/series-q8jwc-compose-reads-from-metadata-cache.md`
 - **series-d5tpn** — Drop the externally-sourced columns from series_list and series_detail, prove the drift check reports zero for SeriesProjection, and retire the lossy-rebuild guard (refactor) — `todo/series-d5tpn-drop-columns-prove-drift-zero.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **series-r2xhv** — Cut Series refresh and Jellyfin materialization over to cache-only writes, and narrow Series_refreshed to fire only on a real airing-status transition — making status replayable from the log for the first time (refactor) — `doing/series-r2xhv-refresh-writes-cache-only-narrow-series-refreshed.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

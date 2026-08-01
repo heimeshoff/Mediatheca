@@ -1,7 +1,7 @@
 ---
 id: series-r2xhv
 title: Cut Series refresh and Jellyfin materialization over to cache-only writes, and narrow Series_refreshed to fire only on a real airing-status transition — making status replayable from the log for the first time
-status: todo
+status: doing
 type: refactor
 context: series
 created: 2026-08-01

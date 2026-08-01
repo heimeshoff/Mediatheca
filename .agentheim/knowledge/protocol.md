@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 20:09 -- Batch started: [series-r2xhv]
+
+**Type:** Work / Batch start
+**Tasks:** series-r2xhv - Cut Series refresh and Jellyfin materialization over to cache-only writes, and narrow Series_refreshed to fire only on a real airing-status transition — making status replayable from the log for the first time
+**Parallel:** no (1 worker - the ready set is exactly one task; series-q8jwc chains behind it, everything else blocked on the two stranded verified tasks awaiting builder conflict resolution)
+
+---
+
 ## 2026-08-01 20:09 -- Task verified and completed: series-m7fdk - Rename the Series season/episode tree into the metadata cache tier (ALTER TABLE RENAME, zero data movement) and replace the materialized next-up/count columns with SQL views
 
 **Type:** Work / Task completion
