@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 15:17 -- Batch started: [games-status-vocabulary-reconcile]
+
+**Type:** Work / Batch start
+**Tasks:** games-status-vocabulary-reconcile - Remodel the game lifecycle to five states — Backlog, InFocus, Retired (né Completed), Abandoned, Dismissed; OnHold removed, Playing never added — and unify DesignSystem.LifecycleStatus 1:1, wiring statusBadge into the Games pages
+**Parallel:** no (1 worker - the ready set was exactly one task; MAX_PARALLEL never bound and nothing was held back)
+
+---
+
 ## 2026-08-01 15:13 -- Modeling / Promoted: games-status-vocabulary-reconcile - Remodel the game lifecycle to five states — Backlog, InFocus, Retired (né Completed), Abandoned, Dismissed; OnHold removed, Playing never added — and unify DesignSystem.LifecycleStatus 1:1, wiring statusBadge into the Games pages
 
 **Type:** Modeling / Promote
