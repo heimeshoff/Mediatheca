@@ -5,6 +5,40 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 13:47 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 49m (batch start 12:58 → session end 13:47)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** administration-k3vmt: 1
+**Commits:** 3 (1 batch start, 1 task integration, this session-end entry)
+**Parallelism:** batch of 1 — the ready set was exactly one task. `MAX_PARALLEL` never bound; nothing was held back.
+**Session-start churn reconciliation:** 0 recognized machine-shape commits, 4 human commits since the 2026-08-01 10:20 boundary (`3bca8bb` searchLibrary removal, `3611a53` Brotli/gzip compression, `3df9150` Ctrl+K games cold-start fix, `62375ce` desktop run modes + STAThread). Two governed-surface hits flagged and written to `whats-next.md`: `62375ce` touches `src/Desktop/Program.fs` (subject of ADR-0018) and `3bca8bb` touches `src/Shared/Shared.fs` (the ADR-0004 API contract, with a client-side-search decision recorded only in a code comment). No task auto-filed. Done **by hand** — `lib/session-start-churn.mjs` still absent from installed plugin (0.9.2), sixth consecutive session.
+**Vision-conformance:** none — batch aligns with vision. administration-k3vmt sits inside the recognized "Operability & Observability — Admin Console" workstream and fixes the mobile-unreachability gap (mobile-first principle). Judged **by hand** against `## Remaining v1 Work` / `## Out of Scope (v1)` / `## Design Principles` — `lib/vision-conformance.mjs`'s `extractVisionSections` still expects section headings this vision doesn't use (fifth consecutive session). Note, not a flag: vision.md's Admin-Console "Shipped" bullet still says "tabbed `/admin` shell" — wording now stale after this task dissolved that shell into Settings.
+**Batch mix:** 100% product-facing (1 task). Classified **by hand** — `lib/vacuum-guard.mjs` still absent from plugin 0.9.2 (sixth consecutive session). Heuristic quirk worth recording again: administration-k3vmt is `type: refactor` and its worker DID list its own ADR (0041) in `FILE_LIST`, which by `classifyTask`'s letter (`.agentheim/knowledge/decisions/` in the file set → harness) would classify this obviously product-facing UI restructure as harness — the same no-meaningful-reason sensitivity the 2026-08-01 10:20 entry predicted. Classified on substance: every production file touched is client UI or e2e spec.
+**Carry-over:** left behind (user WIP, 1 file — untracked `Mediatheca Directions.html`, pre-existing, not under `.agentheim/`). No `.agentheim/`-owned stranded files. No git-registered non-main worktrees remain.
+**Worktree husks:** none left. `.worktrees/administration-k3vmt` torn down cleanly; its `node_modules` junction (needed this session — the task ran the Fable build and the full CI-gated Playwright suite in the worktree) was `rmdir`ed FIRST, and the shared `node_modules` verified intact (184 entries, `vite` present) after `git worktree remove --force`. The ADR-0037 junction-recursion trap was armed this session for the first time and the unlink-first discipline held.
+**Board state after this session:** `todo/` empty, `doing/` empty. `backlog/` holds `integration-hebjs` and `games-status-vocabulary-reconcile`. The next session will hit Phase 2's vacuum guard unless the builder promotes something — `vision.md` still has no `## Open questions` section, so the guard will have no open item to surface.
+
+**Notes carried out of this run:**
+
+1. **First-try PASS on a 20-file, 940-insertion client restructure.** The refinement's precision paid for itself: the two traps it named in advance (the `Settings.State.init` unconditional-batch cold-start trap and the criteria-7/8 dirty-banner-under-lazy-sections contradiction) were both handled correctly by the worker and both proven by dedicated network-assertion e2e specs rather than static inspection — `settings-admin-sections.spec.ts` asserts the exact query set (`["getProjectionStats"]`) on a `/settings` visit and zero admin queries on a cold start away from Settings.
+2. **The verifier ran the full triple gate** — Expecto 441/441, `npm run build` exit 0, `CI=1` Playwright 18/18 executed (not skipped) — and confirmed the `admin-surgery.spec.ts` CI gate survived verbatim while its URL assertion became a DOM assertion, exactly as the criterion demanded.
+3. **One minor doc inaccuracy left as-is** (verifier's judgment, endorsed): the task's Outcome claims the `adminSectionCard`-vs-`.velvet-card` deviation is documented in ADR-0041's Consequences; it isn't, but it IS documented at both code sites where a maintainer would meet it. Not worth a re-dispatch.
+4. **What still needs the builder's eyes** (`[human-eye]` criterion, correctly left unchecked): does `/settings` read as one coherent page rather than two apps stapled together — and `DesignSystem.navGroupBottom`'s `mt-auto` layout with a single item in the bottom group.
+
+**Harness defects observed (installed `agentheim` plugin 0.9.2, not this project):**
+
+1. **`checkpoint` still does not fold in the vacated lifecycle path** (ADR-0057 / agentic-workflow-w2njd) — vacated `doing/` path staged by hand again; git recorded a clean rename. Seventh consecutive session.
+2. **`lib/session-start-churn.mjs`, `lib/vacuum-guard.mjs`, `lib/adr-allocation.mjs`, `lib/worktree-salvage.mjs`, `lib/index-entry-length.mjs` all still absent from 0.9.2** — churn reconciliation, batch-mix, and ADR-number finalization (0041 verified collision-free by hand against 0001–0040) each done manually. Sixth/seventh consecutive session depending on module.
+3. **`lib/vision-conformance.mjs` present but inapplicable to this project's vision shape** — fifth consecutive session.
+4. **Forward slashes in the `checkpoint` CLI's `fileList` JSON worked first try on Windows again** — fourth session confirming the workaround.
+
+---
+
 ## 2026-08-01 13:42 -- Task verified and completed: administration-k3vmt - Dissolve the /admin console into Settings — its six tabs become inline collapsible sections below Data Imports, and the sidebar's bottom group drops to a single Settings button
 
 **Type:** Work / Task completion
