@@ -5,6 +5,39 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 15:44 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 27m (batch start 15:17 → session end 15:44)
+**Completed:** 1 (first-try PASS: 0, re-dispatched: 1, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** games-status-vocabulary-reconcile: 2
+**Commits:** 3 (1 batch start, 1 task integration, this session-end entry)
+**Parallelism:** batch of 1 — the ready set was exactly one task. `MAX_PARALLEL` never bound; nothing was held back.
+**Session-start churn reconciliation:** 0 recognized machine-shape commits, 0 human commits since the 2026-08-01 13:47 boundary — both intervening commits carry `[games-status-vocabulary-reconcile]` modeling trailers. Nothing flagged, no `whats-next.md` write. Done **by hand** — `lib/session-start-churn.mjs` still absent from installed plugin 0.9.2, seventh consecutive session.
+**Vision-conformance:** none — batch aligns with vision. games-status-vocabulary-reconcile implements the "Add InFocus status to Game lifecycle (Backlog → InFocus → Retired / Abandoned / Dismissed)" bullet of `## Remaining v1 Work` verbatim (the bullet was pre-updated to the five-state vocabulary during the same day's refinement, so there is zero drift by construction). Judged **by hand** — `lib/vision-conformance.mjs`'s section-heading expectations still don't match this vision's shape (sixth consecutive session).
+**Batch mix:** 100% product-facing (1 task). Classified **by hand** (`lib/vacuum-guard.mjs` still absent, seventh consecutive session) and on substance: `type: refactor` with every production file in src/ or tests/; by `classifyTask`'s letter the ADR-0042 file in FILE_LIST would flip it to harness — same known heuristic quirk as the two prior session-end entries.
+**Carry-over:** left behind (user WIP, 2 files — modified `src/Client/Pages/Settings/Views.fs` and untracked `Mediatheca Directions.html`, both pre-existing at session start, neither under `.agentheim/`). No `.agentheim/`-owned stranded files. No git-registered non-main worktrees remain.
+**Worktree husks:** none left. `.worktrees/games-status-vocabulary-reconcile` torn down cleanly; its root `node_modules` junction (created by the conductor this session so the verifier could run the Fable build) was `rmdir`ed FIRST, and the shared `node_modules` verified intact (180 entries) after `git worktree remove --force`.
+**Board state after this session:** `todo/` empty, `doing/` empty. `backlog/` holds `integration-hebjs` and the new `design-system-x7k2p` (README vocabulary sync handoff filed at the verifier's direction). Next session hits the vacuum guard unless something is promoted — vision.md still has no `## Open questions` section.
+
+**Notes carried out of this run:**
+
+1. **One verifier-fail iteration, and it was the gate working as designed:** iteration 1 shipped green code (Expecto 445/445, `npm run build` clean) but left the design-system and journal BC READMEs asserting the retired six-state vocabulary with no handoff. The verifier's suggested fix — file a design-system backlog task rather than make an out-of-scope cross-BC edit — was followed exactly in iteration 2 (`design-system-x7k2p`) and the iteration-2 verifier confirmed the handoff is real (quotes both stale lines, cites ADR-0042, four falsifiable criteria) before passing.
+2. **Legacy upcast proven by test, not inspection:** four new Expecto tests cover `"OnHold"`→InFocus and `"Completed"`→Retired at both the deserialization and full replay/projection-rebuild layers, plus any-status auto-promotion (Retired/Abandoned/Dismissed → InFocus on play). The only surviving `'Completed'`/`'OnHold'` SQL literals are the idempotent migration UPDATEs in `GameProjection.fs:79-88`.
+3. **What still needs the builder's eyes** (`[human-eye]` criterion, correctly left unchecked): do the Retired and Dismissed badges read as quiet, distinct states beside the colored ones — on the StyleGuide page and GameDetail.
+
+**Harness defects observed (installed `agentheim` plugin 0.9.2, not this project):**
+
+1. **`deriveContext` mis-derives the BC from multi-word task ids:** `claim games-status-vocabulary-reconcile` rejected with `not-found` because the id's BC prefix is ambiguous; worked on retry via the documented `{"contexts":{...}}` / `{"context":"games"}` override on both `claim` and `complete`. Worth a doctrine note: always pass the explicit context override for ids whose BC name is a prefix of a longer hyphenated id.
+2. **`checkpoint` still does not fold in the vacated lifecycle path** (ADR-0057 / agentic-workflow-w2njd) — vacated `doing/` path staged by hand again; git recorded a clean rename. Eighth consecutive session.
+3. **`lib/session-start-churn.mjs`, `lib/vacuum-guard.mjs`, `lib/adr-allocation.mjs`, `lib/worktree-salvage.mjs`, `lib/index-entry-length.mjs` still absent from 0.9.2** — churn reconciliation, batch-mix, and ADR-number finalization (0042 verified collision-free by hand against 0001–0041) each done manually.
+4. **Forward slashes in the CLI's `fileList` JSON worked first try on Windows again** — fifth session confirming the workaround.
+
+---
+
 ## 2026-08-01 15:43 -- Task verified and completed: games-status-vocabulary-reconcile - Remodel the game lifecycle to five states — Backlog, InFocus, Retired (né Completed), Abandoned, Dismissed; OnHold removed, Playing never added — and unify DesignSystem.LifecycleStatus 1:1, wiring statusBadge into the Games pages
 
 **Type:** Work / Task completion
