@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 18:54 -- Task verified and completed: infrastructure-e4kwm - Record the event-worthiness doctrine — an event records an observation of the user's own engagement, a cache records a third party's description — and amend ADR-0012's retracted justification
+
+**Type:** Work / Task completion
+**Task:** infrastructure-e4kwm - Record the event-worthiness doctrine — an event records an observation of the user's own engagement, a cache records a third party's description — and amend ADR-0012's retracted justification
+**Summary:** Recorded the event-worthiness doctrine (ADR-0043, global scope) - an event records an observation of the user's own engagement, a cache records a third party's description - and amended ADR-0012 in place, retracting its two cache-justification passages
+**Duration:** 14m
+**Verification:** PASS (iteration 1)
+**Files changed:** 6
+**Tests added:** 0
+**ADRs written:** 0043-event-worthiness-doctrine-observation-vs-third-party-cache.md
+
+---
+
 ## 2026-08-01 18:43 -- Batch started: [administration-kv7dp, administration-t9bzx, infrastructure-e4kwm]
 
 **Type:** Work / Batch start

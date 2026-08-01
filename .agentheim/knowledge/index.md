@@ -27,6 +27,7 @@ For BC-scoped artifacts, see each BC's `INDEX.md`.
 ## Global ADRs (scope: global)
 
 <!-- adr-global:start -->
+- **0043** -- Event-worthiness doctrine: an event records an observation of the user's own engagement, a cache records a third party's description (operative test: re-derivability), plus the identity-card clause for externally-sourced projection columns. Amends ADR-0012 in place. -- 2026-08-01 -- `knowledge/decisions/0043-event-worthiness-doctrine-observation-vs-third-party-cache.md`
 - **0001** -- F# on both server and client (Fable transpilation) -- 2026-05-12 -- `knowledge/decisions/0001-fsharp-fullstack.md`
 - **0002** -- Event sourcing + CQRS as the persistence model -- 2026-05-12 -- `knowledge/decisions/0002-event-sourcing-cqrs.md`
 - **0003** -- SQLite as the sole persistence layer -- 2026-05-12 -- `knowledge/decisions/0003-sqlite-persistence.md`

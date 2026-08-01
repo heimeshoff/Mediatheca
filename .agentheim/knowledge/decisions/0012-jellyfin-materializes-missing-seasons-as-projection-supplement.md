@@ -5,6 +5,7 @@ scope: integration
 status: accepted
 date: 2026-06-26
 related_tasks: [integration-m4k7p, integration-007]
+amended_by: [0043]
 ---
 
 # ADR 0012: Jellyfin materializes missing seasons as a projection-only supplement, TMDB stays authoritative
@@ -34,8 +35,12 @@ keeping TMDB authoritative.
   A `source TEXT NOT NULL DEFAULT 'tmdb'` column was added to `series_episodes` and
   `series_seasons` via the existing try/ALTER migration idiom. TMDB writes leave the default;
   the Jellyfin pass writes explicit `'jellyfin'`. **No event-stream change** — this is a
-  deliberate divergence from the event-sourced watch-history path (`Mark_episode_watched`),
-  justified because metadata is already a rebuildable read-model cache, not aggregate state.
+  deliberate divergence from the event-sourced watch-history path (`Mark_episode_watched`).
+  *(Retracted by ADR-0043: the clause that used to close this bullet — "justified because
+  metadata is already a rebuildable read-model cache, not aggregate state" — appealed to "it's
+  just a cache" without a test. ADR-0043 supplies the actual test (re-derivability +
+  identity-card); these materialized rows still pass it, so this is a correction of the
+  reasoning, not of the decision.)*
 - **Enrichment is silent and free.** Dedup/enrichment key is the existing PK
   `(series_slug, season_number, episode_number)` — a materialized row has no TMDB id, so the
   aired number-pair is the only viable join. When TMDB later publishes the season,
@@ -63,8 +68,13 @@ keeping TMDB authoritative.
 ## Consequences
 - Episodes on Jellyfin but missing from TMDB now appear in the app at zero new external
   dependency cost, and self-heal (enrich + clear the badge) once TMDB adds the season.
-- Materialized rows are projection-only: a full projection rebuild drops them and the next
-  sync re-creates them — identical to how TMDB-refreshed episodes already behave.
+- *(Retracted by ADR-0043: this bullet used to read "Materialized rows are projection-only: a
+  full projection rebuild drops them and the next sync re-creates them — identical to how
+  TMDB-refreshed episodes already behave." That framing understated the risk — a projection
+  rebuild silently losing state is precisely the defect ADR-0043 exists to name and prevent, not
+  a benign consequence. Under ADR-0043's re-derivability test these materialized rows are true
+  cache — genuinely re-fetchable from Jellyfin on the next sync — so the underlying decision
+  still holds; only the passage describing it as an unremarkable consequence is retracted.)*
 - Still images were initially deferred: the materialization seam's `fetchStill` lambda existed
   but the v1 wiring returned `None`, so materialized stills were `NULL` until TMDB enriched
   them. **Closed by integration-007** — the seam is now wired to a real Jellyfin fetch, storing
@@ -74,3 +84,12 @@ keeping TMDB authoritative.
 - Provenance caveat: the fix rests on the empirical fact that the user's Jellyfin holds the
   missing season. If a future Jellyfin library runs only the default TMDB scraper it could
   share TMDB's lag — non-blocking, since the fallback still strictly improves on TMDB-only.
+
+## Amended by ADR-0043
+
+ADR-0043 (event-worthiness doctrine, `infrastructure`, global scope) amends this ADR in place —
+this ADR's `status` stays `accepted`; it is not superseded. Every substantive decision above
+survives unchanged. Two passages that stated the old, unexamined justification ("it's already a
+cache") are retracted in favor of ADR-0043's actual test (re-derivability + the identity-card
+clause); both retractions are marked inline above. See
+`.agentheim/knowledge/decisions/0043-event-worthiness-doctrine-observation-vs-third-party-cache.md`.

@@ -122,3 +122,4 @@ The event-sourced store (ADR-0002) is only as trustworthy as it is inspectable. 
 - **Auto-clearing**: In Focus state manages itself — watch something and it moves along
 - **Mobile-first**: Dashboard sections work as a vertical scroll on mobile
 - **Unified, not siloed**: One dashboard with tabs, not separate dashboards per media type
+- **Replayable**: rebuilding projections from the event log always yields the same result. Third-party metadata is cached, not evented. (ADR-0043)

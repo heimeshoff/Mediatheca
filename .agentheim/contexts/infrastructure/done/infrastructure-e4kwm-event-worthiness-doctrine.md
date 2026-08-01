@@ -1,15 +1,15 @@
 ---
 id: infrastructure-e4kwm
 title: Record the event-worthiness doctrine — an event records an observation of the user's own engagement, a cache records a third party's description — and amend ADR-0012's retracted justification
-status: doing
+status: done
 type: decision
 context: infrastructure
 created: 2026-08-01
-completed:
+completed: 2026-08-01
 depends_on: []
 blocks: []
 tags: [event-sourcing, doctrine, metadata, cache, determinism]
-related_adrs: [0002, 0012, 0031, 0039, 0040]
+related_adrs: [0002, 0012, 0031, 0039, 0040, 0043]
 related_research: [tv-series-metadata-fallback-sources]
 prior_art: [integration-m4k7p, administration-btvqa]
 ---
@@ -92,13 +92,27 @@ are tier-agnostic and only their table names move.
 
 ## Acceptance criteria
 
-- [ ] New ADR exists in `.agentheim/knowledge/decisions/` with `scope: global`, `status: accepted`, and a Decision section containing the test and the identity-card clause verbatim.
-- [ ] The ADR is listed under `<!-- adr-global:start -->` in `.agentheim/knowledge/index.md`.
-- [ ] `0012-*.md` diff shows exactly the two named passages changed, and `status:` is still `accepted`.
-- [ ] A cross-reference exists in both directions between the new ADR and ADR-0012 (amendment relationship, not supersession).
-- [ ] `.agentheim/context-map.md` contains the string `metadata cache`, and Administration's shared-kernel bullet names all three of event store, image store, metadata cache.
-- [ ] `.agentheim/vision.md` contains the string `Replayable`.
-- [ ] No `.fs` file is changed by this task.
+- [x] New ADR exists in `.agentheim/knowledge/decisions/` with `scope: global`, `status: accepted`, and a Decision section containing the test and the identity-card clause verbatim. (`0043-event-worthiness-doctrine-observation-vs-third-party-cache.md`)
+- [x] The ADR is listed under `<!-- adr-global:start -->` in `.agentheim/knowledge/index.md`. (conductor inserts at integration)
+- [x] `0012-*.md` diff shows exactly the two named passages changed, and `status:` is still `accepted`.
+- [x] A cross-reference exists in both directions between the new ADR and ADR-0012 (amendment relationship, not supersession) — 0043's frontmatter `amends: [0012]` + "Relationship to ADR-0012" section; 0012's frontmatter `amended_by: [0043]` + new "## Amended by ADR-0043" section.
+- [x] `.agentheim/context-map.md` contains the string `metadata cache`, and Administration's shared-kernel bullet names all three of event store, image store, metadata cache.
+- [x] `.agentheim/vision.md` contains the string `Replayable`.
+- [x] No `.fs` file is changed by this task.
+
+## Outcome
+
+Recorded the event-worthiness doctrine as ADR-0043 (global scope): an event records an observation
+of the user's own engagement, a cache records a third party's description, tested by
+re-derivability plus the identity-card clause (an externally-sourced field may stay a projection
+column only if written exclusively by the event that carries it, never by a refresh path).
+Amended ADR-0012 in place — retracted the two named passages (the old "it's just a cache"
+justification and the "rebuild drops them" consequence framing), kept every substantive decision
+and `status: accepted`. Updated `.agentheim/vision.md` (Design Principles gains **Replayable**),
+`.agentheim/context-map.md` (Administration's shared-kernel gains the metadata cache; Integration's
+relationship gains two output channels — commands vs. cache writes; Games' core language gains
+play session; the Movies/Series/Games → Journal edge now reads "play session events"), and this
+BC's README (new Ubiquitous language entry naming the doctrine). No `.fs` file touched.
 
 ## Notes
 

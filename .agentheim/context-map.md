@@ -18,7 +18,7 @@ Mediatheca is a personal media library + diary + intelligence hub built on event
 
 ### Games
 - **Purpose:** Owns the Game aggregate — video games with lifecycle status, play modes, family ownership, and Steam/HLTB metadata.
-- **Core language:** Game, status (Backlog → InFocus → Retired / Abandoned / Dismissed), play time, family owner, played with, HLTB hours.
+- **Core language:** Game, status (Backlog → InFocus → Retired / Abandoned / Dismissed), play session, play time, family owner, played with, HLTB hours.
 - **Classification:** core
 - **Key actors:** Single user.
 
@@ -79,19 +79,19 @@ Mediatheca is a personal media library + diary + intelligence hub built on event
   Friends emits `Friend_added` / `Friend_updated`. Downstream BCs reference friends by `slug` and copy `name` / `imageRef` into their own projections. Friends never call into the media BCs.
 
 - **Movies / Series / Games → Journal** (upstream, published events).
-  Watch sessions, episode-watched events, and play-time events are published by the three media BCs. Journal's projections subscribe and assemble the cross-media activity timeline. Journal does not write commands back.
+  Watch sessions, episode-watched events, and play session events are published by the three media BCs. Journal's projections subscribe and assemble the cross-media activity timeline. Journal does not write commands back.
 
 - **Movies / Series / Games + Journal → Intelligence** (upstream).
   Intelligence projections fold all upstream event streams into derived stats. No coupling back upstream.
 
 - **Integration → Movies / Series / Games** (upstream → downstream, anticorruption layer).
-  External APIs (TMDB / RAWG / Steam / HLTB / Jellyfin) are wrapped by adapters in Integration. The adapter translates external DTOs into commands (`Add_movie`, `Add_game`, `Set_hltb_hours`, `Refresh_series_from_tmdb`, …) before they enter the core BCs. Core BCs never see external shapes directly.
+  External APIs (TMDB / RAWG / Steam / HLTB / Jellyfin) are wrapped by adapters in Integration. Adapters write through **two output channels** (ADR-0043): commands (`Add_movie`, `Add_game`, `Set_hltb_hours`, `Refresh_series_from_tmdb`, …) for facts that must be replayable domain history, and direct cache writes into projection columns for re-derivable third-party metadata (ratings, artwork, episode/season detail) that a refresh can always re-fetch. Core BCs never see external shapes directly.
 
 - **Curation → Movies / Series / Games** (downstream, conformist).
   Catalogs reference media by `(MediaType, mediaId)` and rely on whatever those BCs expose. Curation conforms to the core BCs' published refs; it doesn't push language back.
 
-- **Administration ↔ everything** (shared kernel: the event store + image store).
-  The append-only event store and the image store are infrastructure consumed by every BC. Administration owns the operational surface (event browser, settings, projection rebuild paths).
+- **Administration ↔ everything** (shared kernel: the event store + image store + the metadata cache).
+  The append-only event store, the image store, and the metadata cache (projection columns holding re-derivable third-party description — ratings, artwork, episode/season detail; ADR-0043) are infrastructure consumed by every BC. Administration owns the operational surface (event browser, settings, projection rebuild paths).
 
 - **Design system → every frontend-bearing BC** (open host / shared kernel).
   Provides tokens, components, and patterns. Every BC's frontend conforms.
