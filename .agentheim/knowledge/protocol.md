@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 10:43 -- Modeling / Refined: integration-q7wv3 - Episodes materialized before integration-007 never get a still — the backfill gap
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** todo
+**Summary:** Both shape questions the capture deliberately left open are now settled against the real code, and a third option the capture had not considered was found and rejected on evidence. **Where the backfill lives:** inside `materializeMissingEpisodes` as a widened skip predicate, not a separate sweep — the Jellyfin item id the fetch needs (`ep.Id`) is already in `seriesBatch`, whereas a query-driven sweep would have to re-resolve it through `jellyfin_episode`, a table `clearAll` wipes and Phase 1 only repopulates for TMDB-matched series; and the "leave `materializeMissingEpisodes` untouched" argument that held for `integration-007` (purely additive, numstat 33/0) does not hold here because the bug *is* that function's skip predicate. The missing UPDATE path becomes `SeriesProjection.backfillEpisodeStill`, repeating `source='jellyfin' AND still_ref IS NULL` **in the WHERE clause** so criteria 2 and 4 are enforced by the statement rather than only at candidate selection — a TMDB refresh landing between the SELECT and the UPDATE cannot be clobbered. **The refetch guard:** none — repetition is accepted and recorded, at the builder's decision. The candidate set is small by construction and drains on its own, because `SeriesRefresh`'s `INSERT OR REPLACE` omits the `source` column and so resets it to the `DEFAULT 'tmdb'`, releasing a row even when TMDB has no still either. **Sentinel `still_ref` was ruled out on hard evidence, not taste:** `("series_episodes", "still_ref")` is entry 8 of ADR 0025's `imageRefColumns` registry, whose `getReferencedImageRefs` collects every non-null value as a live ref — a sentinel would register as a reference to a nonexistent file inside a registry that documents itself as LOAD-BEARING and warns a stale entry "risks a purge deleting a still-referenced image". **Third option found and rejected:** `JellyfinBaseItem.PrimaryImageTag` is already parsed and sitting unused in `seriesBatch` — a zero-state guard for free — but whether `ImageTags` is populated on `/Shows/{id}/Episodes` is unverified, and the failure mode runs the wrong way: an unpopulated field makes the backfill skip everything and the bug survive silently, whereas an unconditional attempt at least wastes a visible 404. Acceptance criteria went 7 → 9 (two added for the WHERE-clause guard and a distinct `StillsBackfilled` counter); no split, no ADR — none of the four governing ADRs is challenged.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-08-01 10:42 -- Modeling / Captured: integration-q7wv3 - Episodes materialized before integration-007 never get a still — the backfill gap
 
 **Type:** Modeling / Capture
