@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 3
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **infrastructure-e4kwm** — Record the event-worthiness doctrine — an event records an observation of the user's own engagement, a cache records a third party's description — and amend ADR-0012's retracted justification (decision) — `todo/infrastructure-e4kwm-event-worthiness-doctrine.md`
 <!-- todo-list:end -->
 
 ### Doing

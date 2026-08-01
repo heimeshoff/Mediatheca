@@ -1,4 +1,4 @@
-﻿# administration -- Index
+# administration -- Index
 
 Catalog of everything in this bounded context: tasks by status, ADRs scoped to this BC,
 research touching this BC, and concept synthesis pages.
@@ -10,14 +10,17 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
-- **Todo:** 0
+- **Backlog:** 1
+- **Todo:** 3
 - **Doing:** 0
 - **Done:** 26
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **administration-kv7dp** — Block projection rebuild for handlers with out-of-band writers — rebuilding SeriesProjection today permanently destroys 780 refreshes' worth of TMDB metadata plus 23 Jellyfin-materialized episodes (bug) — `todo/administration-kv7dp-block-lossy-projection-rebuild.md`
+- **administration-t9bzx** — Classify every durable table as Projected, Cache or Imperative in one registry, and derive projectionTables from it — replacing tribal knowledge currently encoded as scattered comments explaining omissions (refactor) — `todo/administration-t9bzx-table-classification-registry.md`
+- **administration-c3nvp** — Stand up the metadata cache tier — per-BC typed tables that survive Drop/Init/replay, seeded once from current projections, following the ImageStore and JellyfinStore precedents (feature) — `todo/administration-c3nvp-metadata-cache-tier.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -57,6 +60,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **administration-z6ymt** — Purge demoted metadata events from the event log via the existing ADR-0038 wipe-first import — deferred at the builder's direction because the deployed live version cannot take the migration yet (chore) — `backlog/administration-z6ymt-purge-demoted-metadata-events.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC

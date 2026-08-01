@@ -1,4 +1,4 @@
-﻿# journal -- Index
+# journal -- Index
 
 Catalog of everything in this bounded context: tasks by status, ADRs scoped to this BC,
 research touching this BC, and concept synthesis pages.
@@ -11,14 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 0
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-<!-- no tasks in todo -->
+- **journal-w3sbq** — Correct Journal's README to the first-class play-session event model — and to the read-model owners that actually exist, since there is no JournalProjection.fs (chore) — `todo/journal-w3sbq-play-session-language-correction.md`
 <!-- todo-list:end -->
 
 ### Doing

@@ -5,6 +5,28 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 17:25 -- Modeling / Captured: 15 tasks — separate third-party metadata from domain events so projection rebuilds are deterministic
+
+**Type:** Modeling / Capture
+**BC:** infrastructure, administration, series, games, journal, movies (a single capture genuinely landing in six BCs — the sanctioned multi-BC index exception)
+**Filed to:** todo (12), backlog (3)
+**Summary:** A drift check reported 2437 discrepancies, all in SeriesProjection. Root cause verified against the live DB: `SeriesRefresh.applyToProjection` writes TMDB results straight into `series_list`/`series_detail`/`series_seasons`/`series_episodes` while `Series_refreshed` is a no-op summary event, so 780 refreshes plus 23 Jellyfin-materialized episodes exist only in the live tables — and `rebuildProjection`'s `Drop; Init; replay` would destroy all of it at one button press. A broader audit found the same category across BCs (rawg_rating, hltb_hours, tmdb_rating on movies/series/episodes, artwork refs, and 7668 `Game_play_mode_added` events carrying Steam Store category tags — 43% of the 17,638-event log), and the mirror-image defect in playtime: `game_play_session` is a non-event-sourced imperative table holding 42 rows of unrebuildable user history, while `Game_play_time_set` carries a republished `SUM` that is provably non-monotonic (Grounded 2952→2282, Windrose 975→375, Starcom 979→811).
+
+Orchestrator ran strategic-modeler, tactical-modeler and architect. Doctrine landed as an **event-worthiness test** (`infrastructure-e4kwm`, scope global): an event records an observation of the user's own engagement; a cache records a third party's description; operative form is re-derivability. Plus an identity-card second clause that keeps `name`/`year`/`poster_ref`/`genres` as projection columns. ADR-0012 is **amended, not superseded** — two passages retracted.
+
+**Builder decisions taken during capture:**
+1. Now-slice = guard + Series chain + play sessions (tasks 1-12 to `todo/`); Games attribute cache, Movies cutover and the log purge stay in `backlog/`.
+2. `Series_refreshed` is **narrowed to real airing-status transitions**, not retired. Verified basis: 566 of the 780 historical events already carry null statuses (no change) and 214 carry real transitions, and replaying `Series_added_to_library.status` + those 214 reproduces live status for 103 of 105 series. So `status` survives as a projection column instead of being demoted to cache.
+3. Auto-promotion to InFocus narrows to **newly recorded sessions only** — correcting or moving an existing session no longer yanks a Retired game back into focus.
+
+Drift is to reach zero by **removing columns, not by ignoring them** — no ignore-list on `diffTable`, which stays byte-for-byte as ADR-0031 wrote it. The one-time event-log purge is deferred at the builder's explicit direction (the deployed live version cannot take the migration yet).
+
+**Filed to todo:** administration-kv7dp, administration-t9bzx, administration-c3nvp, infrastructure-e4kwm, series-m7fdk, series-r2xhv, series-q8jwc, series-d5tpn, games-p6vkz, games-h4mrd, games-w4tzc, journal-w3sbq
+**Filed to backlog:** games-a7dqx, movies-v2gkh, administration-z6ymt
+**ADRs written:** none yet — 7 are specified in the task bodies (global ×1, administration ×3, series ×1, games ×2), to be written by the workers.
+
+---
+
 ## 2026-08-01 15:55 -- Work session ended
 
 **Type:** Work / Session end

@@ -1,4 +1,4 @@
-﻿# movies -- Index
+# movies -- Index
 
 Catalog of everything in this bounded context: tasks by status, ADRs scoped to this BC,
 research touching this BC, and concept synthesis pages.
@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 0
@@ -32,7 +32,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-<!-- no tasks in backlog -->
+- **movies-v2gkh** — Move Movie TMDB metadata into the cache — cut over the day a movie-refresh feature is actually built, since Movies are deterministic today and have no out-of-band writer at all (refactor) — `backlog/movies-v2gkh-movie-tmdb-metadata-into-cache.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
