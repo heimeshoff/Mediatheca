@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 15:48 -- Modeling / Promoted: design-system-x7k2p - Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042)
+
+**Type:** Modeling / Promote
+**BC:** design-system
+**From → To:** backlog → todo
+
+---
+
 ## 2026-08-01 15:48 -- Modeling / Refined: design-system-x7k2p - Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042)
 
 **Type:** Modeling / Refine

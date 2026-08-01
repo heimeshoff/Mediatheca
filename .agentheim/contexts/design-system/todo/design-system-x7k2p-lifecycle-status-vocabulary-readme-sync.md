@@ -1,7 +1,7 @@
 ---
 id: design-system-x7k2p
 title: Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042)
-status: backlog
+status: todo
 type: chore
 context: design-system
 created: 2026-08-01
