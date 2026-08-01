@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 1
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 8
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **integration-007** — Fetch Jellyfin episode stills when materializing a missing season (feature) — `todo/integration-007-fetch-jellyfin-episode-stills-on-materialize.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **integration-007** — Fetch Jellyfin episode stills when materializing a missing season (feature) — `doing/integration-007-fetch-jellyfin-episode-stills-on-materialize.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

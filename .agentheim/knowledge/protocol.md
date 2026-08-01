@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 02:06 -- Batch started: [integration-007]
+
+**Type:** Work / Batch start
+**Tasks:** integration-007 - Fetch Jellyfin episode stills when materializing a missing season
+**Parallel:** no (1 worker — the ready set was exactly one task; MAX_PARALLEL never bound, nothing held back)
+
+---
+
 ## 2026-08-01 02:05 -- Modeling / Promoted: integration-007 - Fetch Jellyfin episode stills when materializing a missing season
 
 **Type:** Modeling / Promote
