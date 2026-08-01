@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 11:12 -- Modeling / Captured: administration-k3vmt - Dissolve the /admin console into Settings
+
+**Type:** Modeling / Capture
+**BC:** administration
+**Filed to:** backlog
+**Summary:** The builder rejected having two buttons in the sidebar's bottom group for what is one destination — Settings (Integrations + Data Imports) and Admin (Events / Projections / Health / Images / Jobs / Surgery) are both this BC's operator surface. Offered three merge shapes at capture; the builder chose **fully inline**: the `/admin` shell dissolves entirely, its six tab views become collapsible sections on the Settings page below Data Imports, `Router.Page.Admin` is removed with every former admin URL (including the legacy `/events` alias) resolving to `Settings`, and `Sidebar.bottomNavItems` drops to one item. `Stream_detail` (`/admin/streams/<id>`) survives as its own page — it is parameterized and cannot inline, and was already a top-level `Page` case rather than an `AdminTab` variant. Filed to `backlog/` because the shape is chosen but six mechanics are open, chief among them whether Settings absorbs the six admin child models directly or `Pages/Admin/State.fs` survives headless as a composite child; where the ADR-0034 dirty banner's "Go to Projections" link points once `/admin/projections` stops existing; how ADR-0023's Follow-epoch teardown re-keys from "leaving `Admin _`" to "leaving `Settings`" *plus* a genuinely new section-collapse trigger; and whether the change warrants its own ADR given it nudges ADR-0017's client shell, ADR-0023 and ADR-0034 at once.
+
+---
+
 ## 2026-08-01 10:20 -- Work session ended
 
 **Type:** Work / Session end
