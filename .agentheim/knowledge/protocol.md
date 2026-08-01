@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 19:44 -- Batch started: [series-m7fdk]
+
+**Type:** Work / Batch start
+**Tasks:** series-m7fdk - Rename the Series season/episode tree into the metadata cache tier (ALTER TABLE RENAME, zero data movement) and replace the materialized next-up/count columns with SQL views
+**Parallel:** no (1 worker - the ready set is exactly one task; series-r2xhv/q8jwc/d5tpn chain sequentially behind it, journal-w3sbq and games-h4mrd are blocked on stranded games-p6vkz, series-d5tpn additionally on stranded administration-kv7dp - both verified-PASS but merge-conflicted, preserved in their worktrees for the builder)
+
+---
+
 ## 2026-08-01 19:21 -- Task verified and completed: administration-c3nvp - Stand up the metadata cache tier — per-BC typed tables that survive Drop/Init/replay, seeded once from current projections, following the ImageStore and JellyfinStore precedents
 
 **Type:** Work / Task completion

@@ -1,7 +1,7 @@
 ---
 id: series-m7fdk
 title: Rename the Series season/episode tree into the metadata cache tier (ALTER TABLE RENAME, zero data movement) and replace the materialized next-up/count columns with SQL views
-status: todo
+status: doing
 type: refactor
 context: series
 created: 2026-08-01
