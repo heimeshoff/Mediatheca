@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 1
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 9
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **integration-q7wv3** — Episodes materialized before integration-007 never get a still — the backfill gap (bug) — `todo/integration-q7wv3-backfill-jellyfin-stills-for-existing-materialized-episodes.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **integration-q7wv3** — Episodes materialized before integration-007 never get a still — the backfill gap (bug) — `doing/integration-q7wv3-backfill-jellyfin-stills-for-existing-materialized-episodes.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

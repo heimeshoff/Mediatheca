@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 10:05 -- Batch started: [integration-q7wv3]
+
+**Type:** Work / Batch start
+**Tasks:** integration-q7wv3 - Episodes materialized before integration-007 never get a still — the backfill gap
+**Parallel:** no (1 worker — the ready set was exactly one task; MAX_PARALLEL never bound and nothing was held back)
+
+---
+
 ## 2026-08-01 10:03 -- Modeling / Promoted: integration-q7wv3 - Episodes materialized before integration-007 never get a still — the backfill gap
 
 **Type:** Modeling / Promote
