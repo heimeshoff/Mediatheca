@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 14:20 -- Modeling / Refined: games-status-vocabulary-reconcile - Remodel the game lifecycle to five states
+
+**Type:** Modeling / Refine
+**BC:** games
+**Status after:** todo
+**Summary:** The captured either/or (add `Playing` vs document a mapping) was overtaken by a builder remodel of the lifecycle itself: `Playing` will never exist (InFocus explicitly covers "actively playing", alongside near-future intent and want-to-recommend), `OnHold` is removed as a distinction that never mattered (current OnHold games become InFocus), and `Completed` is renamed **Retired** ("played enough for now" — chosen over Played/Finished/Satisfied). `Dismissed` stays (Backlog games never to be played, kept for the record) and gains a muted badge variant, so `Shared.GameStatus` and `DesignSystem.LifecycleStatus` unify 1:1 at five states. Task-048's any-status auto-promotion was deliberately reaffirmed — a play session on a Retired/Abandoned/Dismissed game still pulls it to InFocus (the capture-era question "does replaying resurface it" answered yes). Migration specced as parse-time upcast only ("OnHold"→InFocus, "Completed"→Retired in both DU↔string mappers) plus projection rebuild — no event rewriting. Touchpoint sweep against real code found the stats layer the capture missed (`GamesCompleted`/`CompletedPerYear`/game `CompletionRate`, four SQL literals on `'Completed'`) and the stale styleguide.md pointer (in-app StyleGuide is canonical, design-system-sg8kd). vision.md's two Playing/OnHold lifecycle claims corrected in the same pass. Task retyped decision→refactor (the decision is now made; the worker records it as an ADR at execution). Acceptance criteria went 3 → 10. No split. No orchestrator round — the decision was the builder's and all mechanics were verified directly against the code.
+**Split into:** none
+**ADRs written:** none (one specified as an execution deliverable)
+
+---
+
 ## 2026-08-01 13:47 -- Work session ended
 
 **Type:** Work / Session end

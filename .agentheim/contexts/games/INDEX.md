@@ -32,7 +32,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **games-status-vocabulary-reconcile** -- Reconcile GameStatus with the design system's LifecycleStatus vocabulary -- `backlog/games-status-vocabulary-reconcile.md`
+- **games-status-vocabulary-reconcile** -- Remodel the game lifecycle to five states — Backlog, InFocus, Retired (né Completed), Abandoned, Dismissed; OnHold removed, Playing never added — and unify DesignSystem.LifecycleStatus 1:1, wiring statusBadge into the Games pages -- `backlog/games-status-vocabulary-reconcile.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC

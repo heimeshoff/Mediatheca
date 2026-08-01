@@ -27,8 +27,9 @@ A cross-cutting concept that lets the user signal intent — "I want to engage w
 - Sorting: In Focus first, then by recency of last episode watched
 
 ### Games
-- A status in the lifecycle: Backlog → **InFocus** → Playing → Completed / Abandoned / OnHold
-- InFocus means "I want to play this, I'm already thinking about it"
+- A status in the lifecycle: Backlog → **InFocus** → Retired / Abandoned (plus Dismissed for never-playing, kept for the record)
+- InFocus means "I want to play this soon, I want to recommend it, or I'm actively playing it right now" — there is no separate Playing status
+- Any recognized play session automatically pulls a game (from any status) into InFocus
 - InFocus games appear on the main dashboard
 
 ## Unified Dashboard
@@ -84,7 +85,7 @@ The curated overview. Answers "what's next?" at a glance.
 ### In Focus (cross-cutting)
 - Add In Focus toggle flag to Movies (new event: Movie_in_focus_set / Movie_in_focus_cleared, auto-clear on watch session)
 - Add In Focus toggle flag to TV Series (new event: Series_in_focus_set / Series_in_focus_cleared, auto-clear on episode watched)
-- Add InFocus status to Game lifecycle (Backlog → InFocus → Playing → Completed / Abandoned / OnHold)
+- Add InFocus status to Game lifecycle (Backlog → InFocus → Retired / Abandoned / Dismissed — remodeled 2026-08-01: OnHold removed, Completed renamed Retired, no Playing status)
 
 ### Unified Dashboard (replaces REQ-207)
 - Rework existing dashboard into tabbed layout (All / Movies / TV Series / Games)
