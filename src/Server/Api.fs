@@ -969,16 +969,26 @@ module Api =
                         // policy) and saved under a distinct `-jellyfin.jpg` suffix so a
                         // later TMDB refresh is never short-circuited into keeping the
                         // Jellyfin bytes. Any failure degrades to None, never an error.
+                        // Also backfills the still for rows this materialization already
+                        // created on an earlier run but left NULL (integration-q7wv3, the
+                        // gap integration-007's materialize-time fetch never reached) —
+                        // same best-effort fetch, written via the dedicated UPDATE path
+                        // `SeriesProjection.backfillEpisodeStill` since INSERT OR IGNORE
+                        // cannot touch an already-existing row.
                         let materializeResult =
                             JellyfinImport.materializeMissingEpisodes
                                 seriesBatch
                                 (SeriesProjection.getExistingEpisodeKeys conn)
                                 (SeriesProjection.getExistingSeasonNumbers conn)
+                                (SeriesProjection.getJellyfinEpisodesMissingStill conn)
                                 (JellyfinImport.fetchEpisodeStill
                                     (fun jellyfinItemId ->
                                         Jellyfin.getPrimaryImageWithReauth httpClient config persistAuth jellyfinItemId
                                         |> Async.RunSynchronously)
                                     (fun ref bytes -> ImageStore.saveImage imageBasePath ref bytes))
+                                (fun slug seasonNum epNum stillRef ->
+                                    try SeriesProjection.backfillEpisodeStill conn slug seasonNum epNum stillRef; Ok ()
+                                    with ex -> Error ex.Message)
                                 (fun slug seasonNum ->
                                     try SeriesProjection.materializeSeason conn slug seasonNum; Ok ()
                                     with ex -> Error ex.Message)

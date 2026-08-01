@@ -142,7 +142,9 @@ let fetchEpisodeStillTests =
                     batch
                     (fun _ -> Set.empty)
                     (fun _ -> Set.empty)
+                    (fun _ -> Set.empty)
                     (fetchEpisodeStill (fun _ -> Ok bytes) (fun _ _ -> ()))
+                    (fun _ _ _ _ -> Ok ())
                     (fun _ _ -> Ok ())
                     (fun _ ep -> episodes.Add ep; Ok ())
             Expect.equal result.EpisodesMaterialized 1 "Episode materialized"
@@ -157,7 +159,9 @@ let fetchEpisodeStillTests =
                     batch
                     (fun _ -> Set.empty)
                     (fun _ -> Set.empty)
+                    (fun _ -> Set.empty)
                     (fetchEpisodeStill (fun _ -> Error "HTTP 404") (fun _ _ -> ()))
+                    (fun _ _ _ _ -> Ok ())
                     (fun _ _ -> Ok ())
                     (fun _ ep -> episodes.Add ep; Ok ())
             Expect.equal result.EpisodesMaterialized 1 "Episode still materialized despite still-fetch failure"

@@ -98,7 +98,9 @@ let materializeTests =
                     batch
                     (fun _ -> Set.empty)
                     (fun _ -> Set.empty)
+                    (fun _ -> Set.empty)
                     (fun _ _ _ _ -> None)
+                    (fun _ _ _ _ -> Ok ())
                     (fun _ s -> seasons.Add s; Ok ())
                     (fun _ ep -> episodes.Add ep; Ok ())
             Expect.equal result.EpisodesMaterialized 3 "All three S3 episodes materialized"
@@ -123,7 +125,9 @@ let materializeTests =
                     batch
                     (fun _ -> Set.ofList [ (1, 1); (1, 2) ]) // both already present
                     (fun _ -> Set.ofList [ 1 ])
+                    (fun _ -> Set.empty) // neither is a Jellyfin-still-missing candidate
                     (fun _ _ _ _ -> None)
+                    (fun _ _ _ _ -> Ok ())
                     (fun _ _ -> seasonWrites <- seasonWrites + 1; Ok ())
                     (fun _ _ -> episodeWrites <- episodeWrites + 1; Ok ())
             Expect.equal result.EpisodesMaterialized 0 "Nothing materialized"
@@ -140,7 +144,9 @@ let materializeTests =
                     batch
                     (fun _ -> Set.empty)
                     (fun _ -> Set.empty)
+                    (fun _ -> Set.empty)
                     (fun _ _ _ _ -> None)
+                    (fun _ _ _ _ -> Ok ())
                     (fun _ _ -> Ok ())
                     (fun _ ep -> episodes.Add ep; Ok ())
             Expect.equal result.EpisodesMaterialized 1 "Unwatched episode still materialized"
@@ -156,7 +162,9 @@ let materializeTests =
                     batch
                     (fun _ -> Set.empty)
                     (fun _ -> Set.empty)
+                    (fun _ -> Set.empty)
                     (fun _ _ _ _ -> None)
+                    (fun _ _ _ _ -> Ok ())
                     (fun _ _ -> Ok ())
                     (fun _ ep ->
                         if ep.EpisodeNumber = 3 then Error "DB locked"
@@ -175,7 +183,9 @@ let materializeTests =
                     batch
                     (fun _ -> Set.empty)
                     (fun _ -> Set.empty)
+                    (fun _ -> Set.empty)
                     (fun _ _ _ _ -> failwith "image server down")
+                    (fun _ _ _ _ -> Ok ())
                     (fun _ _ -> Ok ())
                     (fun _ ep -> episodes.Add ep; Ok ())
             Expect.equal result.EpisodesMaterialized 1 "Episode still materialized"
@@ -238,4 +248,141 @@ let materializeTests =
             Expect.isTrue ep.MetadataPending "Episode is Jellyfin-sourced"
             Expect.isTrue ep.IsWatched "Played materialized episode shows as watched"
             Expect.equal ep.WatchedDate (Some "2026-06-10") "Watched date attached"
+
+        // --- integration-q7wv3: backfill a still for a row that already existed
+        //     before the still fetch was ever wired up (integration-007's fetch is
+        //     unreachable for rows that materialized on an earlier run). ---
+
+        testCase "backfills a still for an existing Jellyfin row missing one" <| fun _ ->
+            let backfillCalls = System.Collections.Generic.List<string * int * int * string>()
+            let batch = [ "iwtv", [ mkEp 3 1 true ] ]
+            let result =
+                materializeMissingEpisodes
+                    batch
+                    (fun _ -> Set.ofList [ (3, 1) ]) // already present
+                    (fun _ -> Set.ofList [ 3 ])
+                    (fun _ -> Set.ofList [ (3, 1) ]) // Jellyfin row still missing a still
+                    (fun _ _ _ _ -> Some "stills/iwtv-s03e01-jellyfin.jpg")
+                    (fun slug season ep stillRef -> backfillCalls.Add(slug, season, ep, stillRef); Ok ())
+                    (fun _ _ -> Ok ())
+                    (fun _ _ -> Ok ())
+            Expect.equal result.StillsBackfilled 1 "One still backfilled"
+            Expect.equal result.EpisodesMaterialized 0 "No new episode row created"
+            Expect.equal (List.ofSeq backfillCalls) [ ("iwtv", 3, 1, "stills/iwtv-s03e01-jellyfin.jpg") ] "backfillStill called with the fetched ref"
+            Expect.isFalse result.Failed "No failures"
+
+        // Covers both criterion 3 (a TMDB-sourced row with a NULL still) and
+        // criterion 4 (a row that already has a non-NULL still): in production
+        // both are simply absent from `getJellyfinEpisodesMissingStill`'s result
+        // (its WHERE clause is source='jellyfin' AND still_ref IS NULL), so this
+        // one test — "not a candidate" — covers what the SQL enforces for either.
+        testCase "does not attempt a backfill for a row outside the missing-still candidate set" <| fun _ ->
+            let mutable fetchCalled = false
+            let mutable backfillCalled = false
+            let batch = [ "iwtv", [ mkEp 3 1 true ] ]
+            let result =
+                materializeMissingEpisodes
+                    batch
+                    (fun _ -> Set.ofList [ (3, 1) ])
+                    (fun _ -> Set.ofList [ 3 ])
+                    (fun _ -> Set.empty) // not a candidate
+                    (fun _ _ _ _ -> fetchCalled <- true; Some "stills/should-not-be-used.jpg")
+                    (fun _ _ _ _ -> backfillCalled <- true; Ok ())
+                    (fun _ _ -> Ok ())
+                    (fun _ _ -> Ok ())
+            Expect.equal result.StillsBackfilled 0 "Nothing backfilled"
+            Expect.isFalse fetchCalled "fetchStill never invoked for a non-candidate row"
+            Expect.isFalse backfillCalled "backfillStill never invoked for a non-candidate row"
+
+        testCase "a failed still fetch during backfill leaves the row untouched and records no error" <| fun _ ->
+            let mutable backfillCalled = false
+            let batch = [ "iwtv", [ mkEp 3 1 true ] ]
+            let result =
+                materializeMissingEpisodes
+                    batch
+                    (fun _ -> Set.ofList [ (3, 1) ])
+                    (fun _ -> Set.ofList [ 3 ])
+                    (fun _ -> Set.ofList [ (3, 1) ])
+                    (fun _ _ _ _ -> None) // fetch failed / no primary image
+                    (fun _ _ _ _ -> backfillCalled <- true; Ok ())
+                    (fun _ _ -> Ok ())
+                    (fun _ _ -> Ok ())
+            Expect.equal result.StillsBackfilled 0 "Nothing backfilled"
+            Expect.isFalse backfillCalled "backfillStill never invoked when the fetch degrades to None"
+            Expect.isEmpty result.Errors "A best-effort fetch failure is never recorded as an error"
+            Expect.isFalse result.Failed "Run does not fail on a best-effort backfill fetch failure"
+
+        testCase "a backfillStill write error is recorded and flips Failed" <| fun _ ->
+            let batch = [ "iwtv", [ mkEp 3 1 true ] ]
+            let result =
+                materializeMissingEpisodes
+                    batch
+                    (fun _ -> Set.ofList [ (3, 1) ])
+                    (fun _ -> Set.ofList [ 3 ])
+                    (fun _ -> Set.ofList [ (3, 1) ])
+                    (fun _ _ _ _ -> Some "stills/iwtv-s03e01-jellyfin.jpg")
+                    (fun _ _ _ _ -> Error "DB locked")
+                    (fun _ _ -> Ok ())
+                    (fun _ _ -> Ok ())
+            Expect.equal result.StillsBackfilled 0 "Nothing backfilled on a write error"
+            Expect.equal (List.length result.Errors) 1 "The write error is recorded"
+            Expect.isTrue result.Failed "A backfill write error fails the run"
+
+        testCase "StillsBackfilled is counted distinctly from EpisodesMaterialized" <| fun _ ->
+            // S3E1 already exists and is a backfill candidate; S3E2 is genuinely new.
+            let batch = [ "iwtv", [ mkEp 3 1 true; mkEp 3 2 true ] ]
+            let result =
+                materializeMissingEpisodes
+                    batch
+                    (fun _ -> Set.ofList [ (3, 1) ])
+                    (fun _ -> Set.ofList [ 3 ])
+                    (fun _ -> Set.ofList [ (3, 1) ])
+                    (fun _ _ _ _ -> Some "stills/iwtv-jellyfin.jpg")
+                    (fun _ _ _ _ -> Ok ())
+                    (fun _ _ -> Ok ())
+                    (fun _ _ -> Ok ())
+            Expect.equal result.StillsBackfilled 1 "S3E1 backfilled"
+            Expect.equal result.EpisodesMaterialized 1 "S3E2 materialized as new"
+            Expect.isFalse result.Failed "No failures"
+
+        // integration-q7wv3 acceptance criteria 2, 3 and 4 against the real SQL:
+        // the WHERE clause on both getJellyfinEpisodesMissingStill and
+        // backfillEpisodeStill enforces source='jellyfin' AND still_ref IS NULL,
+        // not just candidate selection.
+        testCase "SeriesProjection.backfillEpisodeStill only touches Jellyfin rows with a NULL still" <| fun _ ->
+            use conn = newConn ()
+            seedSeriesDetail conn "iwtv" 1004
+            SeriesProjection.materializeSeason conn "iwtv" 3
+            // Candidate: Jellyfin row, still_ref NULL.
+            SeriesProjection.materializeEpisode conn "iwtv"
+                { SeasonNumber = 3; EpisodeNumber = 1; Name = "JF Title"
+                  Overview = "JF overview"; Runtime = Some 30
+                  AirDate = Some "2026-05-26"; StillRef = None }
+            // Non-candidate: TMDB row, still_ref NULL — must never be touched.
+            tmdbUpsertEpisode conn "iwtv" 3 2
+
+            let candidates = SeriesProjection.getJellyfinEpisodesMissingStill conn "iwtv"
+            Expect.equal candidates (Set.ofList [ (3, 1) ]) "Only the Jellyfin row with a NULL still is a candidate"
+
+            SeriesProjection.backfillEpisodeStill conn "iwtv" 3 1 "stills/iwtv-s03e01-jellyfin.jpg"
+            // Attempt (and fail, by the WHERE clause) to backfill the TMDB row too.
+            SeriesProjection.backfillEpisodeStill conn "iwtv" 3 2 "stills/iwtv-s03e02-jellyfin.jpg"
+
+            let detail = SeriesProjection.getBySlug conn "iwtv" None |> Option.get
+            let jfEp = findEpisode detail 3 1 |> Option.get
+            let tmdbEp = findEpisode detail 3 2 |> Option.get
+            Expect.equal jfEp.StillRef (Some "stills/iwtv-s03e01-jellyfin.jpg") "Jellyfin row backfilled"
+            Expect.equal tmdbEp.StillRef None "TMDB row's NULL still is left untouched — not the Jellyfin adapter's problem"
+
+            // Re-running the candidate query no longer returns the now-filled row.
+            let candidatesAfter = SeriesProjection.getJellyfinEpisodesMissingStill conn "iwtv"
+            Expect.isEmpty candidatesAfter "The backfilled row drains out of the candidate set"
+
+            // A second backfill attempt on the same row (simulating the accepted
+            // repeat-forever tradeoff for a genuinely image-less episode) must not
+            // overwrite an already-set still.
+            SeriesProjection.backfillEpisodeStill conn "iwtv" 3 1 "stills/should-never-land.jpg"
+            let detailAfter = SeriesProjection.getBySlug conn "iwtv" None |> Option.get
+            let jfEpAfter = findEpisode detailAfter 3 1 |> Option.get
+            Expect.equal jfEpAfter.StillRef (Some "stills/iwtv-s03e01-jellyfin.jpg") "A row with a still is never re-fetched or overwritten"
     ]

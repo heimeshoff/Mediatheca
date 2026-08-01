@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 10:18 -- Task verified and completed: integration-q7wv3 - Episodes materialized before integration-007 never get a still — the backfill gap
+
+**Type:** Work / Task completion
+**Task:** integration-q7wv3 - Episodes materialized before integration-007 never get a still — the backfill gap
+**Summary:** Episode rows materialized before integration-007 wired up the still fetch now get their Jellyfin still backfilled on the next sync, via a new SeriesProjection.backfillEpisodeStill UPDATE path scoped to source=jellyfin AND still_ref IS NULL re-checked in the WHERE clause itself
+**Duration:** 12m
+**Verification:** PASS (iteration 1)
+**Files changed:** 6
+**Tests added:** 6
+**ADRs written:** 0040
+
+---
+
 ## 2026-08-01 10:05 -- Batch started: [integration-q7wv3]
 
 **Type:** Work / Batch start

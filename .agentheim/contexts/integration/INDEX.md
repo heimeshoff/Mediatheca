@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 1
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 9
+- **Doing:** 0
+- **Done:** 10
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **integration-q7wv3** — Episodes materialized before integration-007 never get a still — the backfill gap (bug) — `doing/integration-q7wv3-backfill-jellyfin-stills-for-existing-materialized-episodes.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **integration-q7wv3** — Episodes materialized before integration-007 never get a still — the backfill gap (bug) — `done/integration-q7wv3-backfill-jellyfin-stills-for-existing-materialized-episodes.md`
 - **integration-007** — Fetch Jellyfin episode stills when materializing a missing season (feature) — `done/integration-007-fetch-jellyfin-episode-stills-on-materialize.md`
 - **integration-ygwsa** — Spike — mint Steam Family access tokens from a stored refresh token (SteamKit2) (spike) — `done/integration-ygwsa-steam-family-token-spike.md`
 - **integration-m4k7p** -- Materialize a missing season/episode from Jellyfin when TMDB lacks it -- `feature` -- `done/integration-m4k7p-materialize-missing-season-from-jellyfin.md`
@@ -47,6 +47,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0040** -- The still backfill for pre-existing Jellyfin rows widens `materializeMissingEpisodes`' skip predicate rather than running as a separate sweep (the Jellyfin item id is already in the batch), writing through a dedicated `backfillEpisodeStill` UPDATE that repeats `source='jellyfin' AND still_ref IS NULL` in its WHERE clause; no refetch guard — repetition is accepted because the candidate set drains itself on TMDB enrichment -- 2026-08-01 -- `knowledge/decisions/0040-jellyfin-still-backfill-lives-in-materialize-no-refetch-guard.md`
 - **0039** -- Jellyfin-materialized stills use a distinct `-jellyfin.jpg` storage path, not TMDB's canonical one, so a later TMDB refresh is never short-circuited into keeping the Jellyfin bytes; the resulting post-enrichment orphan is accepted and reclaimed via the ADR-0025 orphan scan -- 2026-08-01 -- `knowledge/decisions/0039-jellyfin-still-distinct-storage-path-accepted-orphan.md`
 - **0019** -- Steam Family token refresh — pure mint-and-retry seam shipped, live audience/scope verification deferred to integration-hebjs -- 2026-07-20 -- `knowledge/decisions/0019-steam-family-token-refresh-seam-pending-audience-verification.md`
 - **0012** -- Jellyfin materializes missing seasons as a projection-only supplement, TMDB stays authoritative -- 2026-06-26 -- `knowledge/decisions/0012-jellyfin-materializes-missing-seasons-as-projection-supplement.md`

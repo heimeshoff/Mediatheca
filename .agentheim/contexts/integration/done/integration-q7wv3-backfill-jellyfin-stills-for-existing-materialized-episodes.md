@@ -1,15 +1,15 @@
 ---
 id: integration-q7wv3
 title: Episodes materialized before integration-007 never get a still — the backfill gap
-status: doing
+status: done
 type: bug
 context: integration
 created: 2026-08-01
-completed:
+completed: 2026-08-01
 depends_on: []
 blocks: []
 tags: [jellyfin, stills, materialize, backfill, projection]
-related_adrs: [0011, 0012, 0025, 0039]
+related_adrs: [0011, 0012, 0025, 0039, 0040]
 related_research: []
 prior_art: [integration-007, integration-m4k7p]
 ---
@@ -123,24 +123,24 @@ a visible drag on SPA load — the escalation is the side table in `## Notes`, w
 
 ## Acceptance criteria
 
-- [ ] An episode row with `source='jellyfin'` and `still_ref IS NULL` gets its still fetched and
+- [x] An episode row with `source='jellyfin'` and `still_ref IS NULL` gets its still fetched and
       `still_ref` written on the next Jellyfin sync, via a dedicated `UPDATE` path — `INSERT OR IGNORE`
       cannot fill a column on an existing row.
-- [ ] The `UPDATE` statement itself carries `AND source = 'jellyfin' AND still_ref IS NULL` in its
+- [x] The `UPDATE` statement itself carries `AND source = 'jellyfin' AND still_ref IS NULL` in its
       `WHERE` clause, so the row is re-checked at write time and not only at candidate selection.
-- [ ] A TMDB-sourced episode with `still_ref IS NULL` is left untouched — the backfill never sources
+- [x] A TMDB-sourced episode with `still_ref IS NULL` is left untouched — the backfill never sources
       a Jellyfin image for a TMDB row.
-- [ ] The backfilled file lands at ADR 0039's `stills/{slug}-sXXeYY-jellyfin.jpg` path, so a later
+- [x] The backfilled file lands at ADR 0039's `stills/{slug}-sXXeYY-jellyfin.jpg` path, so a later
       TMDB refresh still downloads its own canonical still and repoints `still_ref` (the
       `SeriesRefresh` `ImageStore.imageExists` short-circuit is never fed a Jellyfin file at TMDB's
       path).
-- [ ] A row that already has a non-NULL `still_ref` is never re-fetched or overwritten.
-- [ ] A fetch failure degrades to leaving `still_ref` NULL and does not add to
+- [x] A row that already has a non-NULL `still_ref` is never re-fetched or overwritten.
+- [x] A fetch failure degrades to leaving `still_ref` NULL and does not add to
       `SeriesMaterializeResult.Errors` or flip the sync to `SyncFailed`.
-- [ ] The newly-added episodes path from `integration-007` still behaves exactly as before — a
+- [x] The newly-added episodes path from `integration-007` still behaves exactly as before — a
       genuinely new episode gets its still at materialization time, in one pass, not deferred to a
       later backfill sweep. The `else` branch of the skip predicate is unchanged.
-- [ ] `SeriesMaterializeResult` reports how many stills were backfilled, distinctly from
+- [x] `SeriesMaterializeResult` reports how many stills were backfilled, distinctly from
       `EpisodesMaterialized`.
 - [ ] *Interview with the Vampire* season 3 shows real thumbnails instead of the placeholder TV
       icon, against the live Jellyfin server. [human-eye]
@@ -179,3 +179,54 @@ it completes what 0012's deferral, closed by `integration-007`, left half-reacha
 
 **Prior art:** `integration-007` (the fetch this task makes reachable for existing rows),
 `integration-m4k7p` (the materialization arc itself).
+
+## Outcome
+
+Implemented exactly the pre-refined shape — no deviation.
+
+- **`src/Server/SeriesProjection.fs`** — added `getJellyfinEpisodesMissingStill` (`SELECT
+  season_number, episode_number FROM series_episodes WHERE series_slug = @slug AND
+  source = 'jellyfin' AND still_ref IS NULL`) alongside the existing
+  `getExistingEpisodeKeys`/`getExistingSeasonNumbers`, and `backfillEpisodeStill` — the
+  missing `UPDATE` path, repeating `source = 'jellyfin' AND still_ref IS NULL` in its own
+  `WHERE` clause so the row is re-checked at write time, not only at candidate selection.
+- **`src/Server/JellyfinImport.fs`** — `materializeMissingEpisodes` gained two new
+  injected-effect parameters (`getJellyfinEpisodesMissingStill`, `backfillStill`) and its
+  skip predicate widened: an existing row that is a backfill candidate gets a best-effort
+  fetch-then-`UPDATE` attempt (fetch failure -> silently leave `still_ref` NULL, never an
+  error; a `backfillStill` write `Error` is recorded into `Errors` and flips `Failed`,
+  mirroring how `writeEpisode`/`writeSeason` errors are already handled). The `else`
+  branch (a genuinely new episode) is byte-for-byte unchanged. `SeriesMaterializeResult`
+  gained `StillsBackfilled: int`, distinct from `EpisodesMaterialized`.
+- **`src/Server/Api.fs:972-990`** — wired `SeriesProjection.getJellyfinEpisodesMissingStill`
+  and a `backfillStill` lambda over `SeriesProjection.backfillEpisodeStill` into the call,
+  reusing the same `fetchEpisodeStill` composition (Jellyfin fetch + `ImageStore.saveImage`)
+  integration-007 already wired for the materialize-time path.
+
+**ADR written: 0040.** Judged on the merits per the carried-over note from the prior
+session: none of the four governing ADRs (0011/0012/0025/0039) is challenged or made
+stale by this diff — this task is a pure completion of the reachability gap those ADRs
+already describe, and ADR 0012's/0039's Consequences sections remain accurate as written
+(the backfill reuses `fetchEpisodeStill` and the `-jellyfin.jpg` path unchanged; the
+enrichment/orphan behaviour they describe is untouched). But the backfill's own shape —
+where the write path lives, and specifically the **no-refetch-guard** decision (a
+permanently image-less episode is retried forever, accepted as bounded/self-draining) —
+*is* a genuinely new decision with real rejected alternatives (sentinel `still_ref` ruled
+out against ADR 0025's orphan registry; a side-table escalation path; a `PrimaryImageTag`
+pre-filter rejected for its silent-failure direction). That is exactly the shape of
+content the prior session's note warned against leaving only in the task file, so it is
+recorded as ADR 0040 rather than left as refinement narration.
+
+Tests: extended `tests/Server.Tests/JellyfinMaterializeTests.fs` with 6 new cases — the
+happy-path backfill, non-candidate rows (covers both criterion 3's TMDB row and criterion
+4's already-filled row), best-effort fetch failure, a `backfillStill` write error, the
+`StillsBackfilled`/`EpisodesMaterialized` count split, and a real-SQLite test exercising
+`getJellyfinEpisodesMissingStill`/`backfillEpisodeStill` directly (verifies the WHERE-clause
+re-check leaves a TMDB row untouched and a second backfill attempt cannot overwrite an
+already-set still). The 7 existing `materializeMissingEpisodes` call sites (5 in
+`JellyfinMaterializeTests.fs`, 2 in `JellyfinStillTests.fs`) were updated for the widened
+signature with no behavioural change — full suite green at 441 (up from 435).
+`dotnet build src/Server/Server.fsproj` also green.
+
+Criterion 9 ([human-eye], *Interview with the Vampire* S3 against the live Jellyfin
+server) is left unchecked, as instructed — verified by the builder, not this worker.

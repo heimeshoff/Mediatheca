@@ -1141,6 +1141,20 @@ module SeriesProjection =
         |> Db.query (fun (rd: IDataReader) -> rd.ReadInt32 "season_number")
         |> Set.ofList
 
+    /// (season, episode) keys for Jellyfin-materialized rows still missing a still
+    /// (integration-q7wv3, the backfill gap: `integration-007`'s materialize-time
+    /// fetch never reaches a row that already existed before that fetch was wired
+    /// up). Scoped to `source = 'jellyfin'` — a TMDB-sourced NULL still stays
+    /// TMDB's own problem, not the Jellyfin adapter's.
+    let getJellyfinEpisodesMissingStill (conn: SqliteConnection) (slug: string) : Set<int * int> =
+        conn
+        |> Db.newCommand
+            "SELECT season_number, episode_number FROM series_episodes
+             WHERE series_slug = @slug AND source = 'jellyfin' AND still_ref IS NULL"
+        |> Db.setParams [ "slug", SqlType.String slug ]
+        |> Db.query (fun (rd: IDataReader) -> rd.ReadInt32 "season_number", rd.ReadInt32 "episode_number")
+        |> Set.ofList
+
     /// Insert a synthetic, number-only season row sourced from Jellyfin. INSERT OR
     /// IGNORE so a real TMDB season is never clobbered. Without this row the detail
     /// read (which iterates series_seasons) would orphan the episode.
@@ -1174,6 +1188,29 @@ module SeriesProjection =
             "runtime", (match ep.Runtime with Some r -> SqlType.Int32 r | None -> SqlType.Null)
             "air_date", (match ep.AirDate with Some d -> SqlType.String d | None -> SqlType.Null)
             "still_ref", (match ep.StillRef with Some r -> SqlType.String r | None -> SqlType.Null)
+        ]
+        |> Db.exec
+
+    /// Fill in a still_ref that materialization left NULL on a Jellyfin-sourced row
+    /// (integration-q7wv3). `INSERT OR IGNORE` cannot touch an already-existing row,
+    /// so this is the missing UPDATE path a backfill needs. `source = 'jellyfin' AND
+    /// still_ref IS NULL` is repeated in the WHERE clause, not only relied on at
+    /// candidate-selection time (`getJellyfinEpisodesMissingStill`): a TMDB refresh
+    /// landing between that SELECT and this UPDATE resets `source` to `'tmdb'` (via
+    /// `SeriesRefresh`'s `INSERT OR REPLACE`, which omits the `source` column), so
+    /// the WHERE clause re-check makes this UPDATE a no-op in that race instead of
+    /// clobbering a row TMDB has since enriched.
+    let backfillEpisodeStill (conn: SqliteConnection) (slug: string) (season: int) (episode: int) (stillRef: string) : unit =
+        conn
+        |> Db.newCommand
+            "UPDATE series_episodes SET still_ref = @still_ref
+             WHERE series_slug = @slug AND season_number = @season AND episode_number = @episode
+               AND source = 'jellyfin' AND still_ref IS NULL"
+        |> Db.setParams [
+            "still_ref", SqlType.String stillRef
+            "slug", SqlType.String slug
+            "season", SqlType.Int32 season
+            "episode", SqlType.Int32 episode
         ]
         |> Db.exec
 

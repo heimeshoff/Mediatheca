@@ -100,6 +100,10 @@ module JellyfinImport =
     type SeriesMaterializeResult = {
         EpisodesMaterialized: int
         SeasonsMaterialized: int
+        /// Stills backfilled onto rows that already existed before this run
+        /// (integration-q7wv3) — distinct from `EpisodesMaterialized`, which counts
+        /// brand-new rows created this run.
+        StillsBackfilled: int
         Errors: string list
         Failed: bool
     }
@@ -153,27 +157,38 @@ module JellyfinImport =
     /// continues. A still-image fetch is best-effort — `fetchStill` returning
     /// `None` (or throwing) degrades to `StillRef = None`, never an error.
     ///
-    /// - `getExistingEpisodeKeys`   slug -> set of (season, episode) already in the projection
-    /// - `getExistingSeasonNumbers` slug -> set of season numbers already in the projection
-    /// - `fetchStill`               slug -> season -> episode -> jellyfinItemId -> still_ref option
-    /// - `writeSeason`              slug -> season -> Result<unit, string> (synthetic, number-only)
-    /// - `writeEpisode`             slug -> MaterializedEpisode -> Result<unit, string>
+    /// - `getExistingEpisodeKeys`         slug -> set of (season, episode) already in the projection
+    /// - `getExistingSeasonNumbers`       slug -> set of season numbers already in the projection
+    /// - `getJellyfinEpisodesMissingStill` slug -> set of (season, episode) that are Jellyfin-sourced
+    ///   rows with `still_ref IS NULL` — candidates for the integration-q7wv3 backfill below
+    /// - `fetchStill`                     slug -> season -> episode -> jellyfinItemId -> still_ref option
+    /// - `backfillStill`                  slug -> season -> episode -> still_ref -> Result<unit, string>
+    ///   (the missing UPDATE path — `writeEpisode`'s INSERT OR IGNORE cannot fill a column on an
+    ///   existing row)
+    /// - `writeSeason`                    slug -> season -> Result<unit, string> (synthetic, number-only)
+    /// - `writeEpisode`                   slug -> MaterializedEpisode -> Result<unit, string>
     let materializeMissingEpisodes
         (seriesBatch: (string * JellyfinBaseItem list) list)
         (getExistingEpisodeKeys: string -> Set<int * int>)
         (getExistingSeasonNumbers: string -> Set<int>)
+        (getJellyfinEpisodesMissingStill: string -> Set<int * int>)
         (fetchStill: string -> int -> int -> string -> string option)
+        (backfillStill: string -> int -> int -> string -> Result<unit, string>)
         (writeSeason: string -> int -> Result<unit, string>)
         (writeEpisode: string -> MaterializedEpisode -> Result<unit, string>)
         : SeriesMaterializeResult =
 
         let mutable episodesMaterialized = 0
         let mutable seasonsMaterialized = 0
+        let mutable stillsBackfilled = 0
         let mutable errors: string list = []
 
         for (slug, episodes) in seriesBatch do
             try
                 let existingKeys = getExistingEpisodeKeys slug
+                // Jellyfin-sourced rows already present but still missing a still —
+                // the only candidates for the backfill below (integration-q7wv3).
+                let missingStillKeys = getJellyfinEpisodesMissingStill slug
                 // Seasons known to have a row: those already in the projection
                 // plus any we synthesize during this pass (avoids a duplicate
                 // INSERT for every episode of a freshly-materialized season).
@@ -181,8 +196,28 @@ module JellyfinImport =
                 for ep in episodes do
                     match ep.ParentIndexNumber, ep.IndexNumber with
                     | Some seasonNum, Some epNum ->
-                        if existingKeys |> Set.contains (seasonNum, epNum) then
-                            () // already present (TMDB or earlier materialization) — leave untouched
+                        let key = (seasonNum, epNum)
+                        if existingKeys |> Set.contains key then
+                            // Already present (TMDB or earlier materialization). A
+                            // genuinely new episode never reaches this branch — the
+                            // `else` below is unchanged from before this backfill was
+                            // added. The only action possible on an existing row is a
+                            // best-effort still backfill (integration-q7wv3):
+                            // `writeEpisode`'s INSERT OR IGNORE can never touch it.
+                            if missingStillKeys |> Set.contains key then
+                                let stillRef =
+                                    try fetchStill slug seasonNum epNum ep.Id
+                                    with _ -> None
+                                match stillRef with
+                                | Some ref ->
+                                    try
+                                        match backfillStill slug seasonNum epNum ref with
+                                        | Ok () -> stillsBackfilled <- stillsBackfilled + 1
+                                        | Error e ->
+                                            errors <- errors @ [ sprintf "Series '%s' S%02dE%02d still backfill: %s" slug seasonNum epNum e ]
+                                    with ex ->
+                                        errors <- errors @ [ sprintf "Series '%s' S%02dE%02d still backfill threw: %s" slug seasonNum epNum ex.Message ]
+                                | None -> () // best-effort: a failed fetch simply leaves still_ref NULL, never an error
                         else
                             try
                                 // A synthetic season row must exist first or the
@@ -227,5 +262,6 @@ module JellyfinImport =
 
         { EpisodesMaterialized = episodesMaterialized
           SeasonsMaterialized = seasonsMaterialized
+          StillsBackfilled = stillsBackfilled
           Errors = errors
           Failed = not (List.isEmpty errors) }
