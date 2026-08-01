@@ -302,42 +302,15 @@ module SeriesProjection =
                         ]
                         |> Db.exec
 
-                        // Insert all seasons and episodes
-                        for season in data.Seasons do
-                            conn
-                            |> Db.newCommand """
-                                INSERT OR REPLACE INTO series_season_cache (series_slug, season_number, name, overview, poster_ref, air_date, episode_count)
-                                VALUES (@series_slug, @season_number, @name, @overview, @poster_ref, @air_date, @episode_count)
-                            """
-                            |> Db.setParams [
-                                "series_slug", SqlType.String slug
-                                "season_number", SqlType.Int32 season.SeasonNumber
-                                "name", SqlType.String season.Name
-                                "overview", SqlType.String season.Overview
-                                "poster_ref", match season.PosterRef with Some r -> SqlType.String r | None -> SqlType.Null
-                                "air_date", match season.AirDate with Some d -> SqlType.String d | None -> SqlType.Null
-                                "episode_count", SqlType.Int32 (List.length season.Episodes)
-                            ]
-                            |> Db.exec
-
-                            for episode in season.Episodes do
-                                conn
-                                |> Db.newCommand """
-                                    INSERT OR REPLACE INTO series_episode_cache (series_slug, season_number, episode_number, name, overview, runtime, air_date, still_ref, tmdb_rating)
-                                    VALUES (@series_slug, @season_number, @episode_number, @name, @overview, @runtime, @air_date, @still_ref, @tmdb_rating)
-                                """
-                                |> Db.setParams [
-                                    "series_slug", SqlType.String slug
-                                    "season_number", SqlType.Int32 season.SeasonNumber
-                                    "episode_number", SqlType.Int32 episode.EpisodeNumber
-                                    "name", SqlType.String episode.Name
-                                    "overview", SqlType.String episode.Overview
-                                    "runtime", match episode.Runtime with Some r -> SqlType.Int32 r | None -> SqlType.Null
-                                    "air_date", match episode.AirDate with Some d -> SqlType.String d | None -> SqlType.Null
-                                    "still_ref", match episode.StillRef with Some r -> SqlType.String r | None -> SqlType.Null
-                                    "tmdb_rating", match episode.TmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null
-                                ]
-                                |> Db.exec
+                        // Season/episode cache seeding moved to command time
+                        // (series-r2xhv): `Api.addSeriesToLibraryImpl` calls
+                        // `SeriesRefresh.upsertSeasonEpisodeCache` right after
+                        // this event is appended, imperatively — never here.
+                        // A cache write inside `handleEvent` would be a live
+                        // write issued from a shadow replay (the ADR-0031
+                        // drift detector reconstructs projections on a
+                        // throwaway connection), which the cache-tier
+                        // discipline (ADR-0043/ADR-0045) forbids.
 
                         // Create default rewatch session
                         conn
@@ -357,14 +330,13 @@ module SeriesProjection =
                     |> Db.newCommand "DELETE FROM series_detail WHERE slug = @slug"
                     |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.exec
-                    conn
-                    |> Db.newCommand "DELETE FROM series_season_cache WHERE series_slug = @slug"
-                    |> Db.setParams [ "slug", SqlType.String slug ]
-                    |> Db.exec
-                    conn
-                    |> Db.newCommand "DELETE FROM series_episode_cache WHERE series_slug = @slug"
-                    |> Db.setParams [ "slug", SqlType.String slug ]
-                    |> Db.exec
+                    // Season/episode cache cleanup moved to command time
+                    // (series-r2xhv): `Api.removeSeries` deletes
+                    // series_season_cache/series_episode_cache imperatively
+                    // right after this event is appended, never here — see
+                    // the matching note on the Series_added_to_library arm
+                    // above for why a cache write/delete cannot live in
+                    // `handleEvent`.
                     conn
                     |> Db.newCommand "DELETE FROM series_rewatch_sessions WHERE series_slug = @slug"
                     |> Db.setParams [ "slug", SqlType.String slug ]
@@ -696,13 +668,26 @@ module SeriesProjection =
                     |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.exec
 
-                | Series.Series_refreshed _ ->
-                    // Projection side-effects for a refresh are applied
-                    // directly by SeriesRefresh.applyToProjection before the
-                    // event is appended. This handler is a no-op here, but
-                    // during projection rebuilds (catch-up) we cannot
-                    // re-fetch TMDB — the previously-applied rows stay as-is.
-                    ()
+                | Series.Series_refreshed data ->
+                    // Narrowed (series-r2xhv): this event now only ever
+                    // carries a real airing-status transition (both fields
+                    // `Some`) or, for the 566 historical no-change refreshes,
+                    // `None, None` — apply the transition to the two
+                    // Projected columns that still hold status; a
+                    // no-transition event applies nothing. Every other
+                    // TMDB-fetched field (name/overview/episodes/...) is
+                    // cache-only and never touches this handler.
+                    match data.NewStatus with
+                    | Some newStatus ->
+                        conn
+                        |> Db.newCommand "UPDATE series_list SET status = @status WHERE slug = @slug"
+                        |> Db.setParams [ "slug", SqlType.String slug; "status", SqlType.String newStatus ]
+                        |> Db.exec
+                        conn
+                        |> Db.newCommand "UPDATE series_detail SET status = @status WHERE slug = @slug"
+                        |> Db.setParams [ "slug", SqlType.String slug; "status", SqlType.String newStatus ]
+                        |> Db.exec
+                    | None -> ()
 
     let handler: Projection.ProjectionHandler = {
         Name = "SeriesProjection"

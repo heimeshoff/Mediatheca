@@ -323,6 +323,11 @@ module Api =
                     match result with
                     | Error e -> return Error e
                     | Ok () ->
+                        // Season/episode cache seed (series-r2xhv): imperative,
+                        // command-time only — never sourced from projection
+                        // replay (ADR-0043/ADR-0045's cache-tier discipline).
+                        SeriesRefresh.upsertSeasonEpisodeCache conn slug validSeasons
+
                         let! creditsResult = Tmdb.getTvSeriesCredits httpClient tmdbConfig tmdbId
                         match creditsResult with
                         | Ok credits ->
@@ -2359,6 +2364,17 @@ module Api =
                         projectionHandlers
                 match result with
                 | Ok () ->
+                    // Season/episode cache cleanup (series-r2xhv): imperative,
+                    // command-time only — never sourced from projection
+                    // replay (ADR-0043/ADR-0045's cache-tier discipline).
+                    conn
+                    |> Db.newCommand "DELETE FROM series_season_cache WHERE series_slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "DELETE FROM series_episode_cache WHERE series_slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug ]
+                    |> Db.exec
                     // Remove catalog entries referencing this series
                     let catalogEntries = CatalogProjection.getEntriesByMediaSlug conn slug
                     for (catalogSlug, entryId) in catalogEntries do

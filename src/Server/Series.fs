@@ -88,14 +88,20 @@ module Series =
         Date: string
     }
 
-    /// Summary payload attached to Series_refreshed events. Captures what
-    /// changed during a TMDB refresh. All fields are optional for backward
-    /// compatibility with older persisted events.
+    /// Summary payload attached to Series_refreshed events (narrowed by
+    /// series-r2xhv). A TMDB refresh no longer appends this event unless the
+    /// airing status actually transitioned — all other TMDB-fetched metadata
+    /// (name, overview, episodes, ratings, ...) is cache, not an event
+    /// (ADR-0043). `RefreshedAt`/`NewEpisodeCount` are dropped from the wire
+    /// shape going forward (the event carries its own timestamp; new-episode
+    /// counts are reported by the job-runs summary instead, ADR-0026) — but
+    /// `PreviousStatus`/`NewStatus` stay `option` so this same type can still
+    /// decode the 780 historical events, 566 of which carry
+    /// `previousStatus: null, newStatus: null` (a no-change refresh under the
+    /// old, unnarrowed emission rule). A historical null-status event decodes
+    /// to `None, None` and applies nothing on replay. Every event emitted
+    /// going forward is `Some, Some` — `decide` never appends one otherwise.
     type SeriesRefreshedData = {
-        /// UTC timestamp when the refresh was performed (ISO-8601).
-        RefreshedAt: string
-        /// Count of newly-added episodes (including unaired ones) this refresh.
-        NewEpisodeCount: int
         /// The previous status, if it changed. None means no status transition.
         PreviousStatus: string option
         /// The new status, if it changed. None means no status transition.
@@ -515,7 +521,10 @@ module Series =
             if series.InFocus then Ok [ Series_in_focus_cleared ]
             else Ok []
         | Active _, Refresh_series_from_tmdb data ->
-            if data.NewEpisodeCount = 0 && data.NewStatus.IsNone then Ok []
+            // Narrowed (series-r2xhv): a refresh is only worth an event when
+            // the airing status actually transitioned. New-episode volume
+            // alone is cache-only now — see SeriesRefreshedData's doc comment.
+            if data.NewStatus.IsNone then Ok []
             else Ok [ Series_refreshed data ]
         | Removed, _ ->
             Error "Series has been removed"
@@ -700,18 +709,18 @@ module Series =
                 SeasonNumber = get.Required.Field "seasonNumber" Decode.int
             })
 
+        /// Narrowed wire shape going forward: only `previousStatus`/`newStatus`.
+        /// The decoder below still reads the 780 historical events, which also
+        /// carry `refreshedAt`/`newEpisodeCount` — those extra fields are
+        /// simply not asked for, so `Decode.object` ignores them.
         let private encodeSeriesRefreshedData (data: SeriesRefreshedData) =
             Encode.object [
-                "refreshedAt", Encode.string data.RefreshedAt
-                "newEpisodeCount", Encode.int data.NewEpisodeCount
                 "previousStatus", Encode.option Encode.string data.PreviousStatus
                 "newStatus", Encode.option Encode.string data.NewStatus
             ]
 
         let private decodeSeriesRefreshedData: Decoder<SeriesRefreshedData> =
             Decode.object (fun get -> {
-                RefreshedAt = get.Optional.Field "refreshedAt" Decode.string |> Option.defaultValue ""
-                NewEpisodeCount = get.Optional.Field "newEpisodeCount" Decode.int |> Option.defaultValue 0
                 PreviousStatus = get.Optional.Field "previousStatus" Decode.string
                 NewStatus = get.Optional.Field "newStatus" Decode.string
             })

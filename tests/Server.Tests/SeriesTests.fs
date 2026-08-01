@@ -509,6 +509,33 @@ let seriesTests =
                 | Episode_watched _ -> ()
                 | _ -> failtest "Should be Episode_watched"
             | Error e -> failtest $"Expected success but got: {e}"
+
+        // ── Series_refreshed narrowing (series-r2xhv) ──
+
+        testCase "Refresh with no airing-status transition produces zero events" <| fun _ ->
+            let refreshData: SeriesRefreshedData = { PreviousStatus = None; NewStatus = None }
+            let result = givenWhenThen [ Series_added_to_library sampleSeriesData ] (Refresh_series_from_tmdb refreshData)
+            match result with
+            | Ok events -> Expect.isEmpty events "A refresh with no airing-status transition should append zero events"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Refresh with a real airing-status transition appends exactly one Series_refreshed and updates aggregate status" <| fun _ ->
+            // sampleSeriesData.Status is "Ended".
+            let refreshData: SeriesRefreshedData = { PreviousStatus = Some "Ended"; NewStatus = Some "Returning" }
+            let result = givenWhenThen [ Series_added_to_library sampleSeriesData ] (Refresh_series_from_tmdb refreshData)
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 1 "Should append exactly one event"
+                match events.[0] with
+                | Series_refreshed data ->
+                    Expect.equal data.PreviousStatus (Some "Ended") "PreviousStatus should match"
+                    Expect.equal data.NewStatus (Some "Returning") "NewStatus should match"
+                | _ -> failtest "Should be Series_refreshed"
+                let state = applyEvents ([ Series_added_to_library sampleSeriesData ] @ events)
+                match state with
+                | Active series -> Expect.equal series.Status "Returning" "Aggregate status should reflect the transition"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
     ]
 
 [<Tests>]
@@ -589,6 +616,37 @@ let seriesSerializationTests =
             let eventType, data = Serialization.serialize event
             let deserialized = Serialization.deserialize eventType data
             Expect.equal deserialized (Some event) "Should round-trip"
+
+        // ── Series_refreshed narrowed payload + historical backward compat (series-r2xhv) ──
+
+        testCase "Series_refreshed narrowed payload round-trips" <| fun _ ->
+            let event = Series_refreshed { PreviousStatus = Some "Returning"; NewStatus = Some "Ended" }
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Series_refreshed historical full payload with a real transition decodes and round-trips" <| fun _ ->
+            // The pre-narrowing wire shape: refreshedAt + newEpisodeCount + a real transition.
+            let historicalData = """{"refreshedAt":"2024-05-01T00:00:00.0000000Z","newEpisodeCount":3,"previousStatus":"Returning","newStatus":"Ended"}"""
+            let deserialized = Serialization.deserialize "Series_refreshed" historicalData
+            let expected = Series_refreshed { PreviousStatus = Some "Returning"; NewStatus = Some "Ended" }
+            Expect.equal deserialized (Some expected)
+                "Historical full payload with a real transition should decode to the narrowed domain shape, ignoring the dropped refreshedAt/newEpisodeCount fields"
+            let eventType, data = Serialization.serialize deserialized.Value
+            let roundTripped = Serialization.deserialize eventType data
+            Expect.equal roundTripped deserialized
+                "Re-serializing a decoded historical event must decode back to the same domain value (ADR-0032 composer compatibility)"
+
+        testCase "Series_refreshed historical full payload with null statuses decodes to a no-transition event and round-trips" <| fun _ ->
+            // 566 of the 780 historical events are this shape: a no-change refresh
+            // under the old, unnarrowed emission rule.
+            let historicalData = """{"refreshedAt":"2024-05-01T00:00:00.0000000Z","newEpisodeCount":0,"previousStatus":null,"newStatus":null}"""
+            let deserialized = Serialization.deserialize "Series_refreshed" historicalData
+            let expected = Series_refreshed { PreviousStatus = None; NewStatus = None }
+            Expect.equal deserialized (Some expected) "Historical null-status payload should decode to a no-transition event"
+            let eventType, data = Serialization.serialize deserialized.Value
+            let roundTripped = Serialization.deserialize eventType data
+            Expect.equal roundTripped deserialized "Round-trip must be stable for the no-transition shape too"
 
         testCase "All event types serialize and deserialize" <| fun _ ->
             let events: SeriesEvent list = [

@@ -162,77 +162,15 @@ module SeriesRefresh =
                 }
         }
 
-    /// Apply a fetch result to the projection: update series_list/series_detail
-    /// status-ish fields and upsert every season + episode row. Old episodes
-    /// stay in place (so watch progress is preserved); newly-added TMDB
-    /// episodes are inserted, and updated episodes get their metadata replaced.
-    let applyToProjection (conn: SqliteConnection) (slug: string) (result: RefreshFetchResult) : unit =
-        let genresJson =
-            result.Genres
-            |> List.map Thoth.Json.Net.Encode.string
-            |> Thoth.Json.Net.Encode.list
-            |> Thoth.Json.Net.Encode.toString 0
-
-        // Update series_list
-        conn
-        |> Db.newCommand """
-            UPDATE series_list SET
-                name = @name,
-                year = @year,
-                poster_ref = @poster_ref,
-                genres = @genres,
-                tmdb_rating = @tmdb_rating,
-                status = @status,
-                season_count = @season_count,
-                episode_count = @episode_count
-            WHERE slug = @slug
-        """
-        |> Db.setParams [
-            "slug", SqlType.String slug
-            "name", SqlType.String result.Name
-            "year", SqlType.Int32 result.Year
-            "poster_ref", match result.PosterRef with Some r -> SqlType.String r | None -> SqlType.Null
-            "genres", SqlType.String genresJson
-            "tmdb_rating", match result.TmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null
-            "status", SqlType.String result.Status
-            "season_count", SqlType.Int32 (List.length result.Seasons)
-            "episode_count", SqlType.Int32 (result.Seasons |> List.sumBy (fun s -> s.Episodes.Length))
-        ]
-        |> Db.exec
-
-        // Update series_detail
-        conn
-        |> Db.newCommand """
-            UPDATE series_detail SET
-                name = @name,
-                year = @year,
-                overview = @overview,
-                genres = @genres,
-                poster_ref = @poster_ref,
-                backdrop_ref = @backdrop_ref,
-                tmdb_rating = @tmdb_rating,
-                episode_runtime = @episode_runtime,
-                status = @status
-            WHERE slug = @slug
-        """
-        |> Db.setParams [
-            "slug", SqlType.String slug
-            "name", SqlType.String result.Name
-            "year", SqlType.Int32 result.Year
-            "overview", SqlType.String result.Overview
-            "genres", SqlType.String genresJson
-            "poster_ref", match result.PosterRef with Some r -> SqlType.String r | None -> SqlType.Null
-            "backdrop_ref", match result.BackdropRef with Some r -> SqlType.String r | None -> SqlType.Null
-            "tmdb_rating", match result.TmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null
-            "episode_runtime", match result.EpisodeRuntime with Some r -> SqlType.Int32 r | None -> SqlType.Null
-            "status", SqlType.String result.Status
-        ]
-        |> Db.exec
-
-        // Upsert seasons + episodes (old rows for unchanged seasons/episodes
-        // are overwritten; progress rows in series_episode_progress are
-        // unaffected since they live in a separate table).
-        for season in result.Seasons do
+    /// Upsert season + episode rows into the cache tier (series-r2xhv). Old
+    /// rows for unchanged seasons/episodes are overwritten; progress rows in
+    /// series_episode_progress are unaffected since they live in a separate
+    /// table. Shared by a TMDB refresh (`applyToProjection`, below) and the
+    /// command-time cache seed after `Series_added_to_library`
+    /// (`Api.addSeriesToLibraryImpl`) — cache writes never happen from
+    /// projection replay (ADR-0043/ADR-0045's cache-tier discipline).
+    let upsertSeasonEpisodeCache (conn: SqliteConnection) (slug: string) (seasons: Series.SeasonImportData list) : unit =
+        for season in seasons do
             conn
             |> Db.newCommand """
                 INSERT OR REPLACE INTO series_season_cache (series_slug, season_number, name, overview, poster_ref, air_date, episode_count)
@@ -267,8 +205,38 @@ module SeriesRefresh =
                 ]
                 |> Db.exec
 
-    /// Refresh a single series: fetches TMDB data, applies it to the
-    /// projection, and appends a Series_refreshed event to the stream.
+    /// Apply a fetch result to the projection: cache-only now (series-r2xhv).
+    /// The two Projected series tables are no longer written here — TMDB's
+    /// name/overview/poster/genres/rating/status describe a third party, not
+    /// the user's own engagement (ADR-0043), so they live only in the cache
+    /// tables. The one exception, airing status, survives as a projection
+    /// column but travels through the narrowed `Series_refreshed` event
+    /// instead (`SeriesProjection.handleEvent`), never through this function.
+    let applyToProjection (conn: SqliteConnection) (slug: string) (result: RefreshFetchResult) : unit =
+        upsertSeasonEpisodeCache conn slug result.Seasons
+
+    /// What `refreshOne`/`refreshOneForJob` report back per series, replacing
+    /// the old `Series.SeriesRefreshedData` return value now that the event
+    /// itself no longer carries `NewEpisodeCount` (series-r2xhv). New-episode
+    /// volume is TMDB metadata, not an event — it is reported to the caller
+    /// directly from the fetch result instead, for `runNightlyJob`'s summary
+    /// and (potentially) the manual refresh caller.
+    type RefreshOutcome = {
+        NewEpisodeCount: int
+        /// Mirrors the appended `Series_refreshed` event's payload — both
+        /// `Some` if a `Series_refreshed` event was appended, both `None` if
+        /// the airing status did not transition (no event appended).
+        PreviousStatus: string option
+        NewStatus: string option
+    }
+
+    /// Refresh a single series: fetches TMDB data, upserts the cache tier,
+    /// and appends a Series_refreshed event to the stream only when the
+    /// airing status actually transitioned (series-r2xhv narrowing).
+    /// `previousStatus` is read from the aggregate (via `Series.reconstitute`),
+    /// never from the read model — the read model can lag the aggregate,
+    /// which would misfire the transition check the same way
+    /// `promoteToInFocusIfNeeded`'s CQRS inversion did.
     let refreshOne
         (conn: SqliteConnection)
         (httpClient: HttpClient)
@@ -276,50 +244,54 @@ module SeriesRefresh =
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
         (slug: string)
-        : Async<Result<Series.SeriesRefreshedData, string>> =
+        : Async<Result<RefreshOutcome, string>> =
         async {
-            // Look up tmdb_id and current status
-            let row =
+            let tmdbIdRow =
                 conn
-                |> Db.newCommand "SELECT tmdb_id, status FROM series_detail WHERE slug = @slug"
+                |> Db.newCommand "SELECT tmdb_id FROM series_detail WHERE slug = @slug"
                 |> Db.setParams [ "slug", SqlType.String slug ]
-                |> Db.querySingle (fun (rd: IDataReader) ->
-                    rd.ReadInt32 "tmdb_id", rd.ReadString "status")
-            match row with
+                |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "tmdb_id")
+            match tmdbIdRow with
             | None -> return Error (sprintf "Series '%s' not found" slug)
-            | Some (tmdbId, previousStatus) ->
-                let existingKeys = existingEpisodeKeys conn slug
-                let! fetchResult = fetchFromTmdb httpClient tmdbConfig imageBasePath slug tmdbId existingKeys
-                match fetchResult with
-                | Error e -> return Error e
-                | Ok result ->
-                    applyToProjection conn slug result
+            | Some tmdbId ->
+                let streamId = Series.streamId slug
+                let storedEvents = EventStore.readStream conn streamId
+                let events = storedEvents |> List.choose Series.Serialization.fromStoredEvent
+                let state = Series.reconstitute events
+                match state with
+                | Series.Not_created | Series.Removed ->
+                    return Error (sprintf "Series '%s' not found" slug)
+                | Series.Active activeSeries ->
+                    let previousStatus = activeSeries.Status
+                    let existingKeys = existingEpisodeKeys conn slug
+                    let! fetchResult = fetchFromTmdb httpClient tmdbConfig imageBasePath slug tmdbId existingKeys
+                    match fetchResult with
+                    | Error e -> return Error e
+                    | Ok result ->
+                        applyToProjection conn slug result
 
-                    // Append Series_refreshed event to the stream
-                    let statusTransitioned = previousStatus <> result.Status
-                    let refreshData: Series.SeriesRefreshedData = {
-                        RefreshedAt = DateTime.UtcNow.ToString("o")
-                        NewEpisodeCount = result.NewEpisodeCount
-                        PreviousStatus = if statusTransitioned then Some previousStatus else None
-                        NewStatus = if statusTransitioned then Some result.Status else None
-                    }
-                    let streamId = Series.streamId slug
-                    let storedEvents = EventStore.readStream conn streamId
-                    let events = storedEvents |> List.choose Series.Serialization.fromStoredEvent
-                    let state = Series.reconstitute events
-                    let currentPosition = EventStore.getStreamPosition conn streamId
-                    match Series.decide state (Series.Refresh_series_from_tmdb refreshData) with
-                    | Error e ->
-                        return Error e
-                    | Ok newEvents ->
-                        let eventDataList = newEvents |> List.map Series.Serialization.toEventData
-                        match EventStore.appendToStream conn streamId currentPosition eventDataList with
-                        | EventStore.ConcurrencyConflict _ ->
-                            return Error "Concurrency conflict while appending Series_refreshed"
-                        | EventStore.Success _ ->
-                            for handler in projectionHandlers do
-                                Projection.runProjection conn handler
-                            return Ok refreshData
+                        let statusTransitioned = previousStatus <> result.Status
+                        let refreshData: Series.SeriesRefreshedData = {
+                            PreviousStatus = if statusTransitioned then Some previousStatus else None
+                            NewStatus = if statusTransitioned then Some result.Status else None
+                        }
+                        let currentPosition = EventStore.getStreamPosition conn streamId
+                        match Series.decide state (Series.Refresh_series_from_tmdb refreshData) with
+                        | Error e ->
+                            return Error e
+                        | Ok newEvents ->
+                            let eventDataList = newEvents |> List.map Series.Serialization.toEventData
+                            match EventStore.appendToStream conn streamId currentPosition eventDataList with
+                            | EventStore.ConcurrencyConflict _ ->
+                                return Error "Concurrency conflict while appending Series_refreshed"
+                            | EventStore.Success _ ->
+                                for handler in projectionHandlers do
+                                    Projection.runProjection conn handler
+                                return Ok {
+                                    NewEpisodeCount = result.NewEpisodeCount
+                                    PreviousStatus = refreshData.PreviousStatus
+                                    NewStatus = refreshData.NewStatus
+                                }
         }
 
     /// Job-connection variant of `refreshOne` (administration-tj8n2), used only
@@ -339,20 +311,29 @@ module SeriesRefresh =
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
         (slug: string)
-        : Async<Result<Series.SeriesRefreshedData, string>> =
+        : Async<Result<RefreshOutcome, string>> =
         async {
-            let rowAndKeys =
+            let streamId = Series.streamId slug
+            let looked =
                 withLock jobLock (fun () ->
-                    let row =
+                    let tmdbIdRow =
                         conn
-                        |> Db.newCommand "SELECT tmdb_id, status FROM series_detail WHERE slug = @slug"
+                        |> Db.newCommand "SELECT tmdb_id FROM series_detail WHERE slug = @slug"
                         |> Db.setParams [ "slug", SqlType.String slug ]
-                        |> Db.querySingle (fun (rd: IDataReader) ->
-                            rd.ReadInt32 "tmdb_id", rd.ReadString "status")
-                    row |> Option.map (fun (tmdbId, status) -> tmdbId, status, existingEpisodeKeys conn slug))
-            match rowAndKeys with
+                        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "tmdb_id")
+                    match tmdbIdRow with
+                    | None -> None
+                    | Some tmdbId ->
+                        let storedEvents = EventStore.readStream conn streamId
+                        let events = storedEvents |> List.choose Series.Serialization.fromStoredEvent
+                        let state = Series.reconstitute events
+                        match state with
+                        | Series.Active activeSeries ->
+                            Some (tmdbId, state, activeSeries.Status, existingEpisodeKeys conn slug)
+                        | Series.Not_created | Series.Removed -> None)
+            match looked with
             | None -> return Error (sprintf "Series '%s' not found" slug)
-            | Some (tmdbId, previousStatus, existingKeys) ->
+            | Some (tmdbId, state, previousStatus, existingKeys) ->
                 let! fetchResult = fetchFromTmdb httpClient tmdbConfig imageBasePath slug tmdbId existingKeys
                 match fetchResult with
                 | Error e -> return Error e
@@ -361,18 +342,11 @@ module SeriesRefresh =
                         withLock jobLock (fun () ->
                             applyToProjection conn slug result
 
-                            // Append Series_refreshed event to the stream
                             let statusTransitioned = previousStatus <> result.Status
                             let refreshData: Series.SeriesRefreshedData = {
-                                RefreshedAt = DateTime.UtcNow.ToString("o")
-                                NewEpisodeCount = result.NewEpisodeCount
                                 PreviousStatus = if statusTransitioned then Some previousStatus else None
                                 NewStatus = if statusTransitioned then Some result.Status else None
                             }
-                            let streamId = Series.streamId slug
-                            let storedEvents = EventStore.readStream conn streamId
-                            let events = storedEvents |> List.choose Series.Serialization.fromStoredEvent
-                            let state = Series.reconstitute events
                             let currentPosition = EventStore.getStreamPosition conn streamId
                             match Series.decide state (Series.Refresh_series_from_tmdb refreshData) with
                             | Error e -> Error e
@@ -384,7 +358,11 @@ module SeriesRefresh =
                                 | EventStore.Success _ ->
                                     for handler in projectionHandlers do
                                         Projection.runProjection conn handler
-                                    Ok refreshData)
+                                    Ok {
+                                        NewEpisodeCount = result.NewEpisodeCount
+                                        PreviousStatus = refreshData.PreviousStatus
+                                        NewStatus = refreshData.NewStatus
+                                    })
         }
 
     /// Return all series slugs that are candidates for nightly refresh.

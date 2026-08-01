@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 20:37 -- Task verified and completed: series-r2xhv - Cut Series refresh and Jellyfin materialization over to cache-only writes, and narrow Series_refreshed to fire only on a real airing-status transition — making status replayable from the log for the first time
+
+**Type:** Work / Task completion
+**Task:** series-r2xhv - Cut Series refresh and Jellyfin materialization over to cache-only writes, and narrow Series_refreshed to fire only on a real airing-status transition — making status replayable from the log for the first time
+**Summary:** Cut SeriesRefresh/Jellyfin writes over to cache-only (season/episode cache seeded and cleaned up at command time, never from replay) and narrowed Series_refreshed to fire only on a real airing-status transition with previousStatus sourced from the aggregate - the projection handler now applies the transition, backward-compatible with all 780 historical events
+**Duration:** 26m
+**Verification:** PASS (iteration 1)
+**Files changed:** 10
+**Tests added:** 15
+**ADRs written:** 0047-series-refreshed-narrowed-to-real-airing-status-transitions.md
+
+---
+
 ## 2026-08-01 20:09 -- Batch started: [series-r2xhv]
 
 **Type:** Work / Batch start

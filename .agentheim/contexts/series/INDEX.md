@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 2
-- **Doing:** 1
-- **Done:** 1
+- **Doing:** 0
+- **Done:** 2
 <!-- task-counts:end -->
 
 ### Todo
@@ -24,12 +24,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **series-r2xhv** — Cut Series refresh and Jellyfin materialization over to cache-only writes, and narrow Series_refreshed to fire only on a real airing-status transition — making status replayable from the log for the first time (refactor) — `doing/series-r2xhv-refresh-writes-cache-only-narrow-series-refreshed.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **series-r2xhv** — Cut Series refresh and Jellyfin materialization over to cache-only writes, and narrow Series_refreshed to fire only on a real airing-status transition — making status replayable from the log for the first time (refactor) — `done/series-r2xhv-refresh-writes-cache-only-narrow-series-refreshed.md`
 - **series-m7fdk** — Rename the Series season/episode tree into the metadata cache tier (ALTER TABLE RENAME, zero data movement) and replace the materialized next-up/count columns with SQL views (refactor) — `done/series-m7fdk-rename-episode-tree-into-cache.md`
 <!-- done-list:end -->
 
@@ -41,6 +41,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0047** -- `Series_refreshed` narrowed to real airing-status transitions (previousStatus from the aggregate; projection handler applies it); all other TMDB metadata leaves the log for the cache tier. Backward-compatible with all 780 historical events. -- 2026-08-01 -- `../../knowledge/decisions/0047-series-refreshed-narrowed-to-real-airing-status-transitions.md`
 - **0046** -- Series season/episode tree renamed into the cache tier (`series_episode_cache`/`series_season_cache`, idempotent ALTER TABLE RENAME, zero data movement); SQL views `series_next_up`/`series_episode_counts` replace the materialized columns. -- 2026-08-01 -- `../../knowledge/decisions/0046-series-episode-tree-renamed-into-cache-views-replace-materialized-columns.md`
 <!-- no ADRs scoped to this BC -->
 <!-- adr-local:end -->

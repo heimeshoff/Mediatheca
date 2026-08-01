@@ -1,15 +1,15 @@
 ---
 id: series-r2xhv
 title: Cut Series refresh and Jellyfin materialization over to cache-only writes, and narrow Series_refreshed to fire only on a real airing-status transition — making status replayable from the log for the first time
-status: doing
+status: done
 type: refactor
 context: series
 created: 2026-08-01
-completed:
+completed: 2026-08-01
 depends_on: [series-m7fdk]
 blocks: []
 tags: [series, integration, tmdb, jellyfin, drift, event-log]
-related_adrs: [0012, 0026, 0029, 0031, 0032, 0039, 0040]
+related_adrs: [0012, 0026, 0029, 0031, 0032, 0039, 0040, 0047]
 related_research: [tv-series-metadata-fallback-sources]
 prior_art: [integration-m4k7p, integration-006, integration-q7wv3]
 ---
@@ -97,3 +97,28 @@ is written **exclusively by an event that carries it** — the identity-card cla
   ADR-0032 composer.
 - `silo-2023-2` — replays to `Returning` but has no live row at all (this is the `series_list`
   `onlyInShadow` row). A stale/orphaned stream; decide remove-vs-restore during `series-d5tpn`.
+
+## Outcome
+
+`SeriesRefresh.applyToProjection` now writes only the cache tier (`upsertSeasonEpisodeCache`, shared
+with a new command-time seed at `Api.addSeriesToLibraryImpl`); its `UPDATE series_list`/`series_detail`
+statements are gone. `Series_added_to_library`'s season/episode cache seed and `Series_removed_from_library`'s
+cache cleanup moved from `SeriesProjection.handleEvent` (replay) to `Api.fs`'s command handlers
+(imperative, command-time only). `Series.decide`'s `Refresh_series_from_tmdb` arm now appends
+`Series_refreshed` only when the airing status transitioned; `SeriesRefreshedData` dropped
+`RefreshedAt`/`NewEpisodeCount` (episode counts now flow through a new `SeriesRefresh.RefreshOutcome`
+type instead); `previousStatus` is sourced from `Series.reconstitute`, never the read model.
+`SeriesProjection.handleEvent`'s `Series_refreshed` arm is no longer a no-op — it applies the transition
+to `series_list.status`/`series_detail.status`. Decoding stays backward-compatible with all 780
+historical events (566 null-status, 214 real-transition), verified by dedicated round-trip tests.
+
+Key files: `src/Server/SeriesRefresh.fs`, `src/Server/Series.fs`, `src/Server/SeriesProjection.fs`,
+`src/Server/Api.fs`. Tests: `tests/Server.Tests/SeriesRefreshCacheTests.fs` (new, 9 cases),
+`tests/Server.Tests/SeriesTests.fs` (+5), `tests/Server.Tests/AdministrationTests.fs` (+1). ADR:
+`.agentheim/knowledge/decisions/0047-series-refreshed-narrowed-to-real-airing-status-transitions.md`.
+BC README updated with the narrowed `Series_refreshed` semantics and cache-tier note.
+
+Two known residual status discrepancies (`love-death-robots-2019`, `silo-2023-2`) and
+`SeriesProjection.dropTables` still owning `series_season_cache`/`series_episode_cache`'s `Init`/`Drop`
+(ADR-0046's deliberately incomplete state, one step further now) remain, both explicitly deferred to
+`series-d5tpn` per this task's Notes and ADR-0047's Consequences.

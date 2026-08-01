@@ -469,6 +469,23 @@ let administrationTests =
 
             Expect.isNonEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "LegacyThing")) "An event type on a stream matching no known BC prefix should be flagged unhandled"
 
+        testCase "getHealthStats a historical Series_refreshed event (narrowed by series-r2xhv) appears in neither the unhandled nor the unformattable list" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
+            // The narrowed decoder/formatter must still handle the pre-narrowing
+            // historical wire shape (refreshedAt + newEpisodeCount alongside a
+            // null-status no-transition refresh) — one of the 566 historical
+            // Series_refreshed events with this exact shape.
+            EventStore.appendToStream conn (Series.streamId "some-series") -1L [
+                makeEvent "Series_refreshed" """{"refreshedAt":"2024-05-01T00:00:00.0000000Z","newEpisodeCount":0,"previousStatus":null,"newStatus":null}"""
+            ] |> ignore
+            let api = createApi db.Factory
+
+            let stats = api.getHealthStats () |> Async.RunSynchronously
+
+            Expect.isEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "Series_refreshed")) "Series_refreshed is handled by Series' deserializer for both the historical and narrowed payload shapes"
+            Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Series_refreshed")) "Series_refreshed has a formatter case for both the historical and narrowed payload shapes"
+
         testCase "getProjectionStats lists all registered projections with checkpoint, lag, and row counts" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapAdmin
             let conn = db.Connection
