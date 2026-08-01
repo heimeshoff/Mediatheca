@@ -67,8 +67,12 @@ Supersedes the private `projectionTables` list and consolidates the scattered "t
 writes and need no gating" comments in ADR-0025 / ADR-0031. Reasonable fold: merge into
 `administration-c3nvp`'s ADR if one administration ADR is preferred over two.
 
-`steam_playtime_snapshot` deserves its own note in the registry: it is neither projection nor cache
-but a **sync cursor** — external state remembered in order to compute the next delta, not derivable
-from our log at all. If a snapshot row is lost, `getLastSnapshot` returns `None` and
-`PlaytimeTracker.fs:667-680` records the entire lifetime total as one new session. That hazard is out
-of scope here; capture it separately.
+`steam_playtime_snapshot` deserves its own note in the registry: today it is neither projection nor
+cache but a **sync cursor** — external state remembered in order to compute the next delta, not
+derivable from our log at all. If a snapshot row is lost, `getLastSnapshot` returns `None` and
+`PlaytimeTracker.fs:667-680` records the entire lifetime total as one new session.
+
+Classify it `Imperative "PlaytimeTracker"` here — it still exists at this point in the sequence — but
+**note in the registry that `games-p6vkz` deletes it**: once prior playtime and every session are in
+the log, `ActiveGame.SteamObservedMinutes` is the cursor, derived by replay, and the hazard closes by
+construction rather than being guarded. This entry should disappear in that task's diff.

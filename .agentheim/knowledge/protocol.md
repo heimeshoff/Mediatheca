@@ -5,6 +5,26 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 17:52 -- Modeling / Refined: games-p6vkz, games-h4mrd - pre-tracking playtime becomes its own dateless event, and the Steam sync cursor is retired
+
+**Type:** Modeling / Refine
+**BC:** games
+**Status after:** todo (both)
+**Summary:** The builder rejected the original model's treatment of a game's first Steam observation. `PlaytimeTracker.fs:667-680` records a game's entire pre-Mediatheca lifetime total as a single play session dated at `rtime_last_played` — for a 500-hour game that asserts a 500-hour day that never happened and poisons the heatmap. Playtime accumulated before tracking began is a *different fact*: it has a magnitude but no date. Modelled as `Prior_play_time_recorded of minutes` (dateless, counts toward the total, writes no session row, so the Journal excludes it by construction rather than by filter). Threshold for "this is history, not a sitting" is a named 960-minute (16h) constant living in `Games.decide`, not the adapter — which turns the whole Steam sync policy into a pure, directly-testable `Record_steam_observed_total` decision.
+
+**Second-order consequence, and the reason `steam_playtime_snapshot` could be deleted rather than guarded:** once prior playtime and every session are in the log, the aggregate knows what has been accounted for, so the cursor is derivable. But the naive derivation is a trap — deleting a Steam-sourced session drops our counted total below Steam's reported total (Grounded: log 2282, Steam ~2952) and the next sync would fabricate a 670-minute phantom session. Resolved with **two folds over the same events**: `TotalPlayTimeMinutes` (prior + current session minutes — what the user asserts) and `SteamObservedMinutes` (prior + steam deltas as *originally* recorded, never reduced by a later correction or removal — what Steam has told us). The second is computable because the correction and removal events already carry `previousMinutes`. A sixth event, `Steam_observed_total_reconciled`, carries the existing cursor across the migration cutover for the ≤12 games that have a snapshot row, and remains the standing resync primitive.
+
+**Net simplifications:** the `Imported` play-session source is gone (every migrated session is now a genuinely observed delta on a genuinely known date), and `games-h4mrd`'s written-down accepted cost — *"one day in early 2026 shows ~2952 minutes for Grounded"* — is eliminated rather than tolerated. The migration now introduces **no invented dates at all**.
+
+**Builder decisions taken during refinement:** 16h fixed constant (not a setting, not `rtime_last_played`-driven); retire the cursor by deriving from the log (not keep-and-guard); GameDetail breaks prior playtime out as its own line rather than silently summing it.
+
+**Not filed as a separate task:** the `steam_playtime_snapshot` hazard the builder asked to capture is absorbed into `games-p6vkz`, which deletes the table outright. Filing a guard task alongside a task that removes the guarded thing would be bookkeeping noise. `administration-t9bzx`'s registry note now records that its `Imperative` entry is expected to disappear in `games-p6vkz`'s diff.
+
+**Split into:** none
+**ADRs written:** none — the `games-p6vkz` ADR spec grew the two-fold design and the threshold rationale.
+
+---
+
 ## 2026-08-01 17:25 -- Modeling / Captured: 15 tasks — separate third-party metadata from domain events so projection rebuilds are deterministic
 
 **Type:** Modeling / Capture

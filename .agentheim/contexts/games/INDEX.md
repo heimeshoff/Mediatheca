@@ -18,8 +18,8 @@ research touching this BC, and concept synthesis pages.
 
 ### Todo
 <!-- todo-list:start -->
-- **games-p6vkz** — Model play sessions as first-class Games events keyed on (game, gaming day) — replacing the non-event-sourced game_play_session table and the republished-SUM Game_play_time_set (feature) — `todo/games-p6vkz-play-sessions-as-first-class-events.md`
-- **games-h4mrd** — Reconstruct play-session history from the 204 cumulative Game_play_time_set totals — recovering per-day history for 149 games the imperative table never covered — via an operator-triggered SSE migration (chore) — `todo/games-h4mrd-reconstruct-play-session-history.md`
+- **games-p6vkz** — Model play sessions and pre-tracking playtime as first-class Games events — replacing the non-event-sourced game_play_session table, the republished-SUM Game_play_time_set, and the unrebuildable steam_playtime_snapshot cursor (feature) — `todo/games-p6vkz-play-sessions-as-first-class-events.md`
+- **games-h4mrd** — Reconstruct play-session history from the 204 cumulative Game_play_time_set totals — each stream's first observation becoming prior playtime rather than a fabricated session — via an operator-triggered SSE migration (chore) — `todo/games-h4mrd-reconstruct-play-session-history.md`
 - **games-w4tzc** — Make the retained external-identity Game events idempotent — Set_steam_app_id and Add_family_owner re-emit on every sync for values that never change, unlike Set_steam_library_date which already guards (bug) — `todo/games-w4tzc-idempotent-external-identity-events.md`
 <!-- todo-list:end -->
 
