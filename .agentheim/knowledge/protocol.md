@@ -5,6 +5,37 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 15:55 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 5m (batch start 15:50 → session end 15:55)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** design-system-x7k2p: 1
+**Commits:** 3 (1 batch start, 1 task integration, this session-end entry)
+**Parallelism:** batch of 1 — the ready set was exactly one task. `MAX_PARALLEL` never bound; nothing was held back.
+**Session-start churn reconciliation:** 0 recognized machine-shape commits, 0 human commits since the 2026-08-01 15:44 boundary — all three intervening commits carry `[design-system-x7k2p]` / `[games-status-vocabulary-reconcile]` trailers. Nothing flagged, no `whats-next.md` write. Done **by hand** — `lib/session-start-churn.mjs` still absent from installed plugin 0.9.2, eighth consecutive session.
+**Vision-conformance:** none — batch aligns with vision. design-system-x7k2p synchronizes doctrine prose with ADR-0042, which itself implements the "Add InFocus status to Game lifecycle" bullet of `## Remaining v1 Work`; a prose-sync of an already-conforming decision cannot diverge. Judged **by hand** — `lib/vision-conformance.mjs`'s section-heading expectations still don't match this vision's shape (seventh consecutive session).
+**Batch mix:** 100% bookkeeping (1 task). Classified **by hand** (`lib/vacuum-guard.mjs` still absent, eighth consecutive session) and on substance: `type: chore` touching only two `.agentheim/` BC READMEs — project-knowledge bookkeeping; by `classifyTask`'s letter (READMEs are not protocol/INDEX/state surfaces) it would read harness — same known heuristic quirk as prior session-end entries.
+**Carry-over:** left behind (user WIP, 2 files — modified `src/Client/Pages/Settings/Views.fs` and untracked `Mediatheca Directions.html`, both pre-existing at session start, neither under `.agentheim/`). No `.agentheim/`-owned stranded files. No git-registered non-main worktrees remain — `.worktrees/design-system-x7k2p` torn down cleanly after integration (no `node_modules` link was ever created; markdown-only task).
+**Board state after this session:** `todo/` empty, `doing/` empty across every BC. `backlog/` holds only `integration-hebjs` (one-click Steam family import, unrefined). Next session hits the vacuum guard unless something is refined+promoted — vision.md still has no `## Open questions` section.
+
+**Notes carried out of this run:**
+
+1. **First-try PASS on a verifier-note handoff task:** the games iteration-1 verifier's suggested fix (file a design-system follow-up rather than make an out-of-scope cross-BC edit) closed cleanly one session later — the two stale README lines it quoted were the exact and complete edit set, confirmed by the refinement sweep and this verifier's own repo-wide `Playing`/`OnHold` check.
+2. **Cross-BC single-line waiver worked as designed:** the worker prompt explicitly waived rule 5 for the one journal README line the task's What section names; the worker touched exactly that line and nothing else.
+
+**Harness defects observed (installed `agentheim` plugin 0.9.2, not this project):**
+
+1. **`claim`/`complete` with explicit `{"context":"design-system"}` override worked first try** — the deriveContext multi-word-id quirk from last session never fired because the override was passed preemptively. Doctrine note holds: always pass the explicit context override.
+2. **`checkpoint` still does not fold in the vacated lifecycle path** (ADR-0057 / agentic-workflow-w2njd) — vacated `doing/` path staged by hand again; git recorded a clean rename. Ninth consecutive session.
+3. **`lib/session-start-churn.mjs`, `lib/vacuum-guard.mjs`, `lib/vision-conformance.mjs`, `lib/worktree-salvage.mjs`, `lib/index-entry-length.mjs` still absent from 0.9.2** — churn reconciliation, batch-mix, and vision-conformance each done manually.
+4. **`references/worker-return-format.md` absent from the dev checkout** (`C:\src\heimeshoff\agentic\agentheim\skills\work\` has only SKILL.md) — resolved from the plugin cache 0.9.2 copy instead; the resolve-plugin-file-convention fallback worked as documented.
+
+---
+
 ## 2026-08-01 15:54 -- Task verified and completed: design-system-x7k2p - Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042)
 
 **Type:** Work / Task completion
