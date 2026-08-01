@@ -11,6 +11,7 @@ open System.Net.Http
 open System.Threading
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
+open Microsoft.AspNetCore.ResponseCompression
 open Microsoft.AspNetCore.StaticFiles
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.FileProviders
@@ -49,6 +50,27 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     let builder = WebApplication.CreateBuilder(args)
 
     builder.Services.AddGiraffe() |> ignore
+
+    // Response compression (Brotli + gzip, the defaults when no provider is
+    // registered explicitly). The Fable.Remoting list endpoints dominate the
+    // client's cold start — getGames alone is ~261 KB of JSON — and the whole
+    // library snapshot the Ctrl+K search modal depends on is ~354 KB
+    // uncompressed. JSON of that shape compresses several-fold.
+    //
+    // Deliberately left on the default MIME list, which covers application/
+    // json, text/html, text/css and application/javascript but NOT
+    // text/event-stream: the /api/stream/* SSE handlers must keep flushing
+    // event-by-event, so they stay uncompressed.
+    //
+    // EnableForHttps is on because everything here is already carried over an
+    // encrypted transport (Tailscale) or loopback (the desktop shell), and the
+    // app is single-user with no authentication and no session cookies
+    // (ADR-0007) — so the BREACH-style concern that motivates the default-off
+    // setting has no secret to leak. Without this, compression would silently
+    // stop the day the app is fronted by HTTPS.
+    builder.Services.AddResponseCompression(fun (options: ResponseCompressionOptions) ->
+        options.EnableForHttps <- true
+    ) |> ignore
 
     urls |> Option.iter (fun u -> builder.WebHost.UseUrls(u) |> ignore)
 
@@ -365,6 +387,10 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
             remotingHandler
             adminRemotingHandler
         ]
+
+    // Must precede the static-file and Giraffe middleware so their responses
+    // pass through the compression stream.
+    app.UseResponseCompression() |> ignore
 
     // Serve static files from deploy/public in production
     let staticPath = Path.Combine(Directory.GetCurrentDirectory(), "deploy", "public")
