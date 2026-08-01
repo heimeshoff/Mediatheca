@@ -62,6 +62,12 @@ let init (api: IMediathecaApi) (adminApi: IAdminApi) () : Model * Cmd<Msg> =
             (fun ex -> Dashboard_msg (Pages.Dashboard.Types.TabLoadError ex.Message))
         Cmd.map Movie_list_msg movieListCmd
         Cmd.map Series_list_msg seriesListCmd
+        // Games must load at startup like movies and series: the Ctrl+K search
+        // modal's Library tab filters a client-side snapshot of these three
+        // lists (SearchModal.filterLibrary), and the external tabs use them to
+        // exclude already-owned items from TMDB/RAWG results. Without this the
+        // snapshot has no games until the Games page is visited.
+        Cmd.map Game_list_msg gameListCmd
         Cmd.map Settings_msg settingsCmd
         // Trigger Jellyfin auto-sync on app visit
         Cmd.OfAsync.perform api.triggerJellyfinSync () JellyfinSyncTriggered
