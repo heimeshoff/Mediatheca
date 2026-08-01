@@ -1,7 +1,7 @@
 ---
 id: integration-007
 title: Fetch Jellyfin episode stills when materializing a missing season
-status: backlog
+status: todo
 type: feature
 context: integration
 created: 2026-06-26

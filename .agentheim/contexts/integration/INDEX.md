@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 2
-- **Todo:** 0
+- **Backlog:** 1
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 8
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **integration-007** — Fetch Jellyfin episode stills when materializing a missing season (feature) — `todo/integration-007-fetch-jellyfin-episode-stills-on-materialize.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -39,7 +40,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **integration-007** -- Fetch Jellyfin episode stills when materializing a missing season -- `feature` -- `backlog/integration-007-fetch-jellyfin-episode-stills-on-materialize.md`
 - **integration-hebjs** -- One-click Steam Family import — automatic access-token acquisition -- `feature` -- `backlog/integration-hebjs-one-click-steam-family-import.md`
 <!-- backlog-list:end -->
 
