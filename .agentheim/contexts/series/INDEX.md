@@ -11,19 +11,19 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 2
-- **Doing:** 0
+- **Todo:** 1
+- **Doing:** 1
 - **Done:** 2
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **series-q8jwc** — Compose Series read models from the metadata cache — join in the query function, not the API layer — keeping every Shared DTO and the whole client unchanged (refactor) — `todo/series-q8jwc-compose-reads-from-metadata-cache.md`
 - **series-d5tpn** — Drop the externally-sourced columns from series_list and series_detail, prove the drift check reports zero for SeriesProjection, and retire the lossy-rebuild guard (refactor) — `todo/series-d5tpn-drop-columns-prove-drift-zero.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **series-q8jwc** — Compose Series read models from the metadata cache — join in the query function, not the API layer — keeping every Shared DTO and the whole client unchanged (refactor) — `doing/series-q8jwc-compose-reads-from-metadata-cache.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

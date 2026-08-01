@@ -1,7 +1,7 @@
 ---
 id: series-q8jwc
 title: Compose Series read models from the metadata cache — join in the query function, not the API layer — keeping every Shared DTO and the whole client unchanged
-status: todo
+status: doing
 type: refactor
 context: series
 created: 2026-08-01

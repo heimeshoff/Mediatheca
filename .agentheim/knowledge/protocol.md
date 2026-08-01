@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 20:37 -- Batch started: [series-q8jwc]
+
+**Type:** Work / Batch start
+**Tasks:** series-q8jwc - Compose Series read models from the metadata cache — join in the query function, not the API layer — keeping every Shared DTO and the whole client unchanged
+**Parallel:** no (1 worker - the ready set is exactly one task; series-d5tpn, journal-w3sbq and games-h4mrd remain blocked on the stranded administration-kv7dp / games-p6vkz merges awaiting the builder)
+
+---
+
 ## 2026-08-01 20:37 -- Task verified and completed: series-r2xhv - Cut Series refresh and Jellyfin materialization over to cache-only writes, and narrow Series_refreshed to fire only on a real airing-status transition — making status replayable from the log for the first time
 
 **Type:** Work / Task completion
