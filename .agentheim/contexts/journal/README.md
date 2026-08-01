@@ -29,7 +29,7 @@ Journal **has no write aggregates**. It is a projection-heavy read-side context:
 None published. **Subscribes** to:
 - Movies: `Watch_session_recorded`, `Watch_session_removed`, `Watch_session_date_changed`, friend-on-session events.
 - Series: `Episode_watched`, `Episode_unwatched`, `Episode_watched_date_changed`, rewatch-session friend events.
-- Games: `Game_play_time_set`, `Game_steam_last_played_set`, `Game_status_changed` (Playing/Completed transitions).
+- Games: `Game_play_time_set`, `Game_steam_last_played_set`, `Game_status_changed` (status transitions, including the Retired terminal state).
 
 ## Key commands
 

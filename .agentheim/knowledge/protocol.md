@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 15:54 -- Task verified and completed: design-system-x7k2p - Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042)
+
+**Type:** Work / Task completion
+**Task:** design-system-x7k2p - Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042)
+**Summary:** Synced the design-system README lifecycle-status vocabulary entry and the journal README Games subscription line with ADR-0042 five-state unification (Backlog | InFocus | Retired | Abandoned | Dismissed, 1:1, reconciliation closed)
+**Duration:** 3m
+**Verification:** PASS (iteration 1)
+**Files changed:** 2
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-08-01 15:51 -- Batch started: [design-system-x7k2p]
 
 **Type:** Work / Batch start

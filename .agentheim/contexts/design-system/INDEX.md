@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 17
+- **Doing:** 0
+- **Done:** 18
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **design-system-x7k2p** — Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042) (chore) — `doing/design-system-x7k2p-lifecycle-status-vocabulary-readme-sync.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **design-system-x7k2p** — Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042) (chore) — `done/design-system-x7k2p-lifecycle-status-vocabulary-readme-sync.md`
 - **design-system-vk7rd** — Sidebar bottom group (Admin/Settings) must pin to the bottom of the viewport, not the bottom of the document — the rail is `min-h-screen` and stretches with page content, so on any scrolling page the group sits below the fold (bug) — `done/design-system-vk7rd-sidebar-rail-viewport-pinned.md`
 - **design-system-q4ebg** — "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)" (bug) — `done/design-system-q4ebg-daisyui5-bordered-select-textarea.md`
 - **design-system-dib4q** — DaisyUI 5 input-bordered migration — remove the removed modifier from all inputs (bug) — `done/design-system-dib4q-daisyui5-input-bordered-migration.md`

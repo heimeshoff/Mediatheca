@@ -1,7 +1,8 @@
 ---
 id: design-system-x7k2p
 title: Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042)
-status: doing
+status: done
+completed: 2026-08-01
 type: chore
 context: design-system
 created: 2026-08-01
@@ -85,3 +86,15 @@ All acceptance criteria are machine-checkable (grep/diff); none are `[human-eye]
 Convention check (ADR-0059): touches README ubiquitous-language sections but establishes
 no new convention — it synchronizes prose with the already-recorded ADR-0042 decision;
 no enforcement criterion required.
+
+## Outcome
+
+Rewrote the design-system README's "Lifecycle status vocabulary" entry
+(`.agentheim/contexts/design-system/README.md`) to state that
+`DesignSystem.LifecycleStatus` and `Shared.GameStatus` are unified 1:1 on the five-state
+vocabulary `Backlog | InFocus | Retired | Abandoned | Dismissed`, citing ADR-0042 and task
+`games-status-vocabulary-reconcile`, and removed the stale "open Games BC backlog item"
+framing. Fixed the journal README's Games subscription line
+(`.agentheim/contexts/journal/README.md:32`) to drop the stale
+"(Playing/Completed transitions)" parenthetical in favor of "(status transitions, including
+the Retired terminal state)". No other lines touched in either file.
