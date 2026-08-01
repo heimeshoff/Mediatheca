@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 12:57 -- Batch started: [administration-k3vmt]
+
+**Type:** Work / Batch start
+**Tasks:** administration-k3vmt - Dissolve the /admin console into Settings — its six tabs become inline collapsible sections below Data Imports, and the sidebar's bottom group drops to a single Settings button
+**Parallel:** no (1 worker - the ready set was exactly one task; MAX_PARALLEL never bound and nothing was held back)
+
+---
+
 ## 2026-08-01 12:19 -- Modeling / Promoted: administration-k3vmt - Dissolve the /admin console into Settings — its six tabs become inline collapsible sections below Data Imports, and the sidebar's bottom group drops to a single Settings button
 
 **Type:** Modeling / Promote

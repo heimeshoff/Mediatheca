@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 25
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **administration-k3vmt** — Dissolve the /admin console into Settings — its six tabs become inline collapsible sections below Data Imports, and the sidebar's bottom group drops to a single Settings button (refactor) — `todo/administration-k3vmt-dissolve-admin-console-into-settings.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **administration-k3vmt** — Dissolve the /admin console into Settings — its six tabs become inline collapsible sections below Data Imports, and the sidebar's bottom group drops to a single Settings button (refactor) — `doing/administration-k3vmt-dissolve-admin-console-into-settings.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

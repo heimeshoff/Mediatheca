@@ -1,7 +1,7 @@
 ---
 id: administration-k3vmt
 title: Dissolve the /admin console into Settings — its six tabs become inline collapsible sections below Data Imports, and the sidebar's bottom group drops to a single Settings button
-status: todo
+status: doing
 type: refactor
 context: administration
 created: 2026-08-01
