@@ -18,7 +18,7 @@ Mediatheca is a personal media library + diary + intelligence hub built on event
 
 ### Games
 - **Purpose:** Owns the Game aggregate — video games with lifecycle status, play modes, family ownership, and Steam/HLTB metadata.
-- **Core language:** Game, status (Backlog → InFocus → Playing → Completed / Abandoned / OnHold / Dismissed), play time, family owner, played with, HLTB hours.
+- **Core language:** Game, status (Backlog → InFocus → Retired / Abandoned / Dismissed), play time, family owner, played with, HLTB hours.
 - **Classification:** core
 - **Key actors:** Single user.
 

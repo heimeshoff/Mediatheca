@@ -58,3 +58,30 @@ sessions that read them first for ubiquitous language.
       "(Playing/Completed transitions)" — it accurately describes the current five-state
       vocabulary with no stale status names.
 - [ ] No other lines in either README are changed.
+
+## Notes
+
+Refined 2026-08-01 (modeling): both stale lines verified on disk at their cited locations —
+design-system `README.md:23` (six-state "Lifecycle status vocabulary" entry, "tracked as a
+Games BC backlog item" framing) and journal `README.md:32` ("(Playing/Completed
+transitions)"). ADR-0042 confirmed at
+`knowledge/decisions/0042-games-lifecycle-remodeled-to-five-states.md`.
+
+A full sweep of living doctrine (vision.md, context-map.md, every BC README) for
+`Playing`/`OnHold` found exactly one stale spot beyond this task's two targets:
+`context-map.md:21` (Games core language still listed the seven-state pre-remodel
+vocabulary). That is a modeling-owned artifact and was fixed directly during this
+refinement — the two README edits above are therefore the *complete* remaining set of
+stale-vocabulary fixes; the worker needs no further sweep. The games BC README is already
+correct (it names Playing/OnHold only to state they no longer exist).
+
+Suggested rewrite shape for the design-system entry: keep the h3q8n lineage ("surfaced
+during design-system-h3q8n") only if it reads naturally — the load-bearing content is the
+settled state: `DesignSystem.LifecycleStatus` and `Shared.GameStatus` are the same five
+states (`Backlog | InFocus | Retired | Abandoned | Dismissed`), unified 1:1 per ADR-0042
+(task `games-status-vocabulary-reconcile`), with `Dismissed` carrying a muted badge variant.
+
+All acceptance criteria are machine-checkable (grep/diff); none are `[human-eye]`.
+Convention check (ADR-0059): touches README ubiquitous-language sections but establishes
+no new convention — it synchronizes prose with the already-recorded ADR-0042 decision;
+no enforcement criterion required.

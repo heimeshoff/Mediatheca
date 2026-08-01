@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 15:48 -- Modeling / Refined: design-system-x7k2p - Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042)
+
+**Type:** Modeling / Refine
+**BC:** design-system
+**Status after:** todo
+**Summary:** Verifier-authored handoff task verified against disk: both stale lines exist exactly as cited (design-system README:23 six-state vocabulary entry, journal README:32 "(Playing/Completed transitions)"), ADR-0042 exists. A completeness sweep of living doctrine (vision, context-map, all BC READMEs) for `Playing`/`OnHold` found one spot the handoff missed — `context-map.md:21`, the Games core-language line still listing the seven-state pre-remodel vocabulary — fixed directly in this pass (modeling-owned artifact, precedent: the games refine corrected vision.md in-pass). Task Notes now record that the two README edits are the complete remaining set. All four acceptance criteria machine-checkable, none `[human-eye]`; ADR-0059 convention check n/a (synchronizes prose with an already-recorded decision, establishes nothing new). No split, no orchestrator round — everything was verifiable directly on disk.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-08-01 15:44 -- Work session ended
 
 **Type:** Work / Session end
