@@ -1502,6 +1502,22 @@ type ProjectionStatRow = {
     IsRebuilding: bool
 }
 
+/// The `Cache`/`Imperative` half of `Administration.tableRegistry`
+/// (administration-t9bzx): row counts for every durable table that is
+/// explicitly NOT checkpoint-tracked, NOT rebuildable, and NOT drift-checked
+/// — the counterpart to `ProjectionStatRow` for tables `checkProjectionDrift`
+/// never touches. `Classification` is `"Cache"` (re-derivable from an
+/// external system's own state) or `"Imperative"` (written directly, with no
+/// replay or re-fetch path back if lost); `Detail` names the module that
+/// refreshes/writes it (`Administration.TableClass`'s `refreshedBy` /
+/// `writtenBy` payload).
+type UnrebuildableTableStat = {
+    TableName: string
+    Classification: string
+    Detail: string
+    RowCount: int
+}
+
 // Image cache admin (administration-xx3mw): stats/orphan-detection/purge for
 // the images/ cache. Live refs come from the fifteen typed ref-bearing
 // projection columns (Administration.imageRefColumns), never event replay —
@@ -1690,6 +1706,11 @@ type IAdminApi = {
     getHealthStats: unit -> Async<HealthStats>
     // Projections (administration-qjcp4)
     getProjectionStats: unit -> Async<ProjectionStatRow list>
+    /// The Cache/Imperative tables `getProjectionStats` doesn't cover
+    /// (administration-t9bzx) — a separate, explicitly un-rebuildable
+    /// section. Client display is optional/deferred; this is server-side
+    /// visibility for now.
+    getUnrebuildableTableStats: unit -> Async<UnrebuildableTableStat list>
     // Images (administration-xx3mw)
     getImageCacheStats: unit -> Async<ImageCacheStats>
     listOrphanedImages: unit -> Async<OrphanScan>

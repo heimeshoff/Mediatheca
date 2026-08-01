@@ -360,18 +360,97 @@ module Administration =
 
     // ── Projection dashboard (administration-qjcp4) ──
 
-    /// Table(s) each projection owns, for the dashboard's per-table row
-    /// counts. Admin-console-only knowledge of each projection's schema —
-    /// same pattern as boundedContextPrefixes above. Keep in sync if a
-    /// projection's owned tables ever change.
-    let private projectionTables = [
-        "MovieProjection", [ "movie_list"; "movie_detail"; "watch_sessions" ]
-        "FriendProjection", [ "friend_list" ]
-        "ContentBlockProjection", [ "content_blocks" ]
-        "CatalogProjection", [ "catalog_list"; "catalog_entries" ]
-        "SeriesProjection", [ "series_list"; "series_detail"; "series_seasons"; "series_episodes"; "series_rewatch_sessions"; "series_episode_progress" ]
-        "GameProjection", [ "game_list"; "game_detail" ]
+    /// Every durable table's classification (administration-t9bzx): the
+    /// positive counterpart to the scattered "this table is imperative, it
+    /// needs no gating" comments that used to be the only place this fact
+    /// lived (ADR-0025 `tableExists` guard's doc comment, ADR-0031's
+    /// `projectionTables`). A table is exactly one of:
+    ///   - `Projected name` — owned by the checkpoint-tracked `name`
+    ///     projection handler, rebuildable from the event log, drift-checked
+    ///     by `checkProjectionDrift`.
+    ///   - `Cache refreshedBy` — re-derivable from an external system's own
+    ///     state (never our event log), safe to wipe and repopulate; `Cache`
+    ///     tables are never checkpoint-tracked and never drift-checked.
+    ///   - `Imperative writtenBy` — written directly by `writtenBy`, outside
+    ///     both the projection catch-up path and any external re-sync. If
+    ///     these rows are lost there is no replay and no re-fetch that
+    ///     brings them back (`steam_playtime_snapshot` is the sharpest case:
+    ///     see its own comment below).
+    /// LOAD-BEARING: `TableClassificationTests.fs`'s coverage test keeps
+    /// this list honest against `sqlite_master` — a table created anywhere
+    /// in the codebase without an entry here is exactly the "tribal
+    /// knowledge encoded as absence" failure mode this registry exists to
+    /// close.
+    type TableClass =
+        | Projected of projectionName: string
+        | Cache of refreshedBy: string
+        | Imperative of writtenBy: string
+
+    let tableRegistry : (string * TableClass) list = [
+        // Projected — checkpoint-tracked, rebuild-managed (administration-qjcp4,
+        // ADR-0031). Owned by the six handlers registered in Composition.fs's
+        // `projectionHandlers`.
+        "movie_list", Projected "MovieProjection"
+        "movie_detail", Projected "MovieProjection"
+        "watch_sessions", Projected "MovieProjection"
+        "friend_list", Projected "FriendProjection"
+        "content_blocks", Projected "ContentBlockProjection"
+        "catalog_list", Projected "CatalogProjection"
+        "catalog_entries", Projected "CatalogProjection"
+        "series_list", Projected "SeriesProjection"
+        "series_detail", Projected "SeriesProjection"
+        "series_seasons", Projected "SeriesProjection"
+        "series_episodes", Projected "SeriesProjection"
+        "series_rewatch_sessions", Projected "SeriesProjection"
+        "series_episode_progress", Projected "SeriesProjection"
+        "game_list", Projected "GameProjection"
+        "game_detail", Projected "GameProjection"
+
+        // Cache — re-derivable from Jellyfin's own state via a full
+        // clear-then-repopulate sync (Api.fs's Jellyfin import handlers),
+        // never checkpoint-tracked.
+        "jellyfin_movie", Cache "JellyfinSync"
+        "jellyfin_series", Cache "JellyfinSync"
+        "jellyfin_episode", Cache "JellyfinSync"
+
+        // Imperative — written directly by non-event-sourced storage
+        // modules, never through a ProjectionHandler's catch-up.
+        "cast_members", Imperative "CastStore"
+        "movie_cast", Imperative "CastStore"
+        "series_cast", Imperative "CastStore"
+        "movie_crew", Imperative "CastStore"
+        "game_journal_blocks", Imperative "GameJournal"
+        "settings", Imperative "SettingsStore"
+        "job_runs", Imperative "Administration (job runs recorder)"
+        "game_play_session", Imperative "PlaytimeTracker"
+        // Sync cursor, not a projection nor a cache: external state
+        // (Steam's own lifetime playtime total) remembered here only to
+        // compute the next delta — it is not derivable from our event log at
+        // all today. If this row is lost, `PlaytimeTracker.getLastSnapshot`
+        // returns None and the entire lifetime total is recorded as one new
+        // session (PlaytimeTracker.fs:667-680) rather than silently
+        // recovering. games-p6vkz deletes this table entirely: once prior
+        // playtime and every session are logged events,
+        // `ActiveGame.SteamObservedMinutes` becomes the cursor, derived by
+        // replay — closing this hazard by construction rather than
+        // continuing to guard it. This entry should disappear in that
+        // task's diff.
+        "steam_playtime_snapshot", Imperative "PlaytimeTracker"
     ]
+
+    /// Table(s) each projection owns, for the dashboard's per-table row
+    /// counts — derived from `tableRegistry` (not hand-maintained
+    /// separately) so a table can't be `Projected` in one registry and
+    /// absent from the other. Preserves `tableRegistry`'s per-projection
+    /// table order.
+    let private projectionTables : (string * string list) list =
+        tableRegistry
+        |> List.choose (fun (table, cls) ->
+            match cls with
+            | Projected name -> Some (name, table)
+            | Cache _ | Imperative _ -> None)
+        |> List.groupBy fst
+        |> List.map (fun (name, pairs) -> name, pairs |> List.map snd)
 
     let private tableRowCount (conn: SqliteConnection) (tableName: string) : int =
         use cmd = conn.CreateCommand()
@@ -491,6 +570,30 @@ module Administration =
               UpdatedAt = updatedAt
               TableCounts = tables |> List.map (fun t -> { TableName = t; RowCount = tableRowCount conn t })
               IsRebuilding = guards.RebuildingProjections.ContainsKey(handler.Name) })
+
+    /// The `Cache`/`Imperative` half of `tableRegistry`, as its own
+    /// explicitly-un-rebuildable section alongside `buildProjectionStats`'s
+    /// `Projected` rows (administration-t9bzx) — these tables never
+    /// checkpoint, never lag, and never appear in `checkProjectionDrift`'s
+    /// output, so surfacing their row counts here is the only place an
+    /// operator can see them at all. Guarded by `tableExists` the same way
+    /// `getReferencedImageRefs` (ADR-0025) is, since not every fixture/test
+    /// database has every imperative/cache table initialized.
+    let private buildUnrebuildableTableStats (conn: SqliteConnection) : UnrebuildableTableStat list =
+        tableRegistry
+        |> List.choose (fun (table, cls) ->
+            let classification, detail =
+                match cls with
+                | Projected _ -> None, None
+                | Cache refreshedBy -> Some "Cache", Some refreshedBy
+                | Imperative writtenBy -> Some "Imperative", Some writtenBy
+            match classification, detail with
+            | Some classification, Some detail when tableExists conn table ->
+                Some { TableName = table
+                       Classification = classification
+                       Detail = detail
+                       RowCount = tableRowCount conn table }
+            | _ -> None)
 
     // ── Image cache admin (administration-xx3mw) ──
 
@@ -1475,6 +1578,11 @@ module Administration =
             getProjectionStats = fun () -> async {
                 use conn = factory ()
                 return buildProjectionStats conn projectionHandlers guards
+            }
+
+            getUnrebuildableTableStats = fun () -> async {
+                use conn = factory ()
+                return buildUnrebuildableTableStats conn
             }
 
             getImageCacheStats = fun () -> async {

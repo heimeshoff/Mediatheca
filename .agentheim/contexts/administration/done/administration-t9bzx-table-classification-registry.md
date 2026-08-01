@@ -1,15 +1,15 @@
 ---
 id: administration-t9bzx
 title: Classify every durable table as Projected, Cache or Imperative in one registry, and derive projectionTables from it — replacing tribal knowledge currently encoded as scattered comments explaining omissions
-status: doing
+status: done
 type: refactor
 context: administration
 created: 2026-08-01
-completed:
+completed: 2026-08-01
 depends_on: []
 blocks: []
 tags: [projection, drift, registry, taxonomy]
-related_adrs: [0025, 0031, 0021]
+related_adrs: [0025, 0031, 0021, 0044]
 related_research: []
 prior_art: [administration-btvqa, administration-xx3mw, administration-qjcp4]
 ---
@@ -76,3 +76,33 @@ Classify it `Imperative "PlaytimeTracker"` here — it still exists at this poin
 **note in the registry that `games-p6vkz` deletes it**: once prior playtime and every session are in
 the log, `ActiveGame.SteamObservedMinutes` is the cursor, derived by replay, and the hazard closes by
 construction rather than being guarded. This entry should disappear in that task's diff.
+
+## Outcome
+
+Added `Administration.TableClass` (`Projected | Cache | Imperative`) and `Administration.tableRegistry`
+covering all 27 durable tables in `mediatheca.db` (15 `Projected`, 3 `Cache` — the `jellyfin_*` tables,
+refreshed by Jellyfin sync — and 9 `Imperative`, including `game_play_session` and
+`steam_playtime_snapshot` as required, the latter carrying the sync-cursor note verbatim from this
+task's Notes section). `projectionTables` is now derived from `tableRegistry` by filtering to
+`Projected` entries and grouping by projection name, so the two can never drift apart; `checkProjectionDrift`
+and `buildProjectionStats` are unmodified and consume the derived value exactly as before.
+
+Added `IAdminApi.getUnrebuildableTableStats` (additive, server-side only, `UnrebuildableTableStat` DTO)
+surfacing `Cache`/`Imperative` row counts as their own section, gated by the same `tableExists` guard
+`getReferencedImageRefs` uses — a separate Remoting method rather than a change to `getProjectionStats`'s
+existing return shape, so no client code needed to change; client display is deferred per the task.
+
+Tests: `tests/Server.Tests/TableClassificationTests.fs` (4 new Expecto tests) — registry-coverage
+(`tableRegistry` set-equals every non-`sqlite_*`/non-`events*`/non-`projection_checkpoints` table in a
+fully-initialized schema, no duplicates), the explicit `game_play_session`/`steam_playtime_snapshot`
+`Imperative "PlaytimeTracker"` classification, derived-`projectionTables` set-equality per projection
+against the original hardcoded list, and `getUnrebuildableTableStats` behavior (Cache/Imperative rows
+reported, Projected tables excluded). `tests/Server.Tests/ProjectionDriftTests.fs` passes unmodified.
+Full suite: 449/449 passing (`-- --sequenced`); `npm run build` passes.
+
+ADR: `.agentheim/knowledge/decisions/0044-every-durable-table-classified-projected-cache-imperative.md` (authored as 0043, renumbered at integration).
+BC README updated: new "Table classification registry" bullet, and the Projections-tab bullet's
+description of `projectionTables` updated to say "derived" rather than "hardcoded".
+
+Key files: `src/Server/Administration.fs`, `src/Shared/Shared.fs`,
+`tests/Server.Tests/TableClassificationTests.fs`, `tests/Server.Tests/Server.Tests.fsproj`.

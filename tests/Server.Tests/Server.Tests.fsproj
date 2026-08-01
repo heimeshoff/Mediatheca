@@ -18,6 +18,7 @@
     <Compile Include="SseTests.fs" />
     <Compile Include="TestDb.fs" />
     <Compile Include="AdministrationTests.fs" />
+    <Compile Include="TableClassificationTests.fs" />
     <Compile Include="AdminGuardOwnershipTests.fs" />
     <Compile Include="JobRunsTests.fs" />
     <Compile Include="JobConnectionConcurrencyTests.fs" />

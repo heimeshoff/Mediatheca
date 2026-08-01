@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 19:00 -- Task verified and completed: administration-t9bzx - Classify every durable table as Projected, Cache or Imperative in one registry, and derive projectionTables from it — replacing tribal knowledge currently encoded as scattered comments explaining omissions
+
+**Type:** Work / Task completion
+**Task:** administration-t9bzx - Classify every durable table as Projected, Cache or Imperative in one registry, and derive projectionTables from it — replacing tribal knowledge currently encoded as scattered comments explaining omissions
+**Summary:** Added Administration.tableRegistry classifying all 27 durable tables as Projected | Cache | Imperative, derived projectionTables from it (retiring the hand-maintained duplicate), and surfaced Cache/Imperative row counts via a new additive IAdminApi.getUnrebuildableTableStats method
+**Duration:** 25m
+**Verification:** PASS (iteration 1)
+**Files changed:** 6
+**Tests added:** 4
+**ADRs written:** 0044-every-durable-table-classified-projected-cache-imperative.md
+
+---
+
 ## 2026-08-01 18:54 -- Task verified and completed: infrastructure-e4kwm - Record the event-worthiness doctrine — an event records an observation of the user's own engagement, a cache records a third party's description — and amend ADR-0012's retracted justification
 
 **Type:** Work / Task completion
