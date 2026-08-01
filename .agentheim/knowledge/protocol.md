@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 12:19 -- Modeling / Promoted: administration-k3vmt - Dissolve the /admin console into Settings — its six tabs become inline collapsible sections below Data Imports, and the sidebar's bottom group drops to a single Settings button
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-08-01 12:19 -- Modeling / Refined: administration-k3vmt - Dissolve the /admin console into Settings
 
 **Type:** Modeling / Refine
