@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-01 15:13 -- Modeling / Promoted: games-status-vocabulary-reconcile - Remodel the game lifecycle to five states — Backlog, InFocus, Retired (né Completed), Abandoned, Dismissed; OnHold removed, Playing never added — and unify DesignSystem.LifecycleStatus 1:1, wiring statusBadge into the Games pages
+
+**Type:** Modeling / Promote
+**BC:** games
+**From → To:** backlog → todo
+
+---
+
 ## 2026-08-01 14:20 -- Modeling / Refined: games-status-vocabulary-reconcile - Remodel the game lifecycle to five states
 
 **Type:** Modeling / Refine
