@@ -816,20 +816,6 @@ module SeriesProjection =
               NextAirDate = getNextAirDate conn slug }
         )
 
-    let search (conn: SqliteConnection) (query: string) : Mediatheca.Shared.LibrarySearchResult list =
-        conn
-        |> Db.newCommand "SELECT slug, name, year, poster_ref FROM series_list WHERE name LIKE @q ORDER BY name LIMIT 10"
-        |> Db.setParams [ "q", SqlType.String ("%" + query + "%") ]
-        |> Db.query (fun (rd: IDataReader) ->
-            { Mediatheca.Shared.LibrarySearchResult.Slug = rd.ReadString "slug"
-              Name = rd.ReadString "name"
-              Year = rd.ReadInt32 "year"
-              PosterRef =
-                if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
-                else Some (rd.ReadString "poster_ref")
-              MediaType = Mediatheca.Shared.Series }
-        )
-
     let getBySlug (conn: SqliteConnection) (slug: string) (rewatchId: string option) : Mediatheca.Shared.SeriesDetail option =
         conn
         |> Db.newCommand "SELECT slug, name, year, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, episode_runtime, status, personal_rating, recommended_by, want_to_watch_with, abandoned, in_focus FROM series_detail WHERE slug = @slug"

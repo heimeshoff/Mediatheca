@@ -1207,7 +1207,15 @@ module Route =
 
 type IMediathecaApi = {
     healthCheck: unit -> Async<string>
-    searchLibrary: string -> Async<LibrarySearchResult list>
+    // Library search is intentionally client-side: the Ctrl+K modal filters a
+    // snapshot of the movie/series/game lists it already holds for excluding
+    // owned items from TMDB/RAWG results (Client/Components/SearchModal.fs,
+    // `filterLibrary`), and that filter does fuzzy matching, relevance ranking,
+    // and year extraction. A `searchLibrary` endpoint existed here but was
+    // never called — task 021-fuzzy-search flagged it as unused and upgraded
+    // only the client — so it was removed rather than left to rot as a worse
+    // duplicate. Reinstating server-side search means FTS5 with proper
+    // ranking, not the `LIKE` + `ORDER BY name` it used to be.
     searchTmdb: string * int option -> Async<TmdbSearchResult list>
     addMovie: int -> Async<Result<string, string>>
     removeMovie: string -> Async<Result<unit, string>>

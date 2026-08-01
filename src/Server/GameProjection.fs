@@ -397,20 +397,6 @@ module GameProjection =
                   Name = name
                   ImageRef = imageRef })
 
-    let search (conn: SqliteConnection) (query: string) : LibrarySearchResult list =
-        conn
-        |> Db.newCommand "SELECT slug, name, year, cover_ref FROM game_list WHERE name LIKE @q ORDER BY name LIMIT 10"
-        |> Db.setParams [ "q", SqlType.String ("%" + query + "%") ]
-        |> Db.query (fun (rd: IDataReader) ->
-            { LibrarySearchResult.Slug = rd.ReadString "slug"
-              Name = rd.ReadString "name"
-              Year = rd.ReadInt32 "year"
-              PosterRef =
-                if rd.IsDBNull(rd.GetOrdinal("cover_ref")) then None
-                else Some (rd.ReadString "cover_ref")
-              MediaType = Game }
-        )
-
     let getAll (conn: SqliteConnection) : GameListItem list =
         conn
         |> Db.newCommand "SELECT slug, name, year, cover_ref, genres, status, total_play_time, hltb_hours, personal_rating, rawg_rating FROM game_list ORDER BY name"

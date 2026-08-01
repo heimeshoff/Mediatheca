@@ -1172,14 +1172,6 @@ module Api =
         {
             healthCheck = fun () -> async { return "Mediatheca is running" }
 
-            searchLibrary = fun query -> async {
-                use conn = factory ()
-                let movieResults = MovieProjection.search conn query
-                let seriesResults = SeriesProjection.search conn query
-                let gameResults = GameProjection.search conn query
-                return movieResults @ seriesResults @ gameResults
-            }
-
             searchTmdb = fun (query, year) -> async {
                 return! Tmdb.searchMovies httpClient (getTmdbConfig()) query year
             }
