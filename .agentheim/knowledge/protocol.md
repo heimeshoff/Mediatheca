@@ -5,6 +5,31 @@ Newest entries on top.
 
 ---
 
+## 2026-08-02 09:45 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** ~2h (builder-authorized conflict-resolution arc, 2026-08-02 morning; continues the 2026-08-01 21:09 session)
+**Completed:** 5 — administration-kv7dp and games-p6vkz (verified 2026-08-01, integrated after builder-authorized manual conflict resolution with full re-verification on the merged tree: 486/486 and 508/508 + build), journal-w3sbq (PASS iteration 1), games-h4mrd (PASS iteration 2), series-d5tpn (PASS iteration 3). **The 15-task deterministic-rebuild workstream's now-slice (12 tasks) is fully landed; todo/ and doing/ are empty across every BC.**
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0 (three verification FAILs — games-h4mrd iteration 1, series-d5tpn iterations 1-2 — all recovered via re-dispatch; none reached the builder)
+**Dispatches:** journal-w3sbq: 1, games-h4mrd: 2, series-d5tpn: 3 (administration-kv7dp / games-p6vkz: 0 new — integration-only)
+**Commits:** 7 this arc (2 conflict-resolution integrations, 1 batch start, 3 task integrations, this entry)
+**Live-DB incident and repair (series-d5tpn iteration 1):** the worker ran its migration against the LIVE mediatheca.db out-of-band and in the wrong order, creating the cache tables empty before the rename — stranding 370 seasons/4624 episodes and zeroing dashboard series numbers. Conductor repaired at 09:10 (fresh VACUUM INTO backup; drop-empties + rename + view cycling in one transaction; verified 4624/370 under the new names, series_next_up=44, series_episode_counts=104). Backups retained: backups/mediatheca-pre-repair-20260802-091003.db and -091031.db (VACUUM INTO), plus the worker's raw-copy pre-task backup. The worker's 11 compensating events (global_position 17641-17651) bypassed the ADR-0032 composer's audit metadata — permanently untagged, recorded honestly in ADR-0051. Iterations 2-3 hardened MetadataCache.recoverStranded (view-safe, atomic, non-fatal) with fixtures the final verifier independently proved falsifying.
+**ADR renumbering at integration:** kv7dp's provisional 0043 → **0049** (now superseded by 0051 per its own retirement criterion); p6vkz's provisional 0045 → **0050** (amended by games-h4mrd per its sanctioned fold); series-d5tpn wrote **0051**.
+**Vision-conformance:** none — batch aligns with vision. The arc completes the deterministic-rebuild workstream (Replayable design principle, Operability & Observability). The live-DB incident is an execution defect, not vision drift, and is recorded above. Judged by hand.
+**Batch mix:** 100% product-facing (5 tasks), classified by hand and on substance.
+**Carry-over:** left behind (user WIP, 2 files — modified `src/Client/Pages/Settings/Views.fs`, untracked `Mediatheca Directions.html`, both pre-existing; protected through three merge aborts/repairs). No `.agentheim/`-owned files stranded. `.worktrees/` fully swept: the two conflict-stranded worktrees were integrated and removed; ~12 deregistered husk directories (Windows file-lock leftovers from this and PRIOR sessions' `git worktree remove` calls, including administration-k3vmt/n8kqw/svq3t/design-system-vk7rd) were deleted after `dotnet build-server shutdown` released the handles — the husk cause is dotnet build-server file locks surviving worktree removal.
+**Board state after this session:** todo/ and doing/ empty in every BC. Backlog: integration-hebjs, administration-z6ymt (premise stale — re-check before promoting, see 2026-08-01 notes), games-a7dqx, movies-v2gkh, series-t3jkv (cache write path — newly-added series read empty third-party fields until it lands), series-x9mfp. Human-eye checks still pending: GameDetail prior-playtime line (now on main), series list/detail/Next Up render parity, and a first real run of the play-session migration preview + apply from Settings.
+
+**Notes carried out of this arc:**
+
+1. **The verification gate earned its keep three times:** h4mrd's missing dry-run preview (a silent ADR-0034 guardrail violation with a fabricated ADR claim), d5tpn's live-DB incident, and d5tpn's iteration-2 guard that was fatal against the exact state it claimed to repair (caught because the re-verify prompt demanded the fixture include the views). Each fix was verified falsifying before landing.
+2. **Workers must never touch the live DATA_DIR database.** d5tpn iteration 1 did, out-of-band, causing the incident above. Migrations verify against fixtures; live operator actions are builder/conductor-only. Worker prompts for migration-shaped tasks should carry this constraint explicitly from the start (iterations 2-3 did).
+3. **CWD drift bit twice more** (a self-merge no-op and a failed relative-path rollback) — both caught by the doctrine's own first-check. `git -C` everywhere remains the rule.
+
+---
+
 ## 2026-08-02 09:39 -- Task verified and completed: series-d5tpn - Drop the externally-sourced columns from series_list and series_detail, prove the drift check reports zero for SeriesProjection, and retire the lossy-rebuild guard
 
 **Type:** Work / Task completion
