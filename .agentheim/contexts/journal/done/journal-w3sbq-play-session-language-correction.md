@@ -1,11 +1,11 @@
 ---
 id: journal-w3sbq
 title: Correct Journal's README to the first-class play-session event model — and to the read-model owners that actually exist, since there is no JournalProjection.fs
-status: doing
+status: done
 type: chore
 context: journal
 created: 2026-08-01
-completed:
+completed: 2026-08-02
 depends_on: [games-p6vkz]
 blocks: []
 tags: [journal, play-session, documentation]
@@ -47,3 +47,29 @@ subscription list, and carries an open question that `games-p6vkz` closes.
 ## Notes
 
 Pure documentation reconciliation, mirroring the shape of `design-system-x7k2p`.
+
+## Outcome
+
+Corrected `.agentheim/contexts/journal/README.md` to the post-`games-p6vkz` reality, verified directly
+against the current worktree's code rather than the task's pre-p6vkz snapshot:
+
+- **Play session** ubiquitous-language entry now describes the first-class `Play_session_recorded`
+  event (ADR-0050), keyed on gaming day, carrying `Source: SteamSync | Manual` (the actual
+  `PlaySessionSource` DU in `src/Shared/Shared.fs` — no `Imported` case exists in code, so the
+  entry doesn't claim one). Notes that "played with" is a Game-level relationship
+  (`Game_played_with`), not session-level.
+- **Aggregates** section now states plainly that there is no dedicated Journal projection module,
+  and names the real owners: `GameProjection` (queries over `game_play_session`), `PlaytimeTracker`
+  (`getDashboardPlaySessions` / `getPlaytimeSummary`, both delegating to `PlaySessionProjection`),
+  and the equivalent Movies/Series projections.
+- **Key events** subscription list corrected to the four `Play_session_*` events
+  (`Play_session_recorded`, `Play_session_minutes_corrected`, `Play_session_moved`,
+  `Play_session_removed`) plus `Game_status_changed`, replacing the retired `Game_play_time_set`
+  / `Game_steam_last_played_set` pair.
+- **Open questions** — removed the "should Games emit a real event" question; `games-p6vkz` answered
+  it.
+
+No `.fs` files touched. Verified acceptance criteria by grep against the README (all counts as
+required) and against `src/Server/Games.fs`, `src/Server/GameProjection.fs`,
+`src/Server/PlaySessionProjection.fs`, `src/Server/PlaytimeTracker.fs`, and
+`src/Shared/Shared.fs` for the current event/read-model shape.

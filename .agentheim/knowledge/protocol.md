@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-02 08:26 -- Task verified and completed: journal-w3sbq - Correct Journal's README to the first-class play-session event model — and to the read-model owners that actually exist, since there is no JournalProjection.fs
+
+**Type:** Work / Task completion
+**Task:** journal-w3sbq - Correct Journal's README to the first-class play-session event model — and to the read-model owners that actually exist, since there is no JournalProjection.fs
+**Summary:** Corrected Journal's README to the first-class play-session event model (ADR-0050) and the real read-model owners (GameProjection, PlaytimeTracker, PlaySessionProjection) in place of the nonexistent JournalProjection
+**Duration:** 10m
+**Verification:** PASS (iteration 1)
+**Files changed:** 1
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-08-02 08:22 -- Batch started: [series-d5tpn, journal-w3sbq, games-h4mrd]
 
 **Type:** Work / Batch start
