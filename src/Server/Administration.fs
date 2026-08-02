@@ -476,6 +476,58 @@ module Administration =
         |> List.groupBy fst
         |> List.map (fun (name, pairs) -> name, pairs |> List.map snd)
 
+    // ── Lossy-rebuild guard (administration-kv7dp, ADR-0049) ──
+
+    /// Registry of `(handlerName, reason)` pairs for projections whose
+    /// `Drop; Init; replay` (`Projection.rebuildProjection`) would
+    /// permanently destroy data that lives ONLY in the live projection
+    /// tables, written out-of-band by a module outside that projection's own
+    /// `*Projection.fs` — `SeriesRefresh.applyToProjection` writes TMDB
+    /// refresh results directly into `series_list`/`series_detail`/
+    /// `series_seasons`/`series_episodes`, and ADR-0012's Jellyfin
+    /// materialization does the same, while `Series_refreshed` carries only
+    /// a summary and `SeriesProjection.handleEvent`'s arm for it is an
+    /// explicit no-op. Same "admin-console-only knowledge of the schema"
+    /// registry style as `projectionTables`/`boundedContextPrefixes`
+    /// (ADR-0025's precedent). One entry today.
+    ///
+    /// Retirement criterion (belongs here, not in an ADR's Consequences,
+    /// because THIS is the mechanism being retired): remove an entry once
+    /// `checkProjectionDrift` reports 0 discrepancies for it AND no module
+    /// outside its own `*Projection.fs` writes any table classified
+    /// `Projected` for it. When the list empties, delete this mechanism
+    /// entirely. See ADR-0049; `series-d5tpn` is the task that executes the
+    /// retirement for the one entry below.
+    let private lossyRebuildProjections : (string * string) list = [
+        "SeriesProjection",
+            "Rebuilding SeriesProjection would permanently destroy episode/season \
+             metadata written out-of-band by the Series TMDB refresh job \
+             (SeriesRefresh.applyToProjection) and Jellyfin season/episode \
+             materialization (ADR-0012) — data that lives only in \
+             series_detail/series_seasons/series_episodes and cannot be \
+             replayed from Series_refreshed. Recovery: run the Series TMDB \
+             refresh job from the Jobs section, then reload the app to \
+             trigger a Jellyfin sync."
+    ]
+
+    /// Env var escape hatch (temporary, self-evidently so — see ADR-0049):
+    /// set MEDIATHECA_ALLOW_LOSSY_REBUILD=1 to bypass the guard below
+    /// entirely. Server-side only, no UI surfaces it — finding it requires
+    /// reading this source or the ADR.
+    let private allowLossyRebuildEnvVar = "MEDIATHECA_ALLOW_LOSSY_REBUILD"
+
+    /// Operator-facing rejection reason for a lossy-rebuild-guarded
+    /// projection, or `None` if `projectionName` isn't guarded (or the env
+    /// override above is set). Pure — no connection, no guard state — same
+    /// shape as `driftCheckRejectionMessage` below.
+    let lossyRebuildRejectionMessage (projectionName: string) : string option =
+        if Environment.GetEnvironmentVariable(allowLossyRebuildEnvVar) = "1" then
+            None
+        else
+            lossyRebuildProjections
+            |> List.tryFind (fun (name, _) -> name = projectionName)
+            |> Option.map snd
+
     let private tableRowCount (conn: SqliteConnection) (tableName: string) : int =
         use cmd = conn.CreateCommand()
         cmd.CommandText <- $"SELECT COUNT(*) FROM {tableName}"
@@ -577,6 +629,37 @@ module Administration =
     /// directions of the mutual exclusion are independently testable.
     let wipeImportInFlight (guards: AdminGuards) : bool =
         not guards.WipeImportInProgress.IsEmpty
+
+    /// Why `projectionRebuildStreamHandler` refused a rebuild, or that it
+    /// proceeded. Factored out of the SSE handler as a directly-testable
+    /// function (ADR-0043) — same "test the underlying function, not the
+    /// SSE route" shape ADR-0031 established for
+    /// `checkProjectionDrift`/`driftCheckStreamHandler` and ADR-0038
+    /// established for `decideAndClaimWipeImportGuard`/`wipeImportInFlight`.
+    type RebuildRejection =
+        | LossyRebuildBlocked of reason: string
+        | WipeImportInFlight
+        | AlreadyRebuilding
+
+    /// The rebuild-or-reject decision `projectionRebuildStreamHandler` acts
+    /// on. Order is deliberate and load-bearing: the lossy-rebuild guard
+    /// (ADR-0043) is checked FIRST, since it claims nothing on either guard
+    /// dictionary — only if `projectionName` isn't lossy-guarded do the
+    /// wipe-import and single-flight checks run, in the same order the SSE
+    /// handler always used. `None` MEANS `guards.RebuildingProjections` has
+    /// just been claimed for `projectionName` — callers getting `None` MUST
+    /// release via `TryRemove` in a `finally`, same as every other guard in
+    /// this module.
+    let decideAndClaimRebuildGuard (guards: AdminGuards) (projectionName: string) : RebuildRejection option =
+        match lossyRebuildRejectionMessage projectionName with
+        | Some reason -> Some (LossyRebuildBlocked reason)
+        | None ->
+            if wipeImportInFlight guards then
+                Some WipeImportInFlight
+            elif not (guards.RebuildingProjections.TryAdd(projectionName, ())) then
+                Some AlreadyRebuilding
+            else
+                None
 
     let private buildProjectionStats (conn: SqliteConnection) (projectionHandlers: Projection.ProjectionHandler list) (guards: AdminGuards) : ProjectionStatRow list =
         let head = EventStore.getMaxGlobalPosition conn
@@ -1062,14 +1145,19 @@ module Administration =
                     | None ->
                         do! writeEvent "error" (sprintf "{\"message\":\"Unknown projection '%s'\"}" projectionName)
                     | Some handler ->
-                        if wipeImportInFlight guards then
-                            // Mutual exclusion with wipe-import (ADR-0038):
-                            // checked before touching this handler's own
-                            // guard, same shape as the check below it.
+                        // ADR-0043: the lossy-rebuild guard is checked FIRST
+                        // (via decideAndClaimRebuildGuard), before the
+                        // wipe-import and single-flight checks, since it
+                        // claims nothing on either guard dictionary.
+                        match decideAndClaimRebuildGuard guards projectionName with
+                        | Some (LossyRebuildBlocked reason) ->
+                            do! writeEvent "rejected" (sprintf "{\"message\":\"%s\"}" (escapeJson reason))
+                        | Some WipeImportInFlight ->
+                            // Mutual exclusion with wipe-import (ADR-0038).
                             do! writeEvent "rejected" "{\"message\":\"An event log import is in flight\"}"
-                        elif not (guards.RebuildingProjections.TryAdd(projectionName, ())) then
+                        | Some AlreadyRebuilding ->
                             do! writeEvent "rejected" (sprintf "{\"message\":\"%s is already rebuilding\"}" projectionName)
-                        else
+                        | None ->
                             try
                                 try
                                     let emit (progress: Projection.RebuildProgress) =

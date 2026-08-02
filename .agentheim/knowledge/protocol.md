@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-02 08:17 -- Task verified and completed: administration-kv7dp - Block projection rebuild for handlers with out-of-band writers — rebuilding SeriesProjection today permanently destroys 780 refreshes' worth of TMDB metadata plus 23 Jellyfin-materialized episodes
+
+**Type:** Work / Task completion
+**Task:** administration-kv7dp - Block projection rebuild for handlers with out-of-band writers — rebuilding SeriesProjection today permanently destroys 780 refreshes' worth of TMDB metadata plus 23 Jellyfin-materialized episodes
+**Summary:** Rebuild is refused outright, server-side, for projections registered in lossyRebuildProjections (SeriesProjection today) at both the SSE rebuild route and CinemarcoImport's post-import loop - guard verified PASS on 2026-08-01, integrated after builder-authorized conflict resolution against the landed t9bzx registry, re-verified 486/486 on the merged tree
+**Duration:** 20m
+**Verification:** PASS (iteration 1)
+**Files changed:** 6
+**Tests added:** 3
+**ADRs written:** 0049-rebuild-blocked-outright-for-projections-with-out-of-band-writers.md
+
+---
+
 ## 2026-08-01 21:09 -- Work session ended
 
 **Type:** Work / Session end

@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 1
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 28
+- **Doing:** 0
+- **Done:** 29
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **administration-kv7dp** — Block projection rebuild for handlers with out-of-band writers — rebuilding SeriesProjection today permanently destroys 780 refreshes' worth of TMDB metadata plus 23 Jellyfin-materialized episodes (bug) — `doing/administration-kv7dp-block-lossy-projection-rebuild.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **administration-kv7dp** — Block projection rebuild for handlers with out-of-band writers — rebuilding SeriesProjection today permanently destroys 780 refreshes' worth of TMDB metadata plus 23 Jellyfin-materialized episodes (bug) — `done/administration-kv7dp-block-lossy-projection-rebuild.md`
 - **administration-c3nvp** — Stand up the metadata cache tier — per-BC typed tables that survive Drop/Init/replay, seeded once from current projections, following the ImageStore and JellyfinStore precedents (feature) — `done/administration-c3nvp-metadata-cache-tier.md`
 - **administration-t9bzx** — Classify every durable table as Projected, Cache or Imperative in one registry, and derive projectionTables from it — replacing tribal knowledge currently encoded as scattered comments explaining omissions (refactor) — `done/administration-t9bzx-table-classification-registry.md`
 - **administration-k3vmt** — Dissolve the /admin console into Settings — its six tabs become inline collapsible sections below Data Imports, and the sidebar's bottom group drops to a single Settings button (refactor) — `done/administration-k3vmt-dissolve-admin-console-into-settings.md`
@@ -66,6 +66,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0049** -- Rebuild is blocked outright, server-side, for projections with out-of-band writers (`lossyRebuildProjections`, SeriesProjection today) at the SSE route and CinemarcoImport's post-import loop; env-var escape hatch, retirement criterion named in-code, executed by series-d5tpn. -- 2026-08-01 -- `../../knowledge/decisions/0049-rebuild-blocked-outright-for-projections-with-out-of-band-writers.md`
 - **0045** -- Third-party metadata lives in per-BC typed cache tables (`MetadataCache.fs`) that survive projection rebuild — seeded once from current projections behind a settings marker, owned by no `ProjectionHandler`, classified `Cache` in `tableRegistry`. -- 2026-08-01 -- `../../knowledge/decisions/0045-metadata-cache-tier-typed-per-bc-tables.md`
 - **0044** -- Every durable table is classified Projected, Cache, or Imperative in one registry (`Administration.tableRegistry`); `projectionTables` is derived from it, and a registry-coverage test fails on any unclassified table. -- 2026-08-01 -- `../../knowledge/decisions/0044-every-durable-table-classified-projected-cache-imperative.md`
 - **0041** -- The `/admin` tabbed shell (ADR-0017's client shape) dissolves into Settings as six lazy collapsible sections; ADR-0023's Follow-teardown re-keys to "leaving Settings" plus a section-collapse trigger, ADR-0034's dirty banner becomes an in-page expand+scroll, and per-tab deep-linking is dropped. `IAdminApi` untouched. -- 2026-08-01 -- `knowledge/decisions/0041-admin-console-dissolved-into-settings.md`

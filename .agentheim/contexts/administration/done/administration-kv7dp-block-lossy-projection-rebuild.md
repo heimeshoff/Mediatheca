@@ -1,15 +1,15 @@
 ---
 id: administration-kv7dp
 title: Block projection rebuild for handlers with out-of-band writers — rebuilding SeriesProjection today permanently destroys 780 refreshes' worth of TMDB metadata plus 23 Jellyfin-materialized episodes
-status: doing
+status: done
 type: bug
 context: administration
 created: 2026-08-01
-completed:
+completed: 2026-08-01
 depends_on: []
 blocks: []
 tags: [projection, rebuild, data-loss, drift, series]
-related_adrs: [0024, 0025, 0031, 0034, 0012]
+related_adrs: [0024, 0025, 0031, 0034, 0012, 0049]
 related_research: []
 prior_art: [administration-qjcp4, administration-btvqa]
 ---
@@ -53,12 +53,44 @@ must not wait for it.
 
 ## Acceptance criteria
 
-- [ ] Expecto: `lossyRebuildRejectionMessage "SeriesProjection"` returns `Some`; `"MovieProjection"` returns `None`; with `MEDIATHECA_ALLOW_LOSSY_REBUILD=1` set, `"SeriesProjection"` returns `None`.
-- [ ] Expecto: a rebuild request for SeriesProjection emits a `rejected` SSE frame and leaves the `series_episodes` row count unchanged.
-- [ ] Expecto: "Rebuild all" skips SeriesProjection and completes the other five handlers.
-- [ ] The existing non-fatal `Rebuild_rejected` handler at `src/Client/Pages/AdminProjections/State.fs:326` is unmodified in the diff — no client change is required.
-- [ ] `git diff --stat src/Client/` shows zero changed files.
-- [ ] `npm test` passes; `npm run build` passes.
+- [x] Expecto: `lossyRebuildRejectionMessage "SeriesProjection"` returns `Some`; `"MovieProjection"` returns `None`; with `MEDIATHECA_ALLOW_LOSSY_REBUILD=1` set, `"SeriesProjection"` returns `None`.
+- [x] Expecto: a rebuild request for SeriesProjection emits a `rejected` SSE frame and leaves the `series_episodes` row count unchanged.
+- [x] Expecto: "Rebuild all" skips SeriesProjection and completes the other five handlers.
+- [x] The existing non-fatal `Rebuild_rejected` handler at `src/Client/Pages/AdminProjections/State.fs:326` is unmodified in the diff — no client change is required.
+- [x] `git diff --stat src/Client/` shows zero changed files.
+- [x] `npm test` passes; `npm run build` passes.
+
+## Outcome
+
+Rebuild is now refused outright, server-side, for any projection registered in
+`Administration.lossyRebuildProjections` (one entry: `SeriesProjection`).
+`Administration.lossyRebuildRejectionMessage : string -> string option` is the
+pure lookup (env override `MEDIATHECA_ALLOW_LOSSY_REBUILD=1`).
+`Administration.decideAndClaimRebuildGuard` factors the three-rejection-arm
+decision out of `projectionRebuildStreamHandler` as a directly-testable
+function (ADR-0031/ADR-0038's "test the underlying function, not the SSE
+route" seam) — the lossy guard runs first, since it claims neither guard
+dictionary, ahead of the pre-existing wipe-import and single-flight checks.
+`CinemarcoImport.runImport`'s post-import rebuild loop (a second, easily-
+missed call site) falls back to `Projection.runProjection` (incremental
+catch-up) for a guarded handler, `eprintfn`-ing the reason. Reaching that
+call site from `Administration.fs` required reordering `Server.fsproj`'s
+`<Compile>` list (`Administration.fs` now precedes `CinemarcoImport.fs`,
+which still precedes `Api.fs`) — verified safe, no real dependency runs the
+other way. Zero client changes: the existing non-fatal `Rebuild_rejected`
+handler already renders any `rejected` SSE event as a toast.
+
+ADR written: `.agentheim/knowledge/decisions/0049-rebuild-blocked-outright-for-projections-with-out-of-band-writers.md` (authored as 0043, renumbered at integration),
+recording the retirement criterion in the Decision section (per the task's
+Notes) and why ADR-0034's confirm-modal guardrail was deliberately not
+reused.
+
+Key files: `src/Server/Administration.fs` (`lossyRebuildProjections`,
+`lossyRebuildRejectionMessage`, `RebuildRejection`,
+`decideAndClaimRebuildGuard`, `projectionRebuildStreamHandler`),
+`src/Server/CinemarcoImport.fs` (`runImport` step 6),
+`src/Server/Server.fsproj` (compile order), `tests/Server.Tests/ProjectionRebuildTests.fs`
+(3 new tests), `.agentheim/contexts/administration/README.md`.
 
 ## Notes
 

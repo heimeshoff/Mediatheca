@@ -861,9 +861,21 @@ module CinemarcoImport =
             // Step 5: Catalogs
             importCatalogs cmConn conn streamPositions movieEntryIdToSlug seriesEntryIdToSlug seriesIdToSlug counters
 
-            // Step 6: Rebuild all projections
+            // Step 6: Rebuild all projections. Lossy-rebuild-guarded
+            // handlers (ADR-0049 — SeriesProjection today) fall back to
+            // incremental catch-up instead of drop+replay: this import runs
+            // against a fresh, event-store-empty database (checked above),
+            // so `runProjection` still lands every just-imported event, it
+            // simply never drops tables that out-of-band writers (the
+            // Series TMDB refresh job, ADR-0012's Jellyfin materialization)
+            // may have already populated.
             for handler in projectionHandlers do
-                Projection.rebuildProjection conn handler
+                match Administration.lossyRebuildRejectionMessage handler.Name with
+                | Some reason ->
+                    eprintfn "%s" reason
+                    Projection.runProjection conn handler
+                | None ->
+                    Projection.rebuildProjection conn handler
 
             Ok {
                 FriendsImported = counters.Friends
