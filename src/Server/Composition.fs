@@ -242,6 +242,12 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     // metadata_cache_seeded marker, so this is a no-op after the first run.
     MetadataCache.seedFromProjections conn
 
+    // series-d5tpn: drop the externally-sourced series_list/series_detail
+    // columns now that nothing writes or reads them. MUST run after the seed
+    // above — the seed's SELECT reads these same columns off series_detail,
+    // so dropping first would break it on any database not yet seeded.
+    SeriesProjection.dropDeprecatedColumns conn
+
     // Game journal (Notion-style blocks, plain storage) — table + one-time
     // migration of the old event-sourced game content blocks
     GameJournal.initialize conn

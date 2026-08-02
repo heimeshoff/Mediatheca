@@ -120,6 +120,51 @@ let private insertCacheEpisode (conn: SqliteConnection) (slug: string) (season: 
     |> Db.setParams [ "slug", SqlType.String slug; "season", SqlType.Int32 season; "episode", SqlType.Int32 episode ]
     |> Db.exec
 
+/// The exact `CREATE VIEW` DDL `MetadataCache.initialize` itself declares
+/// (`CREATE VIEW IF NOT EXISTS series_next_up`/`series_episode_counts`,
+/// both selecting FROM `series_episode_cache`). series-d5tpn iteration 2:
+/// these views are present on any live database that has booted once —
+/// creating them here before simulating the stranded-rename shape is what
+/// makes the fixture genuinely reproduce the live incident, since SQLite
+/// revalidates every view in the schema during `ALTER TABLE ... RENAME`.
+let private createSeriesViews (conn: SqliteConnection) : unit =
+    conn
+    |> Db.newCommand
+        """
+        CREATE TABLE IF NOT EXISTS series_episode_progress (
+            series_slug TEXT NOT NULL,
+            rewatch_id TEXT NOT NULL,
+            season_number INTEGER NOT NULL,
+            episode_number INTEGER NOT NULL,
+            watched_date TEXT,
+            PRIMARY KEY (series_slug, rewatch_id, season_number, episode_number)
+        );
+
+        CREATE VIEW IF NOT EXISTS series_next_up AS
+        SELECT series_slug, season_number, episode_number, name, overview, still_ref, tmdb_rating
+        FROM (
+            SELECT
+                e.series_slug, e.season_number, e.episode_number, e.name, e.overview, e.still_ref, e.tmdb_rating,
+                ROW_NUMBER() OVER (PARTITION BY e.series_slug ORDER BY e.season_number, e.episode_number) AS rn
+            FROM series_episode_cache e
+            LEFT JOIN series_episode_progress p
+                ON p.series_slug = e.series_slug
+               AND p.season_number = e.season_number
+               AND p.episode_number = e.episode_number
+            WHERE p.series_slug IS NULL
+        )
+        WHERE rn = 1;
+
+        CREATE VIEW IF NOT EXISTS series_episode_counts AS
+        SELECT
+            series_slug,
+            COUNT(DISTINCT season_number) AS season_count,
+            COUNT(*) AS episode_count
+        FROM series_episode_cache
+        GROUP BY series_slug;
+        """
+    |> Db.exec
+
 let private insertProgress (conn: SqliteConnection) (slug: string) (rewatchId: string) (season: int) (episode: int) : unit =
     conn
     |> Db.newCommand
@@ -214,6 +259,166 @@ let tests =
                 |> Db.setParams [ "slug", SqlType.String "the-wire" ]
                 |> Db.querySingle (fun rd -> rd.ReadString "still_ref")
             Expect.equal stillRef (Some "stills/tw-s01e01.jpg") "still_ref unchanged after a second initialize"
+
+        testCase "initialize recovers a stranded rename — old-named table has rows, new-named table already exists and is empty" <| fun _ ->
+            let conn = createConnection ()
+            createLegacySeriesSeasonsAndEpisodes conn
+            conn
+            |> Db.newCommand "INSERT INTO series_seasons (series_slug, season_number, name, source) VALUES ('the-wire', 1, 'Season 1', 'jellyfin')"
+            |> Db.exec
+            conn
+            |> Db.newCommand
+                "INSERT INTO series_episodes (series_slug, season_number, episode_number, name, still_ref, source) VALUES ('the-wire', 1, 1, 'Ep1', 'stills/tw-s01e01.jpg', 'jellyfin')"
+            |> Db.exec
+
+            // Simulate the exact ordering hazard the iteration-1 verifier
+            // note describes against the real database: some out-of-band
+            // caller runs `CREATE TABLE IF NOT EXISTS
+            // series_episode_cache`/`series_season_cache` before
+            // `MetadataCache.initialize` gets a chance to rename the real,
+            // populated tables above into place — stranding the real rows
+            // under the old names forever, with the rename now failing
+            // silently ("target already exists") on every future boot.
+            conn
+            |> Db.newCommand
+                """
+                CREATE TABLE series_season_cache (
+                    series_slug TEXT NOT NULL,
+                    season_number INTEGER NOT NULL,
+                    name TEXT NOT NULL DEFAULT '',
+                    overview TEXT NOT NULL DEFAULT '',
+                    poster_ref TEXT,
+                    air_date TEXT,
+                    episode_count INTEGER NOT NULL DEFAULT 0,
+                    source TEXT NOT NULL DEFAULT 'tmdb',
+                    PRIMARY KEY (series_slug, season_number)
+                );
+
+                CREATE TABLE series_episode_cache (
+                    series_slug TEXT NOT NULL,
+                    season_number INTEGER NOT NULL,
+                    episode_number INTEGER NOT NULL,
+                    name TEXT NOT NULL DEFAULT '',
+                    overview TEXT NOT NULL DEFAULT '',
+                    runtime INTEGER,
+                    air_date TEXT,
+                    still_ref TEXT,
+                    tmdb_rating REAL,
+                    source TEXT NOT NULL DEFAULT 'tmdb',
+                    PRIMARY KEY (series_slug, season_number, episode_number)
+                );
+                """
+            |> Db.exec
+
+            // series-d5tpn iteration 2: the views exist on any live database
+            // that has booted once — create them now, before recovery runs,
+            // so this fixture genuinely reproduces the incident shape (the
+            // iteration-2 verifier note: neither prior fixture did this, so
+            // neither exercised the view-revalidation failure the real
+            // database hit).
+            createSeriesViews conn
+
+            // Sanity: this is the stranded shape before recovery — the
+            // rename target already exists and is empty, the real data
+            // still sits under the old names.
+            Expect.equal (tableRowCount conn "series_season_cache") 0 "sanity: new-named season table starts empty (the stranded shape)"
+            Expect.equal (tableRowCount conn "series_episode_cache") 0 "sanity: new-named episode table starts empty (the stranded shape)"
+            Expect.equal (tableRowCount conn "series_seasons") 1 "sanity: real season data still sits under the old name"
+            Expect.equal (tableRowCount conn "series_episodes") 1 "sanity: real episode data still sits under the old name"
+
+            MetadataCache.initialize conn
+
+            Expect.equal (tableRowCount conn "series_season_cache") 1 "recovery moves the stranded season row under the new name"
+            Expect.equal (tableRowCount conn "series_episode_cache") 1 "recovery moves the stranded episode row under the new name"
+
+            let tableNames = existingTableNames conn
+            Expect.isFalse (Set.contains "series_seasons" tableNames) "the old-named season table is gone after recovery"
+            Expect.isFalse (Set.contains "series_episodes" tableNames) "the old-named episode table is gone after recovery"
+
+            let recoveredEpisode =
+                conn
+                |> Db.newCommand "SELECT source, still_ref FROM series_episode_cache WHERE series_slug = @slug AND season_number = 1 AND episode_number = 1"
+                |> Db.setParams [ "slug", SqlType.String "the-wire" ]
+                |> Db.querySingle (fun rd -> rd.ReadString "source", rd.ReadString "still_ref")
+            Expect.equal recoveredEpisode (Some ("jellyfin", "stills/tw-s01e01.jpg")) "the recovered episode's data is byte-identical to what was stranded"
+
+            // The views must have survived recovery (dropped and recreated
+            // around the DROP TABLE/RENAME pair — series-d5tpn iteration 2)
+            // and must return rows computed over the recovered data, not
+            // empty results left over from a broken schema.
+            let counts =
+                conn
+                |> Db.newCommand "SELECT season_count, episode_count FROM series_episode_counts WHERE series_slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String "the-wire" ]
+                |> Db.querySingle (fun rd -> rd.ReadInt32 "season_count", rd.ReadInt32 "episode_count")
+            Expect.equal counts (Some (1, 1)) "series_episode_counts reflects the recovered episode after view-safe recovery"
+            let nextUp =
+                conn
+                |> Db.newCommand "SELECT season_number, episode_number FROM series_next_up WHERE series_slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String "the-wire" ]
+                |> Db.querySingle (fun rd -> rd.ReadInt32 "season_number", rd.ReadInt32 "episode_number")
+            Expect.equal nextUp (Some (1, 1)) "series_next_up returns the recovered episode after view-safe recovery"
+
+            // Recovery must be idempotent — a second initialize is a no-op
+            // once the rows are safely under the new names.
+            MetadataCache.initialize conn
+            Expect.equal (tableRowCount conn "series_episode_cache") 1 "row count unchanged by a second initialize after recovery"
+
+        testCase "initialize recovers a stranded rename even when SeriesProjection.createTables' own fallback wins the race and creates the new-named tables first" <| fun _ ->
+            // `SeriesProjection.createTables` still declares its own `CREATE
+            // TABLE IF NOT EXISTS series_episode_cache`/`series_season_cache`
+            // fallback (kept — see MetadataCache.initialize's doc comment for
+            // why removing it was reverted). This test proves the guard holds
+            // even in exactly the scenario that produced the live incident:
+            // `SeriesProjection.handler.Init` runs BEFORE `MetadataCache.initialize`
+            // ever gets a chance to rename the real, populated legacy tables —
+            // the reverse of Composition.buildApp's real (correct) order.
+            let conn = createConnection ()
+            createLegacySeriesSeasonsAndEpisodes conn
+            conn
+            |> Db.newCommand "INSERT INTO series_seasons (series_slug, season_number, name, source) VALUES ('the-wire', 1, 'Season 1', 'jellyfin')"
+            |> Db.exec
+            conn
+            |> Db.newCommand
+                "INSERT INTO series_episodes (series_slug, season_number, episode_number, name, still_ref, source) VALUES ('the-wire', 1, 1, 'Ep1', 'stills/tw-s01e01.jpg', 'jellyfin')"
+            |> Db.exec
+
+            // Out-of-order call: SeriesProjection's own fallback claims the
+            // new names first, empty.
+            SeriesProjection.handler.Init conn
+            Expect.equal (tableRowCount conn "series_episode_cache") 0 "sanity: SeriesProjection.handler.Init alone creates the new-named table empty"
+
+            // series-d5tpn iteration 2: on a live database this incident
+            // shape always carries the views too (they're created the first
+            // time `initialize` ever runs, and a boot that gets this far
+            // implies it has). Create them now so this fixture genuinely
+            // reproduces the incident shape, not a version of it that never
+            // hit the view-revalidation failure.
+            createSeriesViews conn
+
+            // MetadataCache.initialize now runs "too late" — the exact
+            // ordering violation the iteration-1 incident produced.
+            MetadataCache.initialize conn
+
+            Expect.equal (tableRowCount conn "series_season_cache") 1 "recovery moves the stranded season row under the new name even after the out-of-order Init"
+            Expect.equal (tableRowCount conn "series_episode_cache") 1 "recovery moves the stranded episode row under the new name even after the out-of-order Init"
+
+            let counts =
+                conn
+                |> Db.newCommand "SELECT season_count, episode_count FROM series_episode_counts WHERE series_slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String "the-wire" ]
+                |> Db.querySingle (fun rd -> rd.ReadInt32 "season_count", rd.ReadInt32 "episode_count")
+            Expect.equal counts (Some (1, 1)) "series_episode_counts reflects the recovered episode after view-safe recovery"
+            let nextUp =
+                conn
+                |> Db.newCommand "SELECT season_number, episode_number FROM series_next_up WHERE series_slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String "the-wire" ]
+                |> Db.querySingle (fun rd -> rd.ReadInt32 "season_number", rd.ReadInt32 "episode_number")
+            Expect.equal nextUp (Some (1, 1)) "series_next_up returns the recovered episode after view-safe recovery"
+
+            let tableNames = existingTableNames conn
+            Expect.isFalse (Set.contains "series_seasons" tableNames) "the old-named season table is gone after recovery"
+            Expect.isFalse (Set.contains "series_episodes" tableNames) "the old-named episode table is gone after recovery"
 
         testCase "series_next_up returns exactly one row per series with an unwatched episode, and zero rows for a fully-watched series" <| fun _ ->
             let conn = createConnection ()
@@ -318,10 +523,32 @@ let tests =
             let conn = createConnection ()
             SettingsStore.initialize conn
             GameProjection.handler.Init conn
-            SeriesProjection.handler.Init conn
+            // series-d5tpn dropped overview/tmdb_rating/episode_runtime from
+            // `SeriesProjection.createTables`'s series_detail — a fresh
+            // `SeriesProjection.handler.Init` no longer has these columns at
+            // all. This test still exercises `seedFromProjections`'s legacy
+            // read path (the one the drop's `dropDeprecatedColumns` migration
+            // must run AFTER, on an existing database), so it stands up a
+            // series_detail shaped like a pre-drop database directly — same
+            // "simulate the state a migration is meant to handle" idiom
+            // `createLegacySeriesSeasonsAndEpisodes` above already uses for
+            // the series_seasons/series_episodes rename.
             conn
             |> Db.newCommand
-                "INSERT INTO series_detail (slug, name, year, overview, backdrop_ref, tmdb_id, tmdb_rating, episode_runtime) VALUES ('the-wire', 'The Wire', 2002, 'A cop show', 'backdrops/the-wire.jpg', 12345, 9.1, 55)"
+                """
+                CREATE TABLE series_detail (
+                    slug TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    year INTEGER NOT NULL,
+                    overview TEXT NOT NULL DEFAULT '',
+                    backdrop_ref TEXT,
+                    tmdb_id INTEGER NOT NULL,
+                    tmdb_rating REAL,
+                    episode_runtime INTEGER
+                );
+                INSERT INTO series_detail (slug, name, year, overview, backdrop_ref, tmdb_id, tmdb_rating, episode_runtime)
+                VALUES ('the-wire', 'The Wire', 2002, 'A cop show', 'backdrops/the-wire.jpg', 12345, 9.1, 55);
+                """
             |> Db.exec
 
             MetadataCache.initialize conn

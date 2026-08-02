@@ -16,14 +16,8 @@ module SeriesProjection =
                 year INTEGER NOT NULL,
                 poster_ref TEXT,
                 genres TEXT NOT NULL DEFAULT '[]',
-                tmdb_rating REAL,
                 status TEXT NOT NULL DEFAULT 'Unknown',
-                season_count INTEGER NOT NULL DEFAULT 0,
-                episode_count INTEGER NOT NULL DEFAULT 0,
                 watched_episode_count INTEGER NOT NULL DEFAULT 0,
-                next_up_season INTEGER,
-                next_up_episode INTEGER,
-                next_up_title TEXT,
                 abandoned INTEGER NOT NULL DEFAULT 0,
                 in_focus INTEGER NOT NULL DEFAULT 0
             );
@@ -32,13 +26,10 @@ module SeriesProjection =
                 slug TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 year INTEGER NOT NULL,
-                overview TEXT NOT NULL DEFAULT '',
                 genres TEXT NOT NULL DEFAULT '[]',
                 poster_ref TEXT,
                 backdrop_ref TEXT,
                 tmdb_id INTEGER NOT NULL,
-                tmdb_rating REAL,
-                episode_runtime INTEGER,
                 status TEXT NOT NULL DEFAULT 'Unknown',
                 personal_rating INTEGER,
                 recommended_by TEXT NOT NULL DEFAULT '[]',
@@ -105,13 +96,6 @@ module SeriesProjection =
             |> Db.exec
         with _ -> () // Column already exists
 
-        // Migration: add jellyfin_id column for Jellyfin play links (legacy, kept for compat)
-        try
-            conn
-            |> Db.newCommand "ALTER TABLE series_detail ADD COLUMN jellyfin_id TEXT"
-            |> Db.exec
-        with _ -> () // Column already exists
-
         // Migration (integration-m4k7p): provenance column on season/episode rows.
         // TMDB writes leave the 'tmdb' default; the Jellyfin materialization pass
         // writes explicit 'jellyfin'. A later TMDB refresh's INSERT OR REPLACE omits
@@ -151,13 +135,57 @@ module SeriesProjection =
         |> Db.newCommand "CREATE INDEX IF NOT EXISTS idx_series_progress_slug_episode ON series_episode_progress (series_slug, season_number, episode_number)"
         |> Db.exec
 
+    /// series-d5tpn: drops the externally-sourced projection columns now
+    /// that nothing writes them (series-r2xhv) and nothing reads them
+    /// (series-q8jwc) — drift reaches zero by removing the columns, never by
+    /// an ignore-list on `Administration.diffTable` (ADR-0031's shadow-diff
+    /// stays byte-for-byte). Each `ALTER TABLE ... DROP COLUMN` is its own
+    /// `try/with`, idempotent the same way this file's `ADD COLUMN`
+    /// migrations already are — a second run throws "no such column" and is
+    /// swallowed.
+    ///
+    /// **Call-order is load-bearing**: must run strictly after
+    /// `MetadataCache.seedFromProjections`, which reads these same columns
+    /// (`overview`/`tmdb_rating`/`episode_runtime` off `series_detail`) to
+    /// seed `series_metadata_cache` — see `Composition.buildApp`'s startup
+    /// sequence, where this is called immediately after that seed. Dropping
+    /// first would make the seed's `SELECT` fail outright on an existing
+    /// database that hasn't been seeded yet.
+    ///
+    /// `status` and `backdrop_ref` are deliberately NOT dropped. `status`
+    /// stays per the task's own text (the narrowed `Series_refreshed` still
+    /// carries every real transition, ADR-0047). `backdrop_ref` is a
+    /// deviation from the task's literal column list: ADR-0048 (`series-q8jwc`)
+    /// already classified `BackdropRef` as an identity-card field driven by
+    /// its own explicit event (`Series_backdrop_replaced`), never something a
+    /// TMDB refresh keeps fresh — the same class as `PosterRef`, which the
+    /// task never proposed dropping. Dropping it would break that event's
+    /// handler and `getBySlug`'s direct read. See ADR-0051 for the full
+    /// reasoning.
+    let dropDeprecatedColumns (conn: SqliteConnection) : unit =
+        for col in [ "tmdb_rating"; "season_count"; "episode_count"; "next_up_season"; "next_up_episode"; "next_up_title" ] do
+            try
+                conn |> Db.newCommand (sprintf "ALTER TABLE series_list DROP COLUMN %s" col) |> Db.exec
+            with _ -> () // Column already dropped
+        for col in [ "overview"; "tmdb_rating"; "episode_runtime"; "jellyfin_id" ] do
+            try
+                conn |> Db.newCommand (sprintf "ALTER TABLE series_detail DROP COLUMN %s" col) |> Db.exec
+            with _ -> () // Column already dropped
+
+    /// series-d5tpn: `series_season_cache`/`series_episode_cache` are NOT
+    /// dropped here — series-m7fdk reclassified them `Cache` (owned by
+    /// `MetadataCache.fs`, never checkpoint-tracked or drift-checked), so a
+    /// `ProjectionHandler.Drop; Init; replay` cycle (`Projection.rebuildProjection`,
+    /// the very mechanism the now-retired lossy-rebuild guard used to refuse
+    /// to run for SeriesProjection) must never wipe them — that was
+    /// precisely the data loss ADR-0049 existed to prevent. Dropping only the
+    /// tables SeriesProjection actually owns (`tableRegistry`'s `Projected
+    /// "SeriesProjection"` rows) is what makes a rebuild finally safe.
     let private dropTables (conn: SqliteConnection) : unit =
         conn
         |> Db.newCommand """
             DROP TABLE IF EXISTS series_list;
             DROP TABLE IF EXISTS series_detail;
-            DROP TABLE IF EXISTS series_season_cache;
-            DROP TABLE IF EXISTS series_episode_cache;
             DROP TABLE IF EXISTS series_rewatch_sessions;
             DROP TABLE IF EXISTS series_episode_progress;
         """
@@ -221,12 +249,16 @@ module SeriesProjection =
                         eprintfn "[SeriesProjection] Skipping Series_added_to_library for '%s' — tmdb_id %d already held by '%s'" slug data.TmdbId other
                     | None ->
                         let genresJson = data.Genres |> List.map Encode.string |> Encode.list |> Encode.toString 0
-                        let totalEpisodes =
-                            data.Seasons |> List.sumBy (fun s -> s.Episodes.Length)
+                        // series-d5tpn: `data.TmdbRating`/`Overview`/`EpisodeRuntime`/
+                        // season+episode counts are no longer written to the
+                        // projection at all — they were the externally-sourced
+                        // columns this task drops. `series-t3jkv` (backlog) is
+                        // where a write path to `series_metadata_cache` gets wired;
+                        // until then these fields of `data` simply go unused here.
                         conn
                         |> Db.newCommand """
-                            INSERT OR REPLACE INTO series_list (slug, name, year, poster_ref, genres, tmdb_rating, status, season_count, episode_count, watched_episode_count)
-                            VALUES (@slug, @name, @year, @poster_ref, @genres, @tmdb_rating, @status, @season_count, @episode_count, 0)
+                            INSERT OR REPLACE INTO series_list (slug, name, year, poster_ref, genres, status, watched_episode_count)
+                            VALUES (@slug, @name, @year, @poster_ref, @genres, @status, 0)
                         """
                         |> Db.setParams [
                             "slug", SqlType.String slug
@@ -234,29 +266,23 @@ module SeriesProjection =
                             "year", SqlType.Int32 data.Year
                             "poster_ref", match data.PosterRef with Some r -> SqlType.String r | None -> SqlType.Null
                             "genres", SqlType.String genresJson
-                            "tmdb_rating", match data.TmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null
                             "status", SqlType.String data.Status
-                            "season_count", SqlType.Int32 (List.length data.Seasons)
-                            "episode_count", SqlType.Int32 totalEpisodes
                         ]
                         |> Db.exec
 
                         conn
                         |> Db.newCommand """
-                            INSERT OR REPLACE INTO series_detail (slug, name, year, overview, genres, poster_ref, backdrop_ref, tmdb_id, tmdb_rating, episode_runtime, status, recommended_by, want_to_watch_with)
-                            VALUES (@slug, @name, @year, @overview, @genres, @poster_ref, @backdrop_ref, @tmdb_id, @tmdb_rating, @episode_runtime, @status, '[]', '[]')
+                            INSERT OR REPLACE INTO series_detail (slug, name, year, genres, poster_ref, backdrop_ref, tmdb_id, status, recommended_by, want_to_watch_with)
+                            VALUES (@slug, @name, @year, @genres, @poster_ref, @backdrop_ref, @tmdb_id, @status, '[]', '[]')
                         """
                         |> Db.setParams [
                             "slug", SqlType.String slug
                             "name", SqlType.String data.Name
                             "year", SqlType.Int32 data.Year
-                            "overview", SqlType.String data.Overview
                             "genres", SqlType.String genresJson
                             "poster_ref", match data.PosterRef with Some r -> SqlType.String r | None -> SqlType.Null
                             "backdrop_ref", match data.BackdropRef with Some r -> SqlType.String r | None -> SqlType.Null
                             "tmdb_id", SqlType.Int32 data.TmdbId
-                            "tmdb_rating", match data.TmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null
-                            "episode_runtime", match data.EpisodeRuntime with Some r -> SqlType.Int32 r | None -> SqlType.Null
                             "status", SqlType.String data.Status
                         ]
                         |> Db.exec
@@ -1392,12 +1418,23 @@ module SeriesProjection =
               NextAirDate = getNextAirDate conn slug }
         )
 
+    /// series-d5tpn: same retargeting `series-q8jwc` gave `getRecentlyFinished`
+    /// (ADR-0048's Consequences named this one as deliberately left
+    /// unretargeted, `series-x9mfp`) — `TmdbRating` from `series_metadata_cache`,
+    /// `SeasonCount`/`EpisodeCount`/`NextUp` from the two views, since
+    /// `series_list`'s own materialized columns are gone.
     let getRecentlyAbandoned (conn: SqliteConnection) : Mediatheca.Shared.SeriesListItem list =
         conn
         |> Db.newCommand """
-            SELECT sl.slug, sl.name, sl.year, sl.poster_ref, sl.genres, sl.tmdb_rating, sl.status, sl.season_count, sl.episode_count,
-                   sl.watched_episode_count, sl.next_up_season, sl.next_up_episode, sl.next_up_title, sl.abandoned, sl.in_focus
+            SELECT sl.slug, sl.name, sl.year, sl.poster_ref, sl.genres, sl.status,
+                   sl.watched_episode_count, sl.abandoned, sl.in_focus,
+                   c.tmdb_rating AS c_tmdb_rating,
+                   ec.season_count AS ec_season_count, ec.episode_count AS ec_episode_count,
+                   nu.season_number AS nu_season, nu.episode_number AS nu_episode, nu.name AS nu_title
             FROM series_list sl
+            LEFT JOIN series_metadata_cache c ON c.series_slug = sl.slug
+            LEFT JOIN series_episode_counts ec ON ec.series_slug = sl.slug
+            LEFT JOIN series_next_up nu ON nu.series_slug = sl.slug
             LEFT JOIN (
                 SELECT series_slug, MAX(watched_date) as last_watched_date
                 FROM series_episode_progress
@@ -1413,12 +1450,12 @@ module SeriesProjection =
                 Decode.fromString (Decode.list Decode.string) genresJson
                 |> Result.defaultValue []
             let nextUp =
-                if rd.IsDBNull(rd.GetOrdinal("next_up_season")) then None
+                if rd.IsDBNull(rd.GetOrdinal("nu_season")) then None
                 else
                     Some {
-                        Mediatheca.Shared.NextUpDto.SeasonNumber = rd.ReadInt32 "next_up_season"
-                        Mediatheca.Shared.NextUpDto.EpisodeNumber = rd.ReadInt32 "next_up_episode"
-                        Mediatheca.Shared.NextUpDto.EpisodeName = rd.ReadString "next_up_title"
+                        Mediatheca.Shared.NextUpDto.SeasonNumber = rd.ReadInt32 "nu_season"
+                        Mediatheca.Shared.NextUpDto.EpisodeNumber = rd.ReadInt32 "nu_episode"
+                        Mediatheca.Shared.NextUpDto.EpisodeName = rd.ReadString "nu_title"
                     }
             let slug = rd.ReadString "slug"
             { Mediatheca.Shared.SeriesListItem.Slug = slug
@@ -1429,11 +1466,15 @@ module SeriesProjection =
                 else Some (rd.ReadString "poster_ref")
               Genres = genres
               TmdbRating =
-                if rd.IsDBNull(rd.GetOrdinal("tmdb_rating")) then None
-                else Some (rd.ReadDouble "tmdb_rating")
+                if rd.IsDBNull(rd.GetOrdinal("c_tmdb_rating")) then None
+                else Some (rd.ReadDouble "c_tmdb_rating")
               Status = parseStatus (rd.ReadString "status")
-              SeasonCount = rd.ReadInt32 "season_count"
-              EpisodeCount = rd.ReadInt32 "episode_count"
+              SeasonCount =
+                if rd.IsDBNull(rd.GetOrdinal("ec_season_count")) then 0
+                else rd.ReadInt32 "ec_season_count"
+              EpisodeCount =
+                if rd.IsDBNull(rd.GetOrdinal("ec_episode_count")) then 0
+                else rd.ReadInt32 "ec_episode_count"
               WatchedEpisodeCount = rd.ReadInt32 "watched_episode_count"
               NextUp = nextUp
               IsAbandoned = rd.ReadInt32 "abandoned" = 1
@@ -1441,15 +1482,20 @@ module SeriesProjection =
               NextAirDate = getNextAirDate conn slug }
         )
 
-    // Dashboard: Currently watching count (series with unwatched episodes, not abandoned)
+    /// Dashboard: Currently watching count (series with unwatched episodes,
+    /// not abandoned). series-d5tpn: `episode_count` moved to the
+    /// `series_episode_counts` view (`series_list` no longer has its own
+    /// column) — same retarget `getCompletionRate` below needs.
     let getCurrentlyWatchingCount (conn: SqliteConnection) : int =
         conn
         |> Db.newCommand """
-            SELECT COUNT(*) as cnt FROM series_list
-            WHERE watched_episode_count > 0
-              AND watched_episode_count < episode_count
-              AND abandoned = 0
-              AND episode_count > 0
+            SELECT COUNT(*) as cnt
+            FROM series_list sl
+            LEFT JOIN series_episode_counts ec ON ec.series_slug = sl.slug
+            WHERE sl.watched_episode_count > 0
+              AND sl.watched_episode_count < COALESCE(ec.episode_count, 0)
+              AND sl.abandoned = 0
+              AND COALESCE(ec.episode_count, 0) > 0
         """
         |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
         |> Option.defaultValue 0
@@ -1468,15 +1514,27 @@ module SeriesProjection =
         |> Option.flatten
 
     // Dashboard: Completion rate (finished / (finished + in-progress), excluding abandoned)
+    // series-d5tpn: `episode_count` retargeted to `series_episode_counts` (see
+    // `getCurrentlyWatchingCount` above).
     let getCompletionRate (conn: SqliteConnection) : float option =
         let finished =
             conn
-            |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_list WHERE episode_count > 0 AND watched_episode_count >= episode_count AND abandoned = 0"
+            |> Db.newCommand """
+                SELECT COUNT(*) as cnt
+                FROM series_list sl
+                LEFT JOIN series_episode_counts ec ON ec.series_slug = sl.slug
+                WHERE COALESCE(ec.episode_count, 0) > 0 AND sl.watched_episode_count >= COALESCE(ec.episode_count, 0) AND sl.abandoned = 0
+            """
             |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
             |> Option.defaultValue 0
         let started =
             conn
-            |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_list WHERE watched_episode_count > 0 AND abandoned = 0 AND episode_count > 0"
+            |> Db.newCommand """
+                SELECT COUNT(*) as cnt
+                FROM series_list sl
+                LEFT JOIN series_episode_counts ec ON ec.series_slug = sl.slug
+                WHERE sl.watched_episode_count > 0 AND sl.abandoned = 0 AND COALESCE(ec.episode_count, 0) > 0
+            """
             |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
             |> Option.defaultValue 0
         if started = 0 then None

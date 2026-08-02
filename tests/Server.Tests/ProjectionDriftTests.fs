@@ -214,6 +214,70 @@ let projectionDriftTests =
             Expect.equal gameDrift.Discrepancies [] "GameProjection should report zero discrepancies"
             Expect.equal sessionDrift.Discrepancies [] "PlaySessionProjection should report zero discrepancies"
 
+        testCase "series-d5tpn: add + refresh + Jellyfin materialization + episode-watched replay with zero SeriesProjection discrepancies" <| fun _ ->
+            let conn = createLiveConnection ()
+            for handler in allProjectionHandlers do
+                handler.Init conn
+
+            let seriesData: Series.SeriesAddedData = {
+                Name = "Silo"
+                Year = 2023
+                Overview = "A community lives underground"
+                Genres = [ "Sci-Fi & Fantasy"; "Drama" ]
+                Status = "Returning"
+                PosterRef = Some "posters/silo-2023.jpg"
+                BackdropRef = Some "backdrops/silo-2023.jpg"
+                TmdbId = 2867
+                TmdbRating = Some 8.2
+                EpisodeRuntime = Some 50
+                Seasons = [
+                    { SeasonNumber = 1
+                      Name = "Season 1"
+                      Overview = ""
+                      PosterRef = None
+                      AirDate = None
+                      Episodes = [
+                        { EpisodeNumber = 1; Name = "Freedom Day"; Overview = ""; Runtime = None; AirDate = None; StillRef = None; TmdbRating = None }
+                        { EpisodeNumber = 2; Name = "Holston's Pick"; Overview = ""; Runtime = None; AirDate = None; StillRef = None; TmdbRating = None }
+                      ] }
+                ]
+            }
+            let streamId = Series.streamId "silo-2023"
+            EventStore.appendToStream conn streamId -1L [ Series.Serialization.toEventData (Series.Series_added_to_library seriesData) ] |> ignore
+            catchUpAll conn
+
+            // Refresh: a real airing-status transition (ADR-0047's narrowed event).
+            let refreshedData: Series.SeriesRefreshedData = { PreviousStatus = Some "Returning"; NewStatus = Some "Ended" }
+            EventStore.appendToStream conn streamId 0L [ Series.Serialization.toEventData (Series.Series_refreshed refreshedData) ] |> ignore
+            catchUpAll conn
+
+            // Jellyfin materialization: a direct cache-tier write (never event-sourced,
+            // per ADR-0043/0045), simulating integration-m4k7p filling a gap TMDB hasn't
+            // published yet. Cache tables are never drift-checked, but this proves their
+            // presence doesn't introduce any Projected-table discrepancy either.
+            SeriesProjection.materializeSeason conn "silo-2023" 2
+            SeriesProjection.materializeEpisode conn "silo-2023" {
+                JellyfinImport.MaterializedEpisode.SeasonNumber = 2
+                EpisodeNumber = 1
+                Name = "The Silence"
+                Overview = ""
+                Runtime = Some 55
+                AirDate = None
+                StillRef = None
+            }
+
+            // Episode-watched: a direct series_episode_progress write + watched-count
+            // recalculation, no cache read involved.
+            let watchedData: Series.EpisodeWatchedData = { RewatchId = "default"; SeasonNumber = 1; EpisodeNumber = 1; Date = "2024-01-01" }
+            EventStore.appendToStream conn streamId 1L [ Series.Serialization.toEventData (Series.Episode_watched watchedData) ] |> ignore
+            catchUpAll conn
+
+            let shadow = createShadowConnection ()
+            let results = Administration.checkProjectionDrift conn shadow allProjectionHandlers (fun _ -> ())
+
+            let seriesDrift = results |> List.find (fun p -> p.Name = "SeriesProjection")
+            Expect.equal seriesDrift.Discrepancies [] "SeriesProjection should report zero discrepancies for this add+refresh+materialize+watch fixture"
+
         testCase "a lagging projection is flagged dirty, and the drift check's rejection message names it" <| fun _ ->
             let conn = createLiveConnection ()
             for handler in allProjectionHandlers do

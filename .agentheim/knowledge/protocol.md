@@ -5,6 +5,42 @@ Newest entries on top.
 
 ---
 
+## 2026-08-02 09:39 -- Task verified and completed: series-d5tpn - Drop the externally-sourced columns from series_list and series_detail, prove the drift check reports zero for SeriesProjection, and retire the lossy-rebuild guard
+
+**Type:** Work / Task completion
+**Task:** series-d5tpn - Drop the externally-sourced columns from series_list and series_detail, prove the drift check reports zero for SeriesProjection, and retire the lossy-rebuild guard
+**Summary:** Dropped the externally-sourced columns from series_list/series_detail (status and backdrop_ref retained per the identity-card clause), proved checkProjectionDrift zero for SeriesProjection, and retired the ADR-0049 lossy-rebuild guard - integrated after builder-authorized conflict resolution and a conductor live-DB repair, with a view-safe atomic recoverStranded guard added across three verification iterations
+**Duration:** 1h30m
+**Verification:** PASS (iteration 3)
+**Files changed:** 11
+**Tests added:** 6
+**ADRs written:** 0051-series-projection-drift-reaches-zero-via-column-drop-and-guard-retirement.md
+
+---
+
+## 2026-08-02 09:45 -- Verification failed: series-d5tpn - Drop the externally-sourced columns, prove drift zero, retire the lossy-rebuild guard
+
+**Type:** Work / Verification failure
+**Task:** series-d5tpn (iteration 2)
+**Iteration:** 2 of 3
+**Reasons:** The iteration-2 `recoverStranded` guard throws on the exact incident state it exists to repair — the `series_next_up`/`series_episode_counts` views block the ALTER TABLE RENAME (reproduced against SQLite 3.49.1), and the unguarded call converts a booting-but-degraded app into a hard startup crash with the cache table dropped; both new tests omit the views from their fixtures, so they pass vacuously; ADR-0051 again records claims the code does not honor. Iteration-1 items 3-5 (metadata gap, backup description, criterion narrowing) verified fixed and honest.
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker into the same worktree (iteration 3 — final before escalation)
+
+---
+
+## 2026-08-02 09:15 -- Verification failed: series-d5tpn - Drop the externally-sourced columns, prove drift zero, retire the lossy-rebuild guard
+
+**Type:** Work / Verification failure
+**Task:** series-d5tpn - Drop the externally-sourced columns from series_list and series_detail, prove drift zero, retire the lossy-rebuild guard
+**Iteration:** 1 of 3
+**Reasons:** The worker's out-of-band run against the LIVE database created the cache tables empty before the rename could run, stranding 370/4624 real rows under the old names (measured live regression: dashboard counts zeroed) — the exact hazard class the retired ADR-0049 guard existed to prevent; the ordering hazard is unguarded in code; the 11 compensating events bypassed the ADR-0032 composer's audit metadata (permanently untagged); the pre-task backup was a raw WAL file copy, not VACUUM INTO. The drift-zero claim itself verified honest (independently re-run: SeriesProjection 0 discrepancies); backdrop_ref retention principled and documented; 509/509 tests.
+**Live-DB repair (conductor, 09:10):** empty cache tables dropped, populated tables renamed into place, views cycled — verified 4624/370 under the new names, series_next_up=44, series_episode_counts=104. Safety backups: backups/mediatheca-pre-repair-20260802-091003.db and -091031.db (VACUUM INTO); the worker's raw-copy pre-task backup also retained.
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker into the same worktree (code guard + ADR corrections only; live DB off-limits)
+
+---
+
 ## 2026-08-02 09:07 -- Task verified and completed: games-h4mrd - Reconstruct play-session history from the 204 cumulative Game_play_time_set totals — each stream's first observation becoming prior playtime rather than a fabricated session — via an operator-triggered SSE migration
 
 **Type:** Work / Task completion

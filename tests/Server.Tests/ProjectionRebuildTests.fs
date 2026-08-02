@@ -81,47 +81,27 @@ let projectionRebuildTests =
             Expect.equal first.Position 0L "First snapshot (emitted before replay starts) should be at position 0"
             Expect.equal first.EventsProcessed 0L "First snapshot should report no events processed yet"
 
-        // administration-kv7dp (ADR-0049): rebuilding SeriesProjection
-        // (Drop; Init; replay) would destroy episode/season metadata written
-        // out-of-band by the Series TMDB refresh job and Jellyfin
-        // materialization (ADR-0012) — data that lives only in the live
-        // tables (now the series_*_cache tier, post series-m7fdk) and cannot
-        // be replayed from Series_refreshed. series-d5tpn retires the guard.
-        // These tests exercise `Administration.lossyRebuildRejectionMessage`
-        // and `Administration.decideAndClaimRebuildGuard` directly, the same
-        // "test the underlying function, not the SSE route" shape this file
-        // already established for `rebuildProjectionWithProgress`.
-        testCase "lossyRebuildRejectionMessage blocks SeriesProjection, allows MovieProjection, and is bypassed by MEDIATHECA_ALLOW_LOSSY_REBUILD=1" <| fun _ ->
-            Expect.isSome (Administration.lossyRebuildRejectionMessage "SeriesProjection") "SeriesProjection must be blocked by default"
-            Expect.isNone (Administration.lossyRebuildRejectionMessage "MovieProjection") "MovieProjection is not out-of-band-written and must not be blocked"
-
-            Environment.SetEnvironmentVariable("MEDIATHECA_ALLOW_LOSSY_REBUILD", "1")
-            try
-                Expect.isNone (Administration.lossyRebuildRejectionMessage "SeriesProjection") "The env override must bypass the guard entirely"
-            finally
-                Environment.SetEnvironmentVariable("MEDIATHECA_ALLOW_LOSSY_REBUILD", null)
-
-        testCase "a rebuild request for SeriesProjection is rejected before it claims the rebuild guard or touches series_episode_cache" <| fun _ ->
+        // series-d5tpn retires the lossy-rebuild guard (administration-kv7dp,
+        // ADR-0049, superseded by ADR-0051): the column drop + compensating
+        // events made `checkProjectionDrift` report zero for SeriesProjection,
+        // and `SeriesProjection.dropTables` no longer drops the season/episode
+        // cache tier (series-m7fdk reclassified those tables `Cache`, owned
+        // by `MetadataCache.fs`) — so a rebuild can no longer destroy the data
+        // the guard used to protect. These tests replace the 3 removed
+        // lossy-rebuild-guard tests above, proving the retirement rather than
+        // leaving green tests that assert a deleted mechanism still exists.
+        testCase "SeriesProjection is no longer special-cased: a rebuild request claims the single-flight guard exactly like any other projection" <| fun _ ->
             let conn = createInMemoryConnection ()
             SeriesProjection.handler.Init conn
-            use insertCmd = conn.CreateCommand()
-            insertCmd.CommandText <- "INSERT INTO series_episode_cache (series_slug, season_number, episode_number, name) VALUES ('breaking-bad', 1, 1, 'Pilot')"
-            insertCmd.ExecuteNonQuery() |> ignore
 
             let guards = Administration.makeGuards ()
             match Administration.decideAndClaimRebuildGuard guards "SeriesProjection" with
-            | Some (Administration.LossyRebuildBlocked reason) ->
-                Expect.stringContains reason "SeriesProjection" "The rejection reason should name the blocked projection"
-            | other -> failtest (sprintf "Expected LossyRebuildBlocked, got %A" other)
+            | None -> ()
+            | other -> failtest (sprintf "Expected the rebuild to be allowed (None), got %A" other)
+            Expect.isTrue (guards.RebuildingProjections.ContainsKey("SeriesProjection")) "The single-flight guard must be claimed for SeriesProjection, same as any other projection"
+            guards.RebuildingProjections.TryRemove("SeriesProjection") |> ignore
 
-            Expect.isTrue guards.RebuildingProjections.IsEmpty "The lossy-rebuild guard must never claim the single-flight rebuild lock — it claims nothing"
-
-            use countCmd = conn.CreateCommand()
-            countCmd.CommandText <- "SELECT COUNT(*) FROM series_episode_cache"
-            let rowCount = countCmd.ExecuteScalar() :?> int64 |> int
-            Expect.equal rowCount 1 "series_episode_cache must be untouched by a rejected rebuild request"
-
-        testCase "'Rebuild all' skips SeriesProjection and completes the other five handlers" <| fun _ ->
+        testCase "'Rebuild all' completes all six handlers, including SeriesProjection — no skip" <| fun _ ->
             let conn = createInMemoryConnection ()
             let allHandlers = [
                 MovieProjection.handler
@@ -135,12 +115,9 @@ let projectionRebuildTests =
                 handler.Init conn
 
             let guards = Administration.makeGuards ()
-            let skipped = ResizeArray<string>()
             let completed = ResizeArray<string>()
             for handler in allHandlers do
                 match Administration.decideAndClaimRebuildGuard guards handler.Name with
-                | Some (Administration.LossyRebuildBlocked _) ->
-                    skipped.Add(handler.Name)
                 | Some other ->
                     failtest (sprintf "%s was unexpectedly rejected with %A" handler.Name other)
                 | None ->
@@ -150,6 +127,49 @@ let projectionRebuildTests =
                     finally
                         guards.RebuildingProjections.TryRemove(handler.Name) |> ignore
 
-            Expect.equal (List.ofSeq skipped) [ "SeriesProjection" ] "Only SeriesProjection should be skipped"
-            Expect.equal (List.ofSeq completed |> List.sort) (allHandlers |> List.map (fun h -> h.Name) |> List.filter ((<>) "SeriesProjection") |> List.sort) "The other five handlers should all complete their rebuild"
+            Expect.equal (List.ofSeq completed |> List.sort) (allHandlers |> List.map (fun h -> h.Name) |> List.sort) "All six handlers, including SeriesProjection, should complete their rebuild"
+
+        testCase "series-d5tpn: rebuilding SeriesProjection leaves series_metadata_cache/series_season_cache/series_episode_cache row counts unchanged" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            MetadataCache.initialize conn
+            SeriesProjection.handler.Init conn
+
+            let seriesData: Series.SeriesAddedData = {
+                Name = "Silo"; Year = 2023; Overview = ""; Genres = [ "Drama" ]; Status = "Returning"
+                PosterRef = None; BackdropRef = None; TmdbId = 2867; TmdbRating = None; EpisodeRuntime = None
+                Seasons = [ { SeasonNumber = 1; Name = "Season 1"; Overview = ""; PosterRef = None; AirDate = None; Episodes = [] } ]
+            }
+            EventStore.appendToStream conn (Series.streamId "silo-2023") -1L [ Series.Serialization.toEventData (Series.Series_added_to_library seriesData) ] |> ignore
+            Projection.runProjection conn SeriesProjection.handler
+
+            // Cache-tier data a rebuild must never touch. `series_detail` no
+            // longer has overview/tmdb_rating/episode_runtime to seed from
+            // (series-d5tpn dropped them) — MetadataCache.seedFromProjections
+            // is a legacy-database-only path now (see MetadataCache.fs), so
+            // seed series_metadata_cache directly here, plus a direct
+            // Jellyfin-style materialization, exactly like the drift fixture
+            // above.
+            use seedCmd = conn.CreateCommand()
+            seedCmd.CommandText <- "INSERT INTO series_metadata_cache (series_slug, overview, backdrop_ref, tmdb_rating, episode_runtime, fetched_at) VALUES ('silo-2023', 'A cop show', NULL, 8.2, 50, NULL)"
+            seedCmd.ExecuteNonQuery() |> ignore
+            SeriesProjection.materializeSeason conn "silo-2023" 2
+            SeriesProjection.materializeEpisode conn "silo-2023" {
+                JellyfinImport.MaterializedEpisode.SeasonNumber = 2
+                EpisodeNumber = 1
+                Name = "The Silence"; Overview = ""; Runtime = None; AirDate = None; StillRef = None
+            }
+
+            let rowCount (table: string) =
+                use cmd = conn.CreateCommand()
+                cmd.CommandText <- sprintf "SELECT COUNT(*) FROM %s" table
+                cmd.ExecuteScalar() :?> int64
+
+            let cacheTables = [ "series_metadata_cache"; "series_season_cache"; "series_episode_cache" ]
+            let preCounts = cacheTables |> List.map (fun t -> t, rowCount t)
+            Expect.isTrue (preCounts |> List.forall (fun (_, c) -> c > 0L)) "Sanity: every cache table should hold at least one row before the rebuild"
+
+            Projection.rebuildProjection conn SeriesProjection.handler
+
+            let postCounts = cacheTables |> List.map (fun t -> t, rowCount t)
+            Expect.equal postCounts preCounts "Rebuilding SeriesProjection must leave every cache-tier table's row count unchanged"
     ]

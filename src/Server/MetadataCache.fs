@@ -67,10 +67,104 @@ module MetadataCache =
     /// that `CREATE TABLE IF NOT EXISTS` becomes a no-op; on a fresh database
     /// neither table exists yet, the rename attempt below throws "no such
     /// table" (swallowed), and `createTables` creates them empty under the
-    /// new name, same as any other fresh install. Reversing this order would
-    /// let `createTables` claim the new name as an empty table *first*,
-    /// making the rename attempted here fail (target already exists) and
-    /// stranding the real rows under the old name forever.
+    /// new name, same as any other fresh install.
+    ///
+    /// Reversing this order — letting `createTables` claim the new name as
+    /// an empty table *first* — is exactly the hazard this comment used to
+    /// only warn about, and (`series-d5tpn`, iteration-1 verifier note) was
+    /// realized once for real against the live database: an out-of-band run
+    /// did exactly that, the rename below then failed ("target already
+    /// exists") and was silently swallowed, and ~4600 real rows were
+    /// stranded under the old names. Removing `createTables`'s independent
+    /// declaration entirely was considered and reverted (iteration 2): a
+    /// large share of the test suite calls `SeriesProjection.handler.Init`
+    /// directly, without going through `MetadataCache.initialize` first, and
+    /// depends on that fallback existing on its own. Instead, `recoverStranded`
+    /// below makes the hazard survivable regardless of which of the two
+    /// independent `CREATE TABLE` statements wins the race: it detects the
+    /// exact stranded shape (old name non-empty, new name empty) on every
+    /// call to this function and repairs it, the same repair the conductor
+    /// applied by hand to the live database after iteration 1 — view-safely
+    /// (the `series_next_up`/`series_episode_counts` views are dropped and
+    /// later recreated around the repair, iteration 2), atomically (one
+    /// transaction), and non-fatally (an unexpected failure is logged and
+    /// leaves the pre-repair state intact rather than aborting startup).
+    let private tableExists (conn: SqliteConnection) (tableName: string) : bool =
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- "SELECT name FROM sqlite_master WHERE type = 'table' AND name = @name"
+        cmd.Parameters.AddWithValue("@name", tableName) |> ignore
+        use reader = cmd.ExecuteReader()
+        reader.Read()
+
+    let private tableRowCount (conn: SqliteConnection) (tableName: string) : int64 =
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- $"SELECT COUNT(*) FROM {tableName}"
+        cmd.ExecuteScalar() :?> int64
+
+    /// Stranded-row recovery — the ordering hazard the module doc comment
+    /// above warns about, realized once against the real database
+    /// (series-d5tpn, iteration-1 verifier note): an out-of-band run let
+    /// `SeriesProjection.createTables`'s `CREATE TABLE IF NOT EXISTS` claim
+    /// `newTable` as an empty table *before* the rename attempt above got a
+    /// chance to run, so that rename failed ("target already exists") and
+    /// was silently swallowed, leaving the real rows sitting under
+    /// `oldTable` forever with nothing left in the codebase that reads that
+    /// name. Detect exactly that shape — `oldTable` exists and is
+    /// non-empty, `newTable` exists and is empty — and repair it the same
+    /// way the conductor repaired the live database by hand: discard the
+    /// empty impostor and rename the real data into its place. A plain
+    /// rename (not a row-by-row `INSERT ... SELECT`) sidesteps any risk of
+    /// the two tables' column sets having drifted apart, and is idempotent
+    /// — once `newTable` has rows, the row-count check below is false and
+    /// this is a no-op on every subsequent boot.
+    ///
+    /// **View-safety (series-d5tpn, iteration-2 verifier note).** The views
+    /// `series_next_up`/`series_episode_counts` (created by `initialize`,
+    /// below, and present on any live database that has booted once) select
+    /// FROM `series_episode_cache`. SQLite revalidates every view in the
+    /// schema during `ALTER TABLE ... RENAME` — with the view still in
+    /// place, `DROP TABLE newTable` followed by the rename throws `error in
+    /// view series_next_up: no such table: main.series_episode_cache`
+    /// *after* the drop has already committed, stranding the row-count
+    /// check's own repair worse than the original hazard. Both views are
+    /// therefore dropped (`IF EXISTS`, so a fresh install or a
+    /// `series_season_cache` repair with no episode view yet is unaffected)
+    /// before the drop/rename pair; `initialize`'s own `CREATE VIEW IF NOT
+    /// EXISTS` block later in this same function recreates them
+    /// unconditionally, so they always exist again by the time `initialize`
+    /// returns.
+    ///
+    /// **Atomicity and non-fatality.** All four statements run inside one
+    /// transaction, so a mid-repair failure can never leave `newTable`
+    /// dropped without `oldTable` successfully renamed into its place — the
+    /// transaction rolls back and the pre-repair state (data still sitting
+    /// safely under `oldTable`) is exactly what remains. An unexpected
+    /// failure is logged to stderr and swallowed rather than propagated:
+    /// this repair pass must never be the reason `Composition.buildApp`
+    /// fails to boot, since a boot crash after `DROP TABLE` has already run
+    /// (the pre-view-safety-fix behavior) is strictly worse than leaving the
+    /// stranded rows exactly where they were found.
+    let private recoverStranded (conn: SqliteConnection) (oldTable: string) (newTable: string) : unit =
+        if tableExists conn oldTable && tableExists conn newTable
+           && tableRowCount conn oldTable > 0L && tableRowCount conn newTable = 0L then
+            use tx = conn.BeginTransaction()
+            let exec (sql: string) =
+                use cmd = conn.CreateCommand()
+                cmd.Transaction <- tx
+                cmd.CommandText <- sql
+                cmd.ExecuteNonQuery() |> ignore
+            try
+                exec "DROP VIEW IF EXISTS series_next_up"
+                exec "DROP VIEW IF EXISTS series_episode_counts"
+                exec (sprintf "DROP TABLE %s" newTable)
+                exec (sprintf "ALTER TABLE %s RENAME TO %s" oldTable newTable)
+                tx.Commit()
+            with ex ->
+                (try tx.Rollback() with _ -> ())
+                eprintfn
+                    "MetadataCache.recoverStranded: repair of %s -> %s failed (%s) — pre-repair state left intact"
+                    oldTable newTable ex.Message
+
     let initialize (conn: SqliteConnection) : unit =
         try
             conn |> Db.newCommand "ALTER TABLE series_episodes RENAME TO series_episode_cache" |> Db.exec
@@ -78,6 +172,17 @@ module MetadataCache =
         try
             conn |> Db.newCommand "ALTER TABLE series_seasons RENAME TO series_season_cache" |> Db.exec
         with _ -> () // Already renamed (or never existed — fresh install)
+
+        // Recovery pass — see `recoverStranded`'s doc comment. Cheap no-op
+        // on every boot where the rename above already succeeded, where
+        // neither table has ever existed (fresh install — `recoverStranded`
+        // requires both tables to exist, so it is a no-op there too), or
+        // where the rename above succeeded and `SeriesProjection.createTables`'s
+        // `CREATE TABLE IF NOT EXISTS` fallback for the same two tables
+        // (unchanged, still the fresh-install path) correctly became a
+        // no-op because the rename already claimed the name.
+        recoverStranded conn "series_episodes" "series_episode_cache"
+        recoverStranded conn "series_seasons" "series_season_cache"
 
         conn
         |> Db.newCommand
@@ -177,10 +282,25 @@ module MetadataCache =
     /// `movie_metadata_cache` is deliberately never seeded here — it ships
     /// empty and unread until `movies-v2gkh` cuts over.
     ///
-    /// `series_metadata_cache` (series-m7fdk) seeds the same way, from
-    /// `series_detail` — its four third-party-sourced flat fields
-    /// (`overview`, `backdrop_ref`, `tmdb_rating`, `episode_runtime`), ready
-    /// for whichever future task cuts a reader over to it.
+    /// `series_metadata_cache` (series-m7fdk) seeded the same way, from
+    /// `series_detail`'s four third-party-sourced flat fields (`overview`,
+    /// `backdrop_ref`, `tmdb_rating`, `episode_runtime`) — until `series-d5tpn`
+    /// dropped three of those four columns (`overview`/`tmdb_rating`/
+    /// `episode_runtime`; `backdrop_ref` stayed, ADR-0051) from
+    /// `series_detail` entirely, once `series-q8jwc` proved no reader needed
+    /// this seed's series half kept fresh. On any database that already ran
+    /// this seed (the marker below is set), this whole function is a no-op
+    /// and the column drop never matters. On a database upgrading through
+    /// both changes in the same release, `Composition.buildApp` calls this
+    /// BEFORE `SeriesProjection.dropDeprecatedColumns`, so the columns still
+    /// exist the one time this genuinely runs. The series `INSERT` is
+    /// therefore wrapped in its own `try/with` (same "defensive, tolerates a
+    /// missing source column" idiom `JellyfinStore.migrateFromProjections`
+    /// already uses) rather than folded into one `Db.newCommand` batch with
+    /// the game seed: a fresh install's `series_detail` never has these
+    /// columns at all (they're gone from `SeriesProjection.createTables`'s
+    /// DDL too), and a single failing statement must not also fail the
+    /// unrelated game seed.
     let seedFromProjections (conn: SqliteConnection) : unit =
         match SettingsStore.getSetting conn seededMarkerKey with
         | Some _ -> ()
@@ -191,13 +311,20 @@ module MetadataCache =
                 INSERT OR IGNORE INTO game_metadata_cache
                     (game_slug, description, short_description, website_url, cover_ref, backdrop_ref, rawg_id, rawg_rating, hltb_hours, hltb_main_plus_hours, hltb_completionist_hours, fetched_at)
                 SELECT slug, description, short_description, website_url, cover_ref, backdrop_ref, rawg_id, rawg_rating, hltb_hours, hltb_main_plus_hours, hltb_completionist_hours, NULL
-                FROM game_detail;
-
-                INSERT OR IGNORE INTO series_metadata_cache
-                    (series_slug, overview, backdrop_ref, tmdb_rating, episode_runtime, fetched_at)
-                SELECT slug, overview, backdrop_ref, tmdb_rating, episode_runtime, NULL
-                FROM series_detail
+                FROM game_detail
                 """
             |> Db.exec
+
+            try
+                conn
+                |> Db.newCommand
+                    """
+                    INSERT OR IGNORE INTO series_metadata_cache
+                        (series_slug, overview, backdrop_ref, tmdb_rating, episode_runtime, fetched_at)
+                    SELECT slug, overview, backdrop_ref, tmdb_rating, episode_runtime, NULL
+                    FROM series_detail
+                    """
+                |> Db.exec
+            with _ -> () // series_detail no longer has overview/tmdb_rating/episode_runtime (series-d5tpn) — nothing to seed
 
             SettingsStore.setSetting conn seededMarkerKey "true"

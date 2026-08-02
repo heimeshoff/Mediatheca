@@ -2,10 +2,10 @@
 id: 0049
 title: Rebuild is blocked outright for projections with out-of-band writers
 scope: administration
-status: accepted
+status: superseded
 date: 2026-08-01
 supersedes: []
-superseded_by: []
+superseded_by: [0051]
 related_tasks: [administration-kv7dp]
 related_research: []
 ---
