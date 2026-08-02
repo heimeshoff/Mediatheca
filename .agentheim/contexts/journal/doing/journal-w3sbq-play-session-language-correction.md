@@ -1,7 +1,7 @@
 ---
 id: journal-w3sbq
 title: Correct Journal's README to the first-class play-session event model — and to the read-model owners that actually exist, since there is no JournalProjection.fs
-status: todo
+status: doing
 type: chore
 context: journal
 created: 2026-08-01

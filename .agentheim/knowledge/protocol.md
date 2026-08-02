@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-02 08:22 -- Batch started: [series-d5tpn, journal-w3sbq, games-h4mrd]
+
+**Type:** Work / Batch start
+**Tasks:** series-d5tpn - Drop the externally-sourced columns from series_list and series_detail, prove the drift check reports zero for SeriesProjection, and retire the lossy-rebuild guard, journal-w3sbq - Correct Journal's README to the first-class play-session event model — and to the read-model owners that actually exist, since there is no JournalProjection.fs, games-h4mrd - Reconstruct play-session history from the 204 cumulative Game_play_time_set totals — each stream's first observation becoming prior playtime rather than a fabricated session — via an operator-triggered SSE migration
+**Parallel:** yes (3 workers - the entire ready set of 3, unblocked by the builder-authorized conflict resolutions of administration-kv7dp and games-p6vkz; file surfaces are near-disjoint (series projection/Administration guard retirement vs journal README-only vs games migration), no merge-order annotation needed beyond landing them in verifier-return order)
+
+---
+
 ## 2026-08-02 08:21 -- Task verified and completed: games-p6vkz - Model play sessions and pre-tracking playtime as first-class Games events — replacing the non-event-sourced game_play_session table, the republished-SUM Game_play_time_set, and the unrebuildable steam_playtime_snapshot cursor
 
 **Type:** Work / Task completion

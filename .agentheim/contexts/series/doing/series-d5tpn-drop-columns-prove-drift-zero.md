@@ -1,7 +1,7 @@
 ---
 id: series-d5tpn
 title: Drop the externally-sourced columns from series_list and series_detail, prove the drift check reports zero for SeriesProjection, and retire the lossy-rebuild guard
-status: todo
+status: doing
 type: refactor
 context: series
 created: 2026-08-01

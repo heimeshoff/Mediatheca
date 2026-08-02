@@ -1,7 +1,7 @@
 ---
 id: games-h4mrd
 title: Reconstruct play-session history from the 204 cumulative Game_play_time_set totals — each stream's first observation becoming prior playtime rather than a fabricated session — via an operator-triggered SSE migration
-status: todo
+status: doing
 type: chore
 context: games
 created: 2026-08-01

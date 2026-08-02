@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 0
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **journal-w3sbq** — Correct Journal's README to the first-class play-session event model — and to the read-model owners that actually exist, since there is no JournalProjection.fs (chore) — `todo/journal-w3sbq-play-session-language-correction.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **journal-w3sbq** — Correct Journal's README to the first-class play-session event model — and to the read-model owners that actually exist, since there is no JournalProjection.fs (chore) — `doing/journal-w3sbq-play-session-language-correction.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
