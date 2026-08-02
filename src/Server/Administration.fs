@@ -374,8 +374,9 @@ module Administration =
     ///   - `Imperative writtenBy` — written directly by `writtenBy`, outside
     ///     both the projection catch-up path and any external re-sync. If
     ///     these rows are lost there is no replay and no re-fetch that
-    ///     brings them back (`steam_playtime_snapshot` is the sharpest case:
-    ///     see its own comment below).
+    ///     brings them back (the retired Steam-sync cursor table used to be
+    ///     the sharpest case — games-p6vkz deleted it once the two-fold
+    ///     aggregate design made it derivable instead).
     /// LOAD-BEARING: `TableClassificationTests.fs`'s coverage test keeps
     /// this list honest against `sqlite_master` — a table created anywhere
     /// in the codebase without an entry here is exactly the "tribal
@@ -403,6 +404,10 @@ module Administration =
         "series_episode_progress", Projected "SeriesProjection"
         "game_list", Projected "GameProjection"
         "game_detail", Projected "GameProjection"
+        // games-p6vkz: play sessions are first-class Games events keyed on
+        // (game, gaming day); the table is now checkpoint-tracked and
+        // rebuildable, no longer PlaytimeTracker's imperative write.
+        "game_play_session", Projected "PlaySessionProjection"
 
         // Cache — re-derivable from Jellyfin's own state via a full
         // clear-then-repopulate sync (Api.fs's Jellyfin import handlers),
@@ -446,20 +451,11 @@ module Administration =
         "game_journal_blocks", Imperative "GameJournal"
         "settings", Imperative "SettingsStore"
         "job_runs", Imperative "Administration (job runs recorder)"
-        "game_play_session", Imperative "PlaytimeTracker"
-        // Sync cursor, not a projection nor a cache: external state
-        // (Steam's own lifetime playtime total) remembered here only to
-        // compute the next delta — it is not derivable from our event log at
-        // all today. If this row is lost, `PlaytimeTracker.getLastSnapshot`
-        // returns None and the entire lifetime total is recorded as one new
-        // session (PlaytimeTracker.fs:667-680) rather than silently
-        // recovering. games-p6vkz deletes this table entirely: once prior
-        // playtime and every session are logged events,
-        // `ActiveGame.SteamObservedMinutes` becomes the cursor, derived by
-        // replay — closing this hazard by construction rather than
-        // continuing to guard it. This entry should disappear in that
-        // task's diff.
-        "steam_playtime_snapshot", Imperative "PlaytimeTracker"
+        // The old Steam-sync snapshot table is deleted entirely by
+        // games-p6vkz: once prior playtime and every session are logged
+        // events, `ActiveGame.SteamObservedMinutes` becomes the cursor,
+        // derived by replay — closing the "lost row -> re-recorded lifetime
+        // total" hazard by construction rather than continuing to guard it.
     ]
 
     /// Table(s) each projection owns, for the dashboard's per-table row

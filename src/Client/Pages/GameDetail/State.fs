@@ -361,14 +361,14 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Edit_session_clicked session ->
         { model with
             PlaySessionEditState =
-                Editing (session.Id, { Date = session.Date; MinutesText = string session.MinutesPlayed }) },
+                Editing (session.Date, { Date = session.Date; MinutesText = string session.MinutesPlayed }) },
         Cmd.none
 
     | Session_draft_date_changed newDate ->
         let newState =
             match model.PlaySessionEditState with
             | Adding draft -> Adding { draft with Date = newDate }
-            | Editing (id, draft) -> Editing (id, { draft with Date = newDate })
+            | Editing (originalDate, draft) -> Editing (originalDate, { draft with Date = newDate })
             | other -> other
         { model with PlaySessionEditState = newState }, Cmd.none
 
@@ -376,7 +376,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         let newState =
             match model.PlaySessionEditState with
             | Adding draft -> Adding { draft with MinutesText = newMinutes }
-            | Editing (id, draft) -> Editing (id, { draft with MinutesText = newMinutes })
+            | Editing (originalDate, draft) -> Editing (originalDate, { draft with MinutesText = newMinutes })
             | other -> other
         { model with PlaySessionEditState = newState }, Cmd.none
 
@@ -402,14 +402,16 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                     ()
                     Session_save_completed
                     (fun ex -> Session_save_completed (Error ex.Message))
-        | Editing (id, draft) ->
+        | Editing (originalDate, draft) ->
             match validateDraft draft with
             | Error e ->
                 { model with PlaySessionEditState = EditFailed e }, Cmd.none
             | Ok (date, minutes) ->
+                let edit: PlaySessionEdit =
+                    { GameSlug = model.Slug; Date = originalDate; NewDate = date; NewMinutes = minutes }
                 { model with PlaySessionEditState = Saving },
                 Cmd.OfAsync.either
-                    (fun () -> api.updatePlaySession (id, date, minutes))
+                    (fun () -> api.updatePlaySession edit)
                     ()
                     Session_save_completed
                     (fun ex -> Session_save_completed (Error ex.Message))
@@ -429,18 +431,18 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Session_save_completed (Error err) ->
         { model with PlaySessionEditState = EditFailed err }, Cmd.none
 
-    | Delete_session_requested id ->
-        { model with PendingDelete = Some id }, Cmd.none
+    | Delete_session_requested date ->
+        { model with PendingDelete = Some date }, Cmd.none
 
     | Delete_session_cancelled ->
         { model with PendingDelete = None }, Cmd.none
 
     | Delete_session_confirmed ->
         match model.PendingDelete with
-        | Some id ->
+        | Some date ->
             model,
             Cmd.OfAsync.either
-                (fun () -> api.deletePlaySession id)
+                (fun () -> api.deletePlaySession (model.Slug, date))
                 ()
                 Delete_session_completed
                 (fun ex -> Delete_session_completed (Error ex.Message))

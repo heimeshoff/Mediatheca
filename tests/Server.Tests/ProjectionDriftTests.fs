@@ -4,6 +4,7 @@ open Expecto
 open Microsoft.Data.Sqlite
 open Donald
 open Mediatheca.Server
+open Mediatheca.Shared
 
 /// Shadow-table replay drift detector (administration-btvqa, ADR-0031): a
 /// throwaway shadow connection is replayed from the live event log via
@@ -25,6 +26,7 @@ let private allProjectionHandlers = [
     CatalogProjection.handler
     SeriesProjection.handler
     GameProjection.handler
+    PlaySessionProjection.handler
 ]
 
 let private createLiveConnection () =
@@ -57,6 +59,23 @@ let private appendMovieAdded (conn: SqliteConnection) (slug: string) =
 let private appendFriendAdded (conn: SqliteConnection) (name: string) =
     let eventData = Friends.Serialization.toEventData (Friends.Friend_added { Name = name; ImageRef = None })
     EventStore.appendToStream conn (Friends.streamId (name.ToLowerInvariant())) -1L [ eventData ] |> ignore
+
+let private sampleGameData: Games.GameAddedData = {
+    Name = "Hollow Knight"
+    Year = 2017
+    Genres = [ "Metroidvania" ]
+    Description = ""
+    ShortDescription = ""
+    WebsiteUrl = None
+    CoverRef = None
+    BackdropRef = None
+    RawgId = None
+    RawgRating = None
+}
+
+let private appendGameAdded (conn: SqliteConnection) (slug: string) =
+    let eventData = Games.Serialization.toEventData (Games.Game_added_to_library sampleGameData)
+    EventStore.appendToStream conn (Games.streamId slug) -1L [ eventData ] |> ignore
 
 /// Full incremental catch-up of every handler against `conn`, in registration
 /// order — mirrors `Projection.startAllProjections`/`Composition.fs`.
@@ -170,6 +189,30 @@ let projectionDriftTests =
 
             Expect.equal postRowCounts preRowCounts "Live table row counts must be unchanged by a drift run"
             Expect.equal postCheckpoints preCheckpoints "Live checkpoint positions must be unchanged by a drift run"
+
+        testCase "games-p6vkz: prior playtime and play sessions replay with zero discrepancies for GameProjection and PlaySessionProjection" <| fun _ ->
+            let conn = createLiveConnection ()
+            for handler in allProjectionHandlers do
+                handler.Init conn
+            appendGameAdded conn "hollow-knight-2017"
+            let events: Games.GameEvent list = [
+                Games.Prior_play_time_recorded 600
+                Games.Play_session_recorded { Day = "2024-06-01"; Minutes = 120; Source = SteamSync }
+                Games.Play_session_recorded { Day = "2024-06-02"; Minutes = 45; Source = Manual }
+                Games.Play_session_minutes_corrected ("2024-06-02", 60, 45)
+                Games.Play_session_moved ("2024-06-01", "2024-06-03", 120)
+            ]
+            let eventDataList = events |> List.map Games.Serialization.toEventData
+            EventStore.appendToStream conn (Games.streamId "hollow-knight-2017") 0L eventDataList |> ignore
+            catchUpAll conn
+
+            let shadow = createShadowConnection ()
+            let results = Administration.checkProjectionDrift conn shadow allProjectionHandlers (fun _ -> ())
+
+            let gameDrift = results |> List.find (fun p -> p.Name = "GameProjection")
+            let sessionDrift = results |> List.find (fun p -> p.Name = "PlaySessionProjection")
+            Expect.equal gameDrift.Discrepancies [] "GameProjection should report zero discrepancies"
+            Expect.equal sessionDrift.Discrepancies [] "PlaySessionProjection should report zero discrepancies"
 
         testCase "a lagging projection is flagged dirty, and the drift check's rejection message names it" <| fun _ ->
             let conn = createLiveConnection ()

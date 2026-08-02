@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-02 08:21 -- Task verified and completed: games-p6vkz - Model play sessions and pre-tracking playtime as first-class Games events — replacing the non-event-sourced game_play_session table, the republished-SUM Game_play_time_set, and the unrebuildable steam_playtime_snapshot cursor
+
+**Type:** Work / Task completion
+**Task:** games-p6vkz - Model play sessions and pre-tracking playtime as first-class Games events — replacing the non-event-sourced game_play_session table, the republished-SUM Game_play_time_set, and the unrebuildable steam_playtime_snapshot cursor
+**Summary:** Play sessions and pre-tracking playtime are first-class Games events keyed on (game, gaming day); the Steam sync collapsed into one pure Record_steam_observed_total decision with its cursor derived via the two-fold aggregate (TotalPlayTimeMinutes vs SteamObservedMinutes); steam_playtime_snapshot deleted; game_play_session is now checkpoint-tracked PlaySessionProjection - verified PASS 2026-08-01, integrated after builder-authorized conflict resolution, re-verified 508/508 + Fable build on the merged tree
+**Duration:** 32m
+**Verification:** PASS (iteration 1)
+**Files changed:** 20
+**Tests added:** 22
+**ADRs written:** 0050-play-sessions-first-class-events-two-fold-cursor.md
+
+---
+
 ## 2026-08-02 08:17 -- Task verified and completed: administration-kv7dp - Block projection rebuild for handlers with out-of-band writers — rebuilding SeriesProjection today permanently destroys 780 refreshes' worth of TMDB metadata plus 23 Jellyfin-materialized episodes
 
 **Type:** Work / Task completion

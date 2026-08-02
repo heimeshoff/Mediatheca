@@ -1,15 +1,15 @@
 ---
 id: games-p6vkz
 title: Model play sessions and pre-tracking playtime as first-class Games events — replacing the non-event-sourced game_play_session table, the republished-SUM Game_play_time_set, and the unrebuildable steam_playtime_snapshot cursor
-status: doing
+status: done
 type: feature
 context: games
 created: 2026-08-01
-completed:
+completed: 2026-08-01
 depends_on: [administration-t9bzx, design-system-001]
 blocks: []
 tags: [games, play-session, prior-play-time, journal, event-sourcing, steam, determinism]
-related_adrs: [0002, 0026, 0028, 0031, 0042]
+related_adrs: [0002, 0026, 0028, 0031, 0042, 0050]
 related_research: []
 prior_art: [games-status-vocabulary-reconcile, integration-004]
 ---
@@ -223,26 +223,26 @@ vanishing into a rewritten row.
 
 ## Acceptance criteria
 
-- [ ] Expecto: `Record_steam_observed_total` on an unseen game with `observedMinutes = 30000` emits exactly one `Prior_play_time_recorded 30000`, no session event, and no `Game_status_changed`.
-- [ ] Expecto: `Record_steam_observed_total` on an unseen game with `observedMinutes = 180` emits one `Play_session_recorded` dated at the supplied gaming day, plus promotion.
-- [ ] Expecto: boundary — `observedMinutes = 960` emits a session; `961` emits `Prior_play_time_recorded`.
-- [ ] Expecto: after prior playtime of 30000, a later `Record_steam_observed_total 30120` emits one 120-minute session.
-- [ ] Expecto: `syncGateOpen` (pure) — refuses with legacy events present and the marker absent; permits with the marker set; permits with no legacy events regardless of the marker.
-- [ ] **Expecto (the phantom-session regression): record 509 prior, then sessions summing to 2443 (total 2952), then remove a 670-minute session. `TotalPlayTimeMinutes` = 2282 and `SteamObservedMinutes` = 2952; a subsequent `Record_steam_observed_total 2952` emits nothing.**
-- [ ] Expecto: `Steam_observed_total_reconciled 2952` on a game whose sessions sum to 2282 leaves `TotalPlayTimeMinutes` at 2282 and sets `SteamObservedMinutes` to 2952; a following `Record_steam_observed_total 2952` then emits nothing.
-- [ ] Expecto: `Record_prior_play_time` on a game that already has prior playtime returns `Error`.
-- [ ] Expecto: two `Play_session_recorded` events on the same `(slug, date)` produce one projection row with summed minutes (integration-004 regression, ported from `PlaytimeTrackerTests.fs`).
-- [ ] Expecto: `decide` rejects `minutesPlayed <= 0` on record and on correct.
-- [ ] Expecto: `Record_play_session` on a `Retired` game emits `Game_status_changed InFocus`; on an `InFocus` game emits only the session event (ADR-0042 rule preserved).
-- [ ] Expecto: correct / move / remove / `Record_prior_play_time` emit **no** `Game_status_changed`, tested against a game in each of the five statuses.
-- [ ] Expecto: correct / move / remove against a nonexistent session return `Error`.
-- [ ] Expecto: for every game, `Games.reconstitute(stream).TotalPlayTimeMinutes` = `prior_play_time + Σ game_play_session.minutes_played` = `game_list.total_play_time` = `game_detail.total_play_time`.
-- [ ] Expecto: a game with only prior playtime produces **zero** rows in `game_play_session`, and `getDashboardPlaySessions` / `getPlaytimeSummary` return nothing for it.
-- [ ] **Expecto: `checkProjectionDrift` returns an empty discrepancy list for `PlaySessionProjection` and for `GameProjection`.**
-- [ ] Expecto: `Games.evolve` on `Game_play_time_set` is a no-op; its codec round-trip still succeeds; `buildUnknownEventReport` reports it neither unhandled nor unformattable.
-- [ ] `grep -rc "Set_play_time\|ManualSteamAppId\|promoteToInFocusIfNeeded\|steam_playtime_snapshot\|getLastSnapshot\|saveSnapshot" src/Server/` returns 0.
-- [ ] `npm test` passes; `npm run build` passes.
-- [ ] The GameDetail play-session list, add, edit and delete behave as before, and the prior-playtime breakdown reads correctly on a game that has one. [human-eye]
+- [x] Expecto: `Record_steam_observed_total` on an unseen game with `observedMinutes = 30000` emits exactly one `Prior_play_time_recorded 30000`, no session event, and no `Game_status_changed`.
+- [x] Expecto: `Record_steam_observed_total` on an unseen game with `observedMinutes = 180` emits one `Play_session_recorded` dated at the supplied gaming day, plus promotion.
+- [x] Expecto: boundary — `observedMinutes = 960` emits a session; `961` emits `Prior_play_time_recorded`.
+- [x] Expecto: after prior playtime of 30000, a later `Record_steam_observed_total 30120` emits one 120-minute session.
+- [x] Expecto: `syncGateOpen` (pure) — refuses with legacy events present and the marker absent; permits with the marker set; permits with no legacy events regardless of the marker.
+- [x] **Expecto (the phantom-session regression): record 509 prior, then sessions summing to 2443 (total 2952), then remove a 670-minute session. `TotalPlayTimeMinutes` = 2282 and `SteamObservedMinutes` = 2952; a subsequent `Record_steam_observed_total 2952` emits nothing.**
+- [x] Expecto: `Steam_observed_total_reconciled 2952` on a game whose sessions sum to 2282 leaves `TotalPlayTimeMinutes` at 2282 and sets `SteamObservedMinutes` to 2952; a following `Record_steam_observed_total 2952` then emits nothing.
+- [x] Expecto: `Record_prior_play_time` on a game that already has prior playtime returns `Error`.
+- [x] Expecto: two `Play_session_recorded` events on the same `(slug, date)` produce one projection row with summed minutes (integration-004 regression, ported from `PlaytimeTrackerTests.fs`).
+- [x] Expecto: `decide` rejects `minutesPlayed <= 0` on record and on correct.
+- [x] Expecto: `Record_play_session` on a `Retired` game emits `Game_status_changed InFocus`; on an `InFocus` game emits only the session event (ADR-0042 rule preserved).
+- [x] Expecto: correct / move / remove / `Record_prior_play_time` emit **no** `Game_status_changed`, tested against a game in each of the five statuses.
+- [x] Expecto: correct / move / remove against a nonexistent session return `Error`.
+- [x] Expecto: for every game, `Games.reconstitute(stream).TotalPlayTimeMinutes` = `prior_play_time + Σ game_play_session.minutes_played` = `game_list.total_play_time` = `game_detail.total_play_time`.
+- [x] Expecto: a game with only prior playtime produces **zero** rows in `game_play_session`, and `getDashboardPlaySessions` / `getPlaytimeSummary` return nothing for it.
+- [x] **Expecto: `checkProjectionDrift` returns an empty discrepancy list for `PlaySessionProjection` and for `GameProjection`.**
+- [x] Expecto: `Games.evolve` on `Game_play_time_set` is a no-op; its codec round-trip still succeeds; `buildUnknownEventReport` reports it neither unhandled nor unformattable.
+- [x] `grep -rc "Set_play_time\|ManualSteamAppId\|promoteToInFocusIfNeeded\|steam_playtime_snapshot\|getLastSnapshot\|saveSnapshot" src/Server/` returns 0.
+- [x] `npm test` passes; `npm run build` passes.
+- [ ] The GameDetail play-session list, add, edit and delete behave as before, and the prior-playtime breakdown reads correctly on a game that has one. [human-eye — not exercised by this worker; no browser tool in this session, see Outcome]
 
 ## Notes
 
@@ -259,3 +259,61 @@ Must record:
 Touches `src/Client/Pages/GameDetail/`, hence `depends_on: design-system-001` per the games BC frontend
 gate (`games/README.md:56`). The prior-playtime breakdown is a typography/label change within existing
 patterns; if it wants new visual vocabulary, stop and file a design-system task first.
+
+## Outcome
+
+Delivered as specified. `Games.fs` gains six events (`Prior_play_time_recorded`,
+`Play_session_recorded`, `Play_session_minutes_corrected`, `Play_session_moved`,
+`Play_session_removed`, `Steam_observed_total_reconciled`) and the matching commands, plus
+`PriorPlayTimeThresholdMinutes = 960`. `Record_steam_observed_total` implements the whole
+Steam-sync policy as one pure decision in `decide`. `ActiveGame` carries the two-fold
+(`PriorPlayTimeMinutes`/`PlaySessions`/`SteamObservedMinutes` vs. `TotalPlayTimeMinutes`) that
+makes the sync cursor derivable. `Set_play_time` is deleted from `GameCommand`;
+`Game_play_time_set` gets an explicit no-op arm in `evolve` (kept in the DU/serializer/formatter
+for replay of old streams). Auto-promotion moved from `PlaytimeTracker.promoteToInFocusIfNeeded`
+(a CQRS-inverted read-model consult) into `decide`, narrowed to newly-recorded sessions only.
+
+New `src/Server/PlaySessionProjection.fs` owns `game_play_session` (PK `(game_slug, date)`,
+`source TEXT`, no `created_at`) as its own checkpoint-tracked projection, registered in
+`Composition.fs` after `GameProjection.handler`. `GameProjection` gains `game_detail.prior_play_time`
+and computes `total_play_time` via pure payload arithmetic on the new events (no cross-projection
+read). `steam_playtime_snapshot` and its CRUD (`getLastSnapshot`/`saveSnapshot`) are deleted;
+`Administration.tableRegistry` drops that entry and reclassifies `game_play_session` from
+`Imperative "PlaytimeTracker"` to `Projected "PlaySessionProjection"`.
+
+`PlaytimeTracker.fs` is substantially rewritten: `syncGateOpen` (pure) gates `runSync` on
+legacy `Game_play_time_set` events plus the absent `play_session_migration_completed` setting;
+the per-game sync body collapses to a single `Record_steam_observed_total` dispatch; the manual
+session API (`addManualPlaySessionApi`/`updatePlaySessionApi`/`deletePlaySessionApi`) is
+re-keyed on the natural `(gameSlug, date)` identity, with the 1440-minute ceiling and
+no-future-date check staying at this layer, not in `decide`. `Api.fs`'s `importSteamLibrary`
+(a separate one-time bulk import, not the scheduled sync) now dispatches the same
+`Record_steam_observed_total` decision instead of the deleted `Set_play_time`.
+
+Shared/client: `PlaySessionDto.Id` removed (natural key is `(GameSlug, Date)`);
+`updatePlaySession` takes a new `PlaySessionEdit` record; `deletePlaySession` takes
+`string * string`. `GameDetail` gains `PriorPlayTimeMinutes`. `GameDetail/State.fs` and
+`Views.fs` are updated mechanically (session identity keyed on date, not id) plus a new
+prior-playtime breakdown line in the hero ("512h before tracking + 12h tracked" / single
+number when there's no prior playtime).
+
+All 20 acceptance criteria with automated checks are covered by tests across
+`GamesTests.fs` (new `testList "Games play sessions"`), `PlaytimeTrackerTests.fs` (rewritten:
+`syncGateOpen`, natural-key manual session API, integration-004 same-day merge, prior-only-game
+zero-session-rows, full aggregate/projection total consistency), `ProjectionDriftTests.fs` (new
+zero-discrepancy case for `PlaySessionProjection`/`GameProjection`), `AdministrationTests.fs`
+(new `Game_play_time_set` handled+formattable case), and `TableClassificationTests.fs` (registry
+reclassification). `npm test` (471 tests) and `npm run build` both pass. The `grep -rc` acceptance
+check returns 0 across `src/Server/`.
+
+The final acceptance criterion (`[human-eye]`, GameDetail add/edit/delete + breakdown display)
+was not exercised in a browser — this worker's toolset has no browser/MCP access. The code paths
+were reviewed by hand (State.fs's session-edit dispatch, Views.fs's key/lookup changes, the new
+hero breakdown text) and the full test suite plus Fable client build both pass, but an actual
+click-through in the running app is still owed before this is fully verified end-to-end.
+
+Key files: `src/Server/Games.fs`, `src/Server/PlaySessionProjection.fs` (new),
+`src/Server/PlaytimeTracker.fs`, `src/Server/GameProjection.fs`, `src/Server/Administration.fs`,
+`src/Server/Api.fs`, `src/Server/Composition.fs`, `src/Server/EventFormatting.fs`,
+`src/Shared/Shared.fs`, `src/Client/Pages/GameDetail/{Types,State,Views}.fs`,
+`.agentheim/knowledge/decisions/0050-play-sessions-first-class-events-two-fold-cursor.md` (authored as 0045, renumbered at integration).

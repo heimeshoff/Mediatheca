@@ -115,8 +115,11 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     // only; seeding happens below, after projection tables exist.
     MetadataCache.initialize conn
 
-    // Initialize PlaytimeTracker tables
-    PlaytimeTracker.initialize conn
+    // games-p6vkz: PlaytimeTracker no longer owns any tables — the play
+    // session table is now PlaySessionProjection's (checkpoint-tracked,
+    // rebuildable) and the old Steam-sync cursor table is deleted outright
+    // (the two-fold aggregate design makes the sync cursor derivable).
+    // Nothing to initialize here anymore.
 
     // Seed TMDB API key from env var if DB has no value yet
     let envTmdbKey =
@@ -224,6 +227,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         CatalogProjection.handler
         SeriesProjection.handler
         GameProjection.handler
+        PlaySessionProjection.handler
     ]
 
     // Catch up all projections from their saved checkpoints. Projections are

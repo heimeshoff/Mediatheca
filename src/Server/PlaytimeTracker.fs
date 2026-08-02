@@ -1,11 +1,9 @@
 namespace Mediatheca.Server
 
 open System
-open System.Data
 open System.Net.Http
 open System.Threading
 open Microsoft.Data.Sqlite
-open Donald
 open System.Text.RegularExpressions
 open Mediatheca.Shared
 
@@ -56,120 +54,73 @@ module PlaytimeTracker =
             let dt = DateTimeOffset.UnixEpoch.AddSeconds(float timestamp).LocalDateTime
             Some (toGamingDay syncHour dt)
 
-    // SQLite table initialization
-
-    let initialize (conn: SqliteConnection) : unit =
-        conn
-        |> Db.newCommand """
-            CREATE TABLE IF NOT EXISTS steam_playtime_snapshot (
-                steam_app_id  INTEGER PRIMARY KEY,
-                game_slug     TEXT NOT NULL,
-                total_minutes INTEGER NOT NULL,
-                updated_at    TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS game_play_session (
-                id             INTEGER PRIMARY KEY AUTOINCREMENT,
-                game_slug      TEXT NOT NULL,
-                steam_app_id   INTEGER NOT NULL,
-                date           TEXT NOT NULL,
-                minutes_played INTEGER NOT NULL,
-                created_at     TEXT NOT NULL,
-                UNIQUE(game_slug, date)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_play_session_slug ON game_play_session(game_slug);
-            CREATE INDEX IF NOT EXISTS idx_play_session_date ON game_play_session(date);
-        """
-        |> Db.exec
-
-    // Snapshot CRUD
-
-    let getLastSnapshot (conn: SqliteConnection) (steamAppId: int) : (int * string) option =
-        conn
-        |> Db.newCommand "SELECT total_minutes, updated_at FROM steam_playtime_snapshot WHERE steam_app_id = @app_id"
-        |> Db.setParams [ "app_id", SqlType.Int32 steamAppId ]
-        |> Db.querySingle (fun (rd: IDataReader) ->
-            rd.ReadInt32 "total_minutes", rd.ReadString "updated_at")
-
-    let saveSnapshot (conn: SqliteConnection) (steamAppId: int) (slug: string) (totalMinutes: int) : unit =
-        conn
-        |> Db.newCommand """
-            INSERT INTO steam_playtime_snapshot (steam_app_id, game_slug, total_minutes, updated_at)
-            VALUES (@app_id, @slug, @minutes, @now)
-            ON CONFLICT(steam_app_id) DO UPDATE SET
-                game_slug = @slug,
-                total_minutes = @minutes,
-                updated_at = @now
-        """
-        |> Db.setParams [
-            "app_id", SqlType.Int32 steamAppId
-            "slug", SqlType.String slug
-            "minutes", SqlType.Int32 totalMinutes
-            "now", SqlType.String (DateTime.UtcNow.ToString("o"))
-        ]
-        |> Db.exec
-
-    // Play session CRUD
-
-    // Sentinel for manual sessions: steam_app_id = 0 means "not from Steam".
-    // Avoids a schema migration; only the DTO mapping (Source field) depends on this convention.
+    /// The setting `games-h4mrd`'s one-time history migration writes on
+    /// success. Its presence (or the absence of any legacy
+    /// `Game_play_time_set` events at all — a fresh install) is what
+    /// un-gates `runSync` below.
     [<Literal>]
-    let private ManualSteamAppId = 0
+    let private migrationCompletedSettingKey = "play_session_migration_completed"
 
-    let recordPlaySession (conn: SqliteConnection) (slug: string) (steamAppId: int) (date: string) (minutesPlayed: int) : unit =
-        // ON CONFLICT(game_slug, date) DO UPDATE: when a session row already exists for the same
-        // (game_slug, date) — e.g. two Steam syncs in the same gaming day, where the second one is
-        // attributed to the previous day via rtime_last_played — sum the new minutes into the existing
-        // row instead of silently dropping the delta. Mirrors `upsertManualPlaySession`. Fixes
-        // integration-004. steam_app_id is intentionally not overwritten so a pre-existing Manual row
-        // (app_id=0) merging in a Steam delta stays labelled Manual in toPlaySessionDto.
-        conn
-        |> Db.newCommand """
-            INSERT INTO game_play_session (game_slug, steam_app_id, date, minutes_played, created_at)
-            VALUES (@slug, @app_id, @date, @minutes, @now)
-            ON CONFLICT(game_slug, date) DO UPDATE SET
-                minutes_played = minutes_played + excluded.minutes_played
-        """
-        |> Db.setParams [
-            "slug", SqlType.String slug
-            "app_id", SqlType.Int32 steamAppId
-            "date", SqlType.String date
-            "minutes", SqlType.Int32 minutesPlayed
-            "now", SqlType.String (DateTime.UtcNow.ToString("o"))
-        ]
-        |> Db.exec
+    /// Pure gate condition for the Steam sync (games-p6vkz): on a legacy
+    /// store, every game reconstitutes with `SteamObservedMinutes = 0`
+    /// (Game_play_time_set is a mandatory no-op in `Games.evolve`), so an
+    /// ungated sync running in the deploy-to-migration window would treat
+    /// every game as "first sight" and append `Prior_play_time_recorded`
+    /// lumps to streams `games-h4mrd`'s migration hasn't reached yet — its
+    /// per-stream idempotency refusal then permanently skips exactly those
+    /// streams, leaving their real history unreconstructed. The gate
+    /// self-retires: a fresh install has no legacy events and is never
+    /// gated; an existing install un-gates the moment the migration
+    /// completes. No setting to remove later, no UI.
+    let syncGateOpen (hasLegacyPlayTimeEvents: bool) (migrationCompleted: bool) : bool =
+        not hasLegacyPlayTimeEvents || migrationCompleted
 
-    let hasAnyPlaySessions (conn: SqliteConnection) (slug: string) : bool =
-        conn
-        |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_play_session WHERE game_slug = @slug"
-        |> Db.setParams [ "slug", SqlType.String slug ]
-        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "cnt")
-        |> Option.map (fun c -> c > 0)
-        |> Option.defaultValue false
+    // Execute game command — local helper (same pattern as Api.executeCommand, needed because Api.fs is compiled later)
 
-    let private toPlaySessionDto (rd: IDataReader) : PlaySessionDto =
-        let appId = rd.ReadInt32 "steam_app_id"
-        let source = if appId = ManualSteamAppId then Manual else SteamSync
-        { Id = rd.ReadInt64 "id"
-          GameSlug = rd.ReadString "game_slug"
-          Date = rd.ReadString "date"
-          MinutesPlayed = rd.ReadInt32 "minutes_played"
-          Source = source }
+    /// Returns the events actually appended (empty if `decide` was a no-op),
+    /// so callers that need to know *what* happened (session count, whether a
+    /// promotion fired) don't have to re-read the stream.
+    let private executeGameCommandWithEvents
+        (conn: SqliteConnection)
+        (slug: string)
+        (command: Games.GameCommand)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        : Result<Games.GameEvent list, string> =
 
-    let getPlaySessionsForGame (conn: SqliteConnection) (slug: string) : PlaySessionDto list =
-        conn
-        |> Db.newCommand "SELECT id, game_slug, date, minutes_played, steam_app_id FROM game_play_session WHERE game_slug = @slug ORDER BY date DESC"
-        |> Db.setParams [ "slug", SqlType.String slug ]
-        |> Db.query toPlaySessionDto
+        let streamId = Games.streamId slug
+        let storedEvents = EventStore.readStream conn streamId
+        let events = storedEvents |> List.choose Games.Serialization.fromStoredEvent
+        let state = Games.reconstitute events
+        let currentPosition = EventStore.getStreamPosition conn streamId
 
-    let getPlaySessionById (conn: SqliteConnection) (sessionId: int64) : PlaySessionDto option =
-        conn
-        |> Db.newCommand "SELECT id, game_slug, date, minutes_played, steam_app_id FROM game_play_session WHERE id = @id"
-        |> Db.setParams [ "id", SqlType.Int64 sessionId ]
-        |> Db.querySingle toPlaySessionDto
+        match Games.decide state command with
+        | Error e -> Error e
+        | Ok newEvents ->
+            if List.isEmpty newEvents then
+                Ok []
+            else
+                let eventDataList = newEvents |> List.map Games.Serialization.toEventData
+                match EventStore.appendToStream conn streamId currentPosition eventDataList with
+                | EventStore.ConcurrencyConflict _ ->
+                    Error "Concurrency conflict"
+                | EventStore.Success _ ->
+                    for handler in projectionHandlers do
+                        Projection.runProjection conn handler
+                    Ok newEvents
 
-    // Validation helpers for manual sessions
+    let private executeGameCommand
+        (conn: SqliteConnection)
+        (slug: string)
+        (command: Games.GameCommand)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        : Result<unit, string> =
+        executeGameCommandWithEvents conn slug command projectionHandlers |> Result.map ignore
+
+    // Manual session API: validate inputs (date format/range, 1440-minute
+    // ceiling), then dispatch through `Games.decide` and read the result back
+    // from `PlaySessionProjection`. The ceiling and future-date check stay
+    // here, deliberately NOT aggregate invariants (games-p6vkz): the aggregate
+    // must accept Steam lumps far above 1440 minutes.
 
     let private parseSessionDate (date: string) : Result<DateTime, string> =
         let parsed, dt =
@@ -189,154 +140,6 @@ module PlaytimeTracker =
         elif minutes > 24 * 60 then Error "A single session cannot exceed 24 hours (1440 minutes)"
         else Ok ()
 
-    let private getTotalMinutesForGame (conn: SqliteConnection) (slug: string) : int =
-        conn
-        |> Db.newCommand "SELECT COALESCE(SUM(minutes_played), 0) as total FROM game_play_session WHERE game_slug = @slug"
-        |> Db.setParams [ "slug", SqlType.String slug ]
-        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "total")
-        |> Option.defaultValue 0
-
-    /// Add OR merge: if (slug, date) already exists, sum minutes into the existing row.
-    /// Returns (id, totalMinutesForThatDate).
-    let upsertManualPlaySession
-        (conn: SqliteConnection)
-        (slug: string)
-        (date: string)
-        (minutesPlayed: int)
-        : (int64 * int) =
-        // Check if a row already exists for (slug, date)
-        let existing =
-            conn
-            |> Db.newCommand "SELECT id, minutes_played FROM game_play_session WHERE game_slug = @slug AND date = @date"
-            |> Db.setParams [
-                "slug", SqlType.String slug
-                "date", SqlType.String date
-            ]
-            |> Db.querySingle (fun (rd: IDataReader) ->
-                rd.ReadInt64 "id", rd.ReadInt32 "minutes_played")
-        match existing with
-        | Some (id, current) ->
-            let newTotal = current + minutesPlayed
-            conn
-            |> Db.newCommand "UPDATE game_play_session SET minutes_played = @minutes WHERE id = @id"
-            |> Db.setParams [
-                "minutes", SqlType.Int32 newTotal
-                "id", SqlType.Int64 id
-            ]
-            |> Db.exec
-            id, newTotal
-        | None ->
-            conn
-            |> Db.newCommand """
-                INSERT INTO game_play_session (game_slug, steam_app_id, date, minutes_played, created_at)
-                VALUES (@slug, @app_id, @date, @minutes, @now)
-            """
-            |> Db.setParams [
-                "slug", SqlType.String slug
-                "app_id", SqlType.Int32 ManualSteamAppId
-                "date", SqlType.String date
-                "minutes", SqlType.Int32 minutesPlayed
-                "now", SqlType.String (DateTime.UtcNow.ToString("o"))
-            ]
-            |> Db.exec
-            let newId =
-                conn
-                |> Db.newCommand "SELECT last_insert_rowid() as id"
-                |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt64 "id")
-                |> Option.defaultValue 0L
-            newId, minutesPlayed
-
-    /// Edit an existing session by id. If newDate collides with another existing session
-    /// for the same game, MERGE (sum minutes into the other row, delete this one).
-    /// Returns the resulting session id.
-    let updatePlaySession
-        (conn: SqliteConnection)
-        (sessionId: int64)
-        (newDate: string)
-        (newMinutes: int)
-        : Result<int64, string> =
-        match getPlaySessionById conn sessionId with
-        | None -> Error "Play session not found"
-        | Some existing ->
-            // Look for a different row with the same (slug, newDate)
-            let collision =
-                conn
-                |> Db.newCommand """
-                    SELECT id, minutes_played FROM game_play_session
-                    WHERE game_slug = @slug AND date = @date AND id <> @id
-                """
-                |> Db.setParams [
-                    "slug", SqlType.String existing.GameSlug
-                    "date", SqlType.String newDate
-                    "id", SqlType.Int64 sessionId
-                ]
-                |> Db.querySingle (fun (rd: IDataReader) ->
-                    rd.ReadInt64 "id", rd.ReadInt32 "minutes_played")
-            match collision with
-            | Some (otherId, otherMinutes) ->
-                // Merge: add new minutes into the other row, delete this one
-                let merged = otherMinutes + newMinutes
-                conn
-                |> Db.newCommand "UPDATE game_play_session SET minutes_played = @minutes WHERE id = @id"
-                |> Db.setParams [
-                    "minutes", SqlType.Int32 merged
-                    "id", SqlType.Int64 otherId
-                ]
-                |> Db.exec
-                conn
-                |> Db.newCommand "DELETE FROM game_play_session WHERE id = @id"
-                |> Db.setParams [ "id", SqlType.Int64 sessionId ]
-                |> Db.exec
-                Ok otherId
-            | None ->
-                conn
-                |> Db.newCommand "UPDATE game_play_session SET date = @date, minutes_played = @minutes WHERE id = @id"
-                |> Db.setParams [
-                    "date", SqlType.String newDate
-                    "minutes", SqlType.Int32 newMinutes
-                    "id", SqlType.Int64 sessionId
-                ]
-                |> Db.exec
-                Ok sessionId
-
-    /// Delete by id. No-op if the id doesn't exist (returns Ok ()).
-    let deletePlaySession
-        (conn: SqliteConnection)
-        (sessionId: int64)
-        : Result<unit, string> =
-        conn
-        |> Db.newCommand "DELETE FROM game_play_session WHERE id = @id"
-        |> Db.setParams [ "id", SqlType.Int64 sessionId ]
-        |> Db.exec
-        Ok ()
-
-    /// Recompute SUM(minutes_played) for the game and emit Games.Set_play_time.
-    let recomputeAndPublishTotal
-        (conn: SqliteConnection)
-        (slug: string)
-        (executeGameCommand: string -> Games.GameCommand -> Result<unit, string>)
-        : unit =
-        let total = getTotalMinutesForGame conn slug
-        executeGameCommand slug (Games.Set_play_time total) |> ignore
-
-    /// If the game's status is anything other than InFocus, emit Change_status InFocus.
-    /// Returns true if the helper actually emitted the event.
-    /// Task 048: any new play activity (Steam sync OR manual session) bumps the game back into focus,
-    /// regardless of prior status (Backlog, Retired, Abandoned, Dismissed all get pulled in).
-    let promoteToInFocusIfNeeded
-        (conn: SqliteConnection)
-        (slug: string)
-        (executeGameCommand: string -> Games.GameCommand -> Result<unit, string>)
-        : bool =
-        match GameProjection.getGameStatus conn slug with
-        | Some InFocus -> false
-        | Some _ | None ->
-            match executeGameCommand slug (Games.Change_status InFocus) with
-            | Ok () -> true
-            | Error _ -> false
-
-    // Public-facing manual session API: validate inputs, mutate, recompute total.
-
     let addManualPlaySessionApi
         (conn: SqliteConnection)
         (slug: string)
@@ -353,108 +156,70 @@ module PlaytimeTracker =
                 match GameProjection.getBySlug conn slug with
                 | None -> Error "Game not found"
                 | Some _ ->
-                    let id, _ = upsertManualPlaySession conn slug date minutesPlayed
-                    recomputeAndPublishTotal conn slug executeGameCommand
-                    // Task 048: a recorded session also bumps the game into focus.
-                    promoteToInFocusIfNeeded conn slug executeGameCommand |> ignore
-                    match getPlaySessionById conn id with
-                    | Some dto -> Ok dto
-                    | None -> Error "Failed to retrieve session after insert"
+                    match executeGameCommand slug (Games.Record_play_session (date, minutesPlayed)) with
+                    | Error e -> Error e
+                    | Ok () ->
+                        match PlaySessionProjection.getBySlugAndDay conn slug date with
+                        | Some dto -> Ok dto
+                        | None -> Error "Failed to retrieve session after insert"
 
+    /// Session identity is the natural key `(GameSlug, Date)` — no synthetic
+    /// id. A combined date+minutes edit is decomposed into the two aggregate
+    /// primitives, in this order: correct the minutes first (while the
+    /// session is still keyed at its original day), then move it — so the
+    /// target minutes land on the target day, merging on collision.
     let updatePlaySessionApi
         (conn: SqliteConnection)
-        (sessionId: int64)
-        (newDate: string)
-        (newMinutes: int)
+        (edit: PlaySessionEdit)
         (executeGameCommand: string -> Games.GameCommand -> Result<unit, string>)
         : Result<PlaySessionDto, string> =
-        match parseSessionDate newDate with
+        match parseSessionDate edit.NewDate with
         | Error e -> Error e
         | Ok _ ->
-            match validateMinutes newMinutes with
+            match validateMinutes edit.NewMinutes with
             | Error e -> Error e
             | Ok () ->
-                match getPlaySessionById conn sessionId with
+                match PlaySessionProjection.getBySlugAndDay conn edit.GameSlug edit.Date with
                 | None -> Error "Play session not found"
                 | Some existing ->
-                    match updatePlaySession conn sessionId newDate newMinutes with
+                    let correctResult =
+                        if edit.NewMinutes <> existing.MinutesPlayed then
+                            executeGameCommand edit.GameSlug (Games.Correct_play_session_minutes (edit.Date, edit.NewMinutes))
+                        else Ok ()
+                    match correctResult with
                     | Error e -> Error e
-                    | Ok resultId ->
-                        recomputeAndPublishTotal conn existing.GameSlug executeGameCommand
-                        // Task 048: a recorded session also bumps the game into focus.
-                        promoteToInFocusIfNeeded conn existing.GameSlug executeGameCommand |> ignore
-                        match getPlaySessionById conn resultId with
-                        | Some dto -> Ok dto
-                        | None -> Error "Failed to retrieve session after update"
+                    | Ok () ->
+                        let moveResult =
+                            if edit.NewDate <> edit.Date then
+                                executeGameCommand edit.GameSlug (Games.Move_play_session (edit.Date, edit.NewDate))
+                            else Ok ()
+                        match moveResult with
+                        | Error e -> Error e
+                        | Ok () ->
+                            match PlaySessionProjection.getBySlugAndDay conn edit.GameSlug edit.NewDate with
+                            | Some dto -> Ok dto
+                            | None -> Error "Failed to retrieve session after update"
 
+    /// No-op (Ok) if the session doesn't exist — mirrors the old id-keyed
+    /// `deletePlaySessionApi`'s idempotent-delete behaviour.
     let deletePlaySessionApi
         (conn: SqliteConnection)
-        (sessionId: int64)
+        (slug: string)
+        (day: string)
         (executeGameCommand: string -> Games.GameCommand -> Result<unit, string>)
         : Result<unit, string> =
-        let slugOpt =
-            getPlaySessionById conn sessionId
-            |> Option.map (fun s -> s.GameSlug)
-        match deletePlaySession conn sessionId with
-        | Error e -> Error e
-        | Ok () ->
-            match slugOpt with
-            | Some slug -> recomputeAndPublishTotal conn slug executeGameCommand
-            | None -> ()
-            Ok ()
+        match PlaySessionProjection.getBySlugAndDay conn slug day with
+        | None -> Ok ()
+        | Some _ -> executeGameCommand slug (Games.Remove_play_session day)
+
+    let getPlaySessionsForGame (conn: SqliteConnection) (slug: string) : PlaySessionDto list =
+        PlaySessionProjection.getForGame conn slug
 
     let getPlaytimeSummary (conn: SqliteConnection) (fromDate: string) (toDate: string) : PlaytimeSummaryItem list =
-        conn
-        |> Db.newCommand """
-            SELECT ps.game_slug,
-                   COALESCE(gd.name, ps.game_slug) as game_name,
-                   gd.cover_ref,
-                   SUM(ps.minutes_played) as total_minutes,
-                   COUNT(*) as session_count
-            FROM game_play_session ps
-            LEFT JOIN game_detail gd ON gd.slug = ps.game_slug
-            WHERE ps.date >= @from_date AND ps.date <= @to_date
-            GROUP BY ps.game_slug
-            ORDER BY total_minutes DESC
-        """
-        |> Db.setParams [
-            "from_date", SqlType.String fromDate
-            "to_date", SqlType.String toDate
-        ]
-        |> Db.query (fun (rd: IDataReader) ->
-            { PlaytimeSummaryItem.GameSlug = rd.ReadString "game_slug"
-              GameName = rd.ReadString "game_name"
-              CoverRef =
-                if rd.IsDBNull(rd.GetOrdinal("cover_ref")) then None
-                else Some (rd.ReadString "cover_ref")
-              TotalMinutes = rd.ReadInt32 "total_minutes"
-              SessionCount = rd.ReadInt32 "session_count" })
-
-    // Dashboard play sessions (cross-game, last N days)
+        PlaySessionProjection.getPlaytimeSummary conn fromDate toDate
 
     let getDashboardPlaySessions (conn: SqliteConnection) (days: int) : DashboardPlaySession list =
-        let fromDate = DateTime.Now.AddDays(float -days).ToString("yyyy-MM-dd")
-        conn
-        |> Db.newCommand """
-            SELECT ps.game_slug,
-                   COALESCE(gd.name, ps.game_slug) as game_name,
-                   gd.cover_ref,
-                   ps.date,
-                   ps.minutes_played
-            FROM game_play_session ps
-            LEFT JOIN game_detail gd ON gd.slug = ps.game_slug
-            WHERE ps.date >= @from_date
-            ORDER BY ps.date
-        """
-        |> Db.setParams [ "from_date", SqlType.String fromDate ]
-        |> Db.query (fun (rd: IDataReader) ->
-            { DashboardPlaySession.GameSlug = rd.ReadString "game_slug"
-              GameName = rd.ReadString "game_name"
-              CoverRef =
-                if rd.IsDBNull(rd.GetOrdinal("cover_ref")) then None
-                else Some (rd.ReadString "cover_ref")
-              Date = rd.ReadString "date"
-              MinutesPlayed = rd.ReadInt32 "minutes_played" })
+        PlaySessionProjection.getDashboardPlaySessions conn days
 
     // Sync status
 
@@ -479,36 +244,6 @@ module PlaytimeTracker =
           IsEnabled = isEnabled
           SyncHourUtc = syncHour }
 
-    // Execute game command — local helper (same pattern as Api.executeCommand, needed because Api.fs is compiled later)
-
-    let private executeGameCommand
-        (conn: SqliteConnection)
-        (slug: string)
-        (command: Games.GameCommand)
-        (projectionHandlers: Projection.ProjectionHandler list)
-        : Result<unit, string> =
-
-        let streamId = Games.streamId slug
-        let storedEvents = EventStore.readStream conn streamId
-        let events = storedEvents |> List.choose Games.Serialization.fromStoredEvent
-        let state = Games.reconstitute events
-        let currentPosition = EventStore.getStreamPosition conn streamId
-
-        match Games.decide state command with
-        | Error e -> Error e
-        | Ok newEvents ->
-            if List.isEmpty newEvents then
-                Ok ()
-            else
-                let eventDataList = newEvents |> List.map Games.Serialization.toEventData
-                match EventStore.appendToStream conn streamId currentPosition eventDataList with
-                | EventStore.ConcurrencyConflict _ ->
-                    Error "Concurrency conflict"
-                | EventStore.Success _ ->
-                    for handler in projectionHandlers do
-                        Projection.runProjection conn handler
-                    Ok ()
-
     // Main sync logic
 
     let private createGameFromSteam
@@ -518,6 +253,8 @@ module PlaytimeTracker =
         (getRawgConfig: unit -> Rawg.RawgConfig)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
+        (syncHour: int)
+        (today: string)
         (steamGame: SteamOwnedGame)
         : Async<Result<string, string>> =
         async {
@@ -579,7 +316,10 @@ module PlaytimeTracker =
                         | Ok () ->
                             executeGameCommand conn slug (Games.Set_steam_app_id steamGame.AppId) projectionHandlers |> ignore
                             if steamGame.PlaytimeMinutes > 0 then
-                                executeGameCommand conn slug (Games.Set_play_time steamGame.PlaytimeMinutes) projectionHandlers |> ignore
+                                let gamingDay =
+                                    unixTimestampToGamingDay syncHour steamGame.RtimeLastPlayed
+                                    |> Option.defaultValue today
+                                executeGameCommand conn slug (Games.Record_steam_observed_total (steamGame.PlaytimeMinutes, gamingDay)) projectionHandlers |> ignore
                             for category in steamCategories do
                                 executeGameCommand conn slug (Games.Add_play_mode category) projectionHandlers |> ignore
                             executeGameCommand conn slug (Games.Set_steam_last_played (Steam.unixTimestampToDateString steamGame.RtimeLastPlayed)) projectionHandlers |> ignore
@@ -608,24 +348,28 @@ module PlaytimeTracker =
                 if String.IsNullOrWhiteSpace(steamConfig.ApiKey) || String.IsNullOrWhiteSpace(steamConfig.SteamId) then
                     return Error "Steam API key and Steam ID must be configured"
                 else
+                    // games-p6vkz: the migration gate — checked once, up
+                    // front, exactly like the config-presence check above.
+                    // See `syncGateOpen`'s doc comment for the race this closes.
+                    let hasLegacyPlayTimeEvents, migrationCompleted =
+                        withLock jobLock (fun () ->
+                            (EventStore.getSampleEventForType conn "Game_play_time_set").IsSome,
+                            (SettingsStore.getSetting conn migrationCompletedSettingKey).IsSome)
+                    if not (syncGateOpen hasLegacyPlayTimeEvents migrationCompleted) then
+                        let reason =
+                            sprintf "Sync skipped: legacy Game_play_time_set events present and '%s' not yet set (play-session history migration has not completed)" migrationCompletedSettingKey
+                        eprintfn "[PlaytimeTracker] %s" reason
+                        return Error reason
+                    else
                     let! recentGames = Steam.getRecentlyPlayedGames httpClient steamConfig
                     let mutable sessionsRecorded = 0
-                    let mutable snapshotsUpdated = 0
+                    let mutable gamesObserved = 0
                     let mutable gamesCreated = 0
                     let mutable gamesPromotedToFocus = 0
                     // Gaming-day boundary is (syncHour + 30 min) — so the daily 04:00 sync
                     // (and late-night sessions ending after midnight) attribute to yesterday.
                     let syncHour = withLock jobLock (fun () -> getSyncHour conn)
                     let today = defaultArg effectiveDate (toGamingDay syncHour DateTime.Now)
-
-                    // Task 048: any new play activity flips the game's status to InFocus
-                    // (skipped when already InFocus to avoid redundant events). NOT locked
-                    // here — `promote` is only ever invoked from inside a section that
-                    // already holds `jobLock` below (SemaphoreSlim isn't reentrant).
-                    let runCmdAll s c = executeGameCommand conn s c projectionHandlers
-                    let promote slug =
-                        if promoteToInFocusIfNeeded conn slug runCmdAll then
-                            gamesPromotedToFocus <- gamesPromotedToFocus + 1
 
                     for steamGame in recentGames do
                         let! slugResult = async {
@@ -643,7 +387,7 @@ module PlaytimeTracker =
                                     // Not in library — create new game. createGameFromSteam
                                     // does its own DB locking internally; not wrapped here
                                     // since it awaits HTTP calls (RAWG/Steam images) first.
-                                    let! result = createGameFromSteam conn jobLock httpClient getRawgConfig imageBasePath projectionHandlers steamGame
+                                    let! result = createGameFromSteam conn jobLock httpClient getRawgConfig imageBasePath projectionHandlers syncHour today steamGame
                                     match result with
                                     | Ok slug ->
                                         eprintfn "[PlaytimeTracker] Created new game: %s (%s)" steamGame.Name slug
@@ -657,68 +401,28 @@ module PlaytimeTracker =
                         match slugResult with
                         | None -> ()
                         | Some (slug, wasJustCreated) ->
-                            // Entirely synchronous from here through the snapshot update —
-                            // no awaited HTTP inside this branch — so one lock acquisition
-                            // covers the whole per-game DB section without holding it across
-                            // any network I/O.
-                            withLock jobLock (fun () ->
-                                let currentPlaytime = steamGame.PlaytimeMinutes
-                                match getLastSnapshot conn steamGame.AppId with
-                                | None ->
-                                    // First time seeing this game in the tracker
-                                    if currentPlaytime > 0 then
-                                        // Game with existing playtime but no snapshot — record an initial play session
-                                        let sessionDate =
-                                            match unixTimestampToGamingDay syncHour steamGame.RtimeLastPlayed with
-                                            | Some d -> d
-                                            | None -> today
-                                        recordPlaySession conn slug steamGame.AppId sessionDate currentPlaytime
-                                        sessionsRecorded <- sessionsRecorded + 1
-                                        promote slug
-                                    // Save baseline snapshot
-                                    saveSnapshot conn steamGame.AppId slug currentPlaytime
-                                    snapshotsUpdated <- snapshotsUpdated + 1
-                                | Some (lastTotal, lastUpdatedAt) ->
-                                    // Reconciliation: if snapshot exists but no play sessions, backfill initial session
-                                    if currentPlaytime > 0 && not (hasAnyPlaySessions conn slug) then
-                                        let sessionDate =
-                                            match unixTimestampToGamingDay syncHour steamGame.RtimeLastPlayed with
-                                            | Some d -> d
-                                            | None -> today
-                                        recordPlaySession conn slug steamGame.AppId sessionDate currentPlaytime
-                                        sessionsRecorded <- sessionsRecorded + 1
-                                        promote slug
-                                        eprintfn "[PlaytimeTracker] Reconciled missing play session for %s (%d min)" slug currentPlaytime
-
-                                    let delta = currentPlaytime - lastTotal
-                                    if delta > 0 then
-                                        // Determine session date
-                                        let sessionDate =
-                                            let lastDate =
-                                                try DateTime.Parse(lastUpdatedAt).ToString("yyyy-MM-dd")
-                                                with _ -> today
-                                            if lastDate = today then
-                                                today
-                                            elif lastDate < today then
-                                                // Missed days — use rtime_last_played from Steam if available
-                                                match unixTimestampToGamingDay syncHour steamGame.RtimeLastPlayed with
-                                                | Some d -> d
-                                                | None -> today
-                                            else
-                                                today
-
-                                        recordPlaySession conn slug steamGame.AppId sessionDate delta
-                                        sessionsRecorded <- sessionsRecorded + 1
-
-                                        // Update game entity's TotalPlayTimeMinutes via event store.
-                                        // Recompute from SUM(minutes_played) so manual sessions are preserved
-                                        // alongside Steam-reported totals.
-                                        recomputeAndPublishTotal conn slug runCmdAll
-                                        promote slug
-
-                                    // Always update snapshot
-                                    saveSnapshot conn steamGame.AppId slug currentPlaytime
-                                    snapshotsUpdated <- snapshotsUpdated + 1)
+                            // wasJustCreated games already had their observed
+                            // total recorded inside createGameFromSteam.
+                            if not wasJustCreated then
+                                // Entirely synchronous — no awaited HTTP inside this branch —
+                                // so one lock acquisition covers the whole per-game DB section.
+                                withLock jobLock (fun () ->
+                                    let gamingDay =
+                                        match unixTimestampToGamingDay syncHour steamGame.RtimeLastPlayed with
+                                        | Some d -> d
+                                        | None -> today
+                                    match executeGameCommandWithEvents conn slug (Games.Record_steam_observed_total (steamGame.PlaytimeMinutes, gamingDay)) projectionHandlers with
+                                    | Error err ->
+                                        eprintfn "[PlaytimeTracker] Failed to record observed playtime for %s: %s" slug err
+                                    | Ok events ->
+                                        gamesObserved <- gamesObserved + 1
+                                        let sessionCount =
+                                            events
+                                            |> List.filter (function Games.Play_session_recorded _ -> true | _ -> false)
+                                            |> List.length
+                                        sessionsRecorded <- sessionsRecorded + sessionCount
+                                        if events |> List.exists (function Games.Game_status_changed InFocus -> true | _ -> false) then
+                                            gamesPromotedToFocus <- gamesPromotedToFocus + 1)
 
                     // Record last sync time
                     withLock jobLock (fun () ->
@@ -726,7 +430,10 @@ module PlaytimeTracker =
 
                     return Ok {
                         SessionsRecorded = sessionsRecorded
-                        SnapshotsUpdated = snapshotsUpdated
+                        // Repurposed (games-p6vkz, no snapshot table anymore):
+                        // count of games for which a Steam-observed-total was
+                        // recorded this run, Steam-sync cursor retired.
+                        SnapshotsUpdated = gamesObserved
                         GamesCreated = gamesCreated
                         GamesPromotedToFocus = gamesPromotedToFocus
                     }

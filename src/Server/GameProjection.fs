@@ -49,6 +49,7 @@ module GameProjection =
                 want_to_play_with TEXT NOT NULL DEFAULT '[]',
                 played_with       TEXT NOT NULL DEFAULT '[]',
                 total_play_time       INTEGER NOT NULL DEFAULT 0,
+                prior_play_time       INTEGER NOT NULL DEFAULT 0,
                 steam_library_date    TEXT,
                 steam_last_played     TEXT,
                 is_owned              INTEGER NOT NULL DEFAULT 0
@@ -59,6 +60,12 @@ module GameProjection =
         // Migration for existing databases
         try
             conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN is_owned INTEGER NOT NULL DEFAULT 0" |> Db.exec
+        with _ -> ()
+        // games-p6vkz: playtime accumulated before session tracking began —
+        // event-derived (Prior_play_time_recorded), therefore replayable,
+        // therefore a projection column rather than imperative state.
+        try
+            conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN prior_play_time INTEGER NOT NULL DEFAULT 0" |> Db.exec
         with _ -> ()
         try
             conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN hltb_main_plus_hours REAL" |> Db.exec
@@ -316,15 +323,71 @@ module GameProjection =
                     |> Db.setParams [ "slug", SqlType.String slug; "steam_app_id", SqlType.Int32 steamAppId ]
                     |> Db.exec
 
-                | Games.Game_play_time_set totalMinutes ->
+                | Games.Game_play_time_set _ ->
+                    // Legacy, mandatory no-op (games-p6vkz) — mirrors
+                    // Games.evolve's explicit no-op arm for the same event.
+                    // Replaying this republished SUM would double-count
+                    // against the reconstructed total from
+                    // Prior_play_time_recorded plus the session events below.
+                    ()
+
+                // games-p6vkz: total_play_time is pure payload arithmetic —
+                // every arm below adjusts it using only numbers already
+                // carried on the event, never by re-reading game_play_session
+                // (a different projection's table, ADR-0031 "no
+                // cross-projection write"), so it stays in lock-step with
+                // Games.ActiveGame.TotalPlayTimeMinutes by construction.
+                | Games.Prior_play_time_recorded minutes ->
                     conn
-                    |> Db.newCommand "UPDATE game_list SET total_play_time = @total_play_time WHERE slug = @slug"
-                    |> Db.setParams [ "slug", SqlType.String slug; "total_play_time", SqlType.Int32 totalMinutes ]
+                    |> Db.newCommand "UPDATE game_detail SET prior_play_time = @minutes, total_play_time = total_play_time + @minutes WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "minutes", SqlType.Int32 minutes ]
                     |> Db.exec
                     conn
-                    |> Db.newCommand "UPDATE game_detail SET total_play_time = @total_play_time WHERE slug = @slug"
-                    |> Db.setParams [ "slug", SqlType.String slug; "total_play_time", SqlType.Int32 totalMinutes ]
+                    |> Db.newCommand "UPDATE game_list SET total_play_time = total_play_time + @minutes WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "minutes", SqlType.Int32 minutes ]
                     |> Db.exec
+
+                | Games.Play_session_recorded d ->
+                    conn
+                    |> Db.newCommand "UPDATE game_detail SET total_play_time = total_play_time + @minutes WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "minutes", SqlType.Int32 d.Minutes ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE game_list SET total_play_time = total_play_time + @minutes WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "minutes", SqlType.Int32 d.Minutes ]
+                    |> Db.exec
+
+                | Games.Play_session_minutes_corrected (_day, newMinutes, previousMinutes) ->
+                    let delta = newMinutes - previousMinutes
+                    conn
+                    |> Db.newCommand "UPDATE game_detail SET total_play_time = total_play_time + @delta WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "delta", SqlType.Int32 delta ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE game_list SET total_play_time = total_play_time + @delta WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "delta", SqlType.Int32 delta ]
+                    |> Db.exec
+
+                | Games.Play_session_moved _ ->
+                    // Relocating a day's minutes to another day doesn't change
+                    // the sum across all days — no total_play_time change.
+                    ()
+
+                | Games.Play_session_removed (_day, previousMinutes) ->
+                    conn
+                    |> Db.newCommand "UPDATE game_detail SET total_play_time = total_play_time - @minutes WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "minutes", SqlType.Int32 previousMinutes ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "UPDATE game_list SET total_play_time = total_play_time - @minutes WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "minutes", SqlType.Int32 previousMinutes ]
+                    |> Db.exec
+
+                | Games.Steam_observed_total_reconciled _ ->
+                    // Affects only Games.ActiveGame.SteamObservedMinutes (the
+                    // sync cursor), which is aggregate-only and has no
+                    // projected column.
+                    ()
 
                 | Games.Game_description_set description ->
                     conn
@@ -441,7 +504,7 @@ module GameProjection =
 
     let getBySlug (conn: SqliteConnection) (slug: string) : GameDetail option =
         conn
-        |> Db.newCommand "SELECT slug, name, year, description, short_description, website_url, cover_ref, backdrop_ref, genres, status, rawg_id, rawg_rating, hltb_hours, hltb_main_plus_hours, hltb_completionist_hours, personal_rating, steam_app_id, play_modes, family_owners, recommended_by, want_to_play_with, played_with, total_play_time, steam_library_date, steam_last_played, is_owned FROM game_detail WHERE slug = @slug"
+        |> Db.newCommand "SELECT slug, name, year, description, short_description, website_url, cover_ref, backdrop_ref, genres, status, rawg_id, rawg_rating, hltb_hours, hltb_main_plus_hours, hltb_completionist_hours, personal_rating, steam_app_id, play_modes, family_owners, recommended_by, want_to_play_with, played_with, total_play_time, prior_play_time, steam_library_date, steam_last_played, is_owned FROM game_detail WHERE slug = @slug"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
@@ -512,6 +575,7 @@ module GameProjection =
                 if rd.IsDBNull(rd.GetOrdinal("steam_last_played")) then None
                 else Some (rd.ReadString "steam_last_played")
               TotalPlayTimeMinutes = rd.ReadInt32 "total_play_time"
+              PriorPlayTimeMinutes = rd.ReadInt32 "prior_play_time"
               PlayModes = playModes
               IsOwnedByMe = rd.ReadInt32 "is_owned" <> 0
               FamilyOwners = resolveFriendRefs conn familyOwnerSlugs

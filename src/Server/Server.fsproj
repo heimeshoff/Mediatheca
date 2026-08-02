@@ -42,6 +42,7 @@
     <Compile Include="FriendProjection.fs" />
     <Compile Include="SeriesProjection.fs" />
     <Compile Include="GameProjection.fs" />
+    <Compile Include="PlaySessionProjection.fs" />
     <Compile Include="PlaytimeTracker.fs" />
     <Compile Include="SeriesRefresh.fs" />
     <Compile Include="ScheduledJobs.fs" />

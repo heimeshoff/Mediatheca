@@ -285,6 +285,32 @@ module EventFormatting =
             let mins = tryFieldInt "totalMinutes" data |> Option.defaultValue 0
             let hours = float mins / 60.0
             Some { Timestamp = ts; Label = "Play time updated"; Details = [ $"{hours:F1} hours ({mins} min)" ] }
+        | "Prior_play_time_recorded" ->
+            let mins = tryFieldInt "minutes" data |> Option.defaultValue 0
+            let hours = float mins / 60.0
+            Some { Timestamp = ts; Label = "Prior play time recorded"; Details = [ $"{hours:F1} hours ({mins} min) before tracking began" ] }
+        | "Play_session_recorded" ->
+            let day = tryField "day" data |> Option.defaultValue "?"
+            let mins = tryFieldInt "minutes" data |> Option.defaultValue 0
+            let source = tryField "source" data |> Option.defaultValue "?"
+            Some { Timestamp = ts; Label = "Play session recorded"; Details = [ $"{day}: {mins} min ({source})" ] }
+        | "Play_session_minutes_corrected" ->
+            let day = tryField "day" data |> Option.defaultValue "?"
+            let newMinutes = tryFieldInt "newMinutes" data |> Option.defaultValue 0
+            let previousMinutes = tryFieldInt "previousMinutes" data |> Option.defaultValue 0
+            Some { Timestamp = ts; Label = "Play session minutes corrected"; Details = [ $"{day}: {previousMinutes} -> {newMinutes} min" ] }
+        | "Play_session_moved" ->
+            let fromDay = tryField "fromDay" data |> Option.defaultValue "?"
+            let toDay = tryField "toDay" data |> Option.defaultValue "?"
+            let mins = tryFieldInt "minutes" data |> Option.defaultValue 0
+            Some { Timestamp = ts; Label = "Play session moved"; Details = [ $"{fromDay} -> {toDay} ({mins} min)" ] }
+        | "Play_session_removed" ->
+            let day = tryField "day" data |> Option.defaultValue "?"
+            let previousMinutes = tryFieldInt "previousMinutes" data |> Option.defaultValue 0
+            Some { Timestamp = ts; Label = "Play session removed"; Details = [ $"{day}: {previousMinutes} min" ] }
+        | "Steam_observed_total_reconciled" ->
+            let mins = tryFieldInt "observedMinutes" data |> Option.defaultValue 0
+            Some { Timestamp = ts; Label = "Steam observed total reconciled"; Details = [ $"{mins} min" ] }
         | "Game_description_set" ->
             Some { Timestamp = ts; Label = "Description updated"; Details = [] }
         | "Game_short_description_set" ->

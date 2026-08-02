@@ -20,6 +20,28 @@ module Games =
         RawgRating: float option
     }
 
+    /// Payload of `Play_session_recorded` — a gaming day, the minutes played on
+    /// it, and whether the delta came from Steam or was typed in by hand
+    /// (games-p6vkz). `Source` decides whether the minutes also accumulate
+    /// into `ActiveGame.SteamObservedMinutes` (see the two-fold design note on
+    /// `evolve` below) — the whole reason the old Steam-sync cursor table
+    /// could be deleted rather than merely guarded.
+    type PlaySessionRecordedData = {
+        Day: string
+        Minutes: int
+        Source: PlaySessionSource
+    }
+
+    /// A first Steam observation at or under this many minutes is plausibly
+    /// one real sitting and is dated correctly from `rtime_last_played`; above
+    /// it, it cannot be one sitting, so it is accumulated pre-tracking history
+    /// (`Prior_play_time_recorded`) instead of a fabricated single day. Lives
+    /// here (not the Steam adapter) so the whole policy is one pure,
+    /// directly-testable function — see `Record_steam_observed_total` in
+    /// `decide`. See ADR-0050 for the 16h rationale.
+    [<Literal>]
+    let PriorPlayTimeThresholdMinutes = 960
+
     // Events
 
     type GameEvent =
@@ -43,6 +65,17 @@ module Games =
         | Game_played_with_removed of friendSlug: string
         | Game_steam_app_id_set of steamAppId: int
         | Game_play_time_set of totalMinutes: int
+        // Legacy — superseded by Prior_play_time_recorded plus the four
+        // session events below (games-p6vkz). Kept in the DU (never rewritten,
+        // ADR-0002) purely so `evolve` can still fold old streams and
+        // `Serialization` can still round-trip old rows; `evolve`'s arm for it
+        // is now an explicit no-op (see below) rather than setting the total.
+        | Prior_play_time_recorded of minutes: int
+        | Play_session_recorded of PlaySessionRecordedData
+        | Play_session_minutes_corrected of day: string * newMinutes: int * previousMinutes: int
+        | Play_session_moved of fromDay: string * toDay: string * minutes: int
+        | Play_session_removed of day: string * previousMinutes: int
+        | Steam_observed_total_reconciled of observedMinutes: int
         | Game_description_set of description: string
         | Game_short_description_set of shortDescription: string
         | Game_website_url_set of websiteUrl: string option
@@ -74,6 +107,20 @@ module Games =
         Status: GameStatus
         SteamAppId: int option
         TotalPlayTimeMinutes: int
+        /// Playtime accumulated before session tracking began — a distinct,
+        /// dateless fact (games-p6vkz): "this much was played before we
+        /// started recording". Never contributes to the diary, only the total.
+        PriorPlayTimeMinutes: int
+        /// Gaming day -> minutes for that day. The natural key IS the day —
+        /// no synthetic session id (see the ADR's drift-detector argument).
+        PlaySessions: Map<string, int>
+        /// What Steam has told us, cumulatively — `PriorPlayTimeMinutes` plus
+        /// every `Play_session_recorded` delta whose `Source` was `SteamSync`,
+        /// **as originally recorded** (never reduced by a later correction,
+        /// move, or removal). This is the two-fold design's load-bearing half:
+        /// it is what makes the old Steam-sync cursor table derivable rather
+        /// than merely guardable — see the ADR's phantom-session example.
+        SteamObservedMinutes: int
         FamilyOwners: Set<string>
         RecommendedBy: Set<string>
         WantToPlayWith: Set<string>
@@ -109,7 +156,24 @@ module Games =
         | Add_played_with of friendSlug: string
         | Remove_played_with of friendSlug: string
         | Set_steam_app_id of steamAppId: int
-        | Set_play_time of totalMinutes: int
+        // The old direct play-time setter is deleted (games-p6vkz) —
+        // superseded by the commands below. Removing it (rather than leaving
+        // it unreachable) is mandatory: games-h4mrd appends session events to
+        // streams that already contain the legacy Game_play_time_set event,
+        // and if the old command could still fire, replay would set the
+        // total from the stale republished SUM and then add the
+        // reconstructed total on top of it.
+        | Record_prior_play_time of minutes: int
+        | Record_play_session of day: string * minutesPlayed: int
+        | Correct_play_session_minutes of day: string * newMinutes: int
+        | Move_play_session of fromDay: string * toDay: string
+        | Remove_play_session of day: string
+        | Reconcile_steam_observed_total of observedMinutes: int
+        /// The Steam-sync entry point: the whole first-sight / prior-playtime /
+        /// delta policy lives here as one pure decision (see `decide` below),
+        /// so the adapter (`PlaytimeTracker.runSync`) only ever supplies
+        /// `(observedMinutes, gamingDay)` and enforces the migration gate.
+        | Record_steam_observed_total of observedMinutes: int * gamingDay: string
         | Set_description of description: string
         | Set_short_description of shortDescription: string
         | Set_website_url of websiteUrl: string option
@@ -122,6 +186,15 @@ module Games =
         | Set_rawg_id of rawgId: int * rawgRating: float option
 
     // Evolve
+
+    /// Recomputes the derived total after any mutation to `PriorPlayTimeMinutes`
+    /// or `PlaySessions` — "what the user asserts happened" (the ADR's first
+    /// fold), kept as a plain stored field (not a computed property) so every
+    /// other reader of `ActiveGame.TotalPlayTimeMinutes` is unaffected.
+    let private recomputeTotal (game: ActiveGame) : ActiveGame =
+        { game with
+            TotalPlayTimeMinutes =
+                game.PriorPlayTimeMinutes + (game.PlaySessions |> Map.toSeq |> Seq.sumBy snd) }
 
     let evolve (state: GameState) (event: GameEvent) : GameState =
         match state, event with
@@ -144,6 +217,9 @@ module Games =
                 Status = Backlog
                 SteamAppId = None
                 TotalPlayTimeMinutes = 0
+                PriorPlayTimeMinutes = 0
+                PlaySessions = Map.empty
+                SteamObservedMinutes = 0
                 FamilyOwners = Set.empty
                 RecommendedBy = Set.empty
                 WantToPlayWith = Set.empty
@@ -186,8 +262,36 @@ module Games =
             Active { game with PlayedWith = game.PlayedWith |> Set.remove friendSlug }
         | Active game, Game_steam_app_id_set steamAppId ->
             Active { game with SteamAppId = Some steamAppId }
-        | Active game, Game_play_time_set totalMinutes ->
-            Active { game with TotalPlayTimeMinutes = totalMinutes }
+        // Legacy, mandatory no-op (games-p6vkz — see the DU comment on
+        // Game_play_time_set above): must NOT re-derive TotalPlayTimeMinutes
+        // from the old republished SUM, or replaying a stream that has both
+        // this event and games-h4mrd's reconstructed session/prior events
+        // would double-count.
+        | Active _, Game_play_time_set _ -> state
+        | Active game, Prior_play_time_recorded minutes ->
+            Active (recomputeTotal { game with
+                                        PriorPlayTimeMinutes = minutes
+                                        SteamObservedMinutes = game.SteamObservedMinutes + minutes })
+        | Active game, Play_session_recorded d ->
+            let currentForDay = game.PlaySessions |> Map.tryFind d.Day |> Option.defaultValue 0
+            let updatedSessions = game.PlaySessions |> Map.add d.Day (currentForDay + d.Minutes)
+            let updatedSteamObserved =
+                match d.Source with
+                | SteamSync -> game.SteamObservedMinutes + d.Minutes
+                | Manual -> game.SteamObservedMinutes
+            Active (recomputeTotal { game with PlaySessions = updatedSessions; SteamObservedMinutes = updatedSteamObserved })
+        | Active game, Play_session_minutes_corrected (day, newMinutes, _previousMinutes) ->
+            Active (recomputeTotal { game with PlaySessions = game.PlaySessions |> Map.add day newMinutes })
+        | Active game, Play_session_moved (fromDay, toDay, minutes) ->
+            let withoutFrom = game.PlaySessions |> Map.remove fromDay
+            let mergedAtToDay = (withoutFrom |> Map.tryFind toDay |> Option.defaultValue 0) + minutes
+            Active (recomputeTotal { game with PlaySessions = withoutFrom |> Map.add toDay mergedAtToDay })
+        | Active game, Play_session_removed (day, _previousMinutes) ->
+            Active (recomputeTotal { game with PlaySessions = game.PlaySessions |> Map.remove day })
+        | Active game, Steam_observed_total_reconciled observedMinutes ->
+            // Sets SteamObservedMinutes only — TotalPlayTimeMinutes (what the
+            // user asserts happened) is untouched, by design.
+            Active { game with SteamObservedMinutes = observedMinutes }
         | Active game, Game_description_set description ->
             Active { game with Description = description }
         | Active game, Game_short_description_set shortDescription ->
@@ -214,6 +318,15 @@ module Games =
         List.fold evolve Not_created events
 
     // Decide
+
+    /// ADR-0042's any-status rule, moved out of `PlaytimeTracker`'s read-model
+    /// consult (`GameProjection.getGameStatus`, CQRS-inverted) and into
+    /// `decide` (games-p6vkz), the same shape `Movies.Record_watch_session`
+    /// already uses. Narrowed (also games-p6vkz) to *newly recorded* sessions
+    /// only — correcting, moving, or removing a session, or recording prior
+    /// playtime, must never promote.
+    let private promotionEvents (status: GameStatus) : GameEvent list =
+        if status <> InFocus then [ Game_status_changed InFocus ] else []
 
     let decide (state: GameState) (command: GameCommand) : Result<GameEvent list, string> =
         match state, command with
@@ -272,9 +385,58 @@ module Games =
         | Active game, Set_steam_app_id steamAppId ->
             if game.SteamAppId = Some steamAppId then Ok []
             else Ok [ Game_steam_app_id_set steamAppId ]
-        | Active game, Set_play_time totalMinutes ->
-            if game.TotalPlayTimeMinutes = totalMinutes then Ok []
-            else Ok [ Game_play_time_set totalMinutes ]
+        | Active game, Record_prior_play_time minutes ->
+            // Refusal is the domain-level guard that makes a lost or reset
+            // sync cursor harmless: prior playtime is recorded once per game.
+            if game.PriorPlayTimeMinutes > 0 then
+                Error "Prior play time has already been recorded for this game"
+            else
+                Ok [ Prior_play_time_recorded minutes ]
+        | Active game, Record_play_session (day, minutesPlayed) ->
+            if minutesPlayed <= 0 then
+                Error "Session minutes must be greater than 0"
+            else
+                Ok ([ Play_session_recorded { Day = day; Minutes = minutesPlayed; Source = Manual } ] @ promotionEvents game.Status)
+        | Active game, Correct_play_session_minutes (day, newMinutes) ->
+            if newMinutes <= 0 then
+                Error "Session minutes must be greater than 0"
+            else
+                match game.PlaySessions |> Map.tryFind day with
+                | None -> Error "Play session not found"
+                | Some previousMinutes -> Ok [ Play_session_minutes_corrected (day, newMinutes, previousMinutes) ]
+        | Active game, Move_play_session (fromDay, toDay) ->
+            match game.PlaySessions |> Map.tryFind fromDay with
+            | None -> Error "Play session not found"
+            | Some minutes -> Ok [ Play_session_moved (fromDay, toDay, minutes) ]
+        | Active game, Remove_play_session day ->
+            match game.PlaySessions |> Map.tryFind day with
+            | None -> Error "Play session not found"
+            | Some previousMinutes -> Ok [ Play_session_removed (day, previousMinutes) ]
+        | Active game, Reconcile_steam_observed_total observedMinutes ->
+            if game.SteamObservedMinutes = observedMinutes then Ok []
+            else Ok [ Steam_observed_total_reconciled observedMinutes ]
+        | Active game, Record_steam_observed_total (observedMinutes, gamingDay) ->
+            // The whole Steam-sync policy, as one pure decision (games-p6vkz):
+            // see PriorPlayTimeThresholdMinutes's doc comment for the 16h
+            // rationale, and the ADR for the phantom-session example this
+            // shape prevents.
+            if game.SteamObservedMinutes = 0 then
+                // First sight of this game from Steam's perspective.
+                if observedMinutes > PriorPlayTimeThresholdMinutes then
+                    Ok [ Prior_play_time_recorded observedMinutes ]
+                elif observedMinutes > 0 then
+                    Ok ([ Play_session_recorded { Day = gamingDay; Minutes = observedMinutes; Source = SteamSync } ] @ promotionEvents game.Status)
+                else
+                    Ok []
+            else
+                let delta = observedMinutes - game.SteamObservedMinutes
+                if delta > 0 then
+                    Ok ([ Play_session_recorded { Day = gamingDay; Minutes = delta; Source = SteamSync } ] @ promotionEvents game.Status)
+                else
+                    // Zero or negative: emit nothing, adjust nothing — a
+                    // corrected/removed session must not be silently re-added
+                    // on the very next sync (the phantom-session case).
+                    Ok []
         | Active game, Set_description description ->
             if game.Description = description then Ok []
             else Ok [ Game_description_set description ]
@@ -365,6 +527,16 @@ module Games =
             | "Dismissed" -> Dismissed
             | _ -> Backlog
 
+        let private encodePlaySessionSource (source: PlaySessionSource) =
+            match source with
+            | SteamSync -> "SteamSync"
+            | Manual -> "Manual"
+
+        let private decodePlaySessionSource (s: string) : PlaySessionSource =
+            match s with
+            | "Manual" -> Manual
+            | _ -> SteamSync
+
         let serialize (event: GameEvent) : string * string =
             match event with
             | Game_added_to_library data ->
@@ -411,6 +583,33 @@ module Games =
                 "Game_steam_app_id_set", Encode.toString 0 (Encode.object [ "steamAppId", Encode.int steamAppId ])
             | Game_play_time_set totalMinutes ->
                 "Game_play_time_set", Encode.toString 0 (Encode.object [ "totalMinutes", Encode.int totalMinutes ])
+            | Prior_play_time_recorded minutes ->
+                "Prior_play_time_recorded", Encode.toString 0 (Encode.object [ "minutes", Encode.int minutes ])
+            | Play_session_recorded d ->
+                "Play_session_recorded", Encode.toString 0 (Encode.object [
+                    "day", Encode.string d.Day
+                    "minutes", Encode.int d.Minutes
+                    "source", Encode.string (encodePlaySessionSource d.Source)
+                ])
+            | Play_session_minutes_corrected (day, newMinutes, previousMinutes) ->
+                "Play_session_minutes_corrected", Encode.toString 0 (Encode.object [
+                    "day", Encode.string day
+                    "newMinutes", Encode.int newMinutes
+                    "previousMinutes", Encode.int previousMinutes
+                ])
+            | Play_session_moved (fromDay, toDay, minutes) ->
+                "Play_session_moved", Encode.toString 0 (Encode.object [
+                    "fromDay", Encode.string fromDay
+                    "toDay", Encode.string toDay
+                    "minutes", Encode.int minutes
+                ])
+            | Play_session_removed (day, previousMinutes) ->
+                "Play_session_removed", Encode.toString 0 (Encode.object [
+                    "day", Encode.string day
+                    "previousMinutes", Encode.int previousMinutes
+                ])
+            | Steam_observed_total_reconciled observedMinutes ->
+                "Steam_observed_total_reconciled", Encode.toString 0 (Encode.object [ "observedMinutes", Encode.int observedMinutes ])
             | Game_description_set description ->
                 "Game_description_set", Encode.toString 0 (Encode.object [ "description", Encode.string description ])
             | Game_short_description_set shortDescription ->
@@ -520,6 +719,48 @@ module Games =
                 Decode.fromString (Decode.field "totalMinutes" Decode.int) data
                 |> Result.toOption
                 |> Option.map Game_play_time_set
+            | "Prior_play_time_recorded" ->
+                Decode.fromString (Decode.field "minutes" Decode.int) data
+                |> Result.toOption
+                |> Option.map Prior_play_time_recorded
+            | "Play_session_recorded" ->
+                Decode.fromString (Decode.object (fun get ->
+                    { Day = get.Required.Field "day" Decode.string
+                      Minutes = get.Required.Field "minutes" Decode.int
+                      Source = get.Required.Field "source" Decode.string |> decodePlaySessionSource }
+                )) data
+                |> Result.toOption
+                |> Option.map Play_session_recorded
+            | "Play_session_minutes_corrected" ->
+                Decode.fromString (Decode.object (fun get ->
+                    let day = get.Required.Field "day" Decode.string
+                    let newMinutes = get.Required.Field "newMinutes" Decode.int
+                    let previousMinutes = get.Required.Field "previousMinutes" Decode.int
+                    (day, newMinutes, previousMinutes)
+                )) data
+                |> Result.toOption
+                |> Option.map Play_session_minutes_corrected
+            | "Play_session_moved" ->
+                Decode.fromString (Decode.object (fun get ->
+                    let fromDay = get.Required.Field "fromDay" Decode.string
+                    let toDay = get.Required.Field "toDay" Decode.string
+                    let minutes = get.Required.Field "minutes" Decode.int
+                    (fromDay, toDay, minutes)
+                )) data
+                |> Result.toOption
+                |> Option.map Play_session_moved
+            | "Play_session_removed" ->
+                Decode.fromString (Decode.object (fun get ->
+                    let day = get.Required.Field "day" Decode.string
+                    let previousMinutes = get.Required.Field "previousMinutes" Decode.int
+                    (day, previousMinutes)
+                )) data
+                |> Result.toOption
+                |> Option.map Play_session_removed
+            | "Steam_observed_total_reconciled" ->
+                Decode.fromString (Decode.field "observedMinutes" Decode.int) data
+                |> Result.toOption
+                |> Option.map Steam_observed_total_reconciled
             | "Game_description_set" ->
                 Decode.fromString (Decode.field "description" Decode.string) data
                 |> Result.toOption
@@ -586,6 +827,12 @@ module Games =
             "Game_played_with_removed"
             "Game_steam_app_id_set"
             "Game_play_time_set"
+            "Prior_play_time_recorded"
+            "Play_session_recorded"
+            "Play_session_minutes_corrected"
+            "Play_session_moved"
+            "Play_session_removed"
+            "Steam_observed_total_reconciled"
             "Game_description_set"
             "Game_short_description_set"
             "Game_website_url_set"

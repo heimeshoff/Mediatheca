@@ -846,6 +846,11 @@ type GameDetail = {
     SteamLibraryDate: string option
     SteamLastPlayed: string option
     TotalPlayTimeMinutes: int
+    /// Playtime accumulated before session tracking began (games-p6vkz) —
+    /// dateless, never contributes to the diary, only to the total above.
+    /// GameDetail shows the breakdown ("512h before tracking + 12h tracked")
+    /// when this is > 0, a single number otherwise.
+    PriorPlayTimeMinutes: int
     PlayModes: string list
     IsOwnedByMe: bool
     FamilyOwners: FriendRef list
@@ -1036,11 +1041,21 @@ type PlaySessionSource =
     | Manual
 
 type PlaySessionDto = {
-    Id: int64
     GameSlug: string
     Date: string
     MinutesPlayed: int
     Source: PlaySessionSource
+}
+
+/// Editing a session (games-p6vkz): natural-key identity is `(GameSlug, Date)`
+/// — no synthetic id (see the ADR's drift-detector argument) — so an edit
+/// must name the session it's changing (`GameSlug`/`Date`) separately from
+/// its new values (`NewDate`/`NewMinutes`).
+type PlaySessionEdit = {
+    GameSlug: string
+    Date: string
+    NewDate: string
+    NewMinutes: int
 }
 
 type PlaytimeSummaryItem = {
@@ -1396,8 +1411,8 @@ type IMediathecaApi = {
     // Playtime Tracking
     getGamePlaySessions: string -> Async<PlaySessionDto list>
     addManualPlaySession: string * string * int -> Async<Result<PlaySessionDto, string>>
-    updatePlaySession: int64 * string * int -> Async<Result<PlaySessionDto, string>>
-    deletePlaySession: int64 -> Async<Result<unit, string>>
+    updatePlaySession: PlaySessionEdit -> Async<Result<PlaySessionDto, string>>
+    deletePlaySession: string * string -> Async<Result<unit, string>>
     getPlaytimeSummary: string -> string -> Async<PlaytimeSummaryItem list>
     getPlaytimeSyncStatus: unit -> Async<PlaytimeSyncStatus>
     triggerPlaytimeSync: unit -> Async<Result<PlaytimeSyncResult, string>>

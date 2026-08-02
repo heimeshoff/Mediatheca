@@ -3482,6 +3482,16 @@ module Api =
 
                         for steamGame in steamGames do
                             try
+                                // games-p6vkz: the old direct play-time setter
+                                // is gone — this bulk import now dispatches
+                                // the same pure Steam-sync decision
+                                // (Games.decide's Record_steam_observed_total)
+                                // the scheduled sync uses, keyed on
+                                // rtime_last_played (or today, if Steam never
+                                // reported one).
+                                let gamingDay =
+                                    Steam.unixTimestampToDateString steamGame.RtimeLastPlayed
+                                    |> Option.defaultValue (System.DateTime.Now.ToString("yyyy-MM-dd"))
                                 // Try to match by steam_app_id first
                                 let existingByAppId = GameProjection.findBySteamAppId conn steamGame.AppId
                                 match existingByAppId with
@@ -3496,7 +3506,7 @@ module Api =
                                                 Games.reconstitute
                                                 Games.decide
                                                 Games.Serialization.toEventData
-                                                (Games.Set_play_time steamGame.PlaytimeMinutes)
+                                                (Games.Record_steam_observed_total (steamGame.PlaytimeMinutes, gamingDay))
                                                 projectionHandlers
                                         match result with
                                         | Ok () -> playTimeUpdated <- playTimeUpdated + 1
@@ -3537,7 +3547,7 @@ module Api =
                                                     Games.reconstitute
                                                     Games.decide
                                                     Games.Serialization.toEventData
-                                                    (Games.Set_play_time steamGame.PlaytimeMinutes)
+                                                    (Games.Record_steam_observed_total (steamGame.PlaytimeMinutes, gamingDay))
                                                     projectionHandlers
                                             match result with
                                             | Ok () -> playTimeUpdated <- playTimeUpdated + 1
@@ -3670,7 +3680,7 @@ module Api =
                                                         Games.reconstitute
                                                         Games.decide
                                                         Games.Serialization.toEventData
-                                                        (Games.Set_play_time steamGame.PlaytimeMinutes)
+                                                        (Games.Record_steam_observed_total (steamGame.PlaytimeMinutes, gamingDay))
                                                         projectionHandlers
                                                 match ptResult with
                                                 | Ok () -> playTimeUpdated <- playTimeUpdated + 1
@@ -4269,7 +4279,7 @@ module Api =
                 return PlaytimeTracker.addManualPlaySessionApi conn slug date minutes runCmd
             }
 
-            updatePlaySession = fun (sessionId, newDate, newMinutes) -> async {
+            updatePlaySession = fun edit -> async {
                 use conn = factory ()
                 let runCmd s c =
                     executeCommand conn (Games.streamId s)
@@ -4279,10 +4289,10 @@ module Api =
                         Games.Serialization.toEventData
                         c
                         projectionHandlers
-                return PlaytimeTracker.updatePlaySessionApi conn sessionId newDate newMinutes runCmd
+                return PlaytimeTracker.updatePlaySessionApi conn edit runCmd
             }
 
-            deletePlaySession = fun sessionId -> async {
+            deletePlaySession = fun (slug, day) -> async {
                 use conn = factory ()
                 let runCmd s c =
                     executeCommand conn (Games.streamId s)
@@ -4292,7 +4302,7 @@ module Api =
                         Games.Serialization.toEventData
                         c
                         projectionHandlers
-                return PlaytimeTracker.deletePlaySessionApi conn sessionId runCmd
+                return PlaytimeTracker.deletePlaySessionApi conn slug day runCmd
             }
 
             getPlaytimeSummary = fun fromDate toDate -> async {

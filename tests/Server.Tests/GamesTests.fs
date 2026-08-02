@@ -344,25 +344,6 @@ let gameTests =
             let withDuplicate = reconstitute [ Game_added_to_library sampleGameData; Game_steam_app_id_set 292030; Game_steam_app_id_set 292030 ]
             Expect.equal withDuplicate withoutDuplicate "State should be identical regardless of duplicate Game_steam_app_id_set events"
 
-        testCase "Setting play time" <| fun _ ->
-            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Set_play_time 3600)
-            match result with
-            | Ok events ->
-                Expect.equal (List.length events) 1 "Should produce one event"
-                let state = applyEvents ([ Game_added_to_library sampleGameData ] @ events)
-                match state with
-                | Active game -> Expect.equal game.TotalPlayTimeMinutes 3600 "TotalPlayTimeMinutes should be 3600"
-                | _ -> failtest "Expected Active state"
-            | Error e -> failtest $"Expected success but got: {e}"
-
-        testCase "Setting same play time is idempotent" <| fun _ ->
-            let result = givenWhenThen
-                            [ Game_added_to_library sampleGameData; Game_play_time_set 3600 ]
-                            (Set_play_time 3600)
-            match result with
-            | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
-            | Error e -> failtest $"Expected success but got: {e}"
-
         testCase "Marking a game as owned" <| fun _ ->
             let result = givenWhenThen [ Game_added_to_library sampleGameData ] Mark_as_owned
             match result with
@@ -421,7 +402,13 @@ let gameTests =
                 Add_played_with "marco"
                 Remove_played_with "marco"
                 Set_steam_app_id 292030
-                Set_play_time 3600
+                Record_prior_play_time 3600
+                Record_play_session ("2024-06-01", 60)
+                Correct_play_session_minutes ("2024-06-01", 90)
+                Move_play_session ("2024-06-01", "2024-06-02")
+                Remove_play_session "2024-06-01"
+                Reconcile_steam_observed_total 3600
+                Record_steam_observed_total (3600, "2024-06-01")
                 Set_short_description "A short desc"
                 Set_website_url (Some "https://example.com")
                 Add_play_mode "Co-op"
@@ -525,6 +512,48 @@ let gameSerializationTests =
             let deserialized = Serialization.deserialize eventType data
             Expect.equal deserialized (Some event) "Should round-trip"
 
+        testCase "Prior_play_time_recorded round-trips" <| fun _ ->
+            let event = Prior_play_time_recorded 30000
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Play_session_recorded round-trips (SteamSync)" <| fun _ ->
+            let event = Play_session_recorded { Day = "2024-06-01"; Minutes = 120; Source = SteamSync }
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Play_session_recorded round-trips (Manual)" <| fun _ ->
+            let event = Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual }
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Play_session_minutes_corrected round-trips" <| fun _ ->
+            let event = Play_session_minutes_corrected ("2024-06-01", 90, 60)
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Play_session_moved round-trips" <| fun _ ->
+            let event = Play_session_moved ("2024-06-01", "2024-06-02", 60)
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Play_session_removed round-trips" <| fun _ ->
+            let event = Play_session_removed ("2024-06-01", 60)
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Steam_observed_total_reconciled round-trips" <| fun _ ->
+            let event = Steam_observed_total_reconciled 2952
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
         testCase "Game_steam_library_date_set round-trips (Some)" <| fun _ ->
             let event = Game_steam_library_date_set (Some "2024-01-15")
             let eventType, data = Serialization.serialize event
@@ -587,6 +616,13 @@ let gameSerializationTests =
                 Game_played_with_removed "marco"
                 Game_steam_app_id_set 292030
                 Game_play_time_set 3600
+                Prior_play_time_recorded 30000
+                Play_session_recorded { Day = "2024-06-01"; Minutes = 120; Source = SteamSync }
+                Play_session_recorded { Day = "2024-06-02"; Minutes = 60; Source = Manual }
+                Play_session_minutes_corrected ("2024-06-01", 90, 60)
+                Play_session_moved ("2024-06-01", "2024-06-02", 60)
+                Play_session_removed ("2024-06-01", 60)
+                Steam_observed_total_reconciled 2952
                 Game_short_description_set "A short description"
                 Game_website_url_set (Some "https://example.com")
                 Game_website_url_set None
@@ -603,4 +639,173 @@ let gameSerializationTests =
                 let eventType, data = Serialization.serialize event
                 let deserialized = Serialization.deserialize eventType data
                 Expect.equal deserialized (Some event) $"Should round-trip: {eventType}"
+    ]
+
+/// games-p6vkz: play sessions and pre-tracking playtime as first-class Games
+/// events. `Record_steam_observed_total` is the whole Steam-sync policy as
+/// one pure decision (see its doc comment in Games.fs); the two-fold design
+/// (TotalPlayTimeMinutes vs. SteamObservedMinutes) is what makes the sync
+/// cursor (`steam_playtime_snapshot`) derivable rather than merely guardable
+/// — the phantom-session regression below is the reason why.
+[<Tests>]
+let playSessionDecideTests =
+    testList "Games play sessions" [
+
+        testCase "Record_steam_observed_total on an unseen game above the threshold records prior playtime only" <| fun _ ->
+            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Record_steam_observed_total (30000, "2024-06-01"))
+            match result with
+            | Ok events -> Expect.equal events [ Prior_play_time_recorded 30000 ] "Should emit exactly one Prior_play_time_recorded event, no session, no promotion"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Record_steam_observed_total on an unseen game at or under the threshold records a dated session and promotes" <| fun _ ->
+            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Record_steam_observed_total (180, "2024-06-01"))
+            match result with
+            | Ok events ->
+                Expect.equal events
+                    [ Play_session_recorded { Day = "2024-06-01"; Minutes = 180; Source = SteamSync }; Game_status_changed InFocus ]
+                    "Should emit a dated session plus promotion (default status is Backlog)"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Record_steam_observed_total boundary: 960 minutes is a session, 961 minutes is prior playtime" <| fun _ ->
+            match givenWhenThen [ Game_added_to_library sampleGameData ] (Record_steam_observed_total (960, "2024-06-01")) with
+            | Ok events ->
+                Expect.isTrue
+                    (events |> List.exists (function Play_session_recorded d -> d.Minutes = 960 | _ -> false))
+                    "960 minutes (at the threshold) should record a session, not prior playtime"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+            match givenWhenThen [ Game_added_to_library sampleGameData ] (Record_steam_observed_total (961, "2024-06-01")) with
+            | Ok events -> Expect.equal events [ Prior_play_time_recorded 961 ] "961 minutes (above the threshold) should record prior playtime"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Record_steam_observed_total after prior playtime records only the delta as a session" <| fun _ ->
+            let given = [ Game_added_to_library sampleGameData; Prior_play_time_recorded 30000 ]
+            match givenWhenThen given (Record_steam_observed_total (30120, "2024-06-02")) with
+            | Ok events ->
+                Expect.equal events
+                    [ Play_session_recorded { Day = "2024-06-02"; Minutes = 120; Source = SteamSync }; Game_status_changed InFocus ]
+                    "Should emit exactly a 120-minute session (30120 - 30000)"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "phantom-session regression: removing a Steam-sourced session doesn't get silently re-added by the next sync" <| fun _ ->
+            // 509 prior + sessions summing to 2443 (1000 + 773 + 670) = 2952 total,
+            // matching what Steam has always reported. Removing the 670-minute
+            // session drops TotalPlayTimeMinutes to 2282, but SteamObservedMinutes
+            // — computed as originally recorded, never reduced by a later removal
+            // — stays at 2952. A sync reporting 2952 again must emit nothing.
+            let given =
+                [ Game_added_to_library sampleGameData
+                  Prior_play_time_recorded 509
+                  Play_session_recorded { Day = "2024-01-01"; Minutes = 1000; Source = SteamSync }
+                  Play_session_recorded { Day = "2024-01-02"; Minutes = 773; Source = SteamSync }
+                  Play_session_recorded { Day = "2024-01-03"; Minutes = 670; Source = SteamSync }
+                  Play_session_removed ("2024-01-03", 670) ]
+            let state = applyEvents given
+            match state with
+            | Active game ->
+                Expect.equal game.TotalPlayTimeMinutes 2282 "Total should be 509 + 1000 + 773 = 2282 after the removal"
+                Expect.equal game.SteamObservedMinutes 2952 "SteamObservedMinutes should stay at 509 + 2443 = 2952, unaffected by the removal"
+                match decide state (Record_steam_observed_total (2952, "2024-01-04")) with
+                | Ok events -> Expect.equal events [] "A subsequent sync reporting the same total Steam has always reported must emit nothing"
+                | Error e -> failtest $"Expected success but got: {e}"
+            | _ -> failtest "Expected Active state"
+
+        testCase "Steam_observed_total_reconciled repairs a desynced cursor without touching the recorded total" <| fun _ ->
+            let given =
+                [ Game_added_to_library sampleGameData
+                  Play_session_recorded { Day = "2024-01-01"; Minutes = 2282; Source = SteamSync } ]
+            let state = applyEvents given
+            match decide state (Reconcile_steam_observed_total 2952) with
+            | Ok events ->
+                Expect.equal events [ Steam_observed_total_reconciled 2952 ] "Should emit the reconciliation event"
+                let state2 = evolve state (List.head events)
+                match state2 with
+                | Active game ->
+                    Expect.equal game.TotalPlayTimeMinutes 2282 "TotalPlayTimeMinutes must stay at 2282"
+                    Expect.equal game.SteamObservedMinutes 2952 "SteamObservedMinutes should now be 2952"
+                    match decide state2 (Record_steam_observed_total (2952, "2024-01-02")) with
+                    | Ok followUp -> Expect.equal followUp [] "A following sync reporting the same total should emit nothing"
+                    | Error e -> failtest $"Expected success but got: {e}"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Record_prior_play_time on a game that already has prior playtime returns Error" <| fun _ ->
+            let given = [ Game_added_to_library sampleGameData; Prior_play_time_recorded 500 ]
+            match givenWhenThen given (Record_prior_play_time 200) with
+            | Error _ -> ()
+            | Ok _ -> failtest "Expected an error — prior playtime is recorded once per game"
+
+        testCase "decide rejects zero or negative minutes on Record_play_session" <| fun _ ->
+            match givenWhenThen [ Game_added_to_library sampleGameData ] (Record_play_session ("2024-06-01", 0)) with
+            | Error _ -> ()
+            | Ok _ -> failtest "Expected an error for zero minutes"
+
+        testCase "decide rejects zero or negative minutes on Correct_play_session_minutes" <| fun _ ->
+            let given = [ Game_added_to_library sampleGameData; Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual } ]
+            match givenWhenThen given (Correct_play_session_minutes ("2024-06-01", 0)) with
+            | Error _ -> ()
+            | Ok _ -> failtest "Expected an error for zero minutes — correcting to 0 is refused, use remove"
+
+        testCase "Record_play_session on a Retired game promotes to InFocus" <| fun _ ->
+            let given = [ Game_added_to_library sampleGameData; Game_status_changed Retired ]
+            match givenWhenThen given (Record_play_session ("2024-06-01", 60)) with
+            | Ok events ->
+                Expect.equal events
+                    [ Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual }; Game_status_changed InFocus ]
+                    "Should promote from Retired"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Record_play_session on an InFocus game emits only the session event" <| fun _ ->
+            let given = [ Game_added_to_library sampleGameData; Game_status_changed InFocus ]
+            match givenWhenThen given (Record_play_session ("2024-06-01", 60)) with
+            | Ok events ->
+                Expect.equal events
+                    [ Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual } ]
+                    "Should not re-promote an already-InFocus game"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "correct, move, remove, and recording prior playtime never promote, in any status" <| fun _ ->
+            let statuses = [ Backlog; InFocus; Retired; Abandoned; Dismissed ]
+            let emittedPromotion (events: GameEvent list) =
+                events |> List.exists (function Game_status_changed _ -> true | _ -> false)
+            for status in statuses do
+                let baseEvents =
+                    [ Game_added_to_library sampleGameData
+                      Game_status_changed status
+                      Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual } ]
+
+                match givenWhenThen baseEvents (Correct_play_session_minutes ("2024-06-01", 90)) with
+                | Ok events -> Expect.isFalse (emittedPromotion events) $"Correct should not promote from {status}"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+                match givenWhenThen baseEvents (Move_play_session ("2024-06-01", "2024-06-02")) with
+                | Ok events -> Expect.isFalse (emittedPromotion events) $"Move should not promote from {status}"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+                match givenWhenThen baseEvents (Remove_play_session "2024-06-01") with
+                | Ok events -> Expect.isFalse (emittedPromotion events) $"Remove should not promote from {status}"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+                let priorEvents = [ Game_added_to_library sampleGameData; Game_status_changed status ]
+                match givenWhenThen priorEvents (Record_prior_play_time 500) with
+                | Ok events -> Expect.isFalse (emittedPromotion events) $"Recording prior playtime should not promote from {status}"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "correct, move, and remove against a nonexistent session return Error" <| fun _ ->
+            let given = [ Game_added_to_library sampleGameData ]
+            match givenWhenThen given (Correct_play_session_minutes ("2024-06-01", 90)) with
+            | Error _ -> ()
+            | Ok _ -> failtest "Expected error for correct against a nonexistent session"
+            match givenWhenThen given (Move_play_session ("2024-06-01", "2024-06-02")) with
+            | Error _ -> ()
+            | Ok _ -> failtest "Expected error for move against a nonexistent session"
+            match givenWhenThen given (Remove_play_session "2024-06-01") with
+            | Error _ -> ()
+            | Ok _ -> failtest "Expected error for remove against a nonexistent session"
+
+        testCase "Games.evolve on Game_play_time_set is a no-op (legacy, superseded)" <| fun _ ->
+            let given = [ Game_added_to_library sampleGameData; Prior_play_time_recorded 500 ]
+            let stateBefore = applyEvents given
+            let stateAfter = applyEvents (given @ [ Game_play_time_set 999999 ])
+            Expect.equal stateAfter stateBefore "Replaying Game_play_time_set must not change state"
     ]

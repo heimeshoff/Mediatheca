@@ -11,10 +11,10 @@ let private createInMemoryConnection () =
     let conn = new SqliteConnection("Data Source=:memory:")
     conn.Open()
     EventStore.initialize conn
-    PlaytimeTracker.initialize conn
     // GameProjection.getBySlug joins with content_blocks, so initialize that table too
     ContentBlockProjection.handler.Init conn
     GameProjection.handler.Init conn
+    PlaySessionProjection.handler.Init conn
     conn
 
 let private sampleGameData: Games.GameAddedData = {
@@ -32,15 +32,16 @@ let private sampleGameData: Games.GameAddedData = {
 
 let private gameSlug = "test-game-2024"
 
-/// Append the Game_added_to_library event and run the projection so the slug exists in game_detail.
+/// Append the Game_added_to_library event and run the projections so the slug exists in game_detail.
 let private seedGame (conn: SqliteConnection) =
     let event = Games.Game_added_to_library sampleGameData
     let eventData = Games.Serialization.toEventData event
     let streamId = Games.streamId gameSlug
     EventStore.appendToStream conn streamId -1L [ eventData ] |> ignore
     Projection.runProjection conn GameProjection.handler
+    Projection.runProjection conn PlaySessionProjection.handler
 
-/// Helper: produces a runCmd callback bound to the connection and projection handlers.
+/// Helper: produces a runCmd callback bound to the connection and both projections.
 let private runCmd (conn: SqliteConnection) (slug: string) (cmd: Games.GameCommand) : Result<unit, string> =
     let streamId = Games.streamId slug
     let storedEvents = EventStore.readStream conn streamId
@@ -57,6 +58,7 @@ let private runCmd (conn: SqliteConnection) (slug: string) (cmd: Games.GameComma
             | EventStore.ConcurrencyConflict _ -> Error "Concurrency conflict"
             | EventStore.Success _ ->
                 Projection.runProjection conn GameProjection.handler
+                Projection.runProjection conn PlaySessionProjection.handler
                 Ok ()
 
 let private getTotalFromProjection (conn: SqliteConnection) (slug: string) : int =
@@ -64,7 +66,7 @@ let private getTotalFromProjection (conn: SqliteConnection) (slug: string) : int
     | Some g -> g.TotalPlayTimeMinutes
     | None -> -1
 
-let private countSessions (conn: SqliteConnection) (slug: string) : int =
+let private countSessionRows (conn: SqliteConnection) (slug: string) : int =
     conn
     |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_play_session WHERE game_slug = @slug"
     |> Db.setParams [ "slug", SqlType.String slug ]
@@ -85,10 +87,25 @@ let private countStatusChangeEvents (conn: SqliteConnection) (slug: string) : in
     |> List.length
 
 [<Tests>]
-let playtimeTrackerTests =
-    testList "PlaytimeTracker manual sessions" [
+let syncGateTests =
+    testList "PlaytimeTracker.syncGateOpen (pure)" [
 
-        testCase "Adding a manual session for a fresh date creates a new row with steam_app_id = 0" <| fun _ ->
+        testCase "refuses when legacy events are present and the migration marker is absent" <| fun _ ->
+            Expect.isFalse (PlaytimeTracker.syncGateOpen true false) "Should refuse — legacy events present, migration not completed"
+
+        testCase "permits when the migration marker is set, even with legacy events present" <| fun _ ->
+            Expect.isTrue (PlaytimeTracker.syncGateOpen true true) "Should permit once the migration marker is set"
+
+        testCase "permits when there are no legacy events at all, regardless of the marker" <| fun _ ->
+            Expect.isTrue (PlaytimeTracker.syncGateOpen false false) "A fresh install (no legacy events) is never gated"
+            Expect.isTrue (PlaytimeTracker.syncGateOpen false true) "Still permitted with the marker set and no legacy events"
+    ]
+
+[<Tests>]
+let manualSessionApiTests =
+    testList "PlaytimeTracker manual sessions (natural key)" [
+
+        testCase "Adding a manual session for a fresh date creates a new row" <| fun _ ->
             let conn = createInMemoryConnection ()
             seedGame conn
 
@@ -100,16 +117,14 @@ let playtimeTrackerTests =
                 Expect.equal dto.Date "2024-06-01" "Date should be the supplied date"
                 Expect.equal dto.MinutesPlayed 60 "Minutes should be 60"
                 Expect.equal dto.Source Manual "Source should be Manual"
-                Expect.equal (countSessions conn gameSlug) 1 "Should have one session"
-                Expect.equal (getTotalFromProjection conn gameSlug) 60 "Projection total should equal SUM"
+                Expect.equal (countSessionRows conn gameSlug) 1 "Should have one session row"
+                Expect.equal (getTotalFromProjection conn gameSlug) 60 "Projection total should equal the session"
             | Error e -> failtest $"Expected Ok, got: {e}"
 
-        testCase "Adding a manual session for an existing date merges minutes" <| fun _ ->
+        testCase "Adding a manual session for an existing date merges minutes (integration-004 shape, at the aggregate level)" <| fun _ ->
             let conn = createInMemoryConnection ()
             seedGame conn
-            // First insert via Steam-style record (steam_app_id = 123)
-            PlaytimeTracker.recordPlaySession conn gameSlug 123 "2024-06-02" 30
-            PlaytimeTracker.recomputeAndPublishTotal conn gameSlug (runCmd conn)
+            PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-02" 30 (runCmd conn) |> ignore
 
             let result =
                 PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-02" 45 (runCmd conn)
@@ -117,111 +132,75 @@ let playtimeTrackerTests =
             match result with
             | Ok dto ->
                 Expect.equal dto.MinutesPlayed 75 "Minutes should be merged (30 + 45)"
-                Expect.equal (countSessions conn gameSlug) 1 "Should still be one row"
+                Expect.equal (countSessionRows conn gameSlug) 1 "Should still be one row"
                 Expect.equal (getTotalFromProjection conn gameSlug) 75 "Projection total reflects merge"
             | Error e -> failtest $"Expected Ok, got: {e}"
 
-        testCase "Editing a session with a colliding date merges into the other row" <| fun _ ->
+        testCase "Editing a session with a colliding new date merges into the other day" <| fun _ ->
             let conn = createInMemoryConnection ()
             seedGame conn
-            // Create two sessions on different dates
-            let added1 = PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-03" 60 (runCmd conn)
-            let added2 = PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-04" 90 (runCmd conn)
+            PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-03" 60 (runCmd conn) |> ignore
+            PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-04" 90 (runCmd conn) |> ignore
 
-            match added1, added2 with
-            | Ok dto1, Ok dto2 ->
-                // Edit dto2 to land on dto1's date — should merge into dto1
-                let edit =
-                    PlaytimeTracker.updatePlaySessionApi conn dto2.Id "2024-06-03" 90 (runCmd conn)
-
-                match edit with
-                | Ok merged ->
-                    Expect.equal merged.Id dto1.Id "Merged session should have dto1's id"
-                    Expect.equal merged.MinutesPlayed 150 "Minutes should be 60 + 90"
-                    Expect.equal (countSessions conn gameSlug) 1 "Only one row should remain"
-                    Expect.equal (getTotalFromProjection conn gameSlug) 150 "Projection reflects merged total"
-                | Error e -> failtest $"Expected merge to succeed, got: {e}"
-            | _ -> failtest "Setup failed"
+            let edit: PlaySessionEdit = { GameSlug = gameSlug; Date = "2024-06-04"; NewDate = "2024-06-03"; NewMinutes = 90 }
+            match PlaytimeTracker.updatePlaySessionApi conn edit (runCmd conn) with
+            | Ok merged ->
+                Expect.equal merged.Date "2024-06-03" "Merged session should land on the collision day"
+                Expect.equal merged.MinutesPlayed 150 "Minutes should be 60 + 90"
+                Expect.equal (countSessionRows conn gameSlug) 1 "Only one row should remain"
+                Expect.equal (getTotalFromProjection conn gameSlug) 150 "Projection reflects merged total"
+            | Error e -> failtest $"Expected merge to succeed, got: {e}"
 
         testCase "Editing a session changes date and minutes without collision" <| fun _ ->
             let conn = createInMemoryConnection ()
             seedGame conn
-            let added = PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-05" 30 (runCmd conn)
-            match added with
-            | Ok dto ->
-                let edited =
-                    PlaytimeTracker.updatePlaySessionApi conn dto.Id "2024-06-06" 50 (runCmd conn)
-                match edited with
-                | Ok updated ->
-                    Expect.equal updated.Id dto.Id "Same id"
-                    Expect.equal updated.Date "2024-06-06" "Date updated"
-                    Expect.equal updated.MinutesPlayed 50 "Minutes updated"
-                    Expect.equal (getTotalFromProjection conn gameSlug) 50 "Total reflects update"
-                | Error e -> failtest $"Expected Ok, got: {e}"
-            | Error e -> failtest $"Setup failed: {e}"
+            PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-05" 30 (runCmd conn) |> ignore
+
+            let edit: PlaySessionEdit = { GameSlug = gameSlug; Date = "2024-06-05"; NewDate = "2024-06-06"; NewMinutes = 50 }
+            match PlaytimeTracker.updatePlaySessionApi conn edit (runCmd conn) with
+            | Ok updated ->
+                Expect.equal updated.Date "2024-06-06" "Date updated"
+                Expect.equal updated.MinutesPlayed 50 "Minutes updated"
+                Expect.equal (getTotalFromProjection conn gameSlug) 50 "Total reflects update"
+            | Error e -> failtest $"Expected Ok, got: {e}"
 
         testCase "Deleting a session removes it and updates total" <| fun _ ->
             let conn = createInMemoryConnection ()
             seedGame conn
-            let added = PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-07" 100 (runCmd conn)
-            match added with
-            | Ok dto ->
-                Expect.equal (getTotalFromProjection conn gameSlug) 100 "Total before delete"
-                let delResult = PlaytimeTracker.deletePlaySessionApi conn dto.Id (runCmd conn)
-                match delResult with
-                | Ok () ->
-                    Expect.equal (countSessions conn gameSlug) 0 "Row should be gone"
-                    Expect.equal (getTotalFromProjection conn gameSlug) 0 "Total should be 0"
-                | Error e -> failtest $"Expected Ok, got: {e}"
-            | Error e -> failtest $"Setup failed: {e}"
+            PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-07" 100 (runCmd conn) |> ignore
+            Expect.equal (getTotalFromProjection conn gameSlug) 100 "Total before delete"
 
-        testCase "Deleting a non-existent id is a no-op (Ok)" <| fun _ ->
-            let conn = createInMemoryConnection ()
-            seedGame conn
-            let result = PlaytimeTracker.deletePlaySessionApi conn 99999L (runCmd conn)
-            match result with
-            | Ok () -> ()
+            match PlaytimeTracker.deletePlaySessionApi conn gameSlug "2024-06-07" (runCmd conn) with
+            | Ok () ->
+                Expect.equal (countSessionRows conn gameSlug) 0 "Row should be gone"
+                Expect.equal (getTotalFromProjection conn gameSlug) 0 "Total should be 0"
             | Error e -> failtest $"Expected Ok, got: {e}"
 
-        testCase "Total playtime equals SUM(minutes_played) after multiple ops" <| fun _ ->
+        testCase "Deleting a nonexistent (slug, day) is a no-op (Ok)" <| fun _ ->
             let conn = createInMemoryConnection ()
             seedGame conn
-
-            PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-10" 30 (runCmd conn) |> ignore
-            PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-11" 45 (runCmd conn) |> ignore
-            PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-12" 25 (runCmd conn) |> ignore
-
-            // 30 + 45 + 25 = 100
-            Expect.equal (getTotalFromProjection conn gameSlug) 100 "Total after three adds"
-
-            let sessions = PlaytimeTracker.getPlaySessionsForGame conn gameSlug
-            let firstId = (sessions |> List.find (fun s -> s.Date = "2024-06-10")).Id
-            PlaytimeTracker.deletePlaySessionApi conn firstId (runCmd conn) |> ignore
-
-            // 45 + 25 = 70
-            Expect.equal (getTotalFromProjection conn gameSlug) 70 "Total after delete"
+            match PlaytimeTracker.deletePlaySessionApi conn gameSlug "1999-01-01" (runCmd conn) with
+            | Ok () -> ()
+            | Error e -> failtest $"Expected Ok, got: {e}"
 
         testCase "Validation: minutes <= 0 returns Error" <| fun _ ->
             let conn = createInMemoryConnection ()
             seedGame conn
-            let result = PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-15" 0 (runCmd conn)
-            match result with
+            match PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-15" 0 (runCmd conn) with
             | Error _ -> ()
             | Ok _ -> failtest "Expected error for 0 minutes"
 
         testCase "Validation: minutes > 1440 returns Error" <| fun _ ->
             let conn = createInMemoryConnection ()
             seedGame conn
-            let result = PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-15" 1441 (runCmd conn)
-            match result with
+            match PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-15" 1441 (runCmd conn) with
             | Error _ -> ()
             | Ok _ -> failtest "Expected error for > 1440 minutes"
 
         testCase "Validation: malformed date returns Error" <| fun _ ->
             let conn = createInMemoryConnection ()
             seedGame conn
-            let result = PlaytimeTracker.addManualPlaySessionApi conn gameSlug "not-a-date" 30 (runCmd conn)
-            match result with
+            match PlaytimeTracker.addManualPlaySessionApi conn gameSlug "not-a-date" 30 (runCmd conn) with
             | Error _ -> ()
             | Ok _ -> failtest "Expected error for malformed date"
 
@@ -229,140 +208,108 @@ let playtimeTrackerTests =
             let conn = createInMemoryConnection ()
             seedGame conn
             let future = DateTime.Now.AddDays(7.0).ToString("yyyy-MM-dd")
-            let result = PlaytimeTracker.addManualPlaySessionApi conn gameSlug future 30 (runCmd conn)
-            match result with
+            match PlaytimeTracker.addManualPlaySessionApi conn gameSlug future 30 (runCmd conn) with
             | Error _ -> ()
             | Ok _ -> failtest "Expected error for future date"
 
-        testCase "Manual sessions do not interfere with Steam delta tracking" <| fun _ ->
-            // Steam delta is computed against steam_playtime_snapshot, not against game_play_session.
-            // Adding manual sessions must not change the snapshot, so the next Steam delta is added
-            // on top of manual sessions. Verify by simulating:
-            //   1. Steam reports 100 min — first sync — baseline snapshot saved (no delta yet).
-            //   2. User adds a manual 50 min session.
-            //   3. Steam reports 130 min. Delta = 30. After this, total should be 100 (steam) + 50 (manual) + 30 (steam delta) = 180.
+        testCase "Same-day Steam delta merges into the existing session row instead of being dropped (integration-004 regression, at the projection level)" <| fun _ ->
             let conn = createInMemoryConnection ()
             seedGame conn
-            let steamAppId = 999
-
-            // Simulate first sync: record initial session and snapshot
-            PlaytimeTracker.recordPlaySession conn gameSlug steamAppId "2024-06-20" 100
-            PlaytimeTracker.saveSnapshot conn steamAppId gameSlug 100
-            PlaytimeTracker.recomputeAndPublishTotal conn gameSlug (runCmd conn)
-            Expect.equal (getTotalFromProjection conn gameSlug) 100 "After first sync, total = 100"
-
-            // User adds manual session
-            PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-21" 50 (runCmd conn) |> ignore
-            Expect.equal (getTotalFromProjection conn gameSlug) 150 "After manual, total = 150"
-
-            // Snapshot should still be 100 (manual sessions don't touch the snapshot)
-            match PlaytimeTracker.getLastSnapshot conn steamAppId with
-            | Some (lastTotal, _) -> Expect.equal lastTotal 100 "Snapshot unaffected by manual session"
-            | None -> failtest "Snapshot should still exist"
-
-            // Simulate next sync: Steam reports 130 (delta = 30)
-            PlaytimeTracker.recordPlaySession conn gameSlug steamAppId "2024-06-22" 30
-            PlaytimeTracker.saveSnapshot conn steamAppId gameSlug 130
-            PlaytimeTracker.recomputeAndPublishTotal conn gameSlug (runCmd conn)
-
-            // Total = 100 (first steam) + 50 (manual) + 30 (delta) = 180
-            Expect.equal (getTotalFromProjection conn gameSlug) 180 "Manual + Steam delta combined correctly"
-
-        testCase "Same-day Steam delta merges into the existing session row instead of being dropped" <| fun _ ->
-            // Regression for integration-004: two Steam syncs that both attribute to the same gaming day
-            // must sum into the existing row, not silently drop the second delta on UNIQUE(game_slug, date).
-            // Simulates:
-            //   Day D evening: sync records 100 min for date D, snapshot 100 -> 200.
-            //   Day D late-night: user plays 60 more min; Steam total now 260.
-            //   Day D+1 morning: sync delta=+60 attributed to date D (via rtime_last_played) —
-            //   must merge into the existing row, not be ignored.
-            let conn = createInMemoryConnection ()
-            seedGame conn
-            let steamAppId = 1001
             let day = "2024-06-20"
 
-            // Seed first sync: row exists for day D with 100 minutes, snapshot at 200.
-            PlaytimeTracker.recordPlaySession conn gameSlug steamAppId day 100
-            PlaytimeTracker.saveSnapshot conn steamAppId gameSlug 200
-            PlaytimeTracker.recomputeAndPublishTotal conn gameSlug (runCmd conn)
-            Expect.equal (getTotalFromProjection conn gameSlug) 100 "Sanity: after first session, total = 100"
+            runCmd conn gameSlug (Games.Record_steam_observed_total (100, day)) |> ignore
+            Expect.equal (getTotalFromProjection conn gameSlug) 100 "Sanity: after first sync, total = 100"
 
-            // Second Steam sync attributes a +60 delta to the same gaming day D.
-            PlaytimeTracker.recordPlaySession conn gameSlug steamAppId day 60
-            PlaytimeTracker.recomputeAndPublishTotal conn gameSlug (runCmd conn)
+            // Second Steam sync attributes a further +60 delta to the same gaming day.
+            runCmd conn gameSlug (Games.Record_steam_observed_total (160, day)) |> ignore
 
-            // The single row for day D must now read 160 min (100 + 60).
             let sessions = PlaytimeTracker.getPlaySessionsForGame conn gameSlug
             let dayRows = sessions |> List.filter (fun s -> s.Date = day)
             Expect.equal (List.length dayRows) 1 "Still exactly one row for the gaming day"
             Expect.equal (List.head dayRows).MinutesPlayed 160 "Same-day delta is summed, not dropped"
             Expect.equal (getTotalFromProjection conn gameSlug) 160 "Projection total reflects merged minutes"
+
+        testCase "A game with only prior playtime produces zero session rows, and dashboard/summary queries return nothing for it" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            runCmd conn gameSlug (Games.Record_prior_play_time 30000) |> ignore
+
+            Expect.equal (countSessionRows conn gameSlug) 0 "Prior playtime writes no session row"
+            Expect.equal (getTotalFromProjection conn gameSlug) 30000 "Total reflects prior playtime"
+            match GameProjection.getBySlug conn gameSlug with
+            | Some g -> Expect.equal g.PriorPlayTimeMinutes 30000 "game_detail.prior_play_time reflects the recorded amount"
+            | None -> failtest "Expected game to exist"
+
+            let dashboard = PlaytimeTracker.getDashboardPlaySessions conn 3650
+            Expect.isEmpty (dashboard |> List.filter (fun s -> s.GameSlug = gameSlug)) "Dashboard should show no sessions for this game"
+            let summary = PlaytimeTracker.getPlaytimeSummary conn "2000-01-01" "2100-01-01"
+            Expect.isEmpty (summary |> List.filter (fun s -> s.GameSlug = gameSlug)) "Playtime summary should show no sessions for this game"
+
+        testCase "TotalPlayTimeMinutes stays in lock-step across the aggregate and both projection tables" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            runCmd conn gameSlug (Games.Record_prior_play_time 500) |> ignore
+            PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-10" 30 (runCmd conn) |> ignore
+            PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-11" 45 (runCmd conn) |> ignore
+            runCmd conn gameSlug (Games.Correct_play_session_minutes ("2024-06-11", 60)) |> ignore
+
+            let streamId = Games.streamId gameSlug
+            let events = EventStore.readStream conn streamId |> List.choose Games.Serialization.fromStoredEvent
+            let state = Games.reconstitute events
+            let aggregateTotal =
+                match state with
+                | Games.Active g -> g.TotalPlayTimeMinutes
+                | _ -> failwith "Expected Active state"
+
+            let sessionSum =
+                conn
+                |> Db.newCommand "SELECT COALESCE(SUM(minutes_played), 0) as total FROM game_play_session WHERE game_slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String gameSlug ]
+                |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
+                |> Option.defaultValue 0
+            let priorPlayTime =
+                conn
+                |> Db.newCommand "SELECT prior_play_time FROM game_detail WHERE slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String gameSlug ]
+                |> Db.querySingle (fun rd -> rd.ReadInt32 "prior_play_time")
+                |> Option.defaultValue 0
+            let gameListTotal =
+                conn
+                |> Db.newCommand "SELECT total_play_time FROM game_list WHERE slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String gameSlug ]
+                |> Db.querySingle (fun rd -> rd.ReadInt32 "total_play_time")
+                |> Option.defaultValue -1
+            let gameDetailTotal = getTotalFromProjection conn gameSlug
+
+            Expect.equal aggregateTotal (priorPlayTime + sessionSum) "Aggregate total should equal prior_play_time + SUM(minutes_played)"
+            Expect.equal gameListTotal aggregateTotal "game_list.total_play_time should match the aggregate"
+            Expect.equal gameDetailTotal aggregateTotal "game_detail.total_play_time should match the aggregate"
     ]
 
 [<Tests>]
 let promoteToInFocusTests =
-    // Task 048: any newly recorded play session promotes the game to InFocus,
-    // regardless of prior status (Backlog, Retired, Abandoned, Dismissed all qualify).
-    // Already-InFocus games are skipped to avoid emitting redundant events.
-    testList "PlaytimeTracker auto-promote to InFocus" [
+    // games-p6vkz: only recording a NEW session promotes, regardless of prior
+    // status (Backlog, Retired, Abandoned, Dismissed all qualify). Correcting,
+    // moving, removing, or recording prior playtime must never promote —
+    // ADR-0042's any-status rule moved into Games.decide.
+    testList "PlaytimeTracker auto-promote to InFocus (via the manual session API)" [
 
-        testCase "Backlog game with new playtime is promoted to InFocus" <| fun _ ->
+        testCase "Backlog game with a new manual session is promoted to InFocus" <| fun _ ->
             let conn = createInMemoryConnection ()
             seedGame conn
-            // Default status is Backlog
             Expect.equal (getStatus conn gameSlug) (Some Backlog) "Starts in Backlog"
 
-            let promoted = PlaytimeTracker.promoteToInFocusIfNeeded conn gameSlug (runCmd conn)
+            match PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-01" 60 (runCmd conn) with
+            | Ok _ -> Expect.equal (getStatus conn gameSlug) (Some InFocus) "Manual session promotes to InFocus"
+            | Error e -> failtest $"Expected Ok, got: {e}"
 
-            Expect.isTrue promoted "Should report promotion"
-            Expect.equal (getStatus conn gameSlug) (Some InFocus) "Status now InFocus"
-
-        testCase "Retired game with new playtime is promoted to InFocus" <| fun _ ->
+        testCase "Retired game with a new manual session is promoted to InFocus" <| fun _ ->
             let conn = createInMemoryConnection ()
             seedGame conn
             setStatus conn gameSlug Retired
-            Expect.equal (getStatus conn gameSlug) (Some Retired) "Starts in Retired"
 
-            let promoted = PlaytimeTracker.promoteToInFocusIfNeeded conn gameSlug (runCmd conn)
-
-            Expect.isTrue promoted "Should report promotion (replaying a finished game)"
-            Expect.equal (getStatus conn gameSlug) (Some InFocus) "Status now InFocus"
-
-        testCase "Abandoned game is promoted to InFocus on new play" <| fun _ ->
-            let conn = createInMemoryConnection ()
-            seedGame conn
-            setStatus conn gameSlug Abandoned
-            let promoted = PlaytimeTracker.promoteToInFocusIfNeeded conn gameSlug (runCmd conn)
-            Expect.isTrue promoted "Should report promotion"
-            Expect.equal (getStatus conn gameSlug) (Some InFocus) "Status now InFocus"
-
-        testCase "Dismissed game is promoted to InFocus on new play" <| fun _ ->
-            let conn = createInMemoryConnection ()
-            seedGame conn
-            setStatus conn gameSlug Dismissed
-            let promoted = PlaytimeTracker.promoteToInFocusIfNeeded conn gameSlug (runCmd conn)
-            Expect.isTrue promoted "Should report promotion"
-            Expect.equal (getStatus conn gameSlug) (Some InFocus) "Status now InFocus"
-
-        testCase "Already-InFocus game emits no Game_status_changed event and reports no promotion" <| fun _ ->
-            let conn = createInMemoryConnection ()
-            seedGame conn
-            setStatus conn gameSlug InFocus
-            let beforeCount = countStatusChangeEvents conn gameSlug
-            let promoted = PlaytimeTracker.promoteToInFocusIfNeeded conn gameSlug (runCmd conn)
-            let afterCount = countStatusChangeEvents conn gameSlug
-            Expect.isFalse promoted "Should NOT report promotion"
-            Expect.equal afterCount beforeCount "No additional Game_status_changed events"
-            Expect.equal (getStatus conn gameSlug) (Some InFocus) "Still InFocus"
-
-        testCase "Manual session for a Backlog game promotes to InFocus" <| fun _ ->
-            let conn = createInMemoryConnection ()
-            seedGame conn
-            // Default Backlog
-            let result =
-                PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-01" 60 (runCmd conn)
-            match result with
-            | Ok _ -> Expect.equal (getStatus conn gameSlug) (Some InFocus) "Manual session promotes to InFocus"
+            match PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-01" 60 (runCmd conn) with
+            | Ok _ -> Expect.equal (getStatus conn gameSlug) (Some InFocus) "Promotes from Retired"
             | Error e -> failtest $"Expected Ok, got: {e}"
 
         testCase "Manual session for an InFocus game does not emit a redundant status event" <| fun _ ->
@@ -374,19 +321,31 @@ let promoteToInFocusTests =
             let after = countStatusChangeEvents conn gameSlug
             Expect.equal after before "No new Game_status_changed event emitted"
 
-        testCase "Manual session edit on a Retired game promotes to InFocus" <| fun _ ->
+        testCase "Editing an existing session does NOT re-promote a Retired game (games-p6vkz narrowing)" <| fun _ ->
             let conn = createInMemoryConnection ()
             seedGame conn
-            // Add a session first while still in Backlog (which itself promotes to InFocus),
-            // then move to Retired, then edit the session — should re-promote.
-            let added = PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-01" 60 (runCmd conn)
+            PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-01" 60 (runCmd conn) |> ignore
+            // Promoted to InFocus by the add above; move it back to Retired.
             setStatus conn gameSlug Retired
-            Expect.equal (getStatus conn gameSlug) (Some Retired) "Now Retired"
-            match added with
-            | Ok dto ->
-                PlaytimeTracker.updatePlaySessionApi conn dto.Id "2024-06-02" 90 (runCmd conn) |> ignore
-                Expect.equal (getStatus conn gameSlug) (Some InFocus) "Edit promotes back to InFocus"
-            | Error e -> failtest $"Setup failed: {e}"
+            let before = countStatusChangeEvents conn gameSlug
+
+            let edit: PlaySessionEdit = { GameSlug = gameSlug; Date = "2024-06-01"; NewDate = "2024-06-02"; NewMinutes = 90 }
+            PlaytimeTracker.updatePlaySessionApi conn edit (runCmd conn) |> ignore
+
+            Expect.equal (getStatus conn gameSlug) (Some Retired) "Editing a session must not yank a Retired game back into focus"
+            Expect.equal (countStatusChangeEvents conn gameSlug) before "No additional Game_status_changed event from the edit"
+
+        testCase "Deleting a session does NOT promote" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+            PlaytimeTracker.addManualPlaySessionApi conn gameSlug "2024-06-01" 60 (runCmd conn) |> ignore
+            setStatus conn gameSlug Abandoned
+            let before = countStatusChangeEvents conn gameSlug
+
+            PlaytimeTracker.deletePlaySessionApi conn gameSlug "2024-06-01" (runCmd conn) |> ignore
+
+            Expect.equal (getStatus conn gameSlug) (Some Abandoned) "Deleting a session must not promote"
+            Expect.equal (countStatusChangeEvents conn gameSlug) before "No additional Game_status_changed event from the delete"
     ]
 
 /// Appends a raw Game_status_changed event carrying a literal legacy status string,

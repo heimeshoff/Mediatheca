@@ -29,6 +29,7 @@ let private bootstrapAdmin (conn: SqliteConnection) =
     MovieProjection.handler.Init conn
     SeriesProjection.handler.Init conn
     GameProjection.handler.Init conn
+    PlaySessionProjection.handler.Init conn
     CatalogProjection.handler.Init conn
     // Job runs console (administration-yamm5): table + startup reconciliation,
     // same as Composition.fs's init sequence, so any test exercising
@@ -54,6 +55,7 @@ let private allProjectionHandlers = [
     CatalogProjection.handler
     SeriesProjection.handler
     GameProjection.handler
+    PlaySessionProjection.handler
 ]
 
 /// Most Administration tests don't exercise the Jobs tab — an empty registry
@@ -458,6 +460,22 @@ let administrationTests =
 
             Expect.isEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "Game_rawg_id_set")) "Game_rawg_id_set is handled by Games' deserializer, so it must not appear in the unhandled list"
             Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Game_rawg_id_set")) "Game_rawg_id_set now has a formatter case, so it must not appear in the unformattable list"
+
+        testCase "getHealthStats Game_play_time_set appears in neither the unhandled nor the unformattable list (games-p6vkz: legacy, mandatory no-op in evolve, still handled+formattable)" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
+            // Game_play_time_set is retired from GameCommand (Set_play_time is
+            // gone) but stays in the GameEvent DU, Games.Serialization's
+            // handledEventTypes, and EventFormatting's formatter — replay must
+            // still recognize old rows, it just must no longer set the total.
+            EventStore.appendToStream conn (Games.streamId "some-game") -1L
+                [ Games.Serialization.toEventData (Games.Game_play_time_set 3600) ] |> ignore
+            let api = createApi db.Factory
+
+            let stats = api.getHealthStats () |> Async.RunSynchronously
+
+            Expect.isEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "Game_play_time_set")) "Game_play_time_set is still in Games.Serialization.handledEventTypes, so it must not appear in the unhandled list"
+            Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Game_play_time_set")) "Game_play_time_set still has a formatter case, so it must not appear in the unformattable list"
 
         testCase "getHealthStats unhandled list flags an event type whose stream prefix matches no known bounded context" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapAdmin

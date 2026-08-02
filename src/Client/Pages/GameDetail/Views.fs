@@ -1071,6 +1071,22 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                     prop.className "flex items-center gap-3 text-base-content/60 mb-4"
                                                     prop.children [
                                                         Html.span [ prop.text (string game.Year) ]
+                                                        // games-p6vkz: prior (pre-tracking) playtime is a
+                                                        // distinct, dateless fact — surfaced as a breakdown
+                                                        // so the total stays honest about what Mediatheca
+                                                        // actually observed. Single number when there's no
+                                                        // prior playtime to break out.
+                                                        if game.TotalPlayTimeMinutes > 0 then
+                                                            Html.span [ prop.text "·" ]
+                                                            Html.span [
+                                                                prop.text (
+                                                                    if game.PriorPlayTimeMinutes > 0 then
+                                                                        let trackedMinutes = game.TotalPlayTimeMinutes - game.PriorPlayTimeMinutes
+                                                                        $"{formatPlayTime game.PriorPlayTimeMinutes} before tracking + {formatPlayTime trackedMinutes} tracked"
+                                                                    else
+                                                                        formatPlayTime game.TotalPlayTimeMinutes
+                                                                )
+                                                            ]
                                                     ]
                                                 ]
                                             ]
@@ -1425,7 +1441,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                             if isCardVisible then
                                                 let editingId =
                                                     match editState with
-                                                    | Editing (id, _) -> Some id
+                                                    | Editing (originalDate, _) -> Some originalDate
                                                     | _ -> None
                                                 let isSaving = editState = Saving
                                                 let validateDraft (draft: PlaySessionDraft) =
@@ -1506,12 +1522,13 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                             | Adding draft -> renderDraftEditor draft
                                                             | _ -> ()
                                                             for session in model.PlaySessions |> List.truncate 10 do
-                                                                if Some session.Id = editingId then
+                                                                if Some session.Date = editingId then
                                                                     match editState with
                                                                     | Editing (_, draft) -> renderDraftEditor draft
                                                                     | _ -> ()
                                                                 else
                                                                     Html.div [
+                                                                        prop.key session.Date
                                                                         prop.className "flex items-center justify-between py-1.5 border-b border-base-content/5 last:border-0 group"
                                                                         prop.children [
                                                                             Html.div [
@@ -1547,7 +1564,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                                                             Html.button [
                                                                                                 prop.className "p-1 rounded hover:bg-error/15 text-base-content/60 hover:text-error cursor-pointer"
                                                                                                 prop.title "Delete session"
-                                                                                                prop.onClick (fun _ -> dispatch (Delete_session_requested session.Id))
+                                                                                                prop.onClick (fun _ -> dispatch (Delete_session_requested session.Date))
                                                                                                 prop.children [
                                                                                                     Svg.svg [
                                                                                                         svg.className "w-4 h-4"
@@ -1588,7 +1605,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                             | Some pendingId ->
                                                 let pendingSession =
                                                     model.PlaySessions
-                                                    |> List.tryFind (fun s -> s.Id = pendingId)
+                                                    |> List.tryFind (fun s -> s.Date = pendingId)
                                                 Html.div [
                                                     prop.className "fixed inset-0 z-[300] flex items-center justify-center p-4"
                                                     prop.onClick (fun _ -> dispatch Delete_session_cancelled)

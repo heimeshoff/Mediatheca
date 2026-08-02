@@ -33,7 +33,10 @@ type PlaySessionDraft = {
 type PlaySessionEditState =
     | EditIdle
     | Adding of draft: PlaySessionDraft
-    | Editing of id: int64 * draft: PlaySessionDraft
+    // games-p6vkz: session identity is the natural key (game slug, gaming
+    // day) — no synthetic id — so editing in progress is keyed on the
+    // session's original date, not an int64 id.
+    | Editing of originalDate: string * draft: PlaySessionDraft
     | Saving
     | EditFailed of string
 
@@ -61,7 +64,7 @@ type Model = {
     ActiveTab: GameTab
     PlaySessions: PlaySessionDto list
     PlaySessionEditState: PlaySessionEditState
-    PendingDelete: int64 option
+    PendingDelete: string option
     HltbFetching: bool
     HltbNoData: bool
     Trailers: GameTrailerInfo list
@@ -133,7 +136,7 @@ type Msg =
     | Session_draft_save
     | Session_draft_cancel
     | Session_save_completed of Result<PlaySessionDto, string>
-    | Delete_session_requested of int64
+    | Delete_session_requested of date: string
     | Delete_session_confirmed
     | Delete_session_cancelled
     | Delete_session_completed of Result<unit, string>

@@ -22,12 +22,12 @@ let private bootstrapEverything (conn: SqliteConnection) =
     MetadataCache.initialize conn
     GameJournal.initialize conn
     SettingsStore.initialize conn
-    PlaytimeTracker.initialize conn
     ContentBlockProjection.handler.Init conn
     FriendProjection.handler.Init conn
     MovieProjection.handler.Init conn
     SeriesProjection.handler.Init conn
     GameProjection.handler.Init conn
+    PlaySessionProjection.handler.Init conn
     CatalogProjection.handler.Init conn
     Administration.initializeJobRuns conn
 
@@ -54,6 +54,7 @@ let private allProjectionHandlers = [
     CatalogProjection.handler
     SeriesProjection.handler
     GameProjection.handler
+    PlaySessionProjection.handler
 ]
 
 [<Tests>]
@@ -76,19 +77,20 @@ let tests =
             Expect.equal (List.length registryTableNames) (Set.count registryTableSet)
                 "tableRegistry must not list any table more than once"
 
-        testCase "game_play_session and steam_playtime_snapshot are both classified Imperative, naming PlaytimeTracker" <| fun _ ->
+        testCase "game_play_session is classified Projected, naming PlaySessionProjection (games-p6vkz: no longer PlaytimeTracker's imperative write)" <| fun _ ->
             let classificationOf table =
                 Administration.tableRegistry |> List.tryFind (fun (t, _) -> t = table) |> Option.map snd
 
             match classificationOf "game_play_session" with
-            | Some (Administration.Imperative writtenBy) ->
-                Expect.equal writtenBy "PlaytimeTracker" "game_play_session's writer"
-            | other -> failtestf "expected game_play_session to be classified Imperative, got %A" other
+            | Some (Administration.Projected projectionName) ->
+                Expect.equal projectionName "PlaySessionProjection" "game_play_session's owning projection"
+            | other -> failtestf "expected game_play_session to be classified Projected, got %A" other
 
-            match classificationOf "steam_playtime_snapshot" with
-            | Some (Administration.Imperative writtenBy) ->
-                Expect.equal writtenBy "PlaytimeTracker" "steam_playtime_snapshot's writer"
-            | other -> failtestf "expected steam_playtime_snapshot to be classified Imperative, got %A" other
+        testCase "steam_playtime_snapshot no longer exists in the registry (games-p6vkz: the two-fold aggregate design makes the cursor derivable)" <| fun _ ->
+            let classificationOf table =
+                Administration.tableRegistry |> List.tryFind (fun (t, _) -> t = table) |> Option.map snd
+
+            Expect.isNone (classificationOf "steam_playtime_snapshot") "steam_playtime_snapshot should have no registry entry — the table is deleted entirely"
 
         testCase "projectionTables derived from tableRegistry is set-equal, per projection, to the original hardcoded list" <| fun _ ->
             // The list Administration.fs hardcoded before this task — kept
@@ -107,6 +109,7 @@ let tests =
                 // checkpoint-tracked projection.
                 "SeriesProjection", [ "series_list"; "series_detail"; "series_rewatch_sessions"; "series_episode_progress" ]
                 "GameProjection", [ "game_list"; "game_detail" ]
+                "PlaySessionProjection", [ "game_play_session" ]
             ]
             let derivedFromRegistry =
                 Administration.tableRegistry
@@ -122,7 +125,7 @@ let tests =
                 let actual = derivedFromRegistry |> Map.tryFind name |> Option.defaultValue Set.empty
                 Expect.equal actual (Set.ofList tables) (sprintf "%s's derived table set" name)
             Expect.equal (Map.count derivedFromRegistry) (List.length expected)
-                "no extra projections should appear in the derivation beyond the six expected"
+                "no extra projections should appear in the derivation beyond the seven expected"
 
         testCase "getUnrebuildableTableStats reports Cache and Imperative row counts, and omits every Projected table" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapEverything
