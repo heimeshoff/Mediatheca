@@ -35,7 +35,10 @@ module PlaytimeTracker =
             suffix <- suffix + 1
         slug
 
-    let private getSyncHour (conn: SqliteConnection) : int =
+    /// Not private (games-h4mrd): the migration derives every reconstructed
+    /// session's gaming day from the SAME configured sync hour `runSync`
+    /// itself uses.
+    let getSyncHour (conn: SqliteConnection) : int =
         SettingsStore.getSetting conn "playtime_sync_hour"
         |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
         |> Option.defaultValue 4
@@ -45,7 +48,12 @@ module PlaytimeTracker =
     // and a late-night session that ends at 00:30 falls into the previous gaming day.
     let private gamingDayGraceMinutes = 30.0
 
-    let private toGamingDay (syncHour: int) (dt: DateTime) : string =
+    /// Not private (games-h4mrd): the play-session history migration derives
+    /// reconstructed sessions' gaming days through this SAME function so
+    /// reconstructed and live sessions land in identical buckets — a
+    /// separately re-derived formula would open a visible seam in the
+    /// heatmap at the migration date.
+    let toGamingDay (syncHour: int) (dt: DateTime) : string =
         dt.AddHours(float -syncHour).AddMinutes(-gamingDayGraceMinutes).ToString("yyyy-MM-dd")
 
     let private unixTimestampToGamingDay (syncHour: int) (timestamp: int) : string option =
@@ -57,9 +65,11 @@ module PlaytimeTracker =
     /// The setting `games-h4mrd`'s one-time history migration writes on
     /// success. Its presence (or the absence of any legacy
     /// `Game_play_time_set` events at all — a fresh install) is what
-    /// un-gates `runSync` below.
+    /// un-gates `runSync` below. Not private: `Administration.fs`'s
+    /// migration executor writes this key on success, and must use the
+    /// SAME literal `runSync` reads.
     [<Literal>]
-    let private migrationCompletedSettingKey = "play_session_migration_completed"
+    let migrationCompletedSettingKey = "play_session_migration_completed"
 
     /// Pure gate condition for the Steam sync (games-p6vkz): on a legacy
     /// store, every game reconstitutes with `SteamObservedMinutes = 0`

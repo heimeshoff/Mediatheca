@@ -201,3 +201,130 @@ construction*, with no filter anyone has to remember to add.
 - Client API surface changes: `PlaySessionDto` loses its synthetic `Id`;
   editing/deleting a session is now keyed on `(gameSlug, date)`
   (`PlaySessionEdit` for edits, `string * string` for deletes).
+
+## Addendum (games-h4mrd, 2026-08-02): reconstructing history from the 204 cumulative totals
+
+The migration this ADR's `## Consequences` deferred to `games-h4mrd` is
+implemented as `PlaySessionMigration.plan` (`src/Server/PlaySessionMigration.fs`) —
+pure, no database, no transport — plus a thin DB-touching shell in
+`Administration.fs` (`previewPlaySessionMigration`, `runPlaySessionMigration`,
+`playSessionMigrationPreviewHandler`, `playSessionMigrationStreamHandler`,
+mounted at `GET /api/stream/migrate-play-sessions/preview` and `POST
+/api/stream/migrate-play-sessions` respectively).
+
+### The property that makes this migration honest: no invented dates
+
+Every date this migration writes came from a genuine source: an actual event
+timestamp (a reconstructed session's day) or an actual pre-migration table
+row's own date (a table-covered session's day). The one quantity whose date
+is genuinely unknown — the pre-tracking lump — is recorded as
+`Prior_play_time_recorded`, a fact that carries no date at all, rather than
+attributed to a fabricated day. The earlier draft of this migration dated the
+whole lump at the stream's first observation and accepted, in writing, that
+"one day in early 2026 shows ~2952 minutes for Grounded — wrong as a day,
+correct as a total." That cost is gone: no fabricated day ever reaches the
+heatmap, Recently Played, or `getPlaytimeSummary`, and no `Imported` source
+case exists — every session this migration writes is a genuinely observed
+delta on a genuinely known date, `Manual` or `SteamSync`, nothing else.
+Dating the lump at `Game_steam_library_date_set` instead (considered and
+rejected) would have asserted a falsehood with more precision, not less.
+
+### Table wins where it exists, all-or-nothing per game
+
+Of the 157 streams carrying `Game_play_time_set` history, 8 also have real
+rows in the pre-migration `game_play_session` table (42 rows total) — genuine
+user-entered/edited history the cumulative totals alone cannot reconstruct
+(a manual edit or removal is invisible in a republished SUM). For those 8,
+the table wins outright: one `Play_session_recorded` per real row, and the
+reconstruction — including its would-be prior-playtime lump — is discarded
+entirely. Never mixed: all 8 have `Game_play_time_set` events both before and
+after their last table edit, and mixing would double-count. An integrity
+gate exploits a structural identity (`recomputeAndPublishTotal` used to
+publish `SUM` over the whole table for that slug, so `Σ table rows = t_last`
+by construction): a slug failing it is refused entirely and reported, never
+guessed at.
+
+### Carrying the Steam-sync cursor across the cutover
+
+`steam_playtime_snapshot` — 12 rows, itself an unmanaged orphan by the time
+this migration runs (see below) — holds what Steam last reported; the
+reconstruction (or the table) yields what was actually counted. Where they
+disagree — the games whose sessions the user edited or removed — this
+migration emits one `Steam_observed_total_reconciled snapshot.total_minutes`,
+setting `SteamObservedMinutes` without touching `TotalPlayTimeMinutes`.
+Without it, Grounded's post-migration cursor would read 2282 against Steam's
+2952, and the very first sync would fabricate a 670-minute session right
+back — this ADR's own phantom-session example, now closed end to end through
+the migration (`AdminPlaySessionMigrationTests.fs`). Bounded and small: at
+most the 12 snapshot rows, and in practice only those whose history has a
+negative delta.
+
+### `steam_playtime_snapshot` was never actually dropped — until now
+
+This ADR's own text says the table "is dropped"; in fact only its *code*
+(`getLastSnapshot`/`saveSnapshot`, the registry entry) was deleted — no
+`DROP TABLE` was ever issued against the physical schema, so on a real
+pre-migration store the 12 rows are still sitting there, unmanaged by any
+projection. `games-h4mrd` is what finally issues the `DROP TABLE`, once its
+values have been read and carried across the cutover as reconciliation
+events.
+
+### Idempotency, two mechanisms, one authoritative
+
+A `play_session_migration_completed` setting is the fast, whole-store
+early exit this ADR's own `PlaytimeTracker.syncGateOpen` reads — but the real
+guarantee is per-stream: any stream already carrying a `Play_session_*` or
+`Prior_play_time_recorded` event refuses a second append outright, so a crash
+mid-run leaves a state a re-run simply completes, and can never double-append
+to a stream it already reached. The completion marker is written only after
+every append has committed, never before — a marker written early would open
+the sync gate onto a half-migrated store, the exact deploy-window race this
+ADR's gate exists to close.
+
+### Cutover shape: checkpoint rewind now, Rebuild-all is a separate operator action
+
+The migration appends events, then rewinds `GameProjection`'s and
+`PlaySessionProjection`'s checkpoints to 0 (`isAnyProjectionDirty` then
+reports both dirty) — it does **not** rebuild them itself. The physical
+`game_play_session` table is still, at that moment, sitting in its OLD,
+non-event-sourced schema (`id, game_slug, steam_app_id, date, minutes_played,
+created_at`) — `CREATE TABLE IF NOT EXISTS` is a no-op against an
+already-existing table, so only `Projection.rebuildProjection`'s `Drop` step
+(the operator's separate, existing "Rebuild-all" action) actually replaces
+it with the new schema before replaying purely from the event log. Running
+the migration's own incremental catch-up instead — inserting through the new
+schema's column list against the still-old physical table — would violate
+the old schema's `NOT NULL` columns and fail outright. This is why the
+guardrail is phrased as two separate steps ("checkpoint rewind, then
+operator-run Rebuild-all"), not one.
+
+### Transport: two operator-triggered routes, not a startup migration
+
+`GET /api/stream/migrate-play-sessions/preview` (Giraffe raw route,
+`Administration.playSessionMigrationPreviewHandler`) is the real dry-run
+preview ADR-0034 guardrail 2 requires: a plain, read-only JSON response —
+no `VACUUM INTO`, no `appendToStream`, no guard claim, since nothing it does
+can mutate the store. It reports the seven-field contract this task's `##
+What` names: streams to be touched, events to be appended, table-covered vs
+reconstructed slugs, prior-playtime lumps, cursor reconciliations, negative
+deltas skipped, and any slug refused by the integrity gate
+(`IntegrityFailures`). An operator calls this first, inspects it, and only
+then — as a second, explicit, separate request — `POST
+/api/stream/migrate-play-sessions` (`Administration.playSessionMigrationStreamHandler`)
+to actually apply. Both handlers share ONE computation,
+`Administration.computeMigrationPlanAndApplicability` (reads the legacy
+table/snapshot/cumulative-event data, runs `PlaySessionMigration.plan`,
+filters to streams not already migrated) — so the preview an operator
+inspects can never diverge from what the apply path that follows actually
+does; this is iteration 2's fix (iteration 1 shipped only the apply route,
+with no way to inspect the plan before the irreversible append, and this
+addendum incorrectly claimed a preview existed — corrected here). The apply
+route's `complete` frame also now carries `integrityFailures`, so a slug
+refused by the gate stays visible in the apply outcome rather than
+vanishing from an otherwise-clean report. The apply route is guarded by a
+new `AdminGuards.PlaySessionMigrationInProgress` mutually exclusive with a
+projection rebuild and a wipe-import in every direction (the same
+`decideAndClaimWipeImportGuard`/`decideAndClaimRebuildGuard` shape
+ADR-0038 established, extended with a third guard dictionary rather than a
+new ambient one, per ADR-0035); `VACUUM INTO` backup runs first, in
+autocommit, before anything is touched.

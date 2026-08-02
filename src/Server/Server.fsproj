@@ -49,6 +49,7 @@
     <Compile Include="JellyfinSync.fs" />
     <Compile Include="EventFormatting.fs" />
     <Compile Include="Sse.fs" />
+    <Compile Include="PlaySessionMigration.fs" />
     <!-- Administration.fs must compile before CinemarcoImport.fs
          (administration-kv7dp, ADR-0043): CinemarcoImport's post-import
          rebuild loop calls Administration.lossyRebuildRejectionMessage.

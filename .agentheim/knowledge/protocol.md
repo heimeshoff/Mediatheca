@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-08-02 09:07 -- Task verified and completed: games-h4mrd - Reconstruct play-session history from the 204 cumulative Game_play_time_set totals — each stream's first observation becoming prior playtime rather than a fabricated session — via an operator-triggered SSE migration
+
+**Type:** Work / Task completion
+**Task:** games-h4mrd - Reconstruct play-session history from the 204 cumulative Game_play_time_set totals — each stream's first observation becoming prior playtime rather than a fabricated session — via an operator-triggered SSE migration
+**Summary:** Reconstructed play-session history from the 204 cumulative Game_play_time_set totals via pure PlaySessionMigration.plan plus an operator-triggered SSE migration with a read-only dry-run preview (ADR-0034 guardrail 2, added in iteration 2 after a verifier FAIL) - table-covered games win outright behind the integrity gate, reconstruction-only games get a dateless prior-playtime lump plus per-delta sessions, and the cursor carries across via Steam_observed_total_reconciled
+**Duration:** 54m
+**Verification:** PASS (iteration 2)
+**Files changed:** 9
+**Tests added:** 26
+**ADRs written:** none (ADR-0050 amended per the task's sanctioned fold)
+
+---
+
+## 2026-08-02 09:05 -- Verification failed: games-h4mrd - Reconstruct play-session history from the 204 cumulative Game_play_time_set totals
+
+**Type:** Work / Verification failure
+**Task:** games-h4mrd - Reconstruct play-session history from the 204 cumulative Game_play_time_set totals
+**Iteration:** 1 of 3
+**Reasons:** ADR-0034 guardrail 2 (dry-run preview + explicit confirm) silently unimplemented despite the task's What binding it; the seven-field preview report contract computed by MigrationPlan but read by nothing; integrity-gate refusals invisible to the operator (clean `complete` while a slug was silently skipped); ADR-0050 addendum claims a preview path that does not exist
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker into the same worktree
+
+---
+
 ## 2026-08-02 08:26 -- Task verified and completed: journal-w3sbq - Correct Journal's README to the first-class play-session event model — and to the read-model owners that actually exist, since there is no JournalProjection.fs
 
 **Type:** Work / Task completion

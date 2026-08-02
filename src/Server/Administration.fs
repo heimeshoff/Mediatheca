@@ -572,17 +572,29 @@ module Administration =
         /// directions — see `wipeImportEventsStreamHandler` and
         /// `projectionRebuildStreamHandler`.
         WipeImportInProgress: System.Collections.Concurrent.ConcurrentDictionary<string, unit>
+        /// The play-session history migration single-flight (games-h4mrd) —
+        /// mutually exclusive with `RebuildingProjections` and
+        /// `WipeImportInProgress` in every direction, for the same coherence
+        /// reason `WipeImportInProgress` is: this migration reads the live
+        /// `game_play_session` table and the event log's
+        /// `Game_play_time_set` history, then appends new events and rewinds
+        /// two projections' checkpoints — a concurrent rebuild or wipe-import
+        /// racing that read/write sequence could observe or leave a
+        /// half-migrated store.
+        PlaySessionMigrationInProgress: System.Collections.Concurrent.ConcurrentDictionary<string, unit>
     }
 
     /// Builds one fresh, independently-owned `AdminGuards`. The composition
     /// root calls this exactly once and passes the same value to `create`,
-    /// `projectionRebuildStreamHandler`, `driftCheckStreamHandler`, and
-    /// `wipeImportEventsStreamHandler`, so "one guard per process" is a
-    /// property of the wiring rather than of this module.
+    /// `projectionRebuildStreamHandler`, `driftCheckStreamHandler`,
+    /// `wipeImportEventsStreamHandler`, and `playSessionMigrationStreamHandler`,
+    /// so "one guard per process" is a property of the wiring rather than of
+    /// this module.
     let makeGuards () : AdminGuards =
         { RebuildingProjections = System.Collections.Concurrent.ConcurrentDictionary<string, unit>()
           DriftCheckInProgress = System.Collections.Concurrent.ConcurrentDictionary<string, unit>()
-          WipeImportInProgress = System.Collections.Concurrent.ConcurrentDictionary<string, unit>() }
+          WipeImportInProgress = System.Collections.Concurrent.ConcurrentDictionary<string, unit>()
+          PlaySessionMigrationInProgress = System.Collections.Concurrent.ConcurrentDictionary<string, unit>() }
 
     /// Single-flight key for `AdminGuards.WipeImportInProgress` — one
     /// wipe-import for the whole store at a time (there is only ever one
@@ -593,6 +605,9 @@ module Administration =
     type WipeImportGuardDecision =
         | RefusedRebuildInFlight
         | RefusedAlreadyImporting
+        /// games-h4mrd: the play-session history migration is in flight —
+        /// same mutual-exclusion reasoning as `RefusedRebuildInFlight`.
+        | RefusedPlaySessionMigrationInFlight
         | ClaimedWipeImport
 
     /// The wipe-import half of the ADR-0038 mutual-exclusion guard
@@ -613,6 +628,8 @@ module Administration =
     let decideAndClaimWipeImportGuard (guards: AdminGuards) : WipeImportGuardDecision =
         if not guards.RebuildingProjections.IsEmpty then
             RefusedRebuildInFlight
+        elif not guards.PlaySessionMigrationInProgress.IsEmpty then
+            RefusedPlaySessionMigrationInFlight
         elif not (guards.WipeImportInProgress.TryAdd(wipeImportKey, ())) then
             RefusedAlreadyImporting
         else
@@ -636,6 +653,9 @@ module Administration =
         | LossyRebuildBlocked of reason: string
         | WipeImportInFlight
         | AlreadyRebuilding
+        /// games-h4mrd: the play-session history migration is in flight —
+        /// same mutual-exclusion reasoning as `WipeImportInFlight`.
+        | PlaySessionMigrationInFlight
 
     /// The rebuild-or-reject decision `projectionRebuildStreamHandler` acts
     /// on. Order is deliberate and load-bearing: the lossy-rebuild guard
@@ -652,6 +672,8 @@ module Administration =
         | None ->
             if wipeImportInFlight guards then
                 Some WipeImportInFlight
+            elif not guards.PlaySessionMigrationInProgress.IsEmpty then
+                Some PlaySessionMigrationInFlight
             elif not (guards.RebuildingProjections.TryAdd(projectionName, ())) then
                 Some AlreadyRebuilding
             else
@@ -1151,6 +1173,9 @@ module Administration =
                         | Some WipeImportInFlight ->
                             // Mutual exclusion with wipe-import (ADR-0038).
                             do! writeEvent "rejected" "{\"message\":\"An event log import is in flight\"}"
+                        | Some PlaySessionMigrationInFlight ->
+                            // Mutual exclusion with the play-session history migration (games-h4mrd).
+                            do! writeEvent "rejected" "{\"message\":\"The play-session history migration is in flight\"}"
                         | Some AlreadyRebuilding ->
                             do! writeEvent "rejected" (sprintf "{\"message\":\"%s is already rebuilding\"}" projectionName)
                         | None ->
@@ -1533,6 +1558,8 @@ module Administration =
                 match decideAndClaimWipeImportGuard guards with
                 | RefusedRebuildInFlight ->
                     do! writeEvent "rejected" "{\"message\":\"A projection rebuild is in flight - wait for it to finish\"}"
+                | RefusedPlaySessionMigrationInFlight ->
+                    do! writeEvent "rejected" "{\"message\":\"The play-session history migration is in flight - wait for it to finish\"}"
                 | RefusedAlreadyImporting ->
                     do! writeEvent "rejected" "{\"message\":\"An event log import is already running\"}"
                 | ClaimedWipeImport ->
@@ -1553,6 +1580,380 @@ module Administration =
                             do! writeEvent "error" (sprintf "{\"phase\":\"import\",\"lineNumber\":0,\"message\":\"%s\"}" (escapeJson ex.Message))
                     finally
                         guards.WipeImportInProgress.TryRemove(wipeImportKey) |> ignore
+
+                return! earlyReturn ctx
+            }
+
+    // ── Play-session history migration (games-h4mrd) ──
+    // Reconstructs genuine play-session history from the 204 cumulative
+    // Game_play_time_set totals games-p6vkz retired: each stream's earliest
+    // observation becomes dateless prior playtime, every later positive
+    // delta becomes a dated Play_session_recorded. A slug present in the
+    // pre-Rebuild-all game_play_session table wins outright. The whole
+    // policy lives in PlaySessionMigration.plan, a pure function; this
+    // section is the thin, DB-touching shell around it, in the same
+    // decideAndClaimWipeImportGuard extraction shape administration-n8kqw
+    // established.
+
+    let private playSessionMigrationKey = "play-session-migration"
+
+    type PlaySessionMigrationGuardDecision =
+        | MigrationRefusedRebuildInFlight
+        | MigrationRefusedWipeImportInFlight
+        | MigrationRefusedAlreadyRunning
+        | MigrationClaimed
+
+    /// Same order-of-checks discipline as `decideAndClaimWipeImportGuard`:
+    /// cross-cutting conditions (a rebuild or a wipe-import already running)
+    /// are checked FIRST, with no claim ever made on
+    /// `PlaySessionMigrationInProgress` on a refused path, and only THEN is
+    /// this migration's own single-flight key attempted.
+    let decideAndClaimPlaySessionMigrationGuard (guards: AdminGuards) : PlaySessionMigrationGuardDecision =
+        if not guards.RebuildingProjections.IsEmpty then
+            MigrationRefusedRebuildInFlight
+        elif wipeImportInFlight guards then
+            MigrationRefusedWipeImportInFlight
+        elif not (guards.PlaySessionMigrationInProgress.TryAdd(playSessionMigrationKey, ())) then
+            MigrationRefusedAlreadyRunning
+        else
+            MigrationClaimed
+
+    /// True while the play-session migration is in flight — the other half
+    /// of the mutual exclusion `decideAndClaimRebuildGuard`/
+    /// `decideAndClaimWipeImportGuard` check before their own claims.
+    let playSessionMigrationInFlight (guards: AdminGuards) : bool =
+        not guards.PlaySessionMigrationInProgress.IsEmpty
+
+    /// Column-presence check (not `tableExists` alone): the OLD,
+    /// non-event-sourced `game_play_session` schema (`id, game_slug,
+    /// steam_app_id, date, minutes_played, created_at`) games-p6vkz
+    /// superseded is indistinguishable from the NEW projection schema
+    /// (`game_slug, date, minutes_played, source`) by table name alone —
+    /// only `steam_app_id` (old) vs `source` (new) tells them apart. A store
+    /// already carrying the new schema (fresh install, or a re-run after
+    /// Rebuild-all already dropped and recreated the table) has no legacy
+    /// rows to read, by construction.
+    let private hasLegacyPlaySessionSchema (conn: SqliteConnection) : bool =
+        if not (tableExists conn "game_play_session") then false
+        else
+            use cmd = conn.CreateCommand()
+            cmd.CommandText <- "SELECT COUNT(*) FROM pragma_table_info('game_play_session') WHERE name = 'steam_app_id'"
+            (cmd.ExecuteScalar() :?> int64) > 0L
+
+    /// Reads the pre-migration `game_play_session` table (old schema) —
+    /// nothing here after Rebuild-all drops and recreates it fresh from the
+    /// events this migration appends. `steam_app_id = 0` is the old table's
+    /// own sentinel for "not from Steam" (`PlaytimeTracker`'s retired
+    /// `recordPlaySession`), mirrored here as `Manual`.
+    let private readLegacyPlaySessionRows (conn: SqliteConnection) : Map<string, PlaySessionMigration.TableRow list> =
+        if not (hasLegacyPlaySessionSchema conn) then Map.empty
+        else
+            use cmd = conn.CreateCommand()
+            cmd.CommandText <- "SELECT game_slug, date, minutes_played, steam_app_id FROM game_play_session"
+            use reader = cmd.ExecuteReader()
+            [ while reader.Read() do
+                yield
+                    reader.GetString(0),
+                    { PlaySessionMigration.Date = reader.GetString(1)
+                      PlaySessionMigration.Minutes = reader.GetInt32(2)
+                      PlaySessionMigration.Source = if reader.GetInt32(3) = 0 then Manual else SteamSync } ]
+            |> List.groupBy fst
+            |> List.map (fun (slug, rows) -> slug, rows |> List.map snd)
+            |> Map.ofList
+
+    /// Reads the orphaned `steam_playtime_snapshot` table — its code
+    /// (`getLastSnapshot`/`saveSnapshot`) was deleted outright by
+    /// games-p6vkz, but nothing ever issued the matching `DROP TABLE`, so on
+    /// a real pre-migration store the 12 rows are still physically present,
+    /// un-managed by any projection. This migration is what finally drops it
+    /// (see `runPlaySessionMigration`).
+    let private readSteamPlaytimeSnapshot (conn: SqliteConnection) : Map<string, int> =
+        if not (tableExists conn "steam_playtime_snapshot") then Map.empty
+        else
+            use cmd = conn.CreateCommand()
+            cmd.CommandText <- "SELECT game_slug, total_minutes FROM steam_playtime_snapshot"
+            use reader = cmd.ExecuteReader()
+            [ while reader.Read() do yield reader.GetString(0), reader.GetInt32(1) ]
+            |> Map.ofList
+
+    /// Every `Game_play_time_set` event in the log, grouped by stream,
+    /// decoded via `Games.Serialization.deserialize` (ADR-0032 discipline —
+    /// never ad-hoc JSON), oldest-first within each stream.
+    let private readCumulativePlayTimeEvents (conn: SqliteConnection) : (string * (int * DateTimeOffset) list) list =
+        EventStore.sampleEventsOfType conn "Game_play_time_set" System.Int32.MaxValue
+        |> List.choose (fun e ->
+            match Games.Serialization.deserialize e.EventType e.Data with
+            | Some (Games.Game_play_time_set totalMinutes) -> Some (e.StreamId, (totalMinutes, e.Timestamp))
+            | _ -> None)
+        |> List.groupBy fst
+        |> List.map (fun (streamId, rows) -> streamId, rows |> List.map snd |> List.sortBy snd)
+
+    /// Any stream already carrying ANY of games-p6vkz's new play-session
+    /// events refuses a second append outright — the REAL idempotency
+    /// guarantee (the completion marker `runPlaySessionMigration` writes is
+    /// the fast, whole-store early-exit `PlaytimeTracker.syncGateOpen`
+    /// reads; this is the per-stream one that makes a crash mid-run safe to
+    /// simply re-run): a re-run picks up exactly the streams the first run
+    /// never reached, and can never double-append to one it did.
+    let private streamAlreadyMigrated (conn: SqliteConnection) (streamId: string) : bool =
+        EventStore.readStream conn streamId
+        |> List.exists (fun e ->
+            e.EventType = "Prior_play_time_recorded"
+            || e.EventType = "Play_session_recorded"
+            || e.EventType = "Play_session_minutes_corrected"
+            || e.EventType = "Play_session_moved"
+            || e.EventType = "Play_session_removed")
+
+    type PlaySessionMigrationOutcome = {
+        BackupPath: string
+        StreamsMigrated: int
+        StreamsSkippedAlreadyMigrated: int
+        EventsAppended: int
+        Plan: PlaySessionMigration.MigrationPlan
+    }
+
+    type PlaySessionMigrationResult =
+        | MigrationBackupFailed of reason: string
+        | MigrationAppendConflict of streamId: string
+        | MigrationApplied of PlaySessionMigrationOutcome
+
+    /// The seven-field report ADR-0034 guardrail 2 requires an operator be
+    /// able to inspect before the irreversible append: streams to be
+    /// touched, events to be appended, table-covered vs reconstructed
+    /// slugs, prior-playtime lumps, cursor reconciliations, negative deltas
+    /// skipped, and any slug refused by the `Σ table rows = t_last`
+    /// integrity gate. `StreamsToBeTouched`/`EventsToBeAppended` already
+    /// exclude already-migrated streams (`streamAlreadyMigrated`), so a
+    /// preview run after a completed migration correctly reports zero —
+    /// matching what a second `runPlaySessionMigration` call would actually
+    /// do.
+    type PlaySessionMigrationPreview = {
+        StreamsToBeTouched: int
+        EventsToBeAppended: int
+        TableCoveredSlugs: string list
+        ReconstructedSlugs: string list
+        PriorPlayTimeLumpCount: int
+        ReconciliationCount: int
+        NegativeDeltasSkipped: int
+        IntegrityFailures: PlaySessionMigration.IntegrityFailure list
+    }
+
+    /// Reads the legacy table/snapshot/cumulative-event data and computes
+    /// `PlaySessionMigration.plan`, then filters to the streams that would
+    /// actually receive an append (skipping any already carrying a
+    /// `Play_session_*`/`Prior_play_time_recorded` event). Entirely
+    /// read-only — no backup, no append, no checkpoint rewind, no marker
+    /// write — and shared VERBATIM by `previewPlaySessionMigration` and
+    /// `runPlaySessionMigration`, so the preview an operator inspects can
+    /// never diverge from what the apply path actually does (ADR-0034
+    /// guardrail 2: "cancelling leaves the store unchanged by
+    /// construction" — true here because nothing above this point ever
+    /// touches storage).
+    let private computeMigrationPlanAndApplicability
+        (conn: SqliteConnection)
+        : PlaySessionMigration.MigrationPlan * (string * Games.GameEvent list) list =
+        let tableRows = readLegacyPlaySessionRows conn
+        let snapshot = readSteamPlaytimeSnapshot conn
+        let cumulative = readCumulativePlayTimeEvents conn
+        let syncHour = PlaytimeTracker.getSyncHour conn
+        let migrationPlan = PlaySessionMigration.plan cumulative tableRows snapshot syncHour
+        let toApply =
+            migrationPlan.StreamEvents
+            |> List.filter (fun (streamId, events) -> not (List.isEmpty events) && not (streamAlreadyMigrated conn streamId))
+        migrationPlan, toApply
+
+    /// The real dry-run preview (ADR-0034 guardrail 2): an operator can call
+    /// this — a pure `SELECT`-only read, no `VACUUM INTO`, no
+    /// `appendToStream`, no guard claim needed since nothing mutates — to
+    /// inspect exactly what `runPlaySessionMigration` would do before ever
+    /// triggering the irreversible append. Reuses
+    /// `computeMigrationPlanAndApplicability` so a slug failing the
+    /// integrity gate is visible here (`IntegrityFailures`), never silently
+    /// dropped.
+    let previewPlaySessionMigration
+        (conn: SqliteConnection)
+        : PlaySessionMigrationPreview =
+        let migrationPlan, toApply = computeMigrationPlanAndApplicability conn
+        { StreamsToBeTouched = List.length toApply
+          EventsToBeAppended = toApply |> List.sumBy (snd >> List.length)
+          TableCoveredSlugs = migrationPlan.TableCoveredSlugs
+          ReconstructedSlugs = migrationPlan.ReconstructedSlugs
+          PriorPlayTimeLumpCount = migrationPlan.PriorPlayTimeLumpCount
+          ReconciliationCount = migrationPlan.ReconciliationCount
+          NegativeDeltasSkipped = migrationPlan.NegativeDeltasSkipped
+          IntegrityFailures = migrationPlan.IntegrityFailures }
+
+    /// The migration's whole DB-touching body: `VACUUM INTO` backup first
+    /// (ADR-0034 guardrail 1), then the SAME
+    /// `computeMigrationPlanAndApplicability` computation
+    /// `previewPlaySessionMigration` uses (guardrail 2 — an operator who
+    /// called the preview first sees exactly what this call then does),
+    /// then one `appendToStream` per NOT-already-migrated stream (never the
+    /// explicit-rowid path), then the checkpoint rewind (ADR-0025's
+    /// `isAnyProjectionDirty` then reports both dirty) and the
+    /// completion-marker write, written ONLY after every append has
+    /// committed so a crash never opens the Steam-sync gate onto a
+    /// half-migrated store. Also drops the orphaned `steam_playtime_snapshot`
+    /// table (see `readSteamPlaytimeSnapshot`'s doc comment) now that its
+    /// values have been carried across the cutover as reconciliation events.
+    /// A slug refused by the integrity gate stays visible in the returned
+    /// outcome's `Plan.IntegrityFailures` — never silently dropped from a
+    /// clean-looking `complete` report.
+    let runPlaySessionMigration
+        (conn: SqliteConnection)
+        (dbPath: string)
+        : PlaySessionMigrationResult =
+        let backupPath = newBackupPath dbPath
+        match EventStore.vacuumIntoBackup conn backupPath with
+        | Error reason -> MigrationBackupFailed reason
+        | Ok () ->
+            let migrationPlan, toApply = computeMigrationPlanAndApplicability conn
+
+            let mutable conflict: string option = None
+            let mutable eventsAppended = 0
+            for (streamId, events) in toApply do
+                if conflict.IsNone then
+                    let expectedPosition = EventStore.getStreamPosition conn streamId
+                    let eventData = events |> List.map Games.Serialization.toEventData
+                    match EventStore.appendToStream conn streamId expectedPosition eventData with
+                    | EventStore.ConcurrencyConflict _ -> conflict <- Some streamId
+                    | EventStore.Success _ -> eventsAppended <- eventsAppended + List.length events
+
+            match conflict with
+            | Some streamId -> MigrationAppendConflict streamId
+            | None ->
+                Projection.saveCheckpoint conn "GameProjection" 0L
+                Projection.saveCheckpoint conn "PlaySessionProjection" 0L
+                if tableExists conn "steam_playtime_snapshot" then
+                    use dropCmd = conn.CreateCommand()
+                    dropCmd.CommandText <- "DROP TABLE steam_playtime_snapshot"
+                    dropCmd.ExecuteNonQuery() |> ignore
+                SettingsStore.setSetting conn PlaytimeTracker.migrationCompletedSettingKey (DateTime.UtcNow.ToString("o"))
+                MigrationApplied {
+                    BackupPath = backupPath
+                    StreamsMigrated = List.length toApply
+                    StreamsSkippedAlreadyMigrated = (migrationPlan.StreamEvents |> List.filter (snd >> List.isEmpty >> not) |> List.length) - List.length toApply
+                    EventsAppended = eventsAppended
+                    Plan = migrationPlan
+                }
+
+    /// `{"slug":"...","tableTotal":N,"lastEventTotal":N}` per refused slug —
+    /// shared by the preview JSON response and the apply path's `complete`
+    /// frame, so an integrity-gate refusal is visible in both rather than
+    /// vanishing from the "clean" apply report (the iteration-1 finding this
+    /// fixes).
+    let private integrityFailuresJson (failures: PlaySessionMigration.IntegrityFailure list) : string =
+        failures
+        |> List.map (fun f -> sprintf "{\"slug\":\"%s\",\"tableTotal\":%d,\"lastEventTotal\":%d}" (escapeJson f.Slug) f.TableTotal f.LastEventTotal)
+        |> String.concat ","
+        |> sprintf "[%s]"
+
+    let private slugListJson (slugs: string list) : string =
+        slugs
+        |> List.map (fun s -> sprintf "\"%s\"" (escapeJson s))
+        |> String.concat ","
+        |> sprintf "[%s]"
+
+    /// The seven-field report as JSON, for both the preview endpoint and
+    /// (minus the two apply-only counters) the apply path's `complete`
+    /// frame.
+    let private previewJson (preview: PlaySessionMigrationPreview) : string =
+        sprintf "{\"streamsToBeTouched\":%d,\"eventsToBeAppended\":%d,\"tableCoveredSlugs\":%s,\"reconstructedSlugs\":%s,\"priorPlayTimeLumpCount\":%d,\"reconciliationCount\":%d,\"negativeDeltasSkipped\":%d,\"integrityFailures\":%s}"
+            preview.StreamsToBeTouched preview.EventsToBeAppended
+            (slugListJson preview.TableCoveredSlugs) (slugListJson preview.ReconstructedSlugs)
+            preview.PriorPlayTimeLumpCount preview.ReconciliationCount preview.NegativeDeltasSkipped
+            (integrityFailuresJson preview.IntegrityFailures)
+
+    /// The real dry-run preview endpoint (ADR-0034 guardrail 2): a plain
+    /// read-only JSON GET, not SSE — there is no long-running progress to
+    /// stream, only one `SELECT`-only computation
+    /// (`previewPlaySessionMigration`) to report. An operator calls this
+    /// FIRST, inspects all seven fields (including any integrity-gate
+    /// refusal), and only then — as an explicit, separate request — POSTs
+    /// `/api/stream/migrate-play-sessions` to actually apply. Cancelling
+    /// after a preview leaves the store unchanged by construction: this
+    /// handler never opens a transaction, never backs up, never appends,
+    /// and never claims `AdminGuards.PlaySessionMigrationInProgress`.
+    let playSessionMigrationPreviewHandler
+        (factory: unit -> SqliteConnection)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (guards: AdminGuards)
+        : HttpHandler =
+        fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
+            task {
+                use conn = factory ()
+                ctx.Response.Headers.["Content-Type"] <- Microsoft.Extensions.Primitives.StringValues("application/json")
+                let writeJson (json: string) = task {
+                    let bytes = System.Text.Encoding.UTF8.GetBytes(json)
+                    do! ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length)
+                }
+                let dirty = isAnyProjectionDirty conn projectionHandlers guards
+                if not (List.isEmpty dirty) then
+                    ctx.Response.StatusCode <- 409
+                    do! writeJson (sprintf "{\"message\":\"Blocked: waiting on %s to catch up\"}" (escapeJson (String.concat ", " dirty)))
+                else
+                    let preview = previewPlaySessionMigration conn
+                    do! writeJson (previewJson preview)
+                return! earlyReturn ctx
+            }
+
+    /// The SSE wrapper — a thin shell over `decideAndClaimPlaySessionMigrationGuard`
+    /// and `runPlaySessionMigration`. Same envelope every other admin SSE
+    /// route uses. `isAnyProjectionDirty` (ADR-0025) is checked BEFORE the
+    /// migration runs: the migration reads the live `game_play_session`
+    /// table and must not read one that is mid-catch-up or mid-rebuild.
+    /// This is the SECOND, explicit, irreversible call — the confirm half
+    /// of ADR-0034 guardrail 2's "preview + explicit confirm"; an operator
+    /// is expected to have called `playSessionMigrationPreviewHandler`
+    /// first.
+    let playSessionMigrationStreamHandler
+        (factory: unit -> SqliteConnection)
+        (dbPath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (guards: AdminGuards)
+        : HttpHandler =
+        fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
+            task {
+                use conn = factory ()
+                ctx.Response.Headers.["Content-Type"] <- Microsoft.Extensions.Primitives.StringValues("text/event-stream")
+                ctx.Response.Headers.["Cache-Control"] <- Microsoft.Extensions.Primitives.StringValues("no-cache")
+                ctx.Response.Headers.["Connection"] <- Microsoft.Extensions.Primitives.StringValues("keep-alive")
+
+                let writer = ctx.Response
+                let writeEvent (eventType: string) (json: string) = task {
+                    let line = Sse.sseFrame eventType json
+                    let bytes = System.Text.Encoding.UTF8.GetBytes(line)
+                    do! writer.Body.WriteAsync(bytes, 0, bytes.Length)
+                    do! writer.Body.FlushAsync()
+                }
+
+                match decideAndClaimPlaySessionMigrationGuard guards with
+                | MigrationRefusedRebuildInFlight ->
+                    do! writeEvent "rejected" "{\"message\":\"A projection rebuild is in flight - wait for it to finish\"}"
+                | MigrationRefusedWipeImportInFlight ->
+                    do! writeEvent "rejected" "{\"message\":\"An event log import is in flight\"}"
+                | MigrationRefusedAlreadyRunning ->
+                    do! writeEvent "rejected" "{\"message\":\"The play-session history migration is already running\"}"
+                | MigrationClaimed ->
+                    try
+                        try
+                            let dirty = isAnyProjectionDirty conn projectionHandlers guards
+                            if not (List.isEmpty dirty) then
+                                do! writeEvent "rejected" (sprintf "{\"message\":\"Blocked: waiting on %s to catch up\"}" (String.concat ", " dirty))
+                            else
+                                match runPlaySessionMigration conn dbPath with
+                                | MigrationBackupFailed reason ->
+                                    do! writeEvent "error" (sprintf "{\"phase\":\"backup\",\"message\":\"%s\"}" (escapeJson reason))
+                                | MigrationAppendConflict streamId ->
+                                    do! writeEvent "error" (sprintf "{\"phase\":\"append\",\"message\":\"Concurrency conflict appending to %s\"}" (escapeJson streamId))
+                                | MigrationApplied outcome ->
+                                    do! writeEvent "complete" (sprintf "{\"backupPath\":\"%s\",\"streamsMigrated\":%d,\"streamsSkipped\":%d,\"eventsAppended\":%d,\"integrityFailures\":%s}"
+                                                                    (escapeJson outcome.BackupPath) outcome.StreamsMigrated outcome.StreamsSkippedAlreadyMigrated outcome.EventsAppended
+                                                                    (integrityFailuresJson outcome.Plan.IntegrityFailures))
+                        with ex ->
+                            do! writeEvent "error" (sprintf "{\"phase\":\"migration\",\"message\":\"%s\"}" (escapeJson ex.Message))
+                    finally
+                        guards.PlaySessionMigrationInProgress.TryRemove(playSessionMigrationKey) |> ignore
 
                 return! earlyReturn ctx
             }

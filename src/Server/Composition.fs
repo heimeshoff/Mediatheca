@@ -394,6 +394,10 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
                 >=> Administration.importEventsStreamHandler connectionFactory
             route "/api/stream/wipe-import-events"
                 >=> Administration.wipeImportEventsStreamHandler connectionFactory dbPath projectionHandlers adminGuards
+            route "/api/stream/migrate-play-sessions/preview"
+                >=> Administration.playSessionMigrationPreviewHandler connectionFactory projectionHandlers adminGuards
+            route "/api/stream/migrate-play-sessions"
+                >=> Administration.playSessionMigrationStreamHandler connectionFactory dbPath projectionHandlers adminGuards
             Administration.projectionRebuildStreamHandler connectionFactory projectionHandlers adminGuards
             route "/api/stream/drift-check"
                 >=> Administration.driftCheckStreamHandler connectionFactory projectionHandlers adminGuards
