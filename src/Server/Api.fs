@@ -327,6 +327,12 @@ module Api =
                         // command-time only — never sourced from projection
                         // replay (ADR-0043/ADR-0045's cache-tier discipline).
                         SeriesRefresh.upsertSeasonEpisodeCache conn slug validSeasons
+                        // Flat metadata cache seed (series-t3jkv): same
+                        // command-time pattern — without this, a series added
+                        // after the one-time startup seed has no
+                        // series_metadata_cache row and shows no rating/
+                        // overview/runtime forever.
+                        MetadataCache.upsertSeriesMetadata conn slug seriesData.Overview seriesData.BackdropRef seriesData.TmdbRating seriesData.EpisodeRuntime
 
                         let! creditsResult = Tmdb.getTvSeriesCredits httpClient tmdbConfig tmdbId
                         match creditsResult with

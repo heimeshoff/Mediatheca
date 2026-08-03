@@ -1,11 +1,11 @@
 ---
 id: series-x9mfp
 title: Retarget getRecentlyAbandoned's TmdbRating/SeasonCount/EpisodeCount/NextUp onto the metadata cache and views, same as its sibling getRecentlyFinished
-status: backlog
+status: done
 type: refactor
 context: series
 created: 2026-08-01
-completed:
+completed: 2026-08-03
 depends_on: [series-q8jwc]
 blocks: []
 tags: [series, metadata, cache, read-model, projection]

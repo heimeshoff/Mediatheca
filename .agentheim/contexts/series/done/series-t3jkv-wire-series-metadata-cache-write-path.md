@@ -1,11 +1,11 @@
 ---
 id: series-t3jkv
 title: Wire series_metadata_cache's write path — nothing keeps it fresh after the one-time seed, so refreshed and newly-added series never get real TmdbRating/Overview/EpisodeRuntime
-status: backlog
+status: done
 type: refactor
 context: series
 created: 2026-08-01
-completed:
+completed: 2026-08-03
 depends_on: [series-q8jwc]
 blocks: []
 tags: [series, metadata, cache, tmdb, refresh]

@@ -39,3 +39,9 @@ module SettingsStore =
             "updated_at", SqlType.String (DateTime.UtcNow.ToString("o"))
         ]
         |> Db.exec
+
+    let deleteSetting (conn: SqliteConnection) (key: string) : unit =
+        conn
+        |> Db.newCommand "DELETE FROM settings WHERE key = @key"
+        |> Db.setParams [ "key", SqlType.String key ]
+        |> Db.exec

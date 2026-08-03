@@ -24,6 +24,11 @@ let private newConn () =
     let conn = new SqliteConnection("Data Source=:memory:")
     conn.Open()
     EventStore.initialize conn
+    // series-t3jkv: `applyToProjection` now also upserts
+    // `series_metadata_cache`, so the fixture needs the cache tier's schema
+    // (same `MetadataCache.initialize`-before-`handler.Init` order as
+    // `Composition.buildApp`).
+    MetadataCache.initialize conn
     SeriesProjection.handler.Init conn
     conn
 

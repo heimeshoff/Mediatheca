@@ -125,6 +125,46 @@ let playSessionMigrationTests =
                 Expect.equal f.LastEventTotal 1000 "reported last-event total"
             | other -> failtest (sprintf "Expected exactly one integrity failure, got %A" other)
 
+        testCase "table-covered, partial coverage (ADR-0052): m0 + Σ table rows = t_last emits the prior lump plus the table's dated rows" <| fun _ ->
+            // The real the-eternal-life-of-goldman-demo-2017 shape: imported
+            // with 14 minutes of pre-tracking playtime (m0 = 14, no table
+            // row — correctly), then one tracked 5-minute session (table row
+            // + cumulative 19). Σ table (5) ≠ t_last (19), but 14 + 5 = 19.
+            let cumulative = [ 14, ts 2026 2 26 12; 19, ts 2026 2 27 12 ]
+            let tableRows = Map.ofList [ "goldman", [ { Date = "2026-02-27"; Minutes = 5; Source = SteamSync } ] ]
+            let snapshot = Map.ofList [ "goldman", 19 ]
+            let result = plan [ "Game-goldman", cumulative ] tableRows snapshot syncHour
+
+            Expect.equal result.IntegrityFailures [] "the two-fold identity satisfies the gate"
+            Expect.equal result.TableCoveredSlugs [ "goldman" ] "still table-covered — the table's dated rows win"
+            Expect.equal result.PriorPlayTimeLumpCount 1 "the pre-tracking playtime becomes a lump"
+            match result.StreamEvents with
+            | [ ("Game-goldman", [ Prior_play_time_recorded 14; Play_session_recorded d ]) ] ->
+                Expect.equal d.Day "2026-02-27" "the table row's date survives"
+                Expect.equal d.Minutes 5 "the table row's minutes survive"
+                Expect.equal d.Source SteamSync "the table row's source survives"
+            | other -> failtest (sprintf "Expected prior lump + one session, got %A" other)
+            Expect.equal result.ReconciliationCount 0
+                "the lump advances SteamObservedMinutes too (Games.evolve), so 14 + 5 = 19 matches the snapshot — no reconciliation"
+
+        testCase "table-covered, partial coverage: a snapshot differing from lump + Steam rows still reconciles" <| fun _ ->
+            let cumulative = [ 14, ts 2026 2 26 12; 19, ts 2026 2 27 12 ]
+            let tableRows = Map.ofList [ "goldman", [ { Date = "2026-02-27"; Minutes = 5; Source = SteamSync } ] ]
+            let snapshot = Map.ofList [ "goldman", 25 ]
+            let result = plan [ "Game-goldman", cumulative ] tableRows snapshot syncHour
+            match result.StreamEvents with
+            | [ ("Game-goldman", evs) ] ->
+                Expect.equal (List.last evs) (Steam_observed_total_reconciled 25) "cursor carried from the snapshot"
+            | other -> failtest (sprintf "Unexpected: %A" other)
+
+        testCase "table-covered: a slug satisfying neither identity is still refused" <| fun _ ->
+            // m0 (100) + Σ table (300) = 400 ≠ t_last (1000), and 300 ≠ 1000.
+            let cumulative = [ 100, ts 2026 1 1 12; 1000, ts 2026 6 1 12 ]
+            let tableRows = Map.ofList [ "broken", [ { Date = "2026-02-01"; Minutes = 300; Source = SteamSync } ] ]
+            let result = plan [ "Game-broken", cumulative ] tableRows Map.empty syncHour
+            Expect.equal result.StreamEvents [] "neither identity holds — refused"
+            Expect.equal (result.IntegrityFailures |> List.map (fun f -> f.Slug)) [ "broken" ] "reported"
+
         testCase "table-covered with no cumulative history at all: the integrity gate is vacuously satisfied" <| fun _ ->
             let tableRows = Map.ofList [ "manualonly", [ { Date = "2026-01-05"; Minutes = 60; Source = Manual } ] ]
             let result = plan [] tableRows Map.empty syncHour

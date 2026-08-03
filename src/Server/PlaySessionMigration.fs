@@ -137,26 +137,51 @@ module PlaySessionMigration =
                     // Table wins where it exists, all-or-nothing (games-h4mrd):
                     // the reconstruction (including its prior-playtime lump)
                     // is discarded entirely for this slug.
+                    //
+                    // The integrity gate accepts exactly two structural
+                    // identities (ADR-0052), refusing anything else:
+                    //   - full coverage:    Σ table rows = t_last — tracking
+                    //     existed for the game's whole history; no lump.
+                    //   - partial coverage: m0 + Σ table rows = t_last, m0 > 0
+                    //     — the game arrived with pre-tracking playtime (its
+                    //     first observation m0 became no table row, correctly),
+                    //     so m0 is emitted as the same dateless
+                    //     `Prior_play_time_recorded` lump the reconstruction
+                    //     path uses, and the table's dated rows cover the rest.
+                    // Both are exact arithmetic against recomputeAndPublishTotal's
+                    // structural identity — never a guess.
                     let tableTotal = rows |> List.sumBy (fun r -> r.Minutes)
+                    let firstEventTotal = cumulative |> List.tryHead |> Option.map fst
                     let lastEventTotal = cumulative |> List.tryLast |> Option.map fst
-                    let integrityOk =
+                    let priorLumpMinutes =
                         match lastEventTotal with
-                        | None -> true // no cumulative history to gate against
-                        | Some lastTotal -> tableTotal = lastTotal
-                    if not integrityOk then
+                        | None -> Some 0 // no cumulative history to gate against
+                        | Some lastTotal when tableTotal = lastTotal -> Some 0
+                        | Some lastTotal ->
+                            match firstEventTotal with
+                            | Some m0 when m0 > 0 && m0 + tableTotal = lastTotal -> Some m0
+                            | _ -> None
+                    match priorLumpMinutes with
+                    | None ->
                         Some (Refused { Slug = slug; TableTotal = tableTotal; LastEventTotal = lastEventTotal |> Option.defaultValue 0 })
-                    else
+                    | Some priorMinutes ->
+                        let priorEvent = if priorMinutes > 0 then [ Prior_play_time_recorded priorMinutes ] else []
                         let sessionEvents =
                             rows |> List.map (fun r -> Play_session_recorded { Day = r.Date; Minutes = r.Minutes; Source = r.Source })
+                        // `Prior_play_time_recorded` advances the aggregate's
+                        // SteamObservedMinutes cursor too (`Games.evolve`), so
+                        // the replay-derived observed total the snapshot is
+                        // compared against includes the lump.
                         let derivedObserved =
-                            rows |> List.filter (fun r -> r.Source = SteamSync) |> List.sumBy (fun r -> r.Minutes)
+                            priorMinutes
+                            + (rows |> List.filter (fun r -> r.Source = SteamSync) |> List.sumBy (fun r -> r.Minutes))
                         let reconciliation =
                             snapshotBySlug
                             |> Map.tryFind slug
                             |> Option.filter (fun snap -> snap <> derivedObserved)
                             |> Option.map Steam_observed_total_reconciled
                         let sessionDays = rows |> List.map (fun r -> slug, r.Date)
-                        let events = sessionEvents @ (reconciliation |> Option.toList)
+                        let events = priorEvent @ sessionEvents @ (reconciliation |> Option.toList)
                         Some (TableCovered(streamId, events, sessionDays, reconciliation.IsSome))
 
                 | _ ->
@@ -202,8 +227,13 @@ module PlaySessionMigration =
         let tableCoveredSlugs =
             outcomes |> List.choose (function TableCovered(streamId, _, _, _) -> Some (slugFromStreamId streamId) | _ -> None)
 
+        // Counted off the actual planned events (not per-outcome flags) so a
+        // partial-coverage table-covered slug's lump (ADR-0052) counts too.
         let priorPlayTimeLumpCount =
-            outcomes |> List.sumBy (function Reconstructed(_, _, _, _, hadPrior) -> (if hadPrior then 1 else 0) | _ -> 0)
+            streamEvents
+            |> List.collect snd
+            |> List.filter (function Prior_play_time_recorded _ -> true | _ -> false)
+            |> List.length
 
         let reconciliationCount =
             outcomes

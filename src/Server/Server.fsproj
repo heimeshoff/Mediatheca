@@ -57,6 +57,7 @@
          CinemarcoImport.runImport. Neither Administration.fs nor Api.fs
          depends on the other. -->
     <Compile Include="Administration.fs" />
+    <Compile Include="StartupCutover.fs" />
     <Compile Include="CinemarcoImport.fs" />
     <Compile Include="Api.fs" />
     <Compile Include="Composition.fs" />

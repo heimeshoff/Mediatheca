@@ -212,8 +212,13 @@ module SeriesRefresh =
     /// tables. The one exception, airing status, survives as a projection
     /// column but travels through the narrowed `Series_refreshed` event
     /// instead (`SeriesProjection.handleEvent`), never through this function.
+    /// series-t3jkv: the flat metadata fields (`Overview`/`BackdropRef`/
+    /// `TmdbRating`/`EpisodeRuntime`) land in `series_metadata_cache` here
+    /// too — previously they were fetched and then discarded, freezing every
+    /// series' cache row at whatever the one-time seed captured.
     let applyToProjection (conn: SqliteConnection) (slug: string) (result: RefreshFetchResult) : unit =
         upsertSeasonEpisodeCache conn slug result.Seasons
+        MetadataCache.upsertSeriesMetadata conn slug result.Overview result.BackdropRef result.TmdbRating result.EpisodeRuntime
 
     /// What `refreshOne`/`refreshOneForJob` report back per series, replacing
     /// the old `Series.SeriesRefreshedData` return value now that the event

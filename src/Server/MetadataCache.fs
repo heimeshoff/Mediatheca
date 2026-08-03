@@ -328,3 +328,38 @@ module MetadataCache =
             with _ -> () // series_detail no longer has overview/tmdb_rating/episode_runtime (series-d5tpn) — nothing to seed
 
             SettingsStore.setSetting conn seededMarkerKey "true"
+
+    /// The ongoing write path for `series_metadata_cache` (series-t3jkv) —
+    /// without it, the one-time seed above is the only writer, and every
+    /// series added or refreshed after the seed ran would show
+    /// `TmdbRating = None`/`Overview = ""`/`EpisodeRuntime = None` forever.
+    /// Called imperatively at command time (`Api.addSeriesToLibraryImpl`) and
+    /// on every TMDB refresh (`SeriesRefresh.applyToProjection`) — never from
+    /// any `ProjectionHandler` (the module doc comment's hard constraint).
+    /// `fetched_at` is stamped with the current UTC instant on every genuine
+    /// write, distinguishing a real fetch from the seed step's deliberate
+    /// NULL ("seeded from the projection, never actually fetched").
+    let upsertSeriesMetadata
+        (conn: SqliteConnection)
+        (slug: string)
+        (overview: string)
+        (backdropRef: string option)
+        (tmdbRating: float option)
+        (episodeRuntime: int option)
+        : unit =
+        conn
+        |> Db.newCommand
+            """
+            INSERT OR REPLACE INTO series_metadata_cache
+                (series_slug, overview, backdrop_ref, tmdb_rating, episode_runtime, fetched_at)
+            VALUES (@series_slug, @overview, @backdrop_ref, @tmdb_rating, @episode_runtime, @fetched_at)
+            """
+        |> Db.setParams [
+            "series_slug", SqlType.String slug
+            "overview", SqlType.String overview
+            "backdrop_ref", (match backdropRef with Some r -> SqlType.String r | None -> SqlType.Null)
+            "tmdb_rating", (match tmdbRating with Some r -> SqlType.Double r | None -> SqlType.Null)
+            "episode_runtime", (match episodeRuntime with Some r -> SqlType.Int32 r | None -> SqlType.Null)
+            "fetched_at", SqlType.String (System.DateTime.UtcNow.ToString("o"))
+        ]
+        |> Db.exec
