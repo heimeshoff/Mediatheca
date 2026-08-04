@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 2
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 5
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **games-v4nqe** — Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3 — stops the 7668-event play-mode bloat games-a7dqx's schema made possible) (refactor) — `todo/games-v4nqe-emission-cutover-column-drop.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **games-v4nqe** — Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3 — stops the 7668-event play-mode bloat games-a7dqx's schema made possible) (refactor) — `doing/games-v4nqe-emission-cutover-column-drop.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

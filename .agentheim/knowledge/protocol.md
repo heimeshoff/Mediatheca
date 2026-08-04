@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 16:05 -- Batch started: [games-v4nqe]
+
+**Type:** Work / Batch start
+**Tasks:** games-v4nqe - Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3 — stops the 7668-event play-mode bloat games-a7dqx's schema made possible)
+**Parallel:** no (1 worker — only one ready task on the board)
+
+---
+
 ## 2026-08-04 16:03 -- Modeling / Promoted: games-v4nqe - Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3 — stops the 7668-event play-mode bloat games-a7dqx's schema made possible)
 
 **Type:** Modeling / Promote
