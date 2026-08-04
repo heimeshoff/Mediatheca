@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 18:08 -- Modeling / Promoted: games-j6wkr - Rewrite the Games UI for typed play facets — Solo/Co-op/Versus/Couch badges, per-facet Auto/On/Off override controls, and client-side list filters over the landed PlayFacets contract (split 3 of 3, closes the no-play-mode-UI window games-v4nqe opened)
+
+**Type:** Modeling / Promote
+**BC:** games
+**From → To:** backlog → todo
+
+---
+
 ## 2026-08-04 18:05 -- Modeling / Refined: games-j6wkr - Rewrite the Games UI for typed play facets (split 3 of 3)
 
 **Type:** Modeling / Refine
