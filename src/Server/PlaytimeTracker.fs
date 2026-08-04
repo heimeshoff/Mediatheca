@@ -287,14 +287,14 @@ module PlaytimeTracker =
                         [], None, None, 0
 
                 let! storeDetails = Steam.getSteamStoreDetails httpClient steamGame.AppId
-                let steamDescription, steamShortDescription, steamWebsiteUrl, steamCategories =
+                let steamDescription, steamShortDescription, steamWebsiteUrl, steamCategoryIds =
                     match storeDetails with
                     | Ok details ->
                         let desc =
                             if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
                             elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
                             else ""
-                        desc, details.ShortDescription, details.WebsiteUrl, details.Categories
+                        desc, details.ShortDescription, details.WebsiteUrl, details.CategoryIds
                     | Error _ -> "", "", None, []
 
                 let description =
@@ -330,9 +330,20 @@ module PlaytimeTracker =
                                     unixTimestampToGamingDay syncHour steamGame.RtimeLastPlayed
                                     |> Option.defaultValue today
                                 executeGameCommand conn slug (Games.Record_steam_observed_total (steamGame.PlaytimeMinutes, gamingDay)) projectionHandlers |> ignore
-                            for category in steamCategories do
-                                executeGameCommand conn slug (Games.Add_play_mode category) projectionHandlers |> ignore
-                            executeGameCommand conn slug (Games.Set_steam_last_played (Steam.unixTimestampToDateString steamGame.RtimeLastPlayed)) projectionHandlers |> ignore
+                            // games-v4nqe (hazard 1): the creation code path
+                            // itself writes the identity card + derived
+                            // facets into game_metadata_cache immediately
+                            // after Add_game succeeds — never the
+                            // ProjectionHandler (ADR-0045). Supersedes
+                            // Add_play_mode/Set_steam_last_played, both
+                            // demoted.
+                            MetadataCache.upsertGameIdentityCard conn slug {
+                                Description = description
+                                ShortDescription = steamShortDescription
+                                WebsiteUrl = steamWebsiteUrl
+                            }
+                            let facets = FacetDerivation.deriveFacets steamCategoryIds
+                            MetadataCache.upsertGameFacets conn slug facets steamCategoryIds
                             executeGameCommand conn slug Games.Mark_as_owned projectionHandlers |> ignore
                             Ok slug
                         | Error e ->

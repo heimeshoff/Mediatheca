@@ -51,8 +51,6 @@ type Model = {
     ShowFriendPicker: FriendPickerKind option
     IsRatingOpen: bool
     IsStatusOpen: bool
-    ShowPlayModePicker: bool
-    AllPlayModes: string list
     IsDescriptionExpanded: bool
     IsFriendsMenuOpen: bool
     ConfirmingRemove: bool
@@ -121,10 +119,6 @@ type Msg =
     | Select_image of url: string
     | Image_selected of Result<unit, string>
     | Toggle_description_expanded
-    | Add_play_mode of string
-    | Remove_play_mode of string
-    | Toggle_play_mode_picker
-    | Play_modes_loaded of string list
     | Confirm_remove_game
     | Cancel_remove_game
     | Remove_game

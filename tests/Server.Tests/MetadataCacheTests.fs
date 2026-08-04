@@ -496,16 +496,24 @@ let tests =
             Expect.equal (tableRowCount conn "game_metadata_cache") 1 "one row seeded from the one existing game"
             Expect.equal (SettingsStore.getSetting conn "metadata_cache_seeded") (Some "true") "marker set after seeding"
 
+            // games-v4nqe: game_detail no longer carries description/short_
+            // description/website_url/hltb_* at all (dropped from
+            // GameProjection.createTables' DDL) — on this fresh test
+            // database the seed's second (try/with-wrapped) step has no
+            // source column to read, so description stays unseeded here.
+            // cover_ref/rawg_rating survive (never dropped from game_detail)
+            // and are always seeded by the first, unconditional step.
             let seeded =
                 conn
                 |> Db.newCommand "SELECT description, cover_ref, rawg_rating, fetched_at FROM game_metadata_cache WHERE game_slug = @slug"
                 |> Db.setParams [ "slug", SqlType.String "braid-2008" ]
                 |> Db.querySingle (fun rd ->
-                    rd.ReadString "description", rd.ReadString "cover_ref", rd.ReadDouble "rawg_rating", rd.IsDBNull(rd.GetOrdinal("fetched_at")))
+                    (if rd.IsDBNull(rd.GetOrdinal("description")) then None else Some (rd.ReadString "description")),
+                    rd.ReadString "cover_ref", rd.ReadDouble "rawg_rating", rd.IsDBNull(rd.GetOrdinal("fetched_at")))
             match seeded with
             | None -> failtest "expected a seeded row for braid-2008"
             | Some (description, coverRef, rawgRating, fetchedAtIsNull) ->
-                Expect.equal description sampleGameData.Description "seeded description matches game_detail"
+                Expect.equal description None "no game_detail.description column exists on this fresh schema to seed from"
                 Expect.equal coverRef (sampleGameData.CoverRef |> Option.get) "seeded cover_ref matches game_detail"
                 Expect.equal rawgRating (sampleGameData.RawgRating |> Option.get) "seeded rawg_rating matches game_detail"
                 Expect.isTrue fetchedAtIsNull "fetched_at is NULL for a projection-seeded, never-refreshed row"
@@ -667,7 +675,17 @@ let tests =
             appendGameAdded conn "braid-2008"
             Projection.runProjection conn GameProjection.handler
             MetadataCache.initialize conn
-            MetadataCache.seedFromProjections conn // seeds description/cover_ref/rawg_rating for braid-2008
+            MetadataCache.seedFromProjections conn // seeds cover_ref/rawg_rating for braid-2008 (games-v4nqe: description no longer seedable from game_detail)
+            // games-v4nqe: the identity-card writer (its own slice) and the
+            // HLTB writer (its own slice) each write independently of the
+            // facet writer — exercise all three to prove upsertGameFacets's
+            // ON CONFLICT DO UPDATE genuinely scopes to its own column set.
+            MetadataCache.upsertGameIdentityCard conn "braid-2008" {
+                Description = sampleGameData.Description
+                ShortDescription = sampleGameData.ShortDescription
+                WebsiteUrl = sampleGameData.WebsiteUrl
+            }
+            MetadataCache.upsertGameHltbHours conn "braid-2008" (Some 12.5) None None
 
             let facets : PlayFacets = {
                 Solo = true; CoopCouch = false; CoopOnline = false; VersusCouch = false
@@ -677,15 +695,16 @@ let tests =
 
             let survived =
                 conn
-                |> Db.newCommand "SELECT description, cover_ref, rawg_rating FROM game_metadata_cache WHERE game_slug = @slug"
+                |> Db.newCommand "SELECT description, cover_ref, rawg_rating, hltb_hours FROM game_metadata_cache WHERE game_slug = @slug"
                 |> Db.setParams [ "slug", SqlType.String "braid-2008" ]
                 |> Db.querySingle (fun rd ->
-                    rd.ReadString "description", rd.ReadString "cover_ref", rd.ReadDouble "rawg_rating")
+                    rd.ReadString "description", rd.ReadString "cover_ref", rd.ReadDouble "rawg_rating", rd.ReadDouble "hltb_hours")
             match survived with
-            | Some (description, coverRef, rawgRating) ->
+            | Some (description, coverRef, rawgRating, hltbHours) ->
                 Expect.equal description sampleGameData.Description "description survives an upsertGameFacets call that never mentions it — NOT INSERT OR REPLACE"
                 Expect.equal coverRef (sampleGameData.CoverRef |> Option.get) "cover_ref survives too"
                 Expect.equal rawgRating (sampleGameData.RawgRating |> Option.get) "rawg_rating survives too"
+                Expect.equal hltbHours 12.5 "hltb_hours (written by upsertGameHltbHours) survives too"
             | None -> failtest "expected the seeded row to still exist"
 
         testCase "upsertGameFacets overwrites a previous facet write on a second call (re-derivation after a table fix)" <| fun _ ->

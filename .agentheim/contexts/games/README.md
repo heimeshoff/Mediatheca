@@ -45,42 +45,85 @@ Single user.
 - **Family owner** — a friend who owns the game in their library / on shared accounts. Multiple allowed.
 - **Played with (friend)** — friend has played this with the user.
 - **HLTB hours** — three estimates from HowLongToBeat: main, main+extras, completionist.
-- **Play mode** — labels like "Singleplayer", "Co-op", "Competitive". Being retired
-  (games-a7dqx/games-v4nqe/games-j6wkr, ADR-0053) in favor of **play facets**, below —
-  `Game_play_mode_added`/`Game_play_mode_removed` and `game_detail.play_modes` are still
-  live and unaffected as of games-a7dqx (split 1 of 3), which builds the replacement
-  foundation alongside the old system without cutting over yet.
-- **Play facets** (ADR-0053, games-a7dqx) — seven typed facets (`Solo`, `CoopCouch`,
-  `CoopOnline`, `VersusCouch`, `VersusOnline`, `RemotePlayTogether`, `Vr`) replacing the
-  302-distinct-string `play_modes` free text. Two-fold: `PlayFacets` is the **cache-derived
-  default**, mechanically derived from Steam Store category ids
-  (`FacetDerivation.deriveFacets`, `src/Server/FacetDerivation.fs`) and written to
-  `game_metadata_cache`'s facet columns by a resumable throttled backfill job
-  (`GameFacetBackfill.fs`) — never carried by an event. `PlayFacetsOverride` is the
+- **Play mode** — the retired free-text predecessor to **play facets** (below),
+  labels like "Singleplayer", "Co-op", "Competitive". Fully cut over as of
+  games-v4nqe (ADR-0053): `Add_play_mode`/`Remove_play_mode`/`Categorize_game`
+  (and the description/short-description/website-url/HLTB/Steam-last-played
+  setters carried alongside the same emission cutover) are deleted from
+  `GameCommand`; `Game_play_mode_added`/`Game_play_mode_removed`/
+  `Game_categorized`/`Game_description_set`/`Game_short_description_set`/
+  `Game_website_url_set`/`Game_hltb_hours_set`/`Game_steam_last_played_set`
+  stay in the codec (old streams still deserialize) but their `evolve` and
+  `GameProjection.handleEvent` arms are explicit no-ops, matching the
+  `Game_store_added` precedent. `game_list.hltb_hours` and
+  `game_detail.description`/`short_description`/`website_url`/
+  `hltb_hours`/`hltb_main_plus_hours`/`hltb_completionist_hours`/`play_modes`/
+  `steam_last_played` are dropped from the projection schema entirely.
+  `genres` is deliberately NOT among them (ADR-0055, amending ADR-0043) — see
+  **Identity card**, below.
+- **Play facets** (ADR-0053) — seven typed facets (`Solo`, `CoopCouch`,
+  `CoopOnline`, `VersusCouch`, `VersusOnline`, `RemotePlayTogether`, `Vr`)
+  superseding the 302-distinct-string `play_modes` free text. Two-fold:
+  `PlayFacets` is the **cache-derived default**, mechanically derived from
+  Steam Store category ids (`FacetDerivation.deriveFacets`,
+  `src/Server/FacetDerivation.fs`) and written to `game_metadata_cache`'s
+  facet columns by a resumable throttled backfill job (`GameFacetBackfill.fs`)
+  or imperatively at Steam-fetch command time (`Api.fs`/`PlaytimeTracker.fs`,
+  games-v4nqe) — never carried by an event. `PlayFacetsOverride` is the
   **manual correction**, event-sourced (`Game_play_facets_overridden` /
   `Override_play_facets`) for non-Steam games and for correcting Steam's own
   mis-categorization; all seven fields are `option`, `None` meaning "defer to the cache".
-  `FacetDerivation.merge` composes the two at query time (override wins where set); a
-  `GameProjection.getPlayFacets` helper does this per-slug from `game_metadata_cache` +
-  `game_detail.facet_override_*`. Not yet wired into the public `GameListItem`/`GameDetail`
-  DTOs or read by the UI as of games-a7dqx — that's games-v4nqe (emission cutover, DTO
-  finalization) and games-j6wkr (UI). See ADR-0053 and ADR-0054 (the live-verified Steam
-  category-id table, including the one judgment call the source decision log left open:
-  a bare "Multi-player" tag with no other multiplayer signal resolves to `CoopOnline`).
+  `FacetDerivation.merge` composes the two at query time (override wins where set),
+  wired into both `GameListItem.PlayFacets` and `GameDetail.PlayFacets`/
+  `PlayFacetsOverride` (games-v4nqe) — the client must send the raw
+  `PlayFacetsOverride` back on the next `overrideGamePlayFacets` call, never the
+  merged `PlayFacets` value (that would freeze every cache-derived field as a
+  permanent manual override). No UI reads/writes them yet — that's games-j6wkr's
+  scope (badges, Auto/On/Off controls, filters); the detail page currently shows
+  no play-mode/facet information at all, a bounded gap closed by that task. See
+  ADR-0053 and ADR-0054 (the live-verified Steam category-id table, including
+  the one judgment call the source decision log left open: a bare "Multi-player"
+  tag with no other multiplayer signal resolves to `CoopOnline`).
+- **Metadata cache slice** (games-v4nqe) — description/short_description/website_url,
+  cache-only (`game_metadata_cache`, `MetadataCache.upsertGameIdentityCard`/
+  `tryGetGameIdentityCard` — the type's own name predates this rename and is kept for
+  now). Written by the creation code path immediately after `Add_game` succeeds
+  (never `GameProjection.handleEvent` — ADR-0045's hard constraint) and by every
+  Steam-fetch call site thereafter, scoped to an `INSERT ... ON CONFLICT DO UPDATE`
+  slice that never touches the facet/category-id/`fetched_at` columns on the same
+  row. `genres` is deliberately NOT in this slice — see **Identity card**, below.
+- **Identity card** (ADR-0043's term) — an externally-sourced field that stays a
+  `game_list`/`game_detail` projection column, read directly, never cache-joined,
+  because it is written exclusively by an event that carries it and never by a
+  refresh path: `Name`, `Year`, `CoverRef`/`BackdropRef`, `Genres`. `games-v4nqe`
+  iteration 1 briefly moved `Genres` to the cache slice above; ADR-0055 reverted
+  that — no refresh path in this codebase ever re-derives Game genres (RAWG genre
+  search only ever runs at creation time), so it fails the cache tier's
+  re-derivability test and stays here, matching Series' identity-card treatment of
+  its own `Genres` (ADR-0048).
 - **Stores** — e.g. Steam, GOG. A game can be in multiple.
 - **Steam library date** — when the game first appeared in the user's Steam library (sync metadata).
 
 ## Aggregates
 
-- **Game** — protects: status transitions follow the lifecycle DU; HLTB hours / play time settable any time after `Game_added_to_library`; family owners and played-with are sets. Play time is a two-fold: `TotalPlayTimeMinutes` (`PriorPlayTimeMinutes` + Σ session minutes, what the user asserts happened) and `SteamObservedMinutes` (what Steam has told us, never reduced by correction/move/removal) — the second fold is what makes the Steam sync cursor derivable rather than externally-guarded state (ADR-0050). `PlayFacetsOverride` (games-a7dqx, ADR-0053) is cache-blind by construction: no invariant here ever reads `game_metadata_cache`, so a redundant-but-harmless override is accepted as normal, self-correcting state, not refused. Only recording a *new* session promotes to InFocus; correcting, moving, removing a session, or recording prior playtime never does.
+- **Game** — protects: status transitions follow the lifecycle DU; play time settable any time after `Game_added_to_library`; family owners and played-with are sets. HLTB hours are no longer aggregate-settable (games-v4nqe demoted `Set_hltb_hours`/`Game_hltb_hours_set` — HLTB hours are cache-derived, `MetadataCache.upsertGameHltbHours`). Play time is a two-fold: `TotalPlayTimeMinutes` (`PriorPlayTimeMinutes` + Σ session minutes, what the user asserts happened) and `SteamObservedMinutes` (what Steam has told us, never reduced by correction/move/removal) — the second fold is what makes the Steam sync cursor derivable rather than externally-guarded state (ADR-0050). `PlayFacetsOverride` (ADR-0053) is cache-blind by construction: no invariant here ever reads `game_metadata_cache`, so a redundant-but-harmless override is accepted as normal, self-correcting state, not refused. Only recording a *new* session promotes to InFocus; correcting, moving, removing a session, or recording prior playtime never does.
 
 ## Key events
 
-`Game_added_to_library`, `Game_categorized`, `Game_cover_replaced`, `Game_backdrop_replaced`, `Game_personal_rating_set`, `Game_status_changed`, `Game_hltb_hours_set`, `Game_store_added`, `Game_store_removed`, `Game_family_owner_added`, `Game_family_owner_removed`, `Game_recommended_by`, `Game_recommendation_removed`, `Want_to_play_with`, `Removed_want_to_play_with`, `Game_played_with`, `Game_played_with_removed`, `Game_steam_app_id_set`, `Game_play_time_set` (legacy, evolve no-op since games-p6vkz), `Prior_play_time_recorded`, `Play_session_recorded`, `Play_session_minutes_corrected`, `Play_session_moved`, `Play_session_removed`, `Steam_observed_total_reconciled`, `Game_description_set`, `Game_short_description_set`, `Game_website_url_set`, `Game_play_mode_added`, `Game_play_mode_removed`, `Game_steam_library_date_set`, `Game_steam_last_played_set`, `Game_play_facets_overridden` (games-a7dqx, ADR-0053 — the play-facets manual correction; added alongside, not replacing, `Game_play_mode_added`/`removed`).
+`Game_added_to_library`, `Game_categorized` (legacy, evolve/projection no-op since games-v4nqe), `Game_cover_replaced`, `Game_backdrop_replaced`, `Game_personal_rating_set`, `Game_status_changed`, `Game_hltb_hours_set` (legacy, evolve/projection no-op since games-v4nqe), `Game_store_added`/`Game_store_removed` (legacy, evolve/projection no-op since the pre-existing four-part-rule precedent), `Game_family_owner_added`, `Game_family_owner_removed`, `Game_recommended_by`, `Game_recommendation_removed`, `Want_to_play_with`, `Removed_want_to_play_with`, `Game_played_with`, `Game_played_with_removed`, `Game_steam_app_id_set`, `Game_play_time_set` (legacy, evolve no-op since games-p6vkz), `Prior_play_time_recorded`, `Play_session_recorded`, `Play_session_minutes_corrected`, `Play_session_moved`, `Play_session_removed`, `Steam_observed_total_reconciled`, `Game_description_set` (legacy, evolve/projection no-op since games-v4nqe), `Game_short_description_set` (legacy, same), `Game_website_url_set` (legacy, same), `Game_play_mode_added`/`Game_play_mode_removed` (legacy, evolve/projection no-op since games-v4nqe — superseded by `Game_play_facets_overridden`), `Game_steam_library_date_set`, `Game_steam_last_played_set` (legacy, evolve/projection no-op since games-v4nqe — redundant with `game_play_session`, derived at query time), `Game_play_facets_overridden` (ADR-0053 — the play-facets manual correction).
+
+All "legacy, evolve/projection no-op" events stay in the codec (`Games.Serialization`
+still deserializes them; `evolve`/`GameProjection.handleEvent` are explicit no-ops,
+the `Game_store_added` precedent) so pre-cutover event streams keep replaying without
+error or corrupted state — only their commands are gone.
 
 ## Key commands
 
-Direct counterparts to the events above (see `Games.fs` for the full list).
+Direct counterparts to the still-live events above (see `Games.fs` for the full
+list). `Categorize_game`, `Set_hltb_hours`, `Set_description`,
+`Set_short_description`, `Set_website_url`, `Add_play_mode`, `Remove_play_mode`,
+`Set_steam_last_played` are deleted from `GameCommand` (games-v4nqe) — their
+event counterparts above are legacy-only now.
 
 ## Relationships with other contexts
 

@@ -19,7 +19,6 @@ module GameProjection =
                 genres          TEXT NOT NULL DEFAULT '[]',
                 status          TEXT NOT NULL DEFAULT 'Backlog',
                 total_play_time INTEGER NOT NULL DEFAULT 0,
-                hltb_hours      REAL,
                 personal_rating INTEGER,
                 rawg_rating     REAL,
                 steam_app_id    INTEGER
@@ -29,21 +28,14 @@ module GameProjection =
                 slug              TEXT PRIMARY KEY,
                 name              TEXT NOT NULL,
                 year              INTEGER NOT NULL,
-                description       TEXT NOT NULL DEFAULT '',
-                short_description TEXT NOT NULL DEFAULT '',
-                website_url       TEXT,
                 cover_ref         TEXT,
                 backdrop_ref      TEXT,
                 genres            TEXT NOT NULL DEFAULT '[]',
                 status            TEXT NOT NULL DEFAULT 'Backlog',
                 rawg_id           INTEGER,
                 rawg_rating       REAL,
-                hltb_hours        REAL,
-                hltb_main_plus_hours REAL,
-                hltb_completionist_hours REAL,
                 personal_rating   INTEGER,
                 steam_app_id      INTEGER,
-                play_modes        TEXT NOT NULL DEFAULT '[]',
                 family_owners     TEXT NOT NULL DEFAULT '[]',
                 recommended_by    TEXT NOT NULL DEFAULT '[]',
                 want_to_play_with TEXT NOT NULL DEFAULT '[]',
@@ -51,7 +43,6 @@ module GameProjection =
                 total_play_time       INTEGER NOT NULL DEFAULT 0,
                 prior_play_time       INTEGER NOT NULL DEFAULT 0,
                 steam_library_date    TEXT,
-                steam_last_played     TEXT,
                 is_owned              INTEGER NOT NULL DEFAULT 0
             );
         """
@@ -61,17 +52,23 @@ module GameProjection =
         try
             conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN is_owned INTEGER NOT NULL DEFAULT 0" |> Db.exec
         with _ -> ()
+        // games-v4nqe-2 (ADR-0055): defensive re-add for any database that
+        // ran iteration 1 of games-v4nqe (which dropped `genres` from both
+        // tables before this reversal landed) — `CREATE TABLE IF NOT EXISTS`
+        // above only helps a fresh install, not a table that already exists
+        // without the column. No-op (column-already-exists) on every other
+        // database, matching the try/with idiom every other migration here uses.
+        try
+            conn |> Db.newCommand "ALTER TABLE game_list ADD COLUMN genres TEXT NOT NULL DEFAULT '[]'" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN genres TEXT NOT NULL DEFAULT '[]'" |> Db.exec
+        with _ -> ()
         // games-p6vkz: playtime accumulated before session tracking began —
         // event-derived (Prior_play_time_recorded), therefore replayable,
         // therefore a projection column rather than imperative state.
         try
             conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN prior_play_time INTEGER NOT NULL DEFAULT 0" |> Db.exec
-        with _ -> ()
-        try
-            conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN hltb_main_plus_hours REAL" |> Db.exec
-        with _ -> ()
-        try
-            conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN hltb_completionist_hours REAL" |> Db.exec
         with _ -> ()
         // Task 048: collapse legacy 'Playing' status into 'InFocus'. Idempotent.
         try
@@ -122,6 +119,31 @@ module GameProjection =
         try
             conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN facet_override_vr TEXT" |> Db.exec
         with _ -> ()
+
+    /// games-v4nqe: drops the now-fully-unread columns the emission cutover
+    /// makes dead — description/short_description/website_url/hltb_*/
+    /// play_modes/steam_last_played are cache-derived or query-time-derived
+    /// now (see this task's event disposition table). `genres` is
+    /// deliberately NOT in this list — ADR-0055 (amending ADR-0043) reverted
+    /// the iteration-1 attempt to drop it and cache-source it: no refresh
+    /// path in this codebase ever re-fetches Game genres (RAWG genre search
+    /// only ever runs at creation time), so it fails ADR-0043's
+    /// re-derivability test and stays the identity-card projection column
+    /// ADR-0043's own classification table already names it as. Mirrors
+    /// `SeriesProjection.dropDeprecatedColumns`'s idiom (try/with per
+    /// column, tolerating "already dropped" on a database that already ran
+    /// this migration).
+    let dropDeprecatedColumns (conn: SqliteConnection) : unit =
+        for col in [ "hltb_hours" ] do
+            try
+                conn |> Db.newCommand (sprintf "ALTER TABLE game_list DROP COLUMN %s" col) |> Db.exec
+            with _ -> () // Column already dropped
+        for col in [ "description"; "short_description"; "website_url"
+                     "hltb_hours"; "hltb_main_plus_hours"; "hltb_completionist_hours"
+                     "play_modes"; "steam_last_played" ] do
+            try
+                conn |> Db.newCommand (sprintf "ALTER TABLE game_detail DROP COLUMN %s" col) |> Db.exec
+            with _ -> () // Column already dropped
 
     let private dropTables (conn: SqliteConnection) : unit =
         conn
@@ -196,11 +218,25 @@ module GameProjection =
             | Some gameEvent ->
                 match gameEvent with
                 | Games.Game_added_to_library data ->
+                    // games-v4nqe (hazard 1): description/short_description/
+                    // website_url are no longer projection columns — this arm
+                    // no longer writes them anywhere. The creation code path
+                    // itself (Api.fs / PlaytimeTracker.fs, at command time,
+                    // imperatively) writes them into game_metadata_cache
+                    // immediately after Add_game succeeds — never this
+                    // ProjectionHandler (ADR-0045's hard constraint; mirrors
+                    // series-r2xhv's precedent).
+                    //
+                    // `genres` is the one exception (ADR-0055, amending
+                    // ADR-0043): it stays an event-carried identity-card
+                    // projection column, written here exactly as before this
+                    // task, because no refresh path in this codebase ever
+                    // re-derives Game genres.
                     let genresJson = data.Genres |> List.map Encode.string |> Encode.list |> Encode.toString 0
                     conn
                     |> Db.newCommand """
-                        INSERT OR REPLACE INTO game_list (slug, name, year, cover_ref, genres, status, total_play_time, hltb_hours, personal_rating, rawg_rating)
-                        VALUES (@slug, @name, @year, @cover_ref, @genres, 'Backlog', 0, NULL, NULL, @rawg_rating)
+                        INSERT OR REPLACE INTO game_list (slug, name, year, cover_ref, genres, status, total_play_time, personal_rating, rawg_rating)
+                        VALUES (@slug, @name, @year, @cover_ref, @genres, 'Backlog', 0, NULL, @rawg_rating)
                     """
                     |> Db.setParams [
                         "slug", SqlType.String slug
@@ -214,16 +250,13 @@ module GameProjection =
 
                     conn
                     |> Db.newCommand """
-                        INSERT OR REPLACE INTO game_detail (slug, name, year, description, short_description, website_url, cover_ref, backdrop_ref, genres, status, rawg_id, rawg_rating, hltb_hours, personal_rating, play_modes, family_owners, recommended_by, want_to_play_with, played_with, total_play_time, steam_library_date, steam_last_played)
-                        VALUES (@slug, @name, @year, @description, @short_description, @website_url, @cover_ref, @backdrop_ref, @genres, 'Backlog', @rawg_id, @rawg_rating, NULL, NULL, '[]', '[]', '[]', '[]', '[]', 0, NULL, NULL)
+                        INSERT OR REPLACE INTO game_detail (slug, name, year, cover_ref, backdrop_ref, genres, status, rawg_id, rawg_rating, personal_rating, family_owners, recommended_by, want_to_play_with, played_with, total_play_time, steam_library_date)
+                        VALUES (@slug, @name, @year, @cover_ref, @backdrop_ref, @genres, 'Backlog', @rawg_id, @rawg_rating, NULL, '[]', '[]', '[]', '[]', 0, NULL)
                     """
                     |> Db.setParams [
                         "slug", SqlType.String slug
                         "name", SqlType.String data.Name
                         "year", SqlType.Int32 data.Year
-                        "description", SqlType.String data.Description
-                        "short_description", SqlType.String data.ShortDescription
-                        "website_url", match data.WebsiteUrl with Some u -> SqlType.String u | None -> SqlType.Null
                         "cover_ref", match data.CoverRef with Some r -> SqlType.String r | None -> SqlType.Null
                         "backdrop_ref", match data.BackdropRef with Some r -> SqlType.String r | None -> SqlType.Null
                         "genres", SqlType.String genresJson
@@ -242,16 +275,7 @@ module GameProjection =
                     |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.exec
 
-                | Games.Game_categorized genres ->
-                    let genresJson = genres |> List.map Encode.string |> Encode.list |> Encode.toString 0
-                    conn
-                    |> Db.newCommand "UPDATE game_list SET genres = @genres WHERE slug = @slug"
-                    |> Db.setParams [ "slug", SqlType.String slug; "genres", SqlType.String genresJson ]
-                    |> Db.exec
-                    conn
-                    |> Db.newCommand "UPDATE game_detail SET genres = @genres WHERE slug = @slug"
-                    |> Db.setParams [ "slug", SqlType.String slug; "genres", SqlType.String genresJson ]
-                    |> Db.exec
+                | Games.Game_categorized _ -> () // demoted (games-v4nqe): Categorize_game had zero live callers; genres stays sourced exclusively from Game_added_to_library's payload (ADR-0043/ADR-0055) — this legacy event is ignored, four-part no-op
 
                 | Games.Game_cover_replaced coverRef ->
                     conn
@@ -296,23 +320,7 @@ module GameProjection =
                     |> Db.setParams [ "slug", SqlType.String slug; "status", SqlType.String statusStr ]
                     |> Db.exec
 
-                | Games.Game_hltb_hours_set (hours, mainPlusHours, completionistHours) ->
-                    conn
-                    |> Db.newCommand "UPDATE game_list SET hltb_hours = @hltb_hours WHERE slug = @slug"
-                    |> Db.setParams [
-                        "slug", SqlType.String slug
-                        "hltb_hours", match hours with Some h -> SqlType.Double h | None -> SqlType.Null
-                    ]
-                    |> Db.exec
-                    conn
-                    |> Db.newCommand "UPDATE game_detail SET hltb_hours = @hltb_hours, hltb_main_plus_hours = @hltb_main_plus_hours, hltb_completionist_hours = @hltb_completionist_hours WHERE slug = @slug"
-                    |> Db.setParams [
-                        "slug", SqlType.String slug
-                        "hltb_hours", match hours with Some h -> SqlType.Double h | None -> SqlType.Null
-                        "hltb_main_plus_hours", match mainPlusHours with Some h -> SqlType.Double h | None -> SqlType.Null
-                        "hltb_completionist_hours", match completionistHours with Some h -> SqlType.Double h | None -> SqlType.Null
-                    ]
-                    |> Db.exec
+                | Games.Game_hltb_hours_set _ -> () // demoted (games-v4nqe, ADR-0043) — HLTB hours now cache-derived; legacy event, ignored
 
                 | Games.Game_store_added _ -> () // legacy event, ignored
                 | Games.Game_store_removed _ -> () // legacy event, ignored
@@ -434,32 +442,15 @@ module GameProjection =
                     // projected column.
                     ()
 
-                | Games.Game_description_set description ->
-                    conn
-                    |> Db.newCommand "UPDATE game_detail SET description = @description WHERE slug = @slug"
-                    |> Db.setParams [ "slug", SqlType.String slug; "description", SqlType.String description ]
-                    |> Db.exec
+                | Games.Game_description_set _ -> () // demoted (games-v4nqe, ADR-0043) — description now cache-derived; legacy event, ignored
 
-                | Games.Game_short_description_set shortDescription ->
-                    conn
-                    |> Db.newCommand "UPDATE game_detail SET short_description = @short_description WHERE slug = @slug"
-                    |> Db.setParams [ "slug", SqlType.String slug; "short_description", SqlType.String shortDescription ]
-                    |> Db.exec
+                | Games.Game_short_description_set _ -> () // demoted (games-v4nqe, ADR-0043) — short description now cache-derived; legacy event, ignored
 
-                | Games.Game_website_url_set websiteUrl ->
-                    conn
-                    |> Db.newCommand "UPDATE game_detail SET website_url = @website_url WHERE slug = @slug"
-                    |> Db.setParams [
-                        "slug", SqlType.String slug
-                        "website_url", match websiteUrl with Some u -> SqlType.String u | None -> SqlType.Null
-                    ]
-                    |> Db.exec
+                | Games.Game_website_url_set _ -> () // demoted (games-v4nqe, ADR-0043) — website url now cache-derived; legacy event, ignored
 
-                | Games.Game_play_mode_added playMode ->
-                    updateJsonList conn "game_detail" "play_modes" slug true playMode
+                | Games.Game_play_mode_added _ -> () // demoted (games-v4nqe, ADR-0053) — superseded by Game_play_facets_overridden; legacy event, ignored
 
-                | Games.Game_play_mode_removed playMode ->
-                    updateJsonList conn "game_detail" "play_modes" slug false playMode
+                | Games.Game_play_mode_removed _ -> () // demoted (games-v4nqe, ADR-0053) — superseded by Game_play_facets_overridden; legacy event, ignored
 
                 | Games.Game_steam_library_date_set dateAdded ->
                     conn
@@ -470,14 +461,7 @@ module GameProjection =
                     ]
                     |> Db.exec
 
-                | Games.Game_steam_last_played_set lastPlayed ->
-                    conn
-                    |> Db.newCommand "UPDATE game_detail SET steam_last_played = @val WHERE slug = @slug"
-                    |> Db.setParams [
-                        "slug", SqlType.String slug
-                        "val", match lastPlayed with Some d -> SqlType.String d | None -> SqlType.Null
-                    ]
-                    |> Db.exec
+                | Games.Game_steam_last_played_set _ -> () // demoted (games-v4nqe) — redundant with game_play_session, derived at query time; legacy event, ignored
 
                 | Games.Game_marked_as_owned ->
                     conn
@@ -559,19 +543,59 @@ module GameProjection =
                   Name = name
                   ImageRef = imageRef })
 
+    /// games-v4nqe (ADR-0053): shared row-readers for the cache-derived
+    /// `PlayFacets` default and the event-sourced `PlayFacetsOverride`
+    /// correction — factored out of `getPlayFacets` (games-a7dqx) so
+    /// `getAll`/`getBySlug` can select the same columns into their own
+    /// broader queries and merge them the same way, without an N+1 per-row
+    /// re-query (ADR-0048's "join in the query function" shape). Column
+    /// names must match whatever SELECT the caller wrote (see `getAll`/
+    /// `getBySlug`/`getPlayFacets` below).
+    let private readCachedPlayFacets (rd: IDataReader) : PlayFacets =
+        let readBool (col: string) =
+            if rd.IsDBNull(rd.GetOrdinal(col)) then false else rd.ReadInt32 col <> 0
+        {
+            Solo = readBool "facet_solo"
+            CoopCouch = readBool "facet_coop_couch"
+            CoopOnline = readBool "facet_coop_online"
+            VersusCouch = readBool "facet_versus_couch"
+            VersusOnline = readBool "facet_versus_online"
+            RemotePlayTogether = readBool "facet_remote_play_together"
+            Vr = if rd.IsDBNull(rd.GetOrdinal("facet_vr")) then NoVr else decodeVrSupport (rd.ReadString "facet_vr")
+        }
+
+    let private readPlayFacetsOverrideRow (rd: IDataReader) : PlayFacetsOverride =
+        let readOverrideBool (col: string) =
+            if rd.IsDBNull(rd.GetOrdinal(col)) then None else Some (rd.ReadInt32 col <> 0)
+        {
+            Solo = readOverrideBool "facet_override_solo"
+            CoopCouch = readOverrideBool "facet_override_coop_couch"
+            CoopOnline = readOverrideBool "facet_override_coop_online"
+            VersusCouch = readOverrideBool "facet_override_versus_couch"
+            VersusOnline = readOverrideBool "facet_override_versus_online"
+            RemotePlayTogether = readOverrideBool "facet_override_remote_play_together"
+            Vr =
+                if rd.IsDBNull(rd.GetOrdinal("facet_override_vr")) then None
+                else Some (decodeVrSupport (rd.ReadString "facet_override_vr"))
+        }
+
     let getAll (conn: SqliteConnection) : GameListItem list =
         conn
         |> Db.newCommand """
-            SELECT gl.slug, gl.name, gl.year, gl.cover_ref, gl.genres, gl.status, gl.total_play_time, mc.hltb_hours, gl.personal_rating, gl.rawg_rating
+            SELECT gl.slug, gl.name, gl.year, gl.cover_ref, gl.genres, gl.status, gl.total_play_time, mc.hltb_hours, gl.personal_rating, gl.rawg_rating,
+                   mc.facet_solo, mc.facet_coop_couch, mc.facet_coop_online, mc.facet_versus_couch, mc.facet_versus_online, mc.facet_remote_play_together, mc.facet_vr,
+                   gd.facet_override_solo, gd.facet_override_coop_couch, gd.facet_override_coop_online,
+                   gd.facet_override_versus_couch, gd.facet_override_versus_online,
+                   gd.facet_override_remote_play_together, gd.facet_override_vr
             FROM game_list gl
             LEFT JOIN game_metadata_cache mc ON mc.game_slug = gl.slug
+            LEFT JOIN game_detail gd ON gd.slug = gl.slug
             ORDER BY gl.name
         """
         |> Db.query (fun (rd: IDataReader) ->
-            let genresJson = rd.ReadString "genres"
             let genres =
-                Decode.fromString (Decode.list Decode.string) genresJson
-                |> Result.defaultValue []
+                if rd.IsDBNull(rd.GetOrdinal("genres")) then []
+                else Decode.fromString (Decode.list Decode.string) (rd.ReadString "genres") |> Result.defaultValue []
             { GameListItem.Slug = rd.ReadString "slug"
               Name = rd.ReadString "name"
               Year = rd.ReadInt32 "year"
@@ -587,6 +611,7 @@ module GameProjection =
               PersonalRating =
                 if rd.IsDBNull(rd.GetOrdinal("personal_rating")) then None
                 else Some (rd.ReadInt32 "personal_rating")
+              PlayFacets = FacetDerivation.merge (readCachedPlayFacets rd) (readPlayFacetsOverrideRow rd)
               RawgRating =
                 if rd.IsDBNull(rd.GetOrdinal("rawg_rating")) then None
                 else Some (rd.ReadDouble "rawg_rating") }
@@ -600,24 +625,25 @@ module GameProjection =
                 mc.description, mc.short_description, mc.website_url,
                 gd.cover_ref, gd.backdrop_ref, gd.genres, gd.status, gd.rawg_id, gd.rawg_rating,
                 mc.hltb_hours, mc.hltb_main_plus_hours, mc.hltb_completionist_hours,
-                gd.personal_rating, gd.steam_app_id, gd.play_modes, gd.family_owners, gd.recommended_by,
+                gd.personal_rating, gd.steam_app_id, gd.family_owners, gd.recommended_by,
                 gd.want_to_play_with, gd.played_with, gd.total_play_time, gd.prior_play_time,
                 gd.steam_library_date, gd.is_owned,
-                (SELECT MAX(date) FROM game_play_session WHERE game_slug = gd.slug) AS steam_last_played
+                (SELECT MAX(date) FROM game_play_session WHERE game_slug = gd.slug) AS steam_last_played,
+                mc.facet_solo, mc.facet_coop_couch, mc.facet_coop_online,
+                mc.facet_versus_couch, mc.facet_versus_online, mc.facet_remote_play_together, mc.facet_vr,
+                gd.facet_override_solo, gd.facet_override_coop_couch, gd.facet_override_coop_online,
+                gd.facet_override_versus_couch, gd.facet_override_versus_online,
+                gd.facet_override_remote_play_together, gd.facet_override_vr
             FROM game_detail gd
             LEFT JOIN game_metadata_cache mc ON mc.game_slug = gd.slug
             WHERE gd.slug = @slug
         """
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) ->
-            let genresJson = rd.ReadString "genres"
             let genres =
-                Decode.fromString (Decode.list Decode.string) genresJson
-                |> Result.defaultValue []
-            let playModesJson = rd.ReadString "play_modes"
-            let playModes =
-                Decode.fromString (Decode.list Decode.string) playModesJson
-                |> Result.defaultValue []
+                if rd.IsDBNull(rd.GetOrdinal("genres")) then []
+                else Decode.fromString (Decode.list Decode.string) (rd.ReadString "genres") |> Result.defaultValue []
+            let overrideRecord = readPlayFacetsOverrideRow rd
             let familyOwnersJson = rd.ReadString "family_owners"
             let familyOwnerSlugs =
                 Decode.fromString (Decode.list Decode.string) familyOwnersJson
@@ -683,7 +709,8 @@ module GameProjection =
                 else Some (rd.ReadString "steam_last_played")
               TotalPlayTimeMinutes = rd.ReadInt32 "total_play_time"
               PriorPlayTimeMinutes = rd.ReadInt32 "prior_play_time"
-              PlayModes = playModes
+              PlayFacets = FacetDerivation.merge (readCachedPlayFacets rd) overrideRecord
+              PlayFacetsOverride = overrideRecord
               IsOwnedByMe = rd.ReadInt32 "is_owned" <> 0
               FamilyOwners = resolveFriendRefs conn familyOwnerSlugs
               RecommendedBy = resolveFriendRefs conn recommendedBySlugs
@@ -692,18 +719,18 @@ module GameProjection =
               ContentBlocks = ContentBlockProjection.getForMovieDetail conn slug }
         )
 
-    /// games-a7dqx (ADR-0053): composes the display-ready `PlayFacets` for
-    /// one game by joining `game_metadata_cache`'s facet columns (the
-    /// cache-derived default) with `game_detail`'s `facet_override_*`
-    /// columns (the event-sourced correction) and applying
-    /// `FacetDerivation.merge` — ADR-0048's "join in the query function,
-    /// never the API layer" shape. NOT yet wired into `getAll`/`getBySlug`'s
-    /// DTO assembly (games-v4nqe's job, inseparable from the DTO rename it
-    /// also owns) — exercised directly by this task's own tests instead. A
-    /// missing `game_metadata_cache` row (not yet backfilled, or the game
-    /// was created before that row could ever be seeded) degrades to the
-    /// all-false/`NoVr` cache default, same honest-degradation stance as
-    /// every other cache read this task adds — never a fabricated value.
+    /// ADR-0053: composes the display-ready `PlayFacets` for one game by
+    /// joining `game_metadata_cache`'s facet columns (the cache-derived
+    /// default) with `game_detail`'s `facet_override_*` columns (the
+    /// event-sourced correction) and applying `FacetDerivation.merge` —
+    /// ADR-0048's "join in the query function, never the API layer" shape.
+    /// `getAll`/`getBySlug` (games-v4nqe) inline the same two column groups
+    /// into their own broader SELECTs and reuse `readCachedPlayFacets`/
+    /// `readPlayFacetsOverrideRow` rather than calling this per row (avoiding
+    /// an N+1 query); this standalone version stays for direct single-slug
+    /// callers. A missing `game_metadata_cache` row (not yet backfilled, or
+    /// the game was created before that row could ever be seeded) degrades
+    /// to the all-false/`NoVr` cache default — never a fabricated value.
     let getPlayFacets (conn: SqliteConnection) (slug: string) : PlayFacets option =
         conn
         |> Db.newCommand """
@@ -719,38 +746,7 @@ module GameProjection =
         """
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) ->
-            let readBool (col: string) =
-                if rd.IsDBNull(rd.GetOrdinal(col)) then false
-                else rd.ReadInt32 col <> 0
-            let readOverrideBool (col: string) =
-                if rd.IsDBNull(rd.GetOrdinal(col)) then None
-                else Some (rd.ReadInt32 col <> 0)
-            let cachedVr =
-                if rd.IsDBNull(rd.GetOrdinal("facet_vr")) then NoVr
-                else decodeVrSupport (rd.ReadString "facet_vr")
-            let overrideVr =
-                if rd.IsDBNull(rd.GetOrdinal("facet_override_vr")) then None
-                else Some (decodeVrSupport (rd.ReadString "facet_override_vr"))
-            let cached : PlayFacets = {
-                Solo = readBool "facet_solo"
-                CoopCouch = readBool "facet_coop_couch"
-                CoopOnline = readBool "facet_coop_online"
-                VersusCouch = readBool "facet_versus_couch"
-                VersusOnline = readBool "facet_versus_online"
-                RemotePlayTogether = readBool "facet_remote_play_together"
-                Vr = cachedVr
-            }
-            let ovr : PlayFacetsOverride = {
-                Solo = readOverrideBool "facet_override_solo"
-                CoopCouch = readOverrideBool "facet_override_coop_couch"
-                CoopOnline = readOverrideBool "facet_override_coop_online"
-                VersusCouch = readOverrideBool "facet_override_versus_couch"
-                VersusOnline = readOverrideBool "facet_override_versus_online"
-                RemotePlayTogether = readOverrideBool "facet_override_remote_play_together"
-                Vr = overrideVr
-            }
-            FacetDerivation.merge cached ovr
-        )
+            FacetDerivation.merge (readCachedPlayFacets rd) (readPlayFacetsOverrideRow rd))
 
     /// Lightweight status lookup — used by Steam sync to check whether a game already is InFocus
     /// before emitting a redundant Game_status_changed event.
@@ -805,10 +801,9 @@ module GameProjection =
               MediaType = Game }
         )
 
-    let getAllPlayModes (conn: SqliteConnection) : string list =
-        conn
-        |> Db.newCommand "SELECT DISTINCT je.value FROM game_detail, json_each(game_detail.play_modes) AS je ORDER BY je.value"
-        |> Db.query (fun (rd: IDataReader) -> rd.ReadString "value")
+    // games-v4nqe: getAllPlayModes deleted alongside its API method — play
+    // modes are superseded by ADR-0053's PlayFacets/PlayFacetsOverride, and
+    // `game_detail.play_modes` no longer exists.
 
     let findBySteamAppId (conn: SqliteConnection) (appId: int) : string option =
         conn
@@ -816,9 +811,21 @@ module GameProjection =
         |> Db.setParams [ "app_id", SqlType.Int32 appId ]
         |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "slug")
 
+    /// games-v4nqe: rewritten to query the cache tier — description/
+    /// short_description no longer live on `game_detail`. Kept (not retired
+    /// in favor of the facet backfill job) since it backfills a different
+    /// concern (missing description text) than `findGamesNeedingFacetBackfill`
+    /// (missing facet derivation); the two cursors are independent.
     let findGamesWithEmptyDescriptionAndSteamAppId (conn: SqliteConnection) : (string * int) list =
         conn
-        |> Db.newCommand "SELECT slug, steam_app_id FROM game_detail WHERE steam_app_id IS NOT NULL AND (description IS NULL OR description = '') AND (short_description IS NULL OR short_description = '')"
+        |> Db.newCommand """
+            SELECT gd.slug, gd.steam_app_id
+            FROM game_detail gd
+            LEFT JOIN game_metadata_cache mc ON mc.game_slug = gd.slug
+            WHERE gd.steam_app_id IS NOT NULL
+              AND (mc.description IS NULL OR mc.description = '')
+              AND (mc.short_description IS NULL OR mc.short_description = '')
+        """
         |> Db.query (fun (rd: IDataReader) ->
             rd.ReadString "slug",
             rd.ReadInt32 "steam_app_id"
@@ -883,19 +890,23 @@ module GameProjection =
     let getRecentlyAddedGames (conn: SqliteConnection) (limit: int) : GameListItem list =
         conn
         |> Db.newCommand """
-            SELECT gl.slug, gl.name, gl.year, gl.cover_ref, gl.genres, gl.status, gl.total_play_time, mc.hltb_hours, gl.personal_rating, gl.rawg_rating
+            SELECT gl.slug, gl.name, gl.year, gl.cover_ref, gl.genres, gl.status, gl.total_play_time, mc.hltb_hours, gl.personal_rating, gl.rawg_rating,
+                   mc.facet_solo, mc.facet_coop_couch, mc.facet_coop_online, mc.facet_versus_couch, mc.facet_versus_online, mc.facet_remote_play_together, mc.facet_vr,
+                   gd.facet_override_solo, gd.facet_override_coop_couch, gd.facet_override_coop_online,
+                   gd.facet_override_versus_couch, gd.facet_override_versus_online,
+                   gd.facet_override_remote_play_together, gd.facet_override_vr
             FROM game_list gl
             LEFT JOIN game_metadata_cache mc ON mc.game_slug = gl.slug
+            LEFT JOIN game_detail gd ON gd.slug = gl.slug
             WHERE gl.status != 'Dismissed'
             ORDER BY gl.rowid DESC
             LIMIT @limit
         """
         |> Db.setParams [ "limit", SqlType.Int32 limit ]
         |> Db.query (fun (rd: IDataReader) ->
-            let genresJson = rd.ReadString "genres"
             let genres =
-                Decode.fromString (Decode.list Decode.string) genresJson
-                |> Result.defaultValue []
+                if rd.IsDBNull(rd.GetOrdinal("genres")) then []
+                else Decode.fromString (Decode.list Decode.string) (rd.ReadString "genres") |> Result.defaultValue []
             { GameListItem.Slug = rd.ReadString "slug"
               Name = rd.ReadString "name"
               Year = rd.ReadInt32 "year"
@@ -911,6 +922,7 @@ module GameProjection =
               PersonalRating =
                 if rd.IsDBNull(rd.GetOrdinal("personal_rating")) then None
                 else Some (rd.ReadInt32 "personal_rating")
+              PlayFacets = FacetDerivation.merge (readCachedPlayFacets rd) (readPlayFacetsOverrideRow rd)
               RawgRating =
                 if rd.IsDBNull(rd.GetOrdinal("rawg_rating")) then None
                 else Some (rd.ReadDouble "rawg_rating") }
@@ -1009,6 +1021,9 @@ module GameProjection =
             rd.ReadInt32 "personal_rating", rd.ReadInt32 "count")
 
     let getGameGenreDistribution (conn: SqliteConnection) : (string * int) list =
+        // games-v4nqe-2: reverted to reading `game_list.genres` directly —
+        // see ADR-0055. Genres stays an identity-card projection column
+        // (ADR-0043), not cache-sourced.
         let allGenres =
             conn
             |> Db.newCommand "SELECT genres FROM game_list"

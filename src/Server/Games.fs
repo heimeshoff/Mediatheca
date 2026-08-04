@@ -101,9 +101,9 @@ module Games =
         | Game_rawg_id_set of rawgId: int * rawgRating: float option
         /// ADR-0053 (games-a7dqx): the manual-correction counterpart to the
         /// cache-derived `PlayFacets` — one event carries the whole
-        /// all-`Option` override record, not seven. Added net-new, alongside
-        /// the still-live `Game_play_mode_added`/`Game_play_mode_removed`
-        /// (untouched by this task).
+        /// all-`Option` override record, not seven. `Game_play_mode_added`/
+        /// `Game_play_mode_removed` above are demoted (games-v4nqe) — their
+        /// commands are gone, `evolve`'s arms for them are no-ops.
         | Game_play_facets_overridden of PlayFacetsOverride
 
     // State
@@ -144,13 +144,13 @@ module Games =
         RecommendedBy: Set<string>
         WantToPlayWith: Set<string>
         PlayedWith: Set<string>
-        PlayModes: Set<string>
         SteamLibraryDate: string option
         SteamLastPlayed: string option
         IsOwnedByMe: bool
-        /// ADR-0053 (games-a7dqx): the manual correction, defer-to-cache by
-        /// default. Added alongside the still-live `PlayModes` above —
-        /// replacing `PlayModes` is games-v4nqe's job, not this task's.
+        /// ADR-0053: the manual correction, defer-to-cache by default.
+        /// `PlayModes: Set<string>` (games-v4nqe: deleted outright — see the
+        /// `evolve` arms for `Game_play_mode_added`/`removed` below, now
+        /// explicit no-ops matching the `Game_store_added` precedent).
         PlayFacetsOverride: PlayFacetsOverride
     }
 
@@ -164,12 +164,10 @@ module Games =
     type GameCommand =
         | Add_game of GameAddedData
         | Remove_game
-        | Categorize_game of genres: string list
         | Replace_cover of coverRef: string
         | Replace_backdrop of backdropRef: string
         | Set_personal_rating of rating: int option
         | Change_status of GameStatus
-        | Set_hltb_hours of hours: float option * mainPlusHours: float option * completionistHours: float option
         | Add_family_owner of friendSlug: string
         | Remove_family_owner of friendSlug: string
         | Recommend_game of friendSlug: string
@@ -197,13 +195,7 @@ module Games =
         /// so the adapter (`PlaytimeTracker.runSync`) only ever supplies
         /// `(observedMinutes, gamingDay)` and enforces the migration gate.
         | Record_steam_observed_total of observedMinutes: int * gamingDay: string
-        | Set_description of description: string
-        | Set_short_description of shortDescription: string
-        | Set_website_url of websiteUrl: string option
-        | Add_play_mode of playMode: string
-        | Remove_play_mode of playMode: string
         | Set_steam_library_date of dateAdded: string option
-        | Set_steam_last_played of lastPlayed: string option
         | Mark_as_owned
         | Remove_ownership
         | Set_rawg_id of rawgId: int * rawgRating: float option
@@ -250,15 +242,13 @@ module Games =
                 RecommendedBy = Set.empty
                 WantToPlayWith = Set.empty
                 PlayedWith = Set.empty
-                PlayModes = Set.empty
                 SteamLibraryDate = None
                 SteamLastPlayed = None
                 IsOwnedByMe = false
                 PlayFacetsOverride = noPlayFacetsOverride
             }
         | Active _, Game_removed_from_library -> Removed
-        | Active game, Game_categorized genres ->
-            Active { game with Genres = genres }
+        | _, Game_categorized _ -> state // demoted (games-v4nqe, ADR-0043/ADR-0055) — genres stays sourced exclusively from Game_added_to_library's payload; legacy event, ignored
         | Active game, Game_cover_replaced coverRef ->
             Active { game with CoverRef = Some coverRef }
         | Active game, Game_backdrop_replaced backdropRef ->
@@ -267,8 +257,7 @@ module Games =
             Active { game with PersonalRating = rating }
         | Active game, Game_status_changed status ->
             Active { game with Status = status }
-        | Active game, Game_hltb_hours_set (hours, mainPlusHours, completionistHours) ->
-            Active { game with HltbHours = hours; HltbMainPlusHours = mainPlusHours; HltbCompletionistHours = completionistHours }
+        | _, Game_hltb_hours_set _ -> state // demoted (games-v4nqe, ADR-0043) — HLTB hours now cache-derived; legacy event, ignored
         | _, Game_store_added _ -> state // legacy event, ignored
         | _, Game_store_removed _ -> state // legacy event, ignored
         | Active game, Game_family_owner_added friendSlug ->
@@ -319,20 +308,14 @@ module Games =
             // Sets SteamObservedMinutes only — TotalPlayTimeMinutes (what the
             // user asserts happened) is untouched, by design.
             Active { game with SteamObservedMinutes = observedMinutes }
-        | Active game, Game_description_set description ->
-            Active { game with Description = description }
-        | Active game, Game_short_description_set shortDescription ->
-            Active { game with ShortDescription = shortDescription }
-        | Active game, Game_website_url_set websiteUrl ->
-            Active { game with WebsiteUrl = websiteUrl }
-        | Active game, Game_play_mode_added playMode ->
-            Active { game with PlayModes = game.PlayModes |> Set.add playMode }
-        | Active game, Game_play_mode_removed playMode ->
-            Active { game with PlayModes = game.PlayModes |> Set.remove playMode }
+        | _, Game_description_set _ -> state // demoted (games-v4nqe, ADR-0043) — description now cache-derived; legacy event, ignored
+        | _, Game_short_description_set _ -> state // demoted (games-v4nqe, ADR-0043) — short description now cache-derived; legacy event, ignored
+        | _, Game_website_url_set _ -> state // demoted (games-v4nqe, ADR-0043) — website url now cache-derived; legacy event, ignored
+        | _, Game_play_mode_added _ -> state // demoted (games-v4nqe, ADR-0053) — superseded by Game_play_facets_overridden; legacy event, ignored
+        | _, Game_play_mode_removed _ -> state // demoted (games-v4nqe, ADR-0053) — superseded by Game_play_facets_overridden; legacy event, ignored
         | Active game, Game_steam_library_date_set dateAdded ->
             Active { game with SteamLibraryDate = dateAdded }
-        | Active game, Game_steam_last_played_set lastPlayed ->
-            Active { game with SteamLastPlayed = lastPlayed }
+        | _, Game_steam_last_played_set _ -> state // demoted (games-v4nqe) — redundant with game_play_session, derived at query time; legacy event, ignored
         | Active game, Game_marked_as_owned ->
             Active { game with IsOwnedByMe = true }
         | Active game, Game_ownership_removed ->
@@ -367,9 +350,6 @@ module Games =
             Ok [ Game_removed_from_library ]
         | Not_created, Remove_game ->
             Error "Game does not exist"
-        | Active game, Categorize_game genres ->
-            if game.Genres = genres then Ok []
-            else Ok [ Game_categorized genres ]
         | Active _, Replace_cover coverRef ->
             Ok [ Game_cover_replaced coverRef ]
         | Active _, Replace_backdrop backdropRef ->
@@ -380,9 +360,6 @@ module Games =
         | Active game, Change_status status ->
             if game.Status = status then Ok []
             else Ok [ Game_status_changed status ]
-        | Active game, Set_hltb_hours (hours, mainPlusHours, completionistHours) ->
-            if game.HltbHours = hours && game.HltbMainPlusHours = mainPlusHours && game.HltbCompletionistHours = completionistHours then Ok []
-            else Ok [ Game_hltb_hours_set (hours, mainPlusHours, completionistHours) ]
         | Active game, Add_family_owner friendSlug ->
             if game.FamilyOwners |> Set.contains friendSlug then Ok []
             else Ok [ Game_family_owner_added friendSlug ]
@@ -466,28 +443,9 @@ module Games =
                     // corrected/removed session must not be silently re-added
                     // on the very next sync (the phantom-session case).
                     Ok []
-        | Active game, Set_description description ->
-            if game.Description = description then Ok []
-            else Ok [ Game_description_set description ]
-        | Active game, Set_short_description shortDescription ->
-            if game.ShortDescription = shortDescription then Ok []
-            else Ok [ Game_short_description_set shortDescription ]
-        | Active game, Set_website_url websiteUrl ->
-            if game.WebsiteUrl = websiteUrl then Ok []
-            else Ok [ Game_website_url_set websiteUrl ]
-        | Active game, Add_play_mode playMode ->
-            if game.PlayModes |> Set.contains playMode then Ok []
-            else Ok [ Game_play_mode_added playMode ]
-        | Active game, Remove_play_mode playMode ->
-            if game.PlayModes |> Set.contains playMode then
-                Ok [ Game_play_mode_removed playMode ]
-            else Ok []
         | Active game, Set_steam_library_date dateAdded ->
             if game.SteamLibraryDate = dateAdded then Ok []
             else Ok [ Game_steam_library_date_set dateAdded ]
-        | Active game, Set_steam_last_played lastPlayed ->
-            if game.SteamLastPlayed = lastPlayed then Ok []
-            else Ok [ Game_steam_last_played_set lastPlayed ]
         | Active game, Mark_as_owned ->
             if game.IsOwnedByMe then Ok [] else Ok [ Game_marked_as_owned ]
         | Active game, Remove_ownership ->

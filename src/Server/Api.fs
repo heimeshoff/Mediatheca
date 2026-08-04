@@ -14,6 +14,40 @@ module Api =
         if System.String.IsNullOrEmpty(html) then ""
         else Regex.Replace(html, "<[^>]+>", "")
 
+    /// games-v4nqe: read-modify-write helper shared by every converted Steam
+    /// emission site below. Reads the current `game_metadata_cache` identity
+    /// card, overrides only the fields the caller actually passes `Some` for
+    /// (`None` = leave unchanged), and writes the whole slice back through
+    /// `MetadataCache.upsertGameIdentityCard` in one call — never
+    /// constructing a partial record from scratch, which would silently
+    /// blank the fields a given call site doesn't touch (description for the
+    /// sites that only ever refresh short_description/website_url, for
+    /// instance). Genres is NOT part of this slice — ADR-0055 (amending
+    /// ADR-0043) keeps it event-carried on `game_list`/`game_detail`.
+    let private updateGameIdentityCache
+        (conn: SqliteConnection)
+        (slug: string)
+        (description: string option)
+        (shortDescription: string option)
+        (websiteUrl: (string option) option)
+        : unit =
+        let current = MetadataCache.tryGetGameIdentityCard conn slug
+        MetadataCache.upsertGameIdentityCard conn slug {
+            Description = description |> Option.defaultValue current.Description
+            ShortDescription = shortDescription |> Option.defaultValue current.ShortDescription
+            WebsiteUrl = websiteUrl |> Option.defaultValue current.WebsiteUrl
+        }
+
+    /// games-v4nqe: derives ADR-0053 facets from a Steam fetch's category ids
+    /// and writes them (plus the raw ids) to the cache — the same
+    /// `deriveFacets` + `upsertGameFacets` pairing every converted emission
+    /// site uses, factored out once. No "don't clobber overrides" guard
+    /// needed (ADR-0053 — the override lives on a different column set
+    /// entirely, `game_detail.facet_override_*`, never touched here).
+    let private updateGameFacetsFromCategoryIds (conn: SqliteConnection) (slug: string) (categoryIds: int list) : unit =
+        let facets = FacetDerivation.deriveFacets categoryIds
+        MetadataCache.upsertGameFacets conn slug facets categoryIds
+
     // administration-mz6kp (ADR-0033): `conn` is a per-request connection
     // opened by the caller via the shared factory (`use conn = factory()` at
     // the record member/handler that reaches this function) — no other
@@ -496,7 +530,7 @@ module Api =
                                             Games.Serialization.toEventData
                                             (Games.Set_steam_library_date (Steam.unixTimestampToDateString app.RtTimeAcquired))
                                             projectionHandlers |> ignore
-                                        // Fetch Steam Store details for description, website, and play modes
+                                        // Fetch Steam Store details for description, website, and facets
                                         let! storeDetails = Steam.getSteamStoreDetails httpClient app.Appid
                                         match storeDetails with
                                         | Ok details ->
@@ -506,29 +540,10 @@ module Api =
                                                     elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
                                                     else ""
                                                 if desc <> "" then
-                                                    executeCommand conn sid
-                                                        Games.Serialization.fromStoredEvent
-                                                        Games.reconstitute
-                                                        Games.decide
-                                                        Games.Serialization.toEventData
-                                                        (Games.Set_short_description details.ShortDescription)
-                                                        projectionHandlers |> ignore
+                                                    updateGameIdentityCache conn slug None (Some details.ShortDescription) None
                                             if details.WebsiteUrl.IsSome then
-                                                executeCommand conn sid
-                                                    Games.Serialization.fromStoredEvent
-                                                    Games.reconstitute
-                                                    Games.decide
-                                                    Games.Serialization.toEventData
-                                                    (Games.Set_website_url details.WebsiteUrl)
-                                                    projectionHandlers |> ignore
-                                            for category in details.Categories do
-                                                executeCommand conn sid
-                                                    Games.Serialization.fromStoredEvent
-                                                    Games.reconstitute
-                                                    Games.decide
-                                                    Games.Serialization.toEventData
-                                                    (Games.Add_play_mode category)
-                                                    projectionHandlers |> ignore
+                                                updateGameIdentityCache conn slug None None (Some details.WebsiteUrl)
+                                            updateGameFacetsFromCategoryIds conn slug details.CategoryIds
                                         | Error _ -> ()
                                         emit { Current = gamesProcessed; Total = total; GameName = app.Name; Action = "Matched" }
                                     | None ->
@@ -553,34 +568,15 @@ module Api =
                                                 Games.Serialization.toEventData
                                                 (Games.Set_steam_library_date (Steam.unixTimestampToDateString app.RtTimeAcquired))
                                                 projectionHandlers |> ignore
-                                            // Fetch Steam Store details for description, website, and play modes
+                                            // Fetch Steam Store details for description, website, and facets
                                             let! storeDetails = Steam.getSteamStoreDetails httpClient app.Appid
                                             match storeDetails with
                                             | Ok details ->
                                                 if details.AboutTheGame <> "" then
-                                                    executeCommand conn sid
-                                                        Games.Serialization.fromStoredEvent
-                                                        Games.reconstitute
-                                                        Games.decide
-                                                        Games.Serialization.toEventData
-                                                        (Games.Set_short_description details.ShortDescription)
-                                                        projectionHandlers |> ignore
+                                                    updateGameIdentityCache conn slug None (Some details.ShortDescription) None
                                                 if details.WebsiteUrl.IsSome then
-                                                    executeCommand conn sid
-                                                        Games.Serialization.fromStoredEvent
-                                                        Games.reconstitute
-                                                        Games.decide
-                                                        Games.Serialization.toEventData
-                                                        (Games.Set_website_url details.WebsiteUrl)
-                                                        projectionHandlers |> ignore
-                                                for category in details.Categories do
-                                                    executeCommand conn sid
-                                                        Games.Serialization.fromStoredEvent
-                                                        Games.reconstitute
-                                                        Games.decide
-                                                        Games.Serialization.toEventData
-                                                        (Games.Add_play_mode category)
-                                                        projectionHandlers |> ignore
+                                                    updateGameIdentityCache conn slug None None (Some details.WebsiteUrl)
+                                                updateGameFacetsFromCategoryIds conn slug details.CategoryIds
                                             | Error _ -> ()
                                             emit { Current = gamesProcessed; Total = total; GameName = app.Name; Action = "Matched by name" }
                                         | [] ->
@@ -605,16 +601,16 @@ module Api =
                                                     | None ->
                                                         "", [], None, None, 0
 
-                                                // Fetch Steam Store details for description, website, and play modes
+                                                // Fetch Steam Store details for description, website, and facets
                                                 let! storeDetails = Steam.getSteamStoreDetails httpClient app.Appid
-                                                let steamDescription, steamShortDescription, steamWebsiteUrl, steamCategories =
+                                                let steamDescription, steamShortDescription, steamWebsiteUrl, steamCategoryIds =
                                                     match storeDetails with
                                                     | Ok details ->
                                                         let desc =
                                                             if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
                                                             elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
                                                             else ""
-                                                        desc, details.ShortDescription, details.WebsiteUrl, details.Categories
+                                                        desc, details.ShortDescription, details.WebsiteUrl, details.CategoryIds
                                                     | Error _ -> "", "", None, []
 
                                                 let description =
@@ -668,14 +664,15 @@ module Api =
                                                         Games.Serialization.toEventData
                                                         (Games.Set_steam_library_date (Steam.unixTimestampToDateString app.RtTimeAcquired))
                                                         projectionHandlers |> ignore
-                                                    for category in steamCategories do
-                                                        executeCommand conn sid
-                                                            Games.Serialization.fromStoredEvent
-                                                            Games.reconstitute
-                                                            Games.decide
-                                                            Games.Serialization.toEventData
-                                                            (Games.Add_play_mode category)
-                                                            projectionHandlers |> ignore
+                                                    // games-v4nqe (hazard 1): creation code path writes the
+                                                    // identity card + derived facets directly, imperatively,
+                                                    // never the ProjectionHandler (ADR-0045).
+                                                    MetadataCache.upsertGameIdentityCard conn slug {
+                                                        Description = description
+                                                        ShortDescription = steamShortDescription
+                                                        WebsiteUrl = steamWebsiteUrl
+                                                    }
+                                                    updateGameFacetsFromCategoryIds conn slug steamCategoryIds
                                                     emit { Current = gamesProcessed; Total = total; GameName = app.Name; Action = "Created" }
                                                 | Error e ->
                                                     errors <- errors @ [ sprintf "Failed to create '%s': %s" app.Name e ]
@@ -1059,12 +1056,17 @@ module Api =
                 return Error $"Jellyfin import failed: {ex.Message}"
         }
 
-    /// Attaches a Steam App ID to an existing game by fetching Store details
-    /// and emitting the same events the Steam library import uses:
-    /// `Set_steam_app_id`, optionally `Set_description` / `Set_short_description`
-    /// / `Set_website_url` / `Add_play_mode`. Only emits the optional events
-    /// when the current game's corresponding field is empty / missing so we
-    /// don't overwrite user edits.
+    /// Attaches a Steam App ID to an existing game by fetching Store details:
+    /// still emits `Set_steam_app_id` (the link is our decision, ADR-0043),
+    /// but description/short_description/website_url now write
+    /// `game_metadata_cache` directly (games-v4nqe) — `Set_description`/
+    /// `Set_short_description`/`Set_website_url`/`Add_play_mode` are demoted.
+    /// Preserves the pre-cutover "only fill if currently empty" guard for
+    /// description/short_description/website_url by reading the cache-backed
+    /// `GameDetail` fields (already cache-sourced since games-a7dqx) instead
+    /// of the now-dropped projection columns; play modes are replaced
+    /// outright by facets derived from Steam's category ids, with no
+    /// "don't clobber overrides" guard needed (ADR-0053).
     let private attachSteamToGameCore
         (conn: SqliteConnection)
         (httpClient: HttpClient)
@@ -1095,51 +1097,33 @@ module Api =
                         projectionHandlers |> ignore
 
                     // 2. Description — only if the current one is empty
-                    if System.String.IsNullOrWhiteSpace(game.Description) then
-                        let desc =
-                            if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
-                            elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
-                            else ""
-                        if desc <> "" then
-                            executeCommand conn sid
-                                Games.Serialization.fromStoredEvent
-                                Games.reconstitute
-                                Games.decide
-                                Games.Serialization.toEventData
-                                (Games.Set_description desc)
-                                projectionHandlers |> ignore
+                    let computedDesc =
+                        if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
+                        elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
+                        else ""
+                    let newDescription =
+                        if System.String.IsNullOrWhiteSpace(game.Description) && computedDesc <> "" then computedDesc
+                        else game.Description
 
                     // 3. Short description — only if empty
-                    if System.String.IsNullOrWhiteSpace(game.ShortDescription) && details.ShortDescription <> "" then
-                        executeCommand conn sid
-                            Games.Serialization.fromStoredEvent
-                            Games.reconstitute
-                            Games.decide
-                            Games.Serialization.toEventData
-                            (Games.Set_short_description details.ShortDescription)
-                            projectionHandlers |> ignore
+                    let newShortDescription =
+                        if System.String.IsNullOrWhiteSpace(game.ShortDescription) && details.ShortDescription <> "" then
+                            details.ShortDescription
+                        else game.ShortDescription
 
                     // 4. Website URL — only if currently missing
-                    if game.WebsiteUrl.IsNone && details.WebsiteUrl.IsSome then
-                        executeCommand conn sid
-                            Games.Serialization.fromStoredEvent
-                            Games.reconstitute
-                            Games.decide
-                            Games.Serialization.toEventData
-                            (Games.Set_website_url details.WebsiteUrl)
-                            projectionHandlers |> ignore
+                    let newWebsiteUrl =
+                        if game.WebsiteUrl.IsNone && details.WebsiteUrl.IsSome then details.WebsiteUrl
+                        else game.WebsiteUrl
 
-                    // 5. Play modes — append any the current game doesn't already have
-                    let existingModes = Set.ofList game.PlayModes
-                    for category in details.Categories do
-                        if not (Set.contains category existingModes) then
-                            executeCommand conn sid
-                                Games.Serialization.fromStoredEvent
-                                Games.reconstitute
-                                Games.decide
-                                Games.Serialization.toEventData
-                                (Games.Add_play_mode category)
-                                projectionHandlers |> ignore
+                    MetadataCache.upsertGameIdentityCard conn slug {
+                        Description = newDescription
+                        ShortDescription = newShortDescription
+                        WebsiteUrl = newWebsiteUrl
+                    }
+
+                    // 5. Facets — derived from Steam's category ids
+                    updateGameFacetsFromCategoryIds conn slug details.CategoryIds
 
                     return Ok ()
         }
@@ -2998,20 +2982,6 @@ module Api =
                         projectionHandlers
             }
 
-            setGameHltbHours = fun slug hours -> async {
-                use conn = factory ()
-                let sid = Games.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        Games.Serialization.fromStoredEvent
-                        Games.reconstitute
-                        Games.decide
-                        Games.Serialization.toEventData
-                        (Games.Set_hltb_hours (hours, None, None))
-                        projectionHandlers
-            }
-
             addGameRecommendation = fun slug friendSlug -> async {
                 use conn = factory ()
                 let sid = Games.streamId slug
@@ -3068,42 +3038,8 @@ module Api =
                         projectionHandlers
             }
 
-            addGamePlayMode = fun slug playMode -> async {
-                use conn = factory ()
-                let sid = Games.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        Games.Serialization.fromStoredEvent
-                        Games.reconstitute
-                        Games.decide
-                        Games.Serialization.toEventData
-                        (Games.Add_play_mode playMode)
-                        projectionHandlers
-            }
-
-            removeGamePlayMode = fun slug playMode -> async {
-                use conn = factory ()
-                let sid = Games.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        Games.Serialization.fromStoredEvent
-                        Games.reconstitute
-                        Games.decide
-                        Games.Serialization.toEventData
-                        (Games.Remove_play_mode playMode)
-                        projectionHandlers
-            }
-
-            getAllPlayModes = fun () -> async {
-                use conn = factory ()
-                return GameProjection.getAllPlayModes conn
-            }
-
-            // games-a7dqx (ADR-0053): purely additive — nothing calls this
-            // yet, `addGamePlayMode`/`removeGamePlayMode`/`getAllPlayModes`
-            // above are untouched.
+            // games-v4nqe: addGamePlayMode/removeGamePlayMode/getAllPlayModes
+            // deleted — superseded by overrideGamePlayFacets (ADR-0053).
             overrideGamePlayFacets = fun slug ovr -> async {
                 use conn = factory ()
                 let sid = Games.streamId slug
@@ -3534,13 +3470,9 @@ module Api =
                                         match result with
                                         | Ok () -> playTimeUpdated <- playTimeUpdated + 1
                                         | Error _ -> ()
-                                    executeCommand conn sid
-                                        Games.Serialization.fromStoredEvent
-                                        Games.reconstitute
-                                        Games.decide
-                                        Games.Serialization.toEventData
-                                        (Games.Set_steam_last_played (Steam.unixTimestampToDateString steamGame.RtimeLastPlayed))
-                                        projectionHandlers |> ignore
+                                    // games-v4nqe: Set_steam_last_played demoted — the
+                                    // column it wrote is dropped; getBySlug now derives
+                                    // SteamLastPlayed from game_play_session directly.
                                     executeCommand conn sid
                                         Games.Serialization.fromStoredEvent
                                         Games.reconstitute
@@ -3575,42 +3507,18 @@ module Api =
                                             match result with
                                             | Ok () -> playTimeUpdated <- playTimeUpdated + 1
                                             | Error _ -> ()
-                                        // Fetch Steam Store details for description, website, and play modes
+                                        // Fetch Steam Store details for description, website, and facets
                                         let! storeDetails = Steam.getSteamStoreDetails httpClient steamGame.AppId
                                         match storeDetails with
                                         | Ok details ->
                                             if details.AboutTheGame <> "" then
-                                                executeCommand conn sid
-                                                    Games.Serialization.fromStoredEvent
-                                                    Games.reconstitute
-                                                    Games.decide
-                                                    Games.Serialization.toEventData
-                                                    (Games.Set_short_description details.ShortDescription)
-                                                    projectionHandlers |> ignore
+                                                updateGameIdentityCache conn slug None (Some details.ShortDescription) None
                                             if details.WebsiteUrl.IsSome then
-                                                executeCommand conn sid
-                                                    Games.Serialization.fromStoredEvent
-                                                    Games.reconstitute
-                                                    Games.decide
-                                                    Games.Serialization.toEventData
-                                                    (Games.Set_website_url details.WebsiteUrl)
-                                                    projectionHandlers |> ignore
-                                            for category in details.Categories do
-                                                executeCommand conn sid
-                                                    Games.Serialization.fromStoredEvent
-                                                    Games.reconstitute
-                                                    Games.decide
-                                                    Games.Serialization.toEventData
-                                                    (Games.Add_play_mode category)
-                                                    projectionHandlers |> ignore
+                                                updateGameIdentityCache conn slug None None (Some details.WebsiteUrl)
+                                            updateGameFacetsFromCategoryIds conn slug details.CategoryIds
                                         | Error _ -> ()
-                                        executeCommand conn sid
-                                            Games.Serialization.fromStoredEvent
-                                            Games.reconstitute
-                                            Games.decide
-                                            Games.Serialization.toEventData
-                                            (Games.Set_steam_last_played (Steam.unixTimestampToDateString steamGame.RtimeLastPlayed))
-                                            projectionHandlers |> ignore
+                                        // games-v4nqe: Set_steam_last_played demoted — see
+                                        // the matched-by-appid branch's comment above.
                                         executeCommand conn sid
                                             Games.Serialization.fromStoredEvent
                                             Games.reconstitute
@@ -3638,16 +3546,16 @@ module Api =
                                             | None ->
                                                 "", [], None, None, 0
 
-                                        // Fetch Steam Store details for description, website, and play modes
+                                        // Fetch Steam Store details for description, website, and facets
                                         let! storeDetails = Steam.getSteamStoreDetails httpClient steamGame.AppId
-                                        let steamDescription, steamShortDescription, steamWebsiteUrl, steamCategories =
+                                        let steamDescription, steamShortDescription, steamWebsiteUrl, steamCategoryIds =
                                             match storeDetails with
                                             | Ok details ->
                                                 let desc =
                                                     if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
                                                     elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
                                                     else ""
-                                                desc, details.ShortDescription, details.WebsiteUrl, details.Categories
+                                                desc, details.ShortDescription, details.WebsiteUrl, details.CategoryIds
                                             | Error _ -> "", "", None, []
 
                                         // Use Steam description if available, then RAWG, then empty
@@ -3708,22 +3616,18 @@ module Api =
                                                 match ptResult with
                                                 | Ok () -> playTimeUpdated <- playTimeUpdated + 1
                                                 | Error _ -> ()
-                                            // Add play modes from Steam categories
-                                            for category in steamCategories do
-                                                executeCommand conn sid
-                                                    Games.Serialization.fromStoredEvent
-                                                    Games.reconstitute
-                                                    Games.decide
-                                                    Games.Serialization.toEventData
-                                                    (Games.Add_play_mode category)
-                                                    projectionHandlers |> ignore
-                                            executeCommand conn sid
-                                                Games.Serialization.fromStoredEvent
-                                                Games.reconstitute
-                                                Games.decide
-                                                Games.Serialization.toEventData
-                                                (Games.Set_steam_last_played (Steam.unixTimestampToDateString steamGame.RtimeLastPlayed))
-                                                projectionHandlers |> ignore
+                                            // games-v4nqe (hazard 1): creation code path writes the
+                                            // identity card + derived facets directly, imperatively,
+                                            // never the ProjectionHandler (ADR-0045).
+                                            MetadataCache.upsertGameIdentityCard conn slug {
+                                                Description = description
+                                                ShortDescription = steamShortDescription
+                                                WebsiteUrl = steamWebsiteUrl
+                                            }
+                                            updateGameFacetsFromCategoryIds conn slug steamCategoryIds
+                                            // Set_steam_last_played demoted — the column it
+                                            // wrote is dropped; SteamLastPlayed is derived
+                                            // from game_play_session at query time.
                                             executeCommand conn sid
                                                 Games.Serialization.fromStoredEvent
                                                 Games.reconstitute
@@ -3745,43 +3649,17 @@ module Api =
                                 let! storeDetails = Steam.getSteamStoreDetails httpClient steamAppId
                                 match storeDetails with
                                 | Ok details ->
-                                    let sid = Games.streamId slug
                                     let desc =
                                         if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
                                         elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
                                         else ""
                                     if desc <> "" then
-                                        executeCommand conn sid
-                                            Games.Serialization.fromStoredEvent
-                                            Games.reconstitute
-                                            Games.decide
-                                            Games.Serialization.toEventData
-                                            (Games.Set_description desc)
-                                            projectionHandlers |> ignore
+                                        updateGameIdentityCache conn slug (Some desc) None None
                                     if details.ShortDescription <> "" then
-                                        executeCommand conn sid
-                                            Games.Serialization.fromStoredEvent
-                                            Games.reconstitute
-                                            Games.decide
-                                            Games.Serialization.toEventData
-                                            (Games.Set_short_description details.ShortDescription)
-                                            projectionHandlers |> ignore
+                                        updateGameIdentityCache conn slug None (Some details.ShortDescription) None
                                     if details.WebsiteUrl.IsSome then
-                                        executeCommand conn sid
-                                            Games.Serialization.fromStoredEvent
-                                            Games.reconstitute
-                                            Games.decide
-                                            Games.Serialization.toEventData
-                                            (Games.Set_website_url details.WebsiteUrl)
-                                            projectionHandlers |> ignore
-                                    for category in details.Categories do
-                                        executeCommand conn sid
-                                            Games.Serialization.fromStoredEvent
-                                            Games.reconstitute
-                                            Games.decide
-                                            Games.Serialization.toEventData
-                                            (Games.Add_play_mode category)
-                                            projectionHandlers |> ignore
+                                        updateGameIdentityCache conn slug None None (Some details.WebsiteUrl)
+                                    updateGameFacetsFromCategoryIds conn slug details.CategoryIds
                                     if desc <> "" || details.ShortDescription <> "" then
                                         descriptionsEnriched <- descriptionsEnriched + 1
                                 | Error _ -> ()
@@ -4366,22 +4244,14 @@ module Api =
                             let mainHours = HowLongToBeat.toHours hltbResult.CompMainSeconds
                             let mainPlusHours = HowLongToBeat.toHours hltbResult.CompPlusSeconds
                             let completionistHours = HowLongToBeat.toHours hltbResult.Comp100Seconds
-                            let sid = Games.streamId gameSlug
-                            let result =
-                                executeCommand
-                                    conn sid
-                                    Games.Serialization.fromStoredEvent
-                                    Games.reconstitute
-                                    Games.decide
-                                    Games.Serialization.toEventData
-                                    (Games.Set_hltb_hours (
-                                        Some mainHours,
-                                        (if mainPlusHours > 0.0 then Some mainPlusHours else None),
-                                        (if completionistHours > 0.0 then Some completionistHours else None)))
-                                    projectionHandlers
-                            match result with
-                            | Ok () -> return Ok (Some mainHours)
-                            | Error e -> return Error e
+                            // games-v4nqe: Set_hltb_hours demoted — HLTB
+                            // hours are cache-derived now; this fetch writes
+                            // game_metadata_cache directly.
+                            MetadataCache.upsertGameHltbHours conn gameSlug
+                                (Some mainHours)
+                                (if mainPlusHours > 0.0 then Some mainPlusHours else None)
+                                (if completionistHours > 0.0 then Some completionistHours else None)
+                            return Ok (Some mainHours)
                 with ex ->
                     return Error $"Failed to fetch HLTB data: {ex.Message}"
             }

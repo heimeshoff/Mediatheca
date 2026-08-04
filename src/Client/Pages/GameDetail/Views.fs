@@ -327,137 +327,11 @@ let private HeroStatus (currentStatus: GameStatus, isOpen: bool, dispatch: Msg -
         ]
     ]
 
-[<ReactComponent>]
-let private PlayModePicker
-    (allPlayModes: string list)
-    (currentModes: string list)
-    (onAdd: string -> unit)
-    (onRemove: string -> unit)
-    (onClose: unit -> unit) =
-    let searchText, setSearchText = React.useState("")
-    let highlightedIndex, setHighlightedIndex = React.useState(0)
-    let currentSet = currentModes |> Set.ofList
-    let available =
-        allPlayModes
-        |> List.filter (fun m ->
-            not (Set.contains m currentSet) &&
-            (searchText = "" || m.ToLowerInvariant().Contains(searchText.ToLowerInvariant())))
-    let availableArr = available |> List.toArray
-    let trimmedSearch = searchText.Trim()
-    let hasExactMatch = allPlayModes |> List.exists (fun m -> m.ToLowerInvariant() = trimmedSearch.ToLowerInvariant())
-    let showCreateNew = trimmedSearch <> "" && not hasExactMatch
-    let totalItems = availableArr.Length + (if showCreateNew then 1 else 0)
-
-    let headerExtra = [
-        if not (List.isEmpty currentModes) then
-            Html.div [
-                prop.className "flex flex-wrap gap-2 mb-4"
-                prop.children [
-                    for mode in currentModes do
-                        Html.span [
-                            prop.className "inline-flex items-center gap-1.5 bg-transparent border border-base-content/20 text-base-content/70 px-3 py-1 rounded-full text-sm font-semibold transition-colors hover:border-base-content/40"
-                            prop.children [
-                                Html.span [ prop.text mode ]
-                                Html.button [
-                                    prop.className "text-base-content/40 hover:text-error transition-colors cursor-pointer ml-0.5"
-                                    prop.onClick (fun e ->
-                                        e.stopPropagation()
-                                        onRemove mode)
-                                    prop.text "\u00D7"
-                                ]
-                            ]
-                        ]
-                ]
-            ]
-        Daisy.input [
-            prop.className "w-full mb-4"
-            prop.type' "text"
-            prop.placeholder "Search play modes..."
-            prop.autoFocus true
-            prop.value searchText
-            prop.onChange (fun (v: string) ->
-                setSearchText v
-                setHighlightedIndex 0)
-            prop.onKeyDown (fun e ->
-                match e.key with
-                | "ArrowDown" ->
-                    e.preventDefault()
-                    if totalItems > 0 then
-                        setHighlightedIndex (min (highlightedIndex + 1) (totalItems - 1))
-                | "ArrowUp" ->
-                    e.preventDefault()
-                    setHighlightedIndex (max (highlightedIndex - 1) 0)
-                | "Enter" ->
-                    e.preventDefault()
-                    if highlightedIndex >= 0 && highlightedIndex < availableArr.Length then
-                        onAdd availableArr.[highlightedIndex]
-                        setSearchText ""
-                        setHighlightedIndex 0
-                    elif showCreateNew && highlightedIndex = availableArr.Length then
-                        onAdd trimmedSearch
-                        setSearchText ""
-                        setHighlightedIndex 0
-                | "Escape" -> onClose ()
-                | _ -> ())
-        ]
-    ]
-
-    let content = [
-        if totalItems = 0 && not showCreateNew then
-            Html.p [
-                prop.className "text-base-content/60 py-2 text-sm"
-                prop.text (
-                    if List.isEmpty allPlayModes && trimmedSearch = "" then "No play modes found across games."
-                    elif trimmedSearch = "" then "All known play modes already assigned."
-                    else "No matches found."
-                )
-            ]
-        else
-            Html.div [
-                prop.className "space-y-1"
-                prop.children [
-                    for i in 0 .. availableArr.Length - 1 do
-                        let mode = availableArr.[i]
-                        let isHighlighted = (i = highlightedIndex)
-                        Html.div [
-                            prop.className (
-                                "flex items-center gap-3 p-2 rounded-lg cursor-pointer " +
-                                (if isHighlighted then "bg-primary/20" else "hover:bg-base-200"))
-                            prop.onClick (fun _ -> onAdd mode)
-                            prop.children [
-                                Html.div [
-                                    prop.className "w-10 h-10 rounded-full bg-base-300 flex items-center justify-center text-base-content/40"
-                                    prop.children [ Icons.gamepad () ]
-                                ]
-                                Html.span [ prop.className "font-semibold"; prop.text mode ]
-                            ]
-                        ]
-                    if showCreateNew then
-                        let isHighlighted = (highlightedIndex = availableArr.Length)
-                        Html.div [
-                            prop.className (
-                                "flex items-center gap-3 p-2 rounded-lg cursor-pointer " +
-                                (if isHighlighted then "bg-primary/20" else "hover:bg-base-200"))
-                            prop.onClick (fun _ ->
-                                onAdd trimmedSearch
-                                setSearchText ""
-                                setHighlightedIndex 0)
-                            prop.children [
-                                Html.div [
-                                    prop.className "w-10 h-10 rounded-full bg-base-300 flex items-center justify-center text-base-content/40 text-lg"
-                                    prop.text "+"
-                                ]
-                                Html.span [
-                                    prop.className "font-semibold"
-                                    prop.text $"Add \"{trimmedSearch}\""
-                                ]
-                            ]
-                        ]
-                ]
-            ]
-    ]
-
-    ModalPanel.viewCustom "Play Modes" onClose headerExtra content []
+// games-v4nqe: PlayModePicker deleted \u2014 ADR-0053 supersedes play modes with
+// play facets. Forced mechanical compile-fix deletion (this task's scope),
+// not the new facet UI (badges, Auto/On/Off controls, filters) \u2014 that is
+// games-j6wkr's distinct, positive-value work. Between this task and
+// games-j6wkr landing, the detail page shows no play-mode/facet information.
 
 [<ReactComponent>]
 let private FriendManager
@@ -1824,43 +1698,11 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                         ]
                                                 ]
                                             ]
-                                            // Play Modes
-                                            panelCard [
-                                                Html.div [
-                                                    prop.className "flex items-center justify-between mb-4"
-                                                    prop.children [
-                                                        Html.h3 [ prop.className "text-lg font-bold"; prop.text "Play Modes" ]
-                                                        Html.button [
-                                                            prop.className "w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content hover:scale-110 transition-transform text-sm font-bold cursor-pointer"
-                                                            prop.onClick (fun _ -> dispatch Toggle_play_mode_picker)
-                                                            prop.text "+"
-                                                        ]
-                                                    ]
-                                                ]
-                                                if List.isEmpty game.PlayModes then
-                                                    Html.p [
-                                                        prop.className "text-base-content/30 text-sm italic"
-                                                        prop.text "No play modes yet"
-                                                    ]
-                                                else
-                                                    Html.div [
-                                                        prop.className "flex flex-wrap gap-2"
-                                                        prop.children [
-                                                            for playMode in game.PlayModes do
-                                                                Html.span [
-                                                                    prop.className "inline-flex items-center gap-1.5 bg-base-100/50 border border-base-content/15 px-3 py-1.5 rounded-lg text-sm font-medium group/mode"
-                                                                    prop.children [
-                                                                        Html.span [ prop.text playMode ]
-                                                                        Html.button [
-                                                                            prop.className "text-base-content/30 hover:text-error transition-colors cursor-pointer opacity-0 group-hover/mode:opacity-100"
-                                                                            prop.onClick (fun _ -> dispatch (Remove_play_mode playMode))
-                                                                            prop.text "\u00D7"
-                                                                        ]
-                                                                    ]
-                                                                ]
-                                                        ]
-                                                    ]
-                                            ]
+                                            // games-v4nqe: the "Play Modes" panel card is deleted
+                                            // \u2014 ADR-0053 supersedes it with play facets; no
+                                            // replacement badge/control is built here (games-j6wkr's
+                                            // scope). No play-mode/facet information shows on this
+                                            // page for the duration between this task and that one.
                                             // Error display
                                             match model.Error with
                                             | Some err ->
@@ -1922,14 +1764,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                         (fun slug entryId -> dispatch (Remove_from_catalog (slug, entryId)))
                         (fun name -> dispatch (Create_catalog_and_add name))
                         (fun () -> dispatch Close_catalog_picker)
-                // Play mode picker modal
-                if model.ShowPlayModePicker then
-                    PlayModePicker
-                        model.AllPlayModes
-                        game.PlayModes
-                        (fun mode -> dispatch (Add_play_mode mode))
-                        (fun mode -> dispatch (Remove_play_mode mode))
-                        (fun () -> dispatch Toggle_play_mode_picker)
+                // games-v4nqe: play mode picker modal deleted alongside PlayModePicker.
                 // Image picker modal
                 match model.ShowImagePicker with
                 | Some pickerKind ->

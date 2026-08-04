@@ -224,14 +224,22 @@ module MetadataCache =
         // games-a7dqx (ADR-0053): additive facet/genre/category-id columns on
         // `game_metadata_cache` — idempotent `ALTER TABLE ... ADD COLUMN`,
         // same try/with idiom as every migration in this function and in
-        // `GameProjection.createTables`. `genres` ships now (mirroring the
-        // general upsert shape) but nothing writes it until games-v4nqe —
-        // see `upsertGameFacets`'s doc comment. The six facet booleans store
+        // `GameProjection.createTables`. The six facet booleans store
         // as INTEGER (0/1/NULL); `facet_vr` stores the `VrSupport` DU as
         // text ("NoVr"/"VrSupported"/"VrOnly"); `steam_category_ids` stores
         // the raw fetched ids as a JSON int array, kept alongside the
         // derived facets so a future re-derivation (e.g. after a
         // `deriveFacets` table fix) never needs a second Steam fetch.
+        //
+        // `genres` was added here (unpopulated) anticipating a games-v4nqe
+        // cache cutover for Game genres — ADR-0055 (amending ADR-0043)
+        // reverted that plan: no refresh path in this codebase ever
+        // re-derives Game genres (RAWG genre search only ever runs at
+        // creation time), so genres fails ADR-0043's re-derivability test
+        // and stays the `game_list`/`game_detail` identity-card projection
+        // column it always was. This column is kept (dropping it needs its
+        // own migration and buys nothing) but is permanently unused —
+        // nothing reads or writes it.
         try
             conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN genres TEXT" |> Db.exec
         with _ -> () // Column already exists
@@ -330,32 +338,69 @@ module MetadataCache =
     /// dropped three of those four columns (`overview`/`tmdb_rating`/
     /// `episode_runtime`; `backdrop_ref` stayed, ADR-0051) from
     /// `series_detail` entirely, once `series-q8jwc` proved no reader needed
-    /// this seed's series half kept fresh. On any database that already ran
-    /// this seed (the marker below is set), this whole function is a no-op
-    /// and the column drop never matters. On a database upgrading through
-    /// both changes in the same release, `Composition.buildApp` calls this
-    /// BEFORE `SeriesProjection.dropDeprecatedColumns`, so the columns still
-    /// exist the one time this genuinely runs. The series `INSERT` is
-    /// therefore wrapped in its own `try/with` (same "defensive, tolerates a
-    /// missing source column" idiom `JellyfinStore.migrateFromProjections`
-    /// already uses) rather than folded into one `Db.newCommand` batch with
-    /// the game seed: a fresh install's `series_detail` never has these
-    /// columns at all (they're gone from `SeriesProjection.createTables`'s
-    /// DDL too), and a single failing statement must not also fail the
-    /// unrelated game seed.
+    /// this seed's series half kept fresh. `game_metadata_cache`'s seed lost
+    /// its own three source columns the same way (games-v4nqe drops
+    /// `description`/`short_description`/`website_url` from `game_detail`;
+    /// `genres` stays — ADR-0055 amends ADR-0043 to keep it event-carried).
+    /// On any database that already ran this seed (the
+    /// marker below is set), this whole function is a no-op and neither
+    /// column drop ever matters. On a database upgrading through a seeding
+    /// task and its column-drop task in the same release (the common case —
+    /// series-m7fdk/series-d5tpn, games-a7dqx/games-v4nqe), `Composition.buildApp`
+    /// calls this BEFORE the drop, so the columns still exist the one time
+    /// this genuinely runs and needs them. Both the game and series `INSERT`s
+    /// are therefore wrapped in their own `try/with` (same "defensive,
+    /// tolerates a missing source column" idiom `JellyfinStore.migrateFromProjections`
+    /// already uses), each in its own `Db.newCommand` call rather than one
+    /// shared batch: a fresh install's `game_detail`/`series_detail` never
+    /// have these columns at all (gone from `GameProjection.createTables`'s/
+    /// `SeriesProjection.createTables`'s DDL too), and a failing statement
+    /// for one media type must not also fail the other's unrelated seed.
     let seedFromProjections (conn: SqliteConnection) : unit =
         match SettingsStore.getSetting conn seededMarkerKey with
         | Some _ -> ()
         | None ->
+            // Step 1: columns games-v4nqe does NOT drop from game_detail
+            // (cover_ref/backdrop_ref/rawg_id/rawg_rating) — always safe,
+            // fresh install or legacy upgrade alike, so this creates the row
+            // unconditionally (never wrapped in try/with).
             conn
             |> Db.newCommand
                 """
                 INSERT OR IGNORE INTO game_metadata_cache
-                    (game_slug, description, short_description, website_url, cover_ref, backdrop_ref, rawg_id, rawg_rating, hltb_hours, hltb_main_plus_hours, hltb_completionist_hours, fetched_at)
-                SELECT slug, description, short_description, website_url, cover_ref, backdrop_ref, rawg_id, rawg_rating, hltb_hours, hltb_main_plus_hours, hltb_completionist_hours, NULL
+                    (game_slug, cover_ref, backdrop_ref, rawg_id, rawg_rating, fetched_at)
+                SELECT slug, cover_ref, backdrop_ref, rawg_id, rawg_rating, NULL
                 FROM game_detail
                 """
             |> Db.exec
+
+            // Step 2: description/short_description/website_url/hltb_* —
+            // games-v4nqe drops these from game_detail. On a database
+            // upgrading through both games-a7dqx (this cache tier) and
+            // games-v4nqe (the drop) in the same release, Composition.buildApp
+            // calls this BEFORE the drop, so the columns still exist here and
+            // this UPDATE genuinely seeds them. On a fresh install (this
+            // task's own new schema, or any test fixture), game_detail never
+            // has these columns at all — the UPDATE fails to prepare and is
+            // swallowed, same "defensive, tolerates a missing source column"
+            // idiom the series half below already uses. Row-scoped UPDATE
+            // (not a second INSERT — the row already exists from step 1).
+            try
+                conn
+                |> Db.newCommand
+                    """
+                    UPDATE game_metadata_cache
+                    SET
+                        description = (SELECT gd.description FROM game_detail gd WHERE gd.slug = game_metadata_cache.game_slug),
+                        short_description = (SELECT gd.short_description FROM game_detail gd WHERE gd.slug = game_metadata_cache.game_slug),
+                        website_url = (SELECT gd.website_url FROM game_detail gd WHERE gd.slug = game_metadata_cache.game_slug),
+                        hltb_hours = (SELECT gd.hltb_hours FROM game_detail gd WHERE gd.slug = game_metadata_cache.game_slug),
+                        hltb_main_plus_hours = (SELECT gd.hltb_main_plus_hours FROM game_detail gd WHERE gd.slug = game_metadata_cache.game_slug),
+                        hltb_completionist_hours = (SELECT gd.hltb_completionist_hours FROM game_detail gd WHERE gd.slug = game_metadata_cache.game_slug)
+                    WHERE EXISTS (SELECT 1 FROM game_detail gd WHERE gd.slug = game_metadata_cache.game_slug)
+                    """
+                |> Db.exec
+            with _ -> () // game_detail no longer has description/short_description/website_url/hltb_* (games-v4nqe) — nothing to seed
 
             try
                 conn
@@ -427,9 +472,10 @@ module MetadataCache =
     /// slice of a row that may already carry unrelated, already-seeded
     /// values in its other columns.
     ///
-    /// `genres` is deliberately not a parameter here — nothing populates it
-    /// until games-v4nqe's creation-path cache-write exists (see this
-    /// task's "What this task deliberately does NOT do").
+    /// `genres` is deliberately not a parameter here — ADR-0055 (amending
+    /// ADR-0043) decided that write will never exist: genres stays
+    /// event-carried on `game_list`/`game_detail`, never cache-sourced, and
+    /// the cache's `genres` column is kept but permanently unused.
     let upsertGameFacets
         (conn: SqliteConnection)
         (slug: string)
@@ -465,6 +511,106 @@ module MetadataCache =
             "facet_vr", SqlType.String (encodeVrSupport facets.Vr)
             "steam_category_ids", SqlType.String categoryIdsJson
             "fetched_at", SqlType.String (System.DateTime.UtcNow.ToString("o"))
+        ]
+        |> Db.exec
+
+    /// games-v4nqe: the identity-card slice of `game_metadata_cache` —
+    /// description/short_description/website_url, the three columns
+    /// `game_detail`'s dropped `description`/`short_description`/
+    /// `website_url` columns are replaced by. `genres` is deliberately NOT a
+    /// field here (ADR-0055, amending ADR-0043): it stays event-carried on
+    /// `game_list`/`game_detail`, never cache-sourced — see
+    /// `GameProjection.dropDeprecatedColumns`'s doc comment. Kept as its own
+    /// record (not reusing `PlayFacets`/DTO types) so `tryGetGameIdentityCard`/
+    /// `upsertGameIdentityCard` stay a self-contained read-modify-write pair
+    /// callers use to echo untouched fields back unchanged (see
+    /// `upsertGameIdentityCard`'s doc comment for why that matters).
+    type GameIdentityCard = {
+        Description: string
+        ShortDescription: string
+        WebsiteUrl: string option
+    }
+
+    let private emptyIdentityCard : GameIdentityCard =
+        { Description = ""; ShortDescription = ""; WebsiteUrl = None }
+
+    /// games-v4nqe: reads the current identity-card slice, defaulting to
+    /// "empty" (never a fabricated value) when no cache row exists yet for
+    /// this slug — the same honest-degradation stance every other cache read
+    /// in this codebase takes (ADR-0048). Callers that only want to change
+    /// ONE of the three fields read this first, `{ current with Field = ... }`
+    /// the field(s) they actually want to change, and write the whole slice
+    /// back via `upsertGameIdentityCard` — never constructing a partial
+    /// record from scratch, which would silently blank the fields they
+    /// didn't mean to touch.
+    let tryGetGameIdentityCard (conn: SqliteConnection) (slug: string) : GameIdentityCard =
+        conn
+        |> Db.newCommand
+            "SELECT description, short_description, website_url FROM game_metadata_cache WHERE game_slug = @slug"
+        |> Db.setParams [ "slug", SqlType.String slug ]
+        |> Db.querySingle (fun (rd: IDataReader) ->
+            { Description = if rd.IsDBNull(rd.GetOrdinal("description")) then "" else rd.ReadString "description"
+              ShortDescription = if rd.IsDBNull(rd.GetOrdinal("short_description")) then "" else rd.ReadString "short_description"
+              WebsiteUrl = if rd.IsDBNull(rd.GetOrdinal("website_url")) then None else Some (rd.ReadString "website_url") })
+        |> Option.defaultValue emptyIdentityCard
+
+    /// games-v4nqe: the identity-card writer the task's "What" section calls
+    /// for — the counterpart to `upsertGameFacets` for the
+    /// description/short_description/website_url slice a7dqx deliberately
+    /// left unwritten. Same `INSERT ... ON CONFLICT DO UPDATE` slice
+    /// discipline as `upsertGameFacets`: never `INSERT OR REPLACE`, which
+    /// would silently null the facet/category-id/`fetched_at` columns of an
+    /// existing row. Deliberately does NOT touch `fetched_at` at all — that
+    /// column is the facet-backfill job's own resume cursor
+    /// (`findGamesNeedingFacetBackfill`'s `WHERE fetched_at IS NULL`); an
+    /// identity-card write must never be mistaken for "facets were fetched
+    /// for this game."
+    let upsertGameIdentityCard (conn: SqliteConnection) (slug: string) (card: GameIdentityCard) : unit =
+        conn
+        |> Db.newCommand
+            """
+            INSERT INTO game_metadata_cache (game_slug, description, short_description, website_url)
+            VALUES (@game_slug, @description, @short_description, @website_url)
+            ON CONFLICT(game_slug) DO UPDATE SET
+                description = excluded.description,
+                short_description = excluded.short_description,
+                website_url = excluded.website_url
+            """
+        |> Db.setParams [
+            "game_slug", SqlType.String slug
+            "description", SqlType.String card.Description
+            "short_description", SqlType.String card.ShortDescription
+            "website_url", (match card.WebsiteUrl with Some u -> SqlType.String u | None -> SqlType.Null)
+        ]
+        |> Db.exec
+
+    /// games-v4nqe: the HLTB-hours writer for `fetchHltbData` (Api.fs) — the
+    /// counterpart to `upsertGameFacets`/`upsertGameIdentityCard` for the
+    /// three `hltb_*` columns. Same slice discipline: `ON CONFLICT DO
+    /// UPDATE` names only these three columns, never touching `fetched_at`
+    /// (the facet-backfill cursor) or any other column on the row.
+    let upsertGameHltbHours
+        (conn: SqliteConnection)
+        (slug: string)
+        (hours: float option)
+        (mainPlusHours: float option)
+        (completionistHours: float option)
+        : unit =
+        conn
+        |> Db.newCommand
+            """
+            INSERT INTO game_metadata_cache (game_slug, hltb_hours, hltb_main_plus_hours, hltb_completionist_hours)
+            VALUES (@game_slug, @hltb_hours, @hltb_main_plus_hours, @hltb_completionist_hours)
+            ON CONFLICT(game_slug) DO UPDATE SET
+                hltb_hours = excluded.hltb_hours,
+                hltb_main_plus_hours = excluded.hltb_main_plus_hours,
+                hltb_completionist_hours = excluded.hltb_completionist_hours
+            """
+        |> Db.setParams [
+            "game_slug", SqlType.String slug
+            "hltb_hours", (match hours with Some h -> SqlType.Double h | None -> SqlType.Null)
+            "hltb_main_plus_hours", (match mainPlusHours with Some h -> SqlType.Double h | None -> SqlType.Null)
+            "hltb_completionist_hours", (match completionistHours with Some h -> SqlType.Double h | None -> SqlType.Null)
         ]
         |> Db.exec
 

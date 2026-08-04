@@ -15,8 +15,6 @@ let init (slug: string) : Model * Cmd<Msg> =
       ShowFriendPicker = None
       IsRatingOpen = false
       IsStatusOpen = false
-      ShowPlayModePicker = false
-      AllPlayModes = []
       IsDescriptionExpanded = false
       IsFriendsMenuOpen = false
       ConfirmingRemove = false
@@ -55,7 +53,6 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             Cmd.OfAsync.perform api.getFriends () Friends_loaded
             Cmd.OfAsync.perform api.getCatalogs () Catalogs_loaded
             Cmd.OfAsync.perform api.getCatalogsForGame slug Game_catalogs_loaded
-            Cmd.OfAsync.perform api.getAllPlayModes () Play_modes_loaded
             Cmd.OfAsync.perform api.getGamePlaySessions slug Play_sessions_loaded
         ]
 
@@ -116,10 +113,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Command_result (Ok ()) ->
         model,
-        Cmd.batch [
-            Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
-            Cmd.OfAsync.perform api.getAllPlayModes () Play_modes_loaded
-        ]
+        Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
 
     | Command_result (Error err) ->
         { model with Error = Some err }, Cmd.none
@@ -324,20 +318,6 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Toggle_description_expanded ->
         { model with IsDescriptionExpanded = not model.IsDescriptionExpanded }, Cmd.none
-
-    | Add_play_mode playMode ->
-        { model with ShowPlayModePicker = false },
-        Cmd.OfAsync.perform (fun () -> api.addGamePlayMode model.Slug playMode) () Command_result
-
-    | Remove_play_mode playMode ->
-        model,
-        Cmd.OfAsync.perform (fun () -> api.removeGamePlayMode model.Slug playMode) () Command_result
-
-    | Toggle_play_mode_picker ->
-        { model with ShowPlayModePicker = not model.ShowPlayModePicker }, Cmd.none
-
-    | Play_modes_loaded playModes ->
-        { model with AllPlayModes = playModes }, Cmd.none
 
     | Confirm_remove_game ->
         { model with ConfirmingRemove = true }, Cmd.none

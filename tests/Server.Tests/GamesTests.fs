@@ -301,17 +301,6 @@ let gameTests =
             | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
             | Error e -> failtest $"Expected success but got: {e}"
 
-        testCase "Setting HLTB hours" <| fun _ ->
-            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Set_hltb_hours (Some 50.5, Some 80.0, Some 120.0))
-            match result with
-            | Ok events ->
-                Expect.equal (List.length events) 1 "Should produce one event"
-                let state = applyEvents ([ Game_added_to_library sampleGameData ] @ events)
-                match state with
-                | Active game -> Expect.equal game.HltbHours (Some 50.5) "HltbHours should be 50.5"
-                | _ -> failtest "Expected Active state"
-            | Error e -> failtest $"Expected success but got: {e}"
-
         testCase "Setting steam app id" <| fun _ ->
             let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Set_steam_app_id 292030)
             match result with
@@ -387,12 +376,10 @@ let gameTests =
             let commands: GameCommand list = [
                 Add_game sampleGameData
                 Remove_game
-                Categorize_game [ "Drama" ]
                 Replace_cover "x"
                 Replace_backdrop "x"
                 Set_personal_rating (Some 3)
                 Change_status Retired
-                Set_hltb_hours (Some 10.0, None, None)
                 Add_family_owner "marco"
                 Remove_family_owner "marco"
                 Recommend_game "marco"
@@ -409,12 +396,7 @@ let gameTests =
                 Remove_play_session "2024-06-01"
                 Reconcile_steam_observed_total 3600
                 Record_steam_observed_total (3600, "2024-06-01")
-                Set_short_description "A short desc"
-                Set_website_url (Some "https://example.com")
-                Add_play_mode "Co-op"
-                Remove_play_mode "Co-op"
                 Set_steam_library_date (Some "2024-01-15")
-                Set_steam_last_played (Some "2024-06-20")
                 Mark_as_owned
                 Remove_ownership
                 Override_play_facets { noPlayFacetsOverride with Solo = Some true }
@@ -424,6 +406,65 @@ let gameTests =
                 match result with
                 | Error msg -> Expect.stringContains msg "removed" "Should say removed"
                 | Ok _ -> failtest $"Expected error for command on removed game: {cmd}"
+    ]
+
+/// games-v4nqe: the four-part rule's "evolve arm becomes an explicit no-op"
+/// half, for the seven event groups this task demotes. Their commands
+/// (Categorize_game, Set_hltb_hours, Set_description, Set_short_description,
+/// Set_website_url, Add_play_mode, Remove_play_mode, Set_steam_last_played)
+/// no longer exist on `GameCommand` (proven at compile time — see the
+/// "Commands on removed game fail" list above, which no longer lists them);
+/// this group proves the *codec* side: a pre-cutover event stream containing
+/// these events still replays without corrupting state, matching the
+/// `Game_store_added`/`Game_store_removed` precedent.
+[<Tests>]
+let demotedEventsAreNoOpsTests =
+    testList "Games demoted events replay as no-ops (games-v4nqe)" [
+
+        testCase "Game_categorized no longer changes Genres" <| fun _ ->
+            let state = applyEvents [ Game_added_to_library sampleGameData; Game_categorized [ "Horror" ] ]
+            match state with
+            | Active game -> Expect.equal game.Genres sampleGameData.Genres "Genres unchanged — Game_categorized is a legacy no-op"
+            | _ -> failtest "Expected Active state"
+
+        testCase "Game_hltb_hours_set no longer changes HltbHours" <| fun _ ->
+            let state = applyEvents [ Game_added_to_library sampleGameData; Game_hltb_hours_set (Some 50.0, None, None) ]
+            match state with
+            | Active game -> Expect.equal game.HltbHours None "HltbHours unchanged — Game_hltb_hours_set is a legacy no-op"
+            | _ -> failtest "Expected Active state"
+
+        testCase "Game_description_set no longer changes Description" <| fun _ ->
+            let state = applyEvents [ Game_added_to_library sampleGameData; Game_description_set "Something else entirely" ]
+            match state with
+            | Active game -> Expect.equal game.Description sampleGameData.Description "Description unchanged — legacy no-op"
+            | _ -> failtest "Expected Active state"
+
+        testCase "Game_short_description_set no longer changes ShortDescription" <| fun _ ->
+            let state = applyEvents [ Game_added_to_library sampleGameData; Game_short_description_set "Something else" ]
+            match state with
+            | Active game -> Expect.equal game.ShortDescription sampleGameData.ShortDescription "ShortDescription unchanged — legacy no-op"
+            | _ -> failtest "Expected Active state"
+
+        testCase "Game_website_url_set no longer changes WebsiteUrl" <| fun _ ->
+            let state = applyEvents [ Game_added_to_library sampleGameData; Game_website_url_set (Some "https://elsewhere.example") ]
+            match state with
+            | Active game -> Expect.equal game.WebsiteUrl sampleGameData.WebsiteUrl "WebsiteUrl unchanged — legacy no-op"
+            | _ -> failtest "Expected Active state"
+
+        testCase "Game_play_mode_added/removed no longer error and no longer track any PlayModes field" <| fun _ ->
+            // ActiveGame.PlayModes was deleted outright (games-v4nqe) — these
+            // events are pure no-ops now, proven by the state round-tripping
+            // identically with or without them.
+            let withoutPlayModeEvents = applyEvents [ Game_added_to_library sampleGameData ]
+            let withPlayModeEvents =
+                applyEvents [ Game_added_to_library sampleGameData; Game_play_mode_added "Co-op"; Game_play_mode_removed "Co-op" ]
+            Expect.equal withPlayModeEvents withoutPlayModeEvents "Play mode events are no-ops — state is identical"
+
+        testCase "Game_steam_last_played_set no longer changes SteamLastPlayed" <| fun _ ->
+            let state = applyEvents [ Game_added_to_library sampleGameData; Game_steam_last_played_set (Some "2024-06-20") ]
+            match state with
+            | Active game -> Expect.equal game.SteamLastPlayed None "SteamLastPlayed unchanged — legacy no-op (derived at query time now)"
+            | _ -> failtest "Expected Active state"
     ]
 
 /// games-a7dqx (ADR-0053): the manual play-facets override — one event

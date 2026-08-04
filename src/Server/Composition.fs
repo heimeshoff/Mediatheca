@@ -263,6 +263,12 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     // so dropping first would break it on any database not yet seeded.
     SeriesProjection.dropDeprecatedColumns conn
 
+    // games-v4nqe: drops the description/short_description/website_url/hltb_*/
+    // play_modes/steam_last_played columns the emission cutover makes dead.
+    // `genres` is deliberately excluded (ADR-0055) — see
+    // GameProjection.dropDeprecatedColumns's doc comment.
+    GameProjection.dropDeprecatedColumns conn
+
     // The automated series + play-session cutover (plan.md Phases 4-5):
     // drift check → compensating events → SeriesProjection rebuild, then
     // dry-run gate → play-session migration → rebuild-all → final drift

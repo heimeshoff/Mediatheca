@@ -5,6 +5,41 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 17:25 -- Task verified and completed: games-v4nqe - Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3 — stops the 7668-event play-mode bloat games-a7dqx's schema made possible)
+
+**Type:** Work / Task completion
+**Task:** games-v4nqe - Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3 — stops the 7668-event play-mode bloat games-a7dqx's schema made possible)
+**Summary:** Converted every Game metadata emission site (18 call sites, 5 flows) to game_metadata_cache writes, deleted the eight demoted commands via the four-part rule, dropped the unread projection columns, wired PlayFacets/PlayFacetsOverride into the public DTOs, and deleted the uncompilable client play-mode picker — with genres kept event-carried per ADR-0055 (amending ADR-0043) after the verifier caught the doctrinal conflict
+**Duration:** 1h29m
+**Verification:** PASS (iteration 3)
+**Files changed:** 15
+**Tests added:** 18
+**ADRs written:** 0055
+
+---
+
+## 2026-08-04 17:20 -- Verification failed: games-v4nqe - Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3)
+
+**Type:** Work / Verification failure
+**Task:** games-v4nqe - Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3)
+**Iteration:** 2 of 3
+**Reasons:** Two stale source comments contradict the worker's own ADR-0055 — `Games.fs:251`'s `Game_categorized` evolve arm still says "genres now cache-derived" (ADR-0055 explicitly names this comment's correction), and `MetadataCache.fs:475-477` still promises a creation-path cache writer for `genres` that ADR-0055 decided will never exist. Everything substantive clean: 630/630 tests, build green, behavior consistent, departure honestly recorded, ADR-0055 well-formed.
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
+## 2026-08-04 16:55 -- Verification failed: games-v4nqe - Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3)
+
+**Type:** Work / Verification failure
+**Task:** games-v4nqe - Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3)
+**Iteration:** 1 of 3
+**Reasons:** Diff contradicts ADR-0043's classification of Game `genres` (event-carried identity-card projection column) — columns dropped and re-sourced from `game_metadata_cache.genres`, which no replay or refresh path writes (only creation paths do), with no amending/superseding ADR recorded; ADR-0048/0051 precedent runs the other way; BC README's new "Identity card" ubiquitous-language entry inverts ADR-0043's meaning of the term. Code/tests/build/scope all clean (632/632 green, Fable build green, demoted-command grep zero).
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-08-04 16:05 -- Batch started: [games-v4nqe]
 
 **Type:** Work / Batch start

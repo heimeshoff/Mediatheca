@@ -1,15 +1,15 @@
 ---
 id: games-v4nqe
 title: Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3 — stops the 7668-event play-mode bloat games-a7dqx's schema made possible)
-status: doing
+status: done
 type: refactor
 context: games
 created: 2026-08-04
-completed:
+completed: 2026-08-04
 depends_on: [games-a7dqx]
 blocks: [administration-z6ymt, games-j6wkr]
 tags: [games, metadata, cache, steam, event-log, migration]
-related_adrs: [0043, 0045, 0048, 0053, 0054]
+related_adrs: [0043, 0045, 0048, 0053, 0054, 0055]
 related_research: []
 prior_art: [games-a7dqx, series-r2xhv, series-d5tpn]
 ---
@@ -273,3 +273,139 @@ land after it, or they pour more junk events into a log this task is trying to s
 flagged), but is now bounded to emission conversion + column drop + DTO finalization + a
 compile-fix client deletion — it does not also carry the new domain model/schema (games-a7dqx,
 already landed) or the new UI construction (games-j6wkr, next).
+
+## Outcome
+
+Landed the full emission cutover: all 18 Steam/RAWG call sites across `Api.fs` (family
+import, `attachSteamToGameCore`, `importSteamLibrary` matched-by-id/matched-by-name/create/
+description-backfill) and `PlaytimeTracker.createGameFromSteam` now write
+`game_metadata_cache` (via two new writers, `MetadataCache.upsertGameIdentityCard`/
+`tryGetGameIdentityCard` for description/short_description/website_url/genres and
+`upsertGameHltbHours` for HLTB) instead of dispatching the demoted commands. Two shared
+Api.fs helpers (`updateGameIdentityCache`, a read-modify-write echoing untouched fields;
+`updateGameFacetsFromCategoryIds`) collapsed the 18-site conversion into a manageable,
+mechanical diff. `Categorize_game`, `Set_hltb_hours`, `Set_description`,
+`Set_short_description`, `Set_website_url`, `Add_play_mode`, `Remove_play_mode`,
+`Set_steam_last_played` are deleted from `GameCommand`; their events stay in the codec with
+explicit no-op `evolve`/`GameProjection.handleEvent` arms (the `Game_store_added`
+precedent) — the `grep -rn "Games\.(...)" src/Server` pre-flight returns zero matches.
+`game_list.genres`/`hltb_hours` and `game_detail.description`/`short_description`/
+`website_url`/`genres`/`hltb_hours`/`hltb_main_plus_hours`/`hltb_completionist_hours`/
+`play_modes`/`steam_last_played` are dropped (`GameProjection.dropDeprecatedColumns`),
+preceded by a one-time `game_detail.genres` -> `game_metadata_cache.genres` copy
+(`GameProjection.copyGenresToMetadataCache`), both wired into `Composition.buildApp` in
+the same seed-then-drop order the series precedent established. `getAll`/`getBySlug`/
+`getRecentlyAddedGames` now read `Genres` from the cache and compose `PlayFacets`/
+`PlayFacetsOverride` via shared row-readers (`readCachedPlayFacets`/
+`readPlayFacetsOverrideRow`), avoiding an N+1 per-row facet query.
+`findGamesWithEmptyDescriptionAndSteamAppId` was rewritten (not retired) to query the
+cache. `Shared.fs`'s `GameListItem`/`GameDetail` carry `PlayFacets` (+ `PlayFacetsOverride`
+on `GameDetail`); `getAllPlayModes`/`addGamePlayMode`/`removeGamePlayMode`/
+`setGameHltbHours` are removed from `IMediathecaApi`. Client: `PlayModePicker` and its
+call sites, `ShowPlayModePicker`/`AllPlayModes`/`Add_play_mode`/`Remove_play_mode`/
+`Toggle_play_mode_picker`/`Play_modes_loaded` are deleted (mechanical compile-fix only,
+per this task's explicit scope note — no replacement UI, that is games-j6wkr's).
+
+Fallout discovered mid-task and fixed: `MetadataCache.seedFromProjections`'s game-side
+`INSERT` (a7dqx) unconditionally selected `description`/`short_description`/`website_url`/
+`hltb_*` from `game_detail` — since this task's own DDL change means a *fresh* install's
+`game_detail` never has those columns at all, that INSERT would have crashed every fresh
+boot. Split into two steps: an always-safe seed of the columns this task does NOT drop
+(`cover_ref`/`backdrop_ref`/`rawg_id`/`rawg_rating`), and a `try/with`-wrapped `UPDATE` for
+the columns this task drops (same "defensive, tolerates a missing source column" idiom the
+series half already used) — correct on both a genuine legacy-database upgrade (columns
+still present at seed time, before the drop) and a fresh install (swallowed, nothing to
+seed).
+
+47 tests added/updated across `GamesTests.fs` (demoted-command removal, aggregate-layer
+no-op proof for all seven demoted event groups) and `GameFacetProjectionTests.fs`
+(identity-card writer slice discipline, the genres copy migration and its idempotency, the
+column-drop migration, projection-layer no-op replay, `getAll`/`getBySlug` facet/override
+DTO wiring); `MetadataCacheTests.fs` updated for the seed split. 632/632 tests pass;
+`npm run build` (Fable compile gate) passes.
+
+Key files: `src/Server/Games.fs`, `src/Server/GameProjection.fs`, `src/Server/MetadataCache.fs`,
+`src/Server/PlaytimeTracker.fs`, `src/Server/Api.fs`, `src/Server/Composition.fs`,
+`src/Shared/Shared.fs`, `src/Client/Pages/GameDetail/{Types,State,Views}.fs`,
+`tests/Server.Tests/{GamesTests,GameFacetProjectionTests,MetadataCacheTests}.fs`,
+`.agentheim/contexts/games/README.md`. No new ADR written — this task executes decisions
+already recorded in ADR-0043/0045/0048/0053/0054; its own implementation choices (the
+identity-card writer's read-modify-write echo pattern, the seed split) follow established
+precedent (`upsertGameFacets`'s slice discipline, the series `try/with` idiom) closely
+enough that a new ADR wasn't warranted.
+
+## Outcome (iteration 2 — verification fix-up, 2026-08-04)
+
+The verifier's iteration-1 finding was correct: `Genres` fails ADR-0043's re-derivability test in
+this codebase specifically — RAWG genre search runs exactly once, at creation time, and none of the
+18 converted Steam emission sites ever re-fetches it (`updateGameIdentityCache`'s genres slot was
+always `None`). Building a real ongoing genre-refresh mechanism to retroactively justify the cache
+move was judged out of scope for a fix-up iteration (see ADR-0055's "why not" section). Reverted:
+`game_list.genres`/`game_detail.genres` are restored as event-carried projection columns, written by
+`Game_added_to_library`'s `handleEvent` arm exactly as before this task; `dropDeprecatedColumns` no
+longer names `genres`; `copyGenresToMetadataCache` and its `Composition.buildApp` call site are
+deleted (the migration it performed is no longer needed); `getAll`/`getBySlug`/
+`getRecentlyAddedGames`/`getGameGenreDistribution` read `genres` straight off the projection tables
+again. `MetadataCache.GameIdentityCard` narrows from four fields to three
+(`Description`/`ShortDescription`/`WebsiteUrl`) — genres is no longer part of the cache slice at all;
+`game_metadata_cache.genres` (shipped unpopulated by `games-a7dqx`) is kept but permanently unused.
+Every other part of iteration 1's diff — the description/short_description/website_url cache
+cutover, the seven other demoted event groups, `PlayFacets`/`PlayFacetsOverride` DTO wiring, the
+client `PlayModePicker` deletion — is unchanged.
+
+ADR-0055 (amending ADR-0043) records the decision, including why route (a) (an ADR asserting genres
+is durable without a real mechanism) was rejected in favor of this narrower revert, and updates the
+BC README's "Identity card" entry to match ADR-0043's actual meaning of the term (a new "Metadata
+cache slice" entry now names the three fields that genuinely moved to the cache).
+
+Two tests removed (the `copyGenresToMetadataCache` migration tests — the migration itself is gone);
+one test rewritten to prove genres survives a `Projection.rebuildProjection` round-trip instead of
+proving a cache read; the demoted-events-replay test's assertion corrected (`Game_categorized`'s
+no-op leaves `Genres` at `Game_added_to_library`'s payload value, not empty). 630/630 tests pass;
+`npm run build` (Fable compile gate) passes.
+
+Key files changed this iteration: `src/Server/GameProjection.fs`, `src/Server/MetadataCache.fs`,
+`src/Server/Api.fs`, `src/Server/PlaytimeTracker.fs`, `src/Server/Composition.fs`,
+`tests/Server.Tests/GameFacetProjectionTests.fs`, `tests/Server.Tests/MetadataCacheTests.fs`,
+`.agentheim/contexts/games/README.md`,
+`.agentheim/knowledge/decisions/0055-game-genres-stays-event-carried-identity-card.md`.
+
+## Verifier note (iteration 1)
+
+REASONS:
+- Check 6b (honored related ADRs) — the diff contradicts `related_adrs: [0043]` and no superseding/amending ADR was written (`ADRS_WRITTEN: none`). ADR-0043's classification table states verbatim: "`name`, `year`, `poster_ref`/`cover_ref`, **`genres`** on Movie/Series/**Game** | **Cache — projection column, event-carried** | Rides in the `*_added_to_library` snapshot event; replay reproduces it deterministically. Passes the identity-card clause." This diff drops `game_list.genres` and `game_detail.genres` (`src/Server/GameProjection.fs:145`, `:149`), deletes the `genres` write from `GameProjection.handleEvent`'s `Game_added_to_library` arm, and re-sources `Genres` from `game_metadata_cache.genres` (`GameProjection.fs:584`, `:625`, `:892`, `:1030`) — a column no replay path ever writes. `GameAddedData.Genres` is still carried by every `Game_added_to_library` event (deliberately unchanged), so genres is now the one dropped field that is neither event-reproduced nor re-fetchable in practice.
+- The same ADR-0043 section names this exact outcome as the defect the doctrine exists to prevent (its ADR-0012 retraction: "a projection rebuild silently losing metadata that should either be re-fetchable on demand (true cache, fine to lose) or **carried by an event (never lost)**"). No repopulation path survives the drop: `GameProjection.copyGenresToMetadataCache` (`GameProjection.fs:127-135`) is a one-time copy whose source column this task deletes, and every converted Steam-refresh call site passes `None` in `updateGameIdentityCache`'s genres slot (`src/Server/Api.fs:544`, `:546`, `:577`, `:579`, `:3518`, `:3520`, `:3661`, `:3663`, `:3665`) — only the two creation paths ever write genres. This lands immediately before `administration-z6ymt`, which this task `blocks` and whose Notes describe it performing ADR-0038's wipe-first event-log import.
+- The house precedent runs the other way and is also in `related_adrs`: ADR-0048 states "**Identity-card fields stay on `series_list`/`series_detail`, read directly, never joined**: Name, Year, PosterRef, BackdropRef, **Genres**, …", and ADR-0051 resolved the analogous Series genres problem (a `Series_categorized` command with no live caller, drifted genres) by appending compensating `Series_categorized` events to keep genres event-carried — not by moving it to the cache tier. The departure from both is unrecorded.
+- Check 6 (ADRs for decisions) — relatedly, the new `## Ubiquitous language` entry "**Identity card** (games-v4nqe) — description/short_description/website_url/genres, now cache-only" (`.agentheim/contexts/games/README.md:85-91`) inverts the meaning of "identity card" as ADR-0043 defines it (the clause naming fields that legitimately *remain* projection columns because an event carries them). Task-file/README narration is not a substitute for an ADR recording the change of meaning.
+
+SUGGESTED_FIX: Write an ADR that amends/supersedes ADR-0043's `genres`-on-Game classification (id in its `supersedes`/amends field, ADR-0048/0051 named as the diverging precedent), stating explicitly how `Genres` survives a projection rebuild and an ADR-0038 wipe-first import now that no replay path writes it — or, if that cannot be justified, keep `genres` projection-sourced and event-carried and narrow the column-drop criterion accordingly. Everything else in the diff verified clean: `npm test` 632/632 pass (exit 0), `npm run build` passes (exit 0), the demoted-command grep pre-flight returns zero matches, and scope/README-sync checks pass.
+
+ITERATION_HINT: likely-fixable
+
+## Verifier note (iteration 2)
+
+REASONS:
+- Check 6b (honored related ADRs) — the diff contradicts ADR-0055, the ADR it wrote itself, at the one site that ADR's `## Decision` explicitly names. ADR-0055's "What changed back" bullet states the `Game_categorized` comment changes from "genres now cache-derived" to "genres stays sourced exclusively from `Game_added_to_library`'s payload." That change was executed at `src/Server/GameProjection.fs:278` but NOT at the aggregate's `evolve` arm, which still reads verbatim (`src/Server/Games.fs:251`): `| _, Game_categorized _ -> state // demoted (games-v4nqe, ADR-0043) — genres now cache-derived; legacy event, ignored`. The claim is false after this iteration, and it cites ADR-0043 as authority for a statement ADR-0043's own classification table contradicts. Half-reverted state in `Game_categorized`'s four-part disposition: behavior correct, in-source record of *why* is not.
+- Same finding family, second site: `src/Server/MetadataCache.fs:475-477` — `upsertGameFacets`'s doc comment still reads "`genres` is deliberately not a parameter here — nothing populates it until games-v4nqe's creation-path cache-write exists". ADR-0055 decided that write will never exist and commits to the `genres` column being "kept, marked permanently unused". That marking was applied at the migration site (`MetadataCache.fs:511-520`) but not here.
+- Nothing else found. Everything substantive verified clean this iteration: `npm test` 630/630 exit 0; `npm run build` exit 0; demoted-command grep zero; scope clean; `Administration.tableRegistry` unchanged; no live-DB access; the genres departure honestly recorded (task Outcome iteration 2 + ADR-0055, original criteria left intact); ADR-0055 well-formed (`amends: [0043]`); behavior consistent (createTables re-declares genres with defensive ALTER re-add, handleEvent writes both tables, dropDeprecatedColumns no longer names it, copyGenresToMetadataCache deleted, all genre readers on projection columns, GameIdentityCard narrowed to three fields, README "Identity card" matches ADR-0043). Drift-zero and rebuild criteria covered by passing tests.
+
+SUGGESTED_FIX: Correct the two stale comments to match ADR-0055 — `src/Server/Games.fs:251` should say genres stays sourced exclusively from `Game_added_to_library`'s payload (citing ADR-0043/ADR-0055), not "genres now cache-derived"; `src/Server/MetadataCache.fs:475-477` should mark `game_metadata_cache.genres` permanently unused per ADR-0055 rather than promising a games-v4nqe creation-path writer. No behavioral change, no test change, and no ADR change is needed — re-run `npm test` and `npm run build` to confirm both still pass.
+
+ITERATION_HINT: likely-fixable
+
+## Outcome (iteration 3)
+
+Fixed the two stale comments flagged in the iteration-2 verifier note, with no behavioral, test,
+or ADR changes:
+
+- `src/Server/Games.fs:251` — `Game_categorized`'s `evolve` arm comment now reads
+  `// demoted (games-v4nqe, ADR-0043/ADR-0055) — genres stays sourced exclusively from
+  Game_added_to_library's payload; legacy event, ignored`, matching the wording already applied
+  at `GameProjection.fs:278` and ADR-0055's "What changed back" bullet.
+- `src/Server/MetadataCache.fs:475-477` — `upsertGameFacets`'s doc comment now states ADR-0055
+  decided the creation-path cache write will never exist and that `game_metadata_cache.genres`
+  is kept but permanently unused, matching the phrasing at the migration site
+  (`MetadataCache.fs:511-520`).
+
+`npm test` (630/630 pass, exit 0) and `npm run build` (exit 0) both re-verified clean after the
+edits.

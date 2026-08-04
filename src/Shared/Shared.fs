@@ -812,6 +812,45 @@ type RawgSearchResult = {
     Genres: string list
 }
 
+/// ADR-0053: three-state VR support. `NoVr` and `VrSupported` are both
+/// distinct from "unknown" — the cache-derived `PlayFacets.Vr` field is
+/// always total (never optional); only `PlayFacetsOverride.Vr` needs the
+/// `option` wrapper, and even there `Some NoVr` is a real, distinct
+/// statement ("Steam says VR-supported, I say no").
+type VrSupport =
+    | NoVr
+    | VrSupported
+    | VrOnly
+
+/// ADR-0053: the cache-derived default — always total, never carried by an
+/// event, written by `game_metadata_cache`'s facet columns (games-a7dqx) and
+/// derived from Steam's numeric category ids. Wired into `GameListItem`/
+/// `GameDetail` by games-v4nqe, superseding the old `PlayModes: string list`
+/// free-text field.
+type PlayFacets = {
+    Solo: bool
+    CoopCouch: bool
+    CoopOnline: bool
+    VersusCouch: bool
+    VersusOnline: bool
+    RemotePlayTogether: bool
+    Vr: VrSupport
+}
+
+/// ADR-0053: the aggregate-held, event-sourced correction — one event
+/// (`Game_play_facets_overridden`) carries the whole record. `None` on any
+/// field means "not overridden, defer to the cache"; `Some v` — including
+/// `Some false`/`Some NoVr` — overrules whatever the cache says.
+type PlayFacetsOverride = {
+    Solo: bool option
+    CoopCouch: bool option
+    CoopOnline: bool option
+    VersusCouch: bool option
+    VersusOnline: bool option
+    RemotePlayTogether: bool option
+    Vr: VrSupport option
+}
+
 type GameListItem = {
     Slug: string
     Name: string
@@ -823,6 +862,11 @@ type GameListItem = {
     HltbHours: float option
     PersonalRating: int option
     RawgRating: float option
+    /// games-v4nqe (ADR-0053): the merged, display-ready facets — cache
+    /// default with any manual override applied. See `PlayFacets`'s own doc
+    /// comment; `GameDetail` additionally carries the raw
+    /// `PlayFacetsOverride` for editing.
+    PlayFacets: PlayFacets
 }
 
 type GameDetail = {
@@ -851,52 +895,20 @@ type GameDetail = {
     /// GameDetail shows the breakdown ("512h before tracking + 12h tracked")
     /// when this is > 0, a single number otherwise.
     PriorPlayTimeMinutes: int
-    PlayModes: string list
+    /// games-v4nqe (ADR-0053): the merged, display-ready facets — superseded
+    /// `PlayModes: string list`. `PlayFacetsOverride` (below) is the raw
+    /// aggregate-held correction the client must send back on the next
+    /// `overrideGamePlayFacets` call — the client must NOT round-trip the
+    /// merged `PlayFacets` value as an override (that would freeze every
+    /// currently-cache-derived field as a permanent manual override).
+    PlayFacets: PlayFacets
+    PlayFacetsOverride: PlayFacetsOverride
     IsOwnedByMe: bool
     FamilyOwners: FriendRef list
     RecommendedBy: FriendRef list
     WantToPlayWith: FriendRef list
     PlayedWith: FriendRef list
     ContentBlocks: ContentBlockDto list
-}
-
-/// ADR-0053: three-state VR support. `NoVr` and `VrSupported` are both
-/// distinct from "unknown" — the cache-derived `PlayFacets.Vr` field is
-/// always total (never optional); only `PlayFacetsOverride.Vr` needs the
-/// `option` wrapper, and even there `Some NoVr` is a real, distinct
-/// statement ("Steam says VR-supported, I say no").
-type VrSupport =
-    | NoVr
-    | VrSupported
-    | VrOnly
-
-/// ADR-0053: the cache-derived default — always total, never carried by an
-/// event, written by `game_metadata_cache`'s facet columns (games-a7dqx) and
-/// derived from Steam's numeric category ids. Not yet wired into
-/// `GameListItem`/`GameDetail` (games-v4nqe's job); this task only adds the
-/// type and the pure derivation/merge functions it needs.
-type PlayFacets = {
-    Solo: bool
-    CoopCouch: bool
-    CoopOnline: bool
-    VersusCouch: bool
-    VersusOnline: bool
-    RemotePlayTogether: bool
-    Vr: VrSupport
-}
-
-/// ADR-0053: the aggregate-held, event-sourced correction — one event
-/// (`Game_play_facets_overridden`) carries the whole record. `None` on any
-/// field means "not overridden, defer to the cache"; `Some v` — including
-/// `Some false`/`Some NoVr` — overrules whatever the cache says.
-type PlayFacetsOverride = {
-    Solo: bool option
-    CoopCouch: bool option
-    CoopOnline: bool option
-    VersusCouch: bool option
-    VersusOnline: bool option
-    RemotePlayTogether: bool option
-    Vr: VrSupport option
 }
 
 type AddGameRequest = {
@@ -1378,7 +1390,6 @@ type IMediathecaApi = {
     getGameDetail: string -> Async<GameDetail option>
     setGameStatus: string -> GameStatus -> Async<Result<unit, string>>
     setGamePersonalRating: string -> int option -> Async<Result<unit, string>>
-    setGameHltbHours: string -> float option -> Async<Result<unit, string>>
     addGameRecommendation: string -> string -> Async<Result<unit, string>>
     removeGameRecommendation: string -> string -> Async<Result<unit, string>>
     addGameWantToPlayWith: string -> string -> Async<Result<unit, string>>
@@ -1389,12 +1400,8 @@ type IMediathecaApi = {
     removeGameFamilyOwner: string -> string -> Async<Result<unit, string>>
     addGamePlayedWith: string -> string -> Async<Result<unit, string>>
     removeGamePlayedWith: string -> string -> Async<Result<unit, string>>
-    addGamePlayMode: string -> string -> Async<Result<unit, string>>
-    removeGamePlayMode: string -> string -> Async<Result<unit, string>>
-    getAllPlayModes: unit -> Async<string list>
-    /// ADR-0053 (games-a7dqx) — dispatches `Override_play_facets`. Purely
-    /// additive: nothing calls this yet, `GameListItem`/`GameDetail`'s
-    /// `PlayModes` field and the three methods above are untouched.
+    /// ADR-0053 — dispatches `Override_play_facets`. Supersedes the deleted
+    /// `addGamePlayMode`/`removeGamePlayMode`/`getAllPlayModes` (games-v4nqe).
     overrideGamePlayFacets: string -> PlayFacetsOverride -> Async<Result<unit, string>>
     getGameContentBlocks: string -> Async<ContentBlockDto list>
     addGameContentBlock: string -> AddContentBlockRequest -> Async<Result<string, string>>
