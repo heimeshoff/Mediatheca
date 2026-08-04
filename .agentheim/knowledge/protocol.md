@@ -18,6 +18,22 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 17:27 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 1h22m (batch start 16:05 → 17:27)
+**Completed:** 1 (first-try PASS: 0, re-dispatched: 1, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** games-v4nqe: 3
+**Commits:** 3 (batch start, task squash-merge commit, this entry)
+**Vision-conformance:** none — batch aligns with vision (games-v4nqe executes the "Replayable" design principle — ADR-0043's doctrine, with ADR-0055 keeping genres replay-deterministic when the task's own spec would have broken it; touches no out-of-scope item)
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task)
+**Carry-over:** left behind (user WIP, 3 files). No `.agentheim/`-owned files stranded; `.worktrees/` fully swept (games-v4nqe worktree removed clean after PASS integration, node_modules junction unlinked first).
+
+---
+
 ## 2026-08-04 17:20 -- Verification failed: games-v4nqe - Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3)
 
 **Type:** Work / Verification failure
