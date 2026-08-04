@@ -5,6 +5,22 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 15:50 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 53m (batch start 14:57 → 15:50)
+**Completed:** 1 (first-try PASS: 0, re-dispatched: 1, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** games-a7dqx: 2
+**Commits:** 3 (batch start, task squash-merge commit, this entry)
+**Vision-conformance:** none — batch aligns with vision (games-a7dqx executes the ADR-0043 replayability doctrine — the vision's "Replayable" design principle — and touches no out-of-scope item)
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task)
+**Carry-over:** left behind (user WIP, 3 files). No `.agentheim/`-owned files stranded; `.worktrees/` fully swept (games-a7dqx worktree removed clean after PASS integration, node_modules junction unlinked first).
+
+---
+
 ## 2026-08-04 15:48 -- Task verified and completed: games-a7dqx - Build the play-facets cache/domain foundation — schema, ADR-0053 override event/command, Steam facet derivation, safe cache-sourced reads for already-seeded fields, and the resumable backfill job (split 1 of 3; games-v4nqe converts emission sites, games-j6wkr rewrites the UI)
 
 **Type:** Work / Task completion
