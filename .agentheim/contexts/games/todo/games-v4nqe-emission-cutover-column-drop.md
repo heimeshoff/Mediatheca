@@ -1,7 +1,7 @@
 ---
 id: games-v4nqe
 title: Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3 — stops the 7668-event play-mode bloat games-a7dqx's schema made possible)
-status: backlog
+status: todo
 type: refactor
 context: games
 created: 2026-08-04

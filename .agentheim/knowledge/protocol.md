@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 16:03 -- Modeling / Promoted: games-v4nqe - Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3 — stops the 7668-event play-mode bloat games-a7dqx's schema made possible)
+
+**Type:** Modeling / Promote
+**BC:** games
+**From → To:** backlog → todo
+
+---
+
 ## 2026-08-04 16:20 -- Modeling / Refined: games-v4nqe - Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3)
 
 **Type:** Modeling / Refine
