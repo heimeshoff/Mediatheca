@@ -6,7 +6,7 @@ type: chore
 context: administration
 created: 2026-08-01
 completed:
-depends_on: [games-a7dqx, series-r2xhv]
+depends_on: [games-v4nqe, series-r2xhv]
 blocks: []
 tags: [event-log, migration, cleanup, ndjson]
 related_adrs: [0029, 0034, 0038]

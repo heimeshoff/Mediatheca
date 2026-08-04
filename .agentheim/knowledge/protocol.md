@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 13:55 -- Modeling / Refined: games-a7dqx - split into three sequenced tasks after bounce
+
+**Type:** Modeling / Refine
+**BC:** games
+**Status after:** backlog (all three; promotion follows readiness check)
+**Summary:** Marco approved splitting the bounced cutover along the worker's recommended seam. Orchestrator resolved two compile-coupling holes in the naive split: the Shared.fs DTO rename (PlayModes → PlayFacets) and the forced old-picker deletion both belong to task 2 (command deletion breaks them at compile time), not task 1 or 3. games-a7dqx re-scoped to the strictly-additive foundation (schema, ADR-0053 override event/command, deriveFacets, safe cache reads for already-seeded fields, backfill job); games-v4nqe carries emission-site conversion + command deletion + column drops + DTO finalization; games-j6wkr carries the new UI (badges, Auto/On/Off controls, filters). Three transitional gaps named and bounded in the task files. administration-z6ymt repointed to depend on games-v4nqe (purge only safe after the four-part-rule pass); games-b8xnw unchanged. All original acceptance criteria partitioned, none lost.
+**Split into:** games-v4nqe, games-j6wkr (games-a7dqx re-scoped in place, id retained)
+**ADRs written:** none (ADR-0053 unchanged, still governs)
+
+---
+
 ## 2026-08-04 13:26 -- Work session ended
 
 **Type:** Work / Session end
