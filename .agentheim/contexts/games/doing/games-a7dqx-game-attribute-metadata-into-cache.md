@@ -1,7 +1,7 @@
 ---
 id: games-a7dqx
 title: Build the play-facets cache/domain foundation — schema, ADR-0053 override event/command, Steam facet derivation, safe cache-sourced reads for already-seeded fields, and the resumable backfill job (split 1 of 3; games-v4nqe converts emission sites, games-j6wkr rewrites the UI)
-status: todo
+status: doing
 type: refactor
 context: games
 created: 2026-08-01

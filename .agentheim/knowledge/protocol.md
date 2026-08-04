@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 14:57 -- Batch started: [games-a7dqx]
+
+**Type:** Work / Batch start
+**Tasks:** games-a7dqx - Build the play-facets cache/domain foundation — schema, ADR-0053 override event/command, Steam facet derivation, safe cache-sourced reads for already-seeded fields, and the resumable backfill job (split 1 of 3; games-v4nqe converts emission sites, games-j6wkr rewrites the UI)
+**Parallel:** no (1 worker — only one ready task on the board)
+
+---
+
 ## 2026-08-04 14:43 -- Modeling / Promoted: games-a7dqx - Build the play-facets cache/domain foundation — schema, ADR-0053 override event/command, Steam facet derivation, safe cache-sourced reads for already-seeded fields, and the resumable backfill job (split 1 of 3; games-v4nqe converts emission sites, games-j6wkr rewrites the UI)
 
 **Type:** Modeling / Promote
