@@ -1,7 +1,7 @@
 ---
 id: administration-z6ymt
 title: Purge the 11 demoted metadata event types from the event log via the ADR-0038 wipe-first import — offline type-level NDJSON filter plus operator-executed runbook (ADR-0056) — and retire the completed games-h4mrd play-session migration machinery in the same change
-status: todo
+status: doing
 type: chore
 context: administration
 created: 2026-08-01

@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 20:11 -- Batch started: [games-j6wkr, administration-z6ymt]
+
+**Type:** Work / Batch start
+**Tasks:** games-j6wkr - Rewrite the Games UI for typed play facets — Solo/Co-op/Versus/Couch badges, per-facet Auto/On/Off override controls, and client-side list filters over the landed PlayFacets contract (split 3 of 3, closes the no-play-mode-UI window games-v4nqe opened), administration-z6ymt - Purge the 11 demoted metadata event types from the event log via the ADR-0038 wipe-first import — offline type-level NDJSON filter plus operator-executed runbook (ADR-0056) — and retire the completed games-h4mrd play-session migration machinery in the same change
+**Parallel:** yes (2 workers — no file overlap: games-j6wkr is client-only Games UI, administration-z6ymt is server-side purge tooling + runbook)
+
+---
+
 ## 2026-08-04 20:09 -- Modeling / Promoted: administration-z6ymt - Purge the 11 demoted metadata event types from the event log via the ADR-0038 wipe-first import — offline type-level NDJSON filter plus operator-executed runbook (ADR-0056) — and retire the completed games-h4mrd play-session migration machinery in the same change
 
 **Type:** Modeling / Promote

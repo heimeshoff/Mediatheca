@@ -1,7 +1,7 @@
 ---
 id: games-j6wkr
 title: Rewrite the Games UI for typed play facets — Solo/Co-op/Versus/Couch badges, per-facet Auto/On/Off override controls, and client-side list filters over the landed PlayFacets contract (split 3 of 3, closes the no-play-mode-UI window games-v4nqe opened)
-status: todo
+status: doing
 type: refactor
 context: games
 created: 2026-08-04
