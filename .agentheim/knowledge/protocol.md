@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 18:05 -- Modeling / Refined: games-j6wkr - Rewrite the Games UI for typed play facets (split 3 of 3)
+
+**Type:** Modeling / Refine
+**BC:** games
+**Status after:** todo (auto-promoted after readiness check)
+**Summary:** Post-v4nqe reconciliation — verified every assumption against the landed code. The contract landed as specified (PlayFacets/PlayFacetsOverride on both DTOs, overrideGamePlayFacets, VrSupport 3-case DU; picker deleted, only tombstone comments remain). Fixed the one stale spec: the SQL COALESCE merge-rule (and its ADR-0048 comment instruction) never shipped — the merge is pure F# (FacetDerivation.merge) server-side, so DTO facets arrive pre-merged and list filters are pure client-side (existing StatusFilter pattern). Added a machine-checkable criterion for the ADR-0053 one-field-override trap, linked ADR-0054 and prior-art games-v4nqe, noted the StyleGuide segmented-control precedent. Both dependencies (games-v4nqe, design-system-001) confirmed done.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-08-04 17:25 -- Task verified and completed: games-v4nqe - Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3 — stops the 7668-event play-mode bloat games-a7dqx's schema made possible)
 
 **Type:** Work / Task completion

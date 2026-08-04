@@ -37,7 +37,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **games-j6wkr** — Rewrite the Games UI for typed play facets — delete the 302-value play-mode picker, add Auto/On/Off facet override controls and badges/list filters, consuming the PlayFacets contract games-v4nqe lands (split 3 of 3) (refactor) — `backlog/games-j6wkr-play-facets-ui-rewrite.md`
+- **games-j6wkr** — Rewrite the Games UI for typed play facets — Solo/Co-op/Versus/Couch badges, per-facet Auto/On/Off override controls, and client-side list filters over the landed PlayFacets contract (split 3 of 3, closes the no-play-mode-UI window games-v4nqe opened) (refactor) — `backlog/games-j6wkr-play-facets-ui-rewrite.md`
 - **games-b8xnw** — Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge (feature) — `backlog/games-b8xnw-steam-deck-compat-readiness.md`
 <!-- backlog-list:end -->
 
