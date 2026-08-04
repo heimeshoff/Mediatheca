@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 23:17 -- Modeling / Promoted: games-b8xnw - Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge
+
+**Type:** Modeling / Promote
+**BC:** games
+**From → To:** backlog → todo
+
+---
+
 ## 2026-08-04 23:18 -- Modeling / Refined: integration-hebjs - One-click Steam Family import — automatic access-token acquisition
 
 **Type:** Modeling / Refine
