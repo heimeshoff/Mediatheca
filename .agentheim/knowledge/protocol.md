@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 -- Modeling / Captured: infrastructure-r8kqt - Retire the one-shot cutover machinery and its backups
+
+**Type:** Modeling / Capture
+**BC:** infrastructure
+**Filed to:** backlog
+**Summary:** Quick capture of the deferred cleanup that ADR-0052 always anticipated: after a two-week stability hold (earliest 2026-08-17), delete `StartupCutover.fs`, its test file, and its three `Composition.fs` call sites, revert `ensureSafeCatchUp` to `Projection.startAllProjections`, and remove the two pre-cutover backups from the server volume plus the pristine dev copy. Carries a full operator procedure (verify-window → remove backups → delete code → test/build/deploy) and the one-way-ordering caveat that deleting the harness makes any surviving pre-cutover backup unmigratable.
+
+---
+
 ## 2026-08-02 09:45 -- Work session ended
 
 **Type:** Work / Session end
