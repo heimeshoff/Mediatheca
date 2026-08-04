@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
+- **Backlog:** 2
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 4
@@ -36,11 +36,13 @@ research touching this BC, and concept synthesis pages.
 ### Backlog
 <!-- backlog-list:start -->
 - **games-a7dqx** — Move Game attribute metadata into the cache and stop emitting it — 7668 Game_play_mode_added events are literally Steam Store category tags and make up 43% of the entire event log (refactor) — `backlog/games-a7dqx-game-attribute-metadata-into-cache.md`
+- **games-b8xnw** — Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge (feature) — `backlog/games-b8xnw-steam-deck-compat-readiness.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0053** -- Game play facets are cache-derived from Steam; per-field manual overrides stay event-sourced (`Game_play_facets_overridden` carrying an all-`Option` record) and merge at query time via a pure `PlayFacets.merge` -- 2026-08-04 -- `../../knowledge/decisions/0053-game-play-facets-cache-derived-event-sourced-override.md`
 - **0050** -- Play sessions are first-class Games events keyed on (game, gaming day); pre-tracking playtime is its own dateless event; the Steam sync cursor is derived from the log via the two-fold aggregate (`TotalPlayTimeMinutes` / `SteamObservedMinutes`). -- 2026-08-01 -- `../../knowledge/decisions/0050-play-sessions-first-class-events-two-fold-cursor.md`
 - **0042** -- Games lifecycle remodeled to five states (Backlog/InFocus/Retired/Abandoned/Dismissed) — OnHold removed via parse-time upcast, Completed renamed Retired, Playing never added (InFocus covers it); DesignSystem.LifecycleStatus unifies 1:1 -- 2026-08-01 -- `knowledge/decisions/0042-games-lifecycle-remodeled-to-five-states.md`
 <!-- adr-local:end -->

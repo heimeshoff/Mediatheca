@@ -5,6 +5,26 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 13:10 -- Modeling / Refined: games-a7dqx - Move Game attribute metadata into the cache and stop emitting it
+
+**Type:** Modeling / Refine
+**BC:** games
+**Status after:** todo
+**Summary:** Resolved both open questions with code evidence (`Categorize_game` is dead code with no genre-editing UI → genres move to cache; Steam Deck readiness split out as games-b8xnw). Orchestrator/tactical-modeler pass produced the full event disposition table (7 demoted event groups under the four-part tolerance rule; `Game_steam_last_played_set` derived from `game_play_session` rather than cached), the `Game_play_facets_overridden` override model, complete acceptance criteria, and five recorded hazards (identity-card write conflict, Api.fs emission-site sweep, decoder reshape, two dead endpoints). Marco decided the override UX: per-facet Auto/On/Off segmented controls (VR four-way). Dependencies verified done (administration-c3nvp, games-w4tzc, design-system-001 added per frontend gate).
+**Split into:** games-b8xnw (follow-up, not a split — captured from decision 6)
+**ADRs written:** 0053
+
+---
+
+## 2026-08-04 13:10 -- Modeling / Captured: games-b8xnw - Steam Deck compatibility readiness
+
+**Type:** Modeling / Capture
+**BC:** games
+**Filed to:** backlog
+**Summary:** Steam Deck compatibility (Verified/Playable/Unsupported) as a `deck_compat` column on `game_metadata_cache` with a card/detail badge — fetched from the unofficial `ajaxgetdeckappcompatibilityreport` endpoint, reusing games-a7dqx's resumable throttled-backfill infrastructure (hence `depends_on: games-a7dqx`). Scoped out of a7dqx at refinement per decision 6's "refiner should scope it".
+
+---
+
 ## 2026-08-04 10:00 -- Work session ended
 
 **Type:** Work / Session end
