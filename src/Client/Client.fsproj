@@ -20,6 +20,7 @@
     <Compile Include="Components\ActionMenu.fs" />
     <Compile Include="Components\EventHistoryModal.fs" />
     <Compile Include="Components\HlsVideo.fs" />
+    <Compile Include="Components\PlayFacetsDisplay.fs" />
     <Compile Include="FuzzyMatch.fs" />
     <Compile Include="Components\SearchModal.fs" />
     <Compile Include="Components\Sidebar.fs" />

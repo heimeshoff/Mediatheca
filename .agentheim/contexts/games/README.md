@@ -78,12 +78,22 @@ Single user.
   `PlayFacetsOverride` (games-v4nqe) — the client must send the raw
   `PlayFacetsOverride` back on the next `overrideGamePlayFacets` call, never the
   merged `PlayFacets` value (that would freeze every cache-derived field as a
-  permanent manual override). No UI reads/writes them yet — that's games-j6wkr's
-  scope (badges, Auto/On/Off controls, filters); the detail page currently shows
-  no play-mode/facet information at all, a bounded gap closed by that task. See
-  ADR-0053 and ADR-0054 (the live-verified Steam category-id table, including
-  the one judgment call the source decision log left open: a bare "Multi-player"
-  tag with no other multiplayer signal resolves to `CoopOnline`).
+  permanent manual override). See ADR-0053 and ADR-0054 (the live-verified
+  Steam category-id table, including the one judgment call the source
+  decision log left open: a bare "Multi-player" tag with no other
+  multiplayer signal resolves to `CoopOnline`).
+  **UI (games-j6wkr):** `Components/PlayFacetsDisplay.fs` is the shared
+  badge/control vocabulary consumed by both `Pages/Games` (list cards +
+  client-side facet filters) and `Pages/GameDetail` (hero badges + a "Play
+  Facets" panel of seven Auto/On/Off segmented controls, VR getting the
+  4-option Auto/No VR/Supported/VR only variant). Badges cap at 4 — Solo,
+  Co-op (couch/online sub-label), Versus (couch/online sub-label), and a
+  standalone Couch summary badge that fires on any couch-playable mode.
+  Segmented controls always render the merged `PlayFacets` for display but
+  POST a single-field-changed `PlayFacetsOverride`, built via
+  `Shared.PlayFacetsOverride`'s `withX` functions (`GameDetail/State.fs`'s
+  `Override_*` message arms) — the ADR-0053 trap guard, covered by
+  `PlayFacetsOverrideTests.fs`.
 - **Metadata cache slice** (games-v4nqe) — description/short_description/website_url,
   cache-only (`game_metadata_cache`, `MetadataCache.upsertGameIdentityCard`/
   `tryGetGameIdentityCard` — the type's own name predates this rename and is kept for

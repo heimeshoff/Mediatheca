@@ -851,6 +851,24 @@ type PlayFacetsOverride = {
     Vr: VrSupport option
 }
 
+/// games-j6wkr: the ADR-0053 correctness-trap guard. Each `withX` changes
+/// exactly one field of an existing `PlayFacetsOverride`, leaving the other
+/// six byte-identical — the GameDetail Auto/On/Off segmented controls call
+/// these exclusively, applied to `GameDetail.PlayFacetsOverride`, and must
+/// never derive the POST payload from the merged `PlayFacets` (that would
+/// silently freeze every currently-cache-derived field as a permanent
+/// manual override). Pure record `with`-update, so the guarantee is
+/// structural, not just tested — `PlayFacetsOverrideTests.fs` covers it
+/// anyway since this is the machine-checkable half of the trap.
+module PlayFacetsOverride =
+    let withSolo (v: bool option) (o: PlayFacetsOverride) = { o with Solo = v }
+    let withCoopCouch (v: bool option) (o: PlayFacetsOverride) = { o with CoopCouch = v }
+    let withCoopOnline (v: bool option) (o: PlayFacetsOverride) = { o with CoopOnline = v }
+    let withVersusCouch (v: bool option) (o: PlayFacetsOverride) = { o with VersusCouch = v }
+    let withVersusOnline (v: bool option) (o: PlayFacetsOverride) = { o with VersusOnline = v }
+    let withRemotePlayTogether (v: bool option) (o: PlayFacetsOverride) = { o with RemotePlayTogether = v }
+    let withVr (v: VrSupport option) (o: PlayFacetsOverride) = { o with Vr = v }
+
 type GameListItem = {
     Slug: string
     Name: string

@@ -8,6 +8,7 @@ let init () : Model * Cmd<Msg> =
     { Games = []
       SearchQuery = ""
       StatusFilter = None
+      FacetFilter = None
       IsLoading = true },
     Cmd.ofMsg Load_games
 
@@ -25,6 +26,9 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Status_filter_changed status ->
         { model with StatusFilter = status }, Cmd.none
+
+    | Facet_filter_changed facet ->
+        { model with FacetFilter = facet }, Cmd.none
 
     | Open_search_modal ->
         model, Cmd.none

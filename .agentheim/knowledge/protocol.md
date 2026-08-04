@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 20:33 -- Task verified and completed: games-j6wkr - Rewrite the Games UI for typed play facets — Solo/Co-op/Versus/Couch badges, per-facet Auto/On/Off override controls, and client-side list filters over the landed PlayFacets contract (split 3 of 3, closes the no-play-mode-UI window games-v4nqe opened)
+
+**Type:** Work / Task completion
+**Task:** games-j6wkr - Rewrite the Games UI for typed play facets — Solo/Co-op/Versus/Couch badges, per-facet Auto/On/Off override controls, and client-side list filters over the landed PlayFacets contract (split 3 of 3, closes the no-play-mode-UI window games-v4nqe opened)
+**Summary:** Rewrote the Games UI for typed play facets — Solo/Co-op/Versus/Couch badges on cards and detail hero, pure client-side facet filter pills, and seven Auto/On/Off segmented controls that POST a single-field-changed PlayFacetsOverride (ADR-0053 trap guarded by 8 Expecto tests)
+**Duration:** 23m
+**Verification:** PASS (iteration 1)
+**Files changed:** 13
+**Tests added:** 8
+**ADRs written:** 0057
+
+---
+
 ## 2026-08-04 20:11 -- Batch started: [games-j6wkr, administration-z6ymt]
 
 **Type:** Work / Batch start

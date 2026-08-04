@@ -41,6 +41,16 @@ let init (slug: string) : Model * Cmd<Msg> =
         Cmd.ofMsg (Load_game slug)
     ]
 
+/// games-j6wkr (ADR-0053): POSTs the caller-built override record — every
+/// `Override_*` arm below constructs it via `PlayFacetsOverride.withX`
+/// against the DTO's raw `PlayFacetsOverride`, never the merged `PlayFacets`.
+let private overrideFacetCmd (api: IMediathecaApi) (slug: string) (newOverride: PlayFacetsOverride) : Cmd<Msg> =
+    Cmd.OfAsync.either
+        (fun () -> api.overrideGamePlayFacets slug newOverride)
+        ()
+        Facets_override_result
+        (fun ex -> Facets_override_result (Error ex.Message))
+
 let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
     | Set_tab tab ->
@@ -590,3 +600,47 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Relink_rawg_dismissed ->
         { model with ConnectRawgState = RawgIdle }, Cmd.none
+
+    // games-j6wkr (ADR-0053 trap guard): each arm applies exactly one
+    // `PlayFacetsOverride.withX` against the DTO's raw override, then POSTs
+    // that — never the merged `PlayFacets`.
+    | Override_solo v ->
+        match model.Game with
+        | Some game -> model, overrideFacetCmd api model.Slug (PlayFacetsOverride.withSolo v game.PlayFacetsOverride)
+        | None -> model, Cmd.none
+
+    | Override_coop_couch v ->
+        match model.Game with
+        | Some game -> model, overrideFacetCmd api model.Slug (PlayFacetsOverride.withCoopCouch v game.PlayFacetsOverride)
+        | None -> model, Cmd.none
+
+    | Override_coop_online v ->
+        match model.Game with
+        | Some game -> model, overrideFacetCmd api model.Slug (PlayFacetsOverride.withCoopOnline v game.PlayFacetsOverride)
+        | None -> model, Cmd.none
+
+    | Override_versus_couch v ->
+        match model.Game with
+        | Some game -> model, overrideFacetCmd api model.Slug (PlayFacetsOverride.withVersusCouch v game.PlayFacetsOverride)
+        | None -> model, Cmd.none
+
+    | Override_versus_online v ->
+        match model.Game with
+        | Some game -> model, overrideFacetCmd api model.Slug (PlayFacetsOverride.withVersusOnline v game.PlayFacetsOverride)
+        | None -> model, Cmd.none
+
+    | Override_remote_play_together v ->
+        match model.Game with
+        | Some game -> model, overrideFacetCmd api model.Slug (PlayFacetsOverride.withRemotePlayTogether v game.PlayFacetsOverride)
+        | None -> model, Cmd.none
+
+    | Override_vr v ->
+        match model.Game with
+        | Some game -> model, overrideFacetCmd api model.Slug (PlayFacetsOverride.withVr v game.PlayFacetsOverride)
+        | None -> model, Cmd.none
+
+    | Facets_override_result (Ok ()) ->
+        model, Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
+
+    | Facets_override_result (Error err) ->
+        { model with Error = Some err }, Cmd.none

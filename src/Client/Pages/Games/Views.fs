@@ -80,6 +80,12 @@ let private gameCard (game: GameListItem) =
                             DesignSystem.statusBadge (toLifecycleStatus game.Status)
                         ]
                     ]
+                    // Play facet badges (games-j6wkr, ADR-0053) — up to 4, from the
+                    // already-merged GameListItem.PlayFacets.
+                    Html.div [
+                        prop.className "mt-1.5 px-1"
+                        prop.children [ PlayFacetsDisplay.badgeRow game.PlayFacets ]
+                    ]
                 ]
             ]
         ]
@@ -104,6 +110,40 @@ let private statusFilterBadges (currentFilter: GameStatus option) (dispatch: Msg
                         if isActive then dispatch (Status_filter_changed None)
                         else dispatch (Status_filter_changed (Some status)))
                     prop.text (DesignSystem.statusBadgeLabel (toLifecycleStatus status))
+                ]
+        ]
+    ]
+
+let private facetFilterLabel (facet: PlayFacetFilter) =
+    match facet with
+    | Facet_solo -> "Solo"
+    | Facet_coop -> "Co-op"
+    | Facet_versus -> "Versus"
+    | Facet_couch -> "Couch"
+
+/// Mirrors `PlayFacetsDisplay.facetBadges`'s categories so "filter by badge"
+/// matches "shown badge" one-to-one.
+let private matchesFacetFilter (filter: PlayFacetFilter option) (facets: PlayFacets) =
+    match filter with
+    | None -> true
+    | Some Facet_solo -> facets.Solo
+    | Some Facet_coop -> facets.CoopCouch || facets.CoopOnline
+    | Some Facet_versus -> facets.VersusCouch || facets.VersusOnline
+    | Some Facet_couch -> facets.CoopCouch || facets.VersusCouch
+
+let private facetFilterPills (currentFilter: PlayFacetFilter option) (dispatch: Msg -> unit) =
+    let allFacets = [ Facet_solo; Facet_coop; Facet_versus; Facet_couch ]
+    Html.div [
+        prop.className "flex flex-wrap gap-2"
+        prop.children [
+            for facet in allFacets do
+                let isActive = currentFilter = Some facet
+                Html.button [
+                    prop.className (DesignSystem.pill isActive)
+                    prop.onClick (fun _ ->
+                        if isActive then dispatch (Facet_filter_changed None)
+                        else dispatch (Facet_filter_changed (Some facet)))
+                    prop.text (facetFilterLabel facet)
                 ]
         ]
     ]
@@ -168,9 +208,17 @@ let view (model: Model) (dispatch: Msg -> unit) =
             ]
             // Status filter badges
             Html.div [
-                prop.className "mb-6"
+                prop.className "mb-3"
                 prop.children [
                     statusFilterBadges model.StatusFilter dispatch
+                ]
+            ]
+            // Play facet filters (games-j6wkr) — pure client-side, over the
+            // already-merged GameListItem.PlayFacets.
+            Html.div [
+                prop.className "mb-6"
+                prop.children [
+                    facetFilterPills model.FacetFilter dispatch
                 ]
             ]
             if model.IsLoading then
@@ -197,6 +245,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         | None -> g.Status <> Dismissed
                         | Some f -> f = g.Status
                     )
+                    |> List.filter (fun g -> matchesFacetFilter model.FacetFilter g.PlayFacets)
                 if List.isEmpty filtered then
                     Html.div [
                         prop.className ("text-center py-20 " + DesignSystem.animateFadeIn)

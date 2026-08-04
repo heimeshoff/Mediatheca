@@ -935,6 +935,12 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                         HeroRating (game.RawgRating, game.PersonalRating, model.IsRatingOpen, dispatch)
                                                     ]
                                                 ]
+                                                // Play facet badges (games-j6wkr, ADR-0053) — up to 4,
+                                                // from the already-merged GameDetail.PlayFacets.
+                                                Html.div [
+                                                    prop.className "mb-3"
+                                                    prop.children [ PlayFacetsDisplay.badgeRow game.PlayFacets ]
+                                                ]
                                                 // Title
                                                 Html.h1 [
                                                     prop.className "text-3xl lg:text-5xl font-bold font-display tracking-tight mb-2"
@@ -1211,6 +1217,27 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                                 Html.span [ prop.className "ml-auto text-base-content/30"; prop.children [ Icons.externalLink () ] ]
                                                             ]
                                                         ]
+                                                    ]
+                                                ]
+                                            ]
+                                            // Play Facets (games-j6wkr, ADR-0053): per-facet Auto/On/Off
+                                            // segmented controls. Auto displays the Steam-derived cached
+                                            // value (game.PlayFacets); the control's selected segment comes
+                                            // from the raw override (game.PlayFacetsOverride). Each onChange
+                                            // dispatches a single-facet Override_* message — State.fs applies
+                                            // it via PlayFacetsOverride.withX, the ADR-0053 trap guard.
+                                            panelCard [
+                                                Html.h3 [ prop.className "text-lg font-bold mb-4"; prop.text "Play Facets" ]
+                                                Html.div [
+                                                    prop.className "space-y-1"
+                                                    prop.children [
+                                                        PlayFacetsDisplay.boolFacetControl "Solo" game.PlayFacets.Solo game.PlayFacetsOverride.Solo (fun v -> dispatch (Override_solo v))
+                                                        PlayFacetsDisplay.boolFacetControl "Co-op (couch)" game.PlayFacets.CoopCouch game.PlayFacetsOverride.CoopCouch (fun v -> dispatch (Override_coop_couch v))
+                                                        PlayFacetsDisplay.boolFacetControl "Co-op (online)" game.PlayFacets.CoopOnline game.PlayFacetsOverride.CoopOnline (fun v -> dispatch (Override_coop_online v))
+                                                        PlayFacetsDisplay.boolFacetControl "Versus (couch)" game.PlayFacets.VersusCouch game.PlayFacetsOverride.VersusCouch (fun v -> dispatch (Override_versus_couch v))
+                                                        PlayFacetsDisplay.boolFacetControl "Versus (online)" game.PlayFacets.VersusOnline game.PlayFacetsOverride.VersusOnline (fun v -> dispatch (Override_versus_online v))
+                                                        PlayFacetsDisplay.boolFacetControl "Remote Play Together" game.PlayFacets.RemotePlayTogether game.PlayFacetsOverride.RemotePlayTogether (fun v -> dispatch (Override_remote_play_together v))
+                                                        PlayFacetsDisplay.vrFacetControl "VR" game.PlayFacets.Vr game.PlayFacetsOverride.Vr (fun v -> dispatch (Override_vr v))
                                                     ]
                                                 ]
                                             ]

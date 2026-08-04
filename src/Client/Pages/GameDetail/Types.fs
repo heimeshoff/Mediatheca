@@ -155,3 +155,16 @@ type Msg =
     | Rawg_candidate_chosen of int
     | Rawg_attach_completed of Result<unit, string>
     | Relink_rawg_dismissed
+    // games-j6wkr (ADR-0053): per-facet Auto/On/Off segmented controls. Each
+    // case carries the raw new override value for one facet; State.fs
+    // applies it via `Shared.PlayFacetsOverride.withX` against
+    // `GameDetail.PlayFacetsOverride` (never the merged `PlayFacets`) — the
+    // correctness-trap guard.
+    | Override_solo of bool option
+    | Override_coop_couch of bool option
+    | Override_coop_online of bool option
+    | Override_versus_couch of bool option
+    | Override_versus_online of bool option
+    | Override_remote_play_together of bool option
+    | Override_vr of VrSupport option
+    | Facets_override_result of Result<unit, string>
