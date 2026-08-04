@@ -39,11 +39,30 @@ Follow the `series-q8jwc` shape: join in the query function, not at the API laye
 
 ## Acceptance criteria
 
-- [ ] To be written during refinement.
+_Written 2026-08-04 following the shipped series-q8jwc / games-a7dqx cutover shape; the
+trigger condition in Notes still governs when this is promotable._
+
+- [ ] `movie_metadata_cache` gains typed columns for `tmdb_rating`, `overview`, `runtime`,
+      `backdrop_ref`, `production_countries` (every image ref individually SELECTable —
+      ADR-0045, no EAV/JSON blob), seeded once from current projection values.
+- [ ] Identity-card fields (`name`, `year`, `poster_ref`, `genres`) stay projection columns;
+      reads use `COALESCE(cache, projection)` on them and nullable cache reads on
+      cache-only fields, joined in `MovieProjection.getBySlug`/`getAll`'s query functions,
+      not at the API layer.
+- [ ] The four-part tolerance rule is applied to the demoted TMDB-sourced events: codec
+      kept, aggregate arm explicit no-op, projection arm deleted with columns dropped,
+      commands deleted so the compiler finds every emission site.
+- [ ] No `ProjectionHandler` reads the cache (`grep -rn "MetadataCache" src/Server/*Projection.fs`
+      stays empty — c3nvp's hard constraint).
+- [ ] `checkProjectionDrift` reports zero discrepancies for `MovieProjection` after cutover.
+- [ ] `npm test` and `npm run build` pass.
 
 ## Notes
 
-**Backlog only — do not promote until a movie-refresh feature is scheduled.**
+**Backlog only — do not promote until a movie-refresh feature is scheduled.** (Re-confirmed
+at the 2026-08-04 refinement pass: still no out-of-band writer for Movies, so cutting over
+now buys nothing — the moment a movie-refresh feature is captured, this task becomes its
+`depends_on` prerequisite and gets promoted alongside it.)
 
 **Product call to surface before it is discovered by surprise:** seeding the cache from current
 projection values preserves exactly what is displayed today, but the *first* movie refresh will then
