@@ -417,12 +417,78 @@ let gameTests =
                 Set_steam_last_played (Some "2024-06-20")
                 Mark_as_owned
                 Remove_ownership
+                Override_play_facets { noPlayFacetsOverride with Solo = Some true }
             ]
             for cmd in commands do
                 let result = givenWhenThen removedEvents cmd
                 match result with
                 | Error msg -> Expect.stringContains msg "removed" "Should say removed"
                 | Ok _ -> failtest $"Expected error for command on removed game: {cmd}"
+    ]
+
+/// games-a7dqx (ADR-0053): the manual play-facets override — one event
+/// carrying the whole all-`Option` record, equality-checked no-op in
+/// `decide`, cache-blind by construction (no read path into
+/// game_metadata_cache from this module at all).
+[<Tests>]
+let playFacetsOverrideTests =
+    testList "Games play facets override (ADR-0053)" [
+
+        testCase "A new game defaults to no override on every facet" <| fun _ ->
+            let state = applyEvents [ Game_added_to_library sampleGameData ]
+            match state with
+            | Active game -> Expect.equal game.PlayFacetsOverride noPlayFacetsOverride "Fresh game defers to the cache on every facet"
+            | _ -> failtest "Expected Active state"
+
+        testCase "Overriding a facet for the first time produces an event" <| fun _ ->
+            let ovr = { noPlayFacetsOverride with Solo = Some true; Vr = Some VrOnly }
+            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Override_play_facets ovr)
+            match result with
+            | Ok events ->
+                Expect.equal events [ Game_play_facets_overridden ovr ] "Should produce exactly the override event"
+                let state = applyEvents ([ Game_added_to_library sampleGameData ] @ events)
+                match state with
+                | Active game -> Expect.equal game.PlayFacetsOverride ovr "ActiveGame.PlayFacetsOverride should hold the new override"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Some false is a real, distinct override — not treated as unset" <| fun _ ->
+            let ovr = { noPlayFacetsOverride with CoopOnline = Some false }
+            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Override_play_facets ovr)
+            match result with
+            | Ok events -> Expect.equal events [ Game_play_facets_overridden ovr ] "Some false must still produce an event, distinct from None"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Re-sending an identical override is a no-op" <| fun _ ->
+            let ovr = { noPlayFacetsOverride with Solo = Some true }
+            let given = [ Game_added_to_library sampleGameData; Game_play_facets_overridden ovr ]
+            let result = givenWhenThen given (Override_play_facets ovr)
+            match result with
+            | Ok events -> Expect.equal events [] "Identical override should produce no events"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Sending an all-None record un-overrides every facet in one command, no separate clear command needed" <| fun _ ->
+            let ovr = { noPlayFacetsOverride with Solo = Some true; CoopOnline = Some false }
+            let given = [ Game_added_to_library sampleGameData; Game_play_facets_overridden ovr ]
+            let result = givenWhenThen given (Override_play_facets noPlayFacetsOverride)
+            match result with
+            | Ok events ->
+                Expect.equal events [ Game_play_facets_overridden noPlayFacetsOverride ] "Clearing is the same event shape, just an all-None payload"
+                let state = applyEvents (given @ events)
+                match state with
+                | Active game -> Expect.equal game.PlayFacetsOverride noPlayFacetsOverride "Every facet defers to the cache again"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "A redundant-but-harmless override (matching what the cache would say) is accepted, not refused — cache-blind by construction" <| fun _ ->
+            // The aggregate has no read path into game_metadata_cache, so it
+            // cannot know whether this override happens to match the cache
+            // default — and must not refuse it on that basis (ADR-0053).
+            let ovr = { noPlayFacetsOverride with Solo = Some true }
+            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Override_play_facets ovr)
+            match result with
+            | Ok events -> Expect.equal (List.length events) 1 "A first-time override is accepted regardless of what any cache might say"
+            | Error e -> failtest $"Expected success but got: {e}"
     ]
 
 [<Tests>]
@@ -590,6 +656,32 @@ let gameSerializationTests =
             let deserialized = Serialization.deserialize eventType data
             Expect.equal deserialized (Some event) "Should round-trip"
 
+        testCase "Game_play_facets_overridden round-trips (all facets set, including Some false)" <| fun _ ->
+            let event = Game_play_facets_overridden {
+                Solo = Some true
+                CoopCouch = Some false
+                CoopOnline = Some true
+                VersusCouch = Some false
+                VersusOnline = Some true
+                RemotePlayTogether = Some false
+                Vr = Some VrOnly
+            }
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Game_play_facets_overridden round-trips (all-None, the 'un-override everything' payload)" <| fun _ ->
+            let event = Game_play_facets_overridden noPlayFacetsOverride
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Game_play_facets_overridden round-trips (Some NoVr — a real, distinct statement, not absence)" <| fun _ ->
+            let event = Game_play_facets_overridden { noPlayFacetsOverride with Vr = Some NoVr }
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip, and Vr must decode as Some NoVr, not None"
+
         testCase "All event types serialize and deserialize" <| fun _ ->
             let events: GameEvent list = [
                 Game_added_to_library sampleGameData
@@ -634,6 +726,8 @@ let gameSerializationTests =
                 Game_steam_last_played_set None
                 Game_marked_as_owned
                 Game_ownership_removed
+                Game_play_facets_overridden { noPlayFacetsOverride with Solo = Some true; Vr = Some VrSupported }
+                Game_play_facets_overridden noPlayFacetsOverride
             ]
             for event in events do
                 let eventType, data = Serialization.serialize event

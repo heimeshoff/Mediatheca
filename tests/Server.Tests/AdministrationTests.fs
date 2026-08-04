@@ -31,6 +31,11 @@ let private bootstrapAdmin (conn: SqliteConnection) =
     GameProjection.handler.Init conn
     PlaySessionProjection.handler.Init conn
     CatalogProjection.handler.Init conn
+    // games-a7dqx: GameProjection.getBySlug/getAll etc. now LEFT JOIN
+    // game_metadata_cache — must exist for the stream drill-in panel's
+    // GameProjection.getBySlug call (Administration.fs:227), mirroring
+    // Composition.buildApp's real startup order.
+    MetadataCache.initialize conn
     // Job runs console (administration-yamm5): table + startup reconciliation,
     // same as Composition.fs's init sequence, so any test exercising
     // getJobStatuses/runJobNow has the table ready.
@@ -476,6 +481,26 @@ let administrationTests =
 
             Expect.isEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "Game_play_time_set")) "Game_play_time_set is still in Games.Serialization.handledEventTypes, so it must not appear in the unhandled list"
             Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Game_play_time_set")) "Game_play_time_set still has a formatter case, so it must not appear in the unformattable list"
+
+        testCase "getHealthStats Game_play_facets_overridden appears in neither the unhandled nor the unformattable list (games-a7dqx: new event ships with both a deserializer and a formatter arm)" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
+            // Games.Serialization.handledEventTypes lists "Game_play_facets_overridden"
+            // and EventFormatting.formatGameEvent has a matching case from the
+            // moment the event is introduced — administration-qk3f7's drift
+            // never opens for this one.
+            let ovr : PlayFacetsOverride = {
+                Solo = Some true; CoopCouch = None; CoopOnline = None; VersusCouch = None
+                VersusOnline = None; RemotePlayTogether = None; Vr = Some VrOnly
+            }
+            EventStore.appendToStream conn (Games.streamId "some-game") -1L
+                [ Games.Serialization.toEventData (Games.Game_play_facets_overridden ovr) ] |> ignore
+            let api = createApi db.Factory
+
+            let stats = api.getHealthStats () |> Async.RunSynchronously
+
+            Expect.isEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "Game_play_facets_overridden")) "Game_play_facets_overridden is handled by Games' deserializer, so it must not appear in the unhandled list"
+            Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Game_play_facets_overridden")) "Game_play_facets_overridden has a formatter case, so it must not appear in the unformattable list"
 
         testCase "getHealthStats unhandled list flags an event type whose stream prefix matches no known bounded context" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapAdmin

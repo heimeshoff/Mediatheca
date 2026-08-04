@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 3
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 4
+- **Doing:** 0
+- **Done:** 5
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **games-a7dqx** — Build the play-facets cache/domain foundation — schema, ADR-0053 override event/command, Steam facet derivation, safe cache-sourced reads for already-seeded fields, and the resumable backfill job (split 1 of 3; games-v4nqe converts emission sites, games-j6wkr rewrites the UI) (refactor) — `doing/games-a7dqx-game-attribute-metadata-into-cache.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **games-a7dqx** — Build the play-facets cache/domain foundation — schema, ADR-0053 override event/command, Steam facet derivation, safe cache-sourced reads for already-seeded fields, and the resumable backfill job (split 1 of 3; games-v4nqe converts emission sites, games-j6wkr rewrites the UI) (refactor) — `done/games-a7dqx-game-attribute-metadata-into-cache.md`
 - **games-h4mrd** — Reconstruct play-session history from the 204 cumulative Game_play_time_set totals — each stream's first observation becoming prior playtime rather than a fabricated session — via an operator-triggered SSE migration (chore) — `done/games-h4mrd-reconstruct-play-session-history.md`
 - **games-p6vkz** — Model play sessions and pre-tracking playtime as first-class Games events — replacing the non-event-sourced game_play_session table, the republished-SUM Game_play_time_set, and the unrebuildable steam_playtime_snapshot cursor (feature) — `done/games-p6vkz-play-sessions-as-first-class-events.md`
 - **games-w4tzc** — Make the retained external-identity Game events idempotent — Set_steam_app_id and Add_family_owner re-emit on every sync for values that never change, unlike Set_steam_library_date which already guards (bug) — `done/games-w4tzc-idempotent-external-identity-events.md`
@@ -44,6 +44,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0054** -- The Steam category-id → PlayFacets derivation table is fixed from 13 live-verified appId fixtures (ids decoded with `&l=english`); bare umbrella ids resolve to the online facet -- 2026-08-04 -- `../../knowledge/decisions/0054-steam-category-id-facet-table-live-verified.md`
 - **0053** -- Game play facets are cache-derived from Steam; per-field manual overrides stay event-sourced (`Game_play_facets_overridden` carrying an all-`Option` record) and merge at query time via a pure `PlayFacets.merge` -- 2026-08-04 -- `../../knowledge/decisions/0053-game-play-facets-cache-derived-event-sourced-override.md`
 - **0050** -- Play sessions are first-class Games events keyed on (game, gaming day); pre-tracking playtime is its own dateless event; the Steam sync cursor is derived from the log via the two-fold aggregate (`TotalPlayTimeMinutes` / `SteamObservedMinutes`). -- 2026-08-01 -- `../../knowledge/decisions/0050-play-sessions-first-class-events-two-fold-cursor.md`
 - **0042** -- Games lifecycle remodeled to five states (Backlog/InFocus/Retired/Abandoned/Dismissed) — OnHold removed via parse-time upcast, Completed renamed Retired, Playing never added (InFocus covers it); DesignSystem.LifecycleStatus unifies 1:1 -- 2026-08-01 -- `knowledge/decisions/0042-games-lifecycle-remodeled-to-five-states.md`

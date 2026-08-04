@@ -124,6 +124,14 @@ module Steam =
         AboutTheGame: string
         WebsiteUrl: string option
         Categories: string list
+        /// games-a7dqx: the same categories' stable numeric ids, decoded
+        /// alongside `Categories` (hazard 3 — `decodeCategoryDescription`
+        /// used to discard `id`, keeping only the localized `description`).
+        /// Additive: `Categories` is untouched so existing callers
+        /// (`PlaytimeTracker.fs`, `Api.fs`'s description backfill) keep
+        /// compiling and behaving exactly as before. `FacetDerivation.deriveFacets`
+        /// is the only consumer of this new field so far.
+        CategoryIds: int list
         HeaderImageUrl: string option
     }
 
@@ -146,20 +154,29 @@ module Steam =
             response
         )
 
-    let private decodeCategoryDescription: Decoder<string> =
-        Decode.object (fun get ->
-            get.Required.Field "description" Decode.string
-        )
+    /// games-a7dqx: decodes both `id` and `description` (hazard 3 — the
+    /// former `decodeCategoryDescription` kept only `description`,
+    /// discarding the stable numeric id `FacetDerivation.deriveFacets` needs).
+    type private SteamCategory = { Id: int; Description: string }
+
+    let private decodeCategory: Decoder<SteamCategory> =
+        Decode.object (fun get -> {
+            Id = get.Required.Field "id" Decode.int
+            Description = get.Required.Field "description" Decode.string
+        })
 
     let private decodeStoreData: Decoder<SteamStoreDetails> =
-        Decode.object (fun get -> {
-            ShortDescription = get.Optional.Field "short_description" Decode.string |> Option.defaultValue ""
-            DetailedDescription = get.Optional.Field "detailed_description" Decode.string |> Option.defaultValue ""
-            AboutTheGame = get.Optional.Field "about_the_game" Decode.string |> Option.defaultValue ""
-            WebsiteUrl = get.Optional.Field "website" Decode.string
-            Categories = get.Optional.Field "categories" (Decode.list decodeCategoryDescription) |> Option.defaultValue []
-            HeaderImageUrl = get.Optional.Field "header_image" Decode.string
-        })
+        Decode.object (fun get ->
+            let categories = get.Optional.Field "categories" (Decode.list decodeCategory) |> Option.defaultValue []
+            {
+                ShortDescription = get.Optional.Field "short_description" Decode.string |> Option.defaultValue ""
+                DetailedDescription = get.Optional.Field "detailed_description" Decode.string |> Option.defaultValue ""
+                AboutTheGame = get.Optional.Field "about_the_game" Decode.string |> Option.defaultValue ""
+                WebsiteUrl = get.Optional.Field "website" Decode.string
+                Categories = categories |> List.map (fun c -> c.Description)
+                CategoryIds = categories |> List.map (fun c -> c.Id)
+                HeaderImageUrl = get.Optional.Field "header_image" Decode.string
+            })
 
     let private decodeStoreAppEntry: Decoder<Result<SteamStoreDetails, string>> =
         Decode.object (fun get ->
@@ -551,7 +568,11 @@ module Steam =
     let getSteamStoreDetails (httpClient: HttpClient) (appId: int) : Async<Result<SteamStoreDetails, string>> =
         async {
             try
-                let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d" appId
+                // games-a7dqx: &l=english belt-and-braces (ADR-0053) — the
+                // category ids are stable regardless of locale, but forcing
+                // English keeps `Categories`'/descriptions readable and
+                // consistent for any caller that still displays them.
+                let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d&l=english" appId
                 let! json = fetchJson httpClient url
                 let appIdKey = string appId
                 match Decode.fromString (Decode.dict decodeStoreAppEntry) json with
@@ -606,7 +627,11 @@ module Steam =
     let getSteamStoreTrailer (httpClient: HttpClient) (appId: int) : Async<Mediatheca.Shared.GameTrailerInfo option> =
         async {
             try
-                let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d" appId
+                // games-a7dqx: &l=english belt-and-braces (ADR-0053) — the
+                // category ids are stable regardless of locale, but forcing
+                // English keeps `Categories`'/descriptions readable and
+                // consistent for any caller that still displays them.
+                let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d&l=english" appId
                 let! json = fetchJson httpClient url
                 let appIdKey = string appId
                 // Parse manually to extract movies from the nested response
@@ -638,7 +663,11 @@ module Steam =
     let getSteamStoreTrailers (httpClient: HttpClient) (appId: int) : Async<Mediatheca.Shared.GameTrailerInfo list> =
         async {
             try
-                let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d" appId
+                // games-a7dqx: &l=english belt-and-braces (ADR-0053) — the
+                // category ids are stable regardless of locale, but forcing
+                // English keeps `Categories`'/descriptions readable and
+                // consistent for any caller that still displays them.
+                let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d&l=english" appId
                 let! json = fetchJson httpClient url
                 let appIdKey = string appId
                 match Decode.fromString (Decode.dict (Decode.object (fun get ->
@@ -807,7 +836,7 @@ module Steam =
             | true, meta -> return Some meta
             | _ ->
                 try
-                    let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d&filters=basic,release_date" appId
+                    let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d&filters=basic,release_date&l=english" appId
                     let! json = fetchJson httpClient url
                     match Decode.fromString (Decode.dict decodeStoreMetaEntry) json with
                     | Ok dict ->

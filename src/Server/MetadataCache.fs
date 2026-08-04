@@ -1,7 +1,10 @@
 namespace Mediatheca.Server
 
+open System.Data
 open Microsoft.Data.Sqlite
 open Donald
+open Thoth.Json.Net
+open Mediatheca.Shared
 
 /// The metadata cache tier (administration-c3nvp; doctrine: ADR-0043
 /// event-worthiness, registry: ADR-0044). The durable home for a third
@@ -218,6 +221,45 @@ module MetadataCache =
             """
         |> Db.exec
 
+        // games-a7dqx (ADR-0053): additive facet/genre/category-id columns on
+        // `game_metadata_cache` — idempotent `ALTER TABLE ... ADD COLUMN`,
+        // same try/with idiom as every migration in this function and in
+        // `GameProjection.createTables`. `genres` ships now (mirroring the
+        // general upsert shape) but nothing writes it until games-v4nqe —
+        // see `upsertGameFacets`'s doc comment. The six facet booleans store
+        // as INTEGER (0/1/NULL); `facet_vr` stores the `VrSupport` DU as
+        // text ("NoVr"/"VrSupported"/"VrOnly"); `steam_category_ids` stores
+        // the raw fetched ids as a JSON int array, kept alongside the
+        // derived facets so a future re-derivation (e.g. after a
+        // `deriveFacets` table fix) never needs a second Steam fetch.
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN genres TEXT" |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN facet_solo INTEGER" |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN facet_coop_couch INTEGER" |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN facet_coop_online INTEGER" |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN facet_versus_couch INTEGER" |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN facet_versus_online INTEGER" |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN facet_remote_play_together INTEGER" |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN facet_vr TEXT" |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN steam_category_ids TEXT" |> Db.exec
+        with _ -> () // Column already exists
+
         // `fetched_at` on the renamed tables themselves — they predate this
         // cache tier and never had this column. Same `ALTER TABLE ... ADD
         // COLUMN` idiom as `SeriesProjection.createTables`'s migrations.
@@ -363,3 +405,87 @@ module MetadataCache =
             "fetched_at", SqlType.String (System.DateTime.UtcNow.ToString("o"))
         ]
         |> Db.exec
+
+    let private encodeVrSupport (vr: VrSupport) =
+        match vr with
+        | NoVr -> "NoVr"
+        | VrSupported -> "VrSupported"
+        | VrOnly -> "VrOnly"
+
+    /// games-a7dqx (ADR-0053): the ongoing write path for
+    /// `game_metadata_cache`'s facet columns — the resumable backfill job's
+    /// only writer, stamping `fetched_at` on every genuine fetch (the same
+    /// "seed vs. real fetch" distinction `upsertSeriesMetadata` uses).
+    ///
+    /// Deliberately `INSERT ... ON CONFLICT DO UPDATE`, never `INSERT OR
+    /// REPLACE`: `game_metadata_cache` also carries description/hltb/rawg
+    /// columns this task's read-composition switches now depend on, and a
+    /// `REPLACE` would silently null out every column not named here.
+    /// `upsertSeriesMetadata` gets away with `INSERT OR REPLACE` because
+    /// every one of `series_metadata_cache`'s columns is named on every
+    /// call; this function only ever owns the facet + category-id + fetched_at
+    /// slice of a row that may already carry unrelated, already-seeded
+    /// values in its other columns.
+    ///
+    /// `genres` is deliberately not a parameter here — nothing populates it
+    /// until games-v4nqe's creation-path cache-write exists (see this
+    /// task's "What this task deliberately does NOT do").
+    let upsertGameFacets
+        (conn: SqliteConnection)
+        (slug: string)
+        (facets: PlayFacets)
+        (categoryIds: int list)
+        : unit =
+        let categoryIdsJson = categoryIds |> List.map Encode.int |> Encode.list |> Encode.toString 0
+        conn
+        |> Db.newCommand
+            """
+            INSERT INTO game_metadata_cache
+                (game_slug, facet_solo, facet_coop_couch, facet_coop_online, facet_versus_couch, facet_versus_online, facet_remote_play_together, facet_vr, steam_category_ids, fetched_at)
+            VALUES (@game_slug, @facet_solo, @facet_coop_couch, @facet_coop_online, @facet_versus_couch, @facet_versus_online, @facet_remote_play_together, @facet_vr, @steam_category_ids, @fetched_at)
+            ON CONFLICT(game_slug) DO UPDATE SET
+                facet_solo = excluded.facet_solo,
+                facet_coop_couch = excluded.facet_coop_couch,
+                facet_coop_online = excluded.facet_coop_online,
+                facet_versus_couch = excluded.facet_versus_couch,
+                facet_versus_online = excluded.facet_versus_online,
+                facet_remote_play_together = excluded.facet_remote_play_together,
+                facet_vr = excluded.facet_vr,
+                steam_category_ids = excluded.steam_category_ids,
+                fetched_at = excluded.fetched_at
+            """
+        |> Db.setParams [
+            "game_slug", SqlType.String slug
+            "facet_solo", SqlType.Int32 (if facets.Solo then 1 else 0)
+            "facet_coop_couch", SqlType.Int32 (if facets.CoopCouch then 1 else 0)
+            "facet_coop_online", SqlType.Int32 (if facets.CoopOnline then 1 else 0)
+            "facet_versus_couch", SqlType.Int32 (if facets.VersusCouch then 1 else 0)
+            "facet_versus_online", SqlType.Int32 (if facets.VersusOnline then 1 else 0)
+            "facet_remote_play_together", SqlType.Int32 (if facets.RemotePlayTogether then 1 else 0)
+            "facet_vr", SqlType.String (encodeVrSupport facets.Vr)
+            "steam_category_ids", SqlType.String categoryIdsJson
+            "fetched_at", SqlType.String (System.DateTime.UtcNow.ToString("o"))
+        ]
+        |> Db.exec
+
+    /// games-a7dqx: the resumable backfill job's cursor — every game whose
+    /// cache row is still seed-only (`fetched_at IS NULL`, ADR-0045's
+    /// "seeded from the projection, never actually fetched" cohort) and has
+    /// a Steam app id to fetch facets for. The `WHERE` clause IS the resume
+    /// cursor: a row the job successfully processes gets `fetched_at`
+    /// stamped by `upsertGameFacets`, so it drops out of this query on the
+    /// next run — no separate cursor table needed. Games created after this
+    /// task's deploy with no `game_metadata_cache` row at all (the
+    /// creation-path cache-write is games-v4nqe's job) are out of scope for
+    /// this cursor by construction — an `INNER JOIN`, not a `LEFT JOIN`.
+    let findGamesNeedingFacetBackfill (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand
+            """
+            SELECT mc.game_slug, gd.steam_app_id
+            FROM game_metadata_cache mc
+            JOIN game_detail gd ON gd.slug = mc.game_slug
+            WHERE mc.fetched_at IS NULL AND gd.steam_app_id IS NOT NULL
+            """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "game_slug", rd.ReadInt32 "steam_app_id")

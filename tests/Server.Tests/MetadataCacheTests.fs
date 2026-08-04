@@ -4,6 +4,7 @@ open Expecto
 open Microsoft.Data.Sqlite
 open Donald
 open Mediatheca.Server
+open Mediatheca.Shared
 
 /// The metadata cache tier (administration-c3nvp, ADR-0043/ADR-0044):
 /// `MetadataCache.initialize`/`seedFromProjections` stand up
@@ -614,4 +615,124 @@ let tests =
 
             Expect.equal (tableRowCount conn "game_metadata_cache") gameCacheBefore "game_metadata_cache row count unchanged by rebuildProjection"
             Expect.equal (tableRowCount conn "movie_metadata_cache") movieCacheBefore "movie_metadata_cache row count unchanged by rebuildProjection"
+
+        // games-a7dqx (ADR-0053) -------------------------------------------
+
+        testCase "initialize adds the 8 facet/genre/category-id columns to game_metadata_cache, idempotently" <| fun _ ->
+            let conn = createConnection ()
+            MetadataCache.initialize conn
+            let colsBefore = allColumns conn "game_metadata_cache" |> Set.ofList
+            for col in [ "genres"; "facet_solo"; "facet_coop_couch"; "facet_coop_online"
+                         "facet_versus_couch"; "facet_versus_online"; "facet_remote_play_together"
+                         "facet_vr"; "steam_category_ids" ] do
+                Expect.isTrue (Set.contains col colsBefore) (sprintf "game_metadata_cache should have column %s" col)
+
+            MetadataCache.initialize conn // second call must not throw
+            Expect.equal (allColumns conn "game_metadata_cache" |> Set.ofList) colsBefore "Schema unchanged by a second initialize"
+
+        testCase "upsertGameFacets inserts a fresh row when none exists yet" <| fun _ ->
+            let conn = createConnection ()
+            MetadataCache.initialize conn
+            let facets : PlayFacets = {
+                Solo = true; CoopCouch = false; CoopOnline = true; VersusCouch = false
+                VersusOnline = true; RemotePlayTogether = false; Vr = VrSupported
+            }
+            MetadataCache.upsertGameFacets conn "portal-2-2011" facets [ 2; 9; 38; 49; 36; 53 ]
+
+            let row =
+                conn
+                |> Db.newCommand """
+                    SELECT facet_solo, facet_coop_couch, facet_coop_online, facet_versus_couch,
+                           facet_versus_online, facet_remote_play_together, facet_vr, steam_category_ids, fetched_at
+                    FROM game_metadata_cache WHERE game_slug = @slug
+                """
+                |> Db.setParams [ "slug", SqlType.String "portal-2-2011" ]
+                |> Db.querySingle (fun rd ->
+                    rd.ReadInt32 "facet_solo", rd.ReadInt32 "facet_coop_couch", rd.ReadInt32 "facet_coop_online",
+                    rd.ReadInt32 "facet_versus_couch", rd.ReadInt32 "facet_versus_online", rd.ReadInt32 "facet_remote_play_together",
+                    rd.ReadString "facet_vr", rd.ReadString "steam_category_ids", rd.IsDBNull(rd.GetOrdinal("fetched_at")))
+            match row with
+            | Some (solo, coopCouch, coopOnline, versusCouch, versusOnline, remotePlay, vr, categoryIdsJson, fetchedAtIsNull) ->
+                Expect.equal (solo, coopCouch, coopOnline, versusCouch, versusOnline, remotePlay) (1, 0, 1, 0, 1, 0) "Booleans written as 0/1"
+                Expect.equal vr "VrSupported" "Vr written as text"
+                Expect.stringContains categoryIdsJson "53" "steam_category_ids carries the raw fetched ids as JSON"
+                Expect.isFalse fetchedAtIsNull "A genuine fetch stamps fetched_at, unlike the seed step's deliberate NULL"
+            | None -> failtest "expected a row"
+
+        testCase "upsertGameFacets updates only the facet/category-id/fetched_at columns — description/hltb/rawg on an existing row survive untouched" <| fun _ ->
+            let conn = createConnection ()
+            SettingsStore.initialize conn
+            GameProjection.handler.Init conn
+            SeriesProjection.handler.Init conn
+            appendGameAdded conn "braid-2008"
+            Projection.runProjection conn GameProjection.handler
+            MetadataCache.initialize conn
+            MetadataCache.seedFromProjections conn // seeds description/cover_ref/rawg_rating for braid-2008
+
+            let facets : PlayFacets = {
+                Solo = true; CoopCouch = false; CoopOnline = false; VersusCouch = false
+                VersusOnline = false; RemotePlayTogether = false; Vr = NoVr
+            }
+            MetadataCache.upsertGameFacets conn "braid-2008" facets [ 2 ]
+
+            let survived =
+                conn
+                |> Db.newCommand "SELECT description, cover_ref, rawg_rating FROM game_metadata_cache WHERE game_slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String "braid-2008" ]
+                |> Db.querySingle (fun rd ->
+                    rd.ReadString "description", rd.ReadString "cover_ref", rd.ReadDouble "rawg_rating")
+            match survived with
+            | Some (description, coverRef, rawgRating) ->
+                Expect.equal description sampleGameData.Description "description survives an upsertGameFacets call that never mentions it — NOT INSERT OR REPLACE"
+                Expect.equal coverRef (sampleGameData.CoverRef |> Option.get) "cover_ref survives too"
+                Expect.equal rawgRating (sampleGameData.RawgRating |> Option.get) "rawg_rating survives too"
+            | None -> failtest "expected the seeded row to still exist"
+
+        testCase "upsertGameFacets overwrites a previous facet write on a second call (re-derivation after a table fix)" <| fun _ ->
+            let conn = createConnection ()
+            MetadataCache.initialize conn
+            let firstPass : PlayFacets = {
+                Solo = false; CoopCouch = false; CoopOnline = true; VersusCouch = false
+                VersusOnline = false; RemotePlayTogether = false; Vr = NoVr
+            }
+            MetadataCache.upsertGameFacets conn "portal-2-2011" firstPass [ 9; 38 ]
+            let secondPass = { firstPass with Solo = true; Vr = VrOnly }
+            MetadataCache.upsertGameFacets conn "portal-2-2011" secondPass [ 9; 38; 2; 54 ]
+
+            let row =
+                conn
+                |> Db.newCommand "SELECT facet_solo, facet_vr FROM game_metadata_cache WHERE game_slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String "portal-2-2011" ]
+                |> Db.querySingle (fun rd -> rd.ReadInt32 "facet_solo", rd.ReadString "facet_vr")
+            Expect.equal row (Some (1, "VrOnly")) "Second upsert replaces the first pass's facet values"
+
+        testCase "findGamesNeedingFacetBackfill returns only steam-linked, never-fetched games — the resumable cursor" <| fun _ ->
+            let conn = createConnection ()
+            SettingsStore.initialize conn
+            GameProjection.handler.Init conn
+            SeriesProjection.handler.Init conn
+            appendGameAdded conn "braid-2008"
+            appendGameAdded conn "another-game-2010"
+            Projection.runProjection conn GameProjection.handler
+            MetadataCache.initialize conn
+            MetadataCache.seedFromProjections conn
+
+            conn
+            |> Db.newCommand "UPDATE game_detail SET steam_app_id = 12345 WHERE slug = @slug"
+            |> Db.setParams [ "slug", SqlType.String "braid-2008" ]
+            |> Db.exec
+            // another-game-2010 has no steam_app_id at all.
+
+            let candidatesBefore = MetadataCache.findGamesNeedingFacetBackfill conn
+            Expect.equal candidatesBefore [ ("braid-2008", 12345) ] "Only the steam-linked, seed-only (fetched_at NULL) game is a candidate"
+
+            // Once facets are written, fetched_at is stamped and the game
+            // drops out of the cursor on its own.
+            let facets : PlayFacets = {
+                Solo = true; CoopCouch = false; CoopOnline = false; VersusCouch = false
+                VersusOnline = false; RemotePlayTogether = false; Vr = NoVr
+            }
+            MetadataCache.upsertGameFacets conn "braid-2008" facets [ 2 ]
+
+            Expect.isEmpty (MetadataCache.findGamesNeedingFacetBackfill conn) "The processed game no longer appears in the cursor"
     ]

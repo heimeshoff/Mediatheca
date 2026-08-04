@@ -39,6 +39,10 @@ let private bootstrap (conn: SqliteConnection) =
     SettingsStore.initialize conn
     ContentBlockProjection.handler.Init conn
     GameProjection.handler.Init conn
+    // games-a7dqx: GameProjection.getBySlug/getAll now LEFT JOIN
+    // game_metadata_cache — must exist even though this fixture doesn't
+    // seed it, mirroring Composition.buildApp's real startup order.
+    MetadataCache.initialize conn
 
 let private createLegacyPlaySessionTable (conn: SqliteConnection) =
     use cmd = conn.CreateCommand()

@@ -35,8 +35,11 @@
     <Compile Include="SeriesRefreshCacheTests.fs" />
     <Compile Include="SeriesProjectionReadsTests.fs" />
     <Compile Include="GamesTests.fs" />
+    <Compile Include="FacetDerivationTests.fs" />
     <Compile Include="GameJournalTests.fs" />
     <Compile Include="PlaytimeTrackerTests.fs" />
+    <Compile Include="GameFacetProjectionTests.fs" />
+    <Compile Include="GameFacetBackfillTests.fs" />
     <Compile Include="PlaySessionMigrationTests.fs" />
     <Compile Include="AdminPlaySessionMigrationTests.fs" />
     <Compile Include="StartupCutoverTests.fs" />

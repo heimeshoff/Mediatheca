@@ -860,6 +860,45 @@ type GameDetail = {
     ContentBlocks: ContentBlockDto list
 }
 
+/// ADR-0053: three-state VR support. `NoVr` and `VrSupported` are both
+/// distinct from "unknown" — the cache-derived `PlayFacets.Vr` field is
+/// always total (never optional); only `PlayFacetsOverride.Vr` needs the
+/// `option` wrapper, and even there `Some NoVr` is a real, distinct
+/// statement ("Steam says VR-supported, I say no").
+type VrSupport =
+    | NoVr
+    | VrSupported
+    | VrOnly
+
+/// ADR-0053: the cache-derived default — always total, never carried by an
+/// event, written by `game_metadata_cache`'s facet columns (games-a7dqx) and
+/// derived from Steam's numeric category ids. Not yet wired into
+/// `GameListItem`/`GameDetail` (games-v4nqe's job); this task only adds the
+/// type and the pure derivation/merge functions it needs.
+type PlayFacets = {
+    Solo: bool
+    CoopCouch: bool
+    CoopOnline: bool
+    VersusCouch: bool
+    VersusOnline: bool
+    RemotePlayTogether: bool
+    Vr: VrSupport
+}
+
+/// ADR-0053: the aggregate-held, event-sourced correction — one event
+/// (`Game_play_facets_overridden`) carries the whole record. `None` on any
+/// field means "not overridden, defer to the cache"; `Some v` — including
+/// `Some false`/`Some NoVr` — overrules whatever the cache says.
+type PlayFacetsOverride = {
+    Solo: bool option
+    CoopCouch: bool option
+    CoopOnline: bool option
+    VersusCouch: bool option
+    VersusOnline: bool option
+    RemotePlayTogether: bool option
+    Vr: VrSupport option
+}
+
 type AddGameRequest = {
     Name: string
     Year: int
@@ -1353,6 +1392,10 @@ type IMediathecaApi = {
     addGamePlayMode: string -> string -> Async<Result<unit, string>>
     removeGamePlayMode: string -> string -> Async<Result<unit, string>>
     getAllPlayModes: unit -> Async<string list>
+    /// ADR-0053 (games-a7dqx) — dispatches `Override_play_facets`. Purely
+    /// additive: nothing calls this yet, `GameListItem`/`GameDetail`'s
+    /// `PlayModes` field and the three methods above are untouched.
+    overrideGamePlayFacets: string -> PlayFacetsOverride -> Async<Result<unit, string>>
     getGameContentBlocks: string -> Async<ContentBlockDto list>
     addGameContentBlock: string -> AddContentBlockRequest -> Async<Result<string, string>>
     updateGameContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>

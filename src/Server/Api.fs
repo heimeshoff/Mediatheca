@@ -3101,6 +3101,23 @@ module Api =
                 return GameProjection.getAllPlayModes conn
             }
 
+            // games-a7dqx (ADR-0053): purely additive — nothing calls this
+            // yet, `addGamePlayMode`/`removeGamePlayMode`/`getAllPlayModes`
+            // above are untouched.
+            overrideGamePlayFacets = fun slug ovr -> async {
+                use conn = factory ()
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Override_play_facets ovr)
+                        projectionHandlers
+            }
+
             markGameAsOwned = fun slug -> async {
                 use conn = factory ()
                 let sid = Games.streamId slug

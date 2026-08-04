@@ -15,6 +15,11 @@ let private createInMemoryConnection () =
     ContentBlockProjection.handler.Init conn
     GameProjection.handler.Init conn
     PlaySessionProjection.handler.Init conn
+    // games-a7dqx: GameProjection.getBySlug/getAll etc. now LEFT JOIN
+    // game_metadata_cache — it must exist even though these tests don't
+    // exercise its contents, mirroring Composition.buildApp's real startup
+    // order (MetadataCache.initialize before any request is served).
+    MetadataCache.initialize conn
     conn
 
 let private sampleGameData: Games.GameAddedData = {

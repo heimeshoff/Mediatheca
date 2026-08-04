@@ -22,6 +22,7 @@
     <Compile Include="Friends.fs" />
     <Compile Include="Series.fs" />
     <Compile Include="Games.fs" />
+    <Compile Include="FacetDerivation.fs" />
     <Compile Include="Tmdb.fs" />
     <Compile Include="Rawg.fs" />
     <Compile Include="Steam.fs" />
@@ -44,6 +45,7 @@
     <Compile Include="GameProjection.fs" />
     <Compile Include="PlaySessionProjection.fs" />
     <Compile Include="PlaytimeTracker.fs" />
+    <Compile Include="GameFacetBackfill.fs" />
     <Compile Include="SeriesRefresh.fs" />
     <Compile Include="ScheduledJobs.fs" />
     <Compile Include="JellyfinSync.fs" />

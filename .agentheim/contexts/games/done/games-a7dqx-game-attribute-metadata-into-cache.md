@@ -1,15 +1,15 @@
 ---
 id: games-a7dqx
 title: Build the play-facets cache/domain foundation — schema, ADR-0053 override event/command, Steam facet derivation, safe cache-sourced reads for already-seeded fields, and the resumable backfill job (split 1 of 3; games-v4nqe converts emission sites, games-j6wkr rewrites the UI)
-status: doing
+status: done
 type: refactor
 context: games
 created: 2026-08-01
-completed:
+completed: 2026-08-04
 depends_on: [administration-c3nvp, games-w4tzc]
 blocks: [games-v4nqe, games-b8xnw]
 tags: [games, metadata, cache, steam, event-log]
-related_adrs: [0012, 0042, 0043, 0045, 0048, 0050, 0053]
+related_adrs: [0012, 0042, 0043, 0045, 0048, 0050, 0053, 0054]
 related_research: []
 prior_art: [administration-qk3f7]
 ---
@@ -365,3 +365,80 @@ rejected alternatives — the worker implements from it, not from a paraphrase.
 **Relationship to `games-b8xnw`:** unaffected by this split — `games-b8xnw` continues to
 `depends_on: [games-a7dqx, design-system-001]` unchanged, since the resumable backfill
 infrastructure it needs is exactly what this task builds.
+
+## Outcome
+
+Built the play-facets cache/domain foundation exactly as scoped — strictly additive,
+nothing existing renamed, dropped, or stopped being written. `npm run build` and the full
+Expecto suite (615 tests, +47 new) both pass.
+
+- **Domain** (`src/Server/Games.fs`): `Game_play_facets_overridden of PlayFacetsOverride`
+  event, `Override_play_facets` command, `ActiveGame.PlayFacetsOverride` field (defaults to
+  all-`None`), equality-checked no-op `decide` arm, `evolve` arm, full Thoth
+  encode/decode, `handledEventTypes` entry.
+- **Derivation** (`src/Server/FacetDerivation.fs`, new): pure `deriveFacets: int list ->
+  PlayFacets` implementing the id->facet table, live-verified against 13 real Steam
+  `appdetails?l=english` fetches (Cyberpunk 2077, It Takes Two, Portal 2, Left 4 Dead 2,
+  Half-Life: Alyx, Rocket League, Terraria, No Man's Sky, Beat Saber, Elite Dangerous, Left
+  4 Dead, Valheim, Counter-Strike 2) — see ADR-0054 for the full table and the one judgment
+  call the source decision left open (bare "Multi-player" -> `CoopOnline`). Pure `merge:
+  PlayFacets -> PlayFacetsOverride -> PlayFacets`.
+- **Steam.fs**: `decodeCategoryDescription` replaced by `decodeCategory` (decodes both `id`
+  and `description`); `SteamStoreDetails` gains additive `CategoryIds: int list` field,
+  `Categories: string list` untouched (no emission call site broken); `&l=english`
+  appended to all 4 `appdetails` fetch URLs.
+- **Schema**: `game_metadata_cache` gains `genres`, 6 `facet_*` booleans, `facet_vr`,
+  `steam_category_ids` (`MetadataCache.fs`, idempotent `ALTER TABLE`);  `game_detail` gains
+  7 nullable `facet_override_*` columns (`GameProjection.fs`, same idiom). New
+  `MetadataCache.upsertGameFacets` (deliberately `INSERT ... ON CONFLICT DO UPDATE`, never
+  `INSERT OR REPLACE`, so it never clobbers already-seeded description/hltb/rawg columns)
+  and `MetadataCache.findGamesNeedingFacetBackfill` (the resumable cursor).
+- **GameProjection.fs**: new `handleEvent` arm writes the 7 override columns
+  (`Projected`-tier only, never touches the cache tier); new `getPlayFacets` query-time
+  merge helper (joins cache + override columns, applies `FacetDerivation.merge`) — not yet
+  wired into `getAll`/`getBySlug`'s DTO (games-v4nqe's job). Safe read-composition
+  switches: `getBySlug`'s `SteamLastPlayed` now `MAX(date)` over `game_play_session`;
+  `getGamesCompletedPerYear`/`getGamesBeatenThisYear` drop the `COALESCE(...,
+  gd.steam_last_played)` fallback; `getAll`/`getBySlug`/`getRecentlyAddedGames`/
+  `getGamesRecentlyPlayed`/`getBacklogStats`/`getInFocusEstimate`/`getHltbComparisons` now
+  read description/short_description/website_url/hltb_hours* from `game_metadata_cache`,
+  straight nullable, no fallback. `genres` and every play-facet field confirmed untouched
+  (still `game_detail.genres`/`play_modes`), verified by a dedicated test.
+- **Backfill job** (`src/Server/GameFacetBackfill.fs`, new): resumable, throttled
+  (`Async.Sleep 300`), walks `MetadataCache.findGamesNeedingFacetBackfill`, derives facets,
+  writes via `upsertGameFacets` — never touches `game_detail`'s override columns. Wired
+  into `Composition.fs`'s `scheduledJobs` list as "Game play-facets backfill" (default
+  05:00 local, one hour clear of the 04:00 Steam playtime sync), sharing the existing
+  `jobConn`/`jobDbLock` infrastructure.
+- **Shared.fs / API**: `PlayFacets`, `PlayFacetsOverride`, `VrSupport` types; new
+  `overrideGamePlayFacets` API method (`Api.fs`) dispatching `Override_play_facets`.
+  `git diff` on `Shared.fs` is purely additive — `GameListItem`/`GameDetail.PlayModes`,
+  `getAllPlayModes`/`addGamePlayMode`/`removeGamePlayMode` byte-identical.
+- **EventFormatting.fs**: `Game_play_facets_overridden` formatter arm (prior-art
+  administration-qk3f7 pattern), plus a matching `AdministrationTests.fs` "appears in
+  neither list" drift-guard test.
+- **Test fixtures updated** for the new `game_metadata_cache` dependency introduced by the
+  read-composition switch: `PlaytimeTrackerTests.fs` and
+  `AdminPlaySessionMigrationTests.fs`/`AdministrationTests.fs`'s `bootstrapAdmin` now call
+  `MetadataCache.initialize conn`, mirroring `Composition.buildApp`'s real startup order.
+- **Transitional state confirmed**: old play-mode system (`Game_play_mode_added`/`removed`,
+  `game_detail.play_modes`, the picker/badges) completely unaffected; new play-facets
+  system exists in parallel (backfill running, override event/command live) but unread by
+  anything user-facing until games-v4nqe/games-j6wkr land.
+- **ADR-0054** written: the live-verified Steam category-id table and the bare-"Multi-player"
+  judgment call, since ADR-0053 (the architecture decision) didn't pin down the literal ids.
+
+Key files: `src/Server/Games.fs`, `src/Server/FacetDerivation.fs`, `src/Server/Steam.fs`,
+`src/Server/MetadataCache.fs`, `src/Server/GameProjection.fs`,
+`src/Server/GameFacetBackfill.fs`, `src/Server/Composition.fs`, `src/Server/Api.fs`,
+`src/Server/EventFormatting.fs`, `src/Shared/Shared.fs`.
+
+## Verifier note (iteration 1)
+
+REASONS:
+- `.agentheim/knowledge/decisions/0054-steam-category-id-facet-table-live-verified.md:1` — the ADR listed in `ADRS_WRITTEN` has **no YAML frontmatter at all**. Line 1 is prose (`Title: The Steam category-id -> PlayFacets derivation table is fixed from 13 live-verified fixtures ... (scope: games, accepted 2026-08-04)`), so the machine-readable `id`, `title`, `scope`, `status`, `date`, `supersedes`, `superseded_by`, `related_tasks` fields are all absent, and the `# ADR 0054: <title>` heading is missing too. This violates the house ADR template and the format 53 of the 54 ADRs in `.agentheim/knowledge/decisions/` follow — including ADR-0053, the ADR this one extends. Only the pre-existing ADR-0052 shares the deviation; it is not the convention.
+- Minor, same file: the alternatives section is headed `## Rejected alternatives` where the template and every neighbouring ADR use `## Alternatives considered`; `## Consequences` is also un-subsectioned (no Positive / Negative / Neutral).
+
+SUGGESTED_FIX: Add the standard YAML frontmatter block (`id: 0054`, `title:` — the current prose title minus the parenthetical, `scope: games`, `status: accepted`, `date: 2026-08-04`, `supersedes: []`, `superseded_by: []`, `related_tasks: [games-a7dqx]`, `related_research: []`) plus an `# ADR 0054: ...` heading to `.agentheim/knowledge/decisions/0054-steam-category-id-facet-table-live-verified.md`, and rename `## Rejected alternatives` to `## Alternatives considered`. No code, test, or task-file change is needed — the ADR body content itself is substantive and correct.
+
+ITERATION_HINT: likely-fixable

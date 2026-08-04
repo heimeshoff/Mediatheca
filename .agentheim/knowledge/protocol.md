@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 15:48 -- Task verified and completed: games-a7dqx - Build the play-facets cache/domain foundation — schema, ADR-0053 override event/command, Steam facet derivation, safe cache-sourced reads for already-seeded fields, and the resumable backfill job (split 1 of 3; games-v4nqe converts emission sites, games-j6wkr rewrites the UI)
+
+**Type:** Work / Task completion
+**Task:** games-a7dqx - Build the play-facets cache/domain foundation — schema, ADR-0053 override event/command, Steam facet derivation, safe cache-sourced reads for already-seeded fields, and the resumable backfill job (split 1 of 3; games-v4nqe converts emission sites, games-j6wkr rewrites the UI)
+**Summary:** Built the strictly-additive play-facets cache/domain foundation (ADR-0053): the Game_play_facets_overridden/Override_play_facets event/command pair, a live-verified FacetDerivation.deriveFacets/merge module, the game_metadata_cache/game_detail schema extensions, safe cache-sourced reads for already-seeded description/HLTB/steam-last-played fields, and a resumable throttled Steam facet backfill job — old play-mode system, Shared.fs DTOs, and client untouched
+**Duration:** 59m
+**Verification:** PASS (iteration 2)
+**Files changed:** 20
+**Tests added:** 47
+**ADRs written:** 0054
+
+---
+
+## 2026-08-04 15:43 -- Verification failed: games-a7dqx - Build the play-facets cache/domain foundation
+
+**Type:** Work / Verification failure
+**Task:** games-a7dqx - Build the play-facets cache/domain foundation — schema, ADR-0053 override event/command, Steam facet derivation, safe cache-sourced reads for already-seeded fields, and the resumable backfill job (split 1 of 3)
+**Iteration:** 1 of 3
+**Reasons:** ADR-0054 file has no YAML frontmatter (id/title/scope/status/date/related_tasks all absent) and no `# ADR 0054:` heading, violating the house ADR template; minor — `## Rejected alternatives` should be `## Alternatives considered`, `## Consequences` un-subsectioned. Code/tests/scope all passed (615/615 green, build green).
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-08-04 14:57 -- Batch started: [games-a7dqx]
 
 **Type:** Work / Batch start

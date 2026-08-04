@@ -331,6 +331,23 @@ module EventFormatting =
             Some { Timestamp = ts; Label = "Marked as owned"; Details = [] }
         | "Game_ownership_removed" ->
             Some { Timestamp = ts; Label = "Ownership removed"; Details = [] }
+        | "Game_play_facets_overridden" ->
+            // games-a7dqx (ADR-0053): PlayFacetsOverride's six bool-option
+            // fields plus Vr — report only the facets that are actually
+            // overridden (Some), not the whole record shape.
+            let overriddenBool (field: string) : string option =
+                match Decode.fromString (Decode.field field (Decode.option Decode.bool)) data with
+                | Ok (Some v) -> Some (sprintf "%s=%b" field v)
+                | _ -> None
+            let overriddenVr : string option =
+                match Decode.fromString (Decode.field "vr" (Decode.option Decode.string)) data with
+                | Ok (Some v) -> Some (sprintf "vr=%s" v)
+                | _ -> None
+            let details =
+                [ "solo"; "coopCouch"; "coopOnline"; "versusCouch"; "versusOnline"; "remotePlayTogether" ]
+                |> List.choose overriddenBool
+                |> fun bools -> bools @ (overriddenVr |> Option.toList)
+            Some { Timestamp = ts; Label = "Play facets overridden"; Details = details }
         | _ -> None
 
     let formatFriendEvent (storedEvent: EventStore.StoredEvent) : EventHistoryEntry option =

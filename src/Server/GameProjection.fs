@@ -95,6 +95,34 @@ module GameProjection =
             conn |> Db.newCommand "UPDATE game_detail SET status = 'Retired' WHERE status = 'Completed'" |> Db.exec
         with _ -> ()
 
+        // games-a7dqx (ADR-0053): the manual play-facets override — a
+        // `Projected`-tier write (this table stays `Projected`; only
+        // `game_metadata_cache` is `Cache`-classified, ADR-0045). Nullable:
+        // `NULL` on every column means "no override recorded", the same
+        // meaning `PlayFacetsOverride`'s `None` carries on the aggregate
+        // side. `facet_override_vr` stores the `VrSupport` DU as text.
+        try
+            conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN facet_override_solo INTEGER" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN facet_override_coop_couch INTEGER" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN facet_override_coop_online INTEGER" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN facet_override_versus_couch INTEGER" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN facet_override_versus_online INTEGER" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN facet_override_remote_play_together INTEGER" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN facet_override_vr TEXT" |> Db.exec
+        with _ -> ()
+
     let private dropTables (conn: SqliteConnection) : unit =
         conn
         |> Db.newCommand """
@@ -122,6 +150,23 @@ module GameProjection =
         | "OnHold" -> InFocus  // legacy — OnHold removed, upcast to InFocus (games-status-vocabulary-reconcile)
         | "Dismissed" -> Dismissed
         | _ -> Backlog
+
+    // games-a7dqx (ADR-0053): the same VrSupport encode/decode idiom used by
+    // Games.Serialization and MetadataCache — kept as a small private
+    // duplication (mirroring how encodeGameStatus is duplicated across
+    // Games.fs/GameProjection.fs already) rather than a shared dependency,
+    // since none of these three modules currently import from one another.
+    let private encodeVrSupport (vr: VrSupport) =
+        match vr with
+        | NoVr -> "NoVr"
+        | VrSupported -> "VrSupported"
+        | VrOnly -> "VrOnly"
+
+    let private decodeVrSupport (s: string) : VrSupport =
+        match s with
+        | "VrSupported" -> VrSupported
+        | "VrOnly" -> VrOnly
+        | _ -> NoVr
 
     let private updateJsonList (conn: SqliteConnection) (table: string) (column: string) (slug: string) (add: bool) (value: string) : unit =
         let currentJson =
@@ -446,6 +491,46 @@ module GameProjection =
                     |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.exec
 
+                | Games.Game_play_facets_overridden ovr ->
+                    // games-a7dqx (ADR-0053): a `Projected`-tier write — the
+                    // 7 `facet_override_*` columns on `game_detail`, NOT
+                    // `game_metadata_cache` (the cache tier). No
+                    // ProjectionHandler ever writes the cache tier
+                    // (ADR-0045); this arm never references
+                    // `game_metadata_cache` at all.
+                    let boolToSql (v: bool option) =
+                        match v with
+                        | Some true -> SqlType.Int32 1
+                        | Some false -> SqlType.Int32 0
+                        | None -> SqlType.Null
+                    let vrToSql (v: VrSupport option) =
+                        match v with
+                        | Some vr -> SqlType.String (encodeVrSupport vr)
+                        | None -> SqlType.Null
+                    conn
+                    |> Db.newCommand """
+                        UPDATE game_detail SET
+                            facet_override_solo = @solo,
+                            facet_override_coop_couch = @coop_couch,
+                            facet_override_coop_online = @coop_online,
+                            facet_override_versus_couch = @versus_couch,
+                            facet_override_versus_online = @versus_online,
+                            facet_override_remote_play_together = @remote_play_together,
+                            facet_override_vr = @vr
+                        WHERE slug = @slug
+                    """
+                    |> Db.setParams [
+                        "slug", SqlType.String slug
+                        "solo", boolToSql ovr.Solo
+                        "coop_couch", boolToSql ovr.CoopCouch
+                        "coop_online", boolToSql ovr.CoopOnline
+                        "versus_couch", boolToSql ovr.VersusCouch
+                        "versus_online", boolToSql ovr.VersusOnline
+                        "remote_play_together", boolToSql ovr.RemotePlayTogether
+                        "vr", vrToSql ovr.Vr
+                    ]
+                    |> Db.exec
+
     let handler: Projection.ProjectionHandler = {
         Name = "GameProjection"
         Handle = handleEvent
@@ -476,7 +561,12 @@ module GameProjection =
 
     let getAll (conn: SqliteConnection) : GameListItem list =
         conn
-        |> Db.newCommand "SELECT slug, name, year, cover_ref, genres, status, total_play_time, hltb_hours, personal_rating, rawg_rating FROM game_list ORDER BY name"
+        |> Db.newCommand """
+            SELECT gl.slug, gl.name, gl.year, gl.cover_ref, gl.genres, gl.status, gl.total_play_time, mc.hltb_hours, gl.personal_rating, gl.rawg_rating
+            FROM game_list gl
+            LEFT JOIN game_metadata_cache mc ON mc.game_slug = gl.slug
+            ORDER BY gl.name
+        """
         |> Db.query (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
             let genres =
@@ -504,7 +594,20 @@ module GameProjection =
 
     let getBySlug (conn: SqliteConnection) (slug: string) : GameDetail option =
         conn
-        |> Db.newCommand "SELECT slug, name, year, description, short_description, website_url, cover_ref, backdrop_ref, genres, status, rawg_id, rawg_rating, hltb_hours, hltb_main_plus_hours, hltb_completionist_hours, personal_rating, steam_app_id, play_modes, family_owners, recommended_by, want_to_play_with, played_with, total_play_time, prior_play_time, steam_library_date, steam_last_played, is_owned FROM game_detail WHERE slug = @slug"
+        |> Db.newCommand """
+            SELECT
+                gd.slug, gd.name, gd.year,
+                mc.description, mc.short_description, mc.website_url,
+                gd.cover_ref, gd.backdrop_ref, gd.genres, gd.status, gd.rawg_id, gd.rawg_rating,
+                mc.hltb_hours, mc.hltb_main_plus_hours, mc.hltb_completionist_hours,
+                gd.personal_rating, gd.steam_app_id, gd.play_modes, gd.family_owners, gd.recommended_by,
+                gd.want_to_play_with, gd.played_with, gd.total_play_time, gd.prior_play_time,
+                gd.steam_library_date, gd.is_owned,
+                (SELECT MAX(date) FROM game_play_session WHERE game_slug = gd.slug) AS steam_last_played
+            FROM game_detail gd
+            LEFT JOIN game_metadata_cache mc ON mc.game_slug = gd.slug
+            WHERE gd.slug = @slug
+        """
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.querySingle (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
@@ -534,8 +637,12 @@ module GameProjection =
             { GameDetail.Slug = rd.ReadString "slug"
               Name = rd.ReadString "name"
               Year = rd.ReadInt32 "year"
-              Description = rd.ReadString "description"
-              ShortDescription = rd.ReadString "short_description"
+              Description =
+                if rd.IsDBNull(rd.GetOrdinal("description")) then ""
+                else rd.ReadString "description"
+              ShortDescription =
+                if rd.IsDBNull(rd.GetOrdinal("short_description")) then ""
+                else rd.ReadString "short_description"
               WebsiteUrl =
                 if rd.IsDBNull(rd.GetOrdinal("website_url")) then None
                 else Some (rd.ReadString "website_url")
@@ -583,6 +690,66 @@ module GameProjection =
               WantToPlayWith = resolveFriendRefs conn wantToPlayWithSlugs
               PlayedWith = resolveFriendRefs conn playedWithSlugs
               ContentBlocks = ContentBlockProjection.getForMovieDetail conn slug }
+        )
+
+    /// games-a7dqx (ADR-0053): composes the display-ready `PlayFacets` for
+    /// one game by joining `game_metadata_cache`'s facet columns (the
+    /// cache-derived default) with `game_detail`'s `facet_override_*`
+    /// columns (the event-sourced correction) and applying
+    /// `FacetDerivation.merge` — ADR-0048's "join in the query function,
+    /// never the API layer" shape. NOT yet wired into `getAll`/`getBySlug`'s
+    /// DTO assembly (games-v4nqe's job, inseparable from the DTO rename it
+    /// also owns) — exercised directly by this task's own tests instead. A
+    /// missing `game_metadata_cache` row (not yet backfilled, or the game
+    /// was created before that row could ever be seeded) degrades to the
+    /// all-false/`NoVr` cache default, same honest-degradation stance as
+    /// every other cache read this task adds — never a fabricated value.
+    let getPlayFacets (conn: SqliteConnection) (slug: string) : PlayFacets option =
+        conn
+        |> Db.newCommand """
+            SELECT
+                mc.facet_solo, mc.facet_coop_couch, mc.facet_coop_online,
+                mc.facet_versus_couch, mc.facet_versus_online, mc.facet_remote_play_together, mc.facet_vr,
+                gd.facet_override_solo, gd.facet_override_coop_couch, gd.facet_override_coop_online,
+                gd.facet_override_versus_couch, gd.facet_override_versus_online,
+                gd.facet_override_remote_play_together, gd.facet_override_vr
+            FROM game_detail gd
+            LEFT JOIN game_metadata_cache mc ON mc.game_slug = gd.slug
+            WHERE gd.slug = @slug
+        """
+        |> Db.setParams [ "slug", SqlType.String slug ]
+        |> Db.querySingle (fun (rd: IDataReader) ->
+            let readBool (col: string) =
+                if rd.IsDBNull(rd.GetOrdinal(col)) then false
+                else rd.ReadInt32 col <> 0
+            let readOverrideBool (col: string) =
+                if rd.IsDBNull(rd.GetOrdinal(col)) then None
+                else Some (rd.ReadInt32 col <> 0)
+            let cachedVr =
+                if rd.IsDBNull(rd.GetOrdinal("facet_vr")) then NoVr
+                else decodeVrSupport (rd.ReadString "facet_vr")
+            let overrideVr =
+                if rd.IsDBNull(rd.GetOrdinal("facet_override_vr")) then None
+                else Some (decodeVrSupport (rd.ReadString "facet_override_vr"))
+            let cached : PlayFacets = {
+                Solo = readBool "facet_solo"
+                CoopCouch = readBool "facet_coop_couch"
+                CoopOnline = readBool "facet_coop_online"
+                VersusCouch = readBool "facet_versus_couch"
+                VersusOnline = readBool "facet_versus_online"
+                RemotePlayTogether = readBool "facet_remote_play_together"
+                Vr = cachedVr
+            }
+            let ovr : PlayFacetsOverride = {
+                Solo = readOverrideBool "facet_override_solo"
+                CoopCouch = readOverrideBool "facet_override_coop_couch"
+                CoopOnline = readOverrideBool "facet_override_coop_online"
+                VersusCouch = readOverrideBool "facet_override_versus_couch"
+                VersusOnline = readOverrideBool "facet_override_versus_online"
+                RemotePlayTogether = readOverrideBool "facet_override_remote_play_together"
+                Vr = overrideVr
+            }
+            FacetDerivation.merge cached ovr
         )
 
     /// Lightweight status lookup — used by Steam sync to check whether a game already is InFocus
@@ -690,9 +857,10 @@ module GameProjection =
     let getGamesRecentlyPlayed (conn: SqliteConnection) (limit: int) : DashboardGameRecentlyPlayed list =
         conn
         |> Db.newCommand """
-            SELECT ps.game_slug, gl.name, gl.cover_ref, gl.total_play_time, gl.hltb_hours, MAX(ps.date) as last_played
+            SELECT ps.game_slug, gl.name, gl.cover_ref, gl.total_play_time, mc.hltb_hours, MAX(ps.date) as last_played
             FROM game_play_session ps
             JOIN game_list gl ON gl.slug = ps.game_slug
+            LEFT JOIN game_metadata_cache mc ON mc.game_slug = ps.game_slug
             WHERE gl.status != 'Dismissed'
             GROUP BY ps.game_slug
             ORDER BY last_played DESC
@@ -715,10 +883,11 @@ module GameProjection =
     let getRecentlyAddedGames (conn: SqliteConnection) (limit: int) : GameListItem list =
         conn
         |> Db.newCommand """
-            SELECT slug, name, year, cover_ref, genres, status, total_play_time, hltb_hours, personal_rating, rawg_rating
-            FROM game_list
-            WHERE status != 'Dismissed'
-            ORDER BY rowid DESC
+            SELECT gl.slug, gl.name, gl.year, gl.cover_ref, gl.genres, gl.status, gl.total_play_time, mc.hltb_hours, gl.personal_rating, gl.rawg_rating
+            FROM game_list gl
+            LEFT JOIN game_metadata_cache mc ON mc.game_slug = gl.slug
+            WHERE gl.status != 'Dismissed'
+            ORDER BY gl.rowid DESC
             LIMIT @limit
         """
         |> Db.setParams [ "limit", SqlType.Int32 limit ]
@@ -811,8 +980,10 @@ module GameProjection =
         let backlogGames =
             conn
             |> Db.newCommand """
-                SELECT hltb_hours FROM game_list
-                WHERE status IN ('Backlog', 'InFocus')
+                SELECT mc.hltb_hours
+                FROM game_list gl
+                LEFT JOIN game_metadata_cache mc ON mc.game_slug = gl.slug
+                WHERE gl.status IN ('Backlog', 'InFocus')
             """
             |> Db.query (fun (rd: IDataReader) ->
                 if rd.IsDBNull(rd.GetOrdinal("hltb_hours")) then None
@@ -866,10 +1037,11 @@ module GameProjection =
     let getHltbComparisons (conn: SqliteConnection) : Mediatheca.Shared.DashboardHltbComparison list =
         conn
         |> Db.newCommand """
-            SELECT gl.slug, gl.name, gl.cover_ref, gl.total_play_time, gl.hltb_hours
+            SELECT gl.slug, gl.name, gl.cover_ref, gl.total_play_time, mc.hltb_hours
             FROM game_list gl
+            LEFT JOIN game_metadata_cache mc ON mc.game_slug = gl.slug
             WHERE gl.status = 'Retired'
-              AND gl.hltb_hours IS NOT NULL
+              AND mc.hltb_hours IS NOT NULL
               AND gl.total_play_time > 0
             ORDER BY gl.rowid DESC
             LIMIT 10
@@ -887,8 +1059,10 @@ module GameProjection =
         let inFocusGames =
             conn
             |> Db.newCommand """
-                SELECT total_play_time, hltb_hours FROM game_list
-                WHERE status = 'InFocus'
+                SELECT gl.total_play_time, mc.hltb_hours
+                FROM game_list gl
+                LEFT JOIN game_metadata_cache mc ON mc.game_slug = gl.slug
+                WHERE gl.status = 'InFocus'
             """
             |> Db.query (fun (rd: IDataReader) ->
                 let playMinutes = rd.ReadInt32 "total_play_time"
@@ -927,20 +1101,19 @@ module GameProjection =
               MinutesPlayed = rd.ReadInt32 "total_minutes" })
 
     let getGamesCompletedPerYear (conn: SqliteConnection) : (int * int) list =
-        // Approximate completion year using last play session date for completed games
+        // Approximate completion year using last play session date for
+        // completed games. games-a7dqx: the `COALESCE(..., gd.steam_last_played)`
+        // fallback is dropped (ADR-0048's honest-degradation stance,
+        // mirroring series-q8jwc) — a game whose only history is dateless
+        // `Prior_play_time_recorded` genuinely has no last-played date and
+        // is correctly excluded here, rather than papered over with a
+        // frozen, potentially stale `game_detail.steam_last_played` value.
         conn
         |> Db.newCommand """
-            SELECT CAST(strftime('%Y', COALESCE(
-                (SELECT MAX(date) FROM game_play_session WHERE game_slug = gl.slug),
-                gd.steam_last_played
-            )) AS INTEGER) as completion_year, COUNT(*) as count
+            SELECT CAST(strftime('%Y', (SELECT MAX(date) FROM game_play_session WHERE game_slug = gl.slug)) AS INTEGER) as completion_year, COUNT(*) as count
             FROM game_list gl
-            LEFT JOIN game_detail gd ON gd.slug = gl.slug
             WHERE gl.status = 'Retired'
-              AND COALESCE(
-                (SELECT MAX(date) FROM game_play_session WHERE game_slug = gl.slug),
-                gd.steam_last_played
-              ) IS NOT NULL
+              AND (SELECT MAX(date) FROM game_play_session WHERE game_slug = gl.slug) IS NOT NULL
             GROUP BY completion_year
             ORDER BY completion_year
         """
@@ -960,12 +1133,8 @@ module GameProjection =
         |> Db.newCommand """
             SELECT COUNT(*) as cnt
             FROM game_list gl
-            LEFT JOIN game_detail gd ON gd.slug = gl.slug
             WHERE gl.status = 'Retired'
-              AND COALESCE(
-                (SELECT MAX(date) FROM game_play_session WHERE game_slug = gl.slug),
-                gd.steam_last_played
-              ) >= strftime('%Y-01-01', 'now')
+              AND (SELECT MAX(date) FROM game_play_session WHERE game_slug = gl.slug) >= strftime('%Y-01-01', 'now')
         """
         |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
         |> Option.defaultValue 0

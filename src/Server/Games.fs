@@ -42,6 +42,19 @@ module Games =
     [<Literal>]
     let PriorPlayTimeThresholdMinutes = 960
 
+    /// ADR-0053: "not overridden, defer to the cache" on every facet —
+    /// `ActiveGame.PlayFacetsOverride`'s default from `Game_added_to_library`
+    /// onward, and `decide`'s no-op comparison base.
+    let noPlayFacetsOverride : PlayFacetsOverride = {
+        Solo = None
+        CoopCouch = None
+        CoopOnline = None
+        VersusCouch = None
+        VersusOnline = None
+        RemotePlayTogether = None
+        Vr = None
+    }
+
     // Events
 
     type GameEvent =
@@ -86,6 +99,12 @@ module Games =
         | Game_marked_as_owned
         | Game_ownership_removed
         | Game_rawg_id_set of rawgId: int * rawgRating: float option
+        /// ADR-0053 (games-a7dqx): the manual-correction counterpart to the
+        /// cache-derived `PlayFacets` — one event carries the whole
+        /// all-`Option` override record, not seven. Added net-new, alongside
+        /// the still-live `Game_play_mode_added`/`Game_play_mode_removed`
+        /// (untouched by this task).
+        | Game_play_facets_overridden of PlayFacetsOverride
 
     // State
 
@@ -129,6 +148,10 @@ module Games =
         SteamLibraryDate: string option
         SteamLastPlayed: string option
         IsOwnedByMe: bool
+        /// ADR-0053 (games-a7dqx): the manual correction, defer-to-cache by
+        /// default. Added alongside the still-live `PlayModes` above —
+        /// replacing `PlayModes` is games-v4nqe's job, not this task's.
+        PlayFacetsOverride: PlayFacetsOverride
     }
 
     type GameState =
@@ -184,6 +207,9 @@ module Games =
         | Mark_as_owned
         | Remove_ownership
         | Set_rawg_id of rawgId: int * rawgRating: float option
+        /// ADR-0053: sending an all-`None` record is "un-overriding" every
+        /// facet — the same operation as setting one, no separate command.
+        | Override_play_facets of PlayFacetsOverride
 
     // Evolve
 
@@ -228,6 +254,7 @@ module Games =
                 SteamLibraryDate = None
                 SteamLastPlayed = None
                 IsOwnedByMe = false
+                PlayFacetsOverride = noPlayFacetsOverride
             }
         | Active _, Game_removed_from_library -> Removed
         | Active game, Game_categorized genres ->
@@ -312,6 +339,8 @@ module Games =
             Active { game with IsOwnedByMe = false }
         | Active game, Game_rawg_id_set (rawgId, rawgRating) ->
             Active { game with RawgId = Some rawgId; RawgRating = rawgRating }
+        | Active game, Game_play_facets_overridden ovr ->
+            Active { game with PlayFacetsOverride = ovr }
         | _ -> state
 
     let reconstitute (events: GameEvent list) : GameState =
@@ -466,6 +495,14 @@ module Games =
         | Active game, Set_rawg_id (rawgId, rawgRating) ->
             if game.RawgId = Some rawgId && game.RawgRating = rawgRating then Ok []
             else Ok [ Game_rawg_id_set (rawgId, rawgRating) ]
+        | Active game, Override_play_facets ovr ->
+            // Cache-blind by construction (ADR-0053) — no invariant here
+            // ever reads game_metadata_cache, so a redundant-but-harmless
+            // override (one that happens to match the cache) is accepted as
+            // normal, self-correcting state. Only a no-op against the
+            // aggregate's OWN previous override is elided.
+            if game.PlayFacetsOverride = ovr then Ok []
+            else Ok [ Game_play_facets_overridden ovr ]
         | Removed, _ ->
             Error "Game has been removed"
         | Not_created, _ ->
@@ -526,6 +563,40 @@ module Games =
             | "OnHold" -> InFocus  // legacy — OnHold removed, upcast to InFocus (games-status-vocabulary-reconcile)
             | "Dismissed" -> Dismissed
             | _ -> Backlog
+
+        let private encodeVrSupport (vr: VrSupport) =
+            match vr with
+            | NoVr -> "NoVr"
+            | VrSupported -> "VrSupported"
+            | VrOnly -> "VrOnly"
+
+        let private decodeVrSupport (s: string) : VrSupport =
+            match s with
+            | "VrSupported" -> VrSupported
+            | "VrOnly" -> VrOnly
+            | _ -> NoVr
+
+        let private encodePlayFacetsOverride (o: PlayFacetsOverride) =
+            Encode.object [
+                "solo", Encode.option Encode.bool o.Solo
+                "coopCouch", Encode.option Encode.bool o.CoopCouch
+                "coopOnline", Encode.option Encode.bool o.CoopOnline
+                "versusCouch", Encode.option Encode.bool o.VersusCouch
+                "versusOnline", Encode.option Encode.bool o.VersusOnline
+                "remotePlayTogether", Encode.option Encode.bool o.RemotePlayTogether
+                "vr", Encode.option (encodeVrSupport >> Encode.string) o.Vr
+            ]
+
+        let private decodePlayFacetsOverride: Decoder<PlayFacetsOverride> =
+            Decode.object (fun get -> {
+                Solo = get.Optional.Field "solo" Decode.bool
+                CoopCouch = get.Optional.Field "coopCouch" Decode.bool
+                CoopOnline = get.Optional.Field "coopOnline" Decode.bool
+                VersusCouch = get.Optional.Field "versusCouch" Decode.bool
+                VersusOnline = get.Optional.Field "versusOnline" Decode.bool
+                RemotePlayTogether = get.Optional.Field "remotePlayTogether" Decode.bool
+                Vr = get.Optional.Field "vr" Decode.string |> Option.map decodeVrSupport
+            })
 
         let private encodePlaySessionSource (source: PlaySessionSource) =
             match source with
@@ -633,6 +704,8 @@ module Games =
                     "rawgId", Encode.int rawgId
                     "rawgRating", Encode.option Encode.float rawgRating
                 ])
+            | Game_play_facets_overridden ovr ->
+                "Game_play_facets_overridden", Encode.toString 0 (encodePlayFacetsOverride ovr)
 
         let deserialize (eventType: string) (data: string) : GameEvent option =
             match eventType with
@@ -801,6 +874,10 @@ module Games =
                 )) data
                 |> Result.toOption
                 |> Option.map Game_rawg_id_set
+            | "Game_play_facets_overridden" ->
+                Decode.fromString decodePlayFacetsOverride data
+                |> Result.toOption
+                |> Option.map Game_play_facets_overridden
             | _ -> None
 
         /// Hand-maintained mirror of the `deserialize` match-arm strings
@@ -843,6 +920,7 @@ module Games =
             "Game_marked_as_owned"
             "Game_ownership_removed"
             "Game_rawg_id_set"
+            "Game_play_facets_overridden"
         ]
 
         let toEventData (event: GameEvent) : EventStore.EventData =

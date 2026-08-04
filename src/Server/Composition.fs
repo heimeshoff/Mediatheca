@@ -331,6 +331,15 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
         |> Option.defaultValue 4
 
+    // games-a7dqx (ADR-0053): resumable throttled play-facets backfill.
+    // Defaults to 05:00 local, an hour clear of the Steam playtime sync
+    // (04:00) so the two jobs' Steam Store API calls don't pile up on the
+    // same catch-up window.
+    let facetBackfillHour =
+        SettingsStore.getSetting conn "facet_backfill_hour"
+        |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
+        |> Option.defaultValue 5
+
     // administration-tj8n2 (ADR-0028): scheduled jobs get their OWN connection,
     // dedicated and never shared with request threads or `conn` — separate
     // from the request-serving `conn` above. Both jobs (and the job-runs
@@ -376,6 +385,15 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
                         sprintf "%d refreshed, %d errors, %d new episodes, %d status transitions"
                             summary.Refreshed summary.Errors summary.NewEpisodes summary.StatusTransitions
                     return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = text } : ScheduledJobs.JobRunOutcome)
+            } }
+        { Name = "Game play-facets backfill"
+          Hour = facetBackfillHour
+          Run = fun () ->
+            async {
+                let! result = GameFacetBackfill.runBackfill jobConn jobDbLock httpClient
+                let summary = sprintf "%d/%d games fetched, %d errors" result.Succeeded result.Processed result.Errors
+                eprintfn "[GameFacetBackfill] %s" summary
+                return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = summary } : ScheduledJobs.JobRunOutcome)
             } }
     ]
 
