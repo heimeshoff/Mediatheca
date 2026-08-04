@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 13:11 -- Modeling / Promoted: games-a7dqx - Move Game attribute metadata into the cache and stop emitting it — 7668 Game_play_mode_added events are literally Steam Store category tags and make up 43% of the entire event log
+
+**Type:** Modeling / Promote
+**BC:** games
+**From → To:** backlog → todo
+
+---
+
 ## 2026-08-04 13:10 -- Modeling / Refined: games-a7dqx - Move Game attribute metadata into the cache and stop emitting it
 
 **Type:** Modeling / Refine
