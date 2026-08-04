@@ -5,6 +5,22 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 20:46 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 32m (batch start 20:14 → 20:46)
+**Completed:** 2 (first-try PASS: 2, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** games-j6wkr: 1, administration-z6ymt: 1
+**Commits:** 4 (batch start, 2 task squash-merge commits, this entry)
+**Vision-conformance:** none — batch aligns with vision (games-j6wkr closes the games-tab play-mode UI gap in the v1 media experience; administration-z6ymt executes the recognized Operability workstream within its stated boundary — operator tooling, builder-executed live purge per ADR-0056, serving the Replayable principle)
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (2 tasks) — hand-classified (lib/vacuum-guard.mjs not present in this plugin install); both tasks shipped app code/tooling under src/, with ADR/README writes as routine task documentation
+**Carry-over:** left behind (user WIP, 3 files). No `.agentheim/`-owned files stranded; `.worktrees/` fully swept (both worktrees removed clean after PASS integration, node_modules junctions unlinked first).
+
+---
+
 ## 2026-08-04 20:44 -- Task verified and completed: administration-z6ymt - Purge the 11 demoted metadata event types from the event log via the ADR-0038 wipe-first import — offline type-level NDJSON filter plus operator-executed runbook (ADR-0056) — and retire the completed games-h4mrd play-session migration machinery in the same change
 
 **Type:** Work / Task completion
