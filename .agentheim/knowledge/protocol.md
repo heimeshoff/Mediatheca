@@ -34,6 +34,13 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 23:58 -- Modeling / Refined: infrastructure-r8kqt - Retire the one-shot cutover machinery and its backups
+
+**Type:** Modeling / Refine
+**BC:** infrastructure
+**Status after:** backlog
+**Summary:** Backlog refinement pass — goal, scope, and acceptance criteria confirmed current with no changes to the What. Recorded the ADR-0056 execution split (Part C code deletion is worker-executable; Parts A/B production verification and backup deletion plus deploy stay builder-executed runbook steps) and the promotion trigger (builder confirms Part A clean on/after 2026-08-17, then promotes). This completes the refine-all-backlog pass: every backlog task (integration-hebjs, movies-v2gkh, infrastructure-r8kqt) now carries an explicit refinement record; each stays in backlog on a named gate, not for lack of refinement.
+
 ## 2026-08-04 23:52 -- Work session ended
 
 **Type:** Work / Session end

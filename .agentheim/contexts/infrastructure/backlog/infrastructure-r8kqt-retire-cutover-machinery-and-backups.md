@@ -119,6 +119,22 @@ Line numbers are as of commit `344d0f6`; re-locate by name rather than trusting 
 
 ## Notes
 
+**Refined 2026-08-04 (backlog refinement pass):** goal, scope, and acceptance criteria confirmed
+current — no changes needed to the What. Two execution-shape clarifications recorded, following the
+administration-z6ymt precedent and ADR-0056 (live actions are operator-executed, never worker-run):
+
+- **Execution split:** Part C (code deletion: `StartupCutover.fs`, its tests, the three
+  `Composition.fs` call sites, the ADR-0052 retirement note) plus the `npm test`/`npm run build`
+  criteria are **worker-executable** in a normal `/work` run. Parts A and B (production log/drift
+  verification and backup deletion over SSH, plus the dev-machine backup sweep) and the final
+  deploy-and-confirm criterion are **builder-executed runbook steps** — workers never touch the
+  live system. The verifier reports those criteria as "builder runbook pending", not PASS/FAIL.
+- **Promotion trigger:** on or after 2026-08-17, the builder confirms Part A's checks look clean,
+  then promotes. Promoting earlier would let a work session delete code while the backups are
+  still live rollback points — exactly the one-way-ordering hazard the Notes below describe.
+- `plan.md` (named below as a deletion candidate) is currently an **untracked** file in the
+  builder's working tree — its disposition stays with the builder, not this task.
+
 - **Earliest execution date: 2026-08-17.** Executing sooner throws away the rollback window
   the two-week hold exists to provide.
 - **Ordering matters, and it is one-way.** Once the code is deleted, restoring a
