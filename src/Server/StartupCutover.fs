@@ -306,58 +306,34 @@ module StartupCutover =
                         else
                             rebuildSeries ()
 
-    /// Phase 5 (plan.md steps 12–15): pure dry-run preview, integrity gate,
-    /// the migration (which takes its own VACUUM INTO backup first), the
-    /// rebuild-all it requires, and the final all-projections drift check.
+    /// Phase 5 (plan.md steps 12–15) — reduced to a guard, not deleted
+    /// (administration-z6ymt): this phase used to drive
+    /// `Administration.previewPlaySessionMigration`/`runPlaySessionMigration`,
+    /// which administration-z6ymt retired outright (ADR-0052's "a completed
+    /// one-time migration's machinery can be deleted wholesale once it has
+    /// fired in production" precedent — the migration completed 2026-08-02).
+    /// That deletion is a hard compile-time dependency on this call site,
+    /// forcing SOME edit here even though StartupCutover.fs's own retirement
+    /// is explicitly out of administration-z6ymt's scope. `Game_play_time_set`
+    /// can never be emitted again (games-v4nqe demoted its only writer), so
+    /// "no legacy events present" is now an invariant this phase verifies
+    /// rather than a migration it drives — every reachable boot (any fresh
+    /// install, and the already-cutover production store once
+    /// administration-z6ymt's purge lands) satisfies it trivially. The
+    /// `Some _` arm should be unreachable; it fails loudly rather than
+    /// silently no-op-ing, per this task's "no route left wired whose re-run
+    /// would silently no-op" discipline.
     let private playSessionPhase
         (conn: SqliteConnection)
-        (dbPath: string)
-        (handlers: Projection.ProjectionHandler list)
+        (_dbPath: string)
+        (_handlers: Projection.ProjectionHandler list)
         : Result<unit, string> =
-        log "Phase 5 (1/4): play-session migration dry-run preview ..."
-        let preview = Administration.previewPlaySessionMigration conn
-        log "  streams to touch: %d, events to append: %d" preview.StreamsToBeTouched preview.EventsToBeAppended
-        log "  table-covered slugs: %d (%s)" (List.length preview.TableCoveredSlugs) (String.concat ", " preview.TableCoveredSlugs)
-        log "  reconstructed slugs: %d, prior-playtime lumps: %d, cursor reconciliations: %d, negative deltas skipped: %d"
-            (List.length preview.ReconstructedSlugs) preview.PriorPlayTimeLumpCount preview.ReconciliationCount preview.NegativeDeltasSkipped
-        if not (List.isEmpty preview.IntegrityFailures) then
-            preview.IntegrityFailures
-            |> List.map (fun f -> sprintf "%s (table total %d vs last event total %d)" f.Slug f.TableTotal f.LastEventTotal)
-            |> String.concat "; "
-            |> sprintf "integrity gate failed for: %s — migration refused, nothing appended"
-            |> Error
-        else
-            log "Phase 5 (2/4): running the migration (it takes its own VACUUM INTO backup first) ..."
-            SettingsStore.setSetting conn phaseMarkerKey "play-session-migration"
-            match Administration.runPlaySessionMigration conn dbPath with
-            | Administration.MigrationBackupFailed reason ->
-                // Nothing was appended — the marker can be cleared safely.
-                SettingsStore.deleteSetting conn phaseMarkerKey
-                Error (sprintf "migration backup failed: %s" reason)
-            | Administration.MigrationAppendConflict streamId ->
-                // Some streams may already carry their events; the phase
-                // marker deliberately stays set so the next boot rebuilds
-                // everything and the cutover re-runs (per-stream idempotency
-                // skips what already landed).
-                Error (sprintf "concurrency conflict appending to %s — phase marker left set, next boot self-heals" streamId)
-            | Administration.MigrationApplied outcome ->
-                log "  migration applied: %d streams, %d events appended, %d streams already migrated, backup: %s"
-                    outcome.StreamsMigrated outcome.EventsAppended outcome.StreamsSkippedAlreadyMigrated outcome.BackupPath
-                log "Phase 5 (3/4): rebuild-all ..."
-                for handler in handlers do
-                    log "  rebuilding %s ..." handler.Name
-                    Projection.rebuildProjection conn handler
-                SettingsStore.deleteSetting conn phaseMarkerKey
-                log "Phase 5 (4/4): final drift check across all projections ..."
-                let drifts = driftCheck conn handlers
-                let total = logDrift drifts
-                if total = 0 then
-                    log "  final drift check: 0 discrepancies across %d projections" (List.length drifts)
-                    Ok ()
-                else
-                    Error
-                        (sprintf "final drift check reports %d discrepancies — migration and rebuild completed, but the store needs inspection before the cutover is marked done"
-                            total)
+        match EventStore.getSampleEventForType conn "Game_play_time_set" with
+        | None ->
+            log "Phase 5: no legacy Game_play_time_set events present — the play-session migration this phase used to drive was retired (administration-z6ymt); nothing to do"
+            Ok ()
+        | Some _ ->
+            Error "legacy Game_play_time_set events are present, but the play-session migration machinery that reconstructs them was retired (administration-z6ymt) — restore administration-n8kqw's Administration.runPlaySessionMigration before retrying"
 
     /// The whole unattended cutover. Runs exactly once (completion marker);
     /// aborts loudly but non-fatally on any gate failure — the app still

@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 20:44 -- Task verified and completed: administration-z6ymt - Purge the 11 demoted metadata event types from the event log via the ADR-0038 wipe-first import — offline type-level NDJSON filter plus operator-executed runbook (ADR-0056) — and retire the completed games-h4mrd play-session migration machinery in the same change
+
+**Type:** Work / Task completion
+**Task:** administration-z6ymt - Purge the 11 demoted metadata event types from the event log via the ADR-0038 wipe-first import — offline type-level NDJSON filter plus operator-executed runbook (ADR-0056) — and retire the completed games-h4mrd play-session migration machinery in the same change
+**Summary:** Shipped the offline NDJSON purge filter as a Server CLI subcommand (EventLogFilter.fs, deny-listing the 11 demoted Game metadata event types, byte-stable pass-through) with fixture-backed tests, retired the completed games-h4mrd migration machinery, and committed the operator runbook — the live purge stays builder-executed per ADR-0056
+**Duration:** 28m
+**Verification:** PASS (iteration 1)
+**Files changed:** 14
+**Tests added:** 8
+**ADRs written:** 0058
+
+---
+
 ## 2026-08-04 20:33 -- Task verified and completed: games-j6wkr - Rewrite the Games UI for typed play facets — Solo/Co-op/Versus/Couch badges, per-facet Auto/On/Off override controls, and client-side list filters over the landed PlayFacets contract (split 3 of 3, closes the no-play-mode-UI window games-v4nqe opened)
 
 **Type:** Work / Task completion

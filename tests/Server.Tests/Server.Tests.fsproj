@@ -41,9 +41,8 @@
     <Compile Include="PlaytimeTrackerTests.fs" />
     <Compile Include="GameFacetProjectionTests.fs" />
     <Compile Include="GameFacetBackfillTests.fs" />
-    <Compile Include="PlaySessionMigrationTests.fs" />
-    <Compile Include="AdminPlaySessionMigrationTests.fs" />
     <Compile Include="StartupCutoverTests.fs" />
+    <Compile Include="EventLogFilterTests.fs" />
     <Compile Include="JellyfinImportTests.fs" />
     <Compile Include="JellyfinMaterializeTests.fs" />
     <Compile Include="JellyfinStillTests.fs" />

@@ -1,15 +1,15 @@
 ---
 id: administration-z6ymt
 title: Purge the 11 demoted metadata event types from the event log via the ADR-0038 wipe-first import — offline type-level NDJSON filter plus operator-executed runbook (ADR-0056) — and retire the completed games-h4mrd play-session migration machinery in the same change
-status: doing
+status: done
 type: chore
 context: administration
 created: 2026-08-01
-completed:
+completed: 2026-08-04
 depends_on: [games-v4nqe, series-r2xhv, games-h4mrd]
 blocks: []
 tags: [event-log, migration, cleanup, ndjson]
-related_adrs: [0029, 0034, 0038, 0043, 0050, 0052, 0055, 0056]
+related_adrs: [0029, 0034, 0038, 0043, 0050, 0052, 0055, 0056, 0058]
 related_research: []
 prior_art: [administration-n8kqw, administration-vrc56, administration-wwc36]
 ---
@@ -93,26 +93,26 @@ it needs its own task with a decoder-tolerance ordering constraint and its own A
 
 ## Acceptance criteria
 
-- [ ] Filter fixture test: given an NDJSON fixture mixing all 11 purge-eligible types with all
+- [x] Filter fixture test: given an NDJSON fixture mixing all 11 purge-eligible types with all
       excluded types (including deliberately duplicated `Game_steam_app_id_set` /
       `Game_family_owner_added` / `Game_steam_library_date_set` instances), the filter drops 100% of
       purge-eligible lines, retains every other line byte-identical, and `kept + dropped = input`.
-- [ ] Fixture: `Game_categorized` rows are dropped AND a full projection replay before/after shows
+- [x] Fixture: `Game_categorized` rows are dropped AND a full projection replay before/after shows
       `game_list.genres`/`game_detail.genres` unchanged — guards the ADR-0055 boundary.
-- [ ] Fixture: none of the five identity-card types is ever dropped, even when duplicated — guards
+- [x] Fixture: none of the five identity-card types is ever dropped, even when duplicated — guards
       against reintroducing the disproven "duplicate identity events" premise.
-- [ ] Fixture: `Series_refreshed` lines are never dropped — the deferred no-change filter must not
+- [x] Fixture: `Series_refreshed` lines are never dropped — the deferred no-change filter must not
       partially ship.
-- [ ] Fixture: `Play_session_recorded` / `Prior_play_time_recorded` /
+- [x] Fixture: `Play_session_recorded` / `Prior_play_time_recorded` /
       `Steam_observed_total_reconciled` lines are never dropped.
-- [ ] Replay-determinism fixture: a fixture store containing ≥1 instance of each of the 11 types
+- [x] Replay-determinism fixture: a fixture store containing ≥1 instance of each of the 11 types
       interleaved with live events; full projection rebuild before and after filter + re-import
       yields row-identical projections (drift-check-style diff, 0 discrepancies).
-- [ ] h4mrd retirement: the files/routes/guard listed in What §3 are deleted; `git grep
+- [x] h4mrd retirement: the files/routes/guard listed in What §3 are deleted; `git grep
       migrate-play-sessions` and `git grep readCumulativePlayTimeEvents` return nothing; Steam sync
       still dispatches on a post-purge store (the `syncGateOpen` gate stays open — existing test
       adapted, not deleted); `npm test` and `npm run build` pass.
-- [ ] Runbook committed at `docs/runbooks/purge-demoted-metadata-events.md`, steps mapping 1:1 to
+- [x] Runbook committed at `docs/runbooks/purge-demoted-metadata-events.md`, steps mapping 1:1 to
       the Settings UI flow, including the position-gap note (gaps in
       `global_position`/`stream_position` are expected and need no renumbering, per ADR-0038).
 - [ ] Builder runs the drift check and confirms 0 discrepancies BEFORE starting the live purge
@@ -147,3 +147,50 @@ it needs its own task with a decoder-tolerance ordering constraint and its own A
   `StartupCutover.fs`-style boot routine: the dangerous failure is a semantically wrong filter only
   a human comparing preview counts catches, and retry-next-boot is incompatible with backup-restore
   as the recovery path.
+- **Worker note (2026-08-04):** `StartupCutover.fs`'s `playSessionPhase` had a hard compile-time
+  dependency on `Administration.previewPlaySessionMigration`/`runPlaySessionMigration` this task's
+  "StartupCutover.fs is NOT in your scope" note hadn't anticipated. Resolved by reducing that one
+  phase to a guard (verifies `Game_play_time_set` can no longer occur, since `games-v4nqe` demoted
+  its only writer) rather than deleting it — the narrowest edit that keeps the build green without
+  doing a full `StartupCutover.fs` retirement, which stays out of scope. See ADR-0058.
+- **[human-eye] steps remain for the builder**, per ADR-0056/the Rules block: run the drift check for
+  a clean baseline, execute export → filter → wipe-import (verifying the confirm modal's line counts
+  against the export/filter output before confirming) → Rebuild-all → a second drift check, and
+  record the actual before/after event counts here, replacing the stale pre-`games-v4nqe` estimate in
+  the Why section above. See `docs/runbooks/purge-demoted-metadata-events.md` for the full procedure.
+
+## Outcome
+
+Worker-side deliverables shipped; the live purge itself is the builder's post-merge step (ADR-0056).
+
+- **Offline filter**: `src/Server/EventLogFilter.fs` — `EventLogFilter.filterNdjson` (pure,
+  `TextReader`/`TextWriter`, no `SqliteConnection`) plus `EventLogFilter.purgeEligibleEventTypes` (the
+  11-type deny-list) and `EventLogFilter.runCli`. Invoked via `dotnet run --project src/Server --
+  filter-demoted-events <in> <out>`, dispatched from a new branch at the top of `Program.fs`'s `main`
+  before the Giraffe host starts — verified end-to-end against a hand-built sample file.
+- **Fixtures/tests**: `tests/Server.Tests/EventLogFilterTests.fs` — 8 tests covering the full-mix
+  drop/retain/byte-identity criterion, the identity-card/`Series_refreshed`/h4mrd never-dropped
+  criteria, blank/unparseable-line handling, the `Game_categorized`-genres-unchanged fixture (ADR-0055
+  boundary), and the replay-determinism fixture (`GameProjection.getAll`/`getBySlug` row-identical
+  before vs. after a real export → filter → import → Rebuild-all round trip, 0 discrepancies).
+- **h4mrd retirement**: deleted `src/Server/PlaySessionMigration.fs`,
+  `tests/Server.Tests/PlaySessionMigrationTests.fs`,
+  `tests/Server.Tests/AdminPlaySessionMigrationTests.fs`; removed both
+  `/api/stream/migrate-play-sessions*` routes from `Composition.fs`; removed
+  `AdminGuards.PlaySessionMigrationInProgress` and every mutual-exclusion arm referencing it in
+  `Administration.fs` (`decideAndClaimWipeImportGuard`, `decideAndClaimRebuildGuard`, both SSE
+  handlers' match arms); removed `previewPlaySessionMigration`/`runPlaySessionMigration`/
+  `computeMigrationPlanAndApplicability`/`readCumulativePlayTimeEvents` and the whole play-session
+  migration section. `PlaytimeTracker.syncGateOpen`/`migrationCompletedSettingKey` were left as-is
+  (already correct post-purge: `hasLegacyPlayTimeEvents` becomes permanently false, so the gate opens
+  unconditionally) — `PlaytimeTrackerTests.fs`'s existing pure `syncGateOpen` tests cover this and were
+  neither deleted nor needed adapting. `StartupCutover.fs`'s `playSessionPhase` was reduced to a guard
+  (see the Worker note above and ADR-0058) since it had a direct compile dependency on the deleted
+  functions.
+- **Runbook**: `docs/runbooks/purge-demoted-metadata-events.md`, steps mapping 1:1 to the Settings UI
+  Backup section, including the position-gap note.
+- **ADRs**: `0058-offline-filter-cli-and-startup-cutover-forced-edit.md`.
+- **BC README**: updated with a new bullet on the offline filter, the h4mrd retirement, and the
+  `StartupCutover.fs` forced edit.
+- **Tests**: 609/609 passing (`npm test`); `npm run build` passes (Fable compile gate, client
+  untouched by this task as expected).
