@@ -869,6 +869,20 @@ module PlayFacetsOverride =
     let withRemotePlayTogether (v: bool option) (o: PlayFacetsOverride) = { o with RemotePlayTogether = v }
     let withVr (v: VrSupport option) (o: PlayFacetsOverride) = { o with Vr = v }
 
+/// games-b8xnw: Steam's own Deck-compatibility verdict — cache-tier only
+/// (`game_metadata_cache.deck_compat`, ADR-0045), no event, no override
+/// (ADR-0043: a third party's re-fetchable description of the work, exactly
+/// like `PlayFacets`, not an observation of Marco's own engagement). `Unknown`
+/// covers both "Steam has never tested this title" and "never fetched yet" —
+/// a caller cannot distinguish those two cases from this DU alone, which is
+/// the correct honest-degradation stance (ADR-0048): neither case has
+/// anything more specific to say.
+type DeckCompatibility =
+    | Verified
+    | Playable
+    | Unsupported
+    | Unknown
+
 type GameListItem = {
     Slug: string
     Name: string
@@ -885,6 +899,8 @@ type GameListItem = {
     /// comment; `GameDetail` additionally carries the raw
     /// `PlayFacetsOverride` for editing.
     PlayFacets: PlayFacets
+    /// games-b8xnw: Steam's Deck-compatibility verdict, cache-derived only.
+    DeckCompat: DeckCompatibility
 }
 
 type GameDetail = {
@@ -921,6 +937,9 @@ type GameDetail = {
     /// currently-cache-derived field as a permanent manual override).
     PlayFacets: PlayFacets
     PlayFacetsOverride: PlayFacetsOverride
+    /// games-b8xnw: Steam's Deck-compatibility verdict, cache-derived only —
+    /// no override counterpart (see `DeckCompatibility`'s own doc comment).
+    DeckCompat: DeckCompatibility
     IsOwnedByMe: bool
     FamilyOwners: FriendRef list
     RecommendedBy: FriendRef list

@@ -936,10 +936,15 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                     ]
                                                 ]
                                                 // Play facet badges (games-j6wkr, ADR-0053) — up to 4,
-                                                // from the already-merged GameDetail.PlayFacets.
+                                                // from the already-merged GameDetail.PlayFacets — plus the
+                                                // Steam Deck compatibility badge (games-b8xnw), cache-only,
+                                                // no override.
                                                 Html.div [
-                                                    prop.className "mb-3"
-                                                    prop.children [ PlayFacetsDisplay.badgeRow game.PlayFacets ]
+                                                    prop.className "mb-3 flex flex-wrap gap-1 items-center"
+                                                    prop.children [
+                                                        PlayFacetsDisplay.badgeRow game.PlayFacets
+                                                        PlayFacetsDisplay.deckCompatBadge game.DeckCompat
+                                                    ]
                                                 ]
                                                 // Title
                                                 Html.h1 [

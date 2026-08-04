@@ -346,6 +346,15 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
         |> Option.defaultValue 5
 
+    // games-b8xnw (ADR-0043/ADR-0045): resumable throttled Deck-compat
+    // backfill, reusing games-a7dqx's job shape (its own `depends_on`
+    // reason). Defaults to 06:00 local, an hour clear of the play-facets
+    // backfill (05:00) so the two jobs' Steam Store fetches don't pile up.
+    let deckCompatBackfillHour =
+        SettingsStore.getSetting conn "deck_compat_backfill_hour"
+        |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
+        |> Option.defaultValue 6
+
     // administration-tj8n2 (ADR-0028): scheduled jobs get their OWN connection,
     // dedicated and never shared with request threads or `conn` — separate
     // from the request-serving `conn` above. Both jobs (and the job-runs
@@ -399,6 +408,15 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
                 let! result = GameFacetBackfill.runBackfill jobConn jobDbLock httpClient
                 let summary = sprintf "%d/%d games fetched, %d errors" result.Succeeded result.Processed result.Errors
                 eprintfn "[GameFacetBackfill] %s" summary
+                return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = summary } : ScheduledJobs.JobRunOutcome)
+            } }
+        { Name = "Game Deck-compat backfill"
+          Hour = deckCompatBackfillHour
+          Run = fun () ->
+            async {
+                let! result = GameDeckCompatBackfill.runBackfill jobConn jobDbLock httpClient
+                let summary = sprintf "%d/%d games fetched, %d errors" result.Succeeded result.Processed result.Errors
+                eprintfn "[GameDeckCompatBackfill] %s" summary
                 return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = summary } : ScheduledJobs.JobRunOutcome)
             } }
     ]

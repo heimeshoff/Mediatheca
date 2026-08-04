@@ -849,6 +849,99 @@ module Steam =
                 with _ -> return None
         }
 
+    // ── Steam Deck compatibility (games-b8xnw) ──
+    //
+    // The unofficial `ajaxgetdeckappcompatibilityreport` endpoint the task
+    // originally named is DEAD — verified live 2026-08-04: every request
+    // (GET, POST, with/without a session cookie jar obtained by visiting the
+    // app page first, with/without a browser User-Agent) returns a bare
+    // `302 Moved Temporarily` to the storefront root, never a JSON body.
+    // Valve has evidently retired it in favor of embedding the verdict
+    // directly in each store app page's HTML, in a
+    // `data-hardwarecompatibility="{...}"` attribute (HTML-entity-encoded
+    // JSON) — confirmed by fetching `https://store.steampowered.com/app/<id>/`
+    // for Hades (1145360), Valheim (892970), Elden Ring (1245620), Beat
+    // Saber (620980), Elite Dangerous (359320), and Counter-Strike 2 (730),
+    // and finding the attribute present on every one. Mature-rated titles
+    // (Elden Ring) 302 to `/agecheck/app/<id>/` instead of the real page
+    // unless the request also carries Steam's age-gate cookies (see
+    // `deckCompatAgeGateCookie` below) — harmless to send unconditionally,
+    // verified against non-Mature titles too.
+    //
+    // The attribute's `resolved_category` field is the classic per-Deck
+    // verdict (0 Unknown / 1 Unsupported / 2 Playable / 3 Verified),
+    // live-verified against all six titles above: Hades/Valheim/Elden Ring
+    // = 3 (Verified, matching their well-known real-world status), Elite
+    // Dangerous/Counter-Strike 2 = 2 (Playable), Beat Saber = 1 (Unsupported
+    // — correct, a VR-only title has no Deck-native input path). The same
+    // attribute also carries `steamos_resolved_category`/
+    // `machine_resolved_category`/`frame_resolved_category` — distinct
+    // verdicts for Valve's newer SteamOS-general/Steam Machine/Steam Frame
+    // hardware, unrelated to this task's Deck-specific scope and
+    // deliberately not read here.
+
+    /// Age-gate bypass — a Mature-rated title's store page 302s to
+    /// `/agecheck/app/<id>/` (no `data-hardwarecompatibility` attribute at
+    /// all) without these three cookies.
+    let private deckCompatAgeGateCookie =
+        "birthtime=157766400; lastagecheckage=1-January-1975; wants_mature_content=1"
+
+    let private hardwareCompatibilityAttr =
+        System.Text.RegularExpressions.Regex(
+            "data-hardwarecompatibility=\"([^\"]*)\"",
+            System.Text.RegularExpressions.RegexOptions.Compiled)
+
+    type private HardwareCompatibility = { ResolvedCategory: int }
+
+    let private decodeHardwareCompatibility: Decoder<HardwareCompatibility> =
+        Decode.object (fun get -> {
+            ResolvedCategory = get.Required.Field "resolved_category" Decode.int
+        })
+
+    /// Pure: extracts and decodes the `data-hardwarecompatibility` attribute
+    /// from an already-fetched store app-page HTML document. No I/O — the
+    /// live fetch lives in `getDeckCompatibility` below; this half is what
+    /// unit tests exercise against captured HTML fixtures.
+    let decodeDeckCompatFromHtml (html: string) : Result<int, string> =
+        let m = hardwareCompatibilityAttr.Match(html)
+        if not m.Success then
+            Error "No data-hardwarecompatibility attribute found in the store page HTML"
+        else
+            let json = System.Net.WebUtility.HtmlDecode(m.Groups.[1].Value)
+            match Decode.fromString decodeHardwareCompatibility json with
+            | Ok result -> Ok result.ResolvedCategory
+            | Error e -> Error (sprintf "Failed to parse data-hardwarecompatibility JSON: %s" e)
+
+    /// Pure: maps Steam's `resolved_category` int (live-verified above) to
+    /// the domain DU. Any value outside 0..3 (a future Valve addition, or an
+    /// unanticipated response shape) degrades to `Unknown` rather than
+    /// fabricating a guess (ADR-0048's honest-degradation stance).
+    let mapDeckCompatCategory (category: int) : Mediatheca.Shared.DeckCompatibility =
+        match category with
+        | 1 -> Mediatheca.Shared.Unsupported
+        | 2 -> Mediatheca.Shared.Playable
+        | 3 -> Mediatheca.Shared.Verified
+        | _ -> Mediatheca.Shared.Unknown
+
+    /// Fetches `appId`'s Steam Deck compatibility verdict from its store app
+    /// page (the `ajaxgetdeckappcompatibilityreport` endpoint this task
+    /// originally targeted is dead — see the module doc comment above).
+    let getDeckCompatibility (httpClient: HttpClient) (appId: int) : Async<Result<Mediatheca.Shared.DeckCompatibility, string>> =
+        async {
+            try
+                let url = sprintf "https://store.steampowered.com/app/%d/?l=english" appId
+                use request = new HttpRequestMessage(HttpMethod.Get, url)
+                request.Headers.Add("Cookie", deckCompatAgeGateCookie)
+                let! response = httpClient.SendAsync(request) |> Async.AwaitTask
+                response.EnsureSuccessStatusCode() |> ignore
+                let! html = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+                match decodeDeckCompatFromHtml html with
+                | Ok category -> return Ok (mapDeckCompatCategory category)
+                | Error e -> return Error e
+            with ex ->
+                return Error (sprintf "Failed to get Deck compatibility for appId %d: %s" appId ex.Message)
+        }
+
     /// Searches Steam for candidates matching `query` (optionally boosted by
     /// `year`). Returns up to 5 candidates scored 0.0 .. 1.0. Callers interpret
     /// scores:

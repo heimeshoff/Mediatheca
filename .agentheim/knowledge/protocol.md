@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 23:51 -- Task verified and completed: games-b8xnw - Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge
+
+**Type:** Work / Task completion
+**Task:** games-b8xnw - Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge
+**Summary:** Steam Deck compatibility (Verified/Playable/Unsupported/Unknown) shipped as a cache-only facet with its own resumable throttled backfill and a badge beside the play-facet badges — the named ajaxgetdeckappcompatibilityreport endpoint proved retired, replaced by scraping the store page data-hardwarecompatibility attribute (ADR-0059); iteration 2 restored ADR-0045 by-construction invariant via a private GameProjection reader
+**Duration:** 40m
+**Verification:** PASS (iteration 2)
+**Files changed:** 16
+**Tests added:** 20
+**ADRs written:** 0059
+
+---
+
 ## 2026-08-04 23:18 -- Batch started: [games-b8xnw]
 
 **Type:** Work / Batch start
@@ -18,6 +31,17 @@ Newest entries on top.
 **Type:** Modeling / Promote
 **BC:** games
 **From → To:** backlog → todo
+
+---
+
+## 2026-08-04 23:45 -- Verification failed: games-b8xnw - Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge
+
+**Type:** Work / Verification failure
+**Task:** games-b8xnw - Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge
+**Iteration:** 1 of 3
+**Reasons:** GameProjection.fs calls MetadataCache.readDeckCompat at three sites — the first code reference to MetadataCache from any *Projection.fs, breaking ADR-0045's by-construction zero-grep property (prior cutovers kept such readers as private GameProjection helpers); secondary: backfill throttle for the new store-page source inherited unmeasured from GameFacetBackfill with no recorded rate-limit observation
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
 
 ---
 

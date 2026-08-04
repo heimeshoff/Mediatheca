@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 7
+- **Doing:** 0
+- **Done:** 8
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **games-b8xnw** — Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge (feature) — `doing/games-b8xnw-steam-deck-compat-readiness.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **games-b8xnw** — Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge (feature) — `done/games-b8xnw-steam-deck-compat-readiness.md`
 - **games-j6wkr** — Rewrite the Games UI for typed play facets — Solo/Co-op/Versus/Couch badges, per-facet Auto/On/Off override controls, and client-side list filters over the landed PlayFacets contract (split 3 of 3, closes the no-play-mode-UI window games-v4nqe opened) (refactor) — `done/games-j6wkr-play-facets-ui-rewrite.md`
 - **games-v4nqe** — Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3 — stops the 7668-event play-mode bloat games-a7dqx's schema made possible) (refactor) — `done/games-v4nqe-emission-cutover-column-drop.md`
 - **games-a7dqx** — Build the play-facets cache/domain foundation — schema, ADR-0053 override event/command, Steam facet derivation, safe cache-sourced reads for already-seeded fields, and the resumable backfill job (split 1 of 3; games-v4nqe converts emission sites, games-j6wkr rewrites the UI) (refactor) — `done/games-a7dqx-game-attribute-metadata-into-cache.md`
@@ -44,6 +44,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0059** -- The unofficial `ajaxgetdeckappcompatibilityreport` endpoint is dead (bare 302 for every request shape); Steam Deck compatibility is scraped from the store app page's embedded `data-hardwarecompatibility` attribute, live-verified against six titles -- 2026-08-04 -- `../../knowledge/decisions/0059-steam-deck-compat-endpoint-retired-html-scrape-replacement.md`
 - **0057** -- Play facets UI: the 4-badge row is Solo/Co-op/Versus + a Couch summary badge with online/couch sub-labels; the ADR-0053 override trap is guarded by pure `Shared` record-update functions (`withSolo` et al.), Expecto-tested in place of absent client-test infra -- 2026-08-04 -- `../../knowledge/decisions/0057-play-facets-ui-badge-mapping-and-override-trap-guard.md`
 - **0055** -- Game genres stays an event-carried identity-card projection column (amends ADR-0043's Game row back into compliance); games-v4nqe's genres cache-cutover is reverted — `game_metadata_cache.genres` is kept but permanently unused -- 2026-08-04 -- `../../knowledge/decisions/0055-game-genres-stays-event-carried-identity-card.md`
 - **0054** -- The Steam category-id → PlayFacets derivation table is fixed from 13 live-verified appId fixtures (ids decoded with `&l=english`); bare umbrella ids resolve to the online facet -- 2026-08-04 -- `../../knowledge/decisions/0054-steam-category-id-facet-table-live-verified.md`

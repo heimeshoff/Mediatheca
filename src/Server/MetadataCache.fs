@@ -268,6 +268,24 @@ module MetadataCache =
             conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN steam_category_ids TEXT" |> Db.exec
         with _ -> () // Column already exists
 
+        // games-b8xnw: Steam's own Deck-compatibility verdict — cache-tier
+        // only (ADR-0043/ADR-0045), no event, no override. `deck_compat`
+        // stores the encoded `DeckCompatibility` DU ("Verified"/"Playable"/
+        // "Unsupported"/"Unknown"); NULL means "never fetched yet" (the seed/
+        // fresh-row default). `deck_compat_fetched_at` is its OWN resume
+        // cursor, deliberately separate from the play-facets `fetched_at`
+        // column above: the two backfills run on independent schedules
+        // against a different endpoint each, and sharing one `fetched_at`
+        // column would let one job's stamp silently drop the other game off
+        // its own cursor (a game whose facets were fetched would never be a
+        // Deck-compat candidate, and vice versa).
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN deck_compat TEXT" |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN deck_compat_fetched_at TEXT" |> Db.exec
+        with _ -> () // Column already exists
+
         // `fetched_at` on the renamed tables themselves — they predate this
         // cache tier and never had this column. Same `ALTER TABLE ... ADD
         // COLUMN` idiom as `SeriesProjection.createTables`'s migrations.
@@ -613,6 +631,63 @@ module MetadataCache =
             "hltb_completionist_hours", (match completionistHours with Some h -> SqlType.Double h | None -> SqlType.Null)
         ]
         |> Db.exec
+
+    let private encodeDeckCompat (compat: DeckCompatibility) =
+        match compat with
+        | Verified -> "Verified"
+        | Playable -> "Playable"
+        | Unsupported -> "Unsupported"
+        | Unknown -> "Unknown"
+
+    /// games-b8xnw: the ongoing write path for `game_metadata_cache.deck_compat`
+    /// — the resumable Deck-compat backfill job's only writer, stamping its
+    /// OWN `deck_compat_fetched_at` cursor column (never the play-facets
+    /// `fetched_at` column — see `initialize`'s doc comment for why they must
+    /// stay separate). Same `INSERT ... ON CONFLICT DO UPDATE` slice
+    /// discipline as `upsertGameFacets`/`upsertGameIdentityCard`: only these
+    /// two columns are named, so an existing row's facet/identity-card/hltb
+    /// columns are never touched.
+    let upsertGameDeckCompat (conn: SqliteConnection) (slug: string) (compat: DeckCompatibility) : unit =
+        conn
+        |> Db.newCommand
+            """
+            INSERT INTO game_metadata_cache (game_slug, deck_compat, deck_compat_fetched_at)
+            VALUES (@game_slug, @deck_compat, @deck_compat_fetched_at)
+            ON CONFLICT(game_slug) DO UPDATE SET
+                deck_compat = excluded.deck_compat,
+                deck_compat_fetched_at = excluded.deck_compat_fetched_at
+            """
+        |> Db.setParams [
+            "game_slug", SqlType.String slug
+            "deck_compat", SqlType.String (encodeDeckCompat compat)
+            "deck_compat_fetched_at", SqlType.String (System.DateTime.UtcNow.ToString("o"))
+        ]
+        |> Db.exec
+
+    /// games-b8xnw (verifier iteration 1 fix): the cache-tier read of
+    /// `deck_compat` was dropped from here — `GameProjection.fs` now keeps
+    /// its own private `readDeckCompat`/`decodeDeckCompat` duplicate (same
+    /// precedent as `decodeVrSupport`) rather than calling into this module,
+    /// so `*Projection.fs` files never reference `MetadataCache` in code
+    /// (ADR-0045's by-construction invariant). The now-unused decode half
+    /// was removed from here; only `encodeDeckCompat` remains, for
+    /// `upsertGameDeckCompat`'s write path.
+
+    /// games-b8xnw: the resumable Deck-compat backfill job's cursor — same
+    /// shape as `findGamesNeedingFacetBackfill`, but walking its own
+    /// `deck_compat_fetched_at IS NULL` column so the two backfills' resume
+    /// cursors never interfere with each other.
+    let findGamesNeedingDeckCompatBackfill (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand
+            """
+            SELECT mc.game_slug, gd.steam_app_id
+            FROM game_metadata_cache mc
+            JOIN game_detail gd ON gd.slug = mc.game_slug
+            WHERE mc.deck_compat_fetched_at IS NULL AND gd.steam_app_id IS NOT NULL
+            """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "game_slug", rd.ReadInt32 "steam_app_id")
 
     /// games-a7dqx: the resumable backfill job's cursor — every game whose
     /// cache row is still seed-only (`fetched_at IS NULL`, ADR-0045's

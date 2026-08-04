@@ -41,6 +41,9 @@
     <Compile Include="PlaytimeTrackerTests.fs" />
     <Compile Include="GameFacetProjectionTests.fs" />
     <Compile Include="GameFacetBackfillTests.fs" />
+    <Compile Include="SteamDeckCompatTests.fs" />
+    <Compile Include="GameDeckCompatBackfillTests.fs" />
+    <Compile Include="GameDeckCompatProjectionTests.fs" />
     <Compile Include="StartupCutoverTests.fs" />
     <Compile Include="EventLogFilterTests.fs" />
     <Compile Include="JellyfinImportTests.fs" />

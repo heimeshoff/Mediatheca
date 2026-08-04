@@ -564,6 +564,26 @@ module GameProjection =
             Vr = if rd.IsDBNull(rd.GetOrdinal("facet_vr")) then NoVr else decodeVrSupport (rd.ReadString "facet_vr")
         }
 
+    /// games-b8xnw (verifier iteration 1 fix): local decode for the
+    /// cache-tier `deck_compat` column, deliberately duplicated from the
+    /// cache module's own private decode/read pair rather than called
+    /// through the module boundary — same precedent as `decodeVrSupport`
+    /// above (also duplicated locally rather than shared). ADR-0045's
+    /// by-construction invariant is that no `*Projection.fs` file
+    /// references the cache module in code at all; a public helper used
+    /// from nowhere else would violate that for no gain, so it stays
+    /// local here instead.
+    let private decodeDeckCompat (s: string) : DeckCompatibility =
+        match s with
+        | "Verified" -> Verified
+        | "Playable" -> Playable
+        | "Unsupported" -> Unsupported
+        | _ -> Unknown
+
+    let private readDeckCompat (rd: IDataReader) : DeckCompatibility =
+        if rd.IsDBNull(rd.GetOrdinal("deck_compat")) then Unknown
+        else decodeDeckCompat (rd.ReadString "deck_compat")
+
     let private readPlayFacetsOverrideRow (rd: IDataReader) : PlayFacetsOverride =
         let readOverrideBool (col: string) =
             if rd.IsDBNull(rd.GetOrdinal(col)) then None else Some (rd.ReadInt32 col <> 0)
@@ -586,7 +606,8 @@ module GameProjection =
                    mc.facet_solo, mc.facet_coop_couch, mc.facet_coop_online, mc.facet_versus_couch, mc.facet_versus_online, mc.facet_remote_play_together, mc.facet_vr,
                    gd.facet_override_solo, gd.facet_override_coop_couch, gd.facet_override_coop_online,
                    gd.facet_override_versus_couch, gd.facet_override_versus_online,
-                   gd.facet_override_remote_play_together, gd.facet_override_vr
+                   gd.facet_override_remote_play_together, gd.facet_override_vr,
+                   mc.deck_compat
             FROM game_list gl
             LEFT JOIN game_metadata_cache mc ON mc.game_slug = gl.slug
             LEFT JOIN game_detail gd ON gd.slug = gl.slug
@@ -614,7 +635,8 @@ module GameProjection =
               PlayFacets = FacetDerivation.merge (readCachedPlayFacets rd) (readPlayFacetsOverrideRow rd)
               RawgRating =
                 if rd.IsDBNull(rd.GetOrdinal("rawg_rating")) then None
-                else Some (rd.ReadDouble "rawg_rating") }
+                else Some (rd.ReadDouble "rawg_rating")
+              DeckCompat = readDeckCompat rd }
         )
 
     let getBySlug (conn: SqliteConnection) (slug: string) : GameDetail option =
@@ -633,7 +655,8 @@ module GameProjection =
                 mc.facet_versus_couch, mc.facet_versus_online, mc.facet_remote_play_together, mc.facet_vr,
                 gd.facet_override_solo, gd.facet_override_coop_couch, gd.facet_override_coop_online,
                 gd.facet_override_versus_couch, gd.facet_override_versus_online,
-                gd.facet_override_remote_play_together, gd.facet_override_vr
+                gd.facet_override_remote_play_together, gd.facet_override_vr,
+                mc.deck_compat
             FROM game_detail gd
             LEFT JOIN game_metadata_cache mc ON mc.game_slug = gd.slug
             WHERE gd.slug = @slug
@@ -711,6 +734,7 @@ module GameProjection =
               PriorPlayTimeMinutes = rd.ReadInt32 "prior_play_time"
               PlayFacets = FacetDerivation.merge (readCachedPlayFacets rd) overrideRecord
               PlayFacetsOverride = overrideRecord
+              DeckCompat = readDeckCompat rd
               IsOwnedByMe = rd.ReadInt32 "is_owned" <> 0
               FamilyOwners = resolveFriendRefs conn familyOwnerSlugs
               RecommendedBy = resolveFriendRefs conn recommendedBySlugs
@@ -894,7 +918,8 @@ module GameProjection =
                    mc.facet_solo, mc.facet_coop_couch, mc.facet_coop_online, mc.facet_versus_couch, mc.facet_versus_online, mc.facet_remote_play_together, mc.facet_vr,
                    gd.facet_override_solo, gd.facet_override_coop_couch, gd.facet_override_coop_online,
                    gd.facet_override_versus_couch, gd.facet_override_versus_online,
-                   gd.facet_override_remote_play_together, gd.facet_override_vr
+                   gd.facet_override_remote_play_together, gd.facet_override_vr,
+                   mc.deck_compat
             FROM game_list gl
             LEFT JOIN game_metadata_cache mc ON mc.game_slug = gl.slug
             LEFT JOIN game_detail gd ON gd.slug = gl.slug
@@ -925,7 +950,8 @@ module GameProjection =
               PlayFacets = FacetDerivation.merge (readCachedPlayFacets rd) (readPlayFacetsOverrideRow rd)
               RawgRating =
                 if rd.IsDBNull(rd.GetOrdinal("rawg_rating")) then None
-                else Some (rd.ReadDouble "rawg_rating") }
+                else Some (rd.ReadDouble "rawg_rating")
+              DeckCompat = readDeckCompat rd }
         )
 
     let getDashboardNewGames (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardNewGame list =

@@ -81,10 +81,14 @@ let private gameCard (game: GameListItem) =
                         ]
                     ]
                     // Play facet badges (games-j6wkr, ADR-0053) — up to 4, from the
-                    // already-merged GameListItem.PlayFacets.
+                    // already-merged GameListItem.PlayFacets — plus the Steam Deck
+                    // compatibility badge (games-b8xnw), cache-only, no override.
                     Html.div [
-                        prop.className "mt-1.5 px-1"
-                        prop.children [ PlayFacetsDisplay.badgeRow game.PlayFacets ]
+                        prop.className "mt-1.5 px-1 flex flex-wrap gap-1 items-center"
+                        prop.children [
+                            PlayFacetsDisplay.badgeRow game.PlayFacets
+                            PlayFacetsDisplay.deckCompatBadge game.DeckCompat
+                        ]
                     ]
                 ]
             ]

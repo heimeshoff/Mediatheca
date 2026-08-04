@@ -94,6 +94,25 @@ Single user.
   `Shared.PlayFacetsOverride`'s `withX` functions (`GameDetail/State.fs`'s
   `Override_*` message arms) — the ADR-0053 trap guard, covered by
   `PlayFacetsOverrideTests.fs`.
+- **Deck compatibility** (`DeckCompatibility`, games-b8xnw, ADR-0043/ADR-0045/ADR-0059) —
+  Steam's own Deck-readiness verdict (`Verified`/`Playable`/`Unsupported`/`Unknown`),
+  cache-tier only — no event, no override, no aggregate involvement at all (unlike
+  play facets, this isn't something Marco is likely to know better than Valve's own
+  testing). Written to `game_metadata_cache.deck_compat` by a resumable throttled
+  backfill job (`GameDeckCompatBackfill.fs`, reusing `GameFacetBackfill.fs`'s shape)
+  walking its OWN cursor column, `deck_compat_fetched_at` — deliberately separate from
+  the play-facets backfill's `fetched_at`, since the two jobs run on independent
+  schedules against different sources and a shared cursor would let one job's stamp
+  silently exempt the other's work for the same game. The unofficial
+  `ajaxgetdeckappcompatibilityreport` endpoint this feature was originally framed
+  around is DEAD (verified live, ADR-0059) — Valve retired it; the verdict is scraped
+  instead from the `data-hardwarecompatibility="{...}"` attribute embedded in each
+  store app page's own HTML (`Steam.fs`'s `getDeckCompatibility`/
+  `decodeDeckCompatFromHtml`/`mapDeckCompatCategory`), which needs Steam's age-gate
+  cookies to render for Mature-rated titles. Read straight through (no merge) into
+  `GameListItem.DeckCompat`/`GameDetail.DeckCompat`, rendered as a colored badge
+  alongside the play-facet badges (`Components/PlayFacetsDisplay.fs`'s
+  `deckCompatBadge`) — `Unknown` renders nothing.
 - **Metadata cache slice** (games-v4nqe) — description/short_description/website_url,
   cache-only (`game_metadata_cache`, `MetadataCache.upsertGameIdentityCard`/
   `tryGetGameIdentityCard` — the type's own name predates this rename and is kept for

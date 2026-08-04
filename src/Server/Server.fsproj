@@ -46,6 +46,7 @@
     <Compile Include="PlaySessionProjection.fs" />
     <Compile Include="PlaytimeTracker.fs" />
     <Compile Include="GameFacetBackfill.fs" />
+    <Compile Include="GameDeckCompatBackfill.fs" />
     <Compile Include="SeriesRefresh.fs" />
     <Compile Include="ScheduledJobs.fs" />
     <Compile Include="JellyfinSync.fs" />

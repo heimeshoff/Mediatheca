@@ -71,6 +71,41 @@ let badgeRow (facets: PlayFacets) : ReactElement =
             prop.children [ for b in badges -> badgeChip b ]
         ]
 
+// ── Steam Deck compatibility badge (games-b8xnw) ──
+//
+// Cache-only (ADR-0043/ADR-0045) — no override, no Auto/On/Off control, no
+// aggregate involvement at all: Steam's own verdict, unlike the play
+// facets, isn't something Marco is likely to know better than Valve's own
+// testing. `Unknown` renders nothing — a badge asserting "Unknown" would be
+// noise on every game Steam hasn't tested (most of the library, until the
+// backfill catches up).
+
+let private deckCompatChipClass (compat: DeckCompatibility) =
+    match compat with
+    | Verified -> "inline-flex items-center gap-1 bg-success/15 text-success px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
+    | Playable -> "inline-flex items-center gap-1 bg-warning/15 text-warning px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
+    | Unsupported -> "inline-flex items-center gap-1 bg-error/15 text-error px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
+    | Unknown -> ""
+
+let private deckCompatLabel (compat: DeckCompatibility) =
+    match compat with
+    | Verified -> "Deck Verified"
+    | Playable -> "Deck Playable"
+    | Unsupported -> "Deck Unsupported"
+    | Unknown -> ""
+
+/// Renders nothing for `Unknown` (never fetched yet, or Steam has no
+/// verdict) — otherwise a single colored chip alongside `badgeRow`'s play
+/// facets.
+let deckCompatBadge (compat: DeckCompatibility) : ReactElement =
+    match compat with
+    | Unknown -> Html.none
+    | _ ->
+        Html.span [
+            prop.className (deckCompatChipClass compat)
+            prop.text (deckCompatLabel compat)
+        ]
+
 // ── Auto/On/Off segmented controls (editable, GameDetail only) ──
 
 let private segmentedOption (label: string) (isActive: bool) (onClick: unit -> unit) =
