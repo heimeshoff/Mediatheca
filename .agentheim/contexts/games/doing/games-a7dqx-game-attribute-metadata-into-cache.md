@@ -1,7 +1,7 @@
 ---
 id: games-a7dqx
 title: Move Game attribute metadata into the cache and stop emitting it — 7668 Game_play_mode_added events are literally Steam Store category tags and make up 43% of the entire event log
-status: todo
+status: doing
 type: refactor
 context: games
 created: 2026-08-01

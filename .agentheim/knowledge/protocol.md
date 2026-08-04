@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 13:17 -- Batch started: [games-a7dqx]
+
+**Type:** Work / Batch start
+**Tasks:** games-a7dqx - Move Game attribute metadata into the cache and stop emitting it — 7668 Game_play_mode_added events are literally Steam Store category tags and make up 43% of the entire event log
+**Parallel:** no (1 worker — only one ready task on the board)
+
+---
+
 ## 2026-08-04 13:11 -- Modeling / Promoted: games-a7dqx - Move Game attribute metadata into the cache and stop emitting it — 7668 Game_play_mode_added events are literally Steam Store category tags and make up 43% of the entire event log
 
 **Type:** Modeling / Promote
