@@ -10,9 +10,9 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
+- **Backlog:** 2
 - **Todo:** 0
-- **Doing:** 1
+- **Doing:** 0
 - **Done:** 4
 <!-- task-counts:end -->
 
@@ -22,7 +22,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **games-a7dqx** — Move Game attribute metadata into the cache and stop emitting it — 7668 Game_play_mode_added events are literally Steam Store category tags and make up 43% of the entire event log (refactor) — `doing/games-a7dqx-game-attribute-metadata-into-cache.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
@@ -36,6 +35,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **games-a7dqx** — Move Game attribute metadata into the cache and stop emitting it — 7668 Game_play_mode_added events are literally Steam Store category tags and make up 43% of the entire event log (refactor) — `backlog/games-a7dqx-game-attribute-metadata-into-cache.md`
 - **games-b8xnw** — Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge (feature) — `backlog/games-b8xnw-steam-deck-compat-readiness.md`
 <!-- backlog-list:end -->
 

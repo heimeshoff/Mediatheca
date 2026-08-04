@@ -1,7 +1,7 @@
 ---
 id: games-a7dqx
 title: Move Game attribute metadata into the cache and stop emitting it — 7668 Game_play_mode_added events are literally Steam Store category tags and make up 43% of the entire event log
-status: doing
+status: backlog
 type: refactor
 context: games
 created: 2026-08-01
@@ -256,3 +256,67 @@ they pour thousands more junk events into a log already 43% play-mode tags, maki
 **ADR-0053** (`0053-game-play-facets-cache-derived-event-sourced-override.md`) carries the full
 `PlayFacets`/`PlayFacetsOverride` type sketches, `decide`/`evolve` arms, merge function, and
 rejected alternatives — the worker implements from it, not from a paraphrase.
+
+## Worker note (bounced 2026-08-04)
+
+Invoking hazard 2's explicit escape hatch ("if the worker finds the combined diff unmanageable
+mid-implementation, bouncing back to backlog with a note is preferable to a rushed partial
+cutover") — made as a judgment call *before* starting the edit phase, after surveying every file
+in scope, because the survey itself confirmed the diff is unmanageable for a single worker pass
+and hazard 2 also names a rushed partial cutover as strictly worse than bouncing, so there is no
+safe middle ground to attempt and stop cleanly.
+
+**What was surveyed (read-only, no production code touched):**
+- `Games.fs` (854 lines) — full aggregate read: `GameEvent`/`GameCommand`/`ActiveGame`/`evolve`/
+  `decide`/`Serialization` (codec, `handledEventTypes`). Confirmed `Game_store_added`/
+  `Game_store_removed` already demonstrate the exact four-part no-op precedent to copy for the
+  seven demoted event groups.
+- `GameProjection.fs` (1018 lines) — full schema (`game_list`/`game_detail` DDL, `ALTER TABLE ADD
+  COLUMN` migration idiom), `handleEvent`, and all ~30 query functions. Confirmed at least 10
+  readers touch the columns slated for drop (`getAll`, `getBySlug`, `getRecentlyAddedGames`,
+  `getGamesRecentlyPlayed`, `getBacklogStats`, `getInFocusEstimate`, `getHltbComparisons`,
+  `getGameGenreDistribution`, `getGamesCompletedPerYear`, `getGamesBeatenThisYear`,
+  `findGamesWithEmptyDescriptionAndSteamAppId`), each needing its own join/subquery rewrite.
+- `MetadataCache.fs` (366 lines) — full read. Confirmed the `game_metadata_cache` schema, the
+  `ALTER TABLE ADD COLUMN` try/with idiom to copy for the 8 new facet/genre columns, and the
+  `upsertSeriesMetadata` shape to mirror for a new `upsertGameMetadata`/facet-write function.
+- `Steam.fs` — confirmed `decodeCategoryDescription` (line 149) discards `id`, and 4 separate
+  `appdetails` fetch URL sites (lines 554, 610, 641, 810) all need `&l=english` appended.
+- `Api.fs` (4410 lines) — `grep -c` on the eight commands/functions slated for conversion
+  (`Add_play_mode`/`Remove_play_mode`/`Set_description`/`Set_short_description`/
+  `Set_website_url`/`Set_hltb_hours`/`Set_steam_last_played`/`Categorize_game`/
+  `setGameHltbHours`/`fetchHltbData`) returns 18 call sites spread across at least 5 structurally
+  distinct flows (family import ~427-582/660-677, `attachSteamToGameCore` ~1068, sync/enrichment
+  ~3500-3770, HLTB endpoints ~3001/4339) — each flow needs independent conversion to cache-writes
+  plus its own manual verification, since none of it is mechanical find-replace (the "only fill
+  if currently empty" guard at `attachSteamToGameCore` in particular has to be re-pointed from a
+  dropped projection column to the cache table without changing its guard semantics).
+- `Shared.fs`, `GameDetail/Views.fs` (2073 lines), `GameDetail/State.fs`, `GameDetail/Types.fs` —
+  sizes confirmed, not yet read in detail; still carry the full UI rewrite (delete the 302-value
+  picker, build 4 Auto/On/Off segmented controls plus the VR 4-option variant, badges, list-page
+  facet filters) plus the `IMediathecaApi` contract change.
+
+**Why this doesn't fit one worker pass:** this is not one refactor but at minimum five
+independently-testable layers that must all land together for the app to compile and boot (new
+domain types + event/command, schema migration with load-bearing column-drop ordering, ~10
+projection query rewrites, a live-API-verified facet-derivation function, ~5 distinct Api.fs
+call-site conversions, a new resumable background job, and a full client UI rewrite) — each layer
+alone is comparable in size to a normal single-worker task, and the task's own hazard note 2
+already anticipates this by naming the Series BC's two-task split (`series-q8jwc` +
+`series-d5tpn`) as the shape this would naturally take.
+
+**Recommendation for the next refinement pass (not a unilateral split — Marco's explicit
+instruction was to keep this one task, so this needs to go back through him):** consider
+splitting along the same seam Series used — one task landing the domain model + schema + facet
+derivation + projection read-composition (cache-blind aggregate, `PlayFacets.merge`, all query
+rewrites, background backfill job), a second task converting every emission site to stop writing
+events and start writing the cache once the first task's cache columns exist, and a third for the
+client UI rewrite (which has two independent [human-eye] acceptance criteria already and no
+hard dependency on exactly when the server-side cutover completes, only on the new
+`overrideGamePlayFacets` API shape existing). Alternatively, re-confirm with Marco that one task
+is still wanted and, if so, route it through the orchestrator/architect for a written
+implementation-order plan before the next worker attempt, so that worker isn't the first one to
+have to sequence five layers from scratch under context pressure.
+
+No code, schema, or test files were modified. ADR-0053 (already minted at refinement) is
+untouched and remains valid guidance for whichever split or single-pass attempt follows.

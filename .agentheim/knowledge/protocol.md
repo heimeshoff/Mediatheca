@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 13:25 -- Task bounced: games-a7dqx - Move Game attribute metadata into the cache and stop emitting it
+
+**Type:** Work / Task bounced
+**Task:** games-a7dqx - Move Game attribute metadata into the cache and stop emitting it
+**Reason:** Full-file survey of every in-scope module (Games.fs 854 lines, GameProjection.fs 1018 lines with ~10 readers of columns slated for drop, MetadataCache.fs, Steam.fs with 4 fetch sites, Api.fs 4410 lines with 18 call sites across 5 distinct emission flows, plus the full client UI rewrite) confirms at minimum five independently-testable layers that must all land together to compile/boot — unmanageable for one worker pass per the task's own hazard note 2. Worker note recommends a Series-precedent-style split (needs Marco's sign-off — he explicitly asked to keep this one task).
+**Moved to:** backlog
+
+---
+
 ## 2026-08-04 13:17 -- Batch started: [games-a7dqx]
 
 **Type:** Work / Batch start
