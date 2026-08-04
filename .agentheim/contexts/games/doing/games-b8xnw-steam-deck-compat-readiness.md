@@ -1,7 +1,7 @@
 ---
 id: games-b8xnw
 title: Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge
-status: todo
+status: doing
 type: feature
 context: games
 created: 2026-08-04

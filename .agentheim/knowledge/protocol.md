@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 23:18 -- Batch started: [games-b8xnw]
+
+**Type:** Work / Batch start
+**Tasks:** games-b8xnw - Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge
+**Parallel:** no (1 worker — single ready task)
+
+---
+
 ## 2026-08-04 23:17 -- Modeling / Promoted: games-b8xnw - Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge
 
 **Type:** Modeling / Promote
