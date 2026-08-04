@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 20:09 -- Modeling / Promoted: administration-z6ymt - Purge the 11 demoted metadata event types from the event log via the ADR-0038 wipe-first import — offline type-level NDJSON filter plus operator-executed runbook (ADR-0056) — and retire the completed games-h4mrd play-session migration machinery in the same change
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-08-04 19:05 -- Modeling / Refined: administration-z6ymt - Purge the 11 demoted metadata event types via the ADR-0038 wipe-first import + retire the games-h4mrd migration machinery
 
 **Type:** Modeling / Refine
