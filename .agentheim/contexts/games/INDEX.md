@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 4
-- **Todo:** 0
+- **Backlog:** 3
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 4
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **games-a7dqx** — Build the play-facets cache/domain foundation — schema, ADR-0053 override event/command, Steam facet derivation, safe cache-sourced reads for already-seeded fields, and the resumable backfill job (split 1 of 3; games-v4nqe converts emission sites, games-j6wkr rewrites the UI) (refactor) — `todo/games-a7dqx-game-attribute-metadata-into-cache.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -35,7 +36,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **games-a7dqx** — Build the play-facets cache/domain foundation — schema, ADR-0053 override event/command, Steam facet derivation, safe cache-sourced reads for already-seeded fields, and the resumable backfill job (split 1 of 3; games-v4nqe converts emission sites, games-j6wkr rewrites the UI) (refactor) — `backlog/games-a7dqx-game-attribute-metadata-into-cache.md`
 - **games-v4nqe** — Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3 — stops the 7668-event play-mode bloat games-a7dqx's schema made possible) (refactor) — `backlog/games-v4nqe-emission-cutover-column-drop.md`
 - **games-j6wkr** — Rewrite the Games UI for typed play facets — delete the 302-value play-mode picker, add Auto/On/Off facet override controls and badges/list filters, consuming the PlayFacets contract games-v4nqe lands (split 3 of 3) (refactor) — `backlog/games-j6wkr-play-facets-ui-rewrite.md`
 - **games-b8xnw** — Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge (feature) — `backlog/games-b8xnw-steam-deck-compat-readiness.md`

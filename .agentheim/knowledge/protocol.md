@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 14:43 -- Modeling / Promoted: games-a7dqx - Build the play-facets cache/domain foundation — schema, ADR-0053 override event/command, Steam facet derivation, safe cache-sourced reads for already-seeded fields, and the resumable backfill job (split 1 of 3; games-v4nqe converts emission sites, games-j6wkr rewrites the UI)
+
+**Type:** Modeling / Promote
+**BC:** games
+**From → To:** backlog → todo
+
+---
+
 ## 2026-08-04 13:55 -- Modeling / Refined: games-a7dqx - split into three sequenced tasks after bounce
 
 **Type:** Modeling / Refine
