@@ -34,6 +34,22 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 23:52 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 28m (batch start 23:24 → 23:52)
+**Completed:** 1 (first-try PASS: 0, re-dispatched: 1, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** games-b8xnw: 2
+**Commits:** 3 (batch start, task squash-merge commit, this entry)
+**Vision-conformance:** none — batch aligns with vision (games-b8xnw enriches the Games tab within the v1 media experience and explicitly honors the Replayable principle: Deck compatibility is cached third-party metadata, never evented, with the ADR-0045 by-construction invariant restored at iteration 2)
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task) — hand-classified (type: feature, all files under src/ and tests/ plus routine task documentation)
+**Carry-over:** left behind (user WIP, 3 files). No `.agentheim/`-owned files stranded; `.worktrees/` fully swept (worktree removed clean after PASS integration, branch deleted).
+
+---
+
 ## 2026-08-04 23:45 -- Verification failed: games-b8xnw - Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge
 
 **Type:** Work / Verification failure
