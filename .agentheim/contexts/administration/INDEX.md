@@ -60,7 +60,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **administration-z6ymt** — Purge demoted metadata events from the event log via the existing ADR-0038 wipe-first import — deferred at the builder's direction because the deployed live version cannot take the migration yet (chore) — `backlog/administration-z6ymt-purge-demoted-metadata-events.md`
+- **administration-z6ymt** — Purge the 11 demoted metadata event types from the event log via the ADR-0038 wipe-first import — offline type-level NDJSON filter plus operator-executed runbook (ADR-0056) — and retire the completed games-h4mrd play-session migration machinery in the same change (chore) — `backlog/administration-z6ymt-purge-demoted-metadata-events.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC

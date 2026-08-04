@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 19:05 -- Modeling / Refined: administration-z6ymt - Purge the 11 demoted metadata event types via the ADR-0038 wipe-first import + retire the games-h4mrd migration machinery
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo (auto-promoted after readiness check)
+**Summary:** Post-v4nqe/r2xhv reconciliation via the orchestrator (tactical-modeler + architect). Three stale premises corrected: the purge set is 11 enumerated Game types (not "rawg/hltb setters"); the "~1000 duplicate identity events" premise was disproven by games-w4tzc (all identity-card types excluded, never dropped); Series_refreshed is still fully live — its ~566 no-change rows deferred at the builder's direction (payload-level filter, ~5% of the reduction, false-positive risk). Builder decisions: deferral LIFTED (production cutover completed 2026-08-03); Game_play_time_set included with the completed games-h4mrd migration machinery retired in the same change; GameAddedData payload scrub dropped entirely (Required-field decoder makes it stream-corrupting). Execution shape per new ADR-0056: worker ships offline byte-preserving NDJSON filter + fixtures + runbook; builder executes the live purge by hand through the Settings UI.
+**Split into:** none
+**ADRs written:** 0056
+
+---
+
 ## 2026-08-04 18:08 -- Modeling / Promoted: games-j6wkr - Rewrite the Games UI for typed play facets — Solo/Co-op/Versus/Couch badges, per-facet Auto/On/Off override controls, and client-side list filters over the landed PlayFacets contract (split 3 of 3, closes the no-play-mode-UI window games-v4nqe opened)
 
 **Type:** Modeling / Promote
