@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 16:20 -- Modeling / Refined: games-v4nqe - Convert every Game metadata emission site to cache writes, delete the demoted commands, drop the projection columns, and prove drift zero (split 2 of 3)
+
+**Type:** Modeling / Refine
+**BC:** games
+**Status after:** todo (auto-promoted after readiness check)
+**Summary:** Post-a7dqx reconciliation — verified the task's assumptions against the landed foundation. Fixed three stale references: `upsertGameMetadata` doesn't exist (the identity-card cache writer is authored in this task, following `upsertGameFacets`'s ON-CONFLICT slice discipline — new acceptance criterion pins that a facet row survives an identity-card write); the cache's `genres` column already shipped unpopulated in a7dqx (seed only, no ADD COLUMN); `findGamesWithEmptyDescriptionAndSteamAppId` moved to `GameProjection.fs:819`. Linked ADR-0054 bidirectionally.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-08-04 15:50 -- Work session ended
 
 **Type:** Work / Session end

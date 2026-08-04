@@ -9,7 +9,7 @@ completed:
 depends_on: [games-a7dqx]
 blocks: [administration-z6ymt, games-j6wkr]
 tags: [games, metadata, cache, steam, event-log, migration]
-related_adrs: [0043, 0045, 0048, 0053]
+related_adrs: [0043, 0045, 0048, 0053, 0054]
 related_research: []
 prior_art: [games-a7dqx, series-r2xhv, series-d5tpn]
 ---
@@ -60,7 +60,7 @@ deleted + column dropped** / **command deleted**.
 | `Game_website_url_set` | `Set_website_url` | Demoted, four-part rule | Same creation-carried caveat. |
 | `Game_hltb_hours_set` | `Set_hltb_hours` | Demoted, four-part rule | Not creation-carried. `setGameHltbHours` (`Api.fs:3001`) has zero client call sites — delete, don't convert. `fetchHltbData` (`Api.fs:4339`) becomes a cache write. No override event needed. |
 | `Game_steam_last_played_set` | `Set_steam_last_played` | Demoted, **derived not cached** | Redundant with `game_play_session`. Column dropped; reads already switched to `MAX(date)` by games-a7dqx. |
-| `Game_categorized` | `Categorize_game` | Demoted, four-part rule | Dead code (verified — zero call sites in `src/Client`, zero dispatch sites outside `Games.fs`). `game_list.genres`/`game_detail.genres` dropped; cache gains `genres`, seeded from `game_detail` **before** the drop (this task's migration, not games-a7dqx's). `GameAddedData.Genres` payload unchanged. |
+| `Game_categorized` | `Categorize_game` | Demoted, four-part rule | Dead code (verified — zero call sites in `src/Client`, zero dispatch sites outside `Games.fs`). `game_list.genres`/`game_detail.genres` dropped; the cache's `genres` column already shipped **unpopulated** in games-a7dqx (`MetadataCache.fs` migration) — this task only seeds it from `game_detail` **before** the drop, no `ADD COLUMN` needed. `GameAddedData.Genres` payload unchanged. |
 
 **Confirmed out of scope:** `Game_steam_library_date_set` stays evented (first-sighting fact Steam
 cannot be re-queried for). `Game_rawg_id_set`/`Game_steam_app_id_set` stay evented (the *link* is
@@ -73,7 +73,12 @@ our decision, per ADR-0043's boundary call).
 - `PlaytimeTracker.createGameFromSteam` (`PlaytimeTracker.fs:259-343`) stops calling
   `Add_play_mode`/`Set_steam_last_played`; writes derived facets, category ids, description,
   short_description, website_url, genres to `game_metadata_cache` using games-a7dqx's
-  `deriveFacets`/`upsertGameMetadata`.
+  `FacetDerivation.deriveFacets` + `MetadataCache.upsertGameFacets` for the facet/category-id
+  slice, plus a **new identity-card upsert this task authors** for the
+  description/short_description/website_url/genres slice — a7dqx shipped no such writer
+  (`upsertGameFacets` deliberately excludes those columns; see its doc comment). The new
+  helper must follow the same `INSERT ... ON CONFLICT DO UPDATE` slice discipline — never
+  `INSERT OR REPLACE`, which would silently null the facet columns of an existing row.
 - `Api.fs`'s Steam family-import flow (`Api.fs:427-535`, `:550-582`, `:660-677` —
   `Set_steam_library_date` stays; `Set_short_description`/`Set_website_url`/`Add_play_mode`
   convert) writes cache directly.
@@ -84,7 +89,7 @@ our decision, per ADR-0043's boundary call).
 - `Api.fs`'s Steam-sync/enrichment flow (~lines 3500-3770, including
   `findGamesWithEmptyDescriptionAndSteamAppId`'s existing throttled backfill loop at
   `Async.Sleep 300`) converts the same way; `findGamesWithEmptyDescriptionAndSteamAppId`
-  (`GameProjection.fs:652`) is rewritten to query `game_metadata_cache` for empty description, or
+  (`GameProjection.fs:819` post-a7dqx) is rewritten to query `game_metadata_cache` for empty description, or
   explicitly retired in favor of games-a7dqx's facet-backfill job if the worker judges the two
   redundant (state which was chosen).
 - `setGameHltbHours` (`Api.fs:3001`, zero client call sites) is deleted with `Set_hltb_hours`;
@@ -189,6 +194,10 @@ our decision, per ADR-0043's boundary call).
       zero matches.
 - [ ] Every converted flow's Steam `appdetails` fetch stores `steam_category_ids`.
 - [ ] Every converted flow writes only the cache tier — no "don't clobber overrides" guard exists.
+- [ ] The new identity-card cache writer (description/short_description/website_url/genres)
+      uses `INSERT ... ON CONFLICT DO UPDATE` scoped to its own column slice — never
+      `INSERT OR REPLACE` — proven by a test showing facet/category-id/`fetched_at` values
+      of an existing row survive an identity-card write.
 
 ### Schema / migration
 - [ ] The one-time `game_detail.genres` → `game_metadata_cache.genres` copy runs and completes
@@ -225,6 +234,14 @@ our decision, per ADR-0043's boundary call).
       `game_metadata_cache` (Cache) are unchanged — column sets differ, classifications don't.
 
 ## Notes
+
+**Post-a7dqx reconciliation (2026-08-04, after split 1 landed):** verified against the shipped
+foundation — `FacetDerivation.deriveFacets`, `PlayFacets.merge`, `MetadataCache.upsertGameFacets`,
+and the `Game_play_facets_overridden`/`Override_play_facets` pair all exist as this task assumes.
+Two corrections folded in above: the cache's `genres` column already exists (a7dqx shipped it
+unpopulated — this task seeds it, no `ADD COLUMN`), and there is no `upsertGameMetadata` — the
+identity-card writer is authored *here*, following `upsertGameFacets`'s ON-CONFLICT slice
+discipline. ADR-0054 (fixed category-id → facet table) governs derivation.
 
 **Fold-forward from the original file's worker survey (2026-08-04), scoped to this task:**
 - `Api.fs` (4410 lines) — `grep -c` on the eight commands/functions slated for conversion returns
