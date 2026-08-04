@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-08-04 23:18 -- Modeling / Refined: integration-hebjs - One-click Steam Family import — automatic access-token acquisition
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** backlog
+**Summary:** Rewrote the provisional ACs around the landed ygwsa spike: added the explicit ADR-0019 builder gate (Marco runs the two spike fsx scripts, ~30 min, QR + mobile app — worker cannot) as a hard pre-promotion step; settled both open questions (manual paste stays as fallback footnote; scheduled family sync out of scope, future capture). Stays in backlog until the gate outcome is recorded.
+
+---
+
+## 2026-08-04 23:18 -- Modeling / Refined: movies-v2gkh - Move Movie TMDB metadata into the cache
+
+**Type:** Modeling / Refine
+**BC:** movies
+**Status after:** backlog
+**Summary:** Wrote the acceptance criteria following the shipped series-q8jwc/games-a7dqx cutover shape (typed cache columns, identity-card COALESCE, four-part tolerance rule, drift zero). Trigger condition re-confirmed: stays parked until a movie-refresh feature is captured, then becomes its depends_on prerequisite.
+
+---
+
 ## 2026-08-04 20:46 -- Work session ended
 
 **Type:** Work / Session end
