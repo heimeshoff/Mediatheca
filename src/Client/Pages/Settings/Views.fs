@@ -96,7 +96,7 @@ let private jellyfinSyncStatusView (status: JellyfinSyncStatus option) =
 
 let private integrationCard (icon: unit -> ReactElement) (title: string) (description: string) (badge: ReactElement) (detail: ReactElement) =
     Html.div [
-        prop.className (DesignSystem.velvetCard + " " + DesignSystem.cardHover + " overflow-hidden")
+        prop.className (DesignSystem.velvetCard + " overflow-hidden")
         prop.children [
             Html.div [
                 prop.className "collapse collapse-arrow"
@@ -172,7 +172,7 @@ let private integrationCard (icon: unit -> ReactElement) (title: string) (descri
 let private adminSectionCard (sectionId: string) (title: string) (description: string) (isOpen: bool) (onToggle: unit -> unit) (content: ReactElement) =
     Html.div [
         prop.id sectionId
-        prop.className ("bg-base-100 rounded-[var(--radius-card)] shadow-[var(--shadow-card)] " + DesignSystem.cardHover + " overflow-hidden")
+        prop.className ("bg-base-100 rounded-[var(--radius-card)] shadow-[var(--shadow-card)] overflow-hidden")
         prop.children [
             Html.div [
                 prop.className "collapse collapse-arrow"
