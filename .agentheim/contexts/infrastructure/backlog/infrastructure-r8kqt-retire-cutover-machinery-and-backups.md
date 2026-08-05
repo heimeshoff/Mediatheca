@@ -29,7 +29,10 @@ that only ever existed to survive a crash inside the cutover's migrate→rebuild
 Alongside it, two multi-megabyte rollback copies sit on the server volume and one pristine
 pre-cutover copy sits in the dev data dir.
 
-The two-week hold is the rollback window. **Not executable before 2026-08-17.**
+The two-week hold is the rollback window. **Not executable before 2026-08-17.** (Amended
+2026-08-05: the wipe-import purge that day created a third server backup with its own
+rollback window — executing everything in one pass means waiting until **2026-08-19**; see
+Part B and Notes.)
 
 ## What
 
@@ -44,10 +47,13 @@ Do this first; if anything here looks wrong, stop and do not delete the backups.
   data-shaped incident.
 - Later boots skip the cutover — a restart logs no `[StartupCutover] Phase …` lines (the
   completion marker doing its job). The container has no `sqlite3` binary, so read this off
-  the logs rather than the DB:
+  the logs rather than the DB. **Grep for `Phase` specifically and expect 0** — every
+  healthy boot logs one benign `[StartupCutover] cutover already completed — skipping` line
+  until the code is deleted (verified 2026-08-05), so a bare `grep -c StartupCutover`
+  reads ≥1 on a perfectly clean window and would look like a failed precondition:
 
   ```bash
-  ssh marco@harbour.elver-minor.ts.net "docker logs --since 24h mediatheca 2>&1 | grep -c StartupCutover"
+  ssh marco@harbour.elver-minor.ts.net "docker logs --since 24h mediatheca 2>&1 | grep -c 'StartupCutover] Phase'"
   ```
 
 - Drift is still zero: Settings → Projections → drift check, or
@@ -58,23 +64,41 @@ Do this first; if anything here looks wrong, stop and do not delete the backups.
 
 ### Part B — remove the backup files
 
-Server volume (both files, ~38 MB total):
+Server volume (three files, ~55 MB total — inventory verified 2026-08-05):
 
 ```bash
 ssh marco@harbour.elver-minor.ts.net "docker exec mediatheca ls -la /app/data/backups"
 ssh marco@harbour.elver-minor.ts.net "docker exec mediatheca rm \
   /app/data/backups/pre-cutover-20260803-111004.db \
-  /app/data/backups/mediatheca-20260803T1110090455038-0f6b4f74.db"
+  /app/data/backups/mediatheca-20260803T1110090455038-0f6b4f74.db \
+  /app/data/backups/mediatheca-20260805T0844246756407-2e8d8351.db"
 ```
 
-Dev machine — the pristine pre-cutover production copy:
+The third file (added to this list 2026-08-05) is the automatic `VACUUM INTO` backup taken
+by `administration-z6ymt`'s wipe-import purge on 2026-08-05 — a *different* rollback point
+(post-cutover, pre-purge) with its own two-week window ending **2026-08-19**. Do not delete
+it before then; simplest is to run this whole task on/after 2026-08-19 so everything goes
+in one pass.
+
+Dev machine (`C:\Users\marco\app\mediatheca\backups\`) — full stale inventory, verified
+present 2026-08-05:
 
 ```
-C:\Users\marco\app\mediatheca\backups\pre-cutover-2026-08-03\
+pre-cutover-2026-08-03\                              (the pristine pre-cutover production copy)
+pre-cutover-20260803-011159.db                       (loose dev pre-cutover copies,
+pre-cutover-20260803-011704.db                        outside the directory above)
+mediatheca-pre-repair-20260802-090956.db             (2026-08-02 live-DB-repair copies)
+mediatheca-pre-repair-20260802-091003.db
+mediatheca-pre-repair-20260802-091031.db
+mediatheca-pre-series-d5tpn-20260802-083050.db       (d5tpn-incident backup + WAL/SHM
+mediatheca-pre-series-d5tpn-20260802-083050.db-shm    sidecars)
+mediatheca-pre-series-d5tpn-20260802-083050.db-wal
+mediatheca-20260731T2240029991076-e949a1f8.db        (generic dated dev backups, both
+mediatheca-20260803T0117075747456-039a8c5a.db         pre-cutover and equally stale)
 ```
 
-Also sweep `mediatheca-pre-repair-20260802-*.db` if those 2026-08-02 live-DB-repair copies
-are still around; they predate the cutover and are equally stale by then.
+All of these predate (or are) the cutover-era rollback points and are equally stale once
+the window closes.
 
 ### Part C — delete the code
 
@@ -98,19 +122,41 @@ Line numbers are as of commit `344d0f6`; re-locate by name rather than trusting 
    `MetadataCache.seedFromProjections`, `SeriesProjection.dropDeprecatedColumns`,
    `JellyfinStore.migrateFromProjections`, and `GameJournal.migrateFromContentBlocks` are
    permanent, idempotent, marker-gated startup steps — they are not part of this retirement.
-5. Keep ADR-0052 in `.agentheim/knowledge/decisions/` as the historical record; append a
+5. **Delete the permanently-dead Steam-sync gate** (added 2026-08-05, post-purge
+   follow-through): `PlaytimeTracker.syncGateOpen`, `migrationCompletedSettingKey`, and the
+   `hasLegacyPlayTimeEvents`/gate check inside the sync job (~`PlaytimeTracker.fs:72-86`,
+   `:372-382` — re-locate by name), plus `PlaytimeTrackerTests.fs`'s pure `syncGateOpen`
+   tests. After `administration-z6ymt`'s live purge (executed 2026-08-05) no
+   `Game_play_time_set` row exists and no surviving command can create one, so the gate is
+   unconditionally open — it guards against a state that is now unrepresentable. The
+   `play_session_migration_completed` settings row in the production DB is a harmless
+   orphan; leave it.
+6. **Delete the fired one-shot purge tooling** (added 2026-08-05): `src/Server/EventLogFilter.fs`
+   and its `Server.fsproj` entry, the `filter-demoted-events` dispatch branch at the top of
+   `Program.fs`'s `main`, and `tests/Server.Tests/EventLogFilterTests.fs` with its fsproj
+   entry. The purge it existed for ran once and completed (administration-z6ymt, 2026-08-05);
+   like `StartupCutover.fs`, git history is the escape hatch. The runbook
+   `docs/runbooks/purge-demoted-metadata-events.md` **stays** as the historical record —
+   prepend a short "executed 2026-08-05; filter tooling removed by infrastructure-r8kqt"
+   note to its header.
+7. Keep ADR-0052 in `.agentheim/knowledge/decisions/` as the historical record; append a
    short "retired by infrastructure-r8kqt on <date>" note rather than deleting it.
-6. `npm test` and `npm run build` green, then `/deploy`.
-7. After the deploy, confirm the first boot of the new image logs no `[StartupCutover]`
+8. `npm test` and `npm run build` green, then `/deploy`.
+9. After the deploy, confirm the first boot of the new image logs no `[StartupCutover]`
    lines at all and the app comes up healthy.
 
 ## Acceptance criteria
 
-- [ ] Both server backup files are gone from `/app/data/backups/`, and the dev
-      `backups/pre-cutover-2026-08-03/` directory is deleted.
+- [ ] All three server backup files (including the 2026-08-05 wipe-import backup — only
+      on/after 2026-08-19) are gone from `/app/data/backups/`, and the dev-machine stale
+      inventory listed in Part B is deleted.
 - [ ] `grep -rn "StartupCutover" src/ tests/` returns no hits.
 - [ ] `Composition.fs` calls `Projection.startAllProjections conn projectionHandlers`
       directly, with no `cutoverBackupOk` binding and no `StartupCutover.run` call.
+- [ ] `grep -rn "syncGateOpen\|migrationCompletedSettingKey\|hasLegacyPlayTimeEvents" src/ tests/`
+      returns no hits; the Steam sync job dispatches unconditionally.
+- [ ] `grep -rn "EventLogFilter\|filter-demoted-events" src/ tests/` returns no hits; the
+      purge runbook still exists and carries the executed/retired header note.
 - [ ] The silent migration calls listed in Part C step 4 are all still present and unchanged.
 - [ ] `npm test` passes and `npm run build` succeeds.
 - [ ] ADR-0052 still exists and carries a retirement note naming this task.
@@ -118,6 +164,29 @@ Line numbers are as of commit `344d0f6`; re-locate by name rather than trusting 
       drift check of 0 discrepancies across all 7 projections.
 
 ## Notes
+
+**Amended 2026-08-05 (post-purge review, builder-approved):** after `administration-z6ymt`'s
+live purge was executed on 2026-08-05, a review of what this task would actually leave
+behind produced five amendments, all folded into What/Acceptance criteria above:
+
+1. Part B now includes the third server backup the purge's wipe-import created
+   (`mediatheca-20260805T0844246756407-2e8d8351.db`) — its own rollback window ends
+   **2026-08-19**, which becomes the effective date for running the whole task in one pass.
+   (Promoting on 2026-08-17 and leaving just that one file for two more days is also valid,
+   but one pass is simpler.)
+2. Part B's dev-machine sweep now lists the full verified stale inventory (loose
+   pre-cutover copies, the d5tpn-incident backup + sidecars, two generic dated backups) —
+   the original wording named only the directory and the pre-repair files.
+3. Part C step 5 (new): the `PlaytimeTracker` Steam-sync gate is deleted — post-purge it
+   guards against an unrepresentable state (z6ymt knowingly left it; this task is the
+   right place to finish the job).
+4. Part C step 6 (new): the fired one-shot purge tooling (`EventLogFilter.fs`, the CLI
+   branch, its tests) is deleted; the runbook stays as historical record with an
+   executed/retired note. Recorded here so "keep vs delete" is a decision, not an
+   accident.
+5. Part A's log-check command now greps for `StartupCutover] Phase` (expect 0) — the
+   benign `cutover already completed — skipping` line appears once per healthy boot until
+   the code is deleted, so the original bare grep would false-alarm.
 
 **Refined 2026-08-04 (backlog refinement pass):** goal, scope, and acceptance criteria confirmed
 current — no changes needed to the What. Two execution-shape clarifications recorded, following the
