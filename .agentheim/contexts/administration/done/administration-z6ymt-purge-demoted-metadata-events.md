@@ -115,17 +115,18 @@ it needs its own task with a decoder-tolerance ordering constraint and its own A
 - [x] Runbook committed at `docs/runbooks/purge-demoted-metadata-events.md`, steps mapping 1:1 to
       the Settings UI flow, including the position-gap note (gaps in
       `global_position`/`stream_position` are expected and need no renumbering, per ADR-0038).
-- [ ] Builder runs the drift check and confirms 0 discrepancies BEFORE starting the live purge
-      (clean baseline). [human-eye]
-- [ ] Before confirming the wipe-import, builder verifies the confirm modal's incoming-side line
+- [x] Builder runs the drift check and confirms 0 discrepancies BEFORE starting the live purge
+      (clean baseline). [human-eye] — done 2026-08-05, see "Live purge executed" note below.
+- [x] Before confirming the wipe-import, builder verifies the confirm modal's incoming-side line
       count equals the filter's reported kept-count, and the discard-side count equals the export's
       recorded line count (write-gap guard — events appended between export and confirm would be
       silently discarded). Mismatch → cancel (model-only, nothing sent) and re-export. [human-eye]
-- [ ] Post-purge, builder runs Rebuild-all (mandatory, not optional — wipe-import resets checkpoints
+      — done 2026-08-05.
+- [x] Post-purge, builder runs Rebuild-all (mandatory, not optional — wipe-import resets checkpoints
       to 0 without dropping tables, and accumulator-style projection arms would double-count under
       incremental catch-up), then a second drift check confirming 0 discrepancies, and records the
       actual before/after event counts in this task's Notes — replacing the stale estimate.
-      [human-eye]
+      [human-eye] — done 2026-08-05, counts recorded below.
 
 ## Notes
 
@@ -158,6 +159,24 @@ it needs its own task with a decoder-tolerance ordering constraint and its own A
   against the export/filter output before confirming) → Rebuild-all → a second drift check, and
   record the actual before/after event counts here, replacing the stale pre-`games-v4nqe` estimate in
   the Why section above. See `docs/runbooks/purge-demoted-metadata-events.md` for the full procedure.
+
+### Live purge executed (builder, 2026-08-05)
+
+The builder ran the full runbook against production on 2026-08-05 and reported it worked
+flawlessly (baseline drift check 0, write-gap counts matched, Rebuild-all run, second drift
+check 0). Actual counts — replacing the Why section's stale pre-`games-v4nqe` estimates
+("~7,668 play-mode rows", "17,638 → ~7,500"):
+
+- **Before:** 17,642 events exported (`mediatheca-events.ndjson`, 2026-08-05 10:35 CEST).
+- **Dropped:** 8,296 (47% of the log), by type: `Game_play_mode_added` 7,676,
+  `Game_play_time_set` 213, `Game_steam_last_played_set` 160,
+  `Game_short_description_set` 134, `Game_website_url_set` 62, `Game_hltb_hours_set` 35,
+  `Game_description_set` 16. The other four deny-listed types (`Game_categorized`,
+  `Game_play_mode_removed`, `Game_store_added`, `Game_store_removed`) had zero rows in the
+  export.
+- **After:** 9,346 events kept; the live store's post-purge count verified at exactly 9,346
+  via `getWipeImportPreview` (read-only) on 2026-08-05, with the newest event timestamp
+  predating the export — no write gap, nothing discarded.
 
 ## Outcome
 
