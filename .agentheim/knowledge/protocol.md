@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-08-08 00:36 -- Task verified and completed: series-ww1rb - Dashboard series cards show only the *current season's* episode dots with a season rail above, and mark the episodes actually watched — extend `DashboardSeriesNextUp` with per-season touched flags and current-season per-episode watched flags, joined at query time per ADR-0048
+
+**Type:** Work / Task completion
+**Task:** series-ww1rb - Dashboard series cards show only the *current season's* episode dots with a season rail above, and mark the episodes actually watched — extend `DashboardSeriesNextUp` with per-season touched flags and current-season per-episode watched flags, joined at query time per ADR-0048
+**Summary:** Dashboard series cards now show only the current season episode dots (real watched holes preserved) plus a season-touched rail, replacing whole-series prefix fills — DashboardSeriesNextUp gained CurrentSeasonNumber/CurrentSeasonWatched/SeasonsTouched composed query-time per ADR-0048, wired into the hero cards and the Series-tab Next Up list
+**Duration:** 19m (dispatch 00:17 → PASS 00:36, across 2 iterations)
+**Verification:** PASS (iteration 2)
+**Files changed:** 6
+**Tests added:** 6
+**ADRs written:** none
+
+---
+
+## 2026-08-08 00:35 -- Verification failed: series-ww1rb - Dashboard series cards show only the current season's episode dots with a season rail above, and mark the episodes actually watched
+
+**Type:** Work / Verification failure
+**Task:** series-ww1rb - Dashboard series cards show only the current season's episode dots with a season rail above, and mark the episodes actually watched
+**Iteration:** 1 of 3
+**Reasons:** CurrentSeasonNumber's primary clause (equals NextUpSeason when a next-up exists) is never falsified — every asserting test uses a series where NextUpSeason coincides with the highest season, so an implementation that always took the highest season would stay green; CurrentSeasonWatched likewise never asserted on a multi-season series. Implementation itself judged correct; only the falsifying test is missing. 686/686 tests and build otherwise clean.
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker (iteration 2, same worktree)
+
+---
+
 ## 2026-08-08 00:08 -- Batch started: [series-ww1rb]
 
 **Type:** Work / Batch start

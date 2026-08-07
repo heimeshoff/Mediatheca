@@ -306,6 +306,18 @@ type DashboardSeriesNextUp = {
     EpisodeCount: int
     WatchedEpisodeCount: int
     AverageRuntimeMinutes: int option
+    /// series-ww1rb: the season the Next Up episode belongs to, or (when
+    /// there is no Next Up — finished/fully watched/abandoned) the
+    /// highest-numbered season with cached episodes. 0 when the series has
+    /// no `series_episode_cache` rows at all.
+    CurrentSeasonNumber: int
+    /// One entry per episode of `CurrentSeasonNumber`, in episode order;
+    /// `true` when watched in ANY rewatch session. Empty on a cache miss.
+    CurrentSeasonWatched: bool list
+    /// One entry per season with cached episodes, in season order; `true`
+    /// when that season has >= 1 watched episode in any rewatch session.
+    /// Two states only — fully vs. partially watched both report `true`.
+    SeasonsTouched: bool list
 }
 
 type DashboardMovieToWatch = {

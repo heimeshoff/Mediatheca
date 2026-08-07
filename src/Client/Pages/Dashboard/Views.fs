@@ -1144,12 +1144,12 @@ let private seriesNextEpisodeCard (jellyfinServerUrl: string option) (item: Dash
                 BackdropRef = item.BackdropRef
                 PosterRef = item.PosterRef
                 InFocus = item.InFocus
-                // series-ww1rb wires the real per-season/per-episode read model
-                // (SeasonsTouched, CurrentSeasonWatched); until then, derive a
-                // single-season prefix flag list from the counts this view
-                // already has so the card keeps compiling and rendering.
-                SeasonsTouched = [ item.WatchedEpisodeCount > 0 ]
-                CurrentSeasonWatched = List.init item.EpisodeCount (fun i -> i < item.WatchedEpisodeCount)
+                // series-ww1rb: real per-season/per-episode watch state,
+                // composed server-side in SeriesProjection.getDashboardSeriesNextUp
+                // (ADR-0048) — one dot per episode of the CURRENT season only,
+                // holes preserved, not a whole-series prefix fill.
+                SeasonsTouched = item.SeasonsTouched
+                CurrentSeasonWatched = item.CurrentSeasonWatched
                 WatchedWith =
                     item.WatchWithFriends
                     |> List.map (fun f ->
@@ -2651,24 +2651,12 @@ let private seriesNextUpItemEnhanced (item: DashboardSeriesNextUp) =
         )
         prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
         prop.children [
-            // Poster with progress bar overlay at bottom
-            Html.div [
-                prop.className "relative flex-shrink-0"
-                prop.children [
-                    PosterCard.thumbnail item.PosterRef item.Name
-                    // Progress bar at bottom of poster
-                    if item.EpisodeCount > 0 then
-                        Html.div [
-                            prop.className "absolute bottom-0 left-0 right-0 h-1 bg-base-content/10 rounded-b"
-                            prop.children [
-                                Html.div [
-                                    prop.className "h-full bg-primary rounded-b transition-all duration-500"
-                                    prop.style [ style.width (length.percent progressPct) ]
-                                ]
-                            ]
-                        ]
-                ]
-            ]
+            // series-ww1rb: the thumbnail is 40x56px (`PosterCard.thumbnail`)
+            // — the old 4px poster-bottom overlay bar fit there, but the
+            // season-rail + episode-dots pair needs two legible rows, which
+            // a 4px strip cannot carry without shrinking to illegibility.
+            // Moved into the text column instead (BC README notes this).
+            PosterCard.thumbnail item.PosterRef item.Name
             Html.div [
                 prop.className "flex-1 min-w-0"
                 prop.children [
@@ -2701,6 +2689,15 @@ let private seriesNextUpItemEnhanced (item: DashboardSeriesNextUp) =
                             prop.className "text-xs text-base-content/50"
                             prop.text $"S{item.NextUpSeason}E{item.NextUpEpisode}: {item.NextUpTitle}"
                         ]
+                    // series-ww1rb: season rail + current-season episode dots,
+                    // replacing the continuous percentage bar that used to sit
+                    // under the poster (a whole-series count could only ever
+                    // paint a prefix; the real per-episode/per-season watch
+                    // state renders the actual pattern, holes included).
+                    Html.div [
+                        prop.className "mt-0.5"
+                        prop.children [ DesignSystem.seriesSeasonEpisodeProgress item.SeasonsTouched item.CurrentSeasonWatched ]
+                    ]
                     // Progress text and time remaining
                     Html.div [
                         prop.className "flex items-center gap-2 mt-0.5"

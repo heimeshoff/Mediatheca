@@ -117,6 +117,18 @@ let private createRewatchSession (conn: SqliteConnection) (slug: string) (rewatc
     |> ignore
     Projection.runProjection conn SeriesProjection.handler
 
+/// series-ww1rb: guarantees a series surfaces in `getDashboardSeriesNextUp`'s
+/// results regardless of `watched_date` freshness — the dashboard WHERE
+/// clause's other visibility path (`>= date('now', '-7 days')`) is fragile
+/// against the fixed dates these tests use, so tests that need a
+/// fully-watched (no-NextUp) series to appear mark it in-focus instead.
+let private markInFocus (conn: SqliteConnection) (slug: string) : unit =
+    let streamId = Series.streamId slug
+    let position = EventStore.getStreamPosition conn streamId
+    EventStore.appendToStream conn streamId position [ Series.Serialization.toEventData Series.Series_in_focus_set ]
+    |> ignore
+    Projection.runProjection conn SeriesProjection.handler
+
 [<Tests>]
 let getBySlugTests =
     testList "SeriesProjection.getBySlug composes reads from the metadata cache" [
@@ -262,6 +274,89 @@ let seriesNextUpFrontierTests =
             | Some nextUp ->
                 Expect.equal nextUp.SeasonNumber 1 "still season 1"
                 Expect.equal nextUp.EpisodeNumber 3 "the episode immediately after the contiguous run (1,1)-(1,2)"
+    ]
+
+[<Tests>]
+let dashboardSeasonEpisodeDotsTests =
+    testList "series-ww1rb: getDashboardSeriesNextUp carries per-season/per-episode watch state" [
+
+        testCase "holes in the middle of the current season are preserved, not collapsed to a count" <| fun _ ->
+            use conn = newConn ()
+            // Season 1 has 8 episodes; 1-3 and 6-7 watched, 4-5 and 8 not.
+            // The frontier (series-k4zpn) is the max watched tuple (1,7), so
+            // NextUp is (1,8) — CurrentSeasonNumber comes from NextUpSeason,
+            // not the fallback path, exercising the primary branch.
+            seedSeries conn "holey-show" 500 None [ mkSeason 1 8 ]
+            for ep in [ 1; 2; 3; 6; 7 ] do
+                markWatched conn "holey-show" "default" 1 ep "2024-06-01"
+
+            let dto = SeriesProjection.getDashboardSeriesNextUp conn None |> List.find (fun r -> r.Slug = "holey-show")
+            Expect.equal dto.CurrentSeasonNumber 1 "current season is 1 (the only season, and NextUpSeason agrees)"
+            Expect.equal
+                dto.CurrentSeasonWatched
+                [ true; true; true; false; false; true; true; false ]
+                "the gaps at episodes 4-5 must survive as `false` entries, not be collapsed into a watched count"
+
+        testCase "SeasonsTouched marks only the season with at least one watched episode" <| fun _ ->
+            use conn = newConn ()
+            seedSeries conn "touched-middle-show" 501 None [ mkSeason 1 2; mkSeason 2 2; mkSeason 3 2 ]
+            markWatched conn "touched-middle-show" "default" 2 1 "2024-06-01"
+
+            let dto = SeriesProjection.getDashboardSeriesNextUp conn None |> List.find (fun r -> r.Slug = "touched-middle-show")
+            Expect.equal dto.SeasonsTouched [ false; true; false ] "only season 2 has any watched episode"
+            // The frontier (series-k4zpn) is the only watched tuple, (2,1), so
+            // NextUp is (2,2) — NextUpSeason is 2, while the highest season in
+            // the series is 3. CurrentSeasonNumber must follow NextUpSeason
+            // here, not the highest-season fallback, and CurrentSeasonWatched
+            // must reflect season 2's own two episodes, not season 3's.
+            Expect.equal dto.CurrentSeasonNumber 2 "current season comes from NextUpSeason (2), not the highest season (3)"
+            Expect.equal dto.CurrentSeasonWatched [ true; false ] "season 2 has episode 1 watched and episode 2 not — the hole is preserved"
+
+        testCase "SeasonsTouched reports true for both a fully-watched and a partially-watched season — two states, not three" <| fun _ ->
+            use conn = newConn ()
+            seedSeries conn "two-state-show" 502 None [ mkSeason 1 2; mkSeason 2 2 ]
+            markWatched conn "two-state-show" "default" 1 1 "2024-06-01"
+            markWatched conn "two-state-show" "default" 1 2 "2024-06-01"
+            markWatched conn "two-state-show" "default" 2 1 "2024-06-02"
+
+            let dto = SeriesProjection.getDashboardSeriesNextUp conn None |> List.find (fun r -> r.Slug = "two-state-show")
+            Expect.equal dto.SeasonsTouched [ true; true ] "season 1 is fully watched, season 2 is partially watched — both report true"
+
+        testCase "CurrentSeasonNumber falls back to the highest season when there is no Next Up (fully watched)" <| fun _ ->
+            use conn = newConn ()
+            seedSeries conn "finished-show" 503 None [ mkSeason 1 2; mkSeason 2 3 ]
+            for ep in [ 1; 2 ] do
+                markWatched conn "finished-show" "default" 1 ep "2024-06-01"
+            for ep in [ 1; 2; 3 ] do
+                markWatched conn "finished-show" "default" 2 ep "2024-06-02"
+            // Fully watched and not recently watched enough to satisfy the
+            // dashboard's own "recent" visibility rule — force visibility
+            // via in-focus instead (see markInFocus's doc comment).
+            markInFocus conn "finished-show"
+
+            let dto = SeriesProjection.getDashboardSeriesNextUp conn None |> List.find (fun r -> r.Slug = "finished-show")
+            Expect.equal dto.NextUpSeason 0 "no Next Up episode remains — the series is fully watched"
+            Expect.equal dto.CurrentSeasonNumber 2 "falls back to the highest-numbered season (2), not the Next Up season"
+
+        testCase "an episode watched only in a non-default rewatch session still reports true" <| fun _ ->
+            use conn = newConn ()
+            seedSeries conn "alt-session-show" 504 None [ mkSeason 1 3 ]
+            createRewatchSession conn "alt-session-show" "with-bob"
+            markWatched conn "alt-session-show" "with-bob" 1 2 "2024-06-01"
+
+            let dto = SeriesProjection.getDashboardSeriesNextUp conn None |> List.find (fun r -> r.Slug = "alt-session-show")
+            Expect.equal dto.CurrentSeasonWatched [ false; true; false ] "episode 2, watched only under 'with-bob', still counts as watched — distinct across all rewatch sessions"
+            Expect.equal dto.SeasonsTouched [ true ] "season 1 is touched by the with-bob session's watch"
+
+        testCase "a series with no series_episode_cache rows returns CurrentSeasonNumber 0 and empty lists" <| fun _ ->
+            use conn = newConn ()
+            seedSeries conn "cache-miss-show" 505 None []
+            markInFocus conn "cache-miss-show"
+
+            let dto = SeriesProjection.getDashboardSeriesNextUp conn None |> List.find (fun r -> r.Slug = "cache-miss-show")
+            Expect.equal dto.CurrentSeasonNumber 0 "no cache data at all — CurrentSeasonNumber defaults to 0"
+            Expect.isEmpty dto.CurrentSeasonWatched "no cache data at all — CurrentSeasonWatched is empty"
+            Expect.isEmpty dto.SeasonsTouched "no cache data at all — SeasonsTouched is empty"
     ]
 
 /// Counts the number of `IDbCommand`s created against the underlying

@@ -1695,7 +1695,10 @@ let private velvetLobbyPatternsSection () =
                         Title = "Loki"
                         NextLabel = "Next: S2 E3 · 44 min"
                         SeasonsTouched = [ true; true ]
-                        CurrentSeasonWatched = [ true; true; false; false; false; false ]
+                        // series-ww1rb: a real mid-season hole (episodes 3-4
+                        // skipped between two watched runs), not a prefix —
+                        // proof the primitive renders gaps, not just counts.
+                        CurrentSeasonWatched = [ true; true; false; false; true; true ]
                     }
                 ]
             ]
