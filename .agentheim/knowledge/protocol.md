@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 17:22 -- Modeling / Captured: design-system-mz9v7, series-ww1rb - Dashboard series card — season rail + per-episode dots that honour the actual watch set
+
+**Type:** Modeling / Capture
+**BC:** design-system, series
+**Filed to:** todo (both)
+**Summary:** Two defects in the dashboard TV card, one root cause. `DesignSystem.progressSegmented filled total` renders one segment per episode of the *whole series* (unreadable at 120 episodes) and fills the **first N** of them — so watching eps 1-3 and 6-7 paints five gold segments at the front instead of showing the gap. It can only paint a prefix because `DashboardSeriesNextUp` hands it a count, never a set, even though `series_episode_progress` holds the per-episode truth server-side. Split along the styleguide gate: **design-system-mz9v7** retires `progressSegmented` for flag-driven `progressEpisodes` + a two-state `progressSeasons` rail (gold = touched, brown = untouched; a fully-watched season is deliberately *not* distinct) with StyleGuide specimens carrying a mid-season hole so the bug can't regress; **series-ww1rb** adds `CurrentSeasonNumber` / `CurrentSeasonWatched` / `SeasonsTouched` to the DTO composed inside `SeriesProjection.getDashboardSeriesNextUp` per ADR-0048 (never `Api.fs`, no new materialized columns per ADR-0051), and wires all three surfaces — the "Next episode" hero cards, the StyleGuide specimens, and the Series-tab Next Up list. Builder calls: current season = Next Up's season, falling back to the last season when finished; two season states only; all three surfaces in scope. Noted as interacting with the concurrently-captured series-k4zpn, which changes what `NextUpSeason` means for a gapped series.
+
+---
+
 ## 2026-08-07 17:14 -- Modeling / Captured: design-system-m2wvc, design-system-n8zqr - Collapsible sidebar rail + drop the active item's inset-left bar
 
 **Type:** Modeling / Capture
