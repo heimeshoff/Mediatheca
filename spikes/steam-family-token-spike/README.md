@@ -1,21 +1,25 @@
 # Spike harness — Steam Family access-token minting (integration-ygwsa)
 
-**Status: UNEXECUTED.** This harness was written to prove/disprove that
-Mediatheca's server can mint its own `IFamilyGroupsService` access tokens from
-a stored Steam refresh token, eliminating the manual DevTools scrape (see
+**Status: EXECUTED — PASS (2026-08-07).** This harness was written to
+prove/disprove that Mediatheca's server can mint its own
+`IFamilyGroupsService` access tokens from a stored Steam refresh token,
+eliminating the manual DevTools scrape (see
 `.agentheim/contexts/integration/done/integration-ygwsa-steam-family-token-spike.md`).
 
-It could **not** be run in the environment this spike was done in: the QR
-step requires a human with the Steam mobile app to scan a code from a live
-terminal session, and no throwaway/test Steam account with an active Family
-Group was available. The code below reflects the recommended shape from the
-companion research report
-(`.agentheim/knowledge/research/steam-family-api-auto-token-refresh-2026-07-20.md`)
-and compiles conceptually against SteamKit2's documented API, but **none of
-it has been executed against the real Steam network.** Do not treat the
-`GetFamilyGroupForUser` call at the bottom as a confirmed-working path — that
-is exactly the decision-critical unknown this spike could not close. See
-ADR-0019 and the task's Notes for what integration-hebjs must verify first.
+The integration-hebjs builder gate ran it live against the real Steam
+network: QR login succeeded (MobileApp platform, persistent session),
+`GenerateAccessTokenForApp` minted an access token over plain HTTP (no CM
+connection), and `GetFamilyGroupForUser` returned **HTTP 200 with real
+family data** — the minted token carries the required audience/scope. The
+decision-critical unknown from ADR-0019 is closed; integration-hebjs builds
+the production flow on this confirmed path. Running it required a handful of
+API fixes vs. the as-written harness (SteamKit2 3.1.0: `CallbackManager` not
+`IDisposable`, `ChallengeURLChanged` is an `Action` property,
+`EAuthTokenPlatformType` lives in `SteamKit2.Internal`; plus
+`GenerateAccessTokenForApp` requires a `steamid` param — taken from the
+refresh-token JWT's `sub` claim — and the QR must be rendered as an image,
+now written to `qr.local.png` via QRCoder) — all folded into the scripts, so
+they are a proven-live reference.
 
 ## Why `MobileApp` platform, not the SteamKit2-sample default
 

@@ -31,14 +31,28 @@ let run () =
             let refreshToken = System.IO.File.ReadAllText(refreshTokenPath).Trim()
             use httpClient = new HttpClient()
 
-            // GenerateAccessTokenForApp/v1: refresh_token in, access_token out.
-            // `renewal_type` = 1 requests token renewal (rotates the refresh
-            // token too) — left at the default here since this is a one-shot
-            // spike call, not the production renew-and-persist policy (that's
-            // Steam.withTokenRefresh's job, see src/Server/Steam.fs).
+            // The refresh token is a JWT; its `sub` claim is the steamid,
+            // which GenerateAccessTokenForApp requires as a parameter.
+            let steamId =
+                let payload = refreshToken.Split('.').[1].Replace('-', '+').Replace('_', '/')
+                let padded = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=')
+                let json = Text.Encoding.UTF8.GetString(Convert.FromBase64String(padded))
+                let idx = json.IndexOf("\"sub\"")
+                let start = json.IndexOf('"', json.IndexOf(':', idx)) + 1
+                json.Substring(start, json.IndexOf('"', start) - start)
+
+            printfn "steamid (from refresh-token JWT sub claim): %s" steamId
+
+            // GenerateAccessTokenForApp/v1: refresh_token + steamid in,
+            // access_token out. `renewal_type` = 1 requests token renewal
+            // (rotates the refresh token too) — left at the default here since
+            // this is a one-shot spike call, not the production
+            // renew-and-persist policy (that's Steam.withTokenRefresh's job,
+            // see src/Server/Steam.fs).
             let content =
                 new FormUrlEncodedContent(
-                    dict [ "refresh_token", refreshToken ] |> Seq.map (fun kv -> System.Collections.Generic.KeyValuePair(kv.Key, kv.Value))
+                    dict [ "refresh_token", refreshToken; "steamid", steamId ]
+                    |> Seq.map (fun kv -> System.Collections.Generic.KeyValuePair(kv.Key, kv.Value))
                 )
 
             let! response =

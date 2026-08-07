@@ -45,3 +45,4 @@ uploads/
 
 ## Spike credentials (never commit — long-lived Steam refresh token)
 spikes/steam-family-token-spike/refresh-token.local.txt
+spikes/steam-family-token-spike/qr.local.png
