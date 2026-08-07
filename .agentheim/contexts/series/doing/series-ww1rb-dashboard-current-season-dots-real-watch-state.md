@@ -1,7 +1,7 @@
 ---
 id: series-ww1rb
 title: Dashboard series cards show only the *current season's* episode dots with a season rail above, and mark the episodes actually watched — extend `DashboardSeriesNextUp` with per-season touched flags and current-season per-episode watched flags, joined at query time per ADR-0048
-status: todo
+status: doing
 type: feature
 context: series
 created: 2026-08-07

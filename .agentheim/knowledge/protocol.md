@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-08 00:08 -- Batch started: [series-ww1rb]
+
+**Type:** Work / Batch start
+**Tasks:** series-ww1rb - Dashboard series cards show only the *current season's* episode dots with a season rail above, and mark the episodes actually watched — extend `DashboardSeriesNextUp` with per-season touched flags and current-season per-episode watched flags, joined at query time per ADR-0048
+**Parallel:** no (1 worker — single ready task, unblocked by design-system-mz9v7's builder-directed take-both merge)
+
+---
+
 ## 2026-08-08 00:08 -- Task verified and completed: design-system-mz9v7 - Season-rail + per-episode progress primitives in DesignSystem — `progressSeasons` (one line per season, gold when touched, brown when untouched) and `progressEpisodes` (one segment per episode of a single season, driven by a per-episode watched flag instead of a fill count), with StyleGuide specimens
 
 **Type:** Work / Task completion
