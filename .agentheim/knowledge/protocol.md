@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 11:17 -- Batch started: [games-k3vps]
+
+**Type:** Work / Batch start
+**Tasks:** games-k3vps - Selectable search sources in the games search tab — RAWG and Steam checkboxes (RAWG always on by default, Steam always off) that immediately include or exclude each API's results
+**Parallel:** no (1 worker — single ready task)
+
+---
+
 ## 2026-08-07 10:32 -- Modeling / Captured: games-k3vps - Selectable search sources in the games search tab (RAWG / Steam checkboxes)
 
 **Type:** Modeling / Capture

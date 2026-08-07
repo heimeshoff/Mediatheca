@@ -1,7 +1,7 @@
 ---
 id: games-k3vps
 title: Selectable search sources in the games search tab — RAWG and Steam checkboxes (RAWG always on by default, Steam always off) that immediately include or exclude each API's results
-status: todo
+status: doing
 type: feature
 context: games
 created: 2026-08-07
