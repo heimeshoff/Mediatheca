@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 14:08 -- Modeling / Promoted: integration-hebjs - One-click Steam Family import — automatic access-token acquisition
+
+**Type:** Modeling / Promote
+**BC:** integration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-08-07 14:08 -- Modeling / Refined: integration-hebjs - One-click Steam Family import — automatic access-token acquisition
 
 **Type:** Modeling / Refine

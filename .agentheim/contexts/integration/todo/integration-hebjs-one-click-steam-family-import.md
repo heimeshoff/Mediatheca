@@ -1,7 +1,7 @@
 ---
 id: integration-hebjs
 title: One-click Steam Family import — automatic access-token acquisition
-status: backlog
+status: todo
 type: feature
 context: integration
 created: 2026-07-20

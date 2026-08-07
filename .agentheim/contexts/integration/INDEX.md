@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
-- **Todo:** 0
+- **Backlog:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 10
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **integration-hebjs** — One-click Steam Family import — automatic access-token acquisition (feature) — `todo/integration-hebjs-one-click-steam-family-import.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -41,7 +42,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **integration-hebjs** -- One-click Steam Family import — automatic access-token acquisition -- `feature` -- `backlog/integration-hebjs-one-click-steam-family-import.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
