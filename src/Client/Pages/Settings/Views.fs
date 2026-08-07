@@ -209,6 +209,100 @@ let private adminSectionCard (sectionId: string) (title: string) (description: s
         ]
     ]
 
+// ── Administration Danger Gate ──
+//
+// The six administration sections carry the app's destructive, event-sourced
+// recovery actions (projection rebuild, image purge, raw event surgery).
+// ADR-0034 guards each of those with its own typed confirm, but that only
+// fires once the operator has already clicked — and the sections sat one
+// stray click away on a page visited for ordinary things like pasting a TMDB
+// key. This gate moves the deliberateness one step earlier: nothing below
+// renders at all until the word "danger" is typed. It is a speed bump, not a
+// secret — no auth, no persistence, no server involvement (this is a
+// single-user app; the threat model is the operator's own misclick).
+let private adminUnlockGate (model: Model) (dispatch: Msg -> unit) =
+    Html.div [
+        prop.className (DesignSystem.velvetCard + " p-5 max-w-md")
+        prop.children [
+            Html.p [
+                prop.className (DesignSystem.secondaryText + " mb-3")
+                prop.text "These controls rebuild projections, purge caches and rewrite the raw event log. Type danger to reveal them."
+            ]
+            Html.div [
+                prop.className "form-control"
+                prop.children [
+                    Daisy.input [
+                        prop.id Mediatheca.Client.Pages.Settings.State.adminUnlockInputElementId
+                        prop.type' "text"
+                        prop.className "w-full"
+                        prop.autoComplete "off"
+                        prop.placeholder "danger"
+                        prop.ariaLabel "Type danger to reveal the administration sections"
+                        prop.value model.AdminUnlockInput
+                        prop.onChange (Admin_unlock_input_changed >> dispatch)
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+// The six administration sections themselves — rendered only once the
+// danger gate above is unlocked (`adminUnlockGate`), in the /admin
+// console's former tab order.
+let private adminSections (model: Model) (dispatch: Msg -> unit) =
+    Html.div [
+        prop.className ("flex flex-col gap-4 " + DesignSystem.animateFadeIn)
+        prop.children [
+            adminSectionCard
+                "settings-admin-events"
+                "Events"
+                "Search and inspect the event store, including live-tail follow."
+                model.EventsSectionOpen
+                (fun () -> dispatch Toggle_events_section)
+                (Mediatheca.Client.Pages.Admin.Views.eventsSection model.AdminModel (Admin_msg >> dispatch))
+
+            adminSectionCard
+                Mediatheca.Client.Pages.Settings.State.projectionsSectionElementId
+                "Projections"
+                "Checkpoint/lag/row counts per projection, rebuild controls, drift check, event log backup."
+                model.ProjectionsSectionOpen
+                (fun () -> dispatch Toggle_projections_section)
+                (Mediatheca.Client.Pages.Admin.Views.projectionsSection model.AdminModel (Admin_msg >> dispatch))
+
+            adminSectionCard
+                "settings-admin-health"
+                "Health"
+                "Store-wide diagnostics: event counts, activity, storage sizes, unknown-event report."
+                model.HealthSectionOpen
+                (fun () -> dispatch Toggle_health_section)
+                (Mediatheca.Client.Pages.Admin.Views.healthSection model.AdminModel (Admin_msg >> dispatch))
+
+            adminSectionCard
+                "settings-admin-images"
+                "Images"
+                "Image cache stats, orphan detection, and purge."
+                model.ImagesSectionOpen
+                (fun () -> dispatch Toggle_images_section)
+                (Mediatheca.Client.Pages.Admin.Views.imagesSection model.AdminModel (Admin_msg >> dispatch))
+
+            adminSectionCard
+                "settings-admin-jobs"
+                "Jobs"
+                "Scheduled job history and manual triggers."
+                model.JobsSectionOpen
+                (fun () -> dispatch Toggle_jobs_section)
+                (Mediatheca.Client.Pages.Admin.Views.jobsSection model.AdminModel (Admin_msg >> dispatch))
+
+            adminSectionCard
+                "settings-admin-surgery"
+                "Surgery"
+                "Raw event-log escape hatch: edit, delete, rename event types."
+                model.SurgerySectionOpen
+                (fun () -> dispatch Toggle_surgery_section)
+                (Mediatheca.Client.Pages.Admin.Views.surgerySection model.AdminModel (Admin_msg >> dispatch))
+        ]
+    ]
+
 // ── Per-Integration Detail Functions ──
 
 let private tmdbDetail (model: Model) (dispatch: Msg -> unit) =
@@ -1483,63 +1577,28 @@ let view (model: Model) (dispatch: Msg -> unit) =
             // below Data Imports, in the tabs' former order. The dirty
             // banner sits above all six so it's visible regardless of which
             // (if any) are expanded — the same "visible on every tab"
-            // guarantee ADR-0034 established, just moved.
-            Html.h2 [
-                prop.className (DesignSystem.subtitle + " text-base-content/50 mb-4 mt-8")
-                prop.text "Administration"
-            ]
-            Mediatheca.Client.Pages.Admin.Views.dirtyBanner model.AdminModel.ProjectionsModel (fun () -> dispatch Go_to_projections_section)
+            // guarantee ADR-0034 established, just moved. It also stays
+            // visible above the danger gate while locked: knowing a
+            // projection is stale is read-only information, so hiding it
+            // would cost the operator awareness without buying any safety
+            // (its affordance leads to the unlock box, not past it).
             Html.div [
-                prop.className "flex flex-col gap-4"
+                prop.className "flex items-baseline justify-between gap-4 mb-4 mt-8"
                 prop.children [
-                    adminSectionCard
-                        "settings-admin-events"
-                        "Events"
-                        "Search and inspect the event store, including live-tail follow."
-                        model.EventsSectionOpen
-                        (fun () -> dispatch Toggle_events_section)
-                        (Mediatheca.Client.Pages.Admin.Views.eventsSection model.AdminModel (Admin_msg >> dispatch))
-
-                    adminSectionCard
-                        Mediatheca.Client.Pages.Settings.State.projectionsSectionElementId
-                        "Projections"
-                        "Checkpoint/lag/row counts per projection, rebuild controls, drift check, event log backup."
-                        model.ProjectionsSectionOpen
-                        (fun () -> dispatch Toggle_projections_section)
-                        (Mediatheca.Client.Pages.Admin.Views.projectionsSection model.AdminModel (Admin_msg >> dispatch))
-
-                    adminSectionCard
-                        "settings-admin-health"
-                        "Health"
-                        "Store-wide diagnostics: event counts, activity, storage sizes, unknown-event report."
-                        model.HealthSectionOpen
-                        (fun () -> dispatch Toggle_health_section)
-                        (Mediatheca.Client.Pages.Admin.Views.healthSection model.AdminModel (Admin_msg >> dispatch))
-
-                    adminSectionCard
-                        "settings-admin-images"
-                        "Images"
-                        "Image cache stats, orphan detection, and purge."
-                        model.ImagesSectionOpen
-                        (fun () -> dispatch Toggle_images_section)
-                        (Mediatheca.Client.Pages.Admin.Views.imagesSection model.AdminModel (Admin_msg >> dispatch))
-
-                    adminSectionCard
-                        "settings-admin-jobs"
-                        "Jobs"
-                        "Scheduled job history and manual triggers."
-                        model.JobsSectionOpen
-                        (fun () -> dispatch Toggle_jobs_section)
-                        (Mediatheca.Client.Pages.Admin.Views.jobsSection model.AdminModel (Admin_msg >> dispatch))
-
-                    adminSectionCard
-                        "settings-admin-surgery"
-                        "Surgery"
-                        "Raw event-log escape hatch: edit, delete, rename event types."
-                        model.SurgerySectionOpen
-                        (fun () -> dispatch Toggle_surgery_section)
-                        (Mediatheca.Client.Pages.Admin.Views.surgerySection model.AdminModel (Admin_msg >> dispatch))
+                    Html.h2 [
+                        prop.className (DesignSystem.subtitle + " text-base-content/50")
+                        prop.text "Administration"
+                    ]
+                    if model.AdminUnlocked then
+                        Html.button [
+                            prop.className (DesignSystem.mutedText + " underline hover:text-base-content transition-colors duration-200")
+                            prop.onClick (fun _ -> dispatch Lock_admin_sections)
+                            prop.text "Lock"
+                        ]
                 ]
             ]
+            Mediatheca.Client.Pages.Admin.Views.dirtyBanner model.AdminModel.ProjectionsModel (fun () -> dispatch Go_to_projections_section)
+            if model.AdminUnlocked then adminSections model dispatch
+            else adminUnlockGate model dispatch
         ]
     ]

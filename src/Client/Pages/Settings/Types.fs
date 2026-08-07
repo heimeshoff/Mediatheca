@@ -90,6 +90,16 @@ type Model = {
     // client-derived from it and must react even if the operator never opens
     // that section.
     AdminModel: Mediatheca.Client.Pages.Admin.Types.Model
+    /// The danger gate (administration-danger-gate): the six sections below
+    /// are not rendered at all until the operator types the word "danger"
+    /// into the unlock box. Guards against an accidental click on a
+    /// destructive, event-sourced recovery action (rebuild, purge, surgery)
+    /// that ADR-0034's per-action confirms only catch one step later.
+    /// Deliberately model state, not persisted: `Settings.State.init` runs on
+    /// every /settings visit (root `Url_changed`), so leaving the page and
+    /// coming back re-locks.
+    AdminUnlockInput: string
+    AdminUnlocked: bool
     EventsSectionOpen: bool
     EventsSectionLoaded: bool
     ProjectionsSectionOpen: bool
@@ -185,6 +195,12 @@ type Msg =
     | Steam_family_last_sync_loaded of string option
     // Administration (administration-k3vmt)
     | Admin_msg of Mediatheca.Client.Pages.Admin.Types.Msg
+    /// Typing in the danger gate's unlock box; unlocks as soon as the value
+    /// reads "danger" (trimmed, case-insensitive).
+    | Admin_unlock_input_changed of string
+    /// Re-locks without leaving the page: hides the six sections again,
+    /// collapses them, and stops the Events live-tail poll.
+    | Lock_admin_sections
     | Toggle_events_section
     | Toggle_projections_section
     | Toggle_health_section

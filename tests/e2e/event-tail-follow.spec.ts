@@ -1,4 +1,5 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
+import { unlockAdminSections } from "./admin-gate";
 
 // administration-a4d9b (ADR-0023, on top of the ADR-0027 harness): codifies
 // the Follow toggle's three ADR-0023 behaviors as committed, repeatable
@@ -54,6 +55,9 @@ const followingButton = (page: Page) => page.getByRole("button", { name: /^Follo
  * trigger `Load_filter_options`/`Load_page`. Idempotent: a no-op if already
  * open. */
 async function expandEventsSection(page: Page) {
+    // administration-danger-gate: the section isn't in the DOM at all until
+    // the "type danger" gate above it is passed.
+    await unlockAdminSections(page);
     const checkbox = page.locator("#settings-admin-events").locator('input[type="checkbox"]');
     if (!(await checkbox.isChecked())) {
         await checkbox.check();

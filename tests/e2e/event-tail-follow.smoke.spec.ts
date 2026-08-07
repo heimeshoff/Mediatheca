@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { unlockAdminSections } from "./admin-gate";
 
 // administration-da908 (ADR-0027): the harness-proving smoke spec. Not a
 // codification of ADR-0023's three live-tail behaviors — that's
@@ -25,8 +26,10 @@ test("Follow toggle: an event appended via a direct API call arrives live and ge
     // k3vmt dissolved the /admin console into inline collapsible sections on
     // Settings — this URL still resolves (to Settings), but the Events
     // section starts collapsed and unloaded, so it has to be expanded before
-    // the Follow button (inside it) is interactable.
+    // the Follow button (inside it) is interactable — and, since
+    // administration-danger-gate, only exists at all once the gate is passed.
     await page.goto("/#/admin/events");
+    await unlockAdminSections(page);
     const eventsCheckbox = page.locator("#settings-admin-events").locator('input[type="checkbox"]');
     await eventsCheckbox.check();
 

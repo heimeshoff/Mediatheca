@@ -1,4 +1,5 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
+import { unlockAdminSections } from "./admin-gate";
 
 // administration-svq3t (ADR-0027 harness, ADR-0034 guardrails): the Surgery
 // tab's first Playwright coverage. administration-wwc36 shipped edit/delete/
@@ -120,6 +121,9 @@ function adminSectionCard(page: Page, sectionId: string) {
  * `collapse` idiom uses to drive open/closed — checking it fires this
  * section's lazy-load on first expand. Idempotent: a no-op if already open. */
 async function expandAdminSection(page: Page, sectionId: string) {
+    // administration-danger-gate: no section renders until the "type danger"
+    // gate above them is passed — unlock first, then toggle.
+    await unlockAdminSections(page);
     const checkbox = adminSectionCard(page, sectionId).locator('input[type="checkbox"]');
     if (!(await checkbox.isChecked())) {
         await checkbox.check();

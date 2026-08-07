@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { unlockAdminSections } from "./admin-gate";
 
 // administration-k3vmt: the /admin console dissolved into six inline
 // collapsible sections on the Settings page (Events, Projections, Health,
@@ -28,6 +29,9 @@ function adminSectionCheckbox(page: Page, sectionId: string) {
 }
 
 async function expandSection(page: Page, sectionId: string) {
+    // The sections don't exist in the DOM until the danger gate is passed
+    // (administration-danger-gate) — unlock first, then toggle.
+    await unlockAdminSections(page);
     const checkbox = adminSectionCheckbox(page, sectionId);
     if (!(await checkbox.isChecked())) {
         await checkbox.check();
@@ -100,6 +104,51 @@ test.describe("Settings' inline administration sections — lazy load + Follow t
         // Give a re-fetch every chance to happen before asserting it didn't.
         await page.waitForTimeout(1_500);
         expect(adminRequests.filter((u) => methodOf(u) === "getHealthStats").length).toBe(1);
+    });
+
+    test("The danger gate hides all six sections until the word is typed, and re-locks on the next visit", async ({ page }) => {
+        const sectionIds = [
+            "settings-admin-events",
+            "settings-admin-projections",
+            "settings-admin-health",
+            "settings-admin-images",
+            "settings-admin-jobs",
+            "settings-admin-surgery",
+        ];
+
+        await page.goto("/#/settings");
+        const gate = page.locator("#settings-admin-unlock");
+        await expect(gate).toBeVisible();
+
+        // Not merely hidden — not rendered. Nothing to click through to.
+        for (const id of sectionIds) {
+            await expect(page.locator(`#${id}`)).toHaveCount(0);
+        }
+
+        // A near miss leaves the gate shut.
+        await gate.fill("dangerous");
+        await expect(page.locator("#settings-admin-surgery")).toHaveCount(0);
+
+        await gate.fill("danger");
+        for (const id of sectionIds) {
+            await expect(page.locator(`#${id}`)).toBeVisible();
+        }
+        await expect(gate).toHaveCount(0);
+
+        // Lock without navigating: sections gone, gate back.
+        await page.getByRole("button", { name: "Lock" }).click();
+        await expect(page.locator("#settings-admin-surgery")).toHaveCount(0);
+        await expect(gate).toBeVisible();
+
+        // Leaving and returning re-locks too — the unlock is per-visit model
+        // state (`Settings.State.init` runs on every /settings visit), never
+        // persisted.
+        await gate.fill("danger");
+        await expect(page.locator("#settings-admin-surgery")).toBeVisible();
+        await page.goto("/#/");
+        await page.goto("/#/settings");
+        await expect(page.locator("#settings-admin-unlock")).toBeVisible();
+        await expect(page.locator("#settings-admin-surgery")).toHaveCount(0);
     });
 
     test("Collapsing the Events section without navigating stops further getEventsAfter requests (ADR-0023, second trigger)", async ({ page }) => {

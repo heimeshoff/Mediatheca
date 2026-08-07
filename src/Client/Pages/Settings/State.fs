@@ -83,6 +83,34 @@ let private scrollToProjectionsCmd : Cmd<Msg> =
             50
         |> ignore)
 
+/// DOM id of the danger gate's unlock box — the scroll/focus target the
+/// dirty banner falls back to while the administration sections are locked.
+let adminUnlockInputElementId = "settings-admin-unlock"
+
+/// The word the operator has to type to reveal the administration sections.
+/// Compared trimmed and case-insensitively (`danger`, `DANGER`, ` Danger `
+/// all pass) — the gate exists to make the reveal *deliberate*, not to be a
+/// spelling test, and it is emphatically not a secret.
+let adminUnlockWord = "danger"
+
+let private matchesUnlockWord (value: string) =
+    value.Trim().ToLowerInvariant() = adminUnlockWord
+
+/// Mirrors `scrollToProjectionsCmd` for the locked case: brings the unlock
+/// box into view and focuses it, so the dirty banner's affordance still
+/// leads somewhere useful without itself bypassing the gate.
+let private focusUnlockInputCmd : Cmd<Msg> =
+    Cmd.ofEffect (fun _ ->
+        Fable.Core.JS.setTimeout
+            (fun () ->
+                let el = Browser.Dom.document.getElementById adminUnlockInputElementId
+                if not (isNull el) then
+                    el?scrollIntoView ({| behavior = "smooth"; block = "center" |})
+                    el?focus ()
+            )
+            50
+        |> ignore)
+
 let init () : Model * Cmd<Msg> =
     let adminModel, _ = Mediatheca.Client.Pages.Admin.State.init ()
     { TmdbApiKey = ""
@@ -147,6 +175,8 @@ let init () : Model * Cmd<Msg> =
       JellyfinSyncStatus = None
       SteamFamilyLastSync = None
       AdminModel = adminModel
+      AdminUnlockInput = ""
+      AdminUnlocked = false
       EventsSectionOpen = false
       EventsSectionLoaded = false
       ProjectionsSectionOpen = false
@@ -679,6 +709,32 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
             | _ -> model
         model, Cmd.map Admin_msg childCmd
 
+    | Admin_unlock_input_changed value ->
+        // Unlocking is one-way for the life of this page visit: once the
+        // word has been typed the box is replaced by the sections plus a
+        // "Lock" button, so there is no "kept typing and it re-hid" state.
+        { model with
+            AdminUnlockInput = value
+            AdminUnlocked = model.AdminUnlocked || matchesUnlockWord value },
+        Cmd.none
+
+    | Lock_admin_sections ->
+        // Collapse everything on the way out so re-unlocking starts from the
+        // same all-closed state a fresh visit gives, and stop the live-tail
+        // poll via the same idempotent `stopFollowing` the collapse and
+        // page-departure paths use (ADR-0023).
+        { model with
+            AdminUnlocked = false
+            AdminUnlockInput = ""
+            AdminModel = Mediatheca.Client.Pages.Admin.State.stopFollowing model.AdminModel
+            EventsSectionOpen = false
+            ProjectionsSectionOpen = false
+            HealthSectionOpen = false
+            ImagesSectionOpen = false
+            JobsSectionOpen = false
+            SurgerySectionOpen = false },
+        Cmd.none
+
     | Toggle_events_section ->
         let opening = not model.EventsSectionOpen
         let model = { model with EventsSectionOpen = opening }
@@ -728,4 +784,11 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
         else model, Cmd.none
 
     | Go_to_projections_section ->
-        { model with ProjectionsSectionOpen = true }, scrollToProjectionsCmd
+        // While the danger gate is locked the banner's affordance must not
+        // be a way around it — a dirty projection is information, rebuilding
+        // one is a destructive recovery action. So it leads to the unlock
+        // box rather than to the (unrendered) Projections section.
+        if not model.AdminUnlocked then
+            model, focusUnlockInputCmd
+        else
+            { model with ProjectionsSectionOpen = true }, scrollToProjectionsCmd
