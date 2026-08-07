@@ -235,7 +235,15 @@ module Rawg =
             | None ->
                 let yearParam = match year with Some y -> $"&dates={y}-01-01,{y}-12-31" | None -> ""
                 let url = $"https://api.rawg.io/api/games?key={config.ApiKey}&search={System.Uri.EscapeDataString(query)}&page_size=10{yearParam}"
-                let! json = fetchJson httpClient url
+                // RAWG outages are routine — surface them as a readable message instead of
+                // letting the raw HttpClient exception escape as an opaque 500.
+                let! json =
+                    async {
+                        try
+                            return! fetchJson httpClient url
+                        with ex ->
+                            return failwith $"RAWG search is unavailable right now ({ex.Message}). Try again later."
+                    }
                 match Decode.fromString decodeSearchResponse json with
                 | Ok response ->
                     let results : Mediatheca.Shared.RawgSearchResult list =
