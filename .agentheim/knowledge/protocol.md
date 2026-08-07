@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 18:36 -- Batch started: [design-system-mz9v7, design-system-m2wvc, series-k4zpn]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-mz9v7 - Season-rail + per-episode progress primitives in DesignSystem — `progressSeasons` (one line per season, gold when touched, brown when untouched) and `progressEpisodes` (one segment per episode of a single season, driven by a per-episode watched flag instead of a fill count), with StyleGuide specimens, design-system-m2wvc - Sidebar active nav item — drop the gold inset-left bar; burgundy fill + gold icon carry the active state alone (retracts that half of ADR-0014's dir-3a treatment), series-k4zpn - Next Up must follow the furthest-watched episode, not the first unwatched one — a skipped episode currently pins Next Up forever; when nothing remains beyond the furthest watched, show the fully-watched state even if a gap exists
+**Parallel:** yes (3 workers — ready set was 4; intelligence-t8n3q held to next wave by MAX_PARALLEL=3: it unblocks nothing while both design-system picks each unblock a queued follower (n8zqr, ww1rb), and it shares Dashboard/Views.fs with design-system-mz9v7's call-site migration)
+
+---
+
 ## 2026-08-07 17:22 -- Modeling / Captured: design-system-mz9v7, series-ww1rb - Dashboard series card — season rail + per-episode dots that honour the actual watch set
 
 **Type:** Modeling / Capture

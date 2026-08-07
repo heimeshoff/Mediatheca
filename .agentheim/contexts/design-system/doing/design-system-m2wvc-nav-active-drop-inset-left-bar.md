@@ -1,7 +1,7 @@
 ---
 id: design-system-m2wvc
 title: Sidebar active nav item — drop the gold inset-left bar; burgundy fill + gold icon carry the active state alone (retracts that half of ADR-0014's dir-3a treatment)
-status: todo
+status: doing
 type: refactor
 context: design-system
 created: 2026-08-07

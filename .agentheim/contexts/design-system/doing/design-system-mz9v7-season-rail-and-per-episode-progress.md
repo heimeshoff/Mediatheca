@@ -1,7 +1,7 @@
 ---
 id: design-system-mz9v7
 title: Season-rail + per-episode progress primitives in DesignSystem — `progressSeasons` (one line per season, gold when touched, brown when untouched) and `progressEpisodes` (one segment per episode of a single season, driven by a per-episode watched flag instead of a fill count), with StyleGuide specimens
-status: todo
+status: doing
 type: feature
 context: design-system
 created: 2026-08-07

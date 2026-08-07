@@ -1,7 +1,7 @@
 ---
 id: series-k4zpn
 title: Next Up must follow the furthest-watched episode, not the first unwatched one — a skipped episode currently pins Next Up forever; when nothing remains beyond the furthest watched, show the fully-watched state even if a gap exists
-status: todo
+status: doing
 type: bug
 context: series
 created: 2026-08-07
