@@ -170,8 +170,10 @@ let navItemInactive = "nav-item-inactive hover:text-base-content hover:bg-base-3
 let navItemClass isActive =
     navItem + " " + (if isActive then navItemActive else navItemInactive)
 
-/// Wraps every nav item's icon (dir 3a: 12px top group / 11px bottom group,
-/// via `navGroupBottom`'s CSS scope; muted by default). Pass
+/// Wraps every nav item's icon (18px top group / 16px bottom group, via
+/// `navGroupBottom`'s CSS scope; muted by default) — one size in both rail
+/// states, since dir 3a's original 12px/11px read undersized against the
+/// collapsed rail's icons. Pass
 /// `navItemActiveIconClass` for the active item instead — flips it to gold.
 let navItemIconClass = "nav-item-icon"
 let navItemActiveIconClass = "nav-item-icon nav-item-active-icon"
@@ -180,7 +182,7 @@ let navItemActiveIconClass = "nav-item-icon nav-item-active-icon"
 let navGroupTop = "flex flex-col gap-[2px]"
 
 /// Bottom nav group — Events/Settings, one step smaller (dir 3a: 12px
-/// labels, 11px icons, `--color-nav-bottom-muted`), pinned to the foot of
+/// labels, 16px icons, `--color-nav-bottom-muted`), pinned to the foot of
 /// the rail via `margin-top: auto`.
 let navGroupBottom = "nav-group-bottom flex flex-col gap-[2px] mt-auto"
 
@@ -188,8 +190,9 @@ let navGroupBottom = "nav-group-bottom flex flex-col gap-[2px] mt-auto"
 let navTagline = "text-[8.5px] font-sans uppercase tracking-[0.26em] text-ink-faint mt-[3px] whitespace-nowrap"
 
 /// Nav-rail marker class applied to the `aside` when the collapsed toggle
-/// (design-system-n8zqr) is on — scopes the icon-size bump (12px/11px grow
-/// to read at the ~64px collapsed width) without a separate icon-class pair.
+/// (design-system-n8zqr) is on — the hook for any collapsed-only scoping
+/// without a separate class pair. (It used to bump the icons one step; the
+/// bumped size is now the single size both states share.)
 let navRailCollapsed = "nav-rail-collapsed"
 
 // ── Tooltip (paper overlay, ADR-0016) — the system's first tooltip. First

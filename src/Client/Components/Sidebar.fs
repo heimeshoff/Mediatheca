@@ -114,18 +114,39 @@ let private navItem
         ]
     ]
 
-let private toggleButton (collapsed: bool) (onToggle: unit -> unit) =
+/// The wordmark *is* the collapse control (no chevron — design-system-n8zqr's
+/// separate toggle button is gone): clicking the title collapses the rail,
+/// clicking the lone mark expands it again. Collapsed, the mark borrows the
+/// nav items' hover tooltip to name the otherwise-invisible affordance.
+let private brandButton
+    (collapsed: bool)
+    (getRailRight: unit -> float)
+    (setTooltip: TooltipTarget option -> unit)
+    (onToggle: unit -> unit)
+    (children: ReactElement list)
+    =
     Html.button [
         prop.type' "button"
-        prop.className "flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-md text-ink-muted hover:text-base-content hover:bg-base-300/50 transition-colors cursor-pointer"
+        prop.className (
+            "flex items-center gap-3 rounded-lg cursor-pointer transition-opacity hover:opacity-80 "
+            + (if collapsed then "justify-center" else "text-left")
+        )
         prop.ariaLabel (if collapsed then "Expand sidebar" else "Collapse sidebar")
+        prop.ariaExpanded (not collapsed)
         prop.onClick (fun _ -> onToggle ())
-        prop.children [
-            Html.span [
-                prop.className ("transition-transform duration-200 " + (if collapsed then "rotate-180" else ""))
-                prop.children [ Icons.chevronLeft () ]
-            ]
-        ]
+        prop.onMouseEnter (fun e ->
+            if collapsed then
+                let el = e.currentTarget :?> Browser.Types.HTMLElement
+                let rect = el.getBoundingClientRect ()
+                setTooltip (
+                    Some {
+                        Label = "Expand sidebar"
+                        Top = rect.top + rect.height / 2.0
+                        Left = getRailRight () + 8.0
+                    }
+                ))
+        prop.onMouseLeave (fun _ -> if collapsed then setTooltip None)
+        prop.children children
     ]
 
 [<ReactComponent>]
@@ -154,60 +175,55 @@ let view (currentPage: Page) =
         // navGroupBottom's mt-auto resolve against the viewport instead of the page foot.
         // Width animates between the two states (design-system-n8zqr); `main` needs no
         // compensation since the rail stays in flow (Components/Layout.fs's flex row).
+        // Collapsed, the fill drops away entirely — the icon strip sits straight on the
+        // page rather than on its own `bg-base-200` panel — and fades with the width so
+        // the two states cross over as one motion.
         prop.className (
-            "hidden lg:flex flex-col lg:sticky lg:top-0 lg:h-screen bg-base-200 border-r border-base-300/50 transition-[width] duration-200 ease-out "
-            + (if collapsed then "w-16 " else "w-64 ")
+            "hidden lg:flex flex-col lg:sticky lg:top-0 lg:h-screen border-r border-base-300/50 transition-[width,background-color] duration-200 ease-out "
+            + (if collapsed then "w-16 bg-transparent " else "w-64 bg-base-200 ")
             + (if collapsed then DesignSystem.navRailCollapsed else "")
         )
         prop.children [
             // Logo header with subtle bottom border — Velvet Lobby wordmark (brief 3a):
             // "Media" in Instrument Serif ink + italic gold "theca", plus the
             // dir 3a tagline underneath. Collapsed: the wordmark reduces to the
-            // mark alone ("Media*theca*" doesn't survive at 64px) and the
-            // tagline is hidden; the collapse toggle lives here in both states.
-            if collapsed then
-                Html.div [
-                    prop.className "flex flex-col items-center gap-3 px-2 py-6 border-b border-base-300/30"
-                    prop.children [
+            // mark alone ("Media*theca*" doesn't survive at 64px). The header
+            // itself is the collapse control in both states — see `brandButton`.
+            //
+            // One header for both states, not a branch per state: the header's
+            // height sets where the nav below it starts, so a collapsed variant
+            // that simply dropped the tagline made every nav icon jump ~16px up
+            // on toggle. The tagline goes `invisible` instead of unmounting —
+            // its box still reserves the height, and `visibility: hidden` keeps
+            // it out of the a11y tree (and out of Playwright's `toBeVisible`).
+            // The 32px mark drives the brand row's height either way, so the
+            // rest lines up on its own.
+            Html.div [
+                prop.className (
+                    "flex flex-col py-6 border-b border-base-300/30 overflow-hidden "
+                    + (if collapsed then "items-center px-2" else "px-6")
+                )
+                prop.children [
+                    brandButton collapsed getRailRight setTooltip toggle [
                         Html.span [
                             prop.className "text-primary drop-shadow-[0_0_8px_oklch(0.80_0.12_82_/_0.4)]"
                             prop.children [ Icons.mediatheca () ]
                         ]
-                        toggleButton collapsed toggle
-                    ]
-                ]
-            else
-                Html.div [
-                    prop.className "flex flex-col px-6 py-6 border-b border-base-300/30"
-                    prop.children [
-                        Html.div [
-                            prop.className "flex items-center justify-between gap-3"
-                            prop.children [
-                                Html.div [
-                                    prop.className "flex items-center gap-3"
-                                    prop.children [
-                                        Html.span [
-                                            prop.className "text-primary drop-shadow-[0_0_8px_oklch(0.80_0.12_82_/_0.4)]"
-                                            prop.children [ Icons.mediatheca () ]
-                                        ]
-                                        Html.span [
-                                            prop.className "font-display text-2xl leading-none text-base-content"
-                                            prop.children [
-                                                Html.text "Media"
-                                                Html.span [ prop.className "italic text-primary"; prop.text "theca" ]
-                                            ]
-                                        ]
-                                    ]
+                        if not collapsed then
+                            Html.span [
+                                prop.className "font-display text-2xl leading-none text-base-content"
+                                prop.children [
+                                    Html.text "Media"
+                                    Html.span [ prop.className "italic text-primary"; prop.text "theca" ]
                                 ]
-                                toggleButton collapsed toggle
                             ]
-                        ]
-                        Html.div [
-                            prop.className DesignSystem.navTagline
-                            prop.text "Where entertainment lives"
-                        ]
+                    ]
+                    Html.div [
+                        prop.className (DesignSystem.navTagline + (if collapsed then " invisible" else ""))
+                        prop.text "Where entertainment lives"
                     ]
                 ]
+            ]
             // Navigation — top group (primary destinations) + bottom group
             // (Events/Settings, pinned via mt-auto).
             Html.nav [
@@ -230,18 +246,27 @@ let view (currentPage: Page) =
             // vertical center, so it escapes `nav`'s `overflow-y-auto`
             // clipping regardless of where in the (possibly
             // internally-scrolled) list the item sits.
+            //
+            // Portalled to `document.body`: `position: sticky` makes the rail
+            // its own stacking context, so the tooltip's z-index could only
+            // ever compete *inside* the rail — page content painted later in
+            // tree order (movie/series cards and their z-indexed overlays)
+            // covered it. As the body's last child it outranks the page.
             match tooltip with
             | Some t ->
-                Html.div [
-                    prop.className DesignSystem.tooltip
-                    prop.style [
-                        style.custom ("position", "fixed")
-                        style.top (length.px t.Top)
-                        style.left (length.px t.Left)
-                        style.custom ("transform", "translateY(-50%)")
-                    ]
-                    prop.text t.Label
-                ]
+                ReactDOM.createPortal (
+                    Html.div [
+                        prop.className DesignSystem.tooltip
+                        prop.style [
+                            style.custom ("position", "fixed")
+                            style.top (length.px t.Top)
+                            style.left (length.px t.Left)
+                            style.custom ("transform", "translateY(-50%)")
+                        ]
+                        prop.text t.Label
+                    ],
+                    Browser.Dom.document.body
+                )
             | None -> ()
         ]
     ]

@@ -549,8 +549,15 @@ h1, h2, h3, h4, h5, h6 {
    corner-notch back to the brief's own burgundy fill + gold icon; the
    inset-left bar dir-3a/ADR-0014 also carried was retracted by
    design-system-m2wvc — the fill and icon alone carry the active state. ── */
+/* An explicit line-height, paired with the matching fixed-height icon box
+   below, is what keeps a collapsed row exactly as tall as an expanded one.
+   Left to `normal`, the row's height comes from the label's line box when the
+   label is rendered and from the icon alone when it isn't — a couple of px
+   apart, accumulating down the list, so toggling the rail slid every item
+   below the first. Change these two in step, never one alone. */
 .nav-item {
     position: relative;
+    line-height: 20px;
     transition: background-color 0.2s ease, color 0.2s ease;
 }
 
@@ -566,44 +573,49 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Icon — muted by default (distinct shade from the inactive label's ink),
-   12px (top group; the bottom group scales it to 11px below). The active
+   18px (top group; the bottom group scales it to 16px below). One size in
+   both rail states: the original 12px/11px was set against the label and
+   read visibly undersized next to the collapsed rail's 18px/16px. The active
    item's icon flips to gold via .nav-item-active-icon. */
 .nav-item-icon {
     color: var(--color-nav-icon-muted);
+    /* Flex, not inline: a fixed box exactly as tall as `.nav-item`'s line box,
+       with no inline descender slack under the svg. */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
 }
 .nav-item-icon svg {
-    width: 12px;
-    height: 12px;
+    width: 18px;
+    height: 18px;
 }
 .nav-item-active-icon {
     color: var(--color-gold);
 }
 
-/* Bottom group (Events/Settings) — one step smaller (dir 3a). */
+/* Bottom group (Events/Settings) — one step smaller (dir 3a). Its own
+   line-height / icon-box pair, same rule as above: keep them equal. */
 .nav-group-bottom .nav-item {
     font-size: 12px;
+    line-height: 18px;
+}
+.nav-group-bottom .nav-item-icon {
+    height: 18px;
 }
 .nav-group-bottom .nav-item-icon svg {
-    width: 11px;
-    height: 11px;
+    width: 16px;
+    height: 16px;
 }
 .nav-group-bottom .nav-item-inactive,
 .nav-group-bottom .nav-item-inactive .nav-item-icon {
     color: var(--color-nav-bottom-muted);
 }
 
-/* Collapsed rail (design-system-n8zqr) — icons-only strip, ~64px wide. The
-   12px/11px icons read too small alone (no label alongside to anchor them),
-   so they grow one step under the `.nav-rail-collapsed` marker class the
-   `aside` carries while collapsed. */
-.nav-rail-collapsed .nav-item-icon svg {
-    width: 18px;
-    height: 18px;
-}
-.nav-rail-collapsed .nav-group-bottom .nav-item-icon svg {
-    width: 16px;
-    height: 16px;
-}
+/* Collapsed rail (design-system-n8zqr) — icons-only strip, ~64px wide. It
+   used to bump the icons one step here (12px/11px → 18px/16px); the 18px/16px
+   is now the single size both states share, so the `.nav-rail-collapsed`
+   marker class needs no icon rule of its own. */
 
 /* ── Underline tab (dir 3a header tabs, design-system-k9p3v) — text tabs
    with a gold underline under the active tab; no filled-pill /

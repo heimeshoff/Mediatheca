@@ -5,6 +5,10 @@ import { test, expect, type Locator } from "@playwright/test";
 // hovering a nav icon reveals its label in a new paper-overlay tooltip
 // composition (ADR-0016) -- the system's first tooltip.
 //
+// The toggle is the wordmark itself -- there is no separate chevron button,
+// and the tooltip is portalled to `document.body` so page content can never
+// paint over it.
+//
 // Non-destructive (read-only navigation, localStorage writes only) -- no
 // `test.skip(!process.env.CI, …)` gate needed, matching the other
 // non-destructive specs in this suite.
@@ -51,6 +55,91 @@ test.describe("Sidebar rail: collapsible icons-only toggle", () => {
         expect(await page.evaluate(() => (window as any).__noReloadMarker)).toBe(true);
 
         await expect(page.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
+    });
+
+    test("the toggle is the wordmark itself -- no separate chevron control", async ({ page }) => {
+        const rail = page.locator("aside");
+
+        // Expanded: the one control in the rail header is the wordmark, and
+        // clicking the title text (not some adjacent affordance) collapses it.
+        const collapseToggle = page.getByRole("button", { name: "Collapse sidebar" });
+        await expect(collapseToggle).toContainText("Mediatheca");
+        await expect(rail.getByRole("button")).toHaveCount(1);
+
+        await collapseToggle.getByText("theca").click();
+        await waitForRailWidth(rail, 64);
+
+        // Collapsed: the mark alone carries the toggle, still the only button.
+        await expect(rail.getByRole("button")).toHaveCount(1);
+        await page.getByRole("button", { name: "Expand sidebar" }).click();
+        await waitForRailWidth(rail, 256);
+    });
+
+    test("while collapsed, hovering the mark names the expand affordance", async ({ page }) => {
+        const rail = page.locator("aside");
+
+        await page.getByRole("button", { name: "Collapse sidebar" }).click();
+        await waitForRailWidth(rail, 64);
+
+        await page.getByRole("button", { name: "Expand sidebar" }).hover();
+
+        const tooltip = page.locator(".nav-tooltip");
+        await expect(tooltip).toBeVisible();
+        await expect(tooltip).toHaveText("Expand sidebar");
+    });
+
+    test("the collapsed tooltip escapes the rail's stacking context so page content cannot cover it", async ({ page }) => {
+        const rail = page.locator("aside");
+
+        await page.getByRole("button", { name: "Collapse sidebar" }).click();
+        await waitForRailWidth(rail, 64);
+        await page.getByRole("link", { name: "Movies" }).hover();
+
+        const tooltip = page.locator(".nav-tooltip");
+        await expect(tooltip).toBeVisible();
+
+        // `position: sticky` makes the rail its own stacking context, so a
+        // tooltip rendered inside it can only ever compete with the rail's own
+        // children -- cards in `main` (painted later in tree order) covered it.
+        // Portalling to `body` is what puts it above the page.
+        const [parentTag, insideRail, zIndex] = await tooltip.evaluate((el) => [
+            el.parentElement?.tagName ?? "",
+            !!el.closest("aside"),
+            getComputedStyle(el).zIndex,
+        ]);
+        expect(parentTag).toBe("BODY");
+        expect(insideRail).toBe(false);
+        expect(Number(zIndex)).toBeGreaterThan(0);
+    });
+
+    test("every nav icon keeps its vertical position across a toggle -- nothing jumps", async ({ page }) => {
+        const rail = page.locator("aside");
+
+        // Two independent ways this drifts, so measure every item rather than
+        // just the first: the header's height sets where the nav starts (a
+        // collapsed header that drops the tagline shifts the whole list up),
+        // and each row's height depends on whether its label renders (a
+        // per-item delta that accumulates downward). Measuring the icons, not
+        // the rows, because the icon is what the eye tracks.
+        const iconTops = async () =>
+            rail.locator(".nav-item-icon svg").evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top));
+
+        const markTop = async (name: string) =>
+            (await page.getByRole("button", { name }).locator("svg").boundingBox())!.y;
+
+        const before = await iconTops();
+        const brandBefore = await markTop("Collapse sidebar");
+        expect(before.length).toBe(7); // 6 top-group items + Settings
+
+        await page.getByRole("button", { name: "Collapse sidebar" }).click();
+        await waitForRailWidth(rail, 64);
+
+        const after = await iconTops();
+        const brandAfter = await markTop("Expand sidebar");
+
+        expect(after.length).toBe(before.length);
+        after.forEach((top, i) => expect(top).toBeCloseTo(before[i], 0));
+        expect(brandAfter).toBeCloseTo(brandBefore, 0);
     });
 
     test("while collapsed, no nav label text or tagline is visible", async ({ page }) => {
