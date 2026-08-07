@@ -1,7 +1,7 @@
 ---
 id: integration-w8fkr
 title: Retire the Cinemarco import — delete the Settings card, the `importFromCinemarco` contract member, and `CinemarcoImport.fs`
-status: todo
+status: doing
 type: refactor
 context: integration
 created: 2026-08-07

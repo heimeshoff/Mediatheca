@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 16:20 -- Batch started: [integration-w8fkr]
+
+**Type:** Work / Batch start
+**Tasks:** integration-w8fkr - Retire the Cinemarco import — delete the Settings card, the `importFromCinemarco` contract member, and `CinemarcoImport.fs`
+**Parallel:** no (1 worker — single ready task; ready set was exactly 1)
+
+---
+
 ## 2026-08-07 16:34 -- Modeling / Captured: integration-w8fkr - Retire the Cinemarco import
 
 **Type:** Modeling / Capture
