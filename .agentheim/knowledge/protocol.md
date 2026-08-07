@@ -5,6 +5,23 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 11:43 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 26m (batch start 11:17 → 11:43)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** games-k3vps: 1
+**Commits:** 3 (batch start, task squash-merge commit, this entry)
+**Session-start churn:** 0 recognized machine-shape commits, 1 human commit since the 2026-08-04 23:52 boundary — `ff1e040` "removed cardhover in settings" touches `src/Client/Pages/Settings/Views.fs`, the settings surface ADR-0041 describes, and drops `DesignSystem.cardHover` from the integration card and the admin section card. Flagged as a governed-surface hit; advisory written to `.agentheim/state/whats-next.md`, no task auto-filed.
+**Vision-conformance:** none — batch aligns with vision (games-k3vps extends the Steam Import Enhancement workstream inside the v1 media experience, and honors the Replayable principle: the Steam-sourced import writes description/short-description/website-url/facets to `game_metadata_cache` via the creation code path and carries only identity-card fields on `Add_game` — verifier confirmed no `*Projection.fs` reference to `MetadataCache`, ADR-0043/ADR-0045 discipline intact)
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task) — hand-classified (type: feature; all files under src/, tests/, plus the BC README and routine task documentation)
+**Carry-over:** left behind (user WIP, 3 files: `src/Server/Rawg.fs` modified, `Mediatheca Directions.html` and `plan.md` untracked). No `.agentheim/`-owned files stranded. `git worktree list` clean — the games-k3vps worktree was unlinked (node_modules junction removed first) and removed after PASS integration, branch deleted; `.worktrees/` retains four gitignored directory shells (administration-z6ymt, games-j6wkr, games-k3vps, games-v4nqe) holding only MSBuild `obj/` residue (12 files, no source) that Windows left behind across teardowns — surfaced to the builder, not removed on this session's initiative.
+
+---
+
 ## 2026-08-07 11:42 -- Task verified and completed: games-k3vps - Selectable search sources in the games search tab — RAWG and Steam checkboxes (RAWG always on by default, Steam always off) that immediately include or exclude each API's results
 
 **Type:** Work / Task completion
