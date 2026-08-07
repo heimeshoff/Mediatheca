@@ -574,6 +574,19 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--color-nav-bottom-muted);
 }
 
+/* Collapsed rail (design-system-n8zqr) — icons-only strip, ~64px wide. The
+   12px/11px icons read too small alone (no label alongside to anchor them),
+   so they grow one step under the `.nav-rail-collapsed` marker class the
+   `aside` carries while collapsed. */
+.nav-rail-collapsed .nav-item-icon svg {
+    width: 18px;
+    height: 18px;
+}
+.nav-rail-collapsed .nav-group-bottom .nav-item-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
 /* ── Underline tab (dir 3a header tabs, design-system-k9p3v) — text tabs
    with a gold underline under the active tab; no filled-pill /
    bordered-button chrome. Ink color is plain Tailwind utility (text-base-content
@@ -672,6 +685,32 @@ h1, h2, h3, h4, h5, h6 {
 
 .rating-dropdown-item-clear:hover {
     background: oklch(0.93 0.012 60 / 0.05);
+}
+
+/* ── Tooltip (paper overlay, ADR-0016) — the system's first tooltip
+   (design-system-n8zqr). First consumer: the collapsed sidebar rail reveals
+   an icon-only item's label on hover. Same opaque-fill/line-ring/elevation
+   material as `.rating-dropdown`; the caller sets `position: fixed` +
+   `top`/`left` inline (measured from the hovered trigger's own rect), so
+   this class owns only the paper material + label typography. Pointer
+   events are disabled -- it is a passive hint, never an interactive target. */
+.nav-tooltip {
+    background: var(--color-paper);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-paper);
+    padding: 6px 10px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    color: var(--color-base-content);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 250;
+    animation: nav-tooltip-fade-in 0.12s ease-out;
+}
+@keyframes nav-tooltip-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
 }
 
 /* ── Stat card subtle glow ── */

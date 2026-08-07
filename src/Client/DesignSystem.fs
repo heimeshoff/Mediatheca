@@ -187,6 +187,23 @@ let navGroupBottom = "nav-group-bottom flex flex-col gap-[2px] mt-auto"
 /// Tagline under the wordmark (dir 3a): "Where entertainment lives".
 let navTagline = "text-[8.5px] font-sans uppercase tracking-[0.26em] text-ink-faint mt-[3px] whitespace-nowrap"
 
+/// Nav-rail marker class applied to the `aside` when the collapsed toggle
+/// (design-system-n8zqr) is on — scopes the icon-size bump (12px/11px grow
+/// to read at the ~64px collapsed width) without a separate icon-class pair.
+let navRailCollapsed = "nav-rail-collapsed"
+
+// ── Tooltip (paper overlay, ADR-0016) — the system's first tooltip. First
+// consumer: the collapsed sidebar rail reveals an icon-only item's label on
+// hover (design-system-n8zqr). ──
+
+/// Tooltip — paper-overlay label reveal (ADR-0016 material: opaque fill,
+/// line ring, elevation shadow, no translucency). Structural placement
+/// (fixed-position coordinates, measured from the hovered trigger's rect) is
+/// the caller's job — this composition owns only the paper material + label
+/// typography, the same division of labour as `paperDropdown`/
+/// `.rating-dropdown`. See `Components/Sidebar.fs` for the first consumer.
+let tooltip = "nav-tooltip"
+
 // ── Underline tab (§ 4 dir 3a header tabs, design-system-k9p3v) ──
 // The header-tab sibling of the dir-3a sidebar nav above: a text tab with a
 // gold underline under the active tab, no filled-pill / bordered-button

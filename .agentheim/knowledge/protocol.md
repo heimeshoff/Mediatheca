@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 19:36 -- Task verified and completed: design-system-n8zqr - Desktop sidebar rail collapses to icons only — a persisted manual toggle in the rail header, with a paper-overlay tooltip supplying each icon's label while collapsed
+
+**Type:** Work / Task completion
+**Task:** design-system-n8zqr - Desktop sidebar rail collapses to icons only — a persisted manual toggle in the rail header, with a paper-overlay tooltip supplying each icon's label while collapsed
+**Summary:** Desktop sidebar rail collapses to a ~64px icons-only strip via a persisted keyboard-focusable toggle, with the design system's first paper-overlay tooltip supplying labels while collapsed
+**Duration:** 31m
+**Verification:** PASS (iteration 1)
+**Files changed:** 8
+**Tests added:** 10
+**ADRs written:** none
+
+---
+
 ## 2026-08-07 19:12 -- Task verified and completed: intelligence-t8n3q - Dashboard library-search control needs a hover affordance — pointer cursor and a "Ctrl + K" tooltip
 
 **Type:** Work / Task completion

@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 2
-- **Done:** 19
+- **Doing:** 1
+- **Done:** 20
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,13 +22,13 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **design-system-n8zqr** — Desktop sidebar rail collapses to icons only — a persisted manual toggle in the rail header, with a paper-overlay tooltip supplying each icon's label while collapsed (feature) — `doing/design-system-n8zqr-sidebar-collapsible-icons-only.md`
 - **design-system-mz9v7** — Season-rail + per-episode progress primitives in DesignSystem — `progressSeasons` (one line per season, gold when touched, brown when untouched) and `progressEpisodes` (one segment per episode of a single season, driven by a per-episode watched flag instead of a fill count), with StyleGuide specimens (feature) — `doing/design-system-mz9v7-season-rail-and-per-episode-progress.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **design-system-n8zqr** — Desktop sidebar rail collapses to icons only — a persisted manual toggle in the rail header, with a paper-overlay tooltip supplying each icon's label while collapsed (feature) — `done/design-system-n8zqr-sidebar-collapsible-icons-only.md`
 - **design-system-m2wvc** — Sidebar active nav item — drop the gold inset-left bar; burgundy fill + gold icon carry the active state alone (retracts that half of ADR-0014's dir-3a treatment) (refactor) — `done/design-system-m2wvc-nav-active-drop-inset-left-bar.md`
 - **design-system-x7k2p** — Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042) (chore) — `done/design-system-x7k2p-lifecycle-status-vocabulary-readme-sync.md`
 - **design-system-vk7rd** — Sidebar bottom group (Admin/Settings) must pin to the bottom of the viewport, not the bottom of the document — the rail is `min-h-screen` and stretches with page content, so on any scrolling page the group sits below the fold (bug) — `done/design-system-vk7rd-sidebar-rail-viewport-pinned.md`

@@ -790,6 +790,28 @@ let private paperOverlaySection () =
                 ]
             ]
 
+            subheading "Tooltip"
+
+            decision "The system's first tooltip (design-system-n8zqr) -- same paper-overlay material as the dropdown above (opaque fill, line ring, elevation shadow), sized down to a compact label pill. Structural placement (fixed-position coordinates measured off the hovered trigger's own rect) is the caller's job; `DesignSystem.tooltip` owns only the material + typography. First consumer: the collapsed sidebar rail reveals an icon-only item's label on hover -- see Components/Sidebar.fs."
+
+            Html.div [
+                prop.className "relative h-16 rounded-lg bg-base-300/40 flex items-center pl-6"
+                prop.children [
+                    Html.div [
+                        prop.className "w-9 h-9 rounded-lg bg-base-200 flex items-center justify-center text-ink-muted"
+                        prop.children [ Icons.dashboard () ]
+                    ]
+                    Html.div [
+                        prop.className (DesignSystem.tooltip + " ml-3")
+                        prop.text "Dashboard"
+                    ]
+                ]
+            ]
+            Html.code [
+                prop.className "text-xs font-mono text-primary/70 mt-2 block"
+                prop.text "DesignSystem.tooltip -- position: fixed + top/left set inline by the caller"
+            ]
+
             subheading "Decisions"
 
             decisionBox
