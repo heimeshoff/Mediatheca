@@ -964,6 +964,22 @@ type AddGameOutcome =
     | Created of slug: string
     | Duplicate_found of existingSlug: string * existingName: string
 
+/// Request for `addGameFromSteam` (games-k3vps — the search modal's Steam
+/// source toggle). Carries only what the client already has from a
+/// `SteamSearchResult`; the server re-fetches everything else (description,
+/// facets, cover/backdrop) from the Steam Store by `AppId`, mirroring the
+/// "no match — create new game" branch of the Steam library import
+/// (`Api.fs`'s `addGameFromSteamCore`) and ADR-0043's identity-card/cache-slice
+/// split. Reuses `AddGameOutcome` so the client's existing duplicate-prompt
+/// flow (`Duplicate_found` -> open existing / add anyway / cancel) works
+/// unchanged for Steam-sourced imports.
+type AddGameFromSteamRequest = {
+    AppId: int
+    Name: string
+    Year: int option
+    SkipDuplicateCheck: bool
+}
+
 // Dashboard Tabs (continued — types that reference MovieListItem / SeriesListItem / GameListItem)
 
 type DashboardMoviesTab = {
@@ -1422,6 +1438,16 @@ type IMediathecaApi = {
     // Games
     searchRawgGames: string * int option -> Async<RawgSearchResult list>
     addGame: AddGameRequest -> Async<Result<AddGameOutcome, string>>
+    /// games-k3vps: query-based Steam store search for the search modal's
+    /// Steam source toggle — a thin wrapper over `Steam.searchSteamByName`,
+    /// mirroring `searchRawgGames`'s (query, year) shape. Distinct from
+    /// `searchSteamForGame` (slug-bound re-link), which is unchanged.
+    searchSteamGames: string * int option -> Async<SteamSearchResult list>
+    /// games-k3vps: imports a Steam search result via the store-details ->
+    /// `Add_game` path, setting `SteamAppId` — the search modal's Steam
+    /// import action. Returns the same `AddGameOutcome` as `addGame` so the
+    /// duplicate-prompt flow is shared.
+    addGameFromSteam: AddGameFromSteamRequest -> Async<Result<AddGameOutcome, string>>
     removeGame: string -> Async<Result<unit, string>>
     getGames: unit -> Async<GameListItem list>
     getGameDetail: string -> Async<GameDetail option>

@@ -1,11 +1,11 @@
 ---
 id: games-k3vps
 title: Selectable search sources in the games search tab — RAWG and Steam checkboxes (RAWG always on by default, Steam always off) that immediately include or exclude each API's results
-status: doing
+status: done
 type: feature
 context: games
 created: 2026-08-07
-completed:
+completed: 2026-08-07
 depends_on: [design-system-001]
 blocks: []
 tags: [search, steam, rawg, search-modal, import]
@@ -77,3 +77,69 @@ import already exercises.
 - Both sources unchecked + non-empty query is a legal state: the Games tab
   simply shows no external results ("No results").
 - Frontend gate: `depends_on` design-system-001 (done — dependency met).
+
+## Outcome
+
+Shipped both new server endpoints and the client toggle row/merged grid.
+
+**Server** (`src/Shared/Shared.fs`, `src/Server/Api.fs`): `searchSteamGames: string *
+int option -> Async<SteamSearchResult list>` is a thin wrapper over
+`Steam.searchSteamByName`, mirroring `searchRawgGames`'s shape; `searchSteamForGame`
+(slug-bound re-link) is untouched. `addGameFromSteam: AddGameFromSteamRequest ->
+Async<Result<AddGameOutcome, string>>` is backed by a new private
+`Api.addGameFromSteamCore`, which mirrors the Steam-library import's "no match — create
+new game" branch: duplicate check by `steam_app_id` then case-insensitive name (returns
+the existing `Duplicate_found`, reusing `AddGameOutcome` so the client's one
+duplicate-prompt flow serves both RAWG and Steam imports); on create, `Name`/`Year`/
+`Genres` (`[]` — no RAWG lookup in this path, out of scope) ride `Add_game`,
+`Game_steam_app_id_set` follows, and description/short_description/website_url/facets
+land in `game_metadata_cache` via the creation code path directly — never
+`GameProjection.handleEvent` — matching ADR-0043/ADR-0045 exactly as games-v4nqe applied
+it. `Mark_as_owned` is deliberately never dispatched (nothing here confirms Steam
+ownership, unlike the library sync).
+
+**Client** (`src/Client/Components/SearchModal.fs`, `src/Client/State.fs`): the Games
+tab gets a fixed-height toggle row (RAWG/Steam checkboxes, DaisyUI `checkbox.xs`,
+RAWG-on/Steam-off on every `initWithGames`, never persisted) that only renders content
+when the Games tab is active, avoiding layout jump on tab switch. RAWG and Steam results
+merge into one keyboard-navigable grid (`GameSearchEntry = RawgEntry | SteamEntry`),
+each carrying a RAWG/Steam source badge; unchecking a source (or a stale response
+arriving for a since-unchecked source) is invisible immediately because the merge is
+gated on the *current* `IncludeRawg`/`IncludeSteam` flags rather than on anything the
+response itself carries — the same "current state wins" principle `SearchVersion`
+already applies to the debounced-typing race, so no per-source version field was needed.
+Checking a source while the query is non-empty fires that source's search right away
+(`Toggle_include_rawg`/`Toggle_include_steam`); typing debounce and `Tab_changed` both
+fire whichever sources are checked and lack results, via a new shared
+`gamesSearchCmds` helper. The loading indicator composes "Searching RAWG…" / "Searching
+Steam…" / "Searching RAWG & Steam…" from whichever checked sources are still in flight.
+Clicking or pressing Enter on a Steam result dispatches `Import_steam`, which posts
+`AddGameFromSteamRequest` and routes `Duplicate_found` through the same
+`Duplicate_prompt_show`/`Duplicate_prompt_force_add` flow as RAWG (`DuplicatePrompt` now
+carries a `PendingGameImport = FromRawg of AddGameRequest | FromSteam of
+AddGameFromSteamRequest` so "add as duplicate" resubmits the right request shape).
+No hover-preview endpoint exists for a Steam search result (only for library games/RAWG/
+TMDB candidates) — Steam cards pass no-op hover handlers rather than getting stuck in a
+`Loading` popover state; out of this task's scope (ACs don't call for a Steam preview).
+
+Server-side TDD: `tests/Server.Tests/AddGameFromSteamTests.fs` (6 new tests, all
+red-then-green against a file-backed `TestDb` + a stub `HttpMessageHandler` routing on
+URL) covers `addGameFromSteam`'s create path (identity-card/facet cache writes,
+`SteamAppId` set), duplicate detection, `SkipDuplicateCheck` bypass, a failed Steam
+lookup degrading to an empty-but-successful create (never throws), and
+`searchSteamGames`'s delegation (including the empty-SearchApps-response degrade to `[]`
+that mirrors `searchSteamForGame`'s existing behavior). 643/643 tests pass; `npm run
+build` (Fable compile gate) passes. Client-side Model/Msg/view wiring has no test
+infrastructure in this project (existing gap, not scoped here) — verified by the build
+gate plus manual code review; interactive/visual behavior (toggle immediacy, badge
+rendering, no layout jump, keyboard nav across the merged grid) is `[human-eye]` per the
+task's final AC.
+
+Key files: `src/Shared/Shared.fs` (`AddGameFromSteamRequest`, two new
+`IMediathecaApi` members), `src/Server/Api.fs` (`addGameFromSteamCore`,
+`searchSteamGames`/`addGameFromSteam` wiring), `src/Client/Components/SearchModal.fs`
+(`PendingGameImport`, `GameSearchEntry`, toggle row, merged grid), `src/Client/State.fs`
+(`gamesSearchCmds`, all new/updated `SearchModal.Msg` handlers),
+`tests/Server.Tests/AddGameFromSteamTests.fs`,
+`.agentheim/contexts/games/README.md` (new "Search source toggles" ubiquitous-language
+entry).

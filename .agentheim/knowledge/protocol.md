@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 11:42 -- Task verified and completed: games-k3vps - Selectable search sources in the games search tab — RAWG and Steam checkboxes (RAWG always on by default, Steam always off) that immediately include or exclude each API's results
+
+**Type:** Work / Task completion
+**Task:** games-k3vps - Selectable search sources in the games search tab — RAWG and Steam checkboxes (RAWG always on by default, Steam always off) that immediately include or exclude each API's results
+**Summary:** Selectable RAWG/Steam search sources in the games search tab — source-toggle checkboxes, merged badge-tagged results, and two new endpoints (searchSteamGames, addGameFromSteam)
+**Duration:** 22m
+**Verification:** PASS (iteration 1)
+**Files changed:** 8
+**Tests added:** 6
+**ADRs written:** none
+
+---
+
 ## 2026-08-07 11:17 -- Batch started: [games-k3vps]
 
 **Type:** Work / Batch start

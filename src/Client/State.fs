@@ -73,6 +73,23 @@ let init (api: IMediathecaApi) (adminApi: IAdminApi) () : Model * Cmd<Msg> =
 
     model, cmd
 
+/// games-k3vps: fires whichever of RAWG/Steam are currently checked, in
+/// parallel — the shared search-firing shape used by `Tab_changed`,
+/// `Debounce_tmdb_expired`, and the two `Toggle_include_*` handlers below.
+let private gamesSearchCmds (api: IMediathecaApi) (includeRawg: bool) (includeSteam: bool) (cleanQuery: string) (yearOpt: int option) : Cmd<Msg> =
+    Cmd.batch [
+        if includeRawg then
+            yield Cmd.OfAsync.either
+                api.searchRawgGames (cleanQuery, yearOpt)
+                (fun results -> Search_modal_msg (SearchModal.Rawg_search_completed results))
+                (fun ex -> Search_modal_msg (SearchModal.Rawg_search_failed ex.Message))
+        if includeSteam then
+            yield Cmd.OfAsync.either
+                api.searchSteamGames (cleanQuery, yearOpt)
+                (fun results -> Search_modal_msg (SearchModal.Steam_search_completed results))
+                (fun ex -> Search_modal_msg (SearchModal.Steam_search_failed ex.Message))
+    ]
+
 let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) (model: Model) : Model * Cmd<Msg> =
     match model.SearchModal with
     | None -> model, Cmd.none
@@ -83,41 +100,43 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
 
         | SearchModal.Tab_changed tab ->
             let updatedSearch = { searchModel with ActiveTab = tab }
-            // Library tab needs no API call; external tabs may need a search
+            // Library tab needs no API call; external tabs may need a search.
+            // For Games, each checked source is considered independently — a
+            // source with no cached results and not already in flight needs
+            // its own search, regardless of the other source's state.
+            let rawgNeedsSearch = searchModel.IncludeRawg && List.isEmpty searchModel.RawgResults && not searchModel.IsSearchingRawg
+            let steamNeedsSearch = searchModel.IncludeSteam && List.isEmpty searchModel.SteamResults && not searchModel.IsSearchingSteam
             let needsSearch =
                 searchModel.Query <> "" &&
                 (match tab with
                  | SearchModal.Library -> false
                  | SearchModal.Movies | SearchModal.Series ->
                      List.isEmpty searchModel.TmdbResults && not searchModel.IsSearchingTmdb
-                 | SearchModal.Games ->
-                     List.isEmpty searchModel.RawgResults && not searchModel.IsSearchingRawg)
+                 | SearchModal.Games -> rawgNeedsSearch || steamNeedsSearch)
             if needsSearch then
-                let withLoading =
-                    match tab with
-                    | SearchModal.Movies | SearchModal.Series -> { updatedSearch with IsSearchingTmdb = true }
-                    | SearchModal.Games -> { updatedSearch with IsSearchingRawg = true }
-                    | SearchModal.Library -> updatedSearch
                 let cleanQuery, yearOpt = FuzzyMatch.extractYear searchModel.Query
-                let searchCmd =
-                    match tab with
-                    | SearchModal.Movies | SearchModal.Series ->
-                        let searchBoth = async {
-                            let! movieResults = api.searchTmdb (cleanQuery, yearOpt)
-                            let! seriesResults = api.searchTvSeries (cleanQuery, yearOpt)
-                            return movieResults @ seriesResults
-                        }
-                        Cmd.OfAsync.either
-                            (fun () -> searchBoth) ()
-                            (fun results -> Search_modal_msg (SearchModal.Tmdb_search_completed results))
-                            (fun ex -> Search_modal_msg (SearchModal.Tmdb_search_failed ex.Message))
-                    | SearchModal.Games ->
-                        Cmd.OfAsync.either
-                            api.searchRawgGames (cleanQuery, yearOpt)
-                            (fun results -> Search_modal_msg (SearchModal.Rawg_search_completed results))
-                            (fun ex -> Search_modal_msg (SearchModal.Rawg_search_failed ex.Message))
-                    | SearchModal.Library -> Cmd.none
-                { model with SearchModal = Some withLoading }, searchCmd
+                match tab with
+                | SearchModal.Movies | SearchModal.Series ->
+                    let withLoading = { updatedSearch with IsSearchingTmdb = true }
+                    let searchBoth = async {
+                        let! movieResults = api.searchTmdb (cleanQuery, yearOpt)
+                        let! seriesResults = api.searchTvSeries (cleanQuery, yearOpt)
+                        return movieResults @ seriesResults
+                    }
+                    { model with SearchModal = Some withLoading },
+                    Cmd.OfAsync.either
+                        (fun () -> searchBoth) ()
+                        (fun results -> Search_modal_msg (SearchModal.Tmdb_search_completed results))
+                        (fun ex -> Search_modal_msg (SearchModal.Tmdb_search_failed ex.Message))
+                | SearchModal.Games ->
+                    let withLoading =
+                        { updatedSearch with
+                            IsSearchingRawg = rawgNeedsSearch
+                            IsSearchingSteam = steamNeedsSearch }
+                    { model with SearchModal = Some withLoading },
+                    gamesSearchCmds api rawgNeedsSearch steamNeedsSearch cleanQuery yearOpt
+                | SearchModal.Library ->
+                    { model with SearchModal = Some updatedSearch }, Cmd.none
             else
                 { model with SearchModal = Some updatedSearch }, Cmd.none
 
@@ -129,7 +148,8 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                     Query = q
                     SearchVersion = newVersion
                     IsSearchingTmdb = q <> "" && (activeTab = SearchModal.Movies || activeTab = SearchModal.Series)
-                    IsSearchingRawg = q <> "" && activeTab = SearchModal.Games
+                    IsSearchingRawg = q <> "" && activeTab = SearchModal.Games && searchModel.IncludeRawg
+                    IsSearchingSteam = q <> "" && activeTab = SearchModal.Games && searchModel.IncludeSteam
                     // Keep active tab results for progressive UX; clear inactive tab results (stale query)
                     TmdbResults =
                         if q = "" then []
@@ -138,6 +158,10 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                     RawgResults =
                         if q = "" then []
                         elif activeTab = SearchModal.Games then searchModel.RawgResults
+                        else []
+                    SteamResults =
+                        if q = "" then []
+                        elif activeTab = SearchModal.Games then searchModel.SteamResults
                         else []
                     Error = None
             }
@@ -167,11 +191,7 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                         (fun results -> Search_modal_msg (SearchModal.Tmdb_search_completed results))
                         (fun ex -> Search_modal_msg (SearchModal.Tmdb_search_failed ex.Message))
                 | SearchModal.Games ->
-                    model,
-                    Cmd.OfAsync.either
-                        api.searchRawgGames (cleanQuery, yearOpt)
-                        (fun results -> Search_modal_msg (SearchModal.Rawg_search_completed results))
-                        (fun ex -> Search_modal_msg (SearchModal.Rawg_search_failed ex.Message))
+                    model, gamesSearchCmds api searchModel.IncludeRawg searchModel.IncludeSteam cleanQuery yearOpt
                 | SearchModal.Library ->
                     model, Cmd.none
 
@@ -186,6 +206,38 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
 
         | SearchModal.Rawg_search_failed err ->
             { model with SearchModal = Some { searchModel with IsSearchingRawg = false; Error = Some err } }, Cmd.none
+
+        | SearchModal.Steam_search_completed results ->
+            { model with SearchModal = Some { searchModel with SteamResults = results; IsSearchingSteam = false } }, Cmd.none
+
+        | SearchModal.Steam_search_failed err ->
+            { model with SearchModal = Some { searchModel with IsSearchingSteam = false; Error = Some err } }, Cmd.none
+
+        | SearchModal.Toggle_include_rawg ->
+            let newInclude = not searchModel.IncludeRawg
+            let updated = { searchModel with IncludeRawg = newInclude }
+            if newInclude && searchModel.Query <> "" then
+                let cleanQuery, yearOpt = FuzzyMatch.extractYear searchModel.Query
+                { model with SearchModal = Some { updated with IsSearchingRawg = true } },
+                Cmd.OfAsync.either
+                    api.searchRawgGames (cleanQuery, yearOpt)
+                    (fun results -> Search_modal_msg (SearchModal.Rawg_search_completed results))
+                    (fun ex -> Search_modal_msg (SearchModal.Rawg_search_failed ex.Message))
+            else
+                { model with SearchModal = Some updated }, Cmd.none
+
+        | SearchModal.Toggle_include_steam ->
+            let newInclude = not searchModel.IncludeSteam
+            let updated = { searchModel with IncludeSteam = newInclude }
+            if newInclude && searchModel.Query <> "" then
+                let cleanQuery, yearOpt = FuzzyMatch.extractYear searchModel.Query
+                { model with SearchModal = Some { updated with IsSearchingSteam = true } },
+                Cmd.OfAsync.either
+                    api.searchSteamGames (cleanQuery, yearOpt)
+                    (fun results -> Search_modal_msg (SearchModal.Steam_search_completed results))
+                    (fun ex -> Search_modal_msg (SearchModal.Steam_search_failed ex.Message))
+            else
+                { model with SearchModal = Some updated }, Cmd.none
 
         | SearchModal.Import (tmdbId, mediaType) ->
             let importCmd =
@@ -224,7 +276,28 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                         | Ok (Created slug) ->
                             Search_modal_msg (SearchModal.Import_completed (Ok (slug, MediaType.Game)))
                         | Ok (Duplicate_found (existingSlug, existingName)) ->
-                            Search_modal_msg (SearchModal.Duplicate_prompt_show (existingSlug, existingName, request))
+                            Search_modal_msg (SearchModal.Duplicate_prompt_show (existingSlug, existingName, SearchModal.FromRawg request))
+                        | Error e ->
+                            Search_modal_msg (SearchModal.Import_completed (Error e)))
+                    (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
+            { model with SearchModal = Some { searchModel with IsImporting = true; Error = None; DuplicatePrompt = None } }, importCmd
+
+        | SearchModal.Import_steam steamResult ->
+            let request: AddGameFromSteamRequest = {
+                AppId = steamResult.AppId
+                Name = steamResult.Name
+                Year = steamResult.ReleaseYear
+                SkipDuplicateCheck = false
+            }
+            let importCmd =
+                Cmd.OfAsync.either
+                    api.addGameFromSteam request
+                    (fun result ->
+                        match result with
+                        | Ok (Created slug) ->
+                            Search_modal_msg (SearchModal.Import_completed (Ok (slug, MediaType.Game)))
+                        | Ok (Duplicate_found (existingSlug, existingName)) ->
+                            Search_modal_msg (SearchModal.Duplicate_prompt_show (existingSlug, existingName, SearchModal.FromSteam request))
                         | Error e ->
                             Search_modal_msg (SearchModal.Import_completed (Error e)))
                     (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
@@ -258,21 +331,36 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
         | SearchModal.Duplicate_prompt_force_add ->
             match searchModel.DuplicatePrompt with
             | None -> model, Cmd.none
-            | Some (_existingSlug, _existingName, originalRequest) ->
-                let forceRequest = { originalRequest with SkipDuplicateCheck = true }
+            | Some (_existingSlug, _existingName, pending) ->
                 let importCmd =
-                    Cmd.OfAsync.either
-                        api.addGame forceRequest
-                        (fun result ->
-                            match result with
-                            | Ok (Created slug) ->
-                                Search_modal_msg (SearchModal.Import_completed (Ok (slug, MediaType.Game)))
-                            | Ok (Duplicate_found _) ->
-                                // Shouldn't happen with SkipDuplicateCheck=true, but treat as a regular error
-                                Search_modal_msg (SearchModal.Import_completed (Error "Unexpected duplicate response"))
-                            | Error e ->
-                                Search_modal_msg (SearchModal.Import_completed (Error e)))
-                        (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
+                    match pending with
+                    | SearchModal.FromRawg originalRequest ->
+                        let forceRequest = { originalRequest with SkipDuplicateCheck = true }
+                        Cmd.OfAsync.either
+                            api.addGame forceRequest
+                            (fun result ->
+                                match result with
+                                | Ok (Created slug) ->
+                                    Search_modal_msg (SearchModal.Import_completed (Ok (slug, MediaType.Game)))
+                                | Ok (Duplicate_found _) ->
+                                    // Shouldn't happen with SkipDuplicateCheck=true, but treat as a regular error
+                                    Search_modal_msg (SearchModal.Import_completed (Error "Unexpected duplicate response"))
+                                | Error e ->
+                                    Search_modal_msg (SearchModal.Import_completed (Error e)))
+                            (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
+                    | SearchModal.FromSteam originalRequest ->
+                        let forceRequest = { originalRequest with SkipDuplicateCheck = true }
+                        Cmd.OfAsync.either
+                            api.addGameFromSteam forceRequest
+                            (fun result ->
+                                match result with
+                                | Ok (Created slug) ->
+                                    Search_modal_msg (SearchModal.Import_completed (Ok (slug, MediaType.Game)))
+                                | Ok (Duplicate_found _) ->
+                                    Search_modal_msg (SearchModal.Import_completed (Error "Unexpected duplicate response"))
+                                | Error e ->
+                                    Search_modal_msg (SearchModal.Import_completed (Error e)))
+                            (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
                 { model with SearchModal = Some { searchModel with IsImporting = true; Error = None; DuplicatePrompt = None } }, importCmd
 
         | SearchModal.Navigate_to (slug, mediaType) ->

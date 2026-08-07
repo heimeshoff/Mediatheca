@@ -1128,6 +1128,125 @@ module Api =
                     return Ok ()
         }
 
+    /// games-k3vps: imports a game the user picked from the search modal's
+    /// Steam source (a query-search result, not a library-owned game) —
+    /// unlike `attachSteamToGameCore` this CREATES a new game rather than
+    /// attaching to an existing one, and never dispatches `Mark_as_owned`
+    /// (nothing here confirms Steam ownership). Mirrors the Steam-library
+    /// import's "no match — create new game" branch (`importSteamLibrary`,
+    /// above): identity-card fields (`Name`/`Year`/`Genres`) ride the
+    /// `Add_game` event, description/short_description/website_url land in
+    /// `game_metadata_cache` via THIS creation code path — never
+    /// `GameProjection.handleEvent` (ADR-0043/ADR-0045) — and facets are
+    /// derived from Steam's own category ids. `Genres` is `[]`: unlike the
+    /// RAWG-sourced `addGame` path, there is no RAWG lookup here to source
+    /// genres from (out of scope for this task).
+    let private addGameFromSteamCore
+        (conn: SqliteConnection)
+        (httpClient: HttpClient)
+        (imageBasePath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (request: AddGameFromSteamRequest)
+        : Async<Result<AddGameOutcome, string>> =
+        async {
+            try
+                // Duplicate check: by steam_app_id, then by exact
+                // case-insensitive name — mirrors `addGame`'s RAWG-id-then-name
+                // check. Skipped when the caller has already confirmed they
+                // want a duplicate (SkipDuplicateCheck, set by the client's
+                // "add as duplicate" action).
+                let existing =
+                    if request.SkipDuplicateCheck then None
+                    else
+                        let byAppId =
+                            GameProjection.findBySteamAppId conn request.AppId
+                            |> Option.map (fun slug ->
+                                match GameProjection.getBySlug conn slug with
+                                | Some g -> slug, g.Name
+                                | None -> slug, request.Name)
+                        match byAppId with
+                        | Some _ -> byAppId
+                        | None ->
+                            match GameProjection.findByName conn request.Name with
+                            | (existingSlug, _) :: _ ->
+                                match GameProjection.getBySlug conn existingSlug with
+                                | Some g -> Some (existingSlug, g.Name)
+                                | None -> Some (existingSlug, request.Name)
+                            | [] -> None
+
+                match existing with
+                | Some (existingSlug, existingName) ->
+                    return Ok (Duplicate_found (existingSlug, existingName))
+                | None ->
+                    let year = request.Year |> Option.defaultValue 0
+                    let baseSlug = Slug.gameSlug request.Name (if year > 0 then year else 2000)
+                    let slug = generateUniqueSlug conn Games.streamId baseSlug
+                    let sid = Games.streamId slug
+
+                    let! storeDetails = Steam.getSteamStoreDetails httpClient request.AppId
+                    let description, shortDescription, websiteUrl, categoryIds =
+                        match storeDetails with
+                        | Ok details ->
+                            let desc =
+                                if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
+                                elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
+                                else ""
+                            desc, details.ShortDescription, details.WebsiteUrl, details.CategoryIds
+                        | Error _ -> "", "", None, []
+
+                    let! coverRef = Steam.downloadSteamCover httpClient request.AppId slug imageBasePath
+                    let! backdropRef = Steam.downloadSteamBackdrop httpClient request.AppId slug imageBasePath
+
+                    let gameData: Games.GameAddedData = {
+                        Name = request.Name
+                        Year = year
+                        Genres = []
+                        Description = description
+                        ShortDescription = shortDescription
+                        WebsiteUrl = websiteUrl
+                        CoverRef = coverRef
+                        BackdropRef = backdropRef
+                        RawgId = None
+                        RawgRating = None
+                    }
+
+                    let result =
+                        executeCommandCore
+                            conn sid
+                            Games.Serialization.fromStoredEvent
+                            Games.reconstitute
+                            Games.decide
+                            Games.Serialization.toEventData
+                            (Games.Add_game gameData)
+                            projectionHandlers
+
+                    match result with
+                    | Error e -> return Error e
+                    | Ok () ->
+                        executeCommandCore
+                            conn sid
+                            Games.Serialization.fromStoredEvent
+                            Games.reconstitute
+                            Games.decide
+                            Games.Serialization.toEventData
+                            (Games.Set_steam_app_id request.AppId)
+                            projectionHandlers |> ignore
+
+                        // games-k3vps (mirroring games-v4nqe, ADR-0045): creation
+                        // code path writes the identity card + derived facets
+                        // directly, imperatively, never the ProjectionHandler.
+                        MetadataCache.upsertGameIdentityCard conn slug {
+                            Description = description
+                            ShortDescription = shortDescription
+                            WebsiteUrl = websiteUrl
+                        }
+                        updateGameFacetsFromCategoryIds conn slug categoryIds
+
+                        return Ok (Created slug)
+            with ex ->
+                return Error (sprintf "Failed to add game from Steam: %s" ex.Message)
+        }
+
     let create
         (factory: unit -> SqliteConnection)
         (httpClient: HttpClient)
@@ -2788,6 +2907,18 @@ module Api =
             // Games
             searchRawgGames = fun (query, year) -> async {
                 return! Rawg.searchGames httpClient (getRawgConfig()) query year
+            }
+
+            // games-k3vps: query-based Steam search for the search modal's
+            // Steam source toggle — thin wrapper, `searchSteamForGame`
+            // (slug-bound re-link) unchanged.
+            searchSteamGames = fun (query, year) -> async {
+                return! Steam.searchSteamByName httpClient query year
+            }
+
+            addGameFromSteam = fun request -> async {
+                use conn = factory ()
+                return! addGameFromSteamCore conn httpClient imageBasePath projectionHandlers request
             }
 
             addGame = fun request -> async {

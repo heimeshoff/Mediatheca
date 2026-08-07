@@ -18,6 +18,14 @@ type HoverPreviewState =
     | LoadedLibraryGame of GameDetail
     | Failed
 
+/// games-k3vps: which request shape a pending duplicate-confirmation is for
+/// — the client's "add as duplicate" retry needs to resubmit the exact
+/// request that triggered `Duplicate_found`, and RAWG/Steam imports build
+/// different request DTOs (`AddGameRequest` vs `AddGameFromSteamRequest`).
+type PendingGameImport =
+    | FromRawg of AddGameRequest
+    | FromSteam of AddGameFromSteamRequest
+
 type Model = {
     Query: string
     LibraryMovies: MovieListItem list
@@ -25,8 +33,15 @@ type Model = {
     LibraryGames: GameListItem list
     TmdbResults: TmdbSearchResult list
     RawgResults: RawgSearchResult list
+    SteamResults: SteamSearchResult list
     IsSearchingTmdb: bool
     IsSearchingRawg: bool
+    IsSearchingSteam: bool
+    /// games-k3vps: session-local search-source toggles for the Games tab —
+    /// RAWG defaults on, Steam defaults off, reset on every modal open
+    /// (`initWithGames`), never persisted.
+    IncludeRawg: bool
+    IncludeSteam: bool
     IsImporting: bool
     Error: string option
     SearchVersion: int
@@ -35,7 +50,7 @@ type Model = {
     HoverPreview: HoverPreviewState
     HoverVersion: int
     PreviewCache: Map<string, HoverPreviewState>
-    DuplicatePrompt: (string * string * AddGameRequest) option
+    DuplicatePrompt: (string * string * PendingGameImport) option
 }
 
 type Msg =
@@ -46,10 +61,16 @@ type Msg =
     | Tmdb_search_failed of string
     | Rawg_search_completed of RawgSearchResult list
     | Rawg_search_failed of string
+    | Steam_search_completed of SteamSearchResult list
+    | Steam_search_failed of string
+    /// games-k3vps: toggling a search source. Session-local, no persistence.
+    | Toggle_include_rawg
+    | Toggle_include_steam
     | Import of tmdbId: int * MediaType
     | Import_rawg of RawgSearchResult
+    | Import_steam of SteamSearchResult
     | Import_completed of Result<string * MediaType, string>
-    | Duplicate_prompt_show of existingSlug: string * existingName: string * request: AddGameRequest
+    | Duplicate_prompt_show of existingSlug: string * existingName: string * request: PendingGameImport
     | Duplicate_prompt_cancel
     | Duplicate_prompt_force_add
     | Navigate_to of slug: string * MediaType
@@ -69,8 +90,12 @@ let initWithGames (movies: MovieListItem list) (series: SeriesListItem list) (ga
     LibraryGames = games
     TmdbResults = []
     RawgResults = []
+    SteamResults = []
     IsSearchingTmdb = false
     IsSearchingRawg = false
+    IsSearchingSteam = false
+    IncludeRawg = true
+    IncludeSteam = false
     IsImporting = false
     Error = None
     SearchVersion = 0
@@ -489,6 +514,13 @@ let private renderPreviewPopover (preview: HoverPreviewState) =
             ]
         ]
 
+/// games-k3vps: the Games tab renders RAWG and Steam results in one merged,
+/// keyboard-navigable grid — this carries provenance through so the badge
+/// and the Enter/click import action can dispatch the right message.
+type private GameSearchEntry =
+    | RawgEntry of RawgSearchResult
+    | SteamEntry of SteamSearchResult
+
 [<ReactComponent>]
 let view (model: Model) (dispatch: Msg -> unit) =
     let selIdx, setSelIdx = React.useState(-1)
@@ -519,17 +551,31 @@ let view (model: Model) (dispatch: Msg -> unit) =
     let isGameInLibrary (r: RawgSearchResult) =
         let key = r.Name.ToLowerInvariant(), r.Year |> Option.defaultValue 0
         libraryGameKeys |> Set.contains key
+    let isSteamGameInLibrary (r: SteamSearchResult) =
+        let key = r.Name.ToLowerInvariant(), r.ReleaseYear |> Option.defaultValue 0
+        libraryGameKeys |> Set.contains key
 
     let movieResults = model.TmdbResults |> List.filter (fun r -> r.MediaType = MediaType.Movie && not (isInLibrary r))
     let seriesResults = model.TmdbResults |> List.filter (fun r -> r.MediaType = MediaType.Series && not (isInLibrary r))
     let gameResults = model.RawgResults |> List.filter (fun r -> not (isGameInLibrary r))
+    let steamGameResults = model.SteamResults |> List.filter (fun r -> not (isSteamGameInLibrary r))
+
+    // games-k3vps: unchecking a source hides its results immediately and a
+    // late-arriving response for a since-unchecked source never renders —
+    // both follow directly from gating this merge on the CURRENT toggle
+    // state rather than on anything carried by the response itself (the
+    // same "current state wins" principle `SearchVersion` applies to the
+    // debounced-typing race).
+    let mergedGameResults : GameSearchEntry list =
+        (if model.IncludeRawg then gameResults |> List.map RawgEntry else [])
+        @ (if model.IncludeSteam then steamGameResults |> List.map SteamEntry else [])
 
     let tabResultCount (tab: SearchTab) =
         match tab with
         | Library -> List.length localResults
         | Movies -> List.length movieResults
         | Series -> List.length seriesResults
-        | Games -> List.length gameResults
+        | Games -> List.length mergedGameResults
 
     let cols = 4
     let tabOrder = [| Library; Movies; Series; Games |]
@@ -629,8 +675,9 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     | Some r -> dispatch (Import (r.TmdbId, r.MediaType))
                     | None -> ()
                 | Games ->
-                    match gameResults |> List.tryItem selIdx with
-                    | Some r -> dispatch (Import_rawg r)
+                    match mergedGameResults |> List.tryItem selIdx with
+                    | Some (RawgEntry r) -> dispatch (Import_rawg r)
+                    | Some (SteamEntry r) -> dispatch (Import_steam r)
                     | None -> ()
         | "Escape" -> dispatch Close
         | _ -> ()
@@ -649,7 +696,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
         match t with
         | Library -> false
         | Movies | Series -> model.IsSearchingTmdb
-        | Games -> model.IsSearchingRawg
+        | Games ->
+            (model.IncludeRawg && model.IsSearchingRawg) || (model.IncludeSteam && model.IsSearchingSteam)
 
     let renderGrid (children: ReactElement list) =
         Html.div [
@@ -664,7 +712,17 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 prop.children [
                     Daisy.loading [ loading.dots; loading.sm ]
                     Html.span [
-                        prop.text (match activeTab with Games -> "Searching RAWG..." | _ -> "Searching TMDB...")
+                        prop.text (
+                            match activeTab with
+                            | Games ->
+                                let sources =
+                                    [ if model.IncludeRawg && model.IsSearchingRawg then yield "RAWG"
+                                      if model.IncludeSteam && model.IsSearchingSteam then yield "Steam" ]
+                                match sources with
+                                | [] -> "Searching..."
+                                | _ -> "Searching " + (sources |> String.concat " & ") + "..."
+                            | _ -> "Searching TMDB..."
+                        )
                     ]
                 ]
             ]
@@ -759,27 +817,50 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 (fun () -> cancelHover ())
                     ]
             | Games ->
-                if List.isEmpty gameResults then
+                if List.isEmpty mergedGameResults then
                     Html.p [
                         prop.className "text-sm text-base-content/40 py-4 text-center"
                         prop.text "No results"
                     ]
                 else
+                    let sourceBadge (label: string) (colorClasses: string) =
+                        Daisy.badge [
+                            badge.xs
+                            prop.className (colorClasses + " border-0")
+                            prop.text label
+                        ]
                     renderGrid [
-                        for (idx, result) in gameResults |> List.mapi (fun i r -> (i, r)) do
+                        for (idx, entry) in mergedGameResults |> List.mapi (fun i r -> (i, r)) do
                             let isSelected = selIdx = idx
-                            let imgSrc = result.BackgroundImage
-                            let hoverKey = $"rawg:{result.RawgId}"
-                            renderPosterCard
-                                imgSrc
-                                (fun () -> Icons.gamepad ())
-                                result.Name
-                                (result.Year |> Option.map string |> Option.defaultValue "")
-                                None
-                                isSelected
-                                (fun () -> dispatch (Import_rawg result))
-                                (fun () -> startHover hoverKey)
-                                (fun () -> cancelHover ())
+                            match entry with
+                            | RawgEntry result ->
+                                let hoverKey = $"rawg:{result.RawgId}"
+                                renderPosterCard
+                                    result.BackgroundImage
+                                    (fun () -> Icons.gamepad ())
+                                    result.Name
+                                    (result.Year |> Option.map string |> Option.defaultValue "")
+                                    (Some (sourceBadge "RAWG" "bg-amber-500/80 text-white"))
+                                    isSelected
+                                    (fun () -> dispatch (Import_rawg result))
+                                    (fun () -> startHover hoverKey)
+                                    (fun () -> cancelHover ())
+                            | SteamEntry result ->
+                                renderPosterCard
+                                    result.HeaderImageUrl
+                                    (fun () -> Icons.gamepad ())
+                                    result.Name
+                                    (result.ReleaseYear |> Option.map string |> Option.defaultValue "")
+                                    (Some (sourceBadge "Steam" "bg-slate-700/80 text-white"))
+                                    isSelected
+                                    (fun () -> dispatch (Import_steam result))
+                                    // games-k3vps: no hover-preview endpoint exists for a
+                                    // Steam SEARCH result (only for library games/RAWG/TMDB
+                                    // candidates) — a no-op here, not a stuck "Loading"
+                                    // popover, is the correct degrade (out of this task's
+                                    // scope; ACs don't call for a Steam preview).
+                                    (fun () -> ())
+                                    (fun () -> ())
                     ]
 
     // Main modal
@@ -844,6 +925,42 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                             prop.children [ tabIcon tab ]
                                                         ]
                                                         Html.span [ prop.text (tabLabel tab) ]
+                                                    ]
+                                                ]
+                                        ]
+                                    ]
+                                    // games-k3vps: search-source toggles, Games tab only.
+                                    // A fixed-height wrapper always renders (empty on other
+                                    // tabs) so switching tabs never shifts the content below.
+                                    Html.div [
+                                        prop.className "h-7 mb-2 flex items-center"
+                                        prop.children [
+                                            if activeTab = Games then
+                                                Html.div [
+                                                    prop.className "flex items-center gap-4 px-1"
+                                                    prop.children [
+                                                        Html.label [
+                                                            prop.className "flex items-center gap-2 text-sm cursor-pointer select-none"
+                                                            prop.children [
+                                                                Daisy.checkbox [
+                                                                    checkbox.xs
+                                                                    prop.isChecked model.IncludeRawg
+                                                                    prop.onChange (fun (_: bool) -> dispatch Toggle_include_rawg)
+                                                                ]
+                                                                Html.span [ prop.text "RAWG" ]
+                                                            ]
+                                                        ]
+                                                        Html.label [
+                                                            prop.className "flex items-center gap-2 text-sm cursor-pointer select-none"
+                                                            prop.children [
+                                                                Daisy.checkbox [
+                                                                    checkbox.xs
+                                                                    prop.isChecked model.IncludeSteam
+                                                                    prop.onChange (fun (_: bool) -> dispatch Toggle_include_steam)
+                                                                ]
+                                                                Html.span [ prop.text "Steam" ]
+                                                            ]
+                                                        ]
                                                     ]
                                                 ]
                                         ]

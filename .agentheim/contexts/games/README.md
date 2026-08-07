@@ -132,6 +132,22 @@ Single user.
   its own `Genres` (ADR-0048).
 - **Stores** — e.g. Steam, GOG. A game can be in multiple.
 - **Steam library date** — when the game first appeared in the user's Steam library (sync metadata).
+- **Search source toggles** (games-k3vps) — the global search modal's Games tab can pull from
+  RAWG and/or Steam store search, chosen per-search via two session-local checkboxes (RAWG
+  checked, Steam unchecked by default on every open — never persisted). `searchSteamGames`
+  (`Shared.fs`) is a thin `Steam.searchSteamByName` wrapper mirroring `searchRawgGames`'s
+  `(query, year option)` shape; `searchSteamForGame` (the slug-bound re-link flow on an
+  already-imported game's detail page) is unchanged and unrelated. Importing a Steam search
+  result goes through `addGameFromSteam` -> `Api.addGameFromSteamCore`, which mirrors the
+  Steam-library import's "no match — create new game" branch: `Name`/`Year`/`Genres` (`[]` —
+  no RAWG lookup in this path) ride `Add_game`, `Game_steam_app_id_set` follows, and
+  description/short_description/website_url/facets land in `game_metadata_cache` via the
+  creation code path directly (never `GameProjection.handleEvent`, ADR-0043/ADR-0045).
+  Duplicate detection (by `steam_app_id` then case-insensitive name) reuses the existing
+  `AddGameOutcome`/`Duplicate_found` shape so the client's one duplicate-prompt flow ("open
+  existing" / "add as duplicate" / cancel) serves both RAWG and Steam imports. Cross-source
+  dedup between simultaneous RAWG and Steam results is deliberately out of scope — both render
+  in the merged poster grid with a RAWG/Steam source badge, and the user picks which to import.
 
 ## Aggregates
 
