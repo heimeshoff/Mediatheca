@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 11
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **integration-w8fkr** — Retire the Cinemarco import — delete the Settings card, the `importFromCinemarco` contract member, and `CinemarcoImport.fs` (refactor) — `todo/integration-w8fkr-retire-cinemarco-import.md`
 <!-- todo-list:end -->
 
 ### Doing

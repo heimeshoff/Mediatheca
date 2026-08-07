@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 16:34 -- Modeling / Captured: integration-w8fkr - Retire the Cinemarco import
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** The Cinemarco migration is finished (startup cutover COMPLETE 2026-08-03, drift 0/7), leaving an 886-line importer, a Fable.Remoting contract member, and a live Settings "Import" button that `plan.md` names as one of two things that can hurt the live container. Task deletes the vertical slice end to end — Settings card (Views/Types/State), `ImportFromCinemarcoRequest`/`ImportResult`/`importFromCinemarco` in Shared, `Api.fs` handler, `CinemarcoImport.fs`, the `Server.fsproj` compile entry and its now-moot ADR-0049 ordering comment — plus `.documentation/cinemarco-notes.md` and the Cinemarco references in the integration/curation/movies READMEs, `context-map.md`, and `knowledge/index.md`. Builder scoped it to the Cinemarco vertical only: the three `Game*Backfill.fs` modules and `StartupCutover.fs` are out. Imported data is untouched — this removes the importer, not its output.
+
+---
+
 ## 2026-08-07 15:57 -- Work session ended
 
 **Type:** Work / Session end
