@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 17:02 -- Modeling / Captured: intelligence-t8n3q - Dashboard library-search control needs a hover affordance — pointer cursor and a "Ctrl + K" tooltip
+
+**Type:** Modeling / Capture
+**BC:** intelligence
+**Filed to:** todo
+**Summary:** The dashboard header's "Search your library" control is an `Html.button` (`Pages/Dashboard/Views.fs:75`) with no `cursor-pointer`, so it doesn't read as clickable on hover — the outlier against 152 `cursor-pointer` call sites across 20 client files — and nothing surfaces its Ctrl+K binding (`Views.fs:16`). Task adds `cursor-pointer` plus `prop.title "Ctrl + K"`. Builder chose the browser-native `title` attribute over minting a styled tooltip pattern: the project has no tooltip in `DesignSystem.fs`, and introducing one would be design-system work behind the styleguide gate — explicitly out of scope, with an acceptance criterion forbidding it. The tooltip-appears criterion is `[human-eye]` (ADR-0061) since a native tooltip renders outside the DOM and can't be asserted.
+
+---
+
 ## 2026-08-07 16:43 -- Task verified and completed: integration-w8fkr - Retire the Cinemarco import — delete the Settings card, the `importFromCinemarco` contract member, and `CinemarcoImport.fs`
 
 **Type:** Work / Task completion
