@@ -5,6 +5,23 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 15:57 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 32m (batch start 15:25 → 15:57)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** integration-hebjs: 1
+**Commits:** 3 (batch start, task squash-merge commit, this entry)
+**Session-start churn:** 0 recognized machine-shape commits, 1 human commit since the 2026-08-07 12:27 boundary — `940a099` "rawg unavaiable message" touches `src/Server/Rawg.fs`, named in the integration BC README's ubiquitous-language Adapter entry (wraps RAWG search fetch failures in a readable unavailable message instead of an opaque 500; stays within the adapter's ACL role). Flagged as a governed-surface hit; advisory written to `.agentheim/state/whats-next.md`, no task auto-filed.
+**Vision-conformance:** none — batch aligns with vision (integration-hebjs lands squarely in the named Steam Import Enhancement workstream and removes the manual DevTools token ritual — intent-driven, self-managing per the Auto-clearing spirit; SteamKit2 stays confined to the one-time QR login per ADR-0019 point 2, ongoing refresh remains a plain HTTP mint, and the "reconnect Steam" surfaced state honors the ADR-0011 pattern rather than inventing a new one)
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task) — hand-classified (type: feature; files under src/, tests/, plus the BC README, one ADR, and routine task documentation)
+**Carry-over:** No `.agentheim/`-owned files stranded. left behind (user WIP, 2 files: `Mediatheca Directions.html` and `plan.md`, both untracked). `git worktree list` clean — the integration-hebjs worktree was removed after PASS integration and branch `aw/integration-hebjs` deleted; `.worktrees/integration-hebjs` retains a gitignored directory shell holding only MSBuild `obj/` residue (3 files, no source) that Windows kept locked during teardown — surfaced to the builder, not removed on this session's initiative. The four prior-session shells (administration-z6ymt, games-j6wkr, games-k3vps, games-v4nqe) are gone — cleaned outside this session.
+
+---
+
 ## 2026-08-07 15:55 -- Task verified and completed: integration-hebjs - One-click Steam Family import — automatic access-token acquisition
 
 **Type:** Work / Task completion
