@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 17:14 -- Modeling / Captured: design-system-m2wvc, design-system-n8zqr - Collapsible sidebar rail + drop the active item's inset-left bar
+
+**Type:** Modeling / Capture
+**BC:** design-system
+**Filed to:** todo (both)
+**Summary:** One builder idea about the desktop rail, split into two sequenced tasks. `design-system-m2wvc` (refactor) removes the gold inset-left bar from the active nav item — the `--ring-active` token's only consumer — leaving dir 3a's burgundy fill + gold icon to carry the active state, and amends ADR-0014 in place for the half-retraction. `design-system-n8zqr` (feature) makes the rail collapsible to a ~64px icons-only strip via a persisted manual toggle (`localStorage`, key `mediatheca.sidebarCollapsed`), with a new paper-overlay tooltip composition (ADR-0016) supplying labels while collapsed; mobile / `BottomNav` untouched. n8zqr `depends_on` m2wvc — settling one active treatment first, and avoiding a conflict in the same `index.css` / `DesignSystem.fs` neighbourhood. Declined at capture: breakpoint auto-collapse, hover-to-expand overlay, non-persisted toggle.
+
+---
+
 ## 2026-08-07 17:02 -- Modeling / Captured: intelligence-t8n3q - Dashboard library-search control needs a hover affordance — pointer cursor and a "Ctrl + K" tooltip
 
 **Type:** Modeling / Capture

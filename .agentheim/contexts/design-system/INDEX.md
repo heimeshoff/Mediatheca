@@ -11,13 +11,15 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 2
 - **Doing:** 0
 - **Done:** 18
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **design-system-m2wvc** — Sidebar active nav item — drop the gold inset-left bar; burgundy fill + gold icon carry the active state alone (retracts that half of ADR-0014's dir-3a treatment) (refactor) — `todo/design-system-m2wvc-nav-active-drop-inset-left-bar.md`
+- **design-system-n8zqr** — Desktop sidebar rail collapses to icons only — a persisted manual toggle in the rail header, with a paper-overlay tooltip supplying each icon's label while collapsed (feature) — `todo/design-system-n8zqr-sidebar-collapsible-icons-only.md`
 <!-- todo-list:end -->
 
 ### Doing
