@@ -130,6 +130,28 @@ Single user.
   search only ever runs at creation time), so it fails the cache tier's
   re-derivability test and stays here, matching Series' identity-card treatment of
   its own `Genres` (ADR-0048).
+- **Release date** (`ReleaseDateInfo`, games-ev65k, ADR-0043/ADR-0045/ADR-0060) — Steam's own
+  release-date fact for a Steam-linked game, cache-tier only — no event, no override (like
+  Deck compatibility, this isn't a user judgment call). `game_metadata_cache` carries the raw
+  Steam display string (`release_date_raw`, always shown verbatim — "25 Oct, 2026"/"October
+  2026"/"2026"/"Coming soon"), a best-effort parsed sortable ISO date
+  (`release_date_parsed`, `ReleaseDateParsing.tryParseSortable` — month-year sorts as the 1st of
+  that month, bare year as 1 January, unparseable/TBA stays `NULL`; ADR-0060 records the
+  reasoning), and Steam's own `coming_soon` flag. Written by the creation code path and every
+  Steam-fetch call site in `Api.fs` (mirroring how those same sites already write play facets)
+  and by a resumable throttled backfill (`GameReleaseDateBackfill.fs`) walking its OWN
+  `release_date_fetched_at` cursor. Unlike the facets/Deck-compat backfills' permanent
+  "never fetched" cursor, this one's steady-state candidate query
+  (`MetadataCache.findGamesNeedingReleaseDateBackfill`) keeps re-polling a game while it is
+  still `coming_soon`, unparseable, or future-dated — self-draining only once a game is
+  confirmed released with a past parsed date, so slipped release dates correct themselves.
+  `GameProjection.readReleaseDateInfo` computes `IsUnreleased` once, server-side
+  (`ComingSoon OR a parsed date still in the future` — deliberately NOT "unparseable implies
+  unreleased", see ADR-0060) — the single flag the list-card badge
+  (`Components/PlayFacetsDisplay.fs`'s `releaseDateBadge`), the detail-page treatment
+  (`releaseDateHero`), and the Games tab's Upcoming section (`GameProjection.getUpcomingGames`,
+  soonest-first, TBA/unparseable last, absent when nothing is unreleased) all share, so the
+  three surfaces can never disagree about what counts as upcoming.
 - **Stores** — e.g. Steam, GOG. A game can be in multiple.
 - **Steam library date** — when the game first appeared in the user's Steam library (sync metadata).
 - **Search source toggles** (games-k3vps) — the global search modal's Games tab can pull from

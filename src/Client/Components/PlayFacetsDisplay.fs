@@ -106,6 +106,57 @@ let deckCompatBadge (compat: DeckCompatibility) : ReactElement =
             prop.text (deckCompatLabel compat)
         ]
 
+// ── Release-date badge (games-ev65k) ──
+//
+// Cache-only (ADR-0043/ADR-0045) — no override, no aggregate involvement,
+// same stance as the Deck-compat badge above: Steam's own release-date fact,
+// re-fetched by its own backfill. Renders nothing for a released game
+// (`IsUnreleased = false`) — a badge is only useful signal on the games a
+// user might otherwise assume are already out.
+
+let private monthAbbrev =
+    [| ""; "Jan"; "Feb"; "Mar"; "Apr"; "May"; "Jun"; "Jul"; "Aug"; "Sep"; "Oct"; "Nov"; "Dec" |]
+
+/// A compact label for the badge — "Oct 2026" from the parsed sortable date
+/// when available, else Steam's raw string verbatim ("Coming soon"/"To be
+/// announced"/etc.) so an unparseable date is still legible rather than
+/// blank. Manual `yyyy-MM-dd` slicing (not a `DateTime` parse) — plain
+/// string ops are Fable-safe without pulling in a date-parsing dependency.
+let private releaseDateShortLabel (rd: ReleaseDateInfo) : string =
+    match rd.Parsed with
+    | Some iso when iso.Length >= 7 ->
+        let year = iso.Substring(0, 4)
+        let monthStr = iso.Substring(5, 2)
+        match System.Int32.TryParse monthStr with
+        | true, m when m >= 1 && m <= 12 -> $"{monthAbbrev.[m]} {year}"
+        | _ -> if rd.Raw = "" then "Upcoming" else rd.Raw
+    | _ -> if rd.Raw = "" then "Upcoming" else rd.Raw
+
+/// Compact badge for list cards — renders nothing when the game is not
+/// unreleased (released games' cards are unchanged, per the task).
+let releaseDateBadge (rd: ReleaseDateInfo) : ReactElement =
+    if not rd.IsUnreleased then Html.none
+    else
+        Html.span [
+            prop.className "inline-flex items-center gap-1 bg-info/15 text-info px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
+            prop.text (releaseDateShortLabel rd)
+        ]
+
+/// Detail-page treatment — the raw Steam string near the year, prefixed
+/// "Upcoming" so the unreleased-ness reads at a glance even before the date
+/// itself is parsed. Renders nothing for a released game.
+let releaseDateHero (rd: ReleaseDateInfo) : ReactElement =
+    if not rd.IsUnreleased then Html.none
+    else
+        Html.span [
+            prop.className "inline-flex items-center gap-1.5 bg-info/15 text-info px-2.5 py-1 rounded-full text-xs font-semibold"
+            prop.children [
+                Html.span [ prop.text "Upcoming" ]
+                if rd.Raw <> "" then
+                    Html.span [ prop.className "opacity-70 font-normal"; prop.text $"· {rd.Raw}" ]
+            ]
+        ]
+
 // ── Auto/On/Off segmented controls (editable, GameDetail only) ──
 
 let private segmentedOption (label: string) (isActive: bool) (onClick: unit -> unit) =

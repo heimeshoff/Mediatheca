@@ -82,12 +82,15 @@ let private gameCard (game: GameListItem) =
                     ]
                     // Play facet badges (games-j6wkr, ADR-0053) — up to 4, from the
                     // already-merged GameListItem.PlayFacets — plus the Steam Deck
-                    // compatibility badge (games-b8xnw), cache-only, no override.
+                    // compatibility badge (games-b8xnw) and the release-date badge
+                    // (games-ev65k, unreleased games only), both cache-only, no
+                    // override.
                     Html.div [
                         prop.className "mt-1.5 px-1 flex flex-wrap gap-1 items-center"
                         prop.children [
                             PlayFacetsDisplay.badgeRow game.PlayFacets
                             PlayFacetsDisplay.deckCompatBadge game.DeckCompat
+                            PlayFacetsDisplay.releaseDateBadge game.ReleaseDate
                         ]
                     ]
                 ]
@@ -225,6 +228,32 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     facetFilterPills model.FacetFilter dispatch
                 ]
             ]
+            // Upcoming section (games-ev65k) — soonest-first, TBA last,
+            // server-sorted (GameProjection.getUpcomingGames). Absent (not
+            // empty-rendered) when there is nothing unreleased.
+            if not (List.isEmpty model.UpcomingGames) then
+                Html.div [
+                    prop.className "mb-8"
+                    prop.children [
+                        Html.h2 [
+                            prop.className "text-lg font-bold font-display mb-3 flex items-center gap-2"
+                            prop.children [
+                                Html.span [ prop.className "w-1 h-5 bg-info rounded-full inline-block" ]
+                                Html.text "Upcoming"
+                            ]
+                        ]
+                        Html.div [
+                            prop.className "flex gap-4 overflow-x-auto pb-2"
+                            prop.children [
+                                for game in model.UpcomingGames do
+                                    Html.div [
+                                        prop.className "flex-none w-32 sm:w-36"
+                                        prop.children [ gameCard game ]
+                                    ]
+                            ]
+                        ]
+                    ]
+                ]
             if model.IsLoading then
                 Html.div [
                     prop.className "flex justify-center py-12"

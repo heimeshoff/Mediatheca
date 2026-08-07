@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 12:26 -- Task verified and completed: games-ev65k - Game release dates from Steam — cached for every Steam-linked game, auto-refreshed while unreleased, surfaced on the detail page and list cards, plus an Upcoming section on the Games tab
+
+**Type:** Work / Task completion
+**Task:** games-ev65k - Game release dates from Steam — cached for every Steam-linked game, auto-refreshed while unreleased, surfaced on the detail page and list cards, plus an Upcoming section on the Games tab
+**Summary:** Game release dates from Steam — cached raw/parsed/coming-soon metadata with a self-draining backfill, surfaced on the detail page, list cards, and a new Upcoming section
+**Duration:** 30m
+**Verification:** PASS (iteration 1)
+**Files changed:** 20
+**Tests added:** 29
+**ADRs written:** 0060
+
+---
+
 ## 2026-08-07 12:01 -- Batch started: [games-ev65k]
 
 **Type:** Work / Batch start

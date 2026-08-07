@@ -286,6 +286,33 @@ module MetadataCache =
             conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN deck_compat_fetched_at TEXT" |> Db.exec
         with _ -> () // Column already exists
 
+        // games-ev65k (ADR-0043): Steam's own release-date facts —
+        // cache-tier only, no event, no override (a third party's
+        // re-fetchable description, exactly like facets/deck_compat).
+        // `release_date_raw` is Steam's exact display string, kept
+        // verbatim for the UI; `release_date_parsed` is a best-effort
+        // sortable ISO (`yyyy-MM-dd`) date (`ReleaseDateParsing.tryParseSortable`),
+        // NULL when the raw string is unparseable (TBA/empty/an
+        // unrecognized shape — normal, not an error, per the task's own
+        // framing); `coming_soon` is Steam's own `release_date.coming_soon`
+        // flag. `release_date_fetched_at` is its OWN resume cursor,
+        // deliberately separate from `fetched_at`/`deck_compat_fetched_at`
+        // — same games-b8xnw lesson: independently-scheduled backfills
+        // against different re-fetch semantics must never share a cursor
+        // column, or one job's stamp silently exempts another's work.
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN release_date_raw TEXT" |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN release_date_parsed TEXT" |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN coming_soon INTEGER" |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN release_date_fetched_at TEXT" |> Db.exec
+        with _ -> () // Column already exists
+
         // `fetched_at` on the renamed tables themselves — they predate this
         // cache tier and never had this column. Same `ALTER TABLE ... ADD
         // COLUMN` idiom as `SeriesProjection.createTables`'s migrations.
@@ -707,6 +734,75 @@ module MetadataCache =
             FROM game_metadata_cache mc
             JOIN game_detail gd ON gd.slug = mc.game_slug
             WHERE mc.fetched_at IS NULL AND gd.steam_app_id IS NOT NULL
+            """
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "game_slug", rd.ReadInt32 "steam_app_id")
+
+    /// games-ev65k: the release-date backfill/ongoing-write path — the same
+    /// slice discipline as `upsertGameFacets`/`upsertGameDeckCompat` (`INSERT
+    /// ... ON CONFLICT DO UPDATE` naming only these four columns, never
+    /// touching any other column on the row), stamping its OWN
+    /// `release_date_fetched_at` cursor on every genuine write. Called both
+    /// by the resumable backfill job and by every creation-path/Steam-fetch
+    /// call site in `Api.fs` (mirroring how those same sites already call
+    /// `upsertGameFacets`) — a fresh Steam fetch keeps both slices current in
+    /// one place, and a freshly-created game's row is immediately excluded
+    /// from the backfill's own "never fetched" cohort, exactly like facets.
+    let upsertGameReleaseDate
+        (conn: SqliteConnection)
+        (slug: string)
+        (releaseDateRaw: string)
+        (releaseDateParsed: string option)
+        (comingSoon: bool)
+        : unit =
+        conn
+        |> Db.newCommand
+            """
+            INSERT INTO game_metadata_cache (game_slug, release_date_raw, release_date_parsed, coming_soon, release_date_fetched_at)
+            VALUES (@game_slug, @release_date_raw, @release_date_parsed, @coming_soon, @release_date_fetched_at)
+            ON CONFLICT(game_slug) DO UPDATE SET
+                release_date_raw = excluded.release_date_raw,
+                release_date_parsed = excluded.release_date_parsed,
+                coming_soon = excluded.coming_soon,
+                release_date_fetched_at = excluded.release_date_fetched_at
+            """
+        |> Db.setParams [
+            "game_slug", SqlType.String slug
+            "release_date_raw", SqlType.String releaseDateRaw
+            "release_date_parsed", (match releaseDateParsed with Some d -> SqlType.String d | None -> SqlType.Null)
+            "coming_soon", SqlType.Int32 (if comingSoon then 1 else 0)
+            "release_date_fetched_at", SqlType.String (System.DateTime.UtcNow.ToString("o"))
+        ]
+        |> Db.exec
+
+    /// games-ev65k: the resumable release-date backfill's own cursor —
+    /// deliberately NOT a plain `fetched_at IS NULL` cohort like
+    /// `findGamesNeedingFacetBackfill`/`findGamesNeedingDeckCompatBackfill`,
+    /// because a release date is expected to *change* while a game remains
+    /// unreleased (delays are common — the whole point of this task). Three
+    /// conditions make a game a candidate: (1) never fetched at all — the
+    /// initial-pass cohort, identical in shape to the other two backfills;
+    /// (2) Steam's own `coming_soon` flag is still set; (3) the parsed date
+    /// is NULL (unparseable/TBA — worth retrying in case a later Steam
+    /// update supplies a cleaner string) or still in the future. A game that
+    /// has been fetched at least once, is not `coming_soon`, and has a
+    /// parsed date at or before today drops out of this query permanently —
+    /// the self-draining property the task calls for. `date('now')` is
+    /// UTC, matching `release_date_parsed`'s lexical ISO comparison.
+    let findGamesNeedingReleaseDateBackfill (conn: SqliteConnection) : (string * int) list =
+        conn
+        |> Db.newCommand
+            """
+            SELECT mc.game_slug, gd.steam_app_id
+            FROM game_metadata_cache mc
+            JOIN game_detail gd ON gd.slug = mc.game_slug
+            WHERE gd.steam_app_id IS NOT NULL
+              AND (
+                mc.release_date_fetched_at IS NULL
+                OR mc.coming_soon = 1
+                OR mc.release_date_parsed IS NULL
+                OR mc.release_date_parsed > date('now')
+              )
             """
         |> Db.query (fun (rd: IDataReader) ->
             rd.ReadString "game_slug", rd.ReadInt32 "steam_app_id")

@@ -584,6 +584,28 @@ module GameProjection =
         if rd.IsDBNull(rd.GetOrdinal("deck_compat")) then Unknown
         else decodeDeckCompat (rd.ReadString "deck_compat")
 
+    /// games-ev65k: local read of the release-date cache columns —
+    /// deliberately not routed through `MetadataCache` (same precedent as
+    /// `readDeckCompat`/`decodeVrSupport` above: ADR-0045's by-construction
+    /// invariant is that no `*Projection.fs` file references the cache
+    /// module in code at all). `IsUnreleased` is computed here, once,
+    /// server-side — the single definition every surface (list-card hint,
+    /// detail-page treatment, Upcoming section) shares: Steam's own
+    /// `coming_soon` flag, OR a parsed date that is a real date still in
+    /// the future. Deliberately does NOT treat "unparseable, comingSoon
+    /// false" as unreleased — an unparseable-but-not-flagged date is far
+    /// more likely a released game whose exact string this parser doesn't
+    /// yet recognize than a genuinely upcoming one (see
+    /// `ReleaseDateParsing`'s own doc comment).
+    let private readReleaseDateInfo (rd: IDataReader) : ReleaseDateInfo =
+        let raw = if rd.IsDBNull(rd.GetOrdinal("release_date_raw")) then "" else rd.ReadString "release_date_raw"
+        let parsed = if rd.IsDBNull(rd.GetOrdinal("release_date_parsed")) then None else Some (rd.ReadString "release_date_parsed")
+        let comingSoon = if rd.IsDBNull(rd.GetOrdinal("coming_soon")) then false else rd.ReadInt32 "coming_soon" <> 0
+        let today = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
+        let isUnreleased =
+            comingSoon || (parsed |> Option.exists (fun d -> System.String.CompareOrdinal(d, today) > 0))
+        { Raw = raw; Parsed = parsed; ComingSoon = comingSoon; IsUnreleased = isUnreleased }
+
     let private readPlayFacetsOverrideRow (rd: IDataReader) : PlayFacetsOverride =
         let readOverrideBool (col: string) =
             if rd.IsDBNull(rd.GetOrdinal(col)) then None else Some (rd.ReadInt32 col <> 0)
@@ -607,7 +629,7 @@ module GameProjection =
                    gd.facet_override_solo, gd.facet_override_coop_couch, gd.facet_override_coop_online,
                    gd.facet_override_versus_couch, gd.facet_override_versus_online,
                    gd.facet_override_remote_play_together, gd.facet_override_vr,
-                   mc.deck_compat
+                   mc.deck_compat, mc.release_date_raw, mc.release_date_parsed, mc.coming_soon
             FROM game_list gl
             LEFT JOIN game_metadata_cache mc ON mc.game_slug = gl.slug
             LEFT JOIN game_detail gd ON gd.slug = gl.slug
@@ -636,7 +658,8 @@ module GameProjection =
               RawgRating =
                 if rd.IsDBNull(rd.GetOrdinal("rawg_rating")) then None
                 else Some (rd.ReadDouble "rawg_rating")
-              DeckCompat = readDeckCompat rd }
+              DeckCompat = readDeckCompat rd
+              ReleaseDate = readReleaseDateInfo rd }
         )
 
     let getBySlug (conn: SqliteConnection) (slug: string) : GameDetail option =
@@ -656,7 +679,7 @@ module GameProjection =
                 gd.facet_override_solo, gd.facet_override_coop_couch, gd.facet_override_coop_online,
                 gd.facet_override_versus_couch, gd.facet_override_versus_online,
                 gd.facet_override_remote_play_together, gd.facet_override_vr,
-                mc.deck_compat
+                mc.deck_compat, mc.release_date_raw, mc.release_date_parsed, mc.coming_soon
             FROM game_detail gd
             LEFT JOIN game_metadata_cache mc ON mc.game_slug = gd.slug
             WHERE gd.slug = @slug
@@ -735,6 +758,7 @@ module GameProjection =
               PlayFacets = FacetDerivation.merge (readCachedPlayFacets rd) overrideRecord
               PlayFacetsOverride = overrideRecord
               DeckCompat = readDeckCompat rd
+              ReleaseDate = readReleaseDateInfo rd
               IsOwnedByMe = rd.ReadInt32 "is_owned" <> 0
               FamilyOwners = resolveFriendRefs conn familyOwnerSlugs
               RecommendedBy = resolveFriendRefs conn recommendedBySlugs
@@ -919,7 +943,7 @@ module GameProjection =
                    gd.facet_override_solo, gd.facet_override_coop_couch, gd.facet_override_coop_online,
                    gd.facet_override_versus_couch, gd.facet_override_versus_online,
                    gd.facet_override_remote_play_together, gd.facet_override_vr,
-                   mc.deck_compat
+                   mc.deck_compat, mc.release_date_raw, mc.release_date_parsed, mc.coming_soon
             FROM game_list gl
             LEFT JOIN game_metadata_cache mc ON mc.game_slug = gl.slug
             LEFT JOIN game_detail gd ON gd.slug = gl.slug
@@ -951,7 +975,59 @@ module GameProjection =
               RawgRating =
                 if rd.IsDBNull(rd.GetOrdinal("rawg_rating")) then None
                 else Some (rd.ReadDouble "rawg_rating")
-              DeckCompat = readDeckCompat rd }
+              DeckCompat = readDeckCompat rd
+              ReleaseDate = readReleaseDateInfo rd }
+        )
+
+    /// games-ev65k: the Games tab's Upcoming section — unreleased
+    /// Steam-linked games (Steam's `coming_soon` flag, or a parsed date
+    /// still in the future), soonest release first, unparseable/TBA (`NULL`
+    /// `release_date_parsed`) sorted last. Mirrors `getRecentlyAddedGames`'s
+    /// dismissed-game exclusion. The `WHERE` clause intentionally mirrors
+    /// `readReleaseDateInfo`'s `IsUnreleased` computation so "what's in the
+    /// Upcoming section" and "what shows the upcoming badge on its card"
+    /// never diverge.
+    let getUpcomingGames (conn: SqliteConnection) : GameListItem list =
+        conn
+        |> Db.newCommand """
+            SELECT gl.slug, gl.name, gl.year, gl.cover_ref, gl.genres, gl.status, gl.total_play_time, mc.hltb_hours, gl.personal_rating, gl.rawg_rating,
+                   mc.facet_solo, mc.facet_coop_couch, mc.facet_coop_online, mc.facet_versus_couch, mc.facet_versus_online, mc.facet_remote_play_together, mc.facet_vr,
+                   gd.facet_override_solo, gd.facet_override_coop_couch, gd.facet_override_coop_online,
+                   gd.facet_override_versus_couch, gd.facet_override_versus_online,
+                   gd.facet_override_remote_play_together, gd.facet_override_vr,
+                   mc.deck_compat, mc.release_date_raw, mc.release_date_parsed, mc.coming_soon
+            FROM game_list gl
+            LEFT JOIN game_metadata_cache mc ON mc.game_slug = gl.slug
+            LEFT JOIN game_detail gd ON gd.slug = gl.slug
+            WHERE gl.status != 'Dismissed'
+              AND (mc.coming_soon = 1 OR (mc.release_date_parsed IS NOT NULL AND mc.release_date_parsed > date('now')))
+            ORDER BY CASE WHEN mc.release_date_parsed IS NULL THEN 1 ELSE 0 END, mc.release_date_parsed ASC
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            let genres =
+                if rd.IsDBNull(rd.GetOrdinal("genres")) then []
+                else Decode.fromString (Decode.list Decode.string) (rd.ReadString "genres") |> Result.defaultValue []
+            { GameListItem.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              Year = rd.ReadInt32 "year"
+              CoverRef =
+                if rd.IsDBNull(rd.GetOrdinal("cover_ref")) then None
+                else Some (rd.ReadString "cover_ref")
+              Genres = genres
+              Status = parseGameStatus (rd.ReadString "status")
+              TotalPlayTimeMinutes = rd.ReadInt32 "total_play_time"
+              HltbHours =
+                if rd.IsDBNull(rd.GetOrdinal("hltb_hours")) then None
+                else Some (rd.ReadDouble "hltb_hours")
+              PersonalRating =
+                if rd.IsDBNull(rd.GetOrdinal("personal_rating")) then None
+                else Some (rd.ReadInt32 "personal_rating")
+              PlayFacets = FacetDerivation.merge (readCachedPlayFacets rd) (readPlayFacetsOverrideRow rd)
+              RawgRating =
+                if rd.IsDBNull(rd.GetOrdinal("rawg_rating")) then None
+                else Some (rd.ReadDouble "rawg_rating")
+              DeckCompat = readDeckCompat rd
+              ReleaseDate = readReleaseDateInfo rd }
         )
 
     let getDashboardNewGames (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardNewGame list =

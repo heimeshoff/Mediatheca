@@ -36,6 +36,7 @@
     <Compile Include="SeriesProjectionReadsTests.fs" />
     <Compile Include="GamesTests.fs" />
     <Compile Include="FacetDerivationTests.fs" />
+    <Compile Include="ReleaseDateParsingTests.fs" />
     <Compile Include="PlayFacetsOverrideTests.fs" />
     <Compile Include="GameJournalTests.fs" />
     <Compile Include="PlaytimeTrackerTests.fs" />
@@ -44,6 +45,8 @@
     <Compile Include="SteamDeckCompatTests.fs" />
     <Compile Include="GameDeckCompatBackfillTests.fs" />
     <Compile Include="GameDeckCompatProjectionTests.fs" />
+    <Compile Include="GameReleaseDateBackfillTests.fs" />
+    <Compile Include="GameReleaseDateProjectionTests.fs" />
     <Compile Include="StartupCutoverTests.fs" />
     <Compile Include="EventLogFilterTests.fs" />
     <Compile Include="JellyfinImportTests.fs" />

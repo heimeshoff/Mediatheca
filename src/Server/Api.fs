@@ -48,6 +48,15 @@ module Api =
         let facets = FacetDerivation.deriveFacets categoryIds
         MetadataCache.upsertGameFacets conn slug facets categoryIds
 
+    /// games-ev65k (ADR-0043/ADR-0045): writes Steam's release-date facts to
+    /// the cache tier — called alongside `updateGameFacetsFromCategoryIds`
+    /// at every creation-path/Steam-fetch call site below, so a fresh Steam
+    /// fetch keeps both slices current together. Never touches
+    /// `game_detail` (there is no override tier for a release date).
+    let private updateGameReleaseDate (conn: SqliteConnection) (slug: string) (details: Steam.SteamStoreDetails) : unit =
+        let parsed = ReleaseDateParsing.tryParseSortable details.ReleaseDateRaw
+        MetadataCache.upsertGameReleaseDate conn slug details.ReleaseDateRaw parsed details.ComingSoon
+
     // administration-mz6kp (ADR-0033): `conn` is a per-request connection
     // opened by the caller via the shared factory (`use conn = factory()` at
     // the record member/handler that reaches this function) — no other
@@ -544,6 +553,7 @@ module Api =
                                             if details.WebsiteUrl.IsSome then
                                                 updateGameIdentityCache conn slug None None (Some details.WebsiteUrl)
                                             updateGameFacetsFromCategoryIds conn slug details.CategoryIds
+                                            updateGameReleaseDate conn slug details
                                         | Error _ -> ()
                                         emit { Current = gamesProcessed; Total = total; GameName = app.Name; Action = "Matched" }
                                     | None ->
@@ -577,6 +587,7 @@ module Api =
                                                 if details.WebsiteUrl.IsSome then
                                                     updateGameIdentityCache conn slug None None (Some details.WebsiteUrl)
                                                 updateGameFacetsFromCategoryIds conn slug details.CategoryIds
+                                                updateGameReleaseDate conn slug details
                                             | Error _ -> ()
                                             emit { Current = gamesProcessed; Total = total; GameName = app.Name; Action = "Matched by name" }
                                         | [] ->
@@ -673,6 +684,9 @@ module Api =
                                                         WebsiteUrl = steamWebsiteUrl
                                                     }
                                                     updateGameFacetsFromCategoryIds conn slug steamCategoryIds
+                                                    match storeDetails with
+                                                    | Ok details -> updateGameReleaseDate conn slug details
+                                                    | Error _ -> ()
                                                     emit { Current = gamesProcessed; Total = total; GameName = app.Name; Action = "Created" }
                                                 | Error e ->
                                                     errors <- errors @ [ sprintf "Failed to create '%s': %s" app.Name e ]
@@ -1125,6 +1139,9 @@ module Api =
                     // 5. Facets — derived from Steam's category ids
                     updateGameFacetsFromCategoryIds conn slug details.CategoryIds
 
+                    // 6. Release date — always refreshed on a re-fetch (games-ev65k)
+                    updateGameReleaseDate conn slug details
+
                     return Ok ()
         }
 
@@ -1241,6 +1258,13 @@ module Api =
                             WebsiteUrl = websiteUrl
                         }
                         updateGameFacetsFromCategoryIds conn slug categoryIds
+                        // games-ev65k: the Tenebris Somnia (appId 2121510)
+                        // end-to-end path — release date lands on the cache
+                        // in the same creation code path as the identity
+                        // card and facets above.
+                        match storeDetails with
+                        | Ok details -> updateGameReleaseDate conn slug details
+                        | Error _ -> ()
 
                         return Ok (Created slug)
             with ex ->
@@ -3080,6 +3104,11 @@ module Api =
                 return GameProjection.getAll conn
             }
 
+            getUpcomingGames = fun () -> async {
+                use conn = factory ()
+                return GameProjection.getUpcomingGames conn
+            }
+
             getGameDetail = fun slug -> async {
                 use conn = factory ()
                 return GameProjection.getBySlug conn slug
@@ -3647,6 +3676,7 @@ module Api =
                                             if details.WebsiteUrl.IsSome then
                                                 updateGameIdentityCache conn slug None None (Some details.WebsiteUrl)
                                             updateGameFacetsFromCategoryIds conn slug details.CategoryIds
+                                            updateGameReleaseDate conn slug details
                                         | Error _ -> ()
                                         // games-v4nqe: Set_steam_last_played demoted — see
                                         // the matched-by-appid branch's comment above.
@@ -3756,6 +3786,9 @@ module Api =
                                                 WebsiteUrl = steamWebsiteUrl
                                             }
                                             updateGameFacetsFromCategoryIds conn slug steamCategoryIds
+                                            match storeDetails with
+                                            | Ok details -> updateGameReleaseDate conn slug details
+                                            | Error _ -> ()
                                             // Set_steam_last_played demoted — the column it
                                             // wrote is dropped; SteamLastPlayed is derived
                                             // from game_play_session at query time.
@@ -3791,6 +3824,7 @@ module Api =
                                     if details.WebsiteUrl.IsSome then
                                         updateGameIdentityCache conn slug None None (Some details.WebsiteUrl)
                                     updateGameFacetsFromCategoryIds conn slug details.CategoryIds
+                                    updateGameReleaseDate conn slug details
                                     if desc <> "" || details.ShortDescription <> "" then
                                         descriptionsEnriched <- descriptionsEnriched + 1
                                 | Error _ -> ()

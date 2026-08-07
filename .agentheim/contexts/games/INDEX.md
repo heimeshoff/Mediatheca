@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 9
+- **Doing:** 0
+- **Done:** 10
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **games-ev65k** — Game release dates from Steam — cached for every Steam-linked game, auto-refreshed while unreleased, surfaced on the detail page and list cards, plus an Upcoming section on the Games tab (feature) — `doing/games-ev65k-game-release-dates-from-steam.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **games-ev65k** — Game release dates from Steam — cached for every Steam-linked game, auto-refreshed while unreleased, surfaced on the detail page and list cards, plus an Upcoming section on the Games tab (feature) — `done/games-ev65k-game-release-dates-from-steam.md`
 - **games-k3vps** — Selectable search sources in the games search tab — RAWG and Steam checkboxes (RAWG always on by default, Steam always off) that immediately include or exclude each API's results (feature) — `done/games-k3vps-search-source-toggles-rawg-steam.md`
 - **games-b8xnw** — Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge (feature) — `done/games-b8xnw-steam-deck-compat-readiness.md`
 - **games-j6wkr** — Rewrite the Games UI for typed play facets — Solo/Co-op/Versus/Couch badges, per-facet Auto/On/Off override controls, and client-side list filters over the landed PlayFacets contract (split 3 of 3, closes the no-play-mode-UI window games-v4nqe opened) (refactor) — `done/games-j6wkr-play-facets-ui-rewrite.md`
@@ -46,6 +46,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0060** -- Steam release dates are cache-tier facts on their own `release_date_fetched_at` cursor; partial-precision dates ("October 2026", "2026") sort by first-of-period while display keeps the raw string, and the backfill re-polls a game only until it is confirmed released, so the candidate set drains itself -- 2026-08-07 -- `../../knowledge/decisions/0060-release-date-cache-partial-precision-sort-and-self-draining-backfill.md`
 - **0059** -- The unofficial `ajaxgetdeckappcompatibilityreport` endpoint is dead (bare 302 for every request shape); Steam Deck compatibility is scraped from the store app page's embedded `data-hardwarecompatibility` attribute, live-verified against six titles -- 2026-08-04 -- `../../knowledge/decisions/0059-steam-deck-compat-endpoint-retired-html-scrape-replacement.md`
 - **0057** -- Play facets UI: the 4-badge row is Solo/Co-op/Versus + a Couch summary badge with online/couch sub-labels; the ADR-0053 override trap is guarded by pure `Shared` record-update functions (`withSolo` et al.), Expecto-tested in place of absent client-test infra -- 2026-08-04 -- `../../knowledge/decisions/0057-play-facets-ui-badge-mapping-and-override-trap-guard.md`
 - **0055** -- Game genres stays an event-carried identity-card projection column (amends ADR-0043's Game row back into compliance); games-v4nqe's genres cache-cutover is reverted — `game_metadata_cache.genres` is kept but permanently unused -- 2026-08-04 -- `../../knowledge/decisions/0055-game-genres-stays-event-carried-identity-card.md`

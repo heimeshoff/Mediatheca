@@ -883,6 +883,30 @@ type DeckCompatibility =
     | Unsupported
     | Unknown
 
+/// games-ev65k (ADR-0043): Steam's release-date facts — cache-tier only, no
+/// event, no override (a third party's re-fetchable description of the
+/// work, exactly like `PlayFacets`/`DeckCompatibility`; unlike facets there
+/// is no manual-correction use case, so there is no override counterpart).
+/// `Raw` is Steam's own display string, always shown for display purposes
+/// ("25 Oct, 2026" / "October 2026" / "2026" / "Coming soon"); `Parsed` is a
+/// best-effort sortable ISO (`yyyy-MM-dd`) date, `None` when `Raw` is
+/// unparseable or the game isn't Steam-linked/never fetched — display
+/// always uses `Raw`, so an unparseable date is invisible to the user, only
+/// affecting sort order. `ComingSoon` is Steam's own flag. `IsUnreleased`
+/// is the single computed signal every surface (list-card hint, detail-page
+/// treatment, Upcoming section) gates on: `true` when `ComingSoon` is set,
+/// or when `Parsed` is a real date still in the future — computed once,
+/// server-side (`GameProjection`), so "what counts as upcoming" lives in
+/// exactly one place. `Raw = ""` (with `Parsed = None`, `ComingSoon =
+/// false`, `IsUnreleased = false`) is the honest-degradation default for a
+/// non-Steam-linked game or one never fetched yet.
+type ReleaseDateInfo = {
+    Raw: string
+    Parsed: string option
+    ComingSoon: bool
+    IsUnreleased: bool
+}
+
 type GameListItem = {
     Slug: string
     Name: string
@@ -901,6 +925,8 @@ type GameListItem = {
     PlayFacets: PlayFacets
     /// games-b8xnw: Steam's Deck-compatibility verdict, cache-derived only.
     DeckCompat: DeckCompatibility
+    /// games-ev65k: Steam's release-date facts, cache-derived only.
+    ReleaseDate: ReleaseDateInfo
 }
 
 type GameDetail = {
@@ -940,6 +966,8 @@ type GameDetail = {
     /// games-b8xnw: Steam's Deck-compatibility verdict, cache-derived only —
     /// no override counterpart (see `DeckCompatibility`'s own doc comment).
     DeckCompat: DeckCompatibility
+    /// games-ev65k: Steam's release-date facts, cache-derived only.
+    ReleaseDate: ReleaseDateInfo
     IsOwnedByMe: bool
     FamilyOwners: FriendRef list
     RecommendedBy: FriendRef list
@@ -1450,6 +1478,10 @@ type IMediathecaApi = {
     addGameFromSteam: AddGameFromSteamRequest -> Async<Result<AddGameOutcome, string>>
     removeGame: string -> Async<Result<unit, string>>
     getGames: unit -> Async<GameListItem list>
+    /// games-ev65k: unreleased Steam-linked games, soonest release first,
+    /// TBA/unparseable last — the Games tab's Upcoming section. Absent
+    /// dismissed games (mirrors `getRecentlyAddedGames`'s status filter).
+    getUpcomingGames: unit -> Async<GameListItem list>
     getGameDetail: string -> Async<GameDetail option>
     setGameStatus: string -> GameStatus -> Async<Result<unit, string>>
     setGamePersonalRating: string -> int option -> Async<Result<unit, string>>

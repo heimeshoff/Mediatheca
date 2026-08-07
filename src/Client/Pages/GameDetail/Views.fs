@@ -956,6 +956,9 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                     prop.className "flex items-center gap-3 text-base-content/60 mb-4"
                                                     prop.children [
                                                         Html.span [ prop.text (string game.Year) ]
+                                                        // games-ev65k: unreleased treatment near the year —
+                                                        // renders nothing for a released game.
+                                                        PlayFacetsDisplay.releaseDateHero game.ReleaseDate
                                                         // games-p6vkz: prior (pre-tracking) playtime is a
                                                         // distinct, dateless fact — surfaced as a breakdown
                                                         // so the total stays honest about what Mediatheca

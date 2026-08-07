@@ -133,6 +133,18 @@ module Steam =
         /// is the only consumer of this new field so far.
         CategoryIds: int list
         HeaderImageUrl: string option
+        /// games-ev65k (ADR-0043): the raw Steam-displayed release date
+        /// string (`release_date.date` — "25 Oct, 2026" / "October 2026" /
+        /// "2026" / "Coming soon", or "" if Steam sent nothing). Kept
+        /// verbatim for display; `ReleaseDateParsing.tryParse` is the only
+        /// place this string is interpreted into a sortable date. Additive:
+        /// existing callers that never read this field keep compiling and
+        /// behaving exactly as before.
+        ReleaseDateRaw: string
+        /// games-ev65k: Steam's own `release_date.coming_soon` flag — the
+        /// authoritative "is this released yet" signal, independent of
+        /// whether `ReleaseDateRaw` happens to parse.
+        ComingSoon: bool
     }
 
     type SteamPlayerSummary = {
@@ -165,9 +177,21 @@ module Steam =
             Description = get.Required.Field "description" Decode.string
         })
 
+    /// games-ev65k: `release_date` is an object (`{ coming_soon: bool, date: string }`)
+    /// on `appdetails`, always present per Steam's own schema but decoded
+    /// defensively (`Optional`) the same way every other field on this
+    /// decoder is, in case a given app entry omits it.
+    let private decodeReleaseDate: Decoder<bool * string> =
+        Decode.object (fun get ->
+            let comingSoon = get.Optional.Field "coming_soon" Decode.bool |> Option.defaultValue false
+            let date = get.Optional.Field "date" Decode.string |> Option.defaultValue ""
+            comingSoon, date)
+
     let private decodeStoreData: Decoder<SteamStoreDetails> =
         Decode.object (fun get ->
             let categories = get.Optional.Field "categories" (Decode.list decodeCategory) |> Option.defaultValue []
+            let comingSoon, releaseDateRaw =
+                get.Optional.Field "release_date" decodeReleaseDate |> Option.defaultValue (false, "")
             {
                 ShortDescription = get.Optional.Field "short_description" Decode.string |> Option.defaultValue ""
                 DetailedDescription = get.Optional.Field "detailed_description" Decode.string |> Option.defaultValue ""
@@ -176,6 +200,8 @@ module Steam =
                 Categories = categories |> List.map (fun c -> c.Description)
                 CategoryIds = categories |> List.map (fun c -> c.Id)
                 HeaderImageUrl = get.Optional.Field "header_image" Decode.string
+                ReleaseDateRaw = releaseDateRaw
+                ComingSoon = comingSoon
             })
 
     let private decodeStoreAppEntry: Decoder<Result<SteamStoreDetails, string>> =

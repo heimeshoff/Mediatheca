@@ -40,6 +40,13 @@ let private storeDetailsJson (appId: int) (shortDesc: string) (aboutTheGame: str
         """{"%d":{"success":true,"data":{"short_description":"%s","detailed_description":"","about_the_game":"%s","website":"https://example.com/game","categories":[%s],"header_image":"https://example.com/header.jpg"}}}"""
         appId shortDesc aboutTheGame categoriesJson
 
+/// games-ev65k: same shape as `storeDetailsJson`, additionally carrying
+/// `release_date` — used by the Tenebris Somnia end-to-end criterion below.
+let private storeDetailsJsonWithReleaseDate (appId: int) (comingSoon: bool) (dateStr: string) =
+    sprintf
+        """{"%d":{"success":true,"data":{"short_description":"A survival horror descent","detailed_description":"","about_the_game":"Long about text","categories":[],"release_date":{"coming_soon":%s,"date":"%s"}}}}"""
+        appId (if comingSoon then "true" else "false") dateStr
+
 /// A stub that answers `appdetails` (both `getSteamStoreDetails`'s call and
 /// `fetchStoreMeta`'s `filters=basic,release_date` call), `SearchApps`, and
 /// 404s the CDN cover/backdrop downloads (image content is out of scope —
@@ -169,6 +176,35 @@ let addGameFromSteamTests =
                     Expect.equal game.Description "" "No store details fetched — empty description, not a fabricated value"
                     Expect.equal game.SteamAppId (Some 999) "Set_steam_app_id still fires even when the store lookup fails"
             | other -> failtestf "Expected the game to be created despite the failed Steam lookup, got %A" other
+
+        testCase "games-ev65k end-to-end: importing Tenebris Somnia (appId 2121510) yields its October 2026 release date on the detail page, an upcoming hint on its list card, and a row in the Upcoming section" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrap
+            let http = httpClientFor "[]" (storeDetailsJsonWithReleaseDate 2121510 true "October 2026") "{}"
+            let api = createApi db.Factory http
+
+            let request: AddGameFromSteamRequest = { AppId = 2121510; Name = "Tenebris Somnia"; Year = None; SkipDuplicateCheck = false }
+            let result = api.addGameFromSteam request |> Async.RunSynchronously
+
+            match result with
+            | Ok (Created slug) ->
+                // Detail page
+                match GameProjection.getBySlug db.Connection slug with
+                | None -> failtest "Expected the newly created game to be readable from the projection"
+                | Some game ->
+                    Expect.equal game.ReleaseDate.Raw "October 2026" "the detail page's release-date field carries Steam's raw string"
+                    Expect.equal game.ReleaseDate.Parsed (Some "2026-10-01") "parsed sortable date for October 2026"
+                    Expect.equal game.ReleaseDate.IsUnreleased true "coming_soon marks it unreleased on the detail page"
+
+                // List card hint
+                let listItem = GameProjection.getAll db.Connection |> List.find (fun g -> g.Slug = slug)
+                Expect.equal listItem.ReleaseDate.IsUnreleased true "the list card's upcoming hint is driven by the same IsUnreleased flag"
+                Expect.equal listItem.ReleaseDate.Raw "October 2026" "the list card can show Steam's raw date string"
+
+                // Upcoming section
+                let upcoming = GameProjection.getUpcomingGames db.Connection
+                Expect.exists upcoming (fun g -> g.Slug = slug) "Tenebris Somnia appears as a row in the Upcoming section"
+            | Ok (Duplicate_found _) -> failtest "Expected a fresh import to create, not duplicate"
+            | Error e -> failtest (sprintf "Expected success, got Error %s" e)
     ]
 
 [<Tests>]

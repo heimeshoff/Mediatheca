@@ -355,6 +355,15 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
         |> Option.defaultValue 6
 
+    // games-ev65k (ADR-0043/ADR-0045): resumable throttled release-date
+    // backfill, reusing the same job shape as games-a7dqx/games-b8xnw.
+    // Defaults to 07:00 local, an hour clear of the Deck-compat backfill
+    // (06:00) so the three jobs' Steam Store fetches don't pile up.
+    let releaseDateBackfillHour =
+        SettingsStore.getSetting conn "release_date_backfill_hour"
+        |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
+        |> Option.defaultValue 7
+
     // administration-tj8n2 (ADR-0028): scheduled jobs get their OWN connection,
     // dedicated and never shared with request threads or `conn` — separate
     // from the request-serving `conn` above. Both jobs (and the job-runs
@@ -417,6 +426,15 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
                 let! result = GameDeckCompatBackfill.runBackfill jobConn jobDbLock httpClient
                 let summary = sprintf "%d/%d games fetched, %d errors" result.Succeeded result.Processed result.Errors
                 eprintfn "[GameDeckCompatBackfill] %s" summary
+                return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = summary } : ScheduledJobs.JobRunOutcome)
+            } }
+        { Name = "Game release-date backfill"
+          Hour = releaseDateBackfillHour
+          Run = fun () ->
+            async {
+                let! result = GameReleaseDateBackfill.runBackfill jobConn jobDbLock httpClient
+                let summary = sprintf "%d/%d games fetched, %d errors" result.Succeeded result.Processed result.Errors
+                eprintfn "[GameReleaseDateBackfill] %s" summary
                 return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = summary } : ScheduledJobs.JobRunOutcome)
             } }
     ]
