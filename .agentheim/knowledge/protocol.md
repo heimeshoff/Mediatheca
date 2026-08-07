@@ -23,6 +23,15 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 17:05 -- Modeling / Captured: series-k4zpn - Next Up must follow the furthest-watched episode, not the first unwatched one
+
+**Type:** Modeling / Capture
+**BC:** series
+**Filed to:** todo
+**Summary:** Next Up answers "earliest episode with no watch record", so a single missed episode pins Next Up on it forever no matter how many later episodes get watched. Task changes the rule, in all three places it is independently implemented, to "first unwatched episode strictly after the furthest-watched (season, episode) tuple" — the `series_next_up` SQL view (`MetadataCache.fs:335`, which fixes all six consuming read functions at once per ADR-0048, covering dashboard + series list), the series-detail hero card (`SeriesDetail/Views.fs:1759`), and the Episodes-tab NEXT badge / "Coming Next" divider (`Views.fs:1206`). When nothing remains beyond the frontier the hero takes its existing empty branch — the same nothing a fully-watched series renders today (builder-confirmed; no new "caught up" element in scope). Builder confirmed the everywhere-Next-Up-appears scope over a detail-page-only fix. Two assumptions recorded in the task: the per-season NEXT badge becomes a single global marker, and server (all-rewatch union) vs client (selected-rewatch) watch scoping is each left as-is. Same commit reconciles two stale `backlog-list` entries in the series INDEX (series-t3jkv, series-x9mfp) that were already sitting in `done/`.
+
+---
+
 ## 2026-08-07 16:43 -- Task verified and completed: integration-w8fkr - Retire the Cinemarco import — delete the Settings card, the `importFromCinemarco` contract member, and `CinemarcoImport.fs`
 
 **Type:** Work / Task completion

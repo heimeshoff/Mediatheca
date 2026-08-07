@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 2
-- **Todo:** 0
+- **Backlog:** 0
+- **Todo:** 1
 - **Doing:** 0
-- **Done:** 4
+- **Done:** 6
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **series-k4zpn** — Next Up must follow the furthest-watched episode, not the first unwatched one — a skipped episode currently pins Next Up forever; when nothing remains beyond the furthest watched, show the fully-watched state even if a gap exists (bug) — `todo/series-k4zpn-next-up-follows-furthest-watched.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -27,6 +28,8 @@ research touching this BC, and concept synthesis pages.
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **series-t3jkv** — Wire series_metadata_cache's write path — nothing keeps it fresh after the one-time seed, so refreshed and newly-added series never get real TmdbRating/Overview/EpisodeRuntime (refactor) — `done/series-t3jkv-wire-series-metadata-cache-write-path.md`
+- **series-x9mfp** — Retarget getRecentlyAbandoned's TmdbRating/SeasonCount/EpisodeCount/NextUp onto the metadata cache and views, same as its sibling getRecentlyFinished (refactor) — `done/series-x9mfp-getrecentlyabandoned-cache-composition.md`
 - **series-d5tpn** — Drop the externally-sourced columns from series_list and series_detail, prove the drift check reports zero for SeriesProjection, and retire the lossy-rebuild guard (refactor) — `done/series-d5tpn-drop-columns-prove-drift-zero.md`
 - **series-q8jwc** — Compose Series read models from the metadata cache — join in the query function, not the API layer — keeping every Shared DTO and the whole client unchanged (refactor) — `done/series-q8jwc-compose-reads-from-metadata-cache.md`
 - **series-r2xhv** — Cut Series refresh and Jellyfin materialization over to cache-only writes, and narrow Series_refreshed to fire only on a real airing-status transition — making status replayable from the log for the first time (refactor) — `done/series-r2xhv-refresh-writes-cache-only-narrow-series-refreshed.md`
@@ -35,8 +38,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **series-t3jkv** — Wire series_metadata_cache's write path — nothing keeps it fresh after the one-time seed, so refreshed and newly-added series never get real TmdbRating/Overview/EpisodeRuntime (feature) — `backlog/series-t3jkv-wire-series-metadata-cache-write-path.md`
-- **series-x9mfp** — Retarget getRecentlyAbandoned's TmdbRating/SeasonCount/EpisodeCount/NextUp onto the metadata cache and views, same as its sibling getRecentlyFinished (refactor) — `backlog/series-x9mfp-getrecentlyabandoned-cache-composition.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
