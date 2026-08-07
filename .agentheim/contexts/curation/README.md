@@ -33,7 +33,6 @@ Single user.
 ## Relationships with other contexts
 
 - **Conformist to:** Movies, Series, Games. Catalog entries reference media items by id; Curation accepts whatever those BCs publish.
-- **Indirect coupling:** Cinemarco import (in [[integration]]) creates Catalogs as part of its flow.
 
 ## Frontend gate
 

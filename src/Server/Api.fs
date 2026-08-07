@@ -4382,11 +4382,6 @@ module Api =
                     return Error $"Jellyfin connection test failed: {ex.Message}"
             }
 
-            importFromCinemarco = fun request -> async {
-                use conn = factory ()
-                return CinemarcoImport.runImport conn imageBasePath projectionHandlers httpClient getTmdbConfig request
-            }
-
             getViewSettings = fun key -> async {
                 use conn = factory ()
                 match SettingsStore.getSetting conn ("view:" + key) with

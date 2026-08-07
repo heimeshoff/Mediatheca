@@ -1294,24 +1294,6 @@ type ViewSettings = {
     GallerySize: ViewGallerySize
 }
 
-// Import
-
-type ImportFromCinemarcoRequest = {
-    DatabasePath: string
-    ImagesPath: string
-}
-
-type ImportResult = {
-    FriendsImported: int
-    MoviesImported: int
-    SeriesImported: int
-    EpisodesWatched: int
-    CatalogsImported: int
-    ContentBlocksImported: int
-    ImagesCopied: int
-    Errors: string list
-}
-
 // Event History
 
 type EventHistoryEntry = {
@@ -1552,8 +1534,6 @@ type IMediathecaApi = {
     // /api/stream/steam-connect (SSE, same shape as steamFamilyImportHandler)
     // rather than this RPC surface.
     getSteamConnectionStatus: unit -> Async<bool>
-    // Import
-    importFromCinemarco: ImportFromCinemarcoRequest -> Async<Result<ImportResult, string>>
     // View Settings
     getViewSettings: string -> Async<ViewSettings option>
     saveViewSettings: string -> ViewSettings -> Async<unit>

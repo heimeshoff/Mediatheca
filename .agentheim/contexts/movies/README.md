@@ -35,7 +35,7 @@ Single user (library owner).
 
 - **Upstream of:** Journal (publishes `Watch_session_recorded` etc.), Intelligence (consumes everything).
 - **Downstream of:** Friends (consumes `Friend_added` to validate friendSlug references).
-- **Downstream of:** Integration via anticorruption (TMDB / Cinemarco adapters translate to `Add_movie_to_library`).
+- **Downstream of:** Integration via anticorruption (TMDB adapter translates to `Add_movie_to_library`).
 - **Consumed by:** Curation (catalogs reference movies by id).
 
 ## Frontend gate

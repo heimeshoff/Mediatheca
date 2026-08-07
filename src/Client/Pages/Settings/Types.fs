@@ -78,11 +78,6 @@ type Model = {
     JellyfinLastSyncTime: string option
     JellyfinSyncStatus: JellyfinSyncStatus option
     SteamFamilyLastSync: string option
-    // Cinemarco Import
-    CinemarcoDbPath: string
-    CinemarcoImagesPath: string
-    IsImporting: bool
-    ImportResult: Result<ImportResult, string> option
     // Administration (administration-k3vmt): the former /admin console's six
     // tabs, dissolved into inline collapsible sections below Data Imports.
     // `AdminModel` is the headless composite child (Pages/Admin) unchanged
@@ -188,11 +183,6 @@ type Msg =
     | Jellyfin_sync_status_loaded of JellyfinSyncStatus
     | Load_steam_family_last_sync
     | Steam_family_last_sync_loaded of string option
-    // Cinemarco Import
-    | Cinemarco_db_path_changed of string
-    | Cinemarco_images_path_changed of string
-    | Start_cinemarco_import
-    | Import_completed of Result<ImportResult, string>
     // Administration (administration-k3vmt)
     | Admin_msg of Mediatheca.Client.Pages.Admin.Types.Msg
     | Toggle_events_section

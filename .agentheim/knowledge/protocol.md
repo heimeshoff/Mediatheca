@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 16:43 -- Task verified and completed: integration-w8fkr - Retire the Cinemarco import — delete the Settings card, the `importFromCinemarco` contract member, and `CinemarcoImport.fs`
+
+**Type:** Work / Task completion
+**Task:** integration-w8fkr - Retire the Cinemarco import — delete the Settings card, the `importFromCinemarco` contract member, and `CinemarcoImport.fs`
+**Summary:** Retired the Cinemarco import vertical slice end to end — deleted the Settings card, the importFromCinemarco contract member and its two Shared types, CinemarcoImport.fs (886 lines) and its Api.fs/Server.fsproj wiring, plus documentation residue; Steam/Steam-Family/Jellyfin import flows untouched
+**Duration:** 14m
+**Verification:** FAIL (iteration 1, task-under-specified) — builder-directed integration: spec/ownership contradiction on knowledge/index.md was the sole blocking finding; all technical criteria verifier-confirmed (rg zero hits, 676/676 tests, clean build)
+**Files changed:** 13
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-08-07 16:38 -- Work session ended
 
 **Type:** Work / Session end

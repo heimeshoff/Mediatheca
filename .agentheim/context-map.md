@@ -49,7 +49,7 @@ Mediatheca is a personal media library + diary + intelligence hub built on event
 - **Notes:** Mostly projections that read from Movies / Series / Games / Journal event streams. Yearly intelligence reports and friend-level intelligence are v2.
 
 ### Integration
-- **Purpose:** Adapters to external systems — TMDB, RAWG, Steam, HowLongToBeat, Jellyfin, Cinemarco. Translates external shapes into commands the core BCs accept; scheduled sync jobs pull external state on a cadence.
+- **Purpose:** Adapters to external systems — TMDB, RAWG, Steam, HowLongToBeat, Jellyfin. Translates external shapes into commands the core BCs accept; scheduled sync jobs pull external state on a cadence.
 - **Core language:** Import, sync, refresh, scheduled job, external id (TMDB id, RAWG id, Steam appId), adapter.
 - **Classification:** generic
 - **Key actors:** External services + single user (triggering manual syncs).

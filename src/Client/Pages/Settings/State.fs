@@ -146,10 +146,6 @@ let init () : Model * Cmd<Msg> =
       JellyfinLastSyncTime = None
       JellyfinSyncStatus = None
       SteamFamilyLastSync = None
-      CinemarcoDbPath = ""
-      CinemarcoImagesPath = ""
-      IsImporting = false
-      ImportResult = None
       AdminModel = adminModel
       EventsSectionOpen = false
       EventsSectionLoaded = false
@@ -655,25 +651,6 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
 
     | Steam_family_last_sync_loaded lastSync ->
         { model with SteamFamilyLastSync = lastSync }, Cmd.none
-
-    | Cinemarco_db_path_changed value ->
-        { model with CinemarcoDbPath = value; ImportResult = None }, Cmd.none
-
-    | Cinemarco_images_path_changed value ->
-        { model with CinemarcoImagesPath = value; ImportResult = None }, Cmd.none
-
-    | Start_cinemarco_import ->
-        let request: ImportFromCinemarcoRequest = {
-            DatabasePath = model.CinemarcoDbPath
-            ImagesPath = model.CinemarcoImagesPath
-        }
-        { model with IsImporting = true; ImportResult = None },
-        Cmd.OfAsync.either api.importFromCinemarco request
-            Import_completed
-            (fun ex -> Import_completed (Error ex.Message))
-
-    | Import_completed result ->
-        { model with IsImporting = false; ImportResult = Some result }, Cmd.none
 
     // Administration (administration-k3vmt)
     | Admin_msg childMsg ->

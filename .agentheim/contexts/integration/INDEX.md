@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 11
+- **Doing:** 0
+- **Done:** 12
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **integration-w8fkr** — Retire the Cinemarco import — delete the Settings card, the `importFromCinemarco` contract member, and `CinemarcoImport.fs` (refactor) — `doing/integration-w8fkr-retire-cinemarco-import.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **integration-w8fkr** — Retire the Cinemarco import — delete the Settings card, the `importFromCinemarco` contract member, and `CinemarcoImport.fs` (refactor) — `done/integration-w8fkr-retire-cinemarco-import.md`
 - **integration-hebjs** — One-click Steam Family import — automatic access-token acquisition (feature) — `done/integration-hebjs-one-click-steam-family-import.md`
 - **integration-q7wv3** — Episodes materialized before integration-007 never get a still — the backfill gap (bug) — `done/integration-q7wv3-backfill-jellyfin-stills-for-existing-materialized-episodes.md`
 - **integration-007** — Fetch Jellyfin episode stills when materializing a missing season (feature) — `done/integration-007-fetch-jellyfin-episode-stills-on-materialize.md`

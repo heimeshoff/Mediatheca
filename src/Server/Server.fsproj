@@ -56,15 +56,8 @@
     <Compile Include="EventFormatting.fs" />
     <Compile Include="Sse.fs" />
     <Compile Include="EventLogFilter.fs" />
-    <!-- Administration.fs must compile before CinemarcoImport.fs
-         (administration-kv7dp, ADR-0043): CinemarcoImport's post-import
-         rebuild loop calls Administration.lossyRebuildRejectionMessage.
-         CinemarcoImport.fs must in turn stay before Api.fs, which calls
-         CinemarcoImport.runImport. Neither Administration.fs nor Api.fs
-         depends on the other. -->
     <Compile Include="Administration.fs" />
     <Compile Include="StartupCutover.fs" />
-    <Compile Include="CinemarcoImport.fs" />
     <Compile Include="Api.fs" />
     <Compile Include="Composition.fs" />
     <Compile Include="Program.fs" />
