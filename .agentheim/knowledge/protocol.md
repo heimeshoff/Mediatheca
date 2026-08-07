@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 11:52 -- Modeling / Captured: games-ev65k - Game release dates from Steam (cached, auto-refreshed, Upcoming view)
+
+**Type:** Modeling / Capture
+**BC:** games
+**Filed to:** todo
+**Summary:** Release date becomes cached third-party metadata (ADR-0043 tier — re-derivable, and it *changes* on delays) on every Steam-linked game: `SteamStoreDetails` decodes `release_date`/`coming_soon`, `game_metadata_cache` gains raw-string + parsed-date + coming-soon columns, and a b8xnw-shaped own-cursor backfill re-polls only unreleased games until the set drains. Surfaced on the detail page, as an unreleased-only list-card hint, and in a new Upcoming section on the Games tab (builder decisions: all three surfaces, all games, auto-refresh). Filed directly to todo — machinery fully precedented (games-b8xnw/a7dqx), concrete ACs including a Tenebris Somnia (appId 2121510, Oct 2026) end-to-end criterion; depends_on games-k3vps (completed mid-capture) and design-system-001 (done), both met.
+
+---
+
 ## 2026-08-07 11:43 -- Work session ended
 
 **Type:** Work / Session end
