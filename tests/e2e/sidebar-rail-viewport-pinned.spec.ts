@@ -88,3 +88,42 @@ test.describe("Sidebar rail: bottom nav group stays pinned to the viewport", () 
         expect(mainBox.x).toBeCloseTo(railBox.x + railBox.width, 0);
     });
 });
+
+// design-system-m2wvc (amends ADR-0014 in place): the active sidebar item's
+// gold inset-left bar (`box-shadow: var(--ring-active)`) was retracted — the
+// burgundy fill (`--color-nav-active-fill`) and the gold icon
+// (`--color-gold` via `.nav-item-active-icon`) carry the active state alone.
+test.describe("Sidebar rail: active nav item has no inset-left bar", () => {
+    test.use({ viewport: { width: 1280, height: 720 } });
+
+    test("the active link has no box-shadow, keeps its burgundy fill, and its icon stays gold", async ({ page }) => {
+        await page.goto("/#/");
+
+        const dashboardLink = page.getByRole("link", { name: "Dashboard" });
+        await expect(dashboardLink).toBeVisible();
+
+        // Resolve the design-system tokens the same way the browser does,
+        // rather than hardcoding an oklch->rgb conversion, so this spec
+        // tracks the tokens if their literal values ever move.
+        const [expectedFill, expectedGold] = await page.evaluate(() => {
+            const probe = document.createElement("div");
+            probe.style.backgroundColor = "var(--color-nav-active-fill)";
+            probe.style.color = "var(--color-gold)";
+            document.body.appendChild(probe);
+            const computed = getComputedStyle(probe);
+            const result = [computed.backgroundColor, computed.color];
+            probe.remove();
+            return result;
+        });
+
+        const linkStyles = await dashboardLink.evaluate((el) => {
+            const computed = getComputedStyle(el);
+            return { boxShadow: computed.boxShadow, backgroundColor: computed.backgroundColor };
+        });
+        expect(linkStyles.boxShadow).toBe("none");
+        expect(linkStyles.backgroundColor).toBe(expectedFill);
+
+        const iconColor = await dashboardLink.locator(".nav-item-active-icon").evaluate((el) => getComputedStyle(el).color);
+        expect(iconColor).toBe(expectedGold);
+    });
+});

@@ -156,8 +156,10 @@ let contentGridRight = "lg:col-span-4"
 let navItem = "nav-item flex items-center gap-[11px] px-3 py-[9px] rounded-lg font-sans"
 
 /// Nav item active state — dir 3a's burgundy fill (`--color-nav-active-fill`)
-/// + gold inset-left bar (`--ring-active`). Reverted from the ADR-0013 ivory
-/// placard + concave corner-notch boundary (see the superseding ADR).
+/// and gold icon (`navItemActiveIconClass`) carry the active state alone.
+/// Reverted from the ADR-0013 ivory placard + concave corner-notch boundary
+/// (see the superseding ADR); the gold inset-left bar dir-3a/ADR-0014 also
+/// carried was retracted by design-system-m2wvc.
 let navItemActive = "nav-item-active"
 
 /// Nav item inactive state — muted ink (`--color-ink-muted`), no fill,

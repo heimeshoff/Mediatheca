@@ -1389,7 +1389,7 @@ let private velvetLobbyPatternsSection () =
             // ── Sidebar nav (dir 3a burgundy active tab) ──
             subheading "Sidebar Nav"
 
-            decision "The desktop rail (§ 4 Sidebar nav — dir 3a, design-system-grtw7): a wordmark + tagline header, a top group of primary destinations, and a bottom group (Events/Settings, one step smaller) pinned via mt-auto. The active item is a burgundy fill (`--color-nav-active-fill`) with a gold inset-left bar (`--ring-active`) and a gold icon — the brief's own dir-3a treatment, reverted from the ADR-0013 ivory placard + concave corner-notch (superseding ADR-0014)."
+            decision "The desktop rail (§ 4 Sidebar nav — dir 3a, design-system-grtw7): a wordmark + tagline header, a top group of primary destinations, and a bottom group (Events/Settings, one step smaller) pinned via mt-auto. The active item is a burgundy fill (`--color-nav-active-fill`) with a gold icon — the brief's own dir-3a treatment, reverted from the ADR-0013 ivory placard + concave corner-notch (superseding ADR-0014); the gold inset-left bar dir-3a/ADR-0014 also carried was retracted (design-system-m2wvc) — the fill and icon alone read as active, without a hard vertical rule down every item's left edge."
 
             Html.div [
                 prop.className "mt-4 max-w-[220px] rounded-lg overflow-hidden bg-base-200/80 border border-base-300/50 p-3"

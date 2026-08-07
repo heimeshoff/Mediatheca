@@ -1,11 +1,11 @@
 ---
 id: design-system-m2wvc
 title: Sidebar active nav item — drop the gold inset-left bar; burgundy fill + gold icon carry the active state alone (retracts that half of ADR-0014's dir-3a treatment)
-status: doing
+status: done
 type: refactor
 context: design-system
 created: 2026-08-07
-completed:
+completed: 2026-08-07
 depends_on: [design-system-001]
 blocks: [design-system-n8zqr]
 tags: [sidebar, nav, active-state, tokens]
@@ -71,6 +71,26 @@ smaller scale, hover states, and the `sticky top-0 h-screen` viewport pinning
 - [ ] `npm run build` exits 0.
 - [ ] The active item still reads unmistakably as active at a glance in the running rail,
       without the bar. [human-eye]
+
+## Outcome
+
+Removed the gold inset-left bar from the active sidebar nav item: deleted
+`.nav-item-active`'s `box-shadow: var(--ring-active)` declaration and the
+now-dead `--ring-active` token (`src/Client/index.css`). The burgundy fill
+(`--color-nav-active-fill`) and the gold icon (`.nav-item-active-icon`,
+`--color-gold`) carry the active state alone, unconditionally in both rail
+states, so `design-system-n8zqr` (collapsible rail) inherits one settled
+treatment. Doc comments updated in `index.css`, `DesignSystem.fs`
+(`navItemActive`), the StyleGuide's Sidebar Nav `decision` prose, and the BC
+README's "Layered sidebar nav" + "Underline tab" entries. ADR-0014 amended in
+place (new "## Amendment (2026-08-07, design-system-m2wvc)" section) per the
+amend-in-place precedent — stays `accepted`, nothing superseded. Added a new
+Playwright `describe` block to `tests/e2e/sidebar-rail-viewport-pinned.spec.ts`
+asserting the active link's computed `box-shadow` is `none`, its background
+still resolves to `--color-nav-active-fill`, and its icon still resolves to
+`--color-gold`; confirmed the test fails for the right reason against the old
+`box-shadow` declaration (red) before restoring the fix (green). `npm run
+build` exits 0.
 
 ## Notes
 

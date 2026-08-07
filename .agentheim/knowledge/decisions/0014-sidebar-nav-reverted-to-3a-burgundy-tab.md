@@ -6,7 +6,7 @@ status: accepted
 date: 2026-07-03
 supersedes: [0013]
 superseded_by: []
-related_tasks: [design-system-grtw7]
+related_tasks: [design-system-grtw7, design-system-m2wvc]
 related_research: []
 ---
 
@@ -84,3 +84,26 @@ running.
 - `styleguide.md` § 4, the design-system BC README, and the live StyleGuide
   specimen are updated in lockstep to describe the burgundy tab, replacing
   the ivory-placard / corner-notch description and its ADR-0013 citation.
+
+## Amendment (2026-08-07, design-system-m2wvc)
+
+This ADR amends in place — it stays `accepted`; nothing above is superseded.
+Point 1's decision covered two things: the burgundy fill + gold icon, and the
+gold inset-left bar (`box-shadow: var(--ring-active)`). The builder reviewed
+the shipped rail and asked for the bar specifically gone: the fill and gold
+icon already read as "you are here", and the bar draws a hard vertical rule
+down every menu item's left edge that the nav doesn't need. This is *not* a
+return to ADR-0013's ivory placard — it is dir 3a's burgundy tab minus its
+edge marker.
+
+Retracted: `.nav-item-active`'s `box-shadow: var(--ring-active)` declaration,
+and the `--ring-active` token itself (deleted outright — it had exactly one
+consumer, so nothing survives it; no dangling unreferenced token was left in
+the theme block).
+
+Standing unchanged from point 1: `background: var(--color-nav-active-fill)`,
+the label's inherited-ink + weight-600-when-active treatment, and the icon's
+flip to `--color-gold` via `.nav-item-active-icon`. Points 2–5 (ADR-0013
+token removal, dir-3a item metrics, rail width/no-profile-chip, the SVG icon
+set) are untouched — this amendment retracts one declaration and one token,
+nothing else in this ADR's scope.

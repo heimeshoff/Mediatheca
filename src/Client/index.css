@@ -71,12 +71,13 @@
     --shadow-hero: 0 20px 44px -18px oklch(0 0 0 / 0.85), 0 0 0 1px oklch(0.34 0.04 30);
     --shadow-card: 0 0 0 1px oklch(0.30 0.03 26);
     --shadow-filmstrip: 0 16px 36px -18px oklch(0 0 0 / 0.9);
-    --ring-active: inset 2px 0 0 oklch(0.80 0.12 82);
 
     /* Sidebar nav — dir 3a active tab (styleguide.md § 4 Sidebar nav,
-       design-system-grtw7). Burgundy fill + the gold `--ring-active`
-       inset-left bar — the brief's own dir-3a treatment, reverted from the
-       ADR-0013 ivory placard + concave corner-notch (superseding ADR-0014). */
+       design-system-grtw7, gold inset-left bar retracted by
+       design-system-m2wvc). Burgundy fill + a gold icon — the brief's own
+       dir-3a treatment, reverted from the ADR-0013 ivory placard + concave
+       corner-notch (superseding ADR-0014), minus the inset-left bar that
+       ADR-0014 restored (retracted per ADR-0014's dated amendment). */
     --color-nav-active-fill: oklch(0.22 0.035 25);
     --color-nav-icon-muted: oklch(0.45 0.03 35);
     --color-nav-bottom-muted: oklch(0.55 0.02 40);
@@ -527,8 +528,9 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ── Sidebar nav — dir 3a active tab (styleguide.md § 4 Sidebar nav,
    design-system-grtw7). Reverted from the ADR-0013 ivory placard + concave
-   corner-notch back to the brief's own burgundy fill + gold inset-left bar
-   (superseding ADR-0014). ── */
+   corner-notch back to the brief's own burgundy fill + gold icon; the
+   inset-left bar dir-3a/ADR-0014 also carried was retracted by
+   design-system-m2wvc — the fill and icon alone carry the active state. ── */
 .nav-item {
     position: relative;
     transition: background-color 0.2s ease, color 0.2s ease;
@@ -536,7 +538,6 @@ h1, h2, h3, h4, h5, h6 {
 
 .nav-item-active {
     background: var(--color-nav-active-fill);
-    box-shadow: var(--ring-active);
     font-size: 13px;
     font-weight: 600;
 }

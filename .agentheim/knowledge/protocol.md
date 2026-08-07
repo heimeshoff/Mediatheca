@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 18:53 -- Task verified and completed: design-system-m2wvc - Sidebar active nav item — drop the gold inset-left bar; burgundy fill + gold icon carry the active state alone (retracts that half of ADR-0014's dir-3a treatment)
+
+**Type:** Work / Task completion
+**Task:** design-system-m2wvc - Sidebar active nav item — drop the gold inset-left bar; burgundy fill + gold icon carry the active state alone (retracts that half of ADR-0014's dir-3a treatment)
+**Summary:** Retracted the gold inset-left bar from the active sidebar nav item — the burgundy fill and gold icon carry the active state alone; --ring-active token deleted outright; ADR-0014 amended in place
+**Duration:** 16m
+**Verification:** PASS (iteration 1)
+**Files changed:** 6
+**Tests added:** 1
+**ADRs written:** 0014 (amended in place)
+
+---
+
 ## 2026-08-07 18:36 -- Batch started: [design-system-mz9v7, design-system-m2wvc, series-k4zpn]
 
 **Type:** Work / Batch start
