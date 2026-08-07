@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mediatheca — Data Architecture Overview</title>
+<style>
+  :root {
+    --bg: #14181d;
+    --surface: #1b2026;
+    --surface-2: #20262e;
+    --line: #2c343f;
+    --text: #d7dce3;
+    --muted: #8f99a6;
+    --faint: #6b7480;
+    --accent: #d9b877;
+    --green: #86b87e;
+    --amber: #e0b153;
+    --red: #e0736a;
+    --blue: #78a7d6;
+    --mono: "Spline Sans Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.65 "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+    padding: 3rem 1.5rem 6rem;
+  }
+  .page { max-width: 1080px; margin: 0 auto; }
+  h1, h2, h3 { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; line-height: 1.2; }
+  h1 { font-size: 2.6rem; margin-bottom: .4rem; }
+  h1 em, .lede em { color: var(--accent); font-style: italic; }
+  .lede { color: var(--muted); max-width: 62ch; margin-bottom: 1.6rem; }
+  h2 { font-size: 1.9rem; font-style: italic; color: var(--accent); margin: 3.2rem 0 .3rem; }
+  h2 + p.sub { color: var(--muted); margin-bottom: 1.2rem; max-width: 75ch; }
+  h3 { font-size: 1.25rem; margin: 1.8rem 0 .5rem; }
+  p { margin-bottom: .8rem; }
+  code { font-family: var(--mono); font-size: .84em; background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: .08em .35em; white-space: nowrap; }
+  .chips { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.2rem 0 2rem; }
+  .chip { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: .3rem .9rem; font-size: .82rem; color: var(--muted); }
+  .chip b { color: var(--text); font-family: var(--mono); font-weight: 500; margin-right: .35rem; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1.2rem 1.4rem; margin: 1rem 0; }
+  .scroll { overflow-x: auto; margin: .8rem 0 1.4rem; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: .86rem; min-width: 640px; }
+  th { text-align: left; font-weight: 600; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); padding: .6rem .8rem; background: var(--surface-2); border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: .55rem .8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(odd) { background: rgba(255,255,255,.015); }
+  td.t { font-family: var(--mono); font-size: .8rem; white-space: nowrap; color: var(--text); }
+  .badge { display: inline-block; font-size: .7rem; font-weight: 600; letter-spacing: .04em; border-radius: 4px; padding: .1rem .5rem; white-space: nowrap; }
+  .b-event   { background: rgba(217,184,119,.13); color: var(--accent); }
+  .b-proj    { background: rgba(120,167,214,.13); color: var(--blue); }
+  .b-cache   { background: rgba(134,184,126,.13); color: var(--green); }
+  .b-imp     { background: rgba(224,177,83,.13);  color: var(--amber); }
+  .b-ok      { background: rgba(134,184,126,.15); color: var(--green); }
+  .b-watch   { background: rgba(224,177,83,.15);  color: var(--amber); }
+  .b-bad     { background: rgba(224,115,106,.16); color: var(--red); }
+  .callout { border-left: 3px solid var(--red); background: rgba(224,115,106,.06); border-radius: 0 8px 8px 0; padding: .9rem 1.2rem; margin: 1.2rem 0; }
+  .callout.amber { border-color: var(--amber); background: rgba(224,177,83,.06); }
+  .callout.green { border-color: var(--green); background: rgba(134,184,126,.06); }
+  .callout b:first-child { display: block; margin-bottom: .2rem; }
+  .ref { font-family: var(--mono); font-size: .74rem; color: var(--faint); }
+  ul { margin: 0 0 1rem 1.3rem; }
+  li { margin-bottom: .35rem; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+  .diagram-wrap { overflow-x: auto; margin: 1.6rem 0 .4rem; }
+  .diagram-wrap svg { display: block; min-width: 900px; width: 100%; height: auto; }
+  footer { margin-top: 4rem; color: var(--faint); font-size: .8rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+  .legend { display: flex; flex-wrap: wrap; gap: 1rem; margin: .6rem 0 0; font-size: .82rem; color: var(--muted); align-items: center; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Mediatheca — <em>Data Architecture</em></h1>
+<p class="lede">Where every piece of information lives in <code>mediatheca.db</code> (plus the <code>images/</code> file cache): what is the event-sourced source of truth, what is projected from it, what is cached from external systems, and what exists nowhere else. Every table's tier is formally declared in <span class="ref">Administration.fs:390–462</span> (<code>tableRegistry</code>) as <code>Projected</code> / <code>Cache</code> / <code>Imperative</code>.</p>
+
+<div class="chips">
+  <span class="chip"><b>1</b> event store (+ FTS index)</span>
+  <span class="chip"><b>7</b> projections · <b>14</b> projected tables</span>
+  <span class="chip"><b>8</b> cache tables + <b>1</b> image file cache</span>
+  <span class="chip"><b>7</b> imperative tables</span>
+  <span class="chip"><b>6</b> event-sourced bounded contexts · <b>97</b> event types</span>
+</div>
+
+<div class="diagram-wrap">
+<svg viewBox="0 0 980 430" xmlns="http://www.w3.org/2000/svg" font-family="'Instrument Sans','Segoe UI',sans-serif" font-size="13">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b7480"/>
+    </marker>
+  </defs>
+  <!-- lane labels -->
+  <text x="20" y="28" fill="#6b7480" font-size="11" letter-spacing="2">WRITE SIDE</text>
+  <text x="640" y="28" fill="#6b7480" font-size="11" letter-spacing="2">READ SIDE</text>
+
+  <!-- commands -->
+  <rect x="20" y="48" width="200" height="64" rx="8" fill="#1b2026" stroke="#2c343f"/>
+  <text x="120" y="74" text-anchor="middle" fill="#d7dce3">User commands</text>
+  <text x="120" y="94" text-anchor="middle" fill="#8f99a6" font-size="11">Fable.Remoting → Api.fs decide()</text>
+
+  <!-- jobs -->
+  <rect x="20" y="132" width="200" height="64" rx="8" fill="#1b2026" stroke="#2c343f"/>
+  <text x="120" y="158" text-anchor="middle" fill="#d7dce3">Scheduled jobs</text>
+  <text x="120" y="178" text-anchor="middle" fill="#8f99a6" font-size="11">Steam sync · TMDB refresh · backfills</text>
+
+  <!-- event store -->
+  <rect x="300" y="60" width="230" height="116" rx="8" fill="rgba(217,184,119,.07)" stroke="#d9b877"/>
+  <text x="415" y="90" text-anchor="middle" fill="#d9b877" font-size="16" font-family="Georgia,serif" font-style="italic">Event Store</text>
+  <text x="415" y="112" text-anchor="middle" fill="#d7dce3" font-size="12">events · append-only · 6 contexts</text>
+  <text x="415" y="132" text-anchor="middle" fill="#8f99a6" font-size="11">Movie- Series- Game- Friend-</text>
+  <text x="415" y="148" text-anchor="middle" fill="#8f99a6" font-size="11">Catalog- ContentBlocks-</text>
+  <text x="415" y="166" text-anchor="middle" fill="#6b7480" font-size="10">+ events_fts · projection_checkpoints</text>
+
+  <!-- projections -->
+  <rect x="620" y="48" width="240" height="140" rx="8" fill="rgba(120,167,214,.07)" stroke="#78a7d6"/>
+  <text x="740" y="76" text-anchor="middle" fill="#78a7d6" font-size="16" font-family="Georgia,serif" font-style="italic">7 Projections</text>
+  <text x="740" y="98" text-anchor="middle" fill="#d7dce3" font-size="11">movie_* · series_* · game_* ·</text>
+  <text x="740" y="114" text-anchor="middle" fill="#d7dce3" font-size="11">game_play_session · catalog_* ·</text>
+  <text x="740" y="130" text-anchor="middle" fill="#d7dce3" font-size="11">friend_list · content_blocks</text>
+  <text x="740" y="152" text-anchor="middle" fill="#8f99a6" font-size="10">checkpointed · disposable ·</text>
+  <text x="740" y="166" text-anchor="middle" fill="#8f99a6" font-size="10">rebuilt by drop + full replay</text>
+
+  <!-- external APIs -->
+  <rect x="20" y="250" width="200" height="76" rx="8" fill="#1b2026" stroke="#2c343f"/>
+  <text x="120" y="278" text-anchor="middle" fill="#d7dce3">External APIs</text>
+  <text x="120" y="298" text-anchor="middle" fill="#8f99a6" font-size="11">TMDB · Steam · RAWG ·</text>
+  <text x="120" y="313" text-anchor="middle" fill="#8f99a6" font-size="11">HowLongToBeat · Jellyfin</text>
+
+  <!-- caches -->
+  <rect x="300" y="240" width="230" height="96" rx="8" fill="rgba(134,184,126,.07)" stroke="#86b87e"/>
+  <text x="415" y="268" text-anchor="middle" fill="#86b87e" font-size="16" font-family="Georgia,serif" font-style="italic">Cache tier</text>
+  <text x="415" y="290" text-anchor="middle" fill="#d7dce3" font-size="11">*_metadata_cache · series_season/</text>
+  <text x="415" y="305" text-anchor="middle" fill="#d7dce3" font-size="11">episode_cache · jellyfin_* · images/</text>
+  <text x="415" y="324" text-anchor="middle" fill="#8f99a6" font-size="10">re-fetchable, never replayed</text>
+
+  <!-- imperative -->
+  <rect x="300" y="356" width="230" height="60" rx="8" fill="rgba(224,177,83,.07)" stroke="#e0b153"/>
+  <text x="415" y="380" text-anchor="middle" fill="#e0b153" font-size="14" font-family="Georgia,serif" font-style="italic">Imperative stores</text>
+  <text x="415" y="400" text-anchor="middle" fill="#8f99a6" font-size="10">settings · game_journal · cast/crew · job_runs</text>
+
+  <!-- API responses -->
+  <rect x="620" y="252" width="240" height="72" rx="8" fill="#1b2026" stroke="#2c343f"/>
+  <text x="740" y="280" text-anchor="middle" fill="#d7dce3">Read path (Api queries)</text>
+  <text x="740" y="300" text-anchor="middle" fill="#8f99a6" font-size="11">projection LEFT JOIN cache</text>
+  <text x="740" y="315" text-anchor="middle" fill="#8f99a6" font-size="11">JOIN cast / jellyfin at query time</text>
+
+  <!-- arrows -->
+  <line x1="220" y1="86" x2="296" y2="104" stroke="#6b7480" marker-end="url(#arr)"/>
+  <line x1="220" y1="158" x2="296" y2="132" stroke="#6b7480" marker-end="url(#arr)"/>
+  <line x1="530" y1="118" x2="616" y2="118" stroke="#6b7480" marker-end="url(#arr)"/>
+  <text x="573" y="108" text-anchor="middle" fill="#6b7480" font-size="10">sync catch-up</text>
+  <line x1="120" y1="250" x2="120" y2="200" stroke="#6b7480" marker-end="url(#arr)"/>
+  <line x1="220" y1="288" x2="296" y2="288" stroke="#6b7480" marker-end="url(#arr)"/>
+  <line x1="530" y1="288" x2="616" y2="288" stroke="#6b7480" marker-end="url(#arr)"/>
+  <line x1="740" y1="188" x2="740" y2="248" stroke="#6b7480" marker-end="url(#arr)"/>
+  <line x1="220" y1="96" x2="296" y2="380" stroke="#6b7480" stroke-dasharray="4 4" marker-end="url(#arr)"/>
+  <line x1="530" y1="386" x2="700" y2="328" stroke="#6b7480" stroke-dasharray="4 4" marker-end="url(#arr)"/>
+</svg>
+</div>
+<div class="legend">
+  <span><span class="badge b-event">EVENT STORE</span> source of truth</span>
+  <span><span class="badge b-proj">PROJECTED</span> disposable, rebuilt by replay</span>
+  <span><span class="badge b-cache">CACHE</span> re-fetchable from external systems</span>
+  <span><span class="badge b-imp">IMPERATIVE</span> direct writes, no replay, no re-fetch</span>
+</div>
+
+<!-- ============================================================ -->
+<h2>1 · Event store — the source of truth</h2>
+<p class="sub">A single append-only <code>events</code> table (<span class="ref">EventStore.fs:52–76</span>): <code>global_position</code> (store-wide order, gaps legal by design), <code>stream_id</code>, <code>stream_position</code> (optimistic-concurrency key via <code>UNIQUE(stream_id, stream_position)</code>), <code>event_type</code>, JSON <code>data</code>/<code>metadata</code>, ISO-8601 <code>timestamp</code>. An FTS5 index (<code>events_fts</code>) mirrors <code>data</code> for the admin event-log search. <code>projection_checkpoints</code> tracks each projection's <code>last_position</code>.</p>
+
+<div class="scroll"><table>
+<thead><tr><th>Bounded context</th><th>Stream prefix</th><th>Event types</th><th>Examples</th></tr></thead>
+<tbody>
+<tr><td>Movies</td><td class="t">Movie-</td><td class="t">17</td><td>added/removed, poster/backdrop replaced, recommendations, watch sessions, personal rating, in-focus</td></tr>
+<tr><td>Series</td><td class="t">Series-</td><td class="t">26</td><td>library lifecycle, rewatch sessions, episode/season watch progress, abandoned, <code>Series_refreshed</code></td></tr>
+<tr><td>Games</td><td class="t">Game-</td><td class="t">37</td><td>library lifecycle, play sessions, playtime reconciliation, ownership, facet overrides, Steam linkage</td></tr>
+<tr><td>Friends</td><td class="t">Friend-</td><td class="t">3</td><td>added, updated, removed</td></tr>
+<tr><td>Catalogs (Curation)</td><td class="t">Catalog-</td><td class="t">7</td><td>catalog CRUD, entries added/reordered</td></tr>
+<tr><td>ContentBlocks</td><td class="t">ContentBlocks-</td><td class="t">7</td><td>movie-page notes/blocks CRUD and grouping (movie-scoped streams only)</td></tr>
+</tbody>
+</table></div>
+
+<ul>
+  <li><b>Writers:</b> the generic command handler (<span class="ref">Api.fs:66–98</span>), admin compensating events, the nightly Steam playtime sync (<span class="ref">PlaytimeTracker.fs:113</span>), the nightly TMDB series refresh (<span class="ref">SeriesRefresh.fs:289,360</span>), and the startup-cutover automation.</li>
+  <li><b>Projections are effectively synchronous:</b> every append is immediately followed by a catch-up of <em>all</em> registered handlers in the same request (<span class="ref">Api.fs:96–97</span>) — read models never lag in normal operation.</li>
+  <li><b>Rebuild machinery:</b> per-projection drop-and-replay via SSE admin route; event surgery (edit/delete/rename) rewinds all checkpoints to 0 and forces rebuilds; a shadow-replay drift detector diffs live tables against a fresh in-memory replay (ADR-0031).</li>
+  <li><b>Not event-sourced by explicit decision:</b> the game journal (migrated <em>out</em> of the event store), settings, cast/crew, all caches, job runs.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2>2 · Projections — derived from events, disposable</h2>
+<p class="sub">Seven checkpointed handlers (<span class="ref">Composition.fs:236–244</span>, registration order load-bearing). Each owns tables that are dropped and rebuilt from a full replay. <code>Game-</code> streams feed <em>two</em> projections (catalog vs play-diary) so the diary can rebuild without dropping the game catalog.</p>
+
+<div class="scroll"><table>
+<thead><tr><th>Projection</th><th>Tables</th><th>Holds</th><th>Fed by</th><th>Rebuild from events alone?</th></tr></thead>
+<tbody>
+<tr><td>MovieProjection</td><td class="t">movie_list<br>movie_detail<br>watch_sessions</td><td>Identity + frozen TMDB snapshot (name, year, runtime, overview, genres, ratings), user state (personal rating, in-focus), friend-relation JSON blobs, watch sessions</td><td>all 17 Movie events</td><td><span class="badge b-ok">YES</span></td></tr>
+<tr><td>SeriesProjection</td><td class="t">series_list<br>series_detail<br>series_rewatch_sessions<br>series_episode_progress</td><td>Identity card + airing status, user state, rewatch sessions, per-episode watch dates, materialized <code>watched_episode_count</code></td><td>all 26 Series events</td><td><span class="badge b-bad">NO — reads a cache mid-replay</span></td></tr>
+<tr><td>GameProjection</td><td class="t">game_list<br>game_detail</td><td>Identity + RAWG/Steam identifiers, user state (status, rating, ownership), friend blobs, playtime totals, manual facet overrides</td><td>Game events (many legacy types are no-ops)</td><td><span class="badge b-ok">YES</span></td></tr>
+<tr><td>PlaySessionProjection</td><td class="t">game_play_session</td><td>Play diary: one row per (game, day) with minutes and source (SteamSync / Manual)</td><td>4 play-session Game events</td><td><span class="badge b-ok">YES</span></td></tr>
+<tr><td>CatalogProjection</td><td class="t">catalog_list<br>catalog_entries</td><td>Curated lists; entries store only slugs + note + position — titles/posters resolved at read time (no denormalization)</td><td>all 7 Catalog events</td><td><span class="badge b-ok">YES</span></td></tr>
+<tr><td>FriendProjection</td><td class="t">friend_list</td><td>Friend identity + avatar crop</td><td>3 Friend events</td><td><span class="badge b-watch">YES, but writes into movie tables</span></td></tr>
+<tr><td>ContentBlockProjection</td><td class="t">content_blocks</td><td>Movie-page note blocks (type, content, image ref, ordering, row groups)</td><td>all 7 ContentBlocks events</td><td><span class="badge b-ok">YES</span></td></tr>
+</tbody>
+</table></div>
+
+<!-- ============================================================ -->
+<h2>3 · Cache tier — external data, never replayed</h2>
+<p class="sub">Re-derivable from external systems. Never checkpointed, never drift-checked, deliberately excluded from projection <code>dropTables</code>. The hard rule (ADR-0045, <span class="ref">MetadataCache.fs:20–30</span>): no projection handler may <em>read</em> this tier — violated in one place (see hazards).</p>
+
+<div class="scroll"><table>
+<thead><tr><th>Table</th><th>Holds</th><th>Initial source</th><th>Updated / invalidated</th><th>If lost</th></tr></thead>
+<tbody>
+<tr><td class="t">game_metadata_cache</td><td>Descriptions, HLTB hours, facets, Steam Deck compat, release dates, Steam category ids (+ seeded cover/backdrop/rawg copies)</td><td>Steam Store API at every game-add path; HLTB on user action; one-time seed from <code>game_detail</code></td><td>Slice-scoped upserts. Three nightly backfills (05:00 facets, 06:00 Deck compat, 07:00 release dates — only release dates recur, for unreleased games). <b>No TTL</b>; identity text and HLTB never re-fetched automatically</td><td>Facets/Deck/release dates self-heal only if rows still exist; descriptions + HLTB lost until manual re-fetch</td></tr>
+<tr><td class="t">series_metadata_cache</td><td>Overview, TMDB rating, episode runtime (+ an unread backdrop_ref copy)</td><td>TMDB at series-add; one-time seed from <code>series_detail</code></td><td>Overwritten on every TMDB refresh: nightly job at 04:00 (airing series + recently-watched, 180-day window) and manual refresh</td><td>Refresh candidates self-heal; ended, unwatched series never come back</td></tr>
+<tr><td class="t">series_season_cache<br>series_episode_cache</td><td>Season/episode metadata: names, overviews, air dates, runtimes, still refs, TMDB ratings</td><td>TMDB at series-add (imperatively, at command time — <em>not</em> via the event handler); Jellyfin sync supplements missing rows (<code>source='jellyfin'</code>)</td><td><code>INSERT OR REPLACE</code> on every TMDB refresh; deleted imperatively on series removal. Live in <span class="ref">SeriesProjection.fs</span> for historical reasons only — they are caches, renamed from the old projection tables</td><td>Refresh candidates self-heal; others permanently missing episode lists</td></tr>
+<tr><td class="t">movie_metadata_cache</td><td>Nothing yet — <code>(movie_slug, fetched_at)</code> stub, no writer, no reader (backlog <code>movies-v2gkh</code>)</td><td>—</td><td>—</td><td>Nothing</td></tr>
+<tr><td class="t">jellyfin_movie<br>jellyfin_series<br>jellyfin_episode</td><td>Slug ↔ Jellyfin item-id mapping for "play" deep links</td><td>One-time migration out of old projection columns; then Jellyfin API</td><td>Full <b>wipe-and-repopulate</b> on every user-triggered sync/scan (plus request-driven auto-sync with 5-min cooldown). No scheduled job, no TTL</td><td>Fully self-healing — one sync restores everything</td></tr>
+<tr><td class="t">images/ (files)</td><td>Posters, backdrops, episode stills, cast portraits, game covers, friend photos, journal uploads</td><td>TMDB / Steam / RAWG / Jellyfin downloads + user uploads</td><td>Series posters/backdrops re-downloaded on every refresh; everything else write-once (guarded by <code>imageExists</code>). Admin orphan purge diffs files against all <code>image_ref</code> columns (blocked while any projection is dirty)</td><td>Series artwork self-heals for refresh candidates; movie/game/cast artwork has <b>no refresh path</b>; friend photos and journal uploads are originals — gone for good</td></tr>
+</tbody>
+</table></div>
+
+<!-- ============================================================ -->
+<h2>4 · Imperative stores — no replay, no re-fetch</h2>
+<p class="sub">Direct-write tables. Nothing here can be reconstructed from the event store, and (unlike the cache tier) most of it cannot be re-fetched from anywhere either.</p>
+
+<div class="scroll"><table>
+<thead><tr><th>Table</th><th>Holds</th><th>Initial source</th><th>Updated / invalidated</th><th>If lost</th></tr></thead>
+<tbody>
+<tr><td class="t">cast_members<br>movie_cast<br>series_cast<br>movie_crew</td><td>Actors (shared, keyed by TMDB id), top-10 billed cast per title, directors</td><td>TMDB credits API once, at movie/series add time</td><td>Effectively <b>write-once</b>: links are <code>INSERT OR IGNORE</code>, roles never corrected, no refresh endpoint. Orphan GC on media removal (deletes unreferenced members + portraits)</td><td><span class="badge b-bad">UNRECOVERABLE</span> for cast; crew self-heals via startup <code>backfillDirectors</code></td></tr>
+<tr><td class="t">settings</td><td>API keys (TMDB/RAWG/Steam), Jellyfin + Steam-Family credentials and session tokens, job schedule hours, one-time migration markers, per-page UI view preferences</td><td>Env vars seed the four API keys if absent; everything else from user actions and sync jobs</td><td>Immediate overwrite per write, no TTL, no cleanup</td><td><span class="badge b-bad">SEVERE</span> — credentials gone (env vars re-seed only the API keys); lost migration markers re-trigger one-time seeds/cutover (defensively guarded, but messy)</td></tr>
+<tr><td class="t">game_journal_blocks</td><td>The Notion-style game journal: user-authored block trees (text, images, columns)</td><td>User authoring; one-time migration from the old event-sourced <code>content_blocks</code> (with a <code>journal-export/*.md</code> insurance dump)</td><td>Whole document <b>delete-all-then-reinsert</b> per save, in one transaction. No versioning, no history</td><td><span class="badge b-bad">SHARPEST LOSS CASE</span> — original content, not in the event store, not re-fetchable; only pre-migration journals have the markdown dump</td></tr>
+<tr><td class="t">job_runs</td><td>Observability history of the five scheduled jobs (status, trigger, timestamps)</td><td>Job-run recorder on the dedicated job connection</td><td>running → terminal once; startup flips orphaned <code>running</code> rows to <code>interrupted</code>. <b>No pruning — grows unbounded</b></td><td>Cosmetic; job cursors live in the metadata cache, not here</td></tr>
+</tbody>
+</table></div>
+
+<!-- ============================================================ -->
+<h2>5 · Redundancy audit</h2>
+<p class="sub">Every place the same information lives in two tables, with a verdict. <span class="badge b-ok">BY DESIGN</span> = deliberate and consistent under replay. <span class="badge b-watch">WATCH</span> = works, but carries drift risk or extra weight. <span class="badge b-bad">NOT A GOOD IDEA</span> = dead weight or genuinely wrong.</p>
+
+<div class="scroll"><table>
+<thead><tr><th>#</th><th>Duplicated information</th><th>Where</th><th>Verdict</th><th>Assessment</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>List-card columns (name, year, poster, genres, rating, status, …)</td><td class="t">movie_list ⊂ movie_detail<br>series_list ⊂ series_detail<br>game_list ⊂ game_detail</td><td><span class="badge b-ok">BY DESIGN</span></td><td>Classic CQRS list-vs-detail read models, written from the same events in the same handler, always rebuilt together — consistency is guaranteed by replay. The games pair is the heaviest (9 shared columns); a <code>game_detail</code>-backed view could replace <code>game_list</code>, but there is no correctness risk today.</td></tr>
+<tr><td>2</td><td><code>cover_ref</code>, <code>backdrop_ref</code>, <code>rawg_id</code>, <code>rawg_rating</code></td><td class="t">game_detail ↔ game_metadata_cache</td><td><span class="badge b-bad">NOT A GOOD IDEA</span></td><td>Seeded once from the projection, then never updated — a later <code>Game_cover_replaced</code> event updates only the projection, so the cache copies silently diverge. All reads use the projection copies, making the cache copies stale dead weight. Drop the four columns from the cache.</td></tr>
+<tr><td>3</td><td><code>backdrop_ref</code></td><td class="t">series_detail ↔ series_metadata_cache</td><td><span class="badge b-bad">NOT A GOOD IDEA</span></td><td>The cache copy is written on every TMDB refresh but read by nothing (ADR-0048 kept the projection field; the registry itself notes the copy is unread). Pure dead weight plus a divergence trap for future readers — drop the column.</td></tr>
+<tr><td>4</td><td><code>genres</code></td><td class="t">game_list / game_detail ↔ game_metadata_cache.genres</td><td><span class="badge b-bad">NOT A GOOD IDEA</span></td><td>Cache column is permanently unused after ADR-0055 reverted the cutover. Dead column; SQLite can't easily drop it mid-migration chain, but it should at least stop being written and stay documented as dead (it currently is).</td></tr>
+<tr><td>5</td><td>Jellyfin movie id</td><td class="t">movie_detail.jellyfin_id ↔ jellyfin_movie</td><td><span class="badge b-bad">NOT A GOOD IDEA</span></td><td>Legacy column, migrated out to <code>jellyfin_movie</code>; no event handler writes it, all reads use the store. The equivalent series column was already dropped — this one should follow.</td></tr>
+<tr><td>6</td><td><code>movie_detail.production_countries</code></td><td class="t">movie_detail (only)</td><td><span class="badge b-bad">DEAD + LATENT BUG</span></td><td>Not redundancy but worse: the column is created and read by <code>getCountryDistribution</code> (<span class="ref">MovieProjection.fs:793–815</span>) yet <b>nothing ever writes it</b> — the country distribution is always empty. Either wire it up from TMDB data or delete both column and query.</td></tr>
+<tr><td>7</td><td>Total playtime</td><td class="t">game_list.total_play_time ↔ game_detail.total_play_time ↔ Σ game_play_session + prior_play_time</td><td><span class="badge b-watch">WATCH</span></td><td>The same number is maintained in three places by independent payload arithmetic (deliberately, to avoid cross-projection joins). Consistent under full replay, but any partial rebuild of only one of the two projections lets the copies disagree until the other is rebuilt too.</td></tr>
+<tr><td>8</td><td>Watched-episode count</td><td class="t">series_list.watched_episode_count ↔ COUNT over series_episode_progress</td><td><span class="badge b-watch">WATCH</span></td><td>A materialized counter, recomputed on every progress event — fine in itself, but it inherits the corruption from hazard H1 below: if the episode cache is stale during a replay, both the progress rows and this counter drift.</td></tr>
+<tr><td>9</td><td>Season episode count</td><td class="t">series_season_cache.episode_count ↔ COUNT over series_episode_cache ↔ series_episode_counts view</td><td><span class="badge b-watch">WATCH</span></td><td>Three ways to derive the same number inside one tier. Both writes come from the same TMDB payload so they rarely disagree, but the SQL view alone would suffice.</td></tr>
+<tr><td>10</td><td><code>jellyfin_series</code> table</td><td class="t">jellyfin_series</td><td><span class="badge b-watch">WATCH</span></td><td>Written on every sync, read by nothing anywhere in <code>src/</code>. Harmless (rebuilt from Jellyfin), but it is a dead table until a series-level deep link ships.</td></tr>
+<tr><td>11</td><td>Frozen TMDB movie metadata</td><td class="t">movie_detail (no cache tier yet)</td><td><span class="badge b-watch">WATCH</span></td><td>Inconsistency across contexts rather than duplication: series and games moved refreshable metadata to the cache tier; movies still freeze overview/runtime/rating inside the projection at add time, with no refresh path (TMDB rating never updates). Known backlog item (<code>movies-v2gkh</code>) — worth finishing, since <code>movie_metadata_cache</code> already exists as a stub.</td></tr>
+<tr><td>12</td><td>Friend identity in relation blobs</td><td class="t">friend slugs in movie/series/game JSON columns</td><td><span class="badge b-ok">BY DESIGN</span></td><td>Only slugs are duplicated (by reference); names and avatars are resolved at read time, so renaming a friend never leaves stale copies. Cast and Jellyfin availability are likewise joined at read time, never copied into projections.</td></tr>
+</tbody>
+</table></div>
+
+<!-- ============================================================ -->
+<h2>6 · Rebuild-integrity hazards</h2>
+<p class="sub">Not duplication, but places where the "projections are disposable" guarantee is weaker than it looks.</p>
+
+<div class="callout">
+<b>H1 — SeriesProjection reads the cache tier during replay (the one real violation)</b>
+The <code>Season_marked_watched</code> handler expands a season into per-episode progress rows by querying <code>series_episode_cache</code> <em>inside</em> <code>handleEvent</code> (<span class="ref">SeriesProjection.fs:546–552</span>) — exactly what ADR-0045 and the file's own comments forbid. Consequences: a rebuild against an empty or stale episode cache silently writes wrong progress rows (and a wrong <code>watched_episode_count</code>), and the ADR-0031 shadow-replay drift detector replays into a throwaway connection that has <em>no</em> episode cache at all, so this arm is a latent no-op there. Fix: enrich the event at command time (record the concrete episode numbers in the payload, as <code>Episodes_watched_up_to</code> already does).
+</div>
+
+<div class="callout amber">
+<b>H2 — FriendProjection writes into MovieProjection's tables, and only Movie's</b>
+<code>Friend_removed</code> scrubs the removed slug from <code>movie_detail</code> and <code>watch_sessions</code> (<span class="ref">FriendProjection.fs:84–138</span>) but <b>not</b> from the equivalent series (<code>series_detail</code>, <code>series_rewatch_sessions</code>) or game (<code>game_detail</code>) blobs — removed friends linger there. It also couples rebuild order: rebuilding MovieProjection alone resurrects deleted friend slugs until FriendProjection replays again (registration order is documented as load-bearing for this reason). Either scrub all three contexts symmetrically or, cleaner, filter deleted friends at read time in <code>resolveFriendRefs</code> and drop the cross-projection write entirely.
+</div>
+
+<div class="callout amber">
+<b>H3 — A read that writes</b>
+<code>SeriesProjection.getBySlug</code> inserts a missing default rewatch-session row during a <em>read</em> (<span class="ref">SeriesProjection.fs:962–976</span>). Self-healing, but it means query traffic mutates projection state outside replay — invisible to the drift detector's model.
+</div>
+
+<!-- ============================================================ -->
+<h2>7 · What actually needs backing up</h2>
+<p class="sub">Ranked by irreplaceability. The event store plus these is the true backup surface; everything else regenerates.</p>
+
+<div class="grid2">
+  <div class="card">
+    <h3>Irreplaceable (no upstream source)</h3>
+    <ul>
+      <li><code>events</code> — the entire user history of six contexts</li>
+      <li><code>game_journal_blocks</code> — original writing, replaced wholesale on every save, no history</li>
+      <li><code>settings</code> — credentials + tokens (only 4 API keys re-seed from env vars)</li>
+      <li><code>images/friends/</code> and <code>images/content/</code> — user uploads</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Expensive or partial to regenerate</h3>
+    <ul>
+      <li><code>movie_cast</code> / <code>series_cast</code> / <code>cast_members</code> — no refresh path at all; only crew self-heals at boot</li>
+      <li>Movie/game posters, backdrops, cast portraits — write-once downloads, never re-fetched</li>
+      <li><code>series_*_cache</code> + <code>series_metadata_cache</code> — nightly refresh restores only airing / recently-watched series</li>
+      <li><code>game_metadata_cache</code> descriptions + HLTB hours — manual re-fetch only</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Fully self-healing</h3>
+    <ul>
+      <li>All 14 projected tables — drop + replay</li>
+      <li><code>jellyfin_movie/series/episode</code> — one sync</li>
+      <li><code>movie_crew</code> — startup backfill</li>
+      <li><code>movie_metadata_cache</code> — empty stub</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Disposable</h3>
+    <ul>
+      <li><code>job_runs</code> — observability only (but unbounded growth: consider retention pruning)</li>
+      <li><code>events_fts</code> — rebuilt from <code>events</code></li>
+      <li><code>projection_checkpoints</code> — rewound to 0 and replayed</li>
+    </ul>
+  </div>
+</div>
+
+<footer>
+Generated 2026-08-07 from the Mediatheca source (branch <code>main</code>, HEAD <code>6582e3b</code>). File references use <code>File.fs:line</code> and point into <code>src/Server/</code>. Tier taxonomy: <code>Administration.tableRegistry</code>.
+</footer>
+
+</div>
+</body>
+</html>
