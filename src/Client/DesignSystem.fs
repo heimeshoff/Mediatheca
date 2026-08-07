@@ -350,7 +350,7 @@ let progressEpisodes (watched: bool list) : ReactElement =
 /// Season rail — one line per season, in season order. `touched.[i]` is gold
 /// when season i has at least one watched episode, brown when untouched.
 /// Two states only: a fully-watched season is not visually distinct from a
-/// partially-watched one. Visually coarser than `progressEpisodes` (taller
+/// partially-watched one. Visually distinct from `progressEpisodes` (slimmer
 /// segments, wider gaps, pill radius vs. poster radius) so the two rows never
 /// read as one long dotted line — this is the coarser "where am I in the
 /// show" mark, sitting above the finer "where am I in this season" row.
