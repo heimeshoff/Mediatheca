@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 14:08 -- Modeling / Refined: integration-hebjs - One-click Steam Family import — automatic access-token acquisition
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** todo
+**Summary:** The ADR-0019 builder gate ran live and **passed**: the builder QR-scanned into the spike harness (SteamKit2 3.1.0, MobileApp platform, persistent session), `GenerateAccessTokenForApp` minted an access token over plain HTTP (no CM connection), and `GetFamilyGroupForUser` returned HTTP 200 with real family data — the minted token carries the required audience/scope, so the browser-retrieval fallback is not needed and the acceptance criteria stand as written. Gate outcome + implementation intel (SteamKit2 API deltas, required `steamid` param from the JWT `sub` claim, ~30 s QR rotation, render-as-image requirement) recorded in the task; BC README's open question resolved; spike harness fixes committed under the task trailer. Auto-promoted per the readiness gate.
+**Split into:** none
+**ADRs written:** none (ADR-0019 anticipated both branches; the PASS branch is now recorded in the task and BC README)
+
+---
+
 ## 2026-08-07 12:27 -- Work session ended
 
 **Type:** Work / Session end
