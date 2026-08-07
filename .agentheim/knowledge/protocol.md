@@ -5,12 +5,29 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 12:27 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 26m (batch start 12:01 → 12:27)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** games-ev65k: 1
+**Commits:** 3 (batch start, task squash-merge commit, this entry)
+**Session-start churn:** 0 recognized machine-shape commits, 0 human commits since the 2026-08-07 11:43 boundary — both commits in the window (`cff5f55` capture of games-ev65k, `188fedd` prior session-end bookkeeping) carry `[games-ev65k]` / `[games-k3vps]` trailers. Nothing flagged; no advisory written.
+**Vision-conformance:** none — batch aligns with vision (games-ev65k lands inside the named Steam Import Enhancement workstream and the Games tab's "expandable over time" clause, and is the cleanest expression yet of the Replayable principle: release date is cache-tier by construction — no new event, no event-payload change, `Year` byte-identical, ADR-0045's zero-grep property independently re-verified by the verifier, and the new ADR-0060 records the partial-precision sort and self-draining cursor as first-class decisions rather than incidental implementation)
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task) — hand-classified (type: feature; files under src/, tests/, plus the BC README, one ADR, and routine task documentation)
+**Carry-over:** No `.agentheim/`-owned files stranded. left behind (user WIP, 3 files: `src/Server/Rawg.fs` modified, `Mediatheca Directions.html` and `plan.md` untracked). `git worktree list` clean — the games-ev65k worktree was unlinked (node_modules junction removed first, real copy verified intact) and removed after PASS integration, branch `aw/games-ev65k` deleted, and Windows released the directory fully this time. `.worktrees/` still retains the same four gitignored-by-intent-but-untracked directory shells from prior sessions (administration-z6ymt, games-j6wkr, games-k3vps, games-v4nqe) holding only MSBuild `obj/` residue (12 files, no source) — surfaced to the builder for a second session running, not removed on this session's initiative.
+
+---
+
 ## 2026-08-07 12:26 -- Task verified and completed: games-ev65k - Game release dates from Steam — cached for every Steam-linked game, auto-refreshed while unreleased, surfaced on the detail page and list cards, plus an Upcoming section on the Games tab
 
 **Type:** Work / Task completion
 **Task:** games-ev65k - Game release dates from Steam — cached for every Steam-linked game, auto-refreshed while unreleased, surfaced on the detail page and list cards, plus an Upcoming section on the Games tab
 **Summary:** Game release dates from Steam — cached raw/parsed/coming-soon metadata with a self-draining backfill, surfaced on the detail page, list cards, and a new Upcoming section
-**Duration:** 30m
+**Duration:** 23m
 **Verification:** PASS (iteration 1)
 **Files changed:** 20
 **Tests added:** 29
