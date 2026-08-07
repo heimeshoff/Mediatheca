@@ -1,7 +1,7 @@
 ---
 id: games-ev65k
 title: Game release dates from Steam — cached for every Steam-linked game, auto-refreshed while unreleased, surfaced on the detail page and list cards, plus an Upcoming section on the Games tab
-status: todo
+status: doing
 type: feature
 context: games
 created: 2026-08-07

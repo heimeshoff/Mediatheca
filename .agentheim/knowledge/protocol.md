@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 12:01 -- Batch started: [games-ev65k]
+
+**Type:** Work / Batch start
+**Tasks:** games-ev65k - Game release dates from Steam — cached for every Steam-linked game, auto-refreshed while unreleased, surfaced on the detail page and list cards, plus an Upcoming section on the Games tab
+**Parallel:** no (1 worker — single ready task; ready set was exactly 1)
+
+---
+
 ## 2026-08-07 11:52 -- Modeling / Captured: games-ev65k - Game release dates from Steam (cached, auto-refreshed, Upcoming view)
 
 **Type:** Modeling / Capture
