@@ -27,6 +27,7 @@
     <Compile Include="Tmdb.fs" />
     <Compile Include="Rawg.fs" />
     <Compile Include="Steam.fs" />
+    <Compile Include="SteamConnect.fs" />
     <Compile Include="HowLongToBeat.fs" />
     <Compile Include="Jellyfin.fs" />
     <Compile Include="JellyfinImport.fs" />
@@ -79,6 +80,14 @@
     <PackageReference Include="Donald" Version="10.*" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.*" />
     <PackageReference Include="Thoth.Json.Net" Version="12.*" />
+    <!-- integration-hebjs: one-time Steam "Connect" QR login only. Ongoing
+         family access-token refresh is a plain HTTP POST (Steam.fs,
+         mintFamilyAccessToken) — no SteamKit2, no CM connection (ADR-0019).
+         Version pinned to the exact release the builder gate proved live;
+         see spikes/steam-family-token-spike/README.md for the API deltas
+         vs. the SteamKit2 samples. -->
+    <PackageReference Include="SteamKit2" Version="3.1.0" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
   </ItemGroup>
 
 </Project>

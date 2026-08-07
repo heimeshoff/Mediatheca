@@ -431,13 +431,22 @@ module Api =
             let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
                 executeCommandCore conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
             try
-                let token =
+                let accessToken =
                     SettingsStore.getSetting conn "steam_family_token"
                     |> Option.defaultValue ""
-                if System.String.IsNullOrWhiteSpace(token) then
+                let refreshToken =
+                    SettingsStore.getSetting conn "steam_family_refresh_token"
+                    |> Option.defaultValue ""
+                let persistAccessToken (t: string) = SettingsStore.setSetting conn "steam_family_token" t
+                if System.String.IsNullOrWhiteSpace(accessToken) && System.String.IsNullOrWhiteSpace(refreshToken) then
                     return Error "Steam Family access token not configured"
                 else
-                    let! familyResult = Steam.getFamilyGroupForUser httpClient token
+                    // integration-hebjs: self-healing — a rejected/expired
+                    // access token mints a fresh one from the stored refresh
+                    // token (Connect Steam) and retries once, so a family
+                    // import an hour after connecting still works with no
+                    // manual token step.
+                    let! familyResult = Steam.getFamilyGroupForUserWithRefresh httpClient accessToken refreshToken persistAccessToken
                     match familyResult with
                     | Error e -> return Error e
                     | Ok familyGroupBasic ->
@@ -466,7 +475,13 @@ module Api =
                                 | None -> None)
                             |> Map.ofList
 
-                        let! sharedResult = Steam.getSharedLibraryApps httpClient token familyGroupBasic.FamilyGroupid
+                        // Re-read the access token: the family-group-for-user
+                        // call above may have already minted and persisted a
+                        // fresh one, and reusing it here avoids a second,
+                        // redundant mint round trip.
+                        let currentAccessToken =
+                            SettingsStore.getSetting conn "steam_family_token" |> Option.defaultValue accessToken
+                        let! sharedResult = Steam.getSharedLibraryAppsWithRefresh httpClient currentAccessToken refreshToken familyGroupBasic.FamilyGroupid persistAccessToken
                         match sharedResult with
                         | Error e -> return Error e
                         | Ok sharedApps ->
@@ -757,6 +772,64 @@ module Api =
                 | Error e ->
                     let escaped = e.Replace("\\", "\\\\").Replace("\"", "\\\"")
                     do! writeEvent "error" (sprintf "{\"message\":\"%s\"}" escaped)
+
+                return! earlyReturn ctx
+            }
+
+    /// SSE stream for the one-time "Connect Steam" QR login (integration-hebjs).
+    /// Same envelope as `steamFamilyImportHandler` (`Sse.sseFrame`): a "qr"
+    /// event each time `SteamConnect`'s challenge-URL/data-URL changes (the QR
+    /// rotates roughly every 30s), then a terminal "complete" (refresh token
+    /// persisted to SettingsStore) or "error" event. The refresh token itself
+    /// is never sent to the client — only the QR image and completion status.
+    let steamConnectStreamHandler
+        (factory: unit -> SqliteConnection)
+        : HttpHandler =
+        fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
+            task {
+                use conn = factory ()
+                ctx.Response.Headers.["Content-Type"] <- Microsoft.Extensions.Primitives.StringValues("text/event-stream")
+                ctx.Response.Headers.["Cache-Control"] <- Microsoft.Extensions.Primitives.StringValues("no-cache")
+                ctx.Response.Headers.["Connection"] <- Microsoft.Extensions.Primitives.StringValues("keep-alive")
+
+                let writer = ctx.Response
+
+                let writeEvent (eventType: string) (json: string) = task {
+                    let line = Sse.sseFrame eventType json
+                    let bytes = System.Text.Encoding.UTF8.GetBytes(line)
+                    do! writer.Body.WriteAsync(bytes, 0, bytes.Length)
+                    do! writer.Body.FlushAsync()
+                }
+
+                let sessionId = SteamConnect.startConnect ()
+                let mutable lastQrDataUrl = ""
+                let mutable finished = false
+                // Slightly past SteamConnect's own 5-minute poll timeout, so
+                // that module's own "QR code expired" ConnectFailed is what
+                // the client sees rather than this loop giving up first.
+                let deadline = System.DateTime.UtcNow.AddMinutes(6.0)
+
+                while not finished && System.DateTime.UtcNow < deadline do
+                    match SteamConnect.status sessionId with
+                    | Some (SteamConnect.AwaitingScan dataUrl) when dataUrl <> "" && dataUrl <> lastQrDataUrl ->
+                        lastQrDataUrl <- dataUrl
+                        let escaped = dataUrl.Replace("\\", "\\\\").Replace("\"", "\\\"")
+                        do! writeEvent "qr" (sprintf "{\"dataUrl\":\"%s\"}" escaped)
+                    | Some (SteamConnect.Connected refreshToken) ->
+                        finished <- true
+                        SettingsStore.setSetting conn "steam_family_refresh_token" refreshToken
+                        do! writeEvent "complete" "{}"
+                    | Some (SteamConnect.ConnectFailed message) ->
+                        finished <- true
+                        let escaped = message.Replace("\\", "\\\\").Replace("\"", "\\\"")
+                        do! writeEvent "error" (sprintf "{\"message\":\"%s\"}" escaped)
+                    | Some (SteamConnect.AwaitingScan _) | None -> ()
+
+                    if not finished then
+                        do! System.Threading.Tasks.Task.Delay(400)
+
+                if not finished then
+                    do! writeEvent "error" "{\"message\":\"Connect Steam timed out — try again\"}"
 
                 return! earlyReturn ctx
             }
@@ -3912,25 +3985,35 @@ module Api =
             fetchSteamFamilyMembers = fun () -> async {
                 use conn = factory ()
                 try
-                    let token =
+                    let accessToken =
                         SettingsStore.getSetting conn "steam_family_token"
                         |> Option.defaultValue ""
-                    if System.String.IsNullOrWhiteSpace(token) then
+                    let refreshToken =
+                        SettingsStore.getSetting conn "steam_family_refresh_token"
+                        |> Option.defaultValue ""
+                    let persistAccessToken (t: string) = SettingsStore.setSetting conn "steam_family_token" t
+                    if System.String.IsNullOrWhiteSpace(accessToken) && System.String.IsNullOrWhiteSpace(refreshToken) then
                         return Error "Steam Family access token not configured"
                     else
                         let steamConfig = getSteamConfig()
-                        // Get family group ID
+                        // Get family group ID — self-healing (integration-hebjs):
+                        // a rejected/expired access token mints a fresh one from
+                        // the stored refresh token (Connect Steam) and retries once.
                         printfn "[SteamFamily] Step 1: Calling getFamilyGroupForUser..."
-                        let! familyResult = Steam.getFamilyGroupForUser httpClient token
+                        let! familyResult = Steam.getFamilyGroupForUserWithRefresh httpClient accessToken refreshToken persistAccessToken
                         match familyResult with
                         | Error e ->
                             printfn "[SteamFamily] getFamilyGroupForUser FAILED: %s" e
                             return Error e
                         | Ok familyGroupBasic ->
                             printfn "[SteamFamily] Got family group ID: %s, basic members: %d" familyGroupBasic.FamilyGroupid familyGroupBasic.Members.Length
-                            // Fetch actual family group details (with members)
+                            // Fetch actual family group details (with members).
+                            // Re-read the access token in case the call above
+                            // already minted and persisted a fresh one.
                             printfn "[SteamFamily] Step 2: Calling getFamilyGroup..."
-                            let! familyDetailResult = Steam.getFamilyGroup httpClient token familyGroupBasic.FamilyGroupid
+                            let currentAccessToken =
+                                SettingsStore.getSetting conn "steam_family_token" |> Option.defaultValue accessToken
+                            let! familyDetailResult = Steam.getFamilyGroupWithRefresh httpClient currentAccessToken refreshToken familyGroupBasic.FamilyGroupid persistAccessToken
                             let familyMembers =
                                 match familyDetailResult with
                                 | Ok fg ->
@@ -4270,6 +4353,14 @@ module Api =
             getSteamFamilyLastSync = fun () -> async {
                 use conn = factory ()
                 return SettingsStore.getSetting conn "steam_family_last_sync"
+            }
+
+            getSteamConnectionStatus = fun () -> async {
+                use conn = factory ()
+                let refreshToken =
+                    SettingsStore.getSetting conn "steam_family_refresh_token"
+                    |> Option.defaultValue ""
+                return not (System.String.IsNullOrWhiteSpace(refreshToken))
             }
 
             testJellyfinConnection = fun (serverUrl, username, password) -> async {

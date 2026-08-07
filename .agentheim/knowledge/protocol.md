@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 15:55 -- Task verified and completed: integration-hebjs - One-click Steam Family import — automatic access-token acquisition
+
+**Type:** Work / Task completion
+**Task:** integration-hebjs - One-click Steam Family import — automatic access-token acquisition
+**Summary:** One-click Steam Family import — Connect Steam QR login persists a refresh token, family access tokens self-mint and self-heal via withTokenRefresh, reconnect prompt on revocation, manual paste demoted to fallback
+**Duration:** 26m
+**Verification:** PASS (iteration 1)
+**Files changed:** 12
+**Tests added:** 4
+**ADRs written:** 0061
+
+---
+
 ## 2026-08-07 15:25 -- Batch started: [integration-hebjs]
 
 **Type:** Work / Batch start

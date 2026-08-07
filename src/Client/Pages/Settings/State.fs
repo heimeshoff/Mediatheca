@@ -12,6 +12,16 @@ let private jsFetch (url: string) : JS.Promise<obj> = jsNative
 [<Emit("new TextDecoder().decode($0)")>]
 let private decodeBytes (value: obj) : string = jsNative
 
+/// integration-hebjs: `Steam.mintFamilyAccessToken`'s missing/rejected
+/// refresh-token errors are prefixed "reconnect required" (mirroring
+/// ADR-0011's Jellyfin `reauthThunk`). Used to distinguish "your Steam
+/// connection needs re-establishing" from any other family-fetch failure, so
+/// the UI can show a clear "Reconnect Steam" prompt instead of a generic
+/// error banner (acceptance criterion 4).
+let private isReconnectRequired (message: string) : bool =
+    not (System.String.IsNullOrEmpty(message))
+    && message.ToLowerInvariant().Contains("reconnect required")
+
 /// DOM id of the Projections section's outer card — the dirty banner's
 /// "Go to Projections" scroll target (administration-k3vmt).
 let projectionsSectionElementId = "settings-admin-projections"
@@ -106,6 +116,11 @@ let init () : Model * Cmd<Msg> =
       SteamFamilyTokenInput = ""
       IsSavingFamilyToken = false
       FamilyTokenSaveResult = None
+      SteamConnected = false
+      IsConnectingSteam = false
+      SteamConnectQrDataUrl = None
+      SteamConnectError = None
+      SteamNeedsReconnect = false
       SteamFamilyMembers = []
       Friends = []
       IsFetchingFamilyMembers = false
@@ -148,7 +163,7 @@ let init () : Model * Cmd<Msg> =
       JobsSectionLoaded = false
       SurgerySectionOpen = false
       SurgerySectionLoaded = false },
-    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync ]
+    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_connect_status; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync ]
 
 let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
@@ -366,11 +381,87 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
             { model with
                 IsFetchingFamilyMembers = false
                 FetchFamilyMembersResult = Some (Ok (sprintf "Found %d family members" members.Length))
-                SteamFamilyMembers = members }, Cmd.none
+                SteamFamilyMembers = members
+                SteamNeedsReconnect = false }, Cmd.none
         | Error e ->
             { model with
                 IsFetchingFamilyMembers = false
-                FetchFamilyMembersResult = Some (Error e) }, Cmd.none
+                FetchFamilyMembersResult = Some (Error e)
+                SteamNeedsReconnect = isReconnectRequired e }, Cmd.none
+
+    // ── Steam Connect (integration-hebjs): one-time "Connect Steam" QR login ──
+
+    | Load_steam_connect_status ->
+        model, Cmd.OfAsync.perform api.getSteamConnectionStatus () Steam_connect_status_loaded
+
+    | Steam_connect_status_loaded connected ->
+        { model with SteamConnected = connected }, Cmd.none
+
+    | Start_steam_connect ->
+        { model with
+            IsConnectingSteam = true
+            SteamConnectQrDataUrl = None
+            SteamConnectError = None
+            SteamNeedsReconnect = false },
+        Cmd.ofEffect (fun dispatch ->
+            async {
+                try
+                    let! response = jsFetch "/api/stream/steam-connect" |> Async.AwaitPromise
+                    let reader: obj = response?body?getReader()
+                    let mutable buffer = ""
+                    let mutable reading = true
+                    while reading do
+                        let! chunk = (reader?read() : JS.Promise<obj>) |> Async.AwaitPromise
+                        let isDone: bool = chunk?``done``
+                        if isDone then
+                            reading <- false
+                        else
+                            let value: obj = chunk?value
+                            let text = decodeBytes value
+                            buffer <- buffer + text
+                            let mutable idx = buffer.IndexOf("\n\n")
+                            while idx >= 0 do
+                                let message = buffer.[0..idx-1]
+                                buffer <- buffer.[idx+2..]
+                                let dataLine =
+                                    if message.StartsWith("data: ") then message.[6..]
+                                    else message
+                                if dataLine <> "" then
+                                    let parsed: obj = JS.JSON.parse dataLine
+                                    let eventType: string = parsed?``type``
+                                    match eventType with
+                                    | "qr" ->
+                                        let dataUrl: string = parsed?dataUrl |> string
+                                        dispatch (Steam_connect_qr_received dataUrl)
+                                    | "complete" ->
+                                        dispatch (Steam_connect_completed (Ok ()))
+                                    | "error" ->
+                                        let errorMsg: string = parsed?message |> string
+                                        dispatch (Steam_connect_completed (Error errorMsg))
+                                    | _ -> ()
+                                idx <- buffer.IndexOf("\n\n")
+                with ex ->
+                    dispatch (Steam_connect_completed (Error ex.Message))
+            } |> Async.StartImmediate
+        )
+
+    | Steam_connect_qr_received dataUrl ->
+        { model with SteamConnectQrDataUrl = Some dataUrl }, Cmd.none
+
+    | Steam_connect_completed result ->
+        match result with
+        | Ok () ->
+            { model with
+                IsConnectingSteam = false
+                SteamConnectQrDataUrl = None
+                SteamConnectError = None
+                SteamConnected = true
+                SteamNeedsReconnect = false }, Cmd.none
+        | Error e ->
+            { model with
+                IsConnectingSteam = false
+                SteamConnectQrDataUrl = None
+                SteamConnectError = Some e }, Cmd.none
 
     | Load_friends ->
         model, Cmd.OfAsync.perform api.getFriends () Friends_loaded
@@ -458,7 +549,15 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
             ImportLog = model.ImportLog @ [ (progress.GameName, progress.Action) ] }, Cmd.none
 
     | Steam_family_import_completed result ->
-        { model with IsImportingSteamFamily = false; SteamFamilyImportResult = Some result; ImportProgress = None }, Cmd.none
+        let needsReconnect =
+            match result with
+            | Error e -> isReconnectRequired e
+            | Ok _ -> false
+        { model with
+            IsImportingSteamFamily = false
+            SteamFamilyImportResult = Some result
+            ImportProgress = None
+            SteamNeedsReconnect = model.SteamNeedsReconnect || needsReconnect }, Cmd.none
 
     // Jellyfin Integration
     | Load_jellyfin_settings ->

@@ -1546,6 +1546,12 @@ type IMediathecaApi = {
     getJellyfinSyncStatus: unit -> Async<JellyfinSyncStatus>
     // Steam Family Last Sync
     getSteamFamilyLastSync: unit -> Async<string option>
+    // Steam Connect (integration-hebjs): whether a one-time QR login has been
+    // completed, i.e. a refresh token is stored and family access tokens now
+    // mint automatically. The QR ceremony itself streams over
+    // /api/stream/steam-connect (SSE, same shape as steamFamilyImportHandler)
+    // rather than this RPC surface.
+    getSteamConnectionStatus: unit -> Async<bool>
     // Import
     importFromCinemarco: ImportFromCinemarcoRequest -> Async<Result<ImportResult, string>>
     // View Settings

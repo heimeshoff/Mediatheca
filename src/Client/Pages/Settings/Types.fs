@@ -37,6 +37,20 @@ type Model = {
     SteamFamilyTokenInput: string
     IsSavingFamilyToken: bool
     FamilyTokenSaveResult: Result<string, string> option
+    // Steam Connect (integration-hebjs): the one-time "Connect Steam" QR
+    // login that replaces the manual DevTools token scrape as the primary
+    // path — mint/refresh then happens automatically server-side
+    // (Steam.withTokenRefresh, ADR-0019/ADR-0011-shaped). Manual paste above
+    // stays available as a fallback, demoted to a collapsed section in the view.
+    SteamConnected: bool
+    IsConnectingSteam: bool
+    SteamConnectQrDataUrl: string option
+    SteamConnectError: string option
+    /// Set when a Steam Family fetch/import fails with a "reconnect
+    /// required" error (an expired/revoked refresh token, or none stored) —
+    /// drives a dedicated "Reconnect Steam" prompt rather than a silent or
+    /// generic failure (acceptance criterion 4).
+    SteamNeedsReconnect: bool
     SteamFamilyMembers: SteamFamilyMember list
     Friends: FriendListItem list
     IsFetchingFamilyMembers: bool
@@ -135,6 +149,12 @@ type Msg =
     | Steam_family_token_input_changed of string
     | Save_steam_family_token
     | Steam_family_token_save_result of Result<unit, string>
+    // Steam Connect (integration-hebjs)
+    | Load_steam_connect_status
+    | Steam_connect_status_loaded of bool
+    | Start_steam_connect
+    | Steam_connect_qr_received of string
+    | Steam_connect_completed of Result<unit, string>
     | Load_steam_family_members
     | Steam_family_members_loaded of SteamFamilyMember list
     | Fetch_steam_family_members

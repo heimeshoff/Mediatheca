@@ -1,5 +1,7 @@
 module Mediatheca.Tests.SteamFamilyTokenTests
 
+open System
+open System.Net.Http
 open Expecto
 open Mediatheca.Server.Steam
 
@@ -102,4 +104,52 @@ let steamFamilyTokenTests =
                 |> Async.RunSynchronously
             Expect.equal result (Error "HTTP 500") "Non-auth failures pass straight through"
             Expect.equal mintCount 0 "Never minted for a non-auth failure"
+    ]
+
+// Coverage for integration-hebjs: the real `mint` half of the seam above —
+// minting a fresh access token from a stored Steam refresh token. Only the
+// pure/degenerate paths are unit-testable without a live Steam network (the
+// QR-login flow that produces the refresh token in the first place is an
+// interactive external dependency, out of scope for unit tests — see the
+// task's TDD_SKIPPED note).
+
+[<Tests>]
+let steamIdFromRefreshTokenTests =
+    testList "steamIdFromRefreshToken" [
+
+        testCase "decodes the steamid from a JWT-shaped refresh token's sub claim" <| fun _ ->
+            let payloadJson = """{"sub":"76561198000000000","exp":1234567890}"""
+            let payloadB64 =
+                payloadJson
+                |> Text.Encoding.UTF8.GetBytes
+                |> Convert.ToBase64String
+                |> fun s -> s.TrimEnd('=').Replace('+', '-').Replace('/', '_')
+            let token = sprintf "header.%s.signature" payloadB64
+            match steamIdFromRefreshToken token with
+            | Ok steamId -> Expect.equal steamId "76561198000000000" "Decoded the sub claim"
+            | Error e -> failtest (sprintf "Expected Ok, got Error %s" e)
+
+        testCase "a non-JWT-shaped token returns a clear Error" <| fun _ ->
+            match steamIdFromRefreshToken "not-a-jwt-at-all" with
+            | Error _ -> ()
+            | Ok _ -> failtest "Expected an Error for a malformed token"
+    ]
+
+[<Tests>]
+let mintFamilyAccessTokenTests =
+    testList "mintFamilyAccessToken" [
+
+        testCase "an empty refresh token short-circuits to a reconnect-required error, no HTTP call" <| fun _ ->
+            use httpClient = new HttpClient()
+            let result = mintFamilyAccessToken httpClient "" |> Async.RunSynchronously
+            match result with
+            | Error msg -> Expect.stringContains msg "reconnect required" "Error names the missing-credential case, mirroring ADR-0011's Jellyfin reauthThunk"
+            | Ok _ -> failtest "Expected an Error for an empty refresh token"
+
+        testCase "a whitespace-only refresh token also short-circuits, no HTTP call" <| fun _ ->
+            use httpClient = new HttpClient()
+            let result = mintFamilyAccessToken httpClient "   " |> Async.RunSynchronously
+            match result with
+            | Error msg -> Expect.stringContains msg "reconnect required" "Whitespace-only is treated the same as empty"
+            | Ok _ -> failtest "Expected an Error for a whitespace-only refresh token"
     ]

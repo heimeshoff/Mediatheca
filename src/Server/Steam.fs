@@ -388,42 +388,186 @@ module Steam =
                         return Error "Steam rejected the family token again after minting a fresh one; aborting (no retry loop)"
         }
 
-    let getFamilyGroupForUser (httpClient: HttpClient) (accessToken: string) : Async<Result<SteamFamilyGroupResponse, string>> =
+    /// GET a family-service `url` with `accessToken`, returning `Error
+    /// Rejected` on 401/403 instead of throwing (the plain
+    /// `fetchJsonWithToken` above still throws via `EnsureSuccessStatusCode`,
+    /// kept for callers that have no refresh token to fall back on) — so
+    /// `withTokenRefresh` can decide to mint a fresh token and retry.
+    let private fetchJsonWithTokenRejectable (httpClient: HttpClient) (url: string) (accessToken: string) : Async<Result<string, FamilyFetchError>> =
         async {
             try
-                let url = "https://api.steampowered.com/IFamilyGroupsService/GetFamilyGroupForUser/v1/"
-                let! json = fetchJsonWithToken httpClient url accessToken
+                let separator = if url.Contains("?") then "&" else "?"
+                let urlWithToken = sprintf "%s%saccess_token=%s" url separator accessToken
+                let! response = httpClient.GetAsync(urlWithToken) |> Async.AwaitTask
+                let status = int response.StatusCode
+                if status = 401 || status = 403 then
+                    return Error Rejected
+                elif not response.IsSuccessStatusCode then
+                    return Error (FamilyOtherFailure (sprintf "HTTP %d" status))
+                else
+                    let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+                    return Ok body
+            with ex ->
+                return Error (FamilyOtherFailure ex.Message)
+        }
+
+    /// Family-group fetch distinguishing a rejected/expired token
+    /// (`Error Rejected`) from any other failure — the `fetch` lambda
+    /// `withTokenRefresh` orchestrates a mint-and-retry around.
+    let fetchFamilyGroupForUser (httpClient: HttpClient) (accessToken: string) : Async<Result<SteamFamilyGroupResponse, FamilyFetchError>> =
+        async {
+            let url = "https://api.steampowered.com/IFamilyGroupsService/GetFamilyGroupForUser/v1/"
+            let! result = fetchJsonWithTokenRejectable httpClient url accessToken
+            match result with
+            | Error e -> return Error e
+            | Ok json ->
                 match Decode.fromString decodeFamilyGroupForUserResponse json with
                 | Ok response -> return Ok response
-                | Error e -> return Error (sprintf "Failed to parse family group: %s" e)
-            with ex ->
-                return Error (sprintf "Failed to get family group: %s" ex.Message)
+                | Error e -> return Error (FamilyOtherFailure (sprintf "Failed to parse family group: %s" e))
+        }
+
+    let fetchSharedLibraryApps (httpClient: HttpClient) (accessToken: string) (familyGroupId: string) : Async<Result<SteamSharedLibraryApp list, FamilyFetchError>> =
+        async {
+            let url = sprintf "https://api.steampowered.com/IFamilyGroupsService/GetSharedLibraryApps/v1/?family_groupid=%s" familyGroupId
+            let! result = fetchJsonWithTokenRejectable httpClient url accessToken
+            match result with
+            | Error e -> return Error e
+            | Ok json ->
+                match Decode.fromString decodeSharedLibraryApps json with
+                | Ok apps -> return Ok apps
+                | Error e -> return Error (FamilyOtherFailure (sprintf "Failed to parse shared library: %s" e))
+        }
+
+    let fetchFamilyGroupDetail (httpClient: HttpClient) (accessToken: string) (familyGroupId: string) : Async<Result<SteamFamilyGroupResponse, FamilyFetchError>> =
+        async {
+            let url = sprintf "https://api.steampowered.com/IFamilyGroupsService/GetFamilyGroup/v1/?family_groupid=%s" familyGroupId
+            let! result = fetchJsonWithTokenRejectable httpClient url accessToken
+            match result with
+            | Error e -> return Error e
+            | Ok json ->
+                match Decode.fromString decodeFamilyGroupDetailResponse json with
+                | Ok response -> return Ok response
+                | Error e -> return Error (FamilyOtherFailure (sprintf "Failed to parse family group details: %s" e))
+        }
+
+    let private mapFamilyFetchError = function
+        | Rejected -> "Rejected (HTTP 401/403)"
+        | FamilyOtherFailure m -> m
+
+    /// Non-retrying siblings of the `fetch*` functions above, for the manual
+    /// -paste-only fallback path where there is no refresh token to mint a
+    /// replacement from.
+    let getFamilyGroupForUser (httpClient: HttpClient) (accessToken: string) : Async<Result<SteamFamilyGroupResponse, string>> =
+        async {
+            let! r = fetchFamilyGroupForUser httpClient accessToken
+            return r |> Result.mapError mapFamilyFetchError
         }
 
     let getSharedLibraryApps (httpClient: HttpClient) (accessToken: string) (familyGroupId: string) : Async<Result<SteamSharedLibraryApp list, string>> =
         async {
-            try
-                let url = sprintf "https://api.steampowered.com/IFamilyGroupsService/GetSharedLibraryApps/v1/?family_groupid=%s" familyGroupId
-                let! json = fetchJsonWithToken httpClient url accessToken
-                match Decode.fromString decodeSharedLibraryApps json with
-                | Ok apps -> return Ok apps
-                | Error e -> return Error (sprintf "Failed to parse shared library: %s" e)
-            with ex ->
-                return Error (sprintf "Failed to get shared library: %s" ex.Message)
+            let! r = fetchSharedLibraryApps httpClient accessToken familyGroupId
+            return r |> Result.mapError mapFamilyFetchError
         }
 
     let getFamilyGroup (httpClient: HttpClient) (accessToken: string) (familyGroupId: string) : Async<Result<SteamFamilyGroupResponse, string>> =
         async {
-            try
-                let url = sprintf "https://api.steampowered.com/IFamilyGroupsService/GetFamilyGroup/v1/?family_groupid=%s" familyGroupId
-                let! json = fetchJsonWithToken httpClient url accessToken
-                printfn "[SteamFamily] GetFamilyGroup raw JSON (first 2000 chars): %s" (if json.Length > 2000 then json.Substring(0, 2000) + "..." else json)
-                match Decode.fromString decodeFamilyGroupDetailResponse json with
-                | Ok response -> return Ok response
-                | Error e -> return Error (sprintf "Failed to parse family group details: %s" e)
-            with ex ->
-                return Error (sprintf "Failed to get family group details: %s" ex.Message)
+            let! r = fetchFamilyGroupDetail httpClient accessToken familyGroupId
+            return r |> Result.mapError mapFamilyFetchError
         }
+
+    // ── Refresh-token minting (integration-hebjs) ──
+    //
+    // The empirical check ADR-0019 deferred has now run live and passed (see
+    // the task file): a MobileApp-platform, persistent-session refresh token
+    // (obtained via the one-time SteamKit2 QR login in `SteamConnect.fs`)
+    // mints access tokens over plain HTTP that carry exactly the
+    // audience/scope `IFamilyGroupsService` requires.
+
+    /// Decodes the `steamid` (JWT `sub` claim) out of a Steam refresh token —
+    /// `GenerateAccessTokenForApp` requires it as an explicit parameter
+    /// alongside the refresh token itself (confirmed live by the
+    /// integration-hebjs builder gate). Pure, no I/O — directly unit-testable
+    /// against a synthetic JWT-shaped string.
+    let steamIdFromRefreshToken (refreshToken: string) : Result<string, string> =
+        try
+            let parts = refreshToken.Split('.')
+            if parts.Length < 2 then
+                Error "Malformed Steam refresh token (not JWT-shaped)"
+            else
+                let payload = parts.[1].Replace('-', '+').Replace('_', '/')
+                let padded = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=')
+                let json = System.Text.Encoding.UTF8.GetString(System.Convert.FromBase64String(padded))
+                match Decode.fromString (Decode.field "sub" Decode.string) json with
+                | Ok steamId -> Ok steamId
+                | Error e -> Error (sprintf "Could not read steamid from refresh token: %s" e)
+        with ex ->
+            Error (sprintf "Could not decode Steam refresh token: %s" ex.Message)
+
+    type private GenerateAccessTokenResponse = { AccessToken: string }
+
+    let private decodeGenerateAccessTokenResponse: Decoder<GenerateAccessTokenResponse> =
+        Decode.object (fun get ->
+            get.Required.Field "response" (Decode.object (fun get2 -> {
+                AccessToken = get2.Required.Field "access_token" Decode.string
+            })))
+
+    /// Mints a fresh family-scope access token from a stored Steam refresh
+    /// token via a plain HTTP POST to
+    /// `IAuthenticationService/GenerateAccessTokenForApp` — no SteamKit2, no
+    /// CM connection (ADR-0019; the refresh token must have been obtained
+    /// with `PlatformType = MobileApp` and `IsPersistentSession = true`, see
+    /// `SteamConnect.fs`). This is the `TokenMinter` `withTokenRefresh`
+    /// expects. An empty/missing refresh token (no "Connect Steam" session
+    /// yet, or Valve invalidated it) short-circuits to a clear
+    /// reconnect-required error rather than attempting a doomed HTTP call —
+    /// mirrors ADR-0011's `Jellyfin.reauthThunk` missing-credentials case, so
+    /// callers can surface a "reconnect Steam" prompt instead of an opaque
+    /// failure.
+    let mintFamilyAccessToken (httpClient: HttpClient) (refreshToken: string) : Async<Result<string, string>> =
+        async {
+            if System.String.IsNullOrWhiteSpace(refreshToken) then
+                return Error "reconnect required: no Steam refresh token stored — use Connect Steam in Settings"
+            else
+                match steamIdFromRefreshToken refreshToken with
+                | Error e -> return Error e
+                | Ok steamId ->
+                    try
+                        use content =
+                            new FormUrlEncodedContent(
+                                dict [ "refresh_token", refreshToken; "steamid", steamId ]
+                                |> Seq.map (fun kv -> System.Collections.Generic.KeyValuePair(kv.Key, kv.Value)))
+                        let! response =
+                            httpClient.PostAsync(
+                                "https://api.steampowered.com/IAuthenticationService/GenerateAccessTokenForApp/v1/",
+                                content)
+                            |> Async.AwaitTask
+                        let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+                        let status = int response.StatusCode
+                        if status = 401 || status = 403 then
+                            return Error "reconnect required: Steam rejected the stored refresh token — use Connect Steam in Settings"
+                        elif not response.IsSuccessStatusCode then
+                            return Error (sprintf "Failed to mint Steam access token (HTTP %d)" status)
+                        else
+                            match Decode.fromString decodeGenerateAccessTokenResponse body with
+                            | Ok r -> return Ok r.AccessToken
+                            | Error e -> return Error (sprintf "Failed to parse minted access token: %s" e)
+                    with ex ->
+                        return Error (sprintf "Failed to mint Steam access token: %s" ex.Message)
+        }
+
+    /// Self-healing family fetches: on a rejected/expired access token, mint
+    /// a fresh one from `refreshToken` and persist it via `persist`, then
+    /// retry once — mirrors `Jellyfin.getMoviesWithReauth` (ADR-0011).
+    /// `refreshToken` empty means "no Connect Steam session yet"; the mint
+    /// short-circuits to the reconnect-required error above.
+    let getFamilyGroupForUserWithRefresh (httpClient: HttpClient) (accessToken: string) (refreshToken: string) (persist: string -> unit) : Async<Result<SteamFamilyGroupResponse, string>> =
+        withTokenRefresh accessToken (fetchFamilyGroupForUser httpClient) (fun () -> mintFamilyAccessToken httpClient refreshToken) persist
+
+    let getSharedLibraryAppsWithRefresh (httpClient: HttpClient) (accessToken: string) (refreshToken: string) (familyGroupId: string) (persist: string -> unit) : Async<Result<SteamSharedLibraryApp list, string>> =
+        withTokenRefresh accessToken (fun token -> fetchSharedLibraryApps httpClient token familyGroupId) (fun () -> mintFamilyAccessToken httpClient refreshToken) persist
+
+    let getFamilyGroupWithRefresh (httpClient: HttpClient) (accessToken: string) (refreshToken: string) (familyGroupId: string) (persist: string -> unit) : Async<Result<SteamFamilyGroupResponse, string>> =
+        withTokenRefresh accessToken (fun token -> fetchFamilyGroupDetail httpClient token familyGroupId) (fun () -> mintFamilyAccessToken httpClient refreshToken) persist
 
     let getPlayerSummaries (httpClient: HttpClient) (apiKey: string) (steamIds: string list) : Async<Result<SteamPlayerSummary list, string>> =
         async {

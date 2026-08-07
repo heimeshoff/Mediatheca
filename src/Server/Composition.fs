@@ -479,6 +479,8 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
             route "/health" >=> text "ok"
             route "/api/stream/import-steam-family"
                 >=> Api.steamFamilyImportHandler connectionFactory httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers
+            route "/api/stream/steam-connect"
+                >=> Api.steamConnectStreamHandler connectionFactory
             route "/api/stream/export-events"
                 >=> Administration.exportEventsStreamHandler connectionFactory
             route "/api/stream/import-events"

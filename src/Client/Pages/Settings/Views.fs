@@ -606,91 +606,211 @@ let private steamFamilyDetail (model: Model) (dispatch: Msg -> unit) =
                 prop.text "Import shared library from your Steam Family group. First discover members, map them to friends, then import."
             ]
 
-            // Collapsible help: how to get the token
+            // Reconnect prompt (integration-hebjs, ADR-0011-shaped): shown
+            // whenever a family fetch/import surfaced a "reconnect required"
+            // error (an expired/revoked refresh token, or none stored yet)
+            // -- never a silent failure.
+            if model.SteamNeedsReconnect && not model.IsConnectingSteam then
+                Daisy.alert [
+                    alert.warning
+                    prop.className "mb-4"
+                    prop.children [
+                        Html.div [
+                            prop.className "flex items-center justify-between gap-3 w-full"
+                            prop.children [
+                                Html.span [
+                                    prop.className "text-sm"
+                                    prop.text "Your Steam connection needs to be re-established."
+                                ]
+                                Daisy.button.button [
+                                    button.warning
+                                    button.sm
+                                    prop.onClick (fun _ -> dispatch Start_steam_connect)
+                                    prop.text "Reconnect Steam"
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+
+            // Connect Steam (integration-hebjs): one-time QR login, primary
+            // path -- replaces the manual DevTools token scrape. After
+            // connecting once, access tokens mint automatically
+            // (Steam.withTokenRefresh) and token expiry stops being
+            // user-facing entirely.
+            Html.div [
+                prop.className "mb-4"
+                prop.children [
+                    if model.IsConnectingSteam then
+                        Html.div [
+                            prop.className "flex flex-col items-center gap-3 py-4 text-center"
+                            prop.children [
+                                match model.SteamConnectQrDataUrl with
+                                | Some dataUrl ->
+                                    Html.img [
+                                        prop.src dataUrl
+                                        prop.alt "Scan with the Steam mobile app to connect"
+                                        prop.className "w-48 h-48 rounded-lg border border-base-content/10"
+                                    ]
+                                    Html.p [
+                                        prop.className "text-sm text-base-content/70 max-w-xs"
+                                        prop.text "Scan this code with the Steam mobile app (Steam Guard → shield icon → scan QR code). It rotates automatically -- no need to rescan."
+                                    ]
+                                | None ->
+                                    Daisy.loading [ loading.spinner; loading.md ]
+                                    Html.p [
+                                        prop.className "text-sm text-base-content/70"
+                                        prop.text "Connecting to Steam..."
+                                    ]
+                            ]
+                        ]
+                    elif model.SteamConnected then
+                        Daisy.alert [
+                            alert.success
+                            prop.children [
+                                Html.div [
+                                    prop.className "flex items-center justify-between gap-3 w-full"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "text-sm"
+                                            prop.text "Steam connected -- access tokens refresh automatically."
+                                        ]
+                                        Daisy.button.button [
+                                            button.ghost
+                                            button.sm
+                                            prop.onClick (fun _ -> dispatch Start_steam_connect)
+                                            prop.text "Reconnect"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    else
+                        Daisy.button.button [
+                            button.primary
+                            prop.onClick (fun _ -> dispatch Start_steam_connect)
+                            prop.text "Connect Steam"
+                        ]
+
+                    match model.SteamConnectError with
+                    | Some err ->
+                        Daisy.alert [
+                            alert.error
+                            prop.className "mt-3"
+                            prop.children [ Html.span [ prop.className "text-sm"; prop.text err ] ]
+                        ]
+                    | None -> ()
+
+                    Html.p [
+                        prop.className "text-xs text-base-content/50 mt-2"
+                        prop.text "The Steam credential this stores lives only in your local Mediatheca database (single-user, self-hosted)."
+                    ]
+                ]
+            ]
+
+            // Manual token entry (fallback), demoted (integration-hebjs):
+            // the DevTools scrape and paste-a-token flow below used to be
+            // the only way in. Kept as the contingency if Valve invalidates
+            // the mint path server-side.
             Html.div [
                 prop.className "collapse collapse-arrow bg-base-200/50 mb-4 rounded-lg"
                 prop.children [
                     Html.input [ prop.type' "checkbox" ]
                     Html.div [
                         prop.className "collapse-title text-sm font-medium"
-                        prop.text "How to get the access token"
+                        prop.text "Manual token entry (fallback)"
                     ]
                     Html.div [
                         prop.className "collapse-content text-sm text-base-content/70"
                         prop.children [
-                            Html.ol [
-                                prop.className "list-decimal list-inside space-y-1"
+                            Html.div [
+                                prop.className "collapse collapse-arrow bg-base-100 mb-3 rounded-lg"
                                 prop.children [
-                                    Html.li [ prop.text "Log into Steam at store.steampowered.com" ]
-                                    Html.li [ prop.text "Open browser DevTools (F12) and switch to the Network tab" ]
-                                    Html.li [
+                                    Html.input [ prop.type' "checkbox" ]
+                                    Html.div [
+                                        prop.className "collapse-title text-sm font-medium"
+                                        prop.text "How to get the access token"
+                                    ]
+                                    Html.div [
+                                        prop.className "collapse-content text-sm text-base-content/70"
                                         prop.children [
-                                            Html.text "Visit your Family page (Store "
-                                            Html.span [ prop.className "mx-1"; prop.text "\u2192" ]
-                                            Html.text "Your Store "
-                                            Html.span [ prop.className "mx-1"; prop.text "\u2192" ]
-                                            Html.text "Family)"
+                                            Html.ol [
+                                                prop.className "list-decimal list-inside space-y-1"
+                                                prop.children [
+                                                    Html.li [ prop.text "Log into Steam at store.steampowered.com" ]
+                                                    Html.li [ prop.text "Open browser DevTools (F12) and switch to the Network tab" ]
+                                                    Html.li [
+                                                        prop.children [
+                                                            Html.text "Visit your Family page (Store "
+                                                            Html.span [ prop.className "mx-1"; prop.text "→" ]
+                                                            Html.text "Your Store "
+                                                            Html.span [ prop.className "mx-1"; prop.text "→" ]
+                                                            Html.text "Family)"
+                                                        ]
+                                                    ]
+                                                    Html.li [
+                                                        prop.children [
+                                                            Html.text "Filter network requests for "
+                                                            Html.code [ prop.className "badge badge-ghost badge-sm"; prop.text "IFamilyGroupsService" ]
+                                                        ]
+                                                    ]
+                                                    Html.li [
+                                                        prop.children [
+                                                            Html.text "Copy the "
+                                                            Html.code [ prop.className "badge badge-ghost badge-sm"; prop.text "access_token=..." ]
+                                                            Html.text " value from any matching request URL"
+                                                        ]
+                                                    ]
+                                                    Html.li [ prop.text "Note: tokens expire within ~1 hour" ]
+                                                ]
+                                            ]
                                         ]
                                     ]
-                                    Html.li [
-                                        prop.children [
-                                            Html.text "Filter network requests for "
-                                            Html.code [ prop.className "badge badge-ghost badge-sm"; prop.text "IFamilyGroupsService" ]
-                                        ]
-                                    ]
-                                    Html.li [
-                                        prop.children [
-                                            Html.text "Copy the "
-                                            Html.code [ prop.className "badge badge-ghost badge-sm"; prop.text "access_token=..." ]
-                                            Html.text " value from any matching request URL"
-                                        ]
-                                    ]
-                                    Html.li [ prop.text "Note: tokens expire within ~1 hour" ]
                                 ]
                             ]
+
+                            // Family access token input
+                            Html.div [
+                                prop.className "form-control mb-4"
+                                prop.children [
+                                    Daisy.label [
+                                        prop.className "label"
+                                        prop.children [
+                                            Html.span [ prop.className "label-text"; prop.text "Steam Family Access Token" ]
+                                        ]
+                                    ]
+                                    Daisy.input [
+                                        prop.type' "password"
+                                        prop.className "w-full"
+                                        prop.placeholder "Paste your Steam access token..."
+                                        prop.value model.SteamFamilyTokenInput
+                                        prop.onChange (Steam_family_token_input_changed >> dispatch)
+                                    ]
+                                ]
+                            ]
+
+                            Html.div [
+                                prop.className "flex gap-2 mb-4"
+                                prop.children [
+                                    Daisy.button.button [
+                                        button.primary
+                                        if model.IsSavingFamilyToken then button.disabled
+                                        prop.onClick (fun _ -> dispatch Save_steam_family_token)
+                                        prop.disabled (model.SteamFamilyTokenInput = "" || model.IsSavingFamilyToken)
+                                        prop.children [
+                                            if model.IsSavingFamilyToken then
+                                                Daisy.loading [ loading.spinner; loading.sm ]
+                                            Html.text "Save Token"
+                                        ]
+                                    ]
+                                ]
+                            ]
+
+                            feedbackAlert model.FamilyTokenSaveResult
                         ]
                     ]
                 ]
             ]
-
-            // Family access token input
-            Html.div [
-                prop.className "form-control mb-4"
-                prop.children [
-                    Daisy.label [
-                        prop.className "label"
-                        prop.children [
-                            Html.span [ prop.className "label-text"; prop.text "Steam Family Access Token" ]
-                        ]
-                    ]
-                    Daisy.input [
-                        prop.type' "password"
-                        prop.className "w-full"
-                        prop.placeholder "Paste your Steam access token..."
-                        prop.value model.SteamFamilyTokenInput
-                        prop.onChange (Steam_family_token_input_changed >> dispatch)
-                    ]
-                ]
-            ]
-
-            Html.div [
-                prop.className "flex gap-2 mb-4"
-                prop.children [
-                    Daisy.button.button [
-                        button.primary
-                        if model.IsSavingFamilyToken then button.disabled
-                        prop.onClick (fun _ -> dispatch Save_steam_family_token)
-                        prop.disabled (model.SteamFamilyTokenInput = "" || model.IsSavingFamilyToken)
-                        prop.children [
-                            if model.IsSavingFamilyToken then
-                                Daisy.loading [ loading.spinner; loading.sm ]
-                            Html.text "Save Token"
-                        ]
-                    ]
-                ]
-            ]
-
-            feedbackAlert model.FamilyTokenSaveResult
 
             // ── Step 1: Fetch Family Members ──
             Html.div [

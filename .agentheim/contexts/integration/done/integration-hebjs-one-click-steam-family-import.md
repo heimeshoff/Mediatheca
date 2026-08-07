@@ -1,15 +1,15 @@
 ---
 id: integration-hebjs
 title: One-click Steam Family import — automatic access-token acquisition
-status: doing
+status: done
 type: feature
 context: integration
 created: 2026-07-20
-completed:
+completed: 2026-08-07
 depends_on: [integration-ygwsa, design-system-001]
 blocks: []
 tags: [steam, steam-family, auth, token, settings, import]
-related_adrs: [0011, 0019]
+related_adrs: [0011, 0019, 0061]
 related_research: [steam-family-api-auto-token-refresh-2026-07-20]
 prior_art: []
 ---
@@ -68,22 +68,74 @@ Implementation intel from the gate run (worker: read before building):
 
 ## Acceptance criteria
 
-- [ ] Settings → Steam Family offers a "Connect Steam" one-time QR flow (QR rendered
+- [x] Settings → Steam Family offers a "Connect Steam" one-time QR flow (QR rendered
       in Settings, polled to completion); the "How to get the access token" DevTools
       instruction block is demoted to a manual-fallback footnote.
-- [ ] The refresh token persists in SettingsStore; access tokens are minted on demand
+- [x] The refresh token persists in SettingsStore; access tokens are minted on demand
       through the already-shipped `Steam.withTokenRefresh` seam
       (`src/Server/Steam.fs`, tests in `SteamFamilyTokenTests.fs`) — the task wires
       real `mint`/`persist` lambdas into it, it does not re-implement retry logic.
-- [ ] After connecting once, "Discover Family Members" and "Import shared library"
+- [x] After connecting once, "Discover Family Members" and "Import shared library"
       work with no manual token step — including more than an hour later
       (server auto-mints a fresh access token per call or on 401).
-- [ ] An expired/revoked refresh token surfaces a clear "reconnect Steam" prompt
+- [x] An expired/revoked refresh token surfaces a clear "reconnect Steam" prompt
       in Settings (mirroring the ADR-0011 Jellyfin re-auth pattern), never a
       silent failure.
-- [ ] A manually pasted access token still works as the fallback path (decided
+- [x] A manually pasted access token still works as the fallback path (decided
       2026-08-04: keep it — it is also the contingency if Valve invalidates the
       mint path server-side).
+
+## Outcome
+
+Shipped the production one-time "Connect Steam" QR login and wired
+`Steam.withTokenRefresh` into the Family adapter's real code paths.
+
+**Server:**
+- `src/Server/Steam.fs` — `steamIdFromRefreshToken` (pure, decodes the JWT
+  `sub` claim), `mintFamilyAccessToken` (plain HTTP POST to
+  `IAuthenticationService/GenerateAccessTokenForApp`, no SteamKit2/CM
+  connection), `fetchFamilyGroupForUser`/`fetchSharedLibraryApps`/
+  `fetchFamilyGroupDetail` (401/403 → `Error Rejected` instead of throwing),
+  and the wired self-healing `getFamilyGroupForUserWithRefresh`/
+  `getSharedLibraryAppsWithRefresh`/`getFamilyGroupWithRefresh`.
+- `src/Server/SteamConnect.fs` (new) — the SteamKit2 QR login ceremony
+  (`startConnect`/`status`), in-memory session state only.
+- `src/Server/Api.fs` — `runSteamFamilyImport` and `fetchSteamFamilyMembers`
+  now use the refresh-aware fetchers with real `persist`
+  (`SettingsStore` `steam_family_token`) wiring; new `steamConnectStreamHandler`
+  SSE endpoint (`/api/stream/steam-connect`, registered in `Composition.fs`)
+  and `getSteamConnectionStatus` RPC.
+- `src/Server/Server.fsproj` — added `SteamKit2` 3.1.0 and `QRCoder` 1.6.0
+  package references (SteamKit2 confined to `SteamConnect.fs`).
+- Live-verified (not just unit-tested) against the real Steam network with
+  the builder's refresh token: mint → family-group fetch, and the full
+  invalid-token → `Rejected` → mint → persist → retry → success self-heal
+  cycle both confirmed working end-to-end.
+
+**Client:**
+- `src/Client/Pages/Settings/Types.fs`/`State.fs` — `SteamConnected`/
+  `IsConnectingSteam`/`SteamConnectQrDataUrl`/`SteamConnectError`/
+  `SteamNeedsReconnect` state, SSE-stream-driven `Start_steam_connect` (same
+  pattern as the existing Steam Family import SSE consumption), and
+  `isReconnectRequired` substring-detection wired into both family-fetch and
+  family-import result handlers.
+- `src/Client/Pages/Settings/Views.fs` — "Connect Steam" QR UI (primary),
+  a "Reconnect Steam" banner, and the DevTools instructions + manual paste
+  input demoted into a collapsed "Manual token entry (fallback)" section.
+
+**Decisions:** ADR-0061 (in-memory QR session + SSE polling, re-read-token-
+between-calls to avoid redundant mints, `"reconnect required: ..."` string
+convention mirroring ADR-0011).
+
+**Tests:** `tests/Server.Tests/SteamFamilyTokenTests.fs` gained
+`steamIdFromRefreshTokenTests` (2) and `mintFamilyAccessTokenTests` (2) — the
+pure/degenerate paths. The interactive SteamKit2 QR ceremony itself
+(`SteamConnect.fs`) is not unit-tested — a legitimate TDD skip (interactive
+external dependency, no decision logic of its own to assert against); it was
+instead live-verified per the builder gate and via ad hoc scratch scripts
+exercising the real mint/refresh/fetch path against the real Steam network
+with the builder's stored refresh token (not committed). Full suite: 676
+tests passing.
 
 ## Notes
 
