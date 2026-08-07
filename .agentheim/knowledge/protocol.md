@@ -5,6 +5,34 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 16:38 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 18m (batch start 16:20 → 16:38)
+**Completed:** 0 (first-try PASS: 0, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 1 (integration-w8fkr — escalated at iteration 1 on `task-under-specified`: the task spec commissions a worker edit to the `work`-owned `.agentheim/knowledge/index.md`, which no worker pass can reconcile with the index-ownership rule; every technical acceptance criterion was independently confirmed met by the verifier)
+**Dispatches:** integration-w8fkr: 1
+**Commits:** 2 (batch start, this entry)
+**Session-start churn:** 0 recognized machine-shape commits, 0 human commits since the 2026-08-07 15:57 boundary — the one commit in the window carries its `[integration-w8fkr]` trailer. Nothing flagged; no advisory written.
+**Vision-conformance:** none — no tasks completed this session (the one dispatched task was escalated pre-integration; its diff, pending the builder's decision, is a pure retirement of dead migration code and raises no vision concern on its face)
+**Batch mix:** none — no tasks completed this session
+**Carry-over:** `.agentheim/knowledge/protocol.md`: committed (session-end bookkeeping — this session's own verification-failure + session-end entries). left behind (user WIP, 2 files: `Mediatheca Directions.html` and `plan.md`, both untracked). `.worktrees/integration-w8fkr`: kept (owner: integration-w8fkr, escalated at iteration 1 (task-under-specified), salvaged: `.agentheim/salvage/integration-w8fkr-escalated-iter1.patch`; branch `aw/integration-w8fkr` kept, HEAD 15c42ec). `.worktrees/integration-hebjs`: directory shell only (not a git worktree — MSBuild `obj/` residue Windows kept locked at the prior session's teardown), surfaced to the builder for a second session running, not removed on this session's initiative.
+
+---
+
+## 2026-08-07 16:37 -- Verification failed: integration-w8fkr - Retire the Cinemarco import — delete the Settings card, the `importFromCinemarco` contract member, and `CinemarcoImport.fs`
+
+**Type:** Work / Verification failure
+**Task:** integration-w8fkr - Retire the Cinemarco import — delete the Settings card, the `importFromCinemarco` contract member, and `CinemarcoImport.fs`
+**Iteration:** 1 of 3
+**Reasons:** Worker edited the `work`-owned `.agentheim/knowledge/index.md` (bc-list block) — but the task spec itself commissions that edit (What bullet + acceptance criterion 9), so no worker pass can satisfy both the criterion and the index-ownership rule (non-converging loop, not a fixable defect); residual: criterion 8's live `/settings` browser-console check has no runtime evidence (BC declares no Runtime surface; DOM delta verified statically)
+**Iteration hint:** task-under-specified
+**Next:** escalated to user — all technical criteria independently confirmed met by the verifier (rg zero hits, 676/676 tests, clean build, sibling import flows intact); worktree kept at `.worktrees/integration-w8fkr`, diff salvaged to `.agentheim/salvage/integration-w8fkr-escalated-iter1.patch`
+
+---
+
 ## 2026-08-07 16:20 -- Batch started: [integration-w8fkr]
 
 **Type:** Work / Batch start
