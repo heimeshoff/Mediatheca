@@ -10,10 +10,10 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 20
+- **Doing:** 0
+- **Done:** 21
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **design-system-mz9v7** — Season-rail + per-episode progress primitives in DesignSystem — `progressSeasons` (one line per season, gold when touched, brown when untouched) and `progressEpisodes` (one segment per episode of a single season, driven by a per-episode watched flag instead of a fill count), with StyleGuide specimens (feature) — `doing/design-system-mz9v7-season-rail-and-per-episode-progress.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **design-system-mz9v7** — Season-rail + per-episode progress primitives in DesignSystem — `progressSeasons` (one line per season, gold when touched, brown when untouched) and `progressEpisodes` (one segment per episode of a single season, driven by a per-episode watched flag instead of a fill count), with StyleGuide specimens (feature) — `done/design-system-mz9v7-season-rail-and-per-episode-progress.md`
 - **design-system-n8zqr** — Desktop sidebar rail collapses to icons only — a persisted manual toggle in the rail header, with a paper-overlay tooltip supplying each icon's label while collapsed (feature) — `done/design-system-n8zqr-sidebar-collapsible-icons-only.md`
 - **design-system-m2wvc** — Sidebar active nav item — drop the gold inset-left bar; burgundy fill + gold icon carry the active state alone (retracts that half of ADR-0014's dir-3a treatment) (refactor) — `done/design-system-m2wvc-nav-active-drop-inset-left-bar.md`
 - **design-system-x7k2p** — Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042) (chore) — `done/design-system-x7k2p-lifecycle-status-vocabulary-readme-sync.md`
@@ -52,6 +52,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **design-system-fp2wt** — Stand up unit-test infrastructure for pure Fable/Feliz functions (Vitest-through-vite-plugin-fable or equivalent) (chore) — `backlog/design-system-fp2wt-fable-unit-test-infra.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC

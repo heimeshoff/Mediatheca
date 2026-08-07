@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-08 00:08 -- Task verified and completed: design-system-mz9v7 - Season-rail + per-episode progress primitives in DesignSystem — `progressSeasons` (one line per season, gold when touched, brown when untouched) and `progressEpisodes` (one segment per episode of a single season, driven by a per-episode watched flag instead of a fill count), with StyleGuide specimens
+
+**Type:** Work / Task completion
+**Task:** design-system-mz9v7 - Season-rail + per-episode progress primitives in DesignSystem — `progressSeasons` (one line per season, gold when touched, brown when untouched) and `progressEpisodes` (one segment per episode of a single season, driven by a per-episode watched flag instead of a fill count), with StyleGuide specimens
+**Summary:** Retired the count-based progressSegmented for flag-driven progressEpisodes/progressSeasons plus the stacked seriesSeasonEpisodeProgress pair, with StyleGuide specimens carrying a mid-season gap so the prefix-paint bug cannot silently regress
+**Duration:** 23m dispatch-to-verdict; integration deferred to 2026-08-08 by a README merge conflict, resolved take-both at builder direction
+**Verification:** PASS (iteration 1)
+**Files changed:** 5
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-08-07 19:38 -- Work session ended
 
 **Type:** Work / Session end

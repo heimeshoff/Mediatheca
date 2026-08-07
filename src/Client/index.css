@@ -327,6 +327,24 @@ h1, h2, h3, h4, h5, h6 {
 .progress-segment-filled {
     background: var(--color-gold);
 }
+
+/* Season rail — the coarser, per-season sibling of .progress-segmented.
+   Taller segments, wider gaps, pill radius (vs. the episode row's poster
+   radius) so the two rows read as visibly distinct marks, never as one long
+   dotted line. */
+.progress-season-rail {
+    display: flex;
+    gap: 0.375rem;
+}
+.progress-season-segment {
+    flex: 1;
+    height: 0.375rem;
+    border-radius: var(--radius-pill);
+    background: oklch(0.32 0.03 30);
+}
+.progress-season-segment-touched {
+    background: var(--color-gold);
+}
 .progress-continuous {
     height: 0.375rem;
     border-radius: var(--radius-pill);

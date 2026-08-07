@@ -1144,8 +1144,12 @@ let private seriesNextEpisodeCard (jellyfinServerUrl: string option) (item: Dash
                 BackdropRef = item.BackdropRef
                 PosterRef = item.PosterRef
                 InFocus = item.InFocus
-                ProgressFilled = item.WatchedEpisodeCount
-                ProgressTotal = item.EpisodeCount
+                // series-ww1rb wires the real per-season/per-episode read model
+                // (SeasonsTouched, CurrentSeasonWatched); until then, derive a
+                // single-season prefix flag list from the counts this view
+                // already has so the card keeps compiling and rendering.
+                SeasonsTouched = [ item.WatchedEpisodeCount > 0 ]
+                CurrentSeasonWatched = List.init item.EpisodeCount (fun i -> i < item.WatchedEpisodeCount)
                 WatchedWith =
                     item.WatchWithFriends
                     |> List.map (fun f ->

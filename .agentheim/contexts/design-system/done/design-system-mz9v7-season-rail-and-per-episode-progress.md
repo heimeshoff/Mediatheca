@@ -1,11 +1,11 @@
 ---
 id: design-system-mz9v7
 title: Season-rail + per-episode progress primitives in DesignSystem — `progressSeasons` (one line per season, gold when touched, brown when untouched) and `progressEpisodes` (one segment per episode of a single season, driven by a per-episode watched flag instead of a fill count), with StyleGuide specimens
-status: doing
+status: done
 type: feature
 context: design-system
 created: 2026-08-07
-completed:
+completed: 2026-08-07
 depends_on: []
 blocks: [series-ww1rb]
 tags: [ui, progress, series, styleguide]
@@ -95,3 +95,47 @@ CSS lands in `src/Client/index.css` next to the existing `.progress-segmented` /
 - `seriesNextUpItemEnhanced` (`src/Client/Pages/Dashboard/Views.fs:2630`) overlays a 4px progress bar on the *poster bottom*, which is far too cramped for a stacked two-row treatment. If a compact variant of `seriesSeasonEpisodeProgress` turns out to be needed for that slot, add it here rather than letting the Series-tab wiring invent a one-off — but only if [[series-ww1rb]] actually hits the wall; do not build it speculatively.
 - ADR-0015: the in-app StyleGuide page is the authoritative design-system artifact. The specimen is not optional documentation — it is where this primitive is reviewed.
 - Fable frontend tests: `skills/fable-frontend-tests` covers the Vitest-through-vite-plugin-fable path if the flag-mapping deserves a unit test. The list→segment mapping is pure and cheap to cover.
+
+## Outcome
+
+Shipped both primitives in `src/Client/DesignSystem.fs`: `progressEpisodes (watched: bool list)`
+(one segment per episode, `watched.[i]` drives segment i — a mid-season gap renders as a gap,
+not a prefix; empty list renders an empty row without throwing) and `progressSeasons
+(touched: bool list)` (one line per season, gold when the season has ≥1 watched episode, brown
+when untouched — two states only). `seriesSeasonEpisodeProgress seasonsTouched
+currentSeasonWatched` stacks the pair. `progressSegmented filled total` is fully retired —
+`rg "progressSegmented" src/` returns zero hits. CSS lands in `src/Client/index.css` as
+`.progress-season-rail`/`.progress-season-segment*`, next to the existing
+`.progress-segmented`/`.progress-segment*` rules — taller segments, wider gaps, pill radius
+(vs. the episode row's poster radius) so the season rail reads as a visibly coarser mark.
+
+`HeroCardProps`, `SecondaryCardProps`, and `NextEpisodeHeroCardProps` all carry
+`SeasonsTouched: bool list` + `CurrentSeasonWatched: bool list` in place of the retired
+`ProgressFilled`/`ProgressTotal` ints. The one live consumer outside the StyleGuide
+(`seriesNextEpisodeCard` in `src/Client/Pages/Dashboard/Views.fs`) was adapted minimally —
+derives a single-season prefix flag list from the counts it already has
+(`item.WatchedEpisodeCount`/`item.EpisodeCount`) — to keep the build green without doing
+`series-ww1rb`'s read-model work; that follow-up task swaps in the real per-season/per-episode
+data.
+
+StyleGuide § 4 ("Progress Meters") got three new specimens: `progressEpisodes` (fixture
+`[true;true;true;false;false;true;true;false;false;false]` — the AC's own gap-in-the-middle
+case), `progressSeasons` (`[true;true;false]`), and the stacked
+`seriesSeasonEpisodeProgress` pair using the same gap fixture, so the mid-season hole is
+visible on the live page and can't silently regress. The prose paragraph above them now
+describes the segmented meter as flag-driven and documents the season rail's two states. The
+`secondaryMediaCard`/`heroCard` specimens were updated to the new prop shape.
+
+`npm run build` succeeds cleanly (Fable compiles, no FS0039 from the changed prop records).
+
+No Vitest/unit-test infra exists in this repo for pure client-side F# functions (`skills/fable-
+frontend-tests`, referenced in this task's own Notes, does not exist; `package.json` has no
+`vitest` devDependency) — TDD was skipped under the "UI tasks where the project has no UI test
+infrastructure" category. Verified manually via `npm run build` and by reading the StyleGuide
+specimens' rendered fixture data. Filed `design-system-fp2wt` in backlog to add real unit-test
+infra for this class of pure function.
+
+Key files: `src/Client/DesignSystem.fs`, `src/Client/index.css`,
+`src/Client/Pages/StyleGuide/Views.fs`, `src/Client/Pages/Dashboard/Views.fs`,
+`.agentheim/contexts/design-system/README.md`,
+`.agentheim/contexts/design-system/backlog/design-system-fp2wt-fable-unit-test-infra.md`.

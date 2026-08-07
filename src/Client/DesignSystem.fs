@@ -328,17 +328,53 @@ let statusBadge (status: LifecycleStatus) : ReactElement =
 
 // ── Progress meters (§ 4 Progress meters, two kinds) ──
 
-/// Segmented ("film-frame") progress — one bar per episode. `filled` bars
-/// render gold, the remaining `total - filled` render `line`-empty.
-let progressSegmented (filled: int) (total: int) : ReactElement =
+/// Segmented ("film-frame") episode progress for a *single* season. One
+/// segment per episode, in episode order; `watched.[i]` drives segment i, so
+/// a gap in the middle of the season renders as a gap — gold-gold-gold-
+/// brown-brown-gold-gold, not a five-gold prefix. Replaces the retired
+/// count-based fill primitive, which could only ever paint a prefix because
+/// a count is all it was given. An empty list renders an empty row (no
+/// episode data) without throwing.
+let progressEpisodes (watched: bool list) : ReactElement =
     Html.div [
         prop.className "progress-segmented"
         prop.children [
-            for i in 1 .. (max total 1) do
+            for i, isWatched in List.indexed watched do
                 Html.div [
                     prop.key (string i)
-                    prop.className ("progress-segment" + (if i <= filled then " progress-segment-filled" else ""))
+                    prop.className ("progress-segment" + (if isWatched then " progress-segment-filled" else ""))
                 ]
+        ]
+    ]
+
+/// Season rail — one line per season, in season order. `touched.[i]` is gold
+/// when season i has at least one watched episode, brown when untouched.
+/// Two states only: a fully-watched season is not visually distinct from a
+/// partially-watched one. Visually coarser than `progressEpisodes` (taller
+/// segments, wider gaps, pill radius vs. poster radius) so the two rows never
+/// read as one long dotted line — this is the coarser "where am I in the
+/// show" mark, sitting above the finer "where am I in this season" row.
+let progressSeasons (touched: bool list) : ReactElement =
+    Html.div [
+        prop.className "progress-season-rail"
+        prop.children [
+            for i, isTouched in List.indexed touched do
+                Html.div [
+                    prop.key (string i)
+                    prop.className ("progress-season-segment" + (if isTouched then " progress-season-segment-touched" else ""))
+                ]
+        ]
+    ]
+
+/// The stacked pair every series card uses: season rail on top, current-
+/// season episode segments below, with the design system's own vertical
+/// rhythm between them.
+let seriesSeasonEpisodeProgress (seasonsTouched: bool list) (currentSeasonWatched: bool list) : ReactElement =
+    Html.div [
+        prop.className "flex flex-col gap-1.5"
+        prop.children [
+            progressSeasons seasonsTouched
+            progressEpisodes currentSeasonWatched
         ]
     ]
 
@@ -643,19 +679,19 @@ let filmstripRow (items: FilmstripItem list) : ReactElement =
 type SecondaryCardProps = {
     Title: string
     NextLabel: string
-    ProgressFilled: int
-    ProgressTotal: int
+    SeasonsTouched: bool list
+    CurrentSeasonWatched: bool list
 }
 
-/// Compact poster-top card — serif title, "Next: SxEy" line, segmented
-/// mini-progress. Velvet card with the standard `--shadow-card`.
+/// Compact poster-top card — serif title, "Next: SxEy" line, season rail +
+/// segmented mini-progress. Velvet card with the standard `--shadow-card`.
 let secondaryMediaCard (props: SecondaryCardProps) : ReactElement =
     Html.div [
         prop.className (velvetCard + " p-3 flex flex-col gap-2 w-40")
         prop.children [
             Html.h3 [ prop.className cardTitle; prop.text props.Title ]
             Html.p [ prop.className mutedText; prop.text props.NextLabel ]
-            progressSegmented props.ProgressFilled props.ProgressTotal
+            seriesSeasonEpisodeProgress props.SeasonsTouched props.CurrentSeasonWatched
         ]
     ]
 
@@ -665,8 +701,8 @@ type HeroCardProps = {
     Title: string
     InFocus: bool
     WatchedWith: string list
-    ProgressFilled: int
-    ProgressTotal: int
+    SeasonsTouched: bool list
+    CurrentSeasonWatched: bool list
     Rating: int
     OnRatingChange: int -> unit
     OnWatchClick: unit -> unit
@@ -702,7 +738,7 @@ let heroCard (props: HeroCardProps) : ReactElement =
                                     ]
                             ]
                         ]
-                    progressSegmented props.ProgressFilled props.ProgressTotal
+                    seriesSeasonEpisodeProgress props.SeasonsTouched props.CurrentSeasonWatched
                     Html.div [
                         prop.className "flex items-center justify-between mt-1"
                         prop.children [
@@ -744,8 +780,8 @@ type NextEpisodeHeroCardProps = {
     /// Fallback background when `BackdropRef` is `None`.
     PosterRef: string option
     InFocus: bool
-    ProgressFilled: int
-    ProgressTotal: int
+    SeasonsTouched: bool list
+    CurrentSeasonWatched: bool list
     WatchedWith: NextEpisodeHeroFriend list
     /// Fully-rendered, self-positioned (`absolute top-3 right-3 ...`) Jellyfin
     /// play button, or `None` when the episode isn't on Jellyfin. Rendered as-is
@@ -801,7 +837,7 @@ let nextEpisodeHeroCard (props: NextEpisodeHeroCardProps) : ReactElement =
                             prop.text label
                         ]
                     | None -> ()
-                    progressSegmented props.ProgressFilled props.ProgressTotal
+                    seriesSeasonEpisodeProgress props.SeasonsTouched props.CurrentSeasonWatched
                     if not props.WatchedWith.IsEmpty then
                         Html.div [
                             prop.className "flex items-center gap-1.5 flex-wrap"
