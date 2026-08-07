@@ -1,11 +1,11 @@
 ---
 id: intelligence-t8n3q
 title: Dashboard library-search control needs a hover affordance — pointer cursor and a "Ctrl + K" tooltip
-status: doing
+status: done
 type: bug
 context: intelligence
 created: 2026-08-07
-completed:
+completed: 2026-08-07
 depends_on: [design-system-001]
 blocks: []
 tags: [dashboard, search, header, hover, affordance, keyboard-shortcut]
@@ -43,18 +43,19 @@ Everything else about the control stays as it is: the existing
 icon, the label, the `Open_search_modal` dispatch.
 
 ## Acceptance criteria
-- [ ] `searchLibraryButton` in `src/Client/Pages/Dashboard/Views.fs` carries `cursor-pointer`
+- [x] `searchLibraryButton` in `src/Client/Pages/Dashboard/Views.fs` carries `cursor-pointer`
       in its `prop.className`.
-- [ ] The same button carries `prop.title "Ctrl + K"` (exactly that string — spaces around
+- [x] The same button carries `prop.title "Ctrl + K"` (exactly that string — spaces around
       the `+`, matching the label the builder asked for).
-- [ ] No other change to the button: the existing hover colour/background classes, the
+- [x] No other change to the button: the existing hover colour/background classes, the
       `transition-colors`, the icon, the "Search your library" label, and the
       `dispatch Open_search_modal` handler are all untouched.
-- [ ] No tooltip component, CSS class, or `DesignSystem.fs` helper is added — the tooltip is
+- [x] No tooltip component, CSS class, or `DesignSystem.fs` helper is added — the tooltip is
       the browser-native `title` attribute only.
-- [ ] `npm run build` completes without new warnings or errors.
+- [x] `npm run build` completes without new warnings or errors.
 - [ ] Hovering the control on the running dashboard shows the pointer cursor and, after the
-      browser's usual delay, a tooltip reading "Ctrl + K". [human-eye]
+      browser's usual delay, a tooltip reading "Ctrl + K". [human-eye] — not verified by the
+      worker; requires a human to hover the live dashboard.
 
 ## Notes
 - **Why the last criterion is `[human-eye]` (ADR-0061):** a native `title` tooltip is rendered
@@ -69,3 +70,10 @@ icon, the label, the `Open_search_modal` dispatch.
   Tailwind utility already used across the app and one HTML attribute, no new design vocabulary.
 - Prior art on this exact control: `intelligence-dq8rk` introduced it (All-tab 3a layout),
   `intelligence-r4m2p` fixed its right-pinning across tabs.
+
+## Outcome
+Added `cursor-pointer` to `searchLibraryButton`'s existing `prop.className` string and a
+`prop.title "Ctrl + K"` attribute, in `src/Client/Pages/Dashboard/Views.fs`. No other line of
+the button changed. `npm run build` completes cleanly (exit 0), no new warnings. The final
+`[human-eye]` criterion (tooltip actually rendering on hover) was not exercised by the worker
+per the task's own instruction not to invent a proxy for it.

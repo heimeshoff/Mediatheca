@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 19:12 -- Task verified and completed: intelligence-t8n3q - Dashboard library-search control needs a hover affordance — pointer cursor and a "Ctrl + K" tooltip
+
+**Type:** Work / Task completion
+**Task:** intelligence-t8n3q - Dashboard library-search control needs a hover affordance — pointer cursor and a "Ctrl + K" tooltip
+**Summary:** Dashboard library-search control gains its missing hover affordances — cursor-pointer and a native Ctrl + K tooltip; nothing else on the button changed
+**Duration:** 11m
+**Verification:** PASS (iteration 1)
+**Files changed:** 1
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-08-07 19:03 -- Batch started: [design-system-n8zqr, intelligence-t8n3q]
 
 **Type:** Work / Batch start

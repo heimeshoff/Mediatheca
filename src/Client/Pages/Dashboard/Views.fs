@@ -74,7 +74,8 @@ let private tabBar (activeTab: DashboardTab) (dispatch: Msg -> unit) =
 
 let private searchLibraryButton (dispatch: Msg -> unit) =
     Html.button [
-        prop.className "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-base-content/50 hover:text-base-content hover:bg-base-300/40 transition-colors"
+        prop.className "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-base-content/50 hover:text-base-content hover:bg-base-300/40 transition-colors cursor-pointer"
+        prop.title "Ctrl + K"
         prop.onClick (fun _ -> dispatch Open_search_modal)
         prop.children [
             Icons.magnifyingGlass ()

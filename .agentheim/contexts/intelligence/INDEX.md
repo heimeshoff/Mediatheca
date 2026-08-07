@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 4
+- **Doing:** 0
+- **Done:** 5
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **intelligence-t8n3q** — Dashboard library-search control needs a hover affordance — pointer cursor and a "Ctrl + K" tooltip (bug) — `doing/intelligence-t8n3q-dashboard-search-hover-affordance.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **intelligence-t8n3q** — Dashboard library-search control needs a hover affordance — pointer cursor and a "Ctrl + K" tooltip (bug) — `done/intelligence-t8n3q-dashboard-search-hover-affordance.md`
 - **intelligence-p9m4t** — Dashboard "Movies to Watch" — wrap posters in the filmstrip well (feature) — `done/intelligence-p9m4t-movies-to-watch-filmstrip.md`
 - **intelligence-h7v2q** — Dashboard "Next episode" — cinematic hero cards (backdrop + still + progress + watched-with + Jellyfin play) (feature) — `done/intelligence-h7v2q-next-episode-cinematic-hero-cards.md`
 - **intelligence-r4m2p** — Dashboard header search must stay pinned right on every tab; Games/Books split stacks when tight (bug) — `done/intelligence-r4m2p-dashboard-search-pin-responsive-split.md`
