@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 10:32 -- Modeling / Captured: games-k3vps - Selectable search sources in the games search tab (RAWG / Steam checkboxes)
+
+**Type:** Modeling / Capture
+**BC:** games
+**Filed to:** todo
+**Summary:** The search modal's Games tab gets a source-toggle row below the tab bar — RAWG checked by default on every open, Steam unchecked, never persisted; toggling immediately includes/excludes each API's results. Filed directly to todo: all server machinery exists (Steam.searchSteamByName for query search, getSteamStoreDetails → Add_game for Steam-sourced import), so the task is a client feature plus two thin endpoints, with concrete ACs and the frontend gate met via design-system-001 (done).
+
+---
+
 ## 2026-08-04 23:51 -- Task verified and completed: games-b8xnw - Steam Deck compatibility readiness (Verified/Playable/Unsupported) as a cached facet with a badge
 
 **Type:** Work / Task completion
