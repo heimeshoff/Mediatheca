@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 15:25 -- Batch started: [integration-hebjs]
+
+**Type:** Work / Batch start
+**Tasks:** integration-hebjs - One-click Steam Family import — automatic access-token acquisition
+**Parallel:** no (1 worker — single ready task; ready set was exactly 1)
+
+---
+
 ## 2026-08-07 14:08 -- Modeling / Promoted: integration-hebjs - One-click Steam Family import — automatic access-token acquisition
 
 **Type:** Modeling / Promote

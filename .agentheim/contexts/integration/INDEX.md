@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 10
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **integration-hebjs** — One-click Steam Family import — automatic access-token acquisition (feature) — `todo/integration-hebjs-one-click-steam-family-import.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **integration-hebjs** — One-click Steam Family import — automatic access-token acquisition (feature) — `doing/integration-hebjs-one-click-steam-family-import.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
