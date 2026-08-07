@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 19:03 -- Batch started: [design-system-n8zqr, intelligence-t8n3q]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-n8zqr - Desktop sidebar rail collapses to icons only — a persisted manual toggle in the rail header, with a paper-overlay tooltip supplying each icon's label while collapsed, intelligence-t8n3q - Dashboard library-search control needs a hover affordance — pointer cursor and a "Ctrl + K" tooltip
+**Parallel:** yes (2 workers — ready set was exactly 2; series-ww1rb remains blocked: its dependency design-system-mz9v7 is verified PASS but unmerged, pending builder resolution of a README squash-merge conflict against the already-integrated design-system-m2wvc)
+
+---
+
 ## 2026-08-07 19:02 -- Task verified and completed: series-k4zpn - Next Up must follow the furthest-watched episode, not the first unwatched one — a skipped episode currently pins Next Up forever; when nothing remains beyond the furthest watched, show the fully-watched state even if a gap exists
 
 **Type:** Work / Task completion

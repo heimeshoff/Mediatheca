@@ -1,7 +1,7 @@
 ---
 id: design-system-n8zqr
 title: Desktop sidebar rail collapses to icons only — a persisted manual toggle in the rail header, with a paper-overlay tooltip supplying each icon's label while collapsed
-status: todo
+status: doing
 type: feature
 context: design-system
 created: 2026-08-07

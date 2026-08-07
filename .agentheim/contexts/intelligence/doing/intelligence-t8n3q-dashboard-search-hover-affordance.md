@@ -1,7 +1,7 @@
 ---
 id: intelligence-t8n3q
 title: Dashboard library-search control needs a hover affordance — pointer cursor and a "Ctrl + K" tooltip
-status: todo
+status: doing
 type: bug
 context: intelligence
 created: 2026-08-07
