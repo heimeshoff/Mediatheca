@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-08-07 19:02 -- Task verified and completed: series-k4zpn - Next Up must follow the furthest-watched episode, not the first unwatched one — a skipped episode currently pins Next Up forever; when nothing remains beyond the furthest watched, show the fully-watched state even if a gap exists
+
+**Type:** Work / Task completion
+**Task:** series-k4zpn - Next Up must follow the furthest-watched episode, not the first unwatched one — a skipped episode currently pins Next Up forever; when nothing remains beyond the furthest watched, show the fully-watched state even if a gap exists
+**Summary:** Next Up now follows the furthest-watched frontier everywhere — series_next_up view (all six consumers) plus one shared pure NextUp.compute for the detail hero and Episodes-tab badge; a skipped episode no longer pins Next Up forever
+**Duration:** 39m
+**Verification:** PASS (iteration 2)
+**Files changed:** 8
+**Tests added:** 4
+**ADRs written:** 0063
+
+---
+
+## 2026-08-07 18:56 -- Verification failed: series-k4zpn - Next Up must follow the furthest-watched episode, not the first unwatched one
+
+**Type:** Work / Verification failure
+**Task:** series-k4zpn - Next Up must follow the furthest-watched episode, not the first unwatched one
+**Iteration:** 1 of 3
+**Reasons:** New ADR (provisional 0062) has no YAML frontmatter — missing id/scope means it cannot be indexed into the BC's decision record; secondary: MetadataCacheTests.fs's hand-copied view-DDL fixture still carries the pre-frontier SQL while its comment claims to be the exact production DDL. All technical criteria otherwise verifier-confirmed (680/680 Expecto, clean build, SQL and client mirror both correct).
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker (iteration 2, same worktree)
+
+---
+
 ## 2026-08-07 18:53 -- Task verified and completed: design-system-m2wvc - Sidebar active nav item — drop the gold inset-left bar; burgundy fill + gold icon carry the active state alone (retracts that half of ADR-0014's dir-3a treatment)
 
 **Type:** Work / Task completion

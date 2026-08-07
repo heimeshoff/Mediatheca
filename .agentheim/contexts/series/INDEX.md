@@ -10,10 +10,10 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 1
-- **Doing:** 1
-- **Done:** 6
+- **Doing:** 0
+- **Done:** 7
 <!-- task-counts:end -->
 
 ### Todo
@@ -23,12 +23,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **series-k4zpn** — Next Up must follow the furthest-watched episode, not the first unwatched one — a skipped episode currently pins Next Up forever; when nothing remains beyond the furthest watched, show the fully-watched state even if a gap exists (bug) — `doing/series-k4zpn-next-up-follows-furthest-watched.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **series-k4zpn** — Next Up must follow the furthest-watched episode, not the first unwatched one — a skipped episode currently pins Next Up forever; when nothing remains beyond the furthest watched, show the fully-watched state even if a gap exists (bug) — `done/series-k4zpn-next-up-follows-furthest-watched.md`
 - **series-t3jkv** — Wire series_metadata_cache's write path — nothing keeps it fresh after the one-time seed, so refreshed and newly-added series never get real TmdbRating/Overview/EpisodeRuntime (refactor) — `done/series-t3jkv-wire-series-metadata-cache-write-path.md`
 - **series-x9mfp** — Retarget getRecentlyAbandoned's TmdbRating/SeasonCount/EpisodeCount/NextUp onto the metadata cache and views, same as its sibling getRecentlyFinished (refactor) — `done/series-x9mfp-getrecentlyabandoned-cache-composition.md`
 - **series-d5tpn** — Drop the externally-sourced columns from series_list and series_detail, prove the drift check reports zero for SeriesProjection, and retire the lossy-rebuild guard (refactor) — `done/series-d5tpn-drop-columns-prove-drift-zero.md`
@@ -39,11 +39,13 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **series-x4qte** — Bootstrap Fable/Vitest client-side unit test infrastructure (blocked on npm install being safe to run) (chore) — `backlog/series-x4qte-bootstrap-fable-vitest-client-tests.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0063** -- Next Up follows the furthest-watched frontier: the `series_next_up` view and the shared client `NextUp.compute` both skip unwatched gaps behind the max watched (season, episode) tuple; view redefinitions in `MetadataCache.initialize` now require `DROP VIEW IF EXISTS` to take effect on existing databases. -- 2026-08-07 -- `../../knowledge/decisions/0063-next-up-follows-furthest-watched-frontier.md`
 - **0051** -- SeriesProjection drift reaches zero by physically dropping the externally-sourced columns (`status`/`backdrop_ref` retained per the identity-card clause); the ADR-0049 lossy-rebuild guard is retired, and `MetadataCache.recoverStranded` guards the rename-ordering hazard (view-safe, atomic, non-fatal). Supersedes ADR-0049. -- 2026-08-02 -- `../../knowledge/decisions/0051-series-projection-drift-reaches-zero-via-column-drop-and-guard-retirement.md`
 - **0048** -- Series read composition joins `series_metadata_cache` and the `series_next_up`/`series_episode_counts` views at query time, never at the API layer — DTOs and client stay byte-identical. -- 2026-08-01 -- `../../knowledge/decisions/0048-series-reads-composed-from-metadata-cache-at-query-time.md`
 - **0047** -- `Series_refreshed` narrowed to real airing-status transitions (previousStatus from the aggregate; projection handler applies it); all other TMDB metadata leaves the log for the cache tier. Backward-compatible with all 780 historical events. -- 2026-08-01 -- `../../knowledge/decisions/0047-series-refreshed-narrowed-to-real-airing-status-transitions.md`

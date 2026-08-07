@@ -203,6 +203,67 @@ let getDashboardSeriesNextUpTests =
                 Expect.equal dto.EpisodeCount 3 "episode count composed from series_episode_counts across both seasons"
     ]
 
+[<Tests>]
+let seriesNextUpFrontierTests =
+    testList "series-k4zpn: series_next_up follows the furthest-watched episode, not the first unwatched one" [
+
+        testCase "a gap behind the frontier is skipped — next up is the first unwatched episode past the furthest watched" <| fun _ ->
+            use conn = newConn ()
+            // Season 1 has 11 episodes. (1,3) is a skipped gap; (1,4)-(1,10)
+            // are watched, making (1,10) the frontier. (1,11) is the first
+            // unwatched episode strictly after the frontier — the old rule
+            // would have returned (1,3) forever.
+            seedSeries conn "gapped-show" 400 None [ mkSeason 1 11 ]
+            for ep in [ 4 .. 10 ] do
+                markWatched conn "gapped-show" "default" 1 ep "2024-06-01"
+
+            let result = SeriesProjection.getAll conn |> List.find (fun s -> s.Slug = "gapped-show")
+            match result.NextUp with
+            | None -> failtest "expected a next-up episode past the frontier"
+            | Some nextUp ->
+                Expect.equal nextUp.SeasonNumber 1 "next-up season should still be 1"
+                Expect.equal nextUp.EpisodeNumber 11 "next-up episode should be 11 (the frontier is (1,10)), not 3 (the gap behind it)"
+
+        testCase "furthest-watched at the very last episode yields no next up, even with gaps behind it" <| fun _ ->
+            use conn = newConn ()
+            // Season 1 has 5 episodes, season 2 has 3. (1,3) is a skipped
+            // gap. The frontier is (2,3) — the last episode of the last
+            // season — so there is nothing left to recommend, regardless of
+            // the gap sitting behind the frontier.
+            seedSeries conn "finished-with-gap" 401 None [ mkSeason 1 5; mkSeason 2 3 ]
+            for ep in [ 1; 2; 4; 5 ] do
+                markWatched conn "finished-with-gap" "default" 1 ep "2024-06-01"
+            for ep in [ 1 .. 3 ] do
+                markWatched conn "finished-with-gap" "default" 2 ep "2024-06-02"
+
+            let result = SeriesProjection.getAll conn |> List.find (fun s -> s.Slug = "finished-with-gap")
+            Expect.isNone result.NextUp "no episode exists past the frontier (2,3) — gap at (1,3) is history, not a queue"
+
+        testCase "no watch records at all — the frontier degenerates to the first episode overall" <| fun _ ->
+            use conn = newConn ()
+            seedSeries conn "never-started-show" 402 None [ mkSeason 1 3 ]
+
+            let result = SeriesProjection.getAll conn |> List.find (fun s -> s.Slug = "never-started-show")
+            match result.NextUp with
+            | None -> failtest "expected the first episode overall when nothing has been watched"
+            | Some nextUp ->
+                Expect.equal nextUp.SeasonNumber 1 "no frontier — falls back to season 1"
+                Expect.equal nextUp.EpisodeNumber 1 "no frontier — falls back to episode 1"
+
+        testCase "a contiguous watch run still returns the episode immediately after it" <| fun _ ->
+            use conn = newConn ()
+            seedSeries conn "contiguous-show" 403 None [ mkSeason 1 5 ]
+            for ep in [ 1 .. 2 ] do
+                markWatched conn "contiguous-show" "default" 1 ep "2024-06-01"
+
+            let result = SeriesProjection.getAll conn |> List.find (fun s -> s.Slug = "contiguous-show")
+            match result.NextUp with
+            | None -> failtest "expected episode 3 to be next up"
+            | Some nextUp ->
+                Expect.equal nextUp.SeasonNumber 1 "still season 1"
+                Expect.equal nextUp.EpisodeNumber 3 "the episode immediately after the contiguous run (1,1)-(1,2)"
+    ]
+
 /// Counts the number of `IDbCommand`s created against the underlying
 /// connection — each `Db.newCommand |> ... |> Db.query/querySingle/exec`
 /// call creates exactly one, so this is a direct proxy for "how many

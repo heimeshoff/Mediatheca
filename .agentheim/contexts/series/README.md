@@ -17,7 +17,7 @@ Single user.
 - **Rewatch session** — a *named* watching pass through the series (default or named, e.g. "with Alice"). Episode-watched events are scoped to a rewatch session.
 - **Default rewatch session** — the rewatch a Series defaults to when episode-marking commands omit an explicit one.
 - **In Focus** — "I want to watch this soon"; pinned to dashboard. Auto-clears on first episode watched.
-- **Next Up** — derived: the next unwatched episode in the current default rewatch session, surfaced on the dashboard.
+- **Next Up** — derived: the first episode, ordered by (season, episode), that has no watch record *and* comes strictly after the furthest-watched episode (series-k4zpn) — not merely the first unwatched episode overall, so a skipped/missed episode never pins Next Up forever; gaps behind the furthest-watched point are history, not a queue. With no watched episodes at all there is no frontier and Next Up is the first episode overall; with nothing left past the frontier there is no Next Up, regardless of gaps behind it. Surfaced on the dashboard and the series-detail hero/Episodes-tab. Watch-record scope differs by surface and is deliberately not unified: the server `series_next_up` view (ADR-0046) unions watch records across every rewatch session; the series-detail client page scopes to the *selected* rewatch session.
 - **Status** — Active / Finished / Abandoned, derived from completion + recent activity. (See `SeriesStatus` in Shared.)
 - **Recommendation / want to watch with** — same meanings as Movies.
 

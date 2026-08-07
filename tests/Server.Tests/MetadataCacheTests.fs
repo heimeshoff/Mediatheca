@@ -121,13 +121,18 @@ let private insertCacheEpisode (conn: SqliteConnection) (slug: string) (season: 
     |> Db.setParams [ "slug", SqlType.String slug; "season", SqlType.Int32 season; "episode", SqlType.Int32 episode ]
     |> Db.exec
 
-/// The exact `CREATE VIEW` DDL `MetadataCache.initialize` itself declares
-/// (`CREATE VIEW IF NOT EXISTS series_next_up`/`series_episode_counts`,
-/// both selecting FROM `series_episode_cache`). series-d5tpn iteration 2:
-/// these views are present on any live database that has booted once —
-/// creating them here before simulating the stranded-rename shape is what
-/// makes the fixture genuinely reproduce the live incident, since SQLite
-/// revalidates every view in the schema during `ALTER TABLE ... RENAME`.
+/// A deliberately minimal stand-in for the `CREATE VIEW` DDL
+/// `MetadataCache.initialize` declares — NOT a byte-for-byte copy. It keeps
+/// the pre-frontier (series-k4zpn) `series_next_up` body, since this
+/// fixture's only job is to reproduce the `recoverStranded` view-revalidation
+/// hazard (SQLite revalidates every view in the schema during
+/// `ALTER TABLE ... RENAME`), which depends on `series_next_up`/
+/// `series_episode_counts` existing and referencing `series_episode_cache` —
+/// not on the SELECT body matching the production frontier rule.
+/// series-d5tpn iteration 2: these views are present on any live database
+/// that has booted once — creating them here before simulating the
+/// stranded-rename shape is what makes the fixture genuinely reproduce the
+/// live incident.
 let private createSeriesViews (conn: SqliteConnection) : unit =
     conn
     |> Db.newCommand

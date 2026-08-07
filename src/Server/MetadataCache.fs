@@ -329,6 +329,18 @@ module MetadataCache =
         // module doc comment). Computed on read: structurally incapable of
         // drifting, and invisible to `PRAGMA table_info` (ADR-0031's shadow
         // diff never sees a view, only base tables).
+        //
+        // series-k4zpn: `series_next_up`'s SELECT body changed (frontier
+        // rule below) but `CREATE VIEW IF NOT EXISTS` is a no-op against a
+        // database that already has the view from a prior boot — an
+        // unconditional `DROP VIEW IF EXISTS` first is required for a
+        // redefinition to actually take effect on every subsequent deploy,
+        // not just fresh installs. Cheap: both views are computed on read
+        // (no data to lose) and this same drop/recreate idiom already
+        // exists for the stranded-repair path (`recoverStranded`, above).
+        conn |> Db.newCommand "DROP VIEW IF EXISTS series_next_up" |> Db.exec
+        conn |> Db.newCommand "DROP VIEW IF EXISTS series_episode_counts" |> Db.exec
+
         conn
         |> Db.newCommand
             """
@@ -343,7 +355,37 @@ module MetadataCache =
                     ON p.series_slug = e.series_slug
                    AND p.season_number = e.season_number
                    AND p.episode_number = e.episode_number
+                -- series-k4zpn: Next Up must follow the furthest-watched
+                -- episode, not just any unwatched one — a skipped episode
+                -- must not pin Next Up forever. `f` is the frontier: the
+                -- max (season_number, episode_number) tuple (lexicographic,
+                -- via ORDER BY ... DESC / rn = 1, since SQLite has no tuple
+                -- comparison) with a watch record for that series, across
+                -- every rewatch session (same union-of-rewatches scope as
+                -- the `p` join above — see SeriesProjection.fs:126). A
+                -- series with no watch records has no frontier row (`f`
+                -- LEFT JOIN misses) and the rule degenerates to today's
+                -- "first unwatched" behaviour. Candidates at or behind the
+                -- frontier are excluded even if unwatched — gaps behind the
+                -- frontier are history, not a queue.
+                LEFT JOIN (
+                    SELECT series_slug, season_number, episode_number
+                    FROM (
+                        SELECT series_slug, season_number, episode_number,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY series_slug
+                                   ORDER BY season_number DESC, episode_number DESC
+                               ) AS rn
+                        FROM series_episode_progress
+                    )
+                    WHERE rn = 1
+                ) f ON f.series_slug = e.series_slug
                 WHERE p.series_slug IS NULL
+                  AND (
+                        f.series_slug IS NULL
+                     OR e.season_number > f.season_number
+                     OR (e.season_number = f.season_number AND e.episode_number > f.episode_number)
+                  )
             )
             WHERE rn = 1;
 

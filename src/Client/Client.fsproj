@@ -40,6 +40,7 @@
     <Compile Include="Pages\Series\State.fs" />
     <Compile Include="Pages\Series\Views.fs" />
     <Compile Include="Pages\SeriesDetail\Types.fs" />
+    <Compile Include="Pages\SeriesDetail\NextUp.fs" />
     <Compile Include="Pages\SeriesDetail\State.fs" />
     <Compile Include="Pages\SeriesDetail\Views.fs" />
     <Compile Include="Pages\Games\Types.fs" />

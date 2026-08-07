@@ -1,15 +1,15 @@
 ---
 id: series-k4zpn
 title: Next Up must follow the furthest-watched episode, not the first unwatched one — a skipped episode currently pins Next Up forever; when nothing remains beyond the furthest watched, show the fully-watched state even if a gap exists
-status: doing
+status: done
 type: bug
 context: series
 created: 2026-08-07
-completed:
+completed: 2026-08-07
 depends_on: [design-system-001]
 blocks: []
 tags: [next-up, series-detail, dashboard, projection-view, watch-state]
-related_adrs: [0046, 0048]
+related_adrs: [0046, 0048, 0063]
 related_research: []
 prior_art: [series-m7fdk, series-q8jwc]
 ---
@@ -148,3 +148,64 @@ hero and the Episodes tab is also what mechanically guarantees the
 **Frontend gate.** `depends_on: design-system-001` per the series BC README's
 frontend gate; that styleguide task is already in `done/`, so the dependency is
 met and does not block.
+
+## Outcome
+
+Implemented the frontier rule in the one server view and both client call
+sites.
+
+- **`series_next_up` view** (`src/Server/MetadataCache.fs`) — added a
+  per-`series_slug` frontier subquery (max `(season_number, episode_number)`
+  tuple via `ROW_NUMBER() ... ORDER BY ... DESC = 1`) and restricted
+  candidates to episodes strictly after it (or unrestricted when no
+  frontier exists). Also added an unconditional `DROP VIEW IF EXISTS`
+  before the `CREATE VIEW IF NOT EXISTS` block — without it, the
+  redefinition would silently never take effect against any database that
+  already had the view from a prior boot (every live/dev database, since
+  series-m7fdk). Fixes all six consumers (`getAll`/`getBySlug`/
+  `getRecentSeries`/`getRecentlyFinished`/`getRecentlyAbandoned`/
+  `getDashboardSeriesNextUp`) at once, per ADR-0048's one-view design.
+- **`src/Client/Pages/SeriesDetail/NextUp.fs`** (new) — pure
+  `compute: SeasonDto list -> (int * EpisodeDto) option` mirroring the SQL
+  view's frontier logic. Wired into both the hero Next Up card and the
+  Episodes-tab "NEXT" badge/"Coming Next" divider in `Views.fs`, replacing
+  their two independent inline implementations — this mechanically
+  guarantees the two surfaces always name the same episode, and per the
+  task's Assumption note the badge is now a single global marker (a season
+  entirely at/below the frontier shows neither badge nor divider).
+- **`tests/Server.Tests/SeriesProjectionReadsTests.fs`** — 4 new Expecto
+  tests (`seriesNextUpFrontierTests`) covering: a gap behind the frontier is
+  skipped; furthest-watched at the very last episode yields no Next Up even
+  with a gap behind it; no watch records degrades to the first episode
+  overall; a contiguous watch run returns the episode immediately after it.
+  All pass; full suite (680 tests, 4 new) green.
+- **Client test coverage deferred** — no Vitest infrastructure exists in
+  this repo, and bootstrapping it needs an `npm install` that is unsafe to
+  run from inside this worker's git worktree (junctioned `node_modules`
+  shared with the main tree). `NextUp.compute` mirrors the SQL view's logic
+  function-for-function and is covered indirectly by the 4 server tests
+  above (same rule, same scenarios) plus a clean `npm run build`. Backlogged
+  as `series-x4qte` (bootstrap Fable/Vitest infra from the main tree, then
+  add `NextUp.spec`).
+- **`.agentheim/knowledge/decisions/0063-next-up-follows-furthest-watched-frontier.md`** (minted provisionally as 0062 in the worktree; renumbered at integration — the builder's untracked 0062-administration-danger-gate.md holds that id)
+  records the frontier rule, the view-redefinition (`DROP VIEW IF EXISTS`)
+  fix, and the deferred-client-test decision.
+- `.agentheim/contexts/series/README.md`'s "Next Up" ubiquitous-language
+  entry updated to describe the frontier rule and the two surfaces'
+  differing (deliberately unreconciled) watch-record scopes.
+
+Key files: `src/Server/MetadataCache.fs`, `src/Client/Pages/SeriesDetail/NextUp.fs`,
+`src/Client/Pages/SeriesDetail/Views.fs`, `src/Client/Client.fsproj`,
+`tests/Server.Tests/SeriesProjectionReadsTests.fs`.
+
+## Verifier note (iteration 1)
+
+**REASONS:**
+- Check 6 (ADR well-formedness): `.agentheim/knowledge/decisions/0062-next-up-follows-furthest-watched-frontier.md:1-5` has **no YAML frontmatter at all**. It opens `# 0062. Next Up follows...` followed by loose `Date:` / `Status:` / `Task:` lines. Every ADR in this project from 0033 onward (except the single 0052 deviation) carries the house frontmatter block — `id`, `title`, `scope`, `status`, `date`, `supersedes`, `superseded_by`, `related_tasks`, `related_research` (see 0060/0061 for the exact shape). The required `id`/`scope` fields are entirely absent, which is exactly what `work` reads to append the ADR to the BC INDEX's `adr-local` list. As written this ADR cannot be indexed and drops out of the BC's discoverable decision record. Body content (Context/Decision/Consequences) is substantive and correct — only the frontmatter is missing.
+- Check 6, secondary: `tests/Server.Tests/MetadataCacheTests.fs:124-157` is a hand-copied duplicate of the production view DDL whose own doc comment states "The exact `CREATE VIEW` DDL `MetadataCache.initialize` itself declares". That copy still carries the pre-frontier `WHERE p.series_slug IS NULL` body, so the comment is now false and the fixture silently diverges from `src/Server/MetadataCache.fs:347-390`. The suite still passes (the fixture only exists to reproduce the `recoverStranded` view-revalidation hazard, which the SELECT body doesn't affect), but the stale mirror is a trap for the next reader.
+
+**SUGGESTED_FIX:** Add the house YAML frontmatter to `0062-next-up-follows-furthest-watched-frontier.md` (`id: 0062`, `title:`, `scope: series`, `status: accepted`, `date: 2026-08-07`, `supersedes: []`, `superseded_by: []`, `related_tasks: [series-k4zpn]`, `related_research: []`), matching ADR-0060/0061, and either refresh the `MetadataCacheTests.fs:144` fixture DDL to the new frontier SQL or amend its "exact DDL" comment to say it is a deliberately minimal stand-in. Note also that the main tree currently holds an untracked `.agentheim/knowledge/decisions/0062-administration-danger-gate.md` — the 0062 id is contested; the conductor's ADR-finalization step renumbers on collision at merge, so keep the frontmatter `id:` consistent with the filename you leave behind.
+
+**ITERATION_HINT:** likely-fixable
+
+_(Everything else passed: all four frontier scenarios verified against the real production view, 680/680 Expecto green, `npm run build` exit 0, scope clean, `DROP VIEW IF EXISTS` confirmed a genuine correctness prerequisite that does not break `recoverStranded`, client `compute` mirrors the SQL faithfully, client-test deferral judged legitimate. Minor factual slips worth fixing while in there: the task Outcome claims "684 tests" and the ADR claims "9 Expecto tests" — the actual suite total is 680, of which 4 are new.)_

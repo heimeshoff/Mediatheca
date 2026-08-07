@@ -1202,10 +1202,17 @@ let private episodesTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                                                 ]
                                             ]
                                         ]
-                                        // Find next episode for highlighting
+                                        // Find next episode for highlighting — series-k4zpn:
+                                        // the single global Next Up episode (NextUp.fs),
+                                        // shared with the hero card, so at most one season
+                                        // ever shows the "NEXT" badge / "Coming Next"
+                                        // divider, and it is always the same episode the
+                                        // hero names. A season lying entirely at or below
+                                        // the frontier gets neither.
                                         let nextEp =
-                                            season.Episodes
-                                            |> List.tryFind (fun e -> not e.IsWatched)
+                                            match NextUp.compute series.Seasons with
+                                            | Some (sNum, ep) when sNum = season.SeasonNumber -> Some ep
+                                            | _ -> None
                                         // Episode cards with "Coming Next" divider
                                         let mutable shownDivider = false
                                         for ep in season.Episodes do
@@ -1755,13 +1762,11 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                 ]
                                             ]
                                         ]
-                                        // Next Up card (bottom-right of hero, desktop only)
-                                        let nextUp =
-                                            series.Seasons
-                                            |> List.tryPick (fun s ->
-                                                s.Episodes
-                                                |> List.tryFind (fun e -> not e.IsWatched)
-                                                |> Option.map (fun e -> s.SeasonNumber, e))
+                                        // Next Up card (bottom-right of hero, desktop only) —
+                                        // series-k4zpn: the episode strictly after the
+                                        // furthest-watched one, not merely the first
+                                        // unwatched episode (see NextUp.fs).
+                                        let nextUp = NextUp.compute series.Seasons
                                         match nextUp with
                                         | Some (sNum, ep) ->
                                             Html.div [
