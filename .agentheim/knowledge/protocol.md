@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-08-08 13:52 -- Modeling / Refined: infrastructure-j7v3c - Stand up the Vitest-through-vite-plugin-fable client unit-test harness
+
+**Type:** Modeling / Refine
+**BC:** infrastructure
+**Status after:** todo
+**Summary:** The task's scheduling constraint — "cannot be dispatched to a worker worktree in the normal way", because `npm install` there writes through the junction into the shared `node_modules` (ADR-0063) — was unenforced by any mechanism, so a `work` batch could have claimed the task and caused exactly the harm it warned about. The builder took the pre-install route: `vitest@^3.2.7` and `Fable.Mocha` 2.17.0 installed from the main tree and committed (d881d11), putting the dependencies on `main` where every worktree inherits them. Task updated to match: the two install bullets struck through and marked already-done so a worker confirms rather than installs, the scheduling constraint rewritten as RESOLVED with the verification table, and the first acceptance criterion loosened from a literal `^3.2.4` to `^3.2.x` + "no second vite instance in the lockfile" — the installed 3.2.7 satisfies the range but would have read as a mismatch to a verifier checking the literal string. Pre-install verified: single `vite` 6.4.1, `ts-lsp-client` override held at 1.0.4 through the fresh resolve (1.1.0 breaks the plugin's ESM imports), `npm run build` clean.
+**Split into:** none
+**ADRs written:** none — ADR-0064 (provisional) remains an acceptance criterion of this task
+
+---
+
 ## 2026-08-08 13:34 -- Modeling / Dismissed: design-system-fp2wt
 
 **Type:** Modeling / Dismiss

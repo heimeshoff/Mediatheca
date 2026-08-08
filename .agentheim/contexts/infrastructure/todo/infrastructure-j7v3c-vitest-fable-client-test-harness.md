@@ -47,12 +47,11 @@ The `fable-frontend-tests` skill (user-level, `~/.claude/skills/fable-frontend-t
 this setup and its version matrix matches this project exactly. Follow it; the notes below record
 the project-specific calls it leaves open.
 
-- Add `vitest@^3.2.4` as a devDependency — the version paired with `vite-plugin-fable` 0.1.1 →
-  Vite 6. Vitest declares Vite as a peer dependency, so an out-of-band vitest major either fails
-  to resolve or silently runs a second Vite.
-  **This install must run from the main tree, not a worker worktree** — a worktree's
-  `node_modules` is a junction to the main tree's real one, so an install there mutates shared
-  state outside the worker's isolated scope (ADR-0063).
+- ~~Add `vitest` as a devDependency.~~ **Already done — do not run `npm install`.** The builder
+  pre-installed `vitest@^3.2.7` in the main tree on 2026-08-08 (see Notes for why, and for the
+  verification). It is paired with `vite-plugin-fable` 0.1.1 → Vite 6; vitest declares Vite as a
+  peer dependency, so an out-of-band vitest major either fails to resolve or silently runs a
+  second Vite. Confirm it is present rather than installing it.
 - Add a `test` block to the **existing** `vite.config.mts`. Do not create a second config file —
   that would instantiate a second Fable compiler instance against the same fsproj. Reusing the
   app config is precisely what makes Vitest run `.fs` through the already-configured `fable()`
@@ -65,8 +64,9 @@ the project-specific calls it leaves open.
       environment: "node",
   }
   ```
-- `dotnet add src/Client/Client.fsproj package Fable.Mocha` — the Expecto-shaped DSL
-  (`testList`/`testCase`/`Expect.*`), self-registering via `Mocha.runTests` at module level.
+- ~~`dotnet add src/Client/Client.fsproj package Fable.Mocha`~~ — **already done** (2.17.0,
+  pre-installed alongside vitest). The Expecto-shaped DSL (`testList`/`testCase`/`Expect.*`),
+  self-registering via `Mocha.runTests` at module level.
 - Register test `.fs` files as explicit `<Compile Include>` items in `Client.fsproj`, after
   everything they test, conventionally as a contiguous block immediately before
   `<Compile Include="App.fs" />`. They are typechecked by `npm run build` but stay out of the
@@ -87,10 +87,12 @@ the project-specific calls it leaves open.
 
 ## Acceptance criteria
 
-- [ ] `vitest` is a devDependency at `^3.2.4`, and `vite.config.mts` carries a single `test`
-      block of the shape above. No second vitest/vite config file exists.
-- [ ] `Fable.Mocha` is a `PackageReference` in `Client.fsproj`, and the domain-free smoke spec is
-      an explicit `<Compile>` item; `npx vitest run` executes it green.
+- [ ] `vitest` is a devDependency at `^3.2.x` — pre-installed at `^3.2.7`, see Notes — resolving
+      against the existing Vite 6 with no second `vite` instance in the lockfile, and
+      `vite.config.mts` carries a single `test` block of the shape above. No second vitest/vite
+      config file exists.
+- [ ] `Fable.Mocha` is a `PackageReference` in `Client.fsproj` (pre-installed at 2.17.0), and the
+      domain-free smoke spec is an explicit `<Compile>` item; `npx vitest run` executes it green.
 - [ ] `npm run test:client` is defined in `package.json`, runs the Vitest suite, and is
       documented in CLAUDE.md's Build & Run section.
 - [ ] `npm run build` still passes clean — proving the new fsproj compile items do not break the
@@ -128,9 +130,25 @@ a branch-free view function.
 > than replaces ADR-0027's Playwright e2e harness, whose specs stay reserved for paths needing
 > the real network/DOM/timing story.
 
-**Scheduling constraint.** Because of the main-tree-only `npm install`, this task cannot be
-dispatched to a worker worktree in the normal way — it needs either a builder/conductor
-pre-install or an explicit main-tree dispatch. Surface this to whoever schedules the batch.
+**Scheduling constraint — RESOLVED 2026-08-08.** This task originally could not be dispatched to
+a worker worktree at all: a worktree's `node_modules` is a junction to the main tree's real one,
+so `npm install` there mutates shared state outside the worker's isolated scope (ADR-0063). The
+builder took the pre-install route on 2026-08-08 and committed the result, so the dependencies
+are on `main` and every worktree branched from it already has them. **This is now an ordinary
+worker-dispatchable task: config block, smoke spec, script, CLAUDE.md line, ADR — zero installs.**
+
+Verified at pre-install time (`npm run build` clean, 39.5s):
+
+| package | resolved | |
+|---|---|---|
+| `vite` | 6.4.1 | single instance — vitest peered onto the existing Vite 6, no second copy |
+| `vitest` | 3.2.7 | satisfies the `^3.2.x` criterion above |
+| `vite-plugin-fable` | 0.1.1 | unchanged |
+| `ts-lsp-client` | 1.0.4 (nested under the plugin) | the `overrides` pin survived the fresh resolve |
+
+That last row was the live risk: adding any devDependency re-resolves the tree, and `ts-lsp-client`
+1.1.0 breaks the plugin's ESM imports. If a future install disturbs it, the pin is in
+`package.json`'s `overrides` block.
 
 **Related tasks.** Supersedes the harness scope of `design-system-fp2wt` (recommended for
 dismissal) and unblocks the narrowed `series-x4qte`.
