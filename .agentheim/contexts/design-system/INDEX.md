@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
+- **Backlog:** 0
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 21
@@ -52,7 +52,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **design-system-fp2wt** — SUPERSEDED — recommended for dismissal. Harness scope moved to `infrastructure-j7v3c`; the progress-primitive unit tests are dropped as low-value (branch-free view functions already guarded by the `bool list` signature, `dotnet build`, and StyleGuide review) (chore) — `backlog/design-system-fp2wt-fable-unit-test-infra.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
