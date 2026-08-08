@@ -1,11 +1,11 @@
 ---
 id: series-x4qte
 title: Add client-side regression coverage for `NextUp.compute` — the frontier rule (gaps behind the furthest-watched episode are history, not a queue) currently has no client test, only its server-side mirror
-status: doing
+status: done
 type: chore
 context: series
 created: 2026-08-07
-completed:
+completed: 2026-08-08
 depends_on: [infrastructure-j7v3c]
 blocks: []
 tags: [testing, vitest, fable, client, series]
@@ -67,7 +67,7 @@ the frontier must not pin Next Up forever.
 
 ## Acceptance criteria
 
-- [ ] `NextUp.test.fs` covers all seven behaviours:
+- [x] `NextUp.test.fs` covers all seven behaviours:
       **(1)** a gap behind the frontier is skipped — the result names the episode *after* the
       frontier, not the gap; **(2)** a plain contiguous watch run (S1E1–E2 watched of 5) → S1E3,
       the ordinary path a user hits almost every time; **(3)** no watched episodes anywhere → the
@@ -77,12 +77,33 @@ the frontier must not pin Next Up forever.
       without throwing; **(7)** unordered input — seasons and episodes passed out of order —
       still yields the correct episode, pinning the normalization `compute` does before finding
       the frontier.
-- [ ] Every assertion checks **both** halves of the `(int * EpisodeDto) option` result — the
+- [x] Every assertion checks **both** halves of the `(int * EpisodeDto) option` result — the
       season number and the episode number — not just the episode.
-- [ ] `npm run test:client` is green with these specs included, and still runs `Smoke.test.fs`
+- [x] `npm run test:client` is green with these specs included, and still runs `Smoke.test.fs`
       too (the block registers, it does not replace).
-- [ ] `npm run build` still passes clean — the new compile item does not break ADR-0037's
+- [x] `npm run build` still passes clean — the new compile item does not break ADR-0037's
       typecheck gate.
+
+## Outcome
+
+Added `src/Client/Pages/SeriesDetail/NextUp.test.fs` (module
+`Mediatheca.Client.Pages.SeriesDetail.NextUpTests`), a Fable.Mocha spec exercising
+`NextUp.compute` against all seven fixture scenarios listed above, using private `episode`/
+`season` fixture-builder helpers so each case reads as its scenario. Every case destructures
+the `(int * EpisodeDto) option` result and asserts both the season number and the episode
+number. Registered as `<Compile Include="Pages\SeriesDetail\NextUp.test.fs" />` in
+`Client.fsproj`, in the contiguous test block immediately before `App.fs`, joining
+`Smoke.test.fs` — compiles after `NextUp.fs` (line 43) as required by F#'s ordering rule.
+
+Verified: `npm run test:client` → 2 test files, 8 tests passing (1 smoke + 7 new). `npm run
+build` → clean, exit 0, 196 modules transformed. No `npm install` was run; the pre-junctioned
+`node_modules` and pre-installed `vitest`/`Fable.Mocha` (ADR-0064, `infrastructure-j7v3c`) were
+used as-is.
+
+No ADR written — this task applies the conventions ADR-0064 already established, with no new
+technical decision of its own. No BC README change — the Next Up ubiquitous-language entry
+already fully describes the frontier rule (series-k4zpn); this task only adds test coverage,
+not new language or behaviour.
 
 ## Notes
 

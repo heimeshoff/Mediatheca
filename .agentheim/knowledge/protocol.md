@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-08 15:32 -- Task verified and completed: series-x4qte - Add client-side regression coverage for `NextUp.compute` — the frontier rule (gaps behind the furthest-watched episode are history, not a queue) currently has no client test, only its server-side mirror
+
+**Type:** Work / Task completion
+**Task:** series-x4qte - Add client-side regression coverage for `NextUp.compute` — the frontier rule (gaps behind the furthest-watched episode are history, not a queue) currently has no client test, only its server-side mirror
+**Summary:** Added client-side Vitest/Fable.Mocha regression coverage for NextUp.compute frontier rule — all seven scenarios including the cross-season frontier, empty input and unordered input, which were pinned nowhere else in the repo
+**Duration:** 11m
+**Verification:** PASS (iteration 1)
+**Files changed:** 2
+**Tests added:** 7
+**ADRs written:** none
+
+---
+
 ## 2026-08-08 15:21 -- Batch started: [series-x4qte]
 
 **Type:** Work / Batch start

@@ -96,6 +96,7 @@
     <Compile Include="State.fs" />
     <Compile Include="Views.fs" />
     <Compile Include="Smoke.test.fs" />
+    <Compile Include="Pages\SeriesDetail\NextUp.test.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
 
