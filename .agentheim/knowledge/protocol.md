@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-08-08 14:52 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 36m (first "Batch started" 14:16 → 14:52)
+**Completed:** 1 (first-try PASS: 0, re-dispatched: 1, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** infrastructure-j7v3c: 2
+**Commits:** 3 (batch start, task completion, this entry)
+**Vision-conformance:** none — batch aligns with vision. The one shipped task is a standing client-side quality gate serving the "Replayable"/build-health discipline; it pulls toward no Out-of-Scope (v1) item and away from no Remaining v1 Work item, and it is not admin-console scope, so the vision's "media experience wins" boundary clause does not fire.
+**Batch mix:** 0% product-facing / 100% harness / 0% bookkeeping (1 task) — hand-classified; installed plugin 0.9.2 carries no vacuum-guard.mjs. `type: chore` touching real config/source (`vite.config.mts`, `package.json`, `Client.fsproj`, `Smoke.test.fs`) rather than purely bookkeeping surfaces.
+**Carry-over:** none — working tree clean, no registered worktrees remain. Five unregistered orphan directories under `.worktrees/` (design-system-m2wvc, design-system-mz9v7, design-system-n8zqr, series-k4zpn, series-ww1rb) — residue from prior sessions' teardowns, each holding only 3 regenerated MSBuild `obj/` files, no source and no git metadata — were discarded at the builder's explicit direction; nothing to salvage (no diff, no branch, invisible to `git worktree list`). `.worktrees/` itself removed.
+
+**Harness note for future sessions:** a fresh worktree has no root `node_modules` (gitignored, so not carried by the commit `git worktree add` checks out). This task needed `npm run build` and `vitest`, so the conductor junctioned the worktree's `node_modules` to the main tree's real one — the same read-only-during-build mechanism `linkDashboardNodeModules` applies to the plugin's own dashboard, and it must be unlinked before `git worktree remove --force` or that command recurses through the junction and destroys the shared tree. Safe here because the batch had exactly one worker. Any future client-side task dispatched to a worktree needs the same link.
+
+---
+
 ## 2026-08-08 14:35 -- Task verified and completed: infrastructure-j7v3c - Stand up the Vitest-through-vite-plugin-fable client unit-test harness — `vitest@^3.2.4` driven through the app's existing `vite.config.mts` Fable plugin, Fable.Mocha as the DSL, `npm run test:client`, plus the ADR recording the harness and its boundary against ADR-0027's e2e suite
 
 **Type:** Work / Task completion
@@ -15,6 +33,17 @@ Newest entries on top.
 **Files changed:** 8
 **Tests added:** 1
 **ADRs written:** 0064
+
+---
+
+## 2026-08-08 14:28 -- Verification failed: infrastructure-j7v3c - Stand up the Vitest-through-vite-plugin-fable client unit-test harness
+
+**Type:** Work / Verification failure
+**Task:** infrastructure-j7v3c - Stand up the Vitest-through-vite-plugin-fable client unit-test harness
+**Iteration:** 1 of 3
+**Reasons:** ADR-0064 was written with no YAML frontmatter at all — Status and Scope encoded as prose headings (`## Status` → "Accepted, 2026-08-08", `## Scope` → "global") instead of the `---`-fenced block 62 of the 64 sibling ADRs carry. Breaks the acceptance criterion literally (no `scope: global` field) and breaks the conductor's `adr-global` index insertion, which reads `id`/`title`/`scope`/`date` out of that frontmatter; `related_tasks` linkage also absent. Secondary: a garbled bullet in `## Alternatives considered` where an orphaned vite-node/SSR sentence had lost its own bullet header. Harness itself verified clean — 686/686 Expecto, `npm run test:client` 1/1, `npm run build` exit 0, scope and README checks all green.
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker (iteration 2, same worktree)
 
 ---
 
