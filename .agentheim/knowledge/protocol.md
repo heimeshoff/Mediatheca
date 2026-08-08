@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-08 14:35 -- Task verified and completed: infrastructure-j7v3c - Stand up the Vitest-through-vite-plugin-fable client unit-test harness — `vitest@^3.2.4` driven through the app's existing `vite.config.mts` Fable plugin, Fable.Mocha as the DSL, `npm run test:client`, plus the ADR recording the harness and its boundary against ADR-0027's e2e suite
+
+**Type:** Work / Task completion
+**Task:** infrastructure-j7v3c - Stand up the Vitest-through-vite-plugin-fable client unit-test harness — `vitest@^3.2.4` driven through the app's existing `vite.config.mts` Fable plugin, Fable.Mocha as the DSL, `npm run test:client`, plus the ADR recording the harness and its boundary against ADR-0027's e2e suite
+**Summary:** Stood up the Vitest-through-vite-plugin-fable client unit-test harness — one test block on the existing vite.config.mts, a domain-free Fable.Mocha smoke spec proving the vite-node/SSR transform end-to-end, npm run test:client wired and documented, and ADR-0064 recording the harness and its boundary against ADR-0027 e2e suite
+**Duration:** 20m
+**Verification:** PASS (iteration 2)
+**Files changed:** 8
+**Tests added:** 1
+**ADRs written:** 0064
+
+---
+
 ## 2026-08-08 14:16 -- Batch started: [infrastructure-j7v3c]
 
 **Type:** Work / Batch start

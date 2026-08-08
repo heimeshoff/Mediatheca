@@ -9,6 +9,7 @@ Personal media library app (movies, series, games, books) built with full-stack 
 - `npm run dev:server` - Server only (dotnet watch, port 5000)
 - `npm run dev:client` - Client only (Vite + vite-plugin-fable, port 5173)
 - `npm test` - Run Expecto tests (`dotnet run --project tests/Server.Tests/Server.Tests.fsproj`)
+- `npm run test:client` - Run client-side unit tests (Vitest driving `*.test.fs` files through `vite.config.mts`'s Fable plugin, Fable.Mocha as the DSL; ADR-0064)
 
 ## Tech Stack
 

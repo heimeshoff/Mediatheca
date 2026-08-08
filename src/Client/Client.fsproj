@@ -95,6 +95,7 @@
     <Compile Include="Types.fs" />
     <Compile Include="State.fs" />
     <Compile Include="Views.fs" />
+    <Compile Include="Smoke.test.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
 

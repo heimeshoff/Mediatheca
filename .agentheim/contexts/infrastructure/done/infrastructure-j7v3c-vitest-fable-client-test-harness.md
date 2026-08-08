@@ -1,15 +1,15 @@
 ---
 id: infrastructure-j7v3c
 title: Stand up the Vitest-through-vite-plugin-fable client unit-test harness — `vitest@^3.2.4` driven through the app's existing `vite.config.mts` Fable plugin, Fable.Mocha as the DSL, `npm run test:client`, plus the ADR recording the harness and its boundary against ADR-0027's e2e suite
-status: doing
+status: done
 type: chore
 context: infrastructure
 created: 2026-08-08
-completed:
+completed: 2026-08-08
 depends_on: []
 blocks: [series-x4qte]
 tags: [testing, infra, fable, client, tooling, build-health]
-related_adrs: [0027, 0037, 0063]
+related_adrs: [0027, 0037, 0063, 0064]
 related_research: []
 prior_art: [infrastructure-p1h9a]
 ---
@@ -156,3 +156,58 @@ dismissal) and unblocks the narrowed `series-x4qte`.
 **Optional follow-on** (not in scope here): `context-map.md` could gain "build gate, test harness"
 in infrastructure's core language and an "Infrastructure → every BC (open host: test harnesses
 and build gates)" relationship bullet.
+
+## Outcome
+
+Confirmed `vitest@3.2.7` and `Fable.Mocha@2.17.0` already present (pre-installed on `main`,
+d881d11) — no install run from this worktree. Added one `test` block to the existing
+`vite.config.mts` (no second config file); wired `"test:client": "vitest run"` in `package.json`
+without touching the existing Expecto `test` script; added `src/Client/Smoke.test.fs` — a
+domain-free, synthetic `2 + 2 = 4` assertion via Fable.Mocha — as an explicit `<Compile>` item in
+`Client.fsproj` immediately before `App.fs`, proving the Vitest-through-vite-node/SSR transform
+path works end-to-end (`npx vitest run` → 1 test file, 1 test, green). `npm run build` still
+passes clean (39.96s, only the pre-existing `FS0020` warning), proving the new compile item
+doesn't break ADR-0037's typecheck gate. Documented `npm run test:client` in CLAUDE.md's Build &
+Run section. Wrote ADR-0064 (provisional numbering per ADR-0058) recording the harness decision,
+why infrastructure owns it, the dropped-scope rule for branch-free Feliz view functions, the
+main-tree-only `npm install` policy, the `environment: "node"` default with the noted-but-
+unadopted `jsdom` escape hatch, and the boundary against ADR-0027's e2e suite. Updated the
+infrastructure BC README with a new "Client unit-test harness" ubiquitous-language entry.
+
+Key files: `vite.config.mts`, `package.json`, `src/Client/Client.fsproj`,
+`src/Client/Smoke.test.fs`, `CLAUDE.md`,
+`.agentheim/knowledge/decisions/0064-vitest-fable-client-unit-test-harness.md`,
+`.agentheim/contexts/infrastructure/README.md`.
+
+**Iteration 2 fix (2026-08-08):** the verifier failed the task on the ADR file's *form* only —
+`0064-vitest-fable-client-unit-test-harness.md` had no YAML frontmatter and encoded
+status/scope as prose headings instead of the machine-readable fields every sibling ADR
+carries. Added the standard frontmatter block (`id: 0064`, `title`, `scope: global`,
+`status: accepted`, `date: 2026-08-08`, `supersedes: []`, `superseded_by: []`,
+`related_tasks: [infrastructure-j7v3c]`, `related_research: []`), matching `0063-*.md`'s shape,
+and dropped the now-redundant `## Status`/`## Scope` prose headings in favor of the H1 +
+`## Context` shape the siblings use. Also repaired the garbled first bullet under
+`## Alternatives considered`, which had merged the "second Vitest config file" rejection with an
+orphaned sentence about Vitest's vite-node/SSR transform path — split back into two distinct,
+correctly-scoped bullets. No code, test, or content changes beyond that structural repair; all
+previously-passing checks (harness runners, ADR content requirements) are unaffected.
+
+## Verifier note (iteration 1)
+
+**VERDICT: FAIL** — everything the harness actually does verified green; the ADR file's *form* fails.
+
+REASONS:
+- `.agentheim/knowledge/decisions/0064-vitest-fable-client-unit-test-harness.md:1` has **no YAML frontmatter at all**. Check 6 requires well-formed frontmatter (`id`, `title`, `status`, `scope`, `date`); the file instead opens with `# ADR-0064 — ...` and encodes the fields as prose headings (`## Status` → `Accepted, 2026-08-08`, `## Scope` → `global`). 62 of the 64 ADRs in that directory carry the frontmatter block (`0063-*.md`, `0037-*.md`, `0027-*.md`, `0062-*.md` all do — `id`/`title`/`scope`/`status`/`date`/`supersedes`/`superseded_by`/`related_tasks`/`related_research`); the sole other exception, `0052-*.md`, is a pre-existing defect, not a precedent.
+- This breaks the acceptance criterion literally as worded: "ADR-0064 (provisional) exists under `.agentheim/knowledge/decisions/` with **`scope: global`**". There is no `scope: global` field in the file — only a `## Scope` heading with `global` under it. The `work` skill's global-ADR index insertion keys on that machine-readable field: `.agentheim/knowledge/index.md`'s `<!-- adr-global:start -->` section renders `**<id>** -- <title> -- <date> -- <path>`, all three of which come from ADR frontmatter and none of which this file exposes.
+- Missing `related_tasks: [infrastructure-j7v3c]` and `related_adrs`/`supersedes` linkage that every sibling ADR carries, so the ADR is not discoverable from the task graph.
+- Secondary (content integrity, not on its own a blocker): the first bullet of `## Alternatives considered` is garbled — the "A second, separate Vitest config file. Rejected —" bullet runs straight into an orphaned sentence, "Vitest transforms through **vite-node/SSR**, not the dev-server pipeline `vite-plugin-fable` is actually proven under elsewhere in this repo...", which reads as a separate alternative whose bullet header was lost. Worth repairing while the file is open.
+
+SUGGESTED_FIX: Add the standard YAML frontmatter block to `.agentheim/knowledge/decisions/0064-vitest-fable-client-unit-test-harness.md`, matching `0063-*.md`'s shape exactly (`id: 0064`, `title: ...`, `scope: global`, `status: accepted`, `date: 2026-08-08`, `supersedes: []`, `superseded_by: []`, `related_tasks: [infrastructure-j7v3c]`, `related_research: []`), and drop or keep the now-redundant `## Status`/`## Scope` prose headings consistently with the sibling ADRs; while there, repair the merged bullet in `## Alternatives considered`. No code changes are needed — the harness itself verified clean.
+
+ITERATION_HINT: likely-fixable
+
+**Checks that PASSED (do not redo this work):**
+- Runners, from the worktree: `npm run test:client` → 1 file / 1 test passed, exit 0. `npm run build` → built in 37.15s, exit 0 (only the expected pre-existing `FS0020` warning at `AdminProjections/Views.fs`). `npm test` → 686 passed, 0 failed, exit 0.
+- Criteria 1-4 all verified: one `vite.config.mts` (no second config), lockfile has exactly one `vite` (6.4.1) and one `vitest` (3.2.7), `test` block at `vite.config.mts:30-35`; `Fable.Mocha 2.17.0` at `Client.fsproj:108` with `<Compile Include="Smoke.test.fs" />` at line 98 immediately before `App.fs`; `"test:client": "vitest run"` present with the Expecto `test` script untouched and CLAUDE.md documented.
+- Criterion 5's *content* requirements are all present in the ADR body (routing test, dropped-scope rule, main-tree-only install policy, `node` default with unadopted `jsdom` hatch, ADR-0027 boundary). Only the `scope: global` field *form* fails.
+- Scope clean (8 files, no INDEX/protocol/other-BC edits, `package-lock.json` untouched); BC README synced; ADR-0059 mechanize-or-drop fires and passes; no protocol/index/git tampering.

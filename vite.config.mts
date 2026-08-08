@@ -27,4 +27,10 @@ export default defineConfig({
         outDir: "../../deploy/public",
         emptyOutDir: true,
     },
+    test: {
+        include: ["**/*.test.fs"],
+        exclude: ["**/fable_modules/**", "**/node_modules/**"],
+        globals: true,
+        environment: "node",
+    },
 });

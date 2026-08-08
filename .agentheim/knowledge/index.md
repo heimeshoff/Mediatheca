@@ -27,6 +27,7 @@ For BC-scoped artifacts, see each BC's `INDEX.md`.
 ## Global ADRs (scope: global)
 
 <!-- adr-global:start -->
+- **0064** -- Client-side F# is unit-tested by Vitest 3 running `*.test.fs` through the app's existing `vite.config.mts` Fable plugin instance, Fable.Mocha as the DSL — no second config, no separate compile step. Test files are `<Compile>` items typechecked by `npm run build` but excluded from the bundle. Complements rather than replaces ADR-0027's e2e suite. -- 2026-08-08 -- `knowledge/decisions/0064-vitest-fable-client-unit-test-harness.md`
 - **0043** -- Event-worthiness doctrine: an event records an observation of the user's own engagement, a cache records a third party's description (operative test: re-derivability), plus the identity-card clause for externally-sourced projection columns. Amends ADR-0012 in place. -- 2026-08-01 -- `knowledge/decisions/0043-event-worthiness-doctrine-observation-vs-third-party-cache.md`
 - **0001** -- F# on both server and client (Fable transpilation) -- 2026-05-12 -- `knowledge/decisions/0001-fsharp-fullstack.md`
 - **0002** -- Event sourcing + CQRS as the persistence model -- 2026-05-12 -- `knowledge/decisions/0002-event-sourcing-cqrs.md`
