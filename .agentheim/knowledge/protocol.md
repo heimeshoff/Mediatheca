@@ -5,6 +5,26 @@ Newest entries on top.
 
 ---
 
+## 2026-08-08 15:35 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 14m (first "Batch started" 15:21 → 15:35)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** series-x4qte: 1
+**Commits:** 3 (batch start, task completion, this entry)
+**Vision-conformance:** none — batch aligns with vision. The one shipped task adds client regression coverage for the series Next Up frontier rule (ADR-0063), a rule the Unified Dashboard and series-detail surfaces both render; it pulls toward no Out-of-Scope (v1) item and away from no Remaining v1 Work item, and it is not admin-console scope, so the vision's "media experience wins" boundary clause does not fire.
+**Batch mix:** 0% product-facing / 100% harness / 0% bookkeeping (1 task) — hand-classified; installed plugin 0.9.2 carries no `vacuum-guard.mjs`. `type: chore` touching real source (`NextUp.test.fs`, `Client.fsproj`) rather than purely bookkeeping surfaces. Worth noting the heuristic reads this as harness even though the coverage it adds pins a user-facing domain rule — the classification tracks the *kind* of file touched, not the value of the rule under test.
+**Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed.
+
+**Session-start churn note:** one untrailed commit since the last session-end boundary — `f4c665c model(series): refine series-x4qte …`, a `modeling` REFINE that dropped its `[series-x4qte]` trailer. Touches only that task file and `protocol.md`; no governed surface, nothing to re-align.
+
+**Harness note, carried forward:** the worktree `node_modules` junction was again required (this is the second client-side task to need it) and was unlinked before `git worktree remove --force`. Main-tree `node_modules` verified intact afterwards (206 entries, `vitest` present). The verifier's `npm run build` regenerates `deploy/public/` inside the worktree — harmless here since the squash-merge takes the branch's committed delta, not the worktree's working directory, but worth remembering if a future flow ever stages from the worktree working tree.
+
+---
+
 ## 2026-08-08 15:32 -- Task verified and completed: series-x4qte - Add client-side regression coverage for `NextUp.compute` — the frontier rule (gaps behind the furthest-watched episode are history, not a queue) currently has no client test, only its server-side mirror
 
 **Type:** Work / Task completion
