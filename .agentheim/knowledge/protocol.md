@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-08-08 15:11 -- Modeling / Refined: series-x4qte - Add client-side regression coverage for `NextUp.compute`
+
+**Type:** Modeling / Refine
+**BC:** series
+**Status after:** todo
+**Summary:** Grounding pass against the actual source, which corrected a load-bearing factual claim the task had carried since capture. The Notes asserted that five of the six behaviours were "each also proven by an Expecto test against the `series_next_up` view, so a client regression would at least contradict a passing server test" — reading `SeriesProjectionReadsTests.fs:219-278` and `MetadataCacheTests.fs:429` shows only **three** are mirrored (gap-behind-frontier, no-watch-records fallback, nothing-past-frontier `None`). The cross-season frontier, the empty input and the ordering are pinned nowhere in the repo; notably there is no server test where the frontier sits at a season boundary and Next Up crosses forward into the next season, since the one two-season server fixture has its frontier at the final episode. The correction argues *for* the task — it triples the count of behaviours only this file will cover — and is now stated in both the Why and the Notes with file:line citations. Added a seventh behaviour at the builder's call: the plain contiguous watch run (S1E1–E2 of 5 → S1E3), the server suite's fourth test and the path a user hits almost every time; without it the file covered only edges and read as if the ordinary path were untested. Pinned case (7)'s assertion shape — a literal expected tuple rather than `compute shuffled = compute sorted`, since the self-comparison reports disagreement without saying which side is wrong and passes when both are wrong together. Two execution hazards closed by direct inspection: the Vitest glob is `include: ["**/*.test.fs"]` against `root: "./src/Client"` and so already reaches the nested `Pages/SeriesDetail/` path (no `vite.config.mts` edit, which a worker might otherwise attempt), and the module-naming note's "mirroring `Smoke.test.fs`" clause was a trap — the exemplar is literally `module Smoke.Tests`, the exact `X.Tests` form the note forbids here, safe there only because no colliding `Smoke` module exists. Verified as accurate and left unchanged: the 10-field `EpisodeDto` / 8-field `SeasonDto` counts behind the fixture-helper guidance. No orchestrator round — the findings were factual corrections grounded directly in the source, and the task had already been refined twice.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-08-08 15:02 -- Modeling / Promoted: series-x4qte - Add client-side regression coverage for `NextUp.compute` — the frontier rule (gaps behind the furthest-watched episode are history, not a queue) currently has no client test, only its server-side mirror
 
 **Type:** Modeling / Promote
