@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-08 15:02 -- Modeling / Promoted: series-x4qte - Add client-side regression coverage for `NextUp.compute` — the frontier rule (gaps behind the furthest-watched episode are history, not a queue) currently has no client test, only its server-side mirror
+
+**Type:** Modeling / Promote
+**BC:** series
+**From → To:** backlog → todo
+
+---
+
 ## 2026-08-08 15:02 -- Modeling / Refined: series-x4qte - Add client-side regression coverage for `NextUp.compute`
 
 **Type:** Modeling / Refine

@@ -1,7 +1,7 @@
 ---
 id: series-x4qte
 title: Add client-side regression coverage for `NextUp.compute` — the frontier rule (gaps behind the furthest-watched episode are history, not a queue) currently has no client test, only its server-side mirror
-status: backlog
+status: todo
 type: chore
 context: series
 created: 2026-08-07
