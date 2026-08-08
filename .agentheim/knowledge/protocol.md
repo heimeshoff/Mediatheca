@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-08 14:16 -- Batch started: [infrastructure-j7v3c]
+
+**Type:** Work / Batch start
+**Tasks:** infrastructure-j7v3c - Stand up the Vitest-through-vite-plugin-fable client unit-test harness — `vitest@^3.2.4` driven through the app's existing `vite.config.mts` Fable plugin, Fable.Mocha as the DSL, `npm run test:client`, plus the ADR recording the harness and its boundary against ADR-0027's e2e suite
+**Parallel:** no (1 worker — infrastructure-j7v3c is the only ready task across every BC; nothing held back)
+
+---
+
 ## 2026-08-08 13:52 -- Modeling / Refined: infrastructure-j7v3c - Stand up the Vitest-through-vite-plugin-fable client unit-test harness
 
 **Type:** Modeling / Refine
