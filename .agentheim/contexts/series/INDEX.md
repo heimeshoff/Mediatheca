@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 8
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **series-x4qte** — Add client-side regression coverage for `NextUp.compute` — the frontier rule (gaps behind the furthest-watched episode are history, not a queue) currently has no client test, only its server-side mirror (chore) — `todo/series-x4qte-nextup-compute-regression-coverage.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **series-x4qte** — Add client-side regression coverage for `NextUp.compute` — the frontier rule (gaps behind the furthest-watched episode are history, not a queue) currently has no client test, only its server-side mirror (chore) — `doing/series-x4qte-nextup-compute-regression-coverage.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

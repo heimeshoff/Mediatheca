@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-08 15:21 -- Batch started: [series-x4qte]
+
+**Type:** Work / Batch start
+**Tasks:** series-x4qte - Add client-side regression coverage for `NextUp.compute` — the frontier rule (gaps behind the furthest-watched episode are history, not a queue) currently has no client test, only its server-side mirror
+**Parallel:** no (1 worker — series-x4qte is the only ready task across every BC; nothing held back)
+
+---
+
 ## 2026-08-08 15:11 -- Modeling / Refined: series-x4qte - Add client-side regression coverage for `NextUp.compute`
 
 **Type:** Modeling / Refine
