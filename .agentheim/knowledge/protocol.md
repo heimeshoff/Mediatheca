@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-08 12:29 -- Modeling / Promoted: infrastructure-j7v3c - Stand up the Vitest-through-vite-plugin-fable client unit-test harness — `vitest@^3.2.4` driven through the app's existing `vite.config.mts` Fable plugin, Fable.Mocha as the DSL, `npm run test:client`, plus the ADR recording the harness and its boundary against ADR-0027's e2e suite
+
+**Type:** Modeling / Promote
+**BC:** infrastructure
+**From → To:** backlog → todo
+
+---
+
 ## 2026-08-08 12:28 -- Modeling / Refined: design-system-fp2wt - Stand up unit-test infrastructure for pure Fable/Feliz functions
 
 **Type:** Modeling / Refine

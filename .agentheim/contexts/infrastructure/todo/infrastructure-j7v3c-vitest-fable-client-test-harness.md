@@ -1,7 +1,7 @@
 ---
 id: infrastructure-j7v3c
 title: Stand up the Vitest-through-vite-plugin-fable client unit-test harness — `vitest@^3.2.4` driven through the app's existing `vite.config.mts` Fable plugin, Fable.Mocha as the DSL, `npm run test:client`, plus the ADR recording the harness and its boundary against ADR-0027's e2e suite
-status: backlog
+status: todo
 type: chore
 context: infrastructure
 created: 2026-08-08
