@@ -39,7 +39,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **series-x4qte** — Bootstrap Fable/Vitest client-side unit test infrastructure (blocked on npm install being safe to run) (chore) — `backlog/series-x4qte-bootstrap-fable-vitest-client-tests.md`
+- **series-x4qte** — Add client-side regression coverage for `NextUp.compute` — the frontier rule (gaps behind the furthest-watched episode are history, not a queue) currently has no client test, only its server-side mirror (chore) — `backlog/series-x4qte-nextup-compute-regression-coverage.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC

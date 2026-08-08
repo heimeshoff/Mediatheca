@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-08-08 12:28 -- Modeling / Refined: design-system-fp2wt - Stand up unit-test infrastructure for pure Fable/Feliz functions
+
+**Type:** Modeling / Refine
+**BC:** design-system (outcome spans infrastructure + series)
+**Status after:** backlog (superseded, recommended for dismissal)
+**Summary:** Refinement found the task's premise wrong on three counts and split it apart. (1) Its "Why" claimed the `fable-frontend-tests` skill does not exist — it exists user-level at `~/.claude/skills/fable-frontend-tests/` and prescribes this exact stack, making the "how" near-mechanical. (2) Its main acceptance criterion targeted `progressEpisodes`/`progressSeasons`/`seriesSeasonEpisodeProgress`, which return `ReactElement` and are branch-free `List.indexed` maps — no logic to assert, and the prefix-paint bug they replaced is now prevented structurally by the `bool list` signature, so the tests were dropped rather than forced through a testability refactor. (3) The harness itself is globally true, not design-system's — `series-x4qte` had independently captured near-identical prose the same day, which is the evidence it belongs to neither BC. Harness scope moved to a new infrastructure task alongside its `infrastructure-p1h9a`/ADR-0037 sibling; `series-x4qte` narrowed in place to the `NextUp.compute` frontier-rule assertion it always wanted, now depending on the harness. ADR-0027's "keep that boundary if such a harness appears later" clause verified verbatim as the ADR's opening.
+**Split into:** infrastructure-j7v3c (new, harness + ADR-0064), series-x4qte (narrowed in place, retitled and renamed)
+**ADRs written:** none by this refinement — ADR-0064 (provisional; 0063 is current head) is specified as an acceptance criterion of infrastructure-j7v3c
+
+---
+
 ## 2026-08-08 00:38 -- Work session ended
 
 **Type:** Work / Session end

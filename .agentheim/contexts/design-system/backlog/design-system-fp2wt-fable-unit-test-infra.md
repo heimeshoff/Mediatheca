@@ -1,6 +1,6 @@
 ---
 id: design-system-fp2wt
-title: Stand up unit-test infrastructure for pure Fable/Feliz functions (Vitest-through-vite-plugin-fable or equivalent)
+title: "SUPERSEDED — recommended for dismissal. Harness scope moved to `infrastructure-j7v3c`; the progress-primitive unit tests are dropped as low-value (branch-free view functions already guarded by the `bool list` signature, `dotnet build`, and StyleGuide review)"
 status: backlog
 type: chore
 context: design-system
@@ -8,49 +8,59 @@ created: 2026-08-07
 completed:
 depends_on: []
 blocks: []
-tags: [testing, infra, fable, client]
-related_adrs: []
+tags: [testing, infra, fable, client, superseded]
+related_adrs: [0015, 0027]
 related_research: []
 prior_art: []
 ---
 
 ## Why
 
-`design-system-mz9v7` added two pure list->segment mapping functions to `DesignSystem.fs`
-(`progressEpisodes`, `progressSeasons`) whose correctness is exactly the kind of thing a small,
-fast unit test should pin down — e.g. "a `bool list` with a gap in the middle produces gold at
-the true indices and brown at the false indices, not a prefix." The task's own Notes section
-pointed at `skills/fable-frontend-tests` (a Vitest-through-vite-plugin-fable path) as the
-intended home for this kind of test, but that skill does not exist in this repo, and
-`package.json` has no `vitest` devDependency or `test:client`-style script — only
-`dotnet run --project tests/Server.Tests` (Expecto, server-side) and Playwright e2e
-(`test:e2e`). There is currently no way to unit-test a pure client-side F# function short of a
-full e2e browser round-trip.
+This task was captured 2026-08-07 to (a) stand up client-side unit-test infrastructure and
+(b) regression-test `progressEpisodes` / `progressSeasons` / `seriesSeasonEpisodeProgress` from
+`design-system-mz9v7`. Refinement on 2026-08-08 found that neither half survives here.
 
-mz9v7 verified `progressEpisodes`/`progressSeasons` by reading the code, running
-`npm run build` (Fable compiles cleanly), and inspecting the StyleGuide specimens' rendered
-fixture data (which includes a mid-season gap) — this stood in for a unit test, per the
-project's "UI tasks where the project has no UI test infrastructure" TDD-skip category, but is
-not a substitute for a real regression test.
+**The harness half was never design-system's.** A client unit-test runner is globally true — if
+design-system did not exist, the harness would still be wanted. `series-x4qte` independently
+captured near-identical prose for it the same day, which is itself the evidence that it belongs
+to neither BC. It now lives as `infrastructure-j7v3c`, alongside its sibling `infrastructure-p1h9a`
+/ ADR-0037 (the client build gate).
+
+**The test half targets code with no testable logic.** All three functions
+(`DesignSystem.fs:341-382`) return `ReactElement` and are straight `List.indexed` maps to divs
+with a conditional class — there is no pure function underneath to assert against. More
+importantly, the bug they were built to prevent cannot recur: the retired count-based
+`progressSegmented filled total` could only ever paint a *prefix* because a count was all it was
+given, and the replacement takes a `bool list`. **That guarantee is structural, in the type
+signature — not behaviour that could regress.** A test here would restate the implementation
+rather than guard it.
+
+The two ways to make them testable were both considered and rejected: extracting a pure
+`bool list -> string list` helper moves the class-string away from the `Html.div` that carries it
+for zero testability gain (test-induced design damage), and a jsdom render assertion is
+disproportionate machinery for a six-line branch-free function.
+
+Coverage for these primitives therefore stays where it is: `dotnet build` typechecking plus
+StyleGuide visual review on the running page (ADR-0015) — whose specimens already carry a
+mid-season gap fixture precisely so the prefix-paint shape cannot silently return. For a
+branch-free view function that is strictly stronger than a change-detector unit test.
 
 ## What
 
-Stand up a lightweight test runner for pure functions in `src/Client/` — Vitest driven through
-`vite-plugin-fable` (matching the stack already in use for the app build) is the most likely
-fit, but the exact tool is this task's call to make. Should be narrow: pure-function unit tests
-only, not a replacement for the existing Playwright e2e suite. Wire an `npm run test:client` (or
-similar) script.
+Nothing. No scope survives independently of `infrastructure-j7v3c`.
 
 ## Acceptance criteria
 
-- [ ] A test runner exists that can execute a unit test against a pure function in
-      `src/Client/DesignSystem.fs` (or equivalent) without a browser.
-- [ ] `progressEpisodes`/`progressSeasons`/`seriesSeasonEpisodeProgress` (or their successors)
-      get at least one regression test each covering the list->segment mapping.
-- [ ] A documented `npm run <script>` entry point, referenced from `CLAUDE.md`'s Build & Run
-      section.
+None — this task is not intended to be worked. See Notes.
 
 ## Notes
 
-- Not urgent — the primitives it would cover are already build-verified and StyleGuide-reviewed.
-  Refine before pulling into a batch.
+**Recommended for dismissal — awaiting builder confirmation.** Superseded by
+`infrastructure-j7v3c` (harness) with no residual design-system scope. Left in `backlog/` rather
+than deleted because dismissal requires an explicit builder decision; run
+`/agentheim:modeling dismiss design-system-fp2wt` to drop it.
+
+Establishes the general rule this refinement settled, worth keeping even if the task is deleted:
+**branch-free Feliz view functions are not unit-test targets in this project.** The harness ADR
+(provisional 0064, written by `infrastructure-j7v3c`) records it as a dropped-scope clause, so
+the rule outlives this file.
