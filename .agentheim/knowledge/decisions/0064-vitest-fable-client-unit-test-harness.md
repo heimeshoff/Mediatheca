@@ -6,7 +6,7 @@ status: accepted
 date: 2026-08-08
 supersedes: []
 superseded_by: []
-related_tasks: [infrastructure-j7v3c]
+related_tasks: [infrastructure-j7v3c, series-x4qte]
 related_research: []
 ---
 

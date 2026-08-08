@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-08-08 15:02 -- Modeling / Refined: series-x4qte - Add client-side regression coverage for `NextUp.compute`
+
+**Type:** Modeling / Refine
+**BC:** series
+**Status after:** todo
+**Summary:** The blocker cleared — `infrastructure-j7v3c` shipped the Vitest/Fable.Mocha harness (ADR-0064) on 2026-08-08, so this task became workable and the Why now records that. Resolved a contradiction the task had carried since capture: it specified the test file's `<Compile>` item "immediately after `NextUp.fs`, before `State.fs`", written a day before the harness existed, whereas the convention j7v3c actually shipped (and ADR-0064 records) is a contiguous test block immediately before `App.fs`, where `Smoke.test.fs` sits. Builder chose the shipped convention; the superseded instruction is called out explicitly so a worker doesn't follow the old draft. Added a sixth behaviour to the acceptance criteria — unordered input — on the reasoning that it is the one case with **no** server-side mirror: the other five are each also proven by an Expecto test against the `series_next_up` view, but the ordering is SQLite's `ORDER BY` server-side and `List.sortBy` inside `compute` client-side, so nothing else in the repo pins it. Added a criterion requiring both halves of the `(int * EpisodeDto)` result be asserted, plus execution guidance the worker would otherwise re-derive: fixture helpers over hand-rolled 10-field DTO records, assert on season/episode numbers rather than whole records, and the `NextUpTests` module-naming hazard (`...NextUp.Tests` would declare a `Tests` module under a `NextUp` namespace and collide with the existing module). Carried forward the worktree `node_modules` junction requirement from the j7v3c session-end note as a dispatch note, since this is the first client-side task to need it since. Linked ADR-0064 bidirectionally.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-08-08 14:52 -- Work session ended
 
 **Type:** Work / Session end
