@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
-- **Todo:** 0
+- **Backlog:** 1
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 12
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **integration-r8kwd** -- Steam Family import aborts with an opaque 401 that comes from the Web-API-key `GetOwnedGames` supplement, not the family token — make the supplement non-fatal and attribute credential failures to the right credential -- `bug` -- `todo/integration-r8kwd-steam-family-import-opaque-401-from-web-api-key.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -43,6 +44,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **integration-n3vqa** -- Incremental Steam Family import — answer "what's new in the family library since I last checked" and only enrich the newcomers -- `feature` -- `backlog/integration-n3vqa-incremental-family-import-whats-new.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC

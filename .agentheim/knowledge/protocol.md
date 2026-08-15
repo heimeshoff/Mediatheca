@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-08-15 11:40 -- Modeling / Captured: integration-r8kwd - Steam Family import aborts with an opaque 401 from the Web-API-key `GetOwnedGames` supplement
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** Builder report: after one successful family import, Valve flagged the account as possibly compromised; QR reconnect still works but every import fails with `Steam Family import failed: Response status code does not indicate success: 401`. Grounded diagnosis: that text is an `EnsureSuccessStatusCode` exception, which the family fetches never throw (they map 401 → `Rejected` for mint-and-retry) — the only throwing `fetchJson` caller outside the per-app try is the `Steam.getOwnedGames` Web-API-key supplement at `Api.fs:491`, so the rejected credential is the Steam Web API key (Valve revokes it on a compromise flag), not the family token. Task: make the supplement non-fatal, give key rejection a typed shape and a distinct remedy message, persist/surface it in Settings, plus a builder gate to regenerate the key. Companion capture below.
+
+---
+
+## 2026-08-15 11:40 -- Modeling / Captured: integration-n3vqa - Incremental Steam Family import — "what's new since I last checked"
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** backlog
+**Summary:** The builder's real question is "what was added to the family library since last time". `GetSharedLibraryApps` has no server-side since-filter (one cheap call anyway); the cost is per-app store enrichment for every app including known ones. Task: diff by known appid + `rt_time_acquired` vs `steam_family_last_sync`, enrich only newcomers, report arrivals by name and persist the last result; explicit "full re-enrich" action keeps today's behaviour. Depends on r8kwd. Open for REFINE: whether arrivals also surface on the Games page, and whether a scheduled cadence should ride on the incremental path.
+
+---
+
 ## 2026-08-08 15:35 -- Work session ended
 
 **Type:** Work / Session end
