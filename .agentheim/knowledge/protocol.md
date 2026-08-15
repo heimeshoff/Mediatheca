@@ -5,6 +5,27 @@ Newest entries on top.
 
 ---
 
+## 2026-08-15 12:09 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 28m (first "Batch started" 11:41 → 12:09)
+**Completed:** 1 (first-try PASS: 0, re-dispatched: 1, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** integration-r8kwd: 2
+**Commits:** 3 (batch start, task completion, this entry)
+**Vision-conformance:** none — batch aligns with vision. The one shipped task restores the Steam Family import, part of the named "Steam Import Enhancement (REQ-208)" v1 workstream; it pulls toward no Out-of-Scope (v1) item (Books, Trakt/Jellyfin sync, yearly intelligence, friend-level intelligence, trailer playback all untouched) and away from no Remaining v1 Work item, and it is not admin-console scope, so the vision's "media experience wins" boundary clause does not fire.
+**Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed.
+
+**Verification note — the iteration-1 FAIL was the gate earning its keep.** Iteration 1 shipped correct production code and 5 tests, and would have passed a shallower review: 692 tests green, build clean, criteria 1/2/3/5 all genuinely met. The verifier's single finding was a *coverage* gap with a mutation argument attached — both `SettingsStore.deleteSetting conn "steam_api_key_last_error"` lines (`Api.fs:3647` in `setSteamApiKey`, `Api.fs:3666` in `testSteamApiKey`) could be deleted with the full suite still green, so criterion 4's "cleared once a key is saved/tested successfully" clause was asserted by nothing. Notable because that is precisely the path the deferred builder gate walks: the builder's remedy for the standing notice *is* saving a regenerated key, so the untested half was the half the gate depends on. Iteration 2 added exactly the two named cases (694 tests), changed no production code, and the second verifier independently re-derived the non-vacuousness (each case seeds the setting on the same connection it asserts against, and `testSteamApiKey`'s stub returns a non-empty game list so the `List.isEmpty` guard doesn't short-circuit before the clear).
+
+**Commit-message note:** the `complete` manifest's generated `message` carried the full one-paragraph summary as a single subject line (~300 chars). Committed with a trimmed subject and the full summary in the body, preserving the `[integration-r8kwd]` trailer that `git log` indexes on. Worth knowing the manifest's `message` is only doctrine-compliant when the `summary` passed to `complete` is already subject-length.
+
+**Builder gate outstanding — the one thing this session could not do.** integration-r8kwd's last acceptance criterion needs the builder's Steam account and a browser: regenerate the Web API key at steamcommunity.com/dev/apikey, save it in Settings → Steam, and confirm a live family import runs end to end. That run also confirms or refutes the task's root-cause hypothesis (Valve revoked the key when it flagged the account). Recorded, unfaked, in the task's `## Builder gate — outstanding` section with concrete steps; the task shipped as done because every other criterion is met and the hardening stands regardless of the hypothesis.
+
+---
+
 ## 2026-08-15 12:08 -- Task verified and completed: integration-r8kwd - Steam Family import aborts with an opaque 401 that comes from the Web-API-key `GetOwnedGames` supplement, not the family token — make the supplement non-fatal and attribute credential failures to the right credential
 
 **Type:** Work / Task completion
