@@ -23,6 +23,11 @@ type Model = {
     IsSavingSteam: bool
     SteamTestResult: Result<string, string> option
     SteamSaveResult: Result<string, string> option
+    /// integration-r8kwd: the standing "Steam Web API key rejected" notice —
+    /// distinct from a Steam Family reconnect prompt (`SteamNeedsReconnect`),
+    /// this is the *other* Steam credential (the Web API key, `key=`), which
+    /// fails independently of the family refresh token.
+    SteamApiKeyLastError: string option
     SteamId: string
     SteamIdInput: string
     IsSavingSteamId: bool
@@ -148,6 +153,8 @@ type Msg =
     | Vanity_resolved of Result<string, string>
     | Import_steam_library
     | Steam_import_completed of Result<SteamImportResult, string>
+    | Load_steam_api_key_last_error
+    | Steam_api_key_last_error_loaded of string option
     // Steam Family
     | Load_steam_family_token
     | Steam_family_token_loaded of string

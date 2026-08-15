@@ -1552,6 +1552,11 @@ type IMediathecaApi = {
     getJellyfinSyncStatus: unit -> Async<JellyfinSyncStatus>
     // Steam Family Last Sync
     getSteamFamilyLastSync: unit -> Async<string option>
+    // Steam Web API key rejection notice (integration-r8kwd): the last
+    // "Steam Web API key rejected" message persisted after a 401 from the
+    // GetOwnedGames supplement, or None once cleared (key saved/tested
+    // successfully, or a subsequent supplement call succeeds).
+    getSteamApiKeyLastError: unit -> Async<string option>
     // Steam Connect (integration-hebjs): whether a one-time QR login has been
     // completed, i.e. a refresh token is stored and family access tokens now
     // mint automatically. The QR ceremony itself streams over

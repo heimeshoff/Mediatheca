@@ -491,6 +491,27 @@ let private steamDetail (model: Model) (dispatch: Msg -> unit) =
                 ]
             ]
 
+            // Web API key rejected notice (integration-r8kwd): a standing
+            // alert distinct from the Steam Family "Reconnect Steam" prompt
+            // below (steamFamilyDetail) -- this is the *other* Steam
+            // credential (the Web API key, `key=`), which Valve can revoke
+            // independently of the family refresh token (e.g. as part of an
+            // "account possibly compromised" flag). Cleared once the key is
+            // saved or tested successfully.
+            match model.SteamApiKeyLastError with
+            | Some lastError ->
+                Daisy.alert [
+                    alert.warning
+                    prop.className "mb-4"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-sm"
+                            prop.text lastError
+                        ]
+                    ]
+                ]
+            | None -> Html.none
+
             // Steam API Key input
             Html.div [
                 prop.className "form-control mb-4"

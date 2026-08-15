@@ -485,10 +485,40 @@ module Api =
                         match sharedResult with
                         | Error e -> return Error e
                         | Ok sharedApps ->
+                            let mutable gamesProcessed = 0
+                            let mutable gamesCreated = 0
+                            let mutable familyOwnersSet = 0
+                            let mutable errors: string list = []
+
                             // Steam's GetSharedLibraryApps may omit the authenticated user's
-                            // own Steam ID from owner_steamids. Supplement with their owned games.
+                            // own Steam ID from owner_steamids. Supplement with their owned
+                            // games — a best-effort call keyed on the *Web API key*, a
+                            // different credential from the family token above. A rejected
+                            // key (integration-r8kwd: Valve revokes it as part of an
+                            // "account possibly compromised" flag) must not abort the whole
+                            // import — it degrades to "own-ownership not set" plus one
+                            // attributed error line naming the right credential and remedy,
+                            // the same fault-isolation discipline the per-app loop below
+                            // already follows (ADR-0010).
                             let steamConfig = getSteamConfig()
-                            let! ownedGames = Steam.getOwnedGames httpClient steamConfig
+                            let! ownedGamesResult = Steam.tryGetOwnedGames httpClient steamConfig
+                            let ownedGames =
+                                match ownedGamesResult with
+                                | Ok games ->
+                                    // Clear any previously persisted key rejection — the
+                                    // key works again (e.g. the builder regenerated it).
+                                    SettingsStore.deleteSetting conn "steam_api_key_last_error"
+                                    games
+                                | Error Steam.KeyRejected ->
+                                    let msg =
+                                        "Steam Web API key rejected (401) — generate a new key at " +
+                                        "steamcommunity.com/dev/apikey and paste it into Settings → Steam"
+                                    SettingsStore.setSetting conn "steam_api_key_last_error" msg
+                                    errors <- errors @ [ msg ]
+                                    []
+                                | Error (Steam.WebApiOtherFailure m) ->
+                                    errors <- errors @ [ sprintf "Steam Web API key check failed: %s" m ]
+                                    []
                             let userOwnedAppIds = ownedGames |> List.map (fun g -> g.AppId) |> Set.ofList
                             let userSteamId = steamConfig.SteamId
 
@@ -502,10 +532,6 @@ module Api =
                                             { app with OwnerSteamids = userSteamId :: app.OwnerSteamids }
                                         else app)
 
-                            let mutable gamesProcessed = 0
-                            let mutable gamesCreated = 0
-                            let mutable familyOwnersSet = 0
-                            let mutable errors: string list = []
                             let total = enrichedApps.Length
 
                             let setFamilyOwners (sid: string) (app: Steam.SteamSharedLibraryApp) =
@@ -3615,6 +3641,10 @@ module Api =
                 use conn = factory ()
                 try
                     SettingsStore.setSetting conn "steam_api_key" key
+                    // integration-r8kwd: saving a (presumably fresh) key clears any
+                    // standing "key rejected" notice — the builder's remedy for that
+                    // notice is exactly this action.
+                    SettingsStore.deleteSetting conn "steam_api_key_last_error"
                     return Ok ()
                 with ex ->
                     return Error $"Failed to save Steam API key: {ex.Message}"
@@ -3630,6 +3660,10 @@ module Api =
                     if List.isEmpty games then
                         return Error "API key accepted but returned no results (may be invalid)"
                     else
+                        // integration-r8kwd: a successful test also clears any standing
+                        // "key rejected" notice (acceptance criterion 4).
+                        use conn = factory ()
+                        SettingsStore.deleteSetting conn "steam_api_key_last_error"
                         return Ok ()
                 with ex ->
                     return Error $"Steam API key validation failed: {ex.Message}"
@@ -4353,6 +4387,14 @@ module Api =
             getSteamFamilyLastSync = fun () -> async {
                 use conn = factory ()
                 return SettingsStore.getSetting conn "steam_family_last_sync"
+            }
+
+            // Steam Web API key rejection (integration-r8kwd): the standing
+            // notice Settings → Steam shows after a family import's
+            // owned-games supplement gets a 401 from a revoked/invalid key.
+            getSteamApiKeyLastError = fun () -> async {
+                use conn = factory ()
+                return SettingsStore.getSetting conn "steam_api_key_last_error"
             }
 
             getSteamConnectionStatus = fun () -> async {

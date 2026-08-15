@@ -55,6 +55,7 @@
     <Compile Include="JellyfinReauthTests.fs" />
     <Compile Include="SteamFamilyTokenTests.fs" />
     <Compile Include="AddGameFromSteamTests.fs" />
+    <Compile Include="SteamFamilyImportOwnedGamesTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

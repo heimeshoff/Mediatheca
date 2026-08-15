@@ -275,6 +275,73 @@ module Steam =
                 | Error _ -> return []
         }
 
+    // ── Web API key failure, typed (integration-r8kwd) ──
+    //
+    // `getOwnedGames` above throws via `fetchJson`'s `EnsureSuccessStatusCode`
+    // on any non-2xx, including a revoked/rejected Web API key (401) — that's
+    // fine for its own callers (`testSteamApiKey`, `importSteamLibrary`),
+    // which already wrap it in their own try/with, but it is NOT fine for a
+    // caller that wants to treat "the key was revoked" as a distinguishable,
+    // non-fatal outcome rather than an opaque exception. `SteamWebApiError` +
+    // `tryGetOwnedGames` give that caller (`runSteamFamilyImport`'s
+    // owned-games supplement) a typed alternative without touching
+    // `getOwnedGames`'s existing signature/behavior.
+
+    /// A failed Steam Web API key call (`key=` query parameter, e.g.
+    /// `IPlayerService/*`), distinguishing a rejected/revoked key (401/403 —
+    /// Valve's standard response to a revoked key, including its "account
+    /// possibly compromised" remediation) from any other failure.
+    type SteamWebApiError =
+        | KeyRejected
+        | WebApiOtherFailure of string
+
+    /// GET a Web-API-key-authenticated `url`, returning `Error KeyRejected`
+    /// on 401/403 instead of throwing via `EnsureSuccessStatusCode` — mirrors
+    /// `fetchJsonWithTokenRejectable`'s non-throwing shape for the
+    /// family-token path, but for the unrelated Web API key credential.
+    let private fetchJsonRejectable (httpClient: HttpClient) (url: string) : Async<Result<string, SteamWebApiError>> =
+        async {
+            try
+                let! response = httpClient.GetAsync(url) |> Async.AwaitTask
+                let status = int response.StatusCode
+                if status = 401 || status = 403 then
+                    return Error KeyRejected
+                elif not response.IsSuccessStatusCode then
+                    return Error (WebApiOtherFailure (sprintf "HTTP %d" status))
+                else
+                    let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+                    return Ok body
+            with ex ->
+                return Error (WebApiOtherFailure ex.Message)
+        }
+
+    /// Non-throwing sibling of `getOwnedGames`: surfaces a revoked/rejected
+    /// Web API key as `Error KeyRejected` instead of letting
+    /// `EnsureSuccessStatusCode` throw an opaque `HttpRequestException`
+    /// (integration-r8kwd: that exception used to escape `runSteamFamilyImport`
+    /// as a whole and get misattributed to the family token). Missing
+    /// config still degenerates to `Ok []`, matching `getOwnedGames`.
+    let tryGetOwnedGames (httpClient: HttpClient) (config: SteamConfig) : Async<Result<Mediatheca.Shared.SteamOwnedGame list, SteamWebApiError>> =
+        async {
+            if System.String.IsNullOrWhiteSpace(config.ApiKey) || System.String.IsNullOrWhiteSpace(config.SteamId) then
+                return Ok []
+            else
+                let url = sprintf "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=%s&steamid=%s&include_appinfo=true&include_played_free_games=true" config.ApiKey config.SteamId
+                let! result = fetchJsonRejectable httpClient url
+                match result with
+                | Error e -> return Error e
+                | Ok json ->
+                    match Decode.fromString decodeOwnedGamesResponse json with
+                    | Ok response ->
+                        return Ok (response.Games |> List.map (fun g ->
+                            { Mediatheca.Shared.SteamOwnedGame.AppId = g.AppId
+                              Name = g.Name
+                              PlaytimeMinutes = g.PlaytimeForever
+                              ImgIconUrl = g.ImgIconUrl
+                              RtimeLastPlayed = g.RtimeLastPlayed }))
+                    | Error e -> return Error (WebApiOtherFailure (sprintf "Failed to parse owned games: %s" e))
+        }
+
     let getRecentlyPlayedGames (httpClient: HttpClient) (config: SteamConfig) : Async<Mediatheca.Shared.SteamOwnedGame list> =
         async {
             if System.String.IsNullOrWhiteSpace(config.ApiKey) || System.String.IsNullOrWhiteSpace(config.SteamId) then

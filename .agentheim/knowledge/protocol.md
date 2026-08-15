@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-08-15 12:08 -- Task verified and completed: integration-r8kwd - Steam Family import aborts with an opaque 401 that comes from the Web-API-key `GetOwnedGames` supplement, not the family token — make the supplement non-fatal and attribute credential failures to the right credential
+
+**Type:** Work / Task completion
+**Task:** integration-r8kwd - Steam Family import aborts with an opaque 401 that comes from the Web-API-key `GetOwnedGames` supplement, not the family token — make the supplement non-fatal and attribute credential failures to the right credential
+**Summary:** The Steam Family import owned-games supplement (Web API key credential) no longer aborts the whole import on a 401 — it degrades with one attributed, remedy-bearing error line distinct from the family-token reconnect message, and Settings shows a persistent key-rejected notice cleared on save/test/next success
+**Duration:** 25m
+**Verification:** PASS (iteration 2)
+**Files changed:** 10
+**Tests added:** 7
+**ADRs written:** 0065
+
+---
+
+## 2026-08-15 11:59 -- Verification failed: integration-r8kwd - Steam Family import aborts with an opaque 401 that comes from the Web-API-key `GetOwnedGames` supplement
+
+**Type:** Work / Verification failure
+**Task:** integration-r8kwd - Steam Family import aborts with an opaque 401 that comes from the Web-API-key `GetOwnedGames` supplement, not the family token
+**Iteration:** 1 of 3
+**Reasons:** Acceptance criterion 4's *clearing* half is unpinned — the two `SettingsStore.deleteSetting conn "steam_api_key_last_error"` lines in `setSteamApiKey` (`Api.fs:3647`) and `testSteamApiKey` (`Api.fs:3666`) can both be deleted with the full 692-test suite still green. The only clearing path under test is a different trigger the criterion does not name (a subsequent successful owned-games call). Server-side, non-visual, and fully testable with the harness the new test file already builds (`createApi` + `TestDb.withTempDbFactory`), so the UI manual-exercise carve-out does not apply — and it is exactly what the deferred builder gate leans on. Criteria 1, 2, 3 and 5 verified clean (692 Expecto tests pass, `npm run build` clean, family-token "reconnect required" path untouched, no other Web-API-key call outside a try/with in `runSteamFamilyImport`, scope/README/ADR-0065 checks clean, builder-gate criterion correctly deferred).
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-08-15 11:41 -- Batch started: [integration-r8kwd]
 
 **Type:** Work / Batch start

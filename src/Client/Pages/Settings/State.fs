@@ -131,6 +131,7 @@ let init () : Model * Cmd<Msg> =
       IsSavingSteam = false
       SteamTestResult = None
       SteamSaveResult = None
+      SteamApiKeyLastError = None
       SteamId = ""
       SteamIdInput = ""
       IsSavingSteamId = false
@@ -189,7 +190,7 @@ let init () : Model * Cmd<Msg> =
       JobsSectionLoaded = false
       SurgerySectionOpen = false
       SurgerySectionLoaded = false },
-    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_connect_status; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync ]
+    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_connect_status; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync; Cmd.ofMsg Load_steam_api_key_last_error ]
 
 let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
@@ -292,7 +293,14 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
             match result with
             | Ok () -> Ok "Connection successful"
             | Error e -> Error e
-        { model with IsTestingSteam = false; SteamTestResult = Some testResult }, Cmd.none
+        let cmd =
+            // integration-r8kwd: a successful test clears the server-side
+            // "key rejected" notice too — reload it so the UI drops the
+            // standing alert in the same round trip (acceptance criterion 4).
+            match result with
+            | Ok () -> Cmd.ofMsg Load_steam_api_key_last_error
+            | Error _ -> Cmd.none
+        { model with IsTestingSteam = false; SteamTestResult = Some testResult }, cmd
 
     | Save_steam_key ->
         { model with IsSavingSteam = true; SteamSaveResult = None },
@@ -307,9 +315,15 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
             | Error e -> Error e
         let cmd =
             match result with
-            | Ok () -> Cmd.ofMsg Load_steam_key
+            | Ok () -> Cmd.batch [ Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_api_key_last_error ]
             | Error _ -> Cmd.none
         { model with IsSavingSteam = false; SteamSaveResult = Some saveResult }, cmd
+
+    | Load_steam_api_key_last_error ->
+        model, Cmd.OfAsync.perform api.getSteamApiKeyLastError () Steam_api_key_last_error_loaded
+
+    | Steam_api_key_last_error_loaded lastError ->
+        { model with SteamApiKeyLastError = lastError }, Cmd.none
 
     | Load_steam_id ->
         model, Cmd.OfAsync.perform api.getSteamId () Steam_id_loaded
@@ -583,7 +597,11 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
             IsImportingSteamFamily = false
             SteamFamilyImportResult = Some result
             ImportProgress = None
-            SteamNeedsReconnect = model.SteamNeedsReconnect || needsReconnect }, Cmd.none
+            SteamNeedsReconnect = model.SteamNeedsReconnect || needsReconnect },
+        // integration-r8kwd: an import may have just set or cleared the
+        // Web-API-key-rejected notice (a different credential from the
+        // family token `needsReconnect` above tracks) — reload it either way.
+        Cmd.ofMsg Load_steam_api_key_last_error
 
     // Jellyfin Integration
     | Load_jellyfin_settings ->
