@@ -1,7 +1,7 @@
 ---
 id: integration-r8kwd
 title: Steam Family import aborts with an opaque 401 that comes from the Web-API-key `GetOwnedGames` supplement, not the family token — make the supplement non-fatal and attribute credential failures to the right credential
-status: todo
+status: doing
 type: bug
 context: integration
 created: 2026-08-15

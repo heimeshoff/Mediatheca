@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-15 11:41 -- Batch started: [integration-r8kwd]
+
+**Type:** Work / Batch start
+**Tasks:** integration-r8kwd - Steam Family import aborts with an opaque 401 that comes from the Web-API-key `GetOwnedGames` supplement, not the family token — make the supplement non-fatal and attribute credential failures to the right credential
+**Parallel:** no (1 worker — integration-r8kwd is the only ready task across every BC; integration-n3vqa is blocked on it, nothing else held back)
+
+---
+
 ## 2026-08-15 11:40 -- Modeling / Captured: integration-r8kwd - Steam Family import aborts with an opaque 401 from the Web-API-key `GetOwnedGames` supplement
 
 **Type:** Modeling / Capture
