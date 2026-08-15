@@ -1369,7 +1369,9 @@ module SeriesProjection =
                   // here, not Api.fs; no per-series round trip).
                   CurrentSeasonNumber = 0
                   CurrentSeasonWatched = []
-                  SeasonsTouched = [] }
+                  SeasonsTouched = []
+                  ActiveSeasonIndex = None
+                  CurrentSeasonNextUpIndex = None }
             )
 
         let slugs = rows |> List.map (fun r -> r.Slug) |> List.distinct
@@ -1421,20 +1423,43 @@ module SeriesProjection =
                 let seasonNumbers = episodes |> List.map fst |> List.distinct |> List.sort
                 let currentSeasonNumber =
                     if dto.NextUpSeason <> 0 then dto.NextUpSeason else List.max seasonNumbers
-                let currentSeasonWatched =
+                let currentSeasonEpisodes =
                     episodes
                     |> List.filter (fun (s, _) -> s = currentSeasonNumber)
                     |> List.map snd
                     |> List.sort
+                let currentSeasonWatched =
+                    currentSeasonEpisodes
                     |> List.map (fun ep -> watchedBySlug |> Set.contains (dto.Slug, currentSeasonNumber, ep))
+                // Position, not `NextUpEpisode - 1`: the episode row is one
+                // segment per cached episode in sorted order, and episode
+                // numbers need not start at 1 or run contiguously.
+                let currentSeasonNextUpIndex =
+                    if dto.NextUpSeason = currentSeasonNumber && dto.NextUpSeason <> 0 then
+                        currentSeasonEpisodes |> List.tryFindIndex (fun ep -> ep = dto.NextUpEpisode)
+                    else
+                        None
                 let seasonsTouched =
                     seasonNumbers
                     |> List.map (fun sn ->
                         watchedBySlug |> Set.exists (fun (slug, s, _) -> slug = dto.Slug && s = sn))
+                // Same "position, not number" rule as the episode index: the
+                // rail has one line per cached season in sorted order, and
+                // season numbers need not start at 1 (specials) or run
+                // contiguously. Gated on there being a Next Up at all — with
+                // nothing left to watch there is no active season, only the
+                // highest-season fallback `CurrentSeasonNumber` names.
+                let activeSeasonIndex =
+                    if dto.NextUpSeason <> 0 then
+                        seasonNumbers |> List.tryFindIndex (fun sn -> sn = currentSeasonNumber)
+                    else
+                        None
                 { dto with
                     CurrentSeasonNumber = currentSeasonNumber
                     CurrentSeasonWatched = currentSeasonWatched
-                    SeasonsTouched = seasonsTouched }
+                    SeasonsTouched = seasonsTouched
+                    ActiveSeasonIndex = activeSeasonIndex
+                    CurrentSeasonNextUpIndex = currentSeasonNextUpIndex }
         )
 
     /// series-q8jwc: same composition as `getAll` (`TmdbRating` from

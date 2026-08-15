@@ -338,46 +338,89 @@ let statusBadge (status: LifecycleStatus) : ReactElement =
 /// count-based fill primitive, which could only ever paint a prefix because
 /// a count is all it was given. An empty list renders an empty row (no
 /// episode data) without throwing.
-let progressEpisodes (watched: bool list) : ReactElement =
+///
+/// `nextUpIndex` marks the one episode that is next up: it renders half-lit
+/// (`--color-progress-next`, exactly midway between the unwatched brown and
+/// the watched gold) so it reads as a step along the same scale, not a new
+/// accent. `watched` still wins where the two disagree — a watched episode
+/// stays fully gold. Out-of-range and `None` both mean "no marker".
+///
+/// `isComplete` (the series is finished) steps off that gold axis entirely:
+/// every segment paints green, and the half-lit marker no longer applies —
+/// there is no "where am I" left to say.
+let progressEpisodes (watched: bool list) (nextUpIndex: int option) (isComplete: bool) : ReactElement =
     Html.div [
         prop.className "progress-segmented"
         prop.children [
             for i, isWatched in List.indexed watched do
                 Html.div [
                     prop.key (string i)
-                    prop.className ("progress-segment" + (if isWatched then " progress-segment-filled" else ""))
+                    prop.className (
+                        "progress-segment"
+                        + (if isComplete then " progress-segment-complete"
+                           elif isWatched then " progress-segment-filled"
+                           elif nextUpIndex = Some i then " progress-segment-next"
+                           else ""))
                 ]
         ]
     ]
 
 /// Season rail — one line per season, in season order. `touched.[i]` is gold
 /// when season i has at least one watched episode, brown when untouched.
-/// Two states only: a fully-watched season is not visually distinct from a
-/// partially-watched one. Visually distinct from `progressEpisodes` (slimmer
-/// segments, wider gaps, pill radius vs. poster radius) so the two rows never
-/// read as one long dotted line — this is the coarser "where am I in the
-/// show" mark, sitting above the finer "where am I in this season" row.
-let progressSeasons (touched: bool list) : ReactElement =
+/// A fully-watched season is not visually distinct from a partially-watched
+/// one. Visually distinct from `progressEpisodes` (slimmer segments, wider
+/// gaps, pill radius vs. poster radius) so the two rows never read as one
+/// long dotted line — this is the coarser "where am I in the show" mark,
+/// sitting above the finer "where am I in this season" row.
+///
+/// `activeIndex` is the season the next-up episode lives in: it renders
+/// half-lit, the coarse-grained echo of `progressEpisodes`' next-up segment,
+/// and wins over `touched` (the active season is partially watched by
+/// definition, so "you are here" is the more useful of the two readings).
+/// `isComplete` paints the whole rail green — see `progressEpisodes`.
+let progressSeasons (touched: bool list) (activeIndex: int option) (isComplete: bool) : ReactElement =
     Html.div [
         prop.className "progress-season-rail"
         prop.children [
             for i, isTouched in List.indexed touched do
                 Html.div [
                     prop.key (string i)
-                    prop.className ("progress-season-segment" + (if isTouched then " progress-season-segment-touched" else ""))
+                    prop.className (
+                        "progress-season-segment"
+                        + (if isComplete then " progress-season-segment-complete"
+                           elif activeIndex = Some i then " progress-season-segment-next"
+                           elif isTouched then " progress-season-segment-touched"
+                           else ""))
                 ]
         ]
     ]
 
+/// Everything the stacked season/episode pair needs — one record rather than
+/// four positional lists/options that are trivial to transpose at a call site.
+type SeriesProgressProps = {
+    /// One entry per season, in season order (see `progressSeasons`).
+    SeasonsTouched: bool list
+    /// Position of the season the next-up episode lives in, within
+    /// `SeasonsTouched`. `None` when there is nothing next up.
+    ActiveSeasonIndex: int option
+    /// One entry per episode of the active season (see `progressEpisodes`).
+    CurrentSeasonWatched: bool list
+    /// Position of the next-up episode within `CurrentSeasonWatched`.
+    CurrentSeasonNextUpIndex: int option
+    /// The series is finished — both rows paint green and the half-lit
+    /// markers are ignored.
+    IsComplete: bool
+}
+
 /// The stacked pair every series card uses: season rail on top, current-
 /// season episode segments below, with the design system's own vertical
 /// rhythm between them.
-let seriesSeasonEpisodeProgress (seasonsTouched: bool list) (currentSeasonWatched: bool list) : ReactElement =
+let seriesSeasonEpisodeProgress (props: SeriesProgressProps) : ReactElement =
     Html.div [
         prop.className "flex flex-col gap-1.5"
         prop.children [
-            progressSeasons seasonsTouched
-            progressEpisodes currentSeasonWatched
+            progressSeasons props.SeasonsTouched props.ActiveSeasonIndex props.IsComplete
+            progressEpisodes props.CurrentSeasonWatched props.CurrentSeasonNextUpIndex props.IsComplete
         ]
     ]
 
@@ -682,8 +725,7 @@ let filmstripRow (items: FilmstripItem list) : ReactElement =
 type SecondaryCardProps = {
     Title: string
     NextLabel: string
-    SeasonsTouched: bool list
-    CurrentSeasonWatched: bool list
+    Progress: SeriesProgressProps
 }
 
 /// Compact poster-top card — serif title, "Next: SxEy" line, season rail +
@@ -694,7 +736,7 @@ let secondaryMediaCard (props: SecondaryCardProps) : ReactElement =
         prop.children [
             Html.h3 [ prop.className cardTitle; prop.text props.Title ]
             Html.p [ prop.className mutedText; prop.text props.NextLabel ]
-            seriesSeasonEpisodeProgress props.SeasonsTouched props.CurrentSeasonWatched
+            seriesSeasonEpisodeProgress props.Progress
         ]
     ]
 
@@ -704,8 +746,7 @@ type HeroCardProps = {
     Title: string
     InFocus: bool
     WatchedWith: string list
-    SeasonsTouched: bool list
-    CurrentSeasonWatched: bool list
+    Progress: SeriesProgressProps
     Rating: int
     OnRatingChange: int -> unit
     OnWatchClick: unit -> unit
@@ -741,7 +782,7 @@ let heroCard (props: HeroCardProps) : ReactElement =
                                     ]
                             ]
                         ]
-                    seriesSeasonEpisodeProgress props.SeasonsTouched props.CurrentSeasonWatched
+                    seriesSeasonEpisodeProgress props.Progress
                     Html.div [
                         prop.className "flex items-center justify-between mt-1"
                         prop.children [
@@ -783,8 +824,7 @@ type NextEpisodeHeroCardProps = {
     /// Fallback background when `BackdropRef` is `None`.
     PosterRef: string option
     InFocus: bool
-    SeasonsTouched: bool list
-    CurrentSeasonWatched: bool list
+    Progress: SeriesProgressProps
     WatchedWith: NextEpisodeHeroFriend list
     /// Fully-rendered, self-positioned (`absolute top-3 right-3 ...`) Jellyfin
     /// play button, or `None` when the episode isn't on Jellyfin. Rendered as-is
@@ -840,7 +880,7 @@ let nextEpisodeHeroCard (props: NextEpisodeHeroCardProps) : ReactElement =
                             prop.text label
                         ]
                     | None -> ()
-                    seriesSeasonEpisodeProgress props.SeasonsTouched props.CurrentSeasonWatched
+                    seriesSeasonEpisodeProgress props.Progress
                     if not props.WatchedWith.IsEmpty then
                         Html.div [
                             prop.className "flex items-center gap-1.5 flex-wrap"

@@ -1539,7 +1539,7 @@ let private velvetLobbyPatternsSection () =
 
             Html.p [
                 prop.className DesignSystem.secondaryText
-                prop.text "Segmented (film-frame, one bar per episode of a single season) is flag-driven — watched.[i] paints segment i, so a gap mid-season renders as a gap, not a prefix. The season rail sits above it: one line per season, gold when the season has at least one watched episode, brown when untouched — two states only, a fully-watched season reads the same as a partially-watched one. Continuous (gold-gradient fill) is for time/percent quantities, unrelated to either."
+                prop.text "Segmented (film-frame, one bar per episode of a single season) is flag-driven — watched.[i] paints segment i, so a gap mid-season renders as a gap, not a prefix. The episode row has three states on one axis: brown (unwatched), half-gold (the next-up episode, exactly midway between the two ends), gold (watched). The season rail sits above it: one line per season, gold when the season has at least one watched episode, brown when untouched — and half-gold for the season the next-up episode lives in, the coarse-grained echo of the episode row's frontier marker. A fully-watched season otherwise reads the same as a partially-watched one. Off that gold axis entirely: a finished series paints both rows green (the Retired-badge green), because a show with nothing left has no frontier to point at. Continuous (gold-gradient fill) is for time/percent quantities, unrelated to either."
             ]
 
             Html.div [
@@ -1548,26 +1548,46 @@ let private velvetLobbyPatternsSection () =
                     Html.div [
                         prop.className "flex flex-col gap-1"
                         prop.children [
-                            DesignSystem.progressEpisodes [ true; true; true; false; false; true; true; false; false; false ]
-                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "DesignSystem.progressEpisodes [ true; true; true; false; false; true; true; false; false; false ]" ]
+                            DesignSystem.progressEpisodes [ true; true; true; false; false; true; true; false; false; false ] (Some 7) false
+                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "DesignSystem.progressEpisodes [ true; true; true; false; false; true; true; false; false; false ] (Some 7) false — episode 8 is next up: half-gold, one step short of watched" ]
                         ]
                     ]
                     Html.div [
                         prop.className "flex flex-col gap-1"
                         prop.children [
-                            DesignSystem.progressSeasons [ true; true; false ]
-                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "DesignSystem.progressSeasons [ true; true; false ]" ]
+                            DesignSystem.progressSeasons [ true; true; false ] (Some 1) false
+                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "DesignSystem.progressSeasons [ true; true; false ] (Some 1) false — season 2 is the one being watched: half-gold, same voice as the episode row's frontier" ]
                         ]
                     ]
                     Html.div [
                         prop.className "flex flex-col gap-1"
                         prop.children [
-                            DesignSystem.seriesSeasonEpisodeProgress
-                                [ true; true; false; true ]
-                                [ true; true; true; false; false; true; true; false; false; false ]
+                            DesignSystem.seriesSeasonEpisodeProgress {
+                                SeasonsTouched = [ true; true; false; true ]
+                                ActiveSeasonIndex = Some 3
+                                CurrentSeasonWatched = [ true; true; true; false; false; true; true; false; false; false ]
+                                CurrentSeasonNextUpIndex = Some 7
+                                IsComplete = false
+                            }
                             Html.code [
                                 prop.className "text-xs font-mono text-primary/70"
-                                prop.text "DesignSystem.seriesSeasonEpisodeProgress seasonsTouched currentSeasonWatched — season rail above episode row; the hole at episodes 4-5 stays visible, not smoothed into a prefix"
+                                prop.text "DesignSystem.seriesSeasonEpisodeProgress { SeasonsTouched; ActiveSeasonIndex; CurrentSeasonWatched; CurrentSeasonNextUpIndex; IsComplete } — season rail above episode row; the hole at episodes 4-5 stays visible (history, not a queue), while episode 8 — the frontier — and its season are half-gold"
+                            ]
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "flex flex-col gap-1"
+                        prop.children [
+                            DesignSystem.seriesSeasonEpisodeProgress {
+                                SeasonsTouched = [ true; true; true ]
+                                ActiveSeasonIndex = None
+                                CurrentSeasonWatched = [ true; true; true; true; true; true ]
+                                CurrentSeasonNextUpIndex = None
+                                IsComplete = true
+                            }
+                            Html.code [
+                                prop.className "text-xs font-mono text-primary/70"
+                                prop.text "…with IsComplete = true — a finished series lingering on the dashboard: every season line and episode segment green, nothing half-lit"
                             ]
                         ]
                     ]
@@ -1693,18 +1713,29 @@ let private velvetLobbyPatternsSection () =
                 prop.children [
                     DesignSystem.secondaryMediaCard {
                         Title = "Loki"
-                        NextLabel = "Next: S2 E3 · 44 min"
-                        SeasonsTouched = [ true; true ]
-                        // series-ww1rb: a real mid-season hole (episodes 3-4
-                        // skipped between two watched runs), not a prefix —
-                        // proof the primitive renders gaps, not just counts.
-                        CurrentSeasonWatched = [ true; true; false; false; true; true ]
+                        NextLabel = "Next: S2 E6 · 44 min"
+                        Progress = {
+                            SeasonsTouched = [ true; true ]
+                            // Season 2 is where the next-up episode lives —
+                            // half-gold, not the flat gold of a season that is
+                            // merely touched.
+                            ActiveSeasonIndex = Some 1
+                            // series-ww1rb: a real mid-season hole (episodes 3-4
+                            // skipped between two watched runs), not a prefix —
+                            // proof the primitive renders gaps, not just counts.
+                            CurrentSeasonWatched = [ true; true; false; false; true; false ]
+                            // The frontier — the first unwatched episode *past* the
+                            // furthest watched one. The 3-4 hole behind it stays
+                            // brown: history, not a queue.
+                            CurrentSeasonNextUpIndex = Some 5
+                            IsComplete = false
+                        }
                     }
                 ]
             ]
             Html.code [
                 prop.className "text-xs font-mono text-primary/70 mt-2 block"
-                prop.text "DesignSystem.secondaryMediaCard { Title; NextLabel; SeasonsTouched; CurrentSeasonWatched }"
+                prop.text "DesignSystem.secondaryMediaCard { Title; NextLabel; Progress }"
             ]
 
             // ── Cinematic hero card ──
@@ -1717,8 +1748,13 @@ let private velvetLobbyPatternsSection () =
                         Title = "Severance"
                         InFocus = true
                         WatchedWith = [ "M"; "A" ]
-                        SeasonsTouched = [ true; true ]
-                        CurrentSeasonWatched = [ true; true; true; false; false; true; true; false; false ]
+                        Progress = {
+                            SeasonsTouched = [ true; true ]
+                            ActiveSeasonIndex = Some 1
+                            CurrentSeasonWatched = [ true; true; true; false; false; true; true; false; false ]
+                            CurrentSeasonNextUpIndex = Some 7
+                            IsComplete = false
+                        }
                         Rating = heroRating
                         OnRatingChange = setHeroRating
                         OnWatchClick = fun () -> ()
@@ -1727,7 +1763,7 @@ let private velvetLobbyPatternsSection () =
             ]
             Html.code [
                 prop.className "text-xs font-mono text-primary/70 mt-2 block"
-                prop.text "DesignSystem.heroCard { Title; InFocus; WatchedWith; SeasonsTouched; CurrentSeasonWatched; Rating; OnRatingChange; OnWatchClick }"
+                prop.text "DesignSystem.heroCard { Title; InFocus; WatchedWith; Progress; Rating; OnRatingChange; OnWatchClick }"
             ]
 
             // ── Motion ──

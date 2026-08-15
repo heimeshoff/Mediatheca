@@ -1099,6 +1099,19 @@ let private heroSpotlight (jellyfinServerUrl: string option) (item: DashboardSer
 
 // ── Next episode — cinematic hero cards (All tab, below hero) ──
 
+/// series-ww1rb: real per-season/per-episode watch state, composed server-side
+/// in `SeriesProjection.getDashboardSeriesNextUp` (ADR-0048) — one dot per
+/// episode of the CURRENT season only, holes preserved, not a whole-series
+/// prefix fill. `IsComplete` flips both rows from the gold "where am I" scale
+/// to green: a finished series still on the dashboard has no frontier left to
+/// point at, so nothing renders half-lit.
+let private seriesProgressOf (item: DashboardSeriesNextUp) : DesignSystem.SeriesProgressProps =
+    { SeasonsTouched = item.SeasonsTouched
+      ActiveSeasonIndex = item.ActiveSeasonIndex
+      CurrentSeasonWatched = item.CurrentSeasonWatched
+      CurrentSeasonNextUpIndex = item.CurrentSeasonNextUpIndex
+      IsComplete = item.IsFinished }
+
 /// Series card for the "Next episode" section: `DesignSystem.nextEpisodeHeroCard`
 /// wrapped in the same navigate-to-series-detail anchor the poster cards use.
 /// The Jellyfin play button is built here (it needs `Icons.play` and the
@@ -1144,12 +1157,7 @@ let private seriesNextEpisodeCard (jellyfinServerUrl: string option) (item: Dash
                 BackdropRef = item.BackdropRef
                 PosterRef = item.PosterRef
                 InFocus = item.InFocus
-                // series-ww1rb: real per-season/per-episode watch state,
-                // composed server-side in SeriesProjection.getDashboardSeriesNextUp
-                // (ADR-0048) — one dot per episode of the CURRENT season only,
-                // holes preserved, not a whole-series prefix fill.
-                SeasonsTouched = item.SeasonsTouched
-                CurrentSeasonWatched = item.CurrentSeasonWatched
+                Progress = seriesProgressOf item
                 WatchedWith =
                     item.WatchWithFriends
                     |> List.map (fun f ->
@@ -2696,7 +2704,7 @@ let private seriesNextUpItemEnhanced (item: DashboardSeriesNextUp) =
                     // state renders the actual pattern, holes included).
                     Html.div [
                         prop.className "mt-0.5"
-                        prop.children [ DesignSystem.seriesSeasonEpisodeProgress item.SeasonsTouched item.CurrentSeasonWatched ]
+                        prop.children [ DesignSystem.seriesSeasonEpisodeProgress (seriesProgressOf item) ]
                     ]
                     // Progress text and time remaining
                     Html.div [

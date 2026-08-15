@@ -318,6 +318,18 @@ type DashboardSeriesNextUp = {
     /// when that season has >= 1 watched episode in any rewatch session.
     /// Two states only — fully vs. partially watched both report `true`.
     SeasonsTouched: bool list
+    /// Position of the season the Next Up episode belongs to inside
+    /// `SeasonsTouched`, so the season rail can paint that one line half-lit
+    /// — the coarse-grained sibling of `CurrentSeasonNextUpIndex`. `None`
+    /// when there is no Next Up (finished/abandoned) or on a cache miss.
+    ActiveSeasonIndex: int option
+    /// Position of the Next Up episode inside `CurrentSeasonWatched`, so the
+    /// episode row can paint that one segment half-lit. Composed server-side
+    /// because episode numbers are not guaranteed contiguous — the index is
+    /// the position in the season's sorted episode numbers, not
+    /// `NextUpEpisode - 1`. `None` when there is no Next Up, when it lives in
+    /// a different season than `CurrentSeasonNumber`, or on a cache miss.
+    CurrentSeasonNextUpIndex: int option
 }
 
 type DashboardMovieToWatch = {

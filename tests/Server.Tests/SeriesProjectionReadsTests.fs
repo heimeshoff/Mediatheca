@@ -296,6 +296,10 @@ let dashboardSeasonEpisodeDotsTests =
                 dto.CurrentSeasonWatched
                 [ true; true; true; false; false; true; true; false ]
                 "the gaps at episodes 4-5 must survive as `false` entries, not be collapsed into a watched count"
+            Expect.equal
+                dto.CurrentSeasonNextUpIndex
+                (Some 7)
+                "the half-lit marker points at episode 8 (index 7) — the frontier, not the 4-5 hole behind it"
 
         testCase "SeasonsTouched marks only the season with at least one watched episode" <| fun _ ->
             use conn = newConn ()
@@ -304,6 +308,7 @@ let dashboardSeasonEpisodeDotsTests =
 
             let dto = SeriesProjection.getDashboardSeriesNextUp conn None |> List.find (fun r -> r.Slug = "touched-middle-show")
             Expect.equal dto.SeasonsTouched [ false; true; false ] "only season 2 has any watched episode"
+            Expect.equal dto.ActiveSeasonIndex (Some 1) "the half-lit season line points at season 2 (index 1) — where the Next Up episode lives"
             // The frontier (series-k4zpn) is the only watched tuple, (2,1), so
             // NextUp is (2,2) — NextUpSeason is 2, while the highest season in
             // the series is 3. CurrentSeasonNumber must follow NextUpSeason
@@ -337,6 +342,25 @@ let dashboardSeasonEpisodeDotsTests =
             let dto = SeriesProjection.getDashboardSeriesNextUp conn None |> List.find (fun r -> r.Slug = "finished-show")
             Expect.equal dto.NextUpSeason 0 "no Next Up episode remains — the series is fully watched"
             Expect.equal dto.CurrentSeasonNumber 2 "falls back to the highest-numbered season (2), not the Next Up season"
+            Expect.isNone dto.CurrentSeasonNextUpIndex "nothing is next up — no segment may render half-lit"
+            Expect.isNone dto.ActiveSeasonIndex "nothing is next up — no season line may render half-lit either; the finished series paints green instead"
+            Expect.isTrue dto.IsFinished "every cached episode is watched — the rows render as complete"
+
+        testCase "CurrentSeasonNextUpIndex is a position in the season's episode list, not NextUpEpisode - 1" <| fun _ ->
+            use conn = newConn ()
+            // Episode 4 is absent from the cache, so the season's four segments
+            // are episodes 1, 2, 3, 5. Next up is episode 5, which sits at
+            // index 3 — `NextUpEpisode - 1` would point at 4, one segment past
+            // the end of the row.
+            let gappySeason = { mkSeason 1 0 with Episodes = [ for i in [ 1; 2; 3; 5 ] -> mkEpisode i ] }
+            seedSeries conn "gappy-numbering-show" 506 None [ gappySeason ]
+            for ep in [ 1; 2; 3 ] do
+                markWatched conn "gappy-numbering-show" "default" 1 ep "2024-06-01"
+
+            let dto = SeriesProjection.getDashboardSeriesNextUp conn None |> List.find (fun r -> r.Slug = "gappy-numbering-show")
+            Expect.equal dto.CurrentSeasonWatched [ true; true; true; false ] "four cached episodes: 1-3 watched, 5 not"
+            Expect.equal dto.NextUpEpisode 5 "the frontier skips the uncached episode 4"
+            Expect.equal dto.CurrentSeasonNextUpIndex (Some 3) "index 3 of [1;2;3;5] — the position, not the episode number minus one"
 
         testCase "an episode watched only in a non-default rewatch session still reports true" <| fun _ ->
             use conn = newConn ()
@@ -357,6 +381,7 @@ let dashboardSeasonEpisodeDotsTests =
             Expect.equal dto.CurrentSeasonNumber 0 "no cache data at all — CurrentSeasonNumber defaults to 0"
             Expect.isEmpty dto.CurrentSeasonWatched "no cache data at all — CurrentSeasonWatched is empty"
             Expect.isEmpty dto.SeasonsTouched "no cache data at all — SeasonsTouched is empty"
+            Expect.isNone dto.ActiveSeasonIndex "no cache data at all — there is no season line to mark active"
     ]
 
 /// Counts the number of `IDbCommand`s created against the underlying
