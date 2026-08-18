@@ -5,6 +5,43 @@ Newest entries on top.
 
 ---
 
+## 2026-08-18 16:10 -- Modeling / Refined: integration-n3vqa - Incremental Steam Family import
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** todo
+**Summary:** Reframed from a speed/UX feature into an **account-safety** task without losing the "what's new" user value that is its actual point — the builder reported Valve has twice alerted the account after a family import ("using the Steam API in the same way a certain brand of account hijacking does"). The design is unchanged and was already right; what changed is why it matters. The task had noted the ~200 req/5 min ceiling only as slowness. Added an **exact-total** outbound-request criterion (a zero-new-app import must issue a fixed, enumerated constant, growing by exactly one `appdetails` call per new app) on the reasoning that a per-app assertion can pass while an unnoticed extra sweep slips in — which is the failure mode the task exists to prevent. Deliberately split ownership with integration-w7ktb: this task owns request *count*, w7ktb owns request *spacing*, neither double-owns. Both `depends_on` (integration-r8kwd, design-system-001) are now satisfied; deliberately **not** made dependent on w7ktb — independent code paths, and this task carries the larger risk reduction so it must not queue behind the throttle. Settled all four previously-open questions: arrivals surface in **Settings only** (builder's call — a Games-page "New in family" filter was deferred to a possible follow-on, since less surface lands the safety benefit sooner); "arrival" is **not** event-worthy (ADR-0043 third-party-description → cache territory, and `Set_steam_library_date` already records it); `GetSharedLibraryApps` flags may be inspected from a single response but **must not** be A/B'd with extra live imports; scheduled cadence stays a follow-on and must consider integration-p2hxn's risk framing first, since periodic automated Steam traffic is a different risk profile from a manual click.
+**Split into:** none
+**ADRs written:** none
+
+---
+
+## 2026-08-18 16:10 -- Modeling / Captured: integration-p2hxn - Accept and document the MobileApp-from-datacenter-IP login signature as a known Steam account-flag risk
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** The half of the suspected hijack signature that is probably *not* fixable. `SteamConnect.fs`'s QR ceremony opens a new `MobileApp`-platform persistent session from the Docker host's datacenter IP — deliberate, per ADR-0019 point 2 (a `SteamClient`-platform token needs a live CM connection to refresh, forcing a permanent SteamKit2 dependency), and inherent to self-hosting (ADR-0007). ADR-0061 already noticed this reads as "a new device signing in from a new location" but recorded it as a passing note, not a decision — so the risk currently lives only in scattered asides, where a future session could reverse the platform choice without knowing why it was made, or re-run the ceremony speculatively because nothing forbids it. `type: decision`; deliverable is an accepted-risk ADR naming the hypothesis *as* a hypothesis, recording mitigations already in place (including r8kwd's removal of the misattributed-401 reconnect loop, the largest source of reconnect churn to date), establishing a no-speculative-reconnect rule, and defining a three-step escalation ladder (let w7ktb/n3vqa land → ADR-0019 point 4's browser-retrieval fallback → reverse ADR-0019 point 2, accepting the SteamKit2/CM dependency).
+
+---
+
+## 2026-08-18 16:10 -- Modeling / Captured: integration-w7ktb - Steam storefront calls are paced by the caller, not the Adapter — the family import paces not at all
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** The immediate, shippable mitigation after Valve's second account alert. Grounded in source rather than in speculation about Valve's undocumented heuristics: `Steam.getSteamStoreDetails` has **11 call sites** across 5 files and exactly **3** are paced, each by its own copy-pasted `Async.Sleep 300` — and the family import's three sites (`Api.fs:584/:623/:657`) are among the eight paced by nothing, which is why the largest collection in the codebase is iterated at full speed. Pacing is caller-owned, so it fails open on every new caller; the fix is an Adapter-owned minimum-interval gate in `Steam.fs` that every storefront caller inherits, with the redundant call-site sleeps deleted. Two corrections surfaced while drafting: **300ms was never the right number** (the ~200 req/5 min ceiling is 1.5 s/req, so the existing precedent is ~5× too fast and copying it would look like a fix while leaving the defect), and **there is no store-details cache** despite a stale comment at `Steam.fs:966-967` claiming one — `storeMetaCache` is search-only. Caching deliberately excluded (n3vqa's skip-known-apps supersedes it — skipping a call beats caching its answer); a pointer note is recorded on n3vqa. Every acceptance criterion is satisfiable against a fake `HttpClient` — **no criterion requires a live import**, since running one is the act under suspicion. Known consequence recorded: at 1500ms a full re-enrich of a few hundred titles takes ~10 minutes, which is the correct trade for a rare full sweep and is precisely why n3vqa matters more after this lands, not less.
+
+---
+
+## 2026-08-18 16:10 -- Modeling / Promoted: integration-n3vqa - Incremental Steam Family import — answer "what's new in the family library since I last checked" and only enrich the newcomers
+
+**Type:** Modeling / Promote
+**BC:** integration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-08-15 12:09 -- Work session ended
 
 **Type:** Work / Session end

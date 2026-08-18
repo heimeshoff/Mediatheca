@@ -108,20 +108,40 @@ key rejection should be surfaced somewhere persistent, not just in a one-shot im
 
 ## Builder gate — outstanding
 
+> **AMENDED 2026-08-18 — step 3 below (run a live family import) is SPLIT and DEFERRED. Do not
+> run a full family import to close this gate.** After this task shipped, the builder reported
+> that Valve had alerted the account *twice*, each time following a family import: *"Your
+> accounts appear to be using the Steam API in the same way a certain brand of account
+> hijacking does."* A full import is therefore the exact act under suspicion, and this gate
+> must not be the thing that triggers a third flag. The gate is split into a safe half that can
+> run now and a deferred half with a named owner. See integration-w7ktb (Adapter-owned
+> storefront throttle), integration-n3vqa (incremental import) and integration-p2hxn (the
+> accepted-risk ADR).
+
 The last acceptance criterion, and the Notes' "verify the root-cause hypothesis first (Test
 key)" step, are deferred to the builder — they need the builder's real Steam account and a
-browser, neither of which this session has. Everything else in this task is done and tested.
+browser, neither of which the implementing session has. Everything else in this task is done
+and tested.
 
-**What to do:**
-1. In Settings → Steam, click **Test Connection** with the currently-stored key. If it fails,
-   that confirms the key is the rejected credential (per this task's diagnosis) rather than
-   something else.
-2. Open https://steamcommunity.com/dev/apikey, regenerate the key, and paste the new key into
-   Settings → Steam → **Save**. (Saving now also clears the "Steam Web API key rejected" notice
-   this task added, if one is showing.)
-3. Run **Import family library**. Confirm it completes end-to-end and the "API key rejected"
-   notice (if it was showing) has cleared.
-4. Record the outcome here (root-cause confirmed / refuted) when closing out this gate.
+**Half A — safe to run now.** This fully answers *"is the key valid again"* and
+confirms/refutes this task's root-cause hypothesis. It costs a **single** `GetOwnedGames`
+request, not a library sweep:
+
+0. **First, rule out an actual compromise.** Open https://steamcommunity.com/dev/apikey and
+   confirm the registered key is *yours*, or that none is registered. An unfamiliar key or
+   domain there is the literal hijack pattern Valve's warning describes, and would mean the
+   account is genuinely compromised — stop and deal with that instead. Also check Steam Support
+   messages, review authorized devices, and confirm mobile Steam Guard is on.
+1. Regenerate the key at that page and paste it into Settings → Steam → **Save**. (Saving
+   clears the "Steam Web API key rejected" notice this task added, if one is showing.)
+2. Click **Test Connection**. One request. Confirm it succeeds and the notice has cleared.
+3. Record the outcome here: root-cause confirmed (the old key was revoked) or refuted.
+
+**Half B — deferred, owner named.** *"A live family import succeeds end to end"* is **not**
+run now. It is discharged by **integration-n3vqa's** own builder gate: that task's first live
+import will be a small incremental one (a handful of requests) rather than today's
+several-hundred-request sweep, and integration-w7ktb will have paced whatever remains. Closing
+Half A is sufficient to consider this task's own diagnosis settled; Half B rides with n3vqa.
 
 ## Notes
 
