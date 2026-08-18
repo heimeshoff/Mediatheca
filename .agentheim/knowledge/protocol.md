@@ -5,6 +5,29 @@ Newest entries on top.
 
 ---
 
+## 2026-08-18 18:06 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 1h35m (first "Batch started" 16:31 -> 18:06)
+**Completed:** 1 (first-try PASS: 0, re-dispatched: 1, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** integration-w7ktb: 2
+**Commits:** 3 (batch start, task completion, this entry)
+**Vision-conformance:** none — batch aligns with vision. The one shipped task hardens the Steam Family import against Valve's account-flagging, squarely inside the named "Steam Import Enhancement (REQ-208)" v1 workstream; it pulls toward no Out-of-Scope (v1) item (Books, Trakt/Jellyfin sync, yearly intelligence, friend-level intelligence, trailer playback all untouched — the storefront *trailer-metadata* fetch it gates is not v2 trailer playback), and away from no Remaining v1 Work item. Not admin-console scope, so the vision's "media experience wins" boundary clause does not fire. The recorded ~10-minute full-sweep consequence at 1500ms is a deliberate, task-documented trade with integration-n3vqa named as the count-side answer, not an unflagged regression.
+**Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed.
+
+**Scope note — user-scoped run.** The builder invoked `work` with an explicit task id, so this session dispatched only integration-w7ktb. Three tasks sat ready in `integration/todo/` the whole time and were deliberately not picked up: integration-k4vqm and integration-p2hxn (both `depends_on: []`), and integration-n3vqa (both deps satisfied). They were held by the naming, not by MAX_PARALLEL and not by any conflict — the batch-start entry records the same.
+
+**Verification note — the iteration-1 FAIL caught a flake, which is the harder catch.** Iteration 1 shipped correct production code: the gate, all eleven call sites routed, the three copy-pasted `Async.Sleep 300`s deleted, the stale cache comment fixed, the 1500ms default correctly derived and not quietly lowered, ADR-0066 answering the task's `GameDeckCompatBackfill` open question. Every criterion passed except the last. The verifier ran `npm test` twice on an unchanged tree and got 695/696 then 696/696 — `Expected consecutive appdetails requests spaced at least 00:00:00.0800000 apart, got 00:00:00.0797100`. A single run would have shown green and shipped a flaky assertion. Root cause was the measurement, not the throttle: `throttleStorefrontCall` stamps `lastStorefrontCallStartedAt` before `fetch ()`, while the test measured at `SendAsync` entry, so the variable HttpClient-pipeline hop between them (larger on the warm-up request) ate a fraction of a millisecond off an 80ms interval. This mattered more than a normal flake because the sibling `MaxInFlight = 1` assertion would pass with the gate deleted entirely — `runSteamFamilyImport`'s loop is already sequential — so the *spacing* assertion was the only thing pinning the throttle itself.
+
+Iteration 2 changed zero production bytes (`git diff HEAD~1 HEAD --name-only` returned exactly the test file and the task file): a shared `clockTolerance = 5ms` with its justification stated in a comment, both assertions relaxed to `gap >= interval - clockTolerance`, and the family-import test's interval raised 80ms -> 250ms because that test carries a second, independent jitter source on top of the clock's. The second verifier ruled the relaxation satisfies the criterion and re-derived non-vacuousness from the numbers: with the wait deleted, consecutive requests would land tens of ms apart at most (bounded by the stub's 15ms simulated delay) against a 245ms threshold — the 5ms tolerance is 2% of the interval and one third of the stub delay alone, so it cannot bridge an order-of-magnitude gap. On the direct gate test the margin is ~3 orders of magnitude. Five consecutive `npm test` runs, 696/696 each; `npm run build` clean.
+
+**Safety posture held throughout.** Both workers and both verifiers carried an explicit no-live-Steam-call constraint, and the second verifier independently confirmed the only `new HttpClient()` in `src/Server` is production wiring in `Composition.fs`, not on the test path. Every criterion was met against a fake `HttpMessageHandler`. No live family import was run — that act is precisely what is under suspicion.
+
+---
+
 ## 2026-08-18 18:03 -- Task verified and completed: integration-w7ktb - Steam storefront calls are paced by the caller, not the Adapter — the family import paces not at all; move throttling into `Steam.fs` so every storefront caller inherits it
 
 **Type:** Work / Task completion
