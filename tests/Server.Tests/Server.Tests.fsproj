@@ -56,6 +56,7 @@
     <Compile Include="SteamFamilyTokenTests.fs" />
     <Compile Include="AddGameFromSteamTests.fs" />
     <Compile Include="SteamFamilyImportOwnedGamesTests.fs" />
+    <Compile Include="SteamStorefrontThrottleTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

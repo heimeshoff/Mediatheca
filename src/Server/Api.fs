@@ -3916,7 +3916,9 @@ module Api =
                         let gamesToEnrich = GameProjection.findGamesWithEmptyDescriptionAndSteamAppId conn
                         for (slug, steamAppId) in gamesToEnrich do
                             try
-                                do! Async.Sleep 300 // Rate limit Steam Store API calls
+                                // Pacing lives inside Steam.getSteamStoreDetails itself now
+                                // (integration-w7ktb's Adapter-owned storefront throttle) --
+                                // callers no longer pace themselves.
                                 let! storeDetails = Steam.getSteamStoreDetails httpClient steamAppId
                                 match storeDetails with
                                 | Ok details ->

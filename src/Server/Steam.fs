@@ -237,6 +237,55 @@ module Steam =
         let urlWithToken = sprintf "%s%saccess_token=%s" url separator accessToken
         fetchJson httpClient urlWithToken
 
+    // ── Storefront throttle (integration-w7ktb) ──
+    //
+    // Steam's `store.steampowered.com` storefront -- `appdetails` (used by
+    // `getSteamStoreDetails`, `getSteamStoreTrailer(s)`, and the search
+    // ranking's `fetchStoreMeta`) plus the Deck-compat store-page fetch
+    // (`getDeckCompatibility`) -- has an informal ceiling of ~200 requests
+    // per 5 minutes, i.e. 1.5s/request. Pacing used to be caller-owned (a
+    // copy-pasted `Async.Sleep 300` at three of eleven call sites, 300ms
+    // itself ~5x too fast) and failed open on every new caller, including
+    // the Family import's per-app loop. It now lives here, inside the
+    // Adapter -- the anticorruption layer that already owns everything else
+    // about talking to Steam -- so every caller inherits it for free. See
+    // ADR-0066.
+    //
+    // `throttleStorefrontInterval` is `mutable`, not `private`, precisely so
+    // tests can drive it fast -- the same public-for-testability precedent
+    // `decodeDeckCompatFromHtml` sets below. Production callers never touch
+    // it; it defaults to the derived 1500ms ceiling.
+    let mutable throttleStorefrontInterval = System.TimeSpan.FromMilliseconds(1500.0)
+
+    let private storefrontGate = new System.Threading.SemaphoreSlim(1, 1)
+    let mutable private lastStorefrontCallStartedAt: System.DateTime option = None
+
+    /// Runs `fetch` under the storefront throttle: serializes with every
+    /// other gated call (a single `SemaphoreSlim` held for the gate's full
+    /// duration -- gate wait AND the fetch itself -- so at most one
+    /// storefront request is ever in flight, pinning the family import's
+    /// sequential-loop guarantee), and, if fewer than
+    /// `throttleStorefrontInterval` has elapsed since the previous gated
+    /// call *started*, waits out the remainder first. Exposed (not
+    /// `private`) so tests can exercise the gate directly, independent of
+    /// any one storefront function.
+    let throttleStorefrontCall (fetch: unit -> Async<'a>) : Async<'a> =
+        async {
+            do! storefrontGate.WaitAsync() |> Async.AwaitTask
+            try
+                let now = System.DateTime.UtcNow
+                match lastStorefrontCallStartedAt with
+                | Some last ->
+                    let remaining = throttleStorefrontInterval - (now - last)
+                    if remaining > System.TimeSpan.Zero then
+                        do! Async.Sleep remaining
+                | None -> ()
+                lastStorefrontCallStartedAt <- Some System.DateTime.UtcNow
+                return! fetch ()
+            finally
+                storefrontGate.Release() |> ignore
+        }
+
     // Public API functions
 
     let resolveVanityUrl (httpClient: HttpClient) (apiKey: string) (vanityUrl: string) : Async<Result<string, string>> =
@@ -803,25 +852,26 @@ module Steam =
         }
 
     let getSteamStoreDetails (httpClient: HttpClient) (appId: int) : Async<Result<SteamStoreDetails, string>> =
-        async {
-            try
-                // games-a7dqx: &l=english belt-and-braces (ADR-0053) — the
-                // category ids are stable regardless of locale, but forcing
-                // English keeps `Categories`'/descriptions readable and
-                // consistent for any caller that still displays them.
-                let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d&l=english" appId
-                let! json = fetchJson httpClient url
-                let appIdKey = string appId
-                match Decode.fromString (Decode.dict decodeStoreAppEntry) json with
-                | Ok dict ->
-                    match dict.TryGetValue(appIdKey) with
-                    | true, Ok details -> return Ok details
-                    | true, Error e -> return Error e
-                    | false, _ -> return Error (sprintf "No entry found for appId %d in response" appId)
-                | Error e -> return Error (sprintf "Failed to parse Steam store response: %s" e)
-            with ex ->
-                return Error (sprintf "Failed to get Steam store details: %s" ex.Message)
-        }
+        throttleStorefrontCall (fun () ->
+            async {
+                try
+                    // games-a7dqx: &l=english belt-and-braces (ADR-0053) — the
+                    // category ids are stable regardless of locale, but forcing
+                    // English keeps `Categories`'/descriptions readable and
+                    // consistent for any caller that still displays them.
+                    let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d&l=english" appId
+                    let! json = fetchJson httpClient url
+                    let appIdKey = string appId
+                    match Decode.fromString (Decode.dict decodeStoreAppEntry) json with
+                    | Ok dict ->
+                        match dict.TryGetValue(appIdKey) with
+                        | true, Ok details -> return Ok details
+                        | true, Error e -> return Error e
+                        | false, _ -> return Error (sprintf "No entry found for appId %d in response" appId)
+                    | Error e -> return Error (sprintf "Failed to parse Steam store response: %s" e)
+                with ex ->
+                    return Error (sprintf "Failed to get Steam store details: %s" ex.Message)
+            })
 
     // Steam Store trailer types and decoders
     //
@@ -862,73 +912,75 @@ module Steam =
         | None -> None
 
     let getSteamStoreTrailer (httpClient: HttpClient) (appId: int) : Async<Mediatheca.Shared.GameTrailerInfo option> =
-        async {
-            try
-                // games-a7dqx: &l=english belt-and-braces (ADR-0053) — the
-                // category ids are stable regardless of locale, but forcing
-                // English keeps `Categories`'/descriptions readable and
-                // consistent for any caller that still displays them.
-                let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d&l=english" appId
-                let! json = fetchJson httpClient url
-                let appIdKey = string appId
-                // Parse manually to extract movies from the nested response
-                match Decode.fromString (Decode.dict (Decode.object (fun get ->
-                    let success = get.Required.Field "success" Decode.bool
-                    if success then
-                        get.Optional.At [ "data"; "movies" ] (Decode.list decodeSteamMovie) |> Option.defaultValue []
-                    else
-                        []
-                ))) json with
-                | Ok dict ->
-                    match dict.TryGetValue(appIdKey) with
-                    | true, movies when not (List.isEmpty movies) ->
-                        // Prefer highlight trailer, else first
-                        let trailer =
-                            movies
-                            |> List.tryFind (fun m -> m.Highlight)
-                            |> Option.orElse (List.tryHead movies)
-                        match trailer with
-                        | Some t -> return movieToTrailerInfo t
-                        | None -> return None
-                    | _ -> return None
-                | Error _ -> return None
-            with _ ->
-                return None
-        }
+        throttleStorefrontCall (fun () ->
+            async {
+                try
+                    // games-a7dqx: &l=english belt-and-braces (ADR-0053) — the
+                    // category ids are stable regardless of locale, but forcing
+                    // English keeps `Categories`'/descriptions readable and
+                    // consistent for any caller that still displays them.
+                    let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d&l=english" appId
+                    let! json = fetchJson httpClient url
+                    let appIdKey = string appId
+                    // Parse manually to extract movies from the nested response
+                    match Decode.fromString (Decode.dict (Decode.object (fun get ->
+                        let success = get.Required.Field "success" Decode.bool
+                        if success then
+                            get.Optional.At [ "data"; "movies" ] (Decode.list decodeSteamMovie) |> Option.defaultValue []
+                        else
+                            []
+                    ))) json with
+                    | Ok dict ->
+                        match dict.TryGetValue(appIdKey) with
+                        | true, movies when not (List.isEmpty movies) ->
+                            // Prefer highlight trailer, else first
+                            let trailer =
+                                movies
+                                |> List.tryFind (fun m -> m.Highlight)
+                                |> Option.orElse (List.tryHead movies)
+                            match trailer with
+                            | Some t -> return movieToTrailerInfo t
+                            | None -> return None
+                        | _ -> return None
+                    | Error _ -> return None
+                with _ ->
+                    return None
+            })
 
     /// Returns all trailers for a Steam app, highlight-first, then the rest in API order.
     let getSteamStoreTrailers (httpClient: HttpClient) (appId: int) : Async<Mediatheca.Shared.GameTrailerInfo list> =
-        async {
-            try
-                // games-a7dqx: &l=english belt-and-braces (ADR-0053) — the
-                // category ids are stable regardless of locale, but forcing
-                // English keeps `Categories`'/descriptions readable and
-                // consistent for any caller that still displays them.
-                let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d&l=english" appId
-                let! json = fetchJson httpClient url
-                let appIdKey = string appId
-                match Decode.fromString (Decode.dict (Decode.object (fun get ->
-                    let success = get.Required.Field "success" Decode.bool
-                    if success then
-                        get.Optional.At [ "data"; "movies" ] (Decode.list decodeSteamMovie) |> Option.defaultValue []
-                    else
-                        []
-                ))) json with
-                | Ok dict ->
-                    match dict.TryGetValue(appIdKey) with
-                    | true, movies when not (List.isEmpty movies) ->
-                        // Highlight first, then remaining in original order
-                        let highlights = movies |> List.filter (fun m -> m.Highlight)
-                        let rest = movies |> List.filter (fun m -> not m.Highlight)
-                        let ordered = highlights @ rest
-                        return
-                            ordered
-                            |> List.choose movieToTrailerInfo
-                    | _ -> return []
-                | Error _ -> return []
-            with _ ->
-                return []
-        }
+        throttleStorefrontCall (fun () ->
+            async {
+                try
+                    // games-a7dqx: &l=english belt-and-braces (ADR-0053) — the
+                    // category ids are stable regardless of locale, but forcing
+                    // English keeps `Categories`'/descriptions readable and
+                    // consistent for any caller that still displays them.
+                    let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d&l=english" appId
+                    let! json = fetchJson httpClient url
+                    let appIdKey = string appId
+                    match Decode.fromString (Decode.dict (Decode.object (fun get ->
+                        let success = get.Required.Field "success" Decode.bool
+                        if success then
+                            get.Optional.At [ "data"; "movies" ] (Decode.list decodeSteamMovie) |> Option.defaultValue []
+                        else
+                            []
+                    ))) json with
+                    | Ok dict ->
+                        match dict.TryGetValue(appIdKey) with
+                        | true, movies when not (List.isEmpty movies) ->
+                            // Highlight first, then remaining in original order
+                            let highlights = movies |> List.filter (fun m -> m.Highlight)
+                            let rest = movies |> List.filter (fun m -> not m.Highlight)
+                            let ordered = highlights @ rest
+                            return
+                                ordered
+                                |> List.choose movieToTrailerInfo
+                        | _ -> return []
+                    | Error _ -> return []
+                with _ ->
+                    return []
+            })
 
     // ── Steam name search (SteamCommunity SearchApps + fuzzy rescore) ──
     //
@@ -963,8 +1015,12 @@ module Steam =
         })
 
     // Per-session cache of Store details (release_date / type) used for year
-    // boost and type filtering during search. Separate from the full-response
-    // cache used by getSteamStoreDetails callers.
+    // boost and type filtering during search. There is no cache for
+    // `getSteamStoreDetails`/`getSteamStoreTrailer(s)` callers — those hit
+    // the storefront on every call, paced (not cached) by the storefront
+    // throttle above (integration-w7ktb). This cache exists purely to keep
+    // one search's candidate re-scoring from re-fetching the same appId's
+    // meta twice within that search.
     type private SteamStoreMeta = {
         Type: string
         ReleaseYear: int option
@@ -1072,18 +1128,24 @@ module Steam =
             match storeMetaCache.TryGetValue(appId) with
             | true, meta -> return Some meta
             | _ ->
-                try
-                    let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d&filters=basic,release_date&l=english" appId
-                    let! json = fetchJson httpClient url
-                    match Decode.fromString (Decode.dict decodeStoreMetaEntry) json with
-                    | Ok dict ->
-                        match dict.TryGetValue(string appId) with
-                        | true, Some meta ->
-                            storeMetaCache.[appId] <- meta
-                            return Some meta
-                        | _ -> return None
-                    | Error _ -> return None
-                with _ -> return None
+                // Only the actual network fetch is gated -- a cache hit above
+                // never touches the storefront and shouldn't wait on it.
+                return!
+                    throttleStorefrontCall (fun () ->
+                        async {
+                            try
+                                let url = sprintf "https://store.steampowered.com/api/appdetails?appids=%d&filters=basic,release_date&l=english" appId
+                                let! json = fetchJson httpClient url
+                                match Decode.fromString (Decode.dict decodeStoreMetaEntry) json with
+                                | Ok dict ->
+                                    match dict.TryGetValue(string appId) with
+                                    | true, Some meta ->
+                                        storeMetaCache.[appId] <- meta
+                                        return Some meta
+                                    | _ -> return None
+                                | Error _ -> return None
+                            with _ -> return None
+                        })
         }
 
     // ── Steam Deck compatibility (games-b8xnw) ──
@@ -1163,21 +1225,26 @@ module Steam =
     /// Fetches `appId`'s Steam Deck compatibility verdict from its store app
     /// page (the `ajaxgetdeckappcompatibilityreport` endpoint this task
     /// originally targeted is dead — see the module doc comment above).
+    // Routed through the same storefront gate as `appdetails` (integration-w7ktb):
+    // it's the same host, and a vendor's rate ceiling is safest treated as one
+    // shared budget rather than assuming a page fetch is exempt from a JSON-API
+    // ceiling neither of us has documentation for. See ADR-0066.
     let getDeckCompatibility (httpClient: HttpClient) (appId: int) : Async<Result<Mediatheca.Shared.DeckCompatibility, string>> =
-        async {
-            try
-                let url = sprintf "https://store.steampowered.com/app/%d/?l=english" appId
-                use request = new HttpRequestMessage(HttpMethod.Get, url)
-                request.Headers.Add("Cookie", deckCompatAgeGateCookie)
-                let! response = httpClient.SendAsync(request) |> Async.AwaitTask
-                response.EnsureSuccessStatusCode() |> ignore
-                let! html = response.Content.ReadAsStringAsync() |> Async.AwaitTask
-                match decodeDeckCompatFromHtml html with
-                | Ok category -> return Ok (mapDeckCompatCategory category)
-                | Error e -> return Error e
-            with ex ->
-                return Error (sprintf "Failed to get Deck compatibility for appId %d: %s" appId ex.Message)
-        }
+        throttleStorefrontCall (fun () ->
+            async {
+                try
+                    let url = sprintf "https://store.steampowered.com/app/%d/?l=english" appId
+                    use request = new HttpRequestMessage(HttpMethod.Get, url)
+                    request.Headers.Add("Cookie", deckCompatAgeGateCookie)
+                    let! response = httpClient.SendAsync(request) |> Async.AwaitTask
+                    response.EnsureSuccessStatusCode() |> ignore
+                    let! html = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+                    match decodeDeckCompatFromHtml html with
+                    | Ok category -> return Ok (mapDeckCompatCategory category)
+                    | Error e -> return Error e
+                with ex ->
+                    return Error (sprintf "Failed to get Deck compatibility for appId %d: %s" appId ex.Message)
+            })
 
     /// Searches Steam for candidates matching `query` (optionally boosted by
     /// `year`). Returns up to 5 candidates scored 0.0 .. 1.0. Callers interpret

@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 3
-- **Doing:** 1
-- **Done:** 13
+- **Doing:** 0
+- **Done:** 14
 <!-- task-counts:end -->
 
 ### Todo
@@ -25,12 +25,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **integration-w7ktb** — Steam storefront calls are paced by the caller, not the Adapter — the family import paces not at all; move throttling into `Steam.fs` so every storefront caller inherits it (bug) — `doing/integration-w7ktb-adapter-owned-steam-storefront-throttle.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **integration-w7ktb** — Steam storefront calls are paced by the caller, not the Adapter — the family import paces not at all; move throttling into `Steam.fs` so every storefront caller inherits it (bug) — `done/integration-w7ktb-adapter-owned-steam-storefront-throttle.md`
 - **integration-r8kwd** — Steam Family import aborts with an opaque 401 that comes from the Web-API-key `GetOwnedGames` supplement, not the family token — make the supplement non-fatal and attribute credential failures to the right credential (bug) — `done/integration-r8kwd-steam-family-import-opaque-401-from-web-api-key.md`
 - **integration-w8fkr** — Retire the Cinemarco import — delete the Settings card, the `importFromCinemarco` contract member, and `CinemarcoImport.fs` (refactor) — `done/integration-w8fkr-retire-cinemarco-import.md`
 - **integration-hebjs** — One-click Steam Family import — automatic access-token acquisition (feature) — `done/integration-hebjs-one-click-steam-family-import.md`
@@ -53,6 +53,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0066** -- Steam storefront calls are paced inside the Adapter, not by callers: one process-wide `Steam.throttleStorefrontCall` gate (a `SemaphoreSlim` held across the interval wait and the call itself, default 1500ms from the ~200 req/5min ceiling, injectable for tests) fronts every `store.steampowered.com` call — `appdetails`, trailers, search store-meta, and the Deck-compat store page — replacing eleven independently-remembered caller-owned `Async.Sleep`s, only three of which existed -- 2026-08-18 -- `knowledge/decisions/0066-steam-storefront-throttle-is-adapter-owned.md`
 - **0065** -- Steam Web API key rejection gets a typed shape (`SteamWebApiError`/`KeyRejected` via the non-throwing `Steam.tryGetOwnedGames`), degrades the Family import's owned-games supplement instead of aborting the whole import, and is attributed separately from the family token — persisted to `steam_api_key_last_error` for a standing Settings notice, cleared on save/test/next success -- 2026-08-15 -- `knowledge/decisions/0065-steam-web-api-key-typed-rejection-and-fault-isolation.md`
 - **0061** -- Steam Connect QR login runs as an in-memory server session streamed to Settings over SSE; the refresh token persists in SettingsStore, and `Steam.withTokenRefresh` is production-wired with real mint/persist lambdas so family tokens self-heal, with "reconnect required" surfaced as data -- 2026-08-07 -- `knowledge/decisions/0061-steam-connect-qr-session-and-family-token-refresh-wiring.md`
 - **0040** -- The still backfill for pre-existing Jellyfin rows widens `materializeMissingEpisodes`' skip predicate rather than running as a separate sweep (the Jellyfin item id is already in the batch), writing through a dedicated `backfillEpisodeStill` UPDATE that repeats `source='jellyfin' AND still_ref IS NULL` in its WHERE clause; no refetch guard — repetition is accepted because the candidate set drains itself on TMDB enrichment -- 2026-08-01 -- `knowledge/decisions/0040-jellyfin-still-backfill-lives-in-materialize-no-refetch-guard.md`

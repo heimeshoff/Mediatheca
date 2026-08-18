@@ -41,7 +41,10 @@ module GameDeckCompatBackfill =
             let mutable errors = 0
             for (slug, steamAppId) in candidates do
                 try
-                    do! Async.Sleep 300 // Rate limit Steam Store page fetches, mirrors GameFacetBackfill's throttle
+                    // Pacing lives inside Steam.getDeckCompatibility itself now
+                    // (integration-w7ktb's Adapter-owned storefront throttle, which
+                    // also covers the store-page fetch this backfill drives) --
+                    // callers no longer pace themselves.
                     let! compatResult = Steam.getDeckCompatibility httpClient steamAppId
                     match compatResult with
                     | Ok compat ->

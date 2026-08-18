@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-08-18 18:03 -- Task verified and completed: integration-w7ktb - Steam storefront calls are paced by the caller, not the Adapter — the family import paces not at all; move throttling into `Steam.fs` so every storefront caller inherits it
+
+**Type:** Work / Task completion
+**Task:** integration-w7ktb - Steam storefront calls are paced by the caller, not the Adapter — the family import paces not at all; move throttling into `Steam.fs` so every storefront caller inherits it
+**Summary:** Steam storefront pacing moves into the Adapter — one gate, every caller, Family import included
+**Duration:** 1h29m
+**Verification:** PASS (iteration 2)
+**Files changed:** 9
+**Tests added:** 2
+**ADRs written:** 0066
+
+---
+
+## 2026-08-18 17:12 -- Verification failed: integration-w7ktb - Steam storefront calls are paced by the caller, not the Adapter
+
+**Type:** Work / Verification failure
+**Task:** integration-w7ktb - Steam storefront calls are paced by the caller, not the Adapter — the family import paces not at all
+**Iteration:** 1 of 3
+**Reasons:** `npm test` not reliably green — the new spacing assertion is flaky (run 1: 695/696, `Expected consecutive appdetails requests spaced at least 00:00:00.0800000 apart, got 00:00:00.0797100`; run 2, unchanged tree: 696/696). Root cause is the measurement, not the throttle: the gate records its timestamp before `fetch ()`, the test measures at `SendAsync` entry, and the variable HttpClient-pipeline delay between the two can eat a fraction of a millisecond off an 80ms test interval. Every other criterion verified clean (gate present and injectable, all storefront call sites routed, the three call-site `Async.Sleep`s deleted, stale cache comment fixed, production default genuinely 1500ms, ADR-0066 records the Deck-compat open question, README `Throttle` entry added, `Steam.fs` churn purely mechanical). `npm run build` was not reached.
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-08-18 16:31 -- Batch started: [integration-w7ktb]
 
 **Type:** Work / Batch start

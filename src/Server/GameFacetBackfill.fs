@@ -6,9 +6,10 @@ open Microsoft.Data.Sqlite
 
 /// Resumable, throttled backfill of Steam-derived play facets into
 /// `game_metadata_cache` (games-a7dqx, ADR-0053). Same shape as the
-/// existing scheduled-job infrastructure (`ScheduledJobs.fs`) and the
-/// `Async.Sleep 300` Steam Store rate-limit throttle `Api.fs`'s description
-/// backfill already uses.
+/// existing scheduled-job infrastructure (`ScheduledJobs.fs`). Pacing
+/// against Steam's storefront now lives inside `Steam.getSteamStoreDetails`
+/// itself (the Adapter-owned throttle, integration-w7ktb/ADR-0066) rather
+/// than a call-site `Async.Sleep` here.
 ///
 /// Walks every game whose cache row is still seed-only
 /// (`MetadataCache.findGamesNeedingFacetBackfill`'s `fetched_at IS NULL`
@@ -47,7 +48,9 @@ module GameFacetBackfill =
             let mutable errors = 0
             for (slug, steamAppId) in candidates do
                 try
-                    do! Async.Sleep 300 // Rate limit Steam Store API calls, mirrors Api.fs's description backfill
+                    // Pacing lives inside Steam.getSteamStoreDetails itself now
+                    // (integration-w7ktb's Adapter-owned storefront throttle) --
+                    // callers no longer pace themselves.
                     let! storeDetails = Steam.getSteamStoreDetails httpClient steamAppId
                     match storeDetails with
                     | Ok details ->
