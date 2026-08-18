@@ -5,6 +5,33 @@ Newest entries on top.
 
 ---
 
+## 2026-08-18 19:47 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 1h10m (first "Batch started" 18:37 -> 19:47)
+**Completed:** 3 (first-try PASS: 3, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** integration-k4vqm: 1, integration-p2hxn: 1, integration-n3vqa: 1
+**Commits:** 5 (batch start, three task completions, this entry)
+**Vision-conformance:** none -- batch aligns with vision. All three tasks sit in the named "Steam Import Enhancement (REQ-208)" v1 workstream or the account-safety work that keeps it usable; none pulls toward an Out-of-Scope (v1) item (Books, Trakt/Jellyfin sync, yearly intelligence, friend-level intelligence, trailer playback all untouched) and none is admin-console scope, so the vision's "media experience wins" boundary clause does not fire. One tension was checked and dismissed on evidence rather than asserted: REQ-208's "detect existing games with missing descriptions and backfill from Steam Store API" looked like it might be undercut by integration-n3vqa's skip-store-details-for-known-apps rule, but the backfill sweep (`findGamesWithEmptyDescriptionAndSteamAppId`, `Api.fs:4090`) belongs to the *personal* Steam library import, not `runSteamFamilyImport` (`Api.fs:477`), and was not touched.
+**Carry-over:** none -- working tree clean, all three worktrees torn down, `.worktrees/` removed.
+
+**Batch shape.** Three tasks, the entire ready set, dispatched in one wave at MAX_PARALLEL=3 -- integration-k4vqm (bug), integration-p2hxn (decision), integration-n3vqa (feature). All three passed verification on iteration 1, the first session in this BC to do so; the run's real friction was infrastructure, not code.
+
+**ADR number collision -- three workers, one number.** All three workers independently allocated ADR **0067**, each with a different filename. This is invisible to git: different paths merge cleanly, so no conflict surfaced and nothing would have caught it downstream except a human noticing two ADRs claiming the same id. The conductor resolved it at integration time by merge order -- integration-p2hxn (first to pass) kept 0067, integration-k4vqm was renumbered to **0068** and integration-n3vqa to **0069**, in each case rewriting the filename, the frontmatter `id:`, the `# ADR NNNN:` heading, and every reference in the owning task file, then verifying no residual `0067` remained in either artifact. **The pre-dispatch conflict scan cannot see this class of collision** -- it scans task prose for shared file paths, and these three tasks named no ADR file because the number did not exist yet. Worth noting for future parallel batches: any batch where more than one task may write an ADR carries this hazard, and the cheap mitigation would be for the conductor to pre-allocate distinct ADR numbers per worker at dispatch.
+
+**The merged combination was tested, not assumed.** integration-k4vqm and integration-n3vqa both rewrote the family-import region of `src/Server/Api.fs`; the pre-scan flagged them for sequential merge and a real conflict was expected. Git auto-merged both `Api.fs` and the BC README with no conflict -- but each verifier had only ever tested its own worktree, so no one had run the *combination*. The conductor ran `npm test` and `npm run build` on the merged main tree before committing integration-n3vqa: **711 passed / 0 failed** (703 + 8, both tasks' tests coexisting) and a clean build. A clean auto-merge is not evidence of a working merge, and that check is what made the difference between a green tree and a hopeful one.
+
+**Verifier findings worth keeping.** (1) integration-k4vqm's verifier accepted a documented deviation and was right to: the criterion demanded that a scheduled playtime sync "whose *owned-games* call returns empty" surface a persisted indication, but the scheduled sync calls `GetRecentlyPlayedGames` and never `GetOwnedGames` -- the criterion rested on a false premise. The worker persisted the notice on the real failure mode (`KeyRejected`) and deliberately left a genuinely empty result alone, since "played nothing in two weeks" is that endpoint's routine steady state and flagging it would fire a false notice daily; the reasoning is recorded in ADR-0068's *Alternatives considered*, not just the task file. Enforcing the literal wording would have shipped worse behaviour. (2) The same verifier saw one first-run failure in `RequestConnectionConcurrencyTests.fs:87` -- a pre-existing SQLite-concurrency flake in a file this diff does not touch, aggravated by a concurrent build, green on an isolated re-run -- and correctly declined to attribute it to the change. (3) integration-n3vqa's exact-total assertion is genuinely non-vacuous: `RequestCounts.Total` sums *all* buckets and the stub records every request into a catch-all `other` bucket, so an unnoticed extra sweep of any kind breaks the total, which is precisely the failure mode that criterion existed to prevent.
+
+**Infrastructure friction -- eight subagent deaths to API 529 overload.** The two initial verifiers were killed mid-run repeatedly (`529 Overloaded`), including across three resume attempts and two backoffs of two and five minutes. Resuming a large-transcript agent failed every time; spawning a *fresh, leaner* verifier with targeted cheapest-decisive-first checks instead of a full diff paste succeeded immediately for all three tasks. Every worker survived. None of this reached the code: no verdict was skipped, weakened, or self-substituted by the conductor, and each of the three tasks got a real fresh-context audit.
+
+**Safety posture held.** Valve has twice flagged the builder's Steam account over the family import's traffic pattern, so every worker and every verifier carried an explicit no-live-Steam-call constraint. All three verifiers independently confirmed their test paths drive fake `HttpMessageHandler`s with no `api.steampowered.com` / `store.steampowered.com` contact. **No live Steam call and no QR ceremony was made by any agent this session.** integration-r8kwd's deferred builder gate -- a live family import succeeding end to end -- remains the builder's to discharge, and is now a small incremental import (3 requests steady-state) rather than a full sweep.
+
+---
+
 ## 2026-08-18 19:44 -- Task verified and completed: integration-n3vqa - Incremental Steam Family import — answer "what's new in the family library since I last checked" and only enrich the newcomers
 
 **Type:** Work / Task completion
