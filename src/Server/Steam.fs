@@ -344,6 +344,15 @@ module Steam =
         | KeyRejected
         | WebApiOtherFailure of string
 
+    /// Shared remedy text for a rejected/revoked Web API key (integration-r8kwd,
+    /// integration-k4vqm). Every caller that can hit this outcome — `testSteamApiKey`,
+    /// the Family import's owned-games supplement, and the scheduled playtime sync —
+    /// names the exact same regenerate action, so the builder sees one consistent
+    /// message regardless of which code path caught the rejection.
+    let webApiKeyRejectedMessage =
+        "Steam Web API key rejected (401) — generate a new key at " +
+        "steamcommunity.com/dev/apikey and paste it into Settings → Steam"
+
     /// GET a Web-API-key-authenticated `url`, returning `Error KeyRejected`
     /// on 401/403 instead of throwing via `EnsureSuccessStatusCode` — mirrors
     /// `fetchJsonWithTokenRejectable`'s non-throwing shape for the
@@ -389,6 +398,58 @@ module Steam =
                               ImgIconUrl = g.ImgIconUrl
                               RtimeLastPlayed = g.RtimeLastPlayed }))
                     | Error e -> return Error (WebApiOtherFailure (sprintf "Failed to parse owned games: %s" e))
+        }
+
+    /// Validates a Web API key without depending on any Steam profile's
+    /// privacy settings (integration-k4vqm: `testSteamApiKey`'s original
+    /// probe hardcoded a third-party SteamID and read an empty
+    /// `GetOwnedGames` response — which Steam also returns for any profile
+    /// whose Game Details are not Public — as "key may be invalid", which is
+    /// simply wrong). Used only when the caller has no `steam_id` of its own
+    /// to test against. `ISteamUserStats/GetSchemaForGame` takes no
+    /// `steamid` parameter at all — its success depends solely on the key
+    /// and a valid `appid`, never on anyone's profile visibility. AppId 440
+    /// (Team Fortress 2) is free-to-play and has shipped an achievement
+    /// schema for its entire life, so it is always available to probe
+    /// against.
+    let tryValidateApiKeyOnly (httpClient: HttpClient) (apiKey: string) : Async<Result<unit, SteamWebApiError>> =
+        async {
+            if System.String.IsNullOrWhiteSpace apiKey then
+                return Error (WebApiOtherFailure "No API key provided")
+            else
+                let url = sprintf "https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?appid=440&key=%s" apiKey
+                let! result = fetchJsonRejectable httpClient url
+                match result with
+                | Ok _ -> return Ok ()
+                | Error e -> return Error e
+        }
+
+    /// Non-throwing sibling of `getRecentlyPlayedGames`, for the same reason
+    /// `tryGetOwnedGames` exists (integration-k4vqm): the scheduled playtime
+    /// sync (`PlaytimeTracker.runSync`) needs to distinguish "the Web API
+    /// key was rejected" — a genuine, attributable, persistable failure —
+    /// from "genuinely nothing recently played," instead of both collapsing
+    /// into either a silent empty list or an opaque thrown
+    /// `HttpRequestException`.
+    let tryGetRecentlyPlayedGames (httpClient: HttpClient) (config: SteamConfig) : Async<Result<Mediatheca.Shared.SteamOwnedGame list, SteamWebApiError>> =
+        async {
+            if System.String.IsNullOrWhiteSpace(config.ApiKey) || System.String.IsNullOrWhiteSpace(config.SteamId) then
+                return Ok []
+            else
+                let url = sprintf "https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key=%s&steamid=%s&include_appinfo=true" config.ApiKey config.SteamId
+                let! result = fetchJsonRejectable httpClient url
+                match result with
+                | Error e -> return Error e
+                | Ok json ->
+                    match Decode.fromString decodeOwnedGamesResponse json with
+                    | Ok response ->
+                        return Ok (response.Games |> List.map (fun g ->
+                            { Mediatheca.Shared.SteamOwnedGame.AppId = g.AppId
+                              Name = g.Name
+                              PlaytimeMinutes = g.PlaytimeForever
+                              ImgIconUrl = g.ImgIconUrl
+                              RtimeLastPlayed = g.RtimeLastPlayed }))
+                    | Error e -> return Error (WebApiOtherFailure (sprintf "Failed to parse recently played games: %s" e))
         }
 
     let getRecentlyPlayedGames (httpClient: HttpClient) (config: SteamConfig) : Async<Mediatheca.Shared.SteamOwnedGame list> =

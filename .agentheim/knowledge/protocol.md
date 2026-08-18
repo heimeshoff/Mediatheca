@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-18 19:33 -- Task verified and completed: integration-k4vqm - An empty `GetOwnedGames` response is treated as success everywhere — the key test probes a third party's private profile and calls a good key "may be invalid", while the import and the scheduled sync silently degrade
+
+**Type:** Work / Task completion
+**Task:** integration-k4vqm - An empty `GetOwnedGames` response is treated as success everywhere — the key test probes a third party's private profile and calls a good key "may be invalid", while the import and the scheduled sync silently degrade
+**Summary:** an empty Steam owned-games response is inconclusive, not success — the key test probes the builder own account and three call sites stop reading empty as an all-clear
+**Duration:** 1h05m
+**Verification:** PASS (iteration 1)
+**Files changed:** 9
+**Tests added:** 8
+**ADRs written:** 0068
+
+---
+
 ## 2026-08-18 19:23 -- Task verified and completed: integration-p2hxn - Accept and document the MobileApp-from-datacenter-IP login signature as a known Steam account-flag risk — mitigations, a no-speculative-reconnect rule, and an escalation ladder
 
 **Type:** Work / Task completion

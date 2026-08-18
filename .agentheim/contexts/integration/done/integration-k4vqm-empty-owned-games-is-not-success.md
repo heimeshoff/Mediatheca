@@ -1,15 +1,15 @@
 ---
 id: integration-k4vqm
 title: An empty `GetOwnedGames` response is treated as success everywhere — the key test probes a third party's private profile and calls a good key "may be invalid", while the import and the scheduled sync silently degrade
-status: doing
+status: done
 type: bug
 context: integration
 created: 2026-08-18
-completed:
+completed: 2026-08-18
 depends_on: []
 blocks: []
 tags: [steam, api-key, settings, sync, import, error-surfacing, privacy]
-related_adrs: [0010, 0043, 0065]
+related_adrs: [0010, 0043, 0065, 0068]
 related_research: []
 prior_art: [integration-r8kwd, integration-003, integration-004]
 ---
@@ -119,3 +119,56 @@ discipline, and integration-003's "surface the persisted failure in Settings".
 - Independent of integration-w7ktb, integration-p2hxn and integration-n3vqa — no dependency
   in any direction, though it touches the same `Steam.fs` / `Api.fs` neighbourhood as w7ktb
   and n3vqa, so expect merge overlap if worked concurrently.
+
+## Outcome
+
+Fixed all three call sites and added the doctrine ADR (0068, amends 0065).
+
+- **`testSteamApiKey` (`Api.fs`)**: no longer references the hardcoded third-party SteamID.
+  It now probes the builder's own stored `steam_id` via `Steam.tryGetOwnedGames`; if none is
+  stored, it falls back to `Steam.tryValidateApiKeyOnly` (`ISteamUserStats/GetSchemaForGame`,
+  appId 440 — takes no `steamid` parameter, so its success is independent of any profile's
+  privacy). Three distinguishable `Result<unit, string>` outcomes: `Error
+  Steam.webApiKeyRejectedMessage` (401/403, names the regenerate remedy), `Ok ()` (non-empty
+  owned-games list — genuine success), and a third, distinctly-worded `Error` for an empty-
+  but-200 response ("...this does not indicate a problem with the key" — never "may be
+  invalid", names profile privacy as the likely cause).
+- **Family import owned-games supplement (`Api.fs`'s `runSteamFamilyImport`)**: `Ok []` no
+  longer clears `steam_api_key_last_error` (only a genuinely populated `Ok games` does) and
+  now appends its own non-fatal `Errors` line, worded distinctly from `KeyRejected`'s.
+- **Scheduled playtime sync (`PlaytimeTracker.runSync`)**: switched from the throwing
+  `Steam.getRecentlyPlayedGames` to the new non-throwing `Steam.tryGetRecentlyPlayedGames`. A
+  `KeyRejected` result now persists `steam_api_key_last_error` (Settings → Steam's existing
+  notice picks it up with no new UI work) and fails the run with an attributed message,
+  instead of an opaque, unattributed `HttpRequestException` escaping to a generic catch-all. A
+  genuinely empty (`Ok []`, "nothing played recently") result is deliberately left alone — see
+  ADR-0068's "alternatives considered" for why this endpoint's emptiness is not flagged the
+  same way `GetOwnedGames`'s is (it's the routine, frequent case, not evidence of anything
+  wrong).
+- **`Steam.fs`**: added `webApiKeyRejectedMessage` (one shared remedy string, replacing three
+  independently-worded copies), `tryValidateApiKeyOnly`, and `tryGetRecentlyPlayedGames`.
+- **BC README**: extended the "Web API key" ubiquitous-language entry with the empty-response
+  ambiguity and how each of the three call sites now handles it.
+- **ADR 0068** (amends ADR-0065) records the three-outcome design, the "don't flag routine
+  emptiness" alternative considered and rejected for `GetOwnedGames` but accepted for
+  `GetRecentlyPlayedGames`, and the shared remedy-string decision.
+- **Tests** (all against a fake `HttpMessageHandler` — no live Steam call in any test):
+  `tests/Server.Tests/SteamFamilyImportOwnedGamesTests.fs` — updated the pre-existing
+  "successful owned-games call clears the notice" test to use a genuinely non-empty stub (it
+  previously stubbed an empty response while asserting a clear, which was itself the bug this
+  task fixes), added a new test asserting `Ok []` does NOT clear a pre-seeded notice, seeded
+  `steam_id` in the pre-existing `testSteamApiKey` success test (now required by the fixed
+  probe), and added a new `testSteamApiKeyThreeOutcomesTests` list (5 cases: no hardcoded
+  SteamID referenced, 401 → key-rejected naming the remedy, 200 non-empty → success, 200 empty
+  → inconclusive/privacy-worded, no-stored-steam_id → key-only fallback probe).
+  `tests/Server.Tests/PlaytimeSyncKeyRejectionTests.fs` (new file, 2 cases): a rejected key
+  surfaces the persisted, attributed notice instead of completing silently; a genuinely empty
+  response completes normally without touching the notice.
+- `npm test`: 704/704 Expecto tests passing (run twice, consistent). `npm run build`: clean.
+
+Key files: `src/Server/Steam.fs`, `src/Server/Api.fs`, `src/Server/PlaytimeTracker.fs`,
+`tests/Server.Tests/SteamFamilyImportOwnedGamesTests.fs`,
+`tests/Server.Tests/PlaytimeSyncKeyRejectionTests.fs`,
+`tests/Server.Tests/Server.Tests.fsproj`,
+`.agentheim/knowledge/decisions/0068-steam-empty-owned-games-is-inconclusive-not-failure.md`,
+`.agentheim/contexts/integration/README.md`.

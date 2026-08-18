@@ -504,15 +504,30 @@ module Api =
                             let! ownedGamesResult = Steam.tryGetOwnedGames httpClient steamConfig
                             let ownedGames =
                                 match ownedGamesResult with
+                                | Ok [] ->
+                                    // integration-k4vqm: an empty owned-games response is
+                                    // genuinely ambiguous — Steam's IPlayerService/GetOwnedGames
+                                    // returns this exact same `{"response":{}}` shape whether
+                                    // the account owns nothing OR its Game Details privacy is
+                                    // not Public. It is NOT evidence the key is bad, so it must
+                                    // NOT clear a standing `steam_api_key_last_error` notice —
+                                    // but it costs the same own-ownership backfill degradation
+                                    // a key rejection does, so it earns its own non-fatal error
+                                    // line, worded distinctly from KeyRejected's so the two
+                                    // causes are never confused.
+                                    let msg =
+                                        "Steam Web API key returned no owned games — the account's " +
+                                        "Game Details privacy may not be Public, or it genuinely owns " +
+                                        "nothing; own-ownership was not backfilled this run"
+                                    errors <- errors @ [ msg ]
+                                    []
                                 | Ok games ->
-                                    // Clear any previously persisted key rejection — the
-                                    // key works again (e.g. the builder regenerated it).
+                                    // A genuinely informative success — clear any previously
+                                    // persisted key rejection (e.g. the builder regenerated it).
                                     SettingsStore.deleteSetting conn "steam_api_key_last_error"
                                     games
                                 | Error Steam.KeyRejected ->
-                                    let msg =
-                                        "Steam Web API key rejected (401) — generate a new key at " +
-                                        "steamcommunity.com/dev/apikey and paste it into Settings → Steam"
+                                    let msg = Steam.webApiKeyRejectedMessage
                                     SettingsStore.setSetting conn "steam_api_key_last_error" msg
                                     errors <- errors @ [ msg ]
                                     []
@@ -3651,20 +3666,51 @@ module Api =
             }
 
             testSteamApiKey = fun key -> async {
+                // integration-k4vqm: this used to hardcode a third-party SteamID
+                // ("Robin Walker, public profile") and treat an empty
+                // `GetOwnedGames` response as "key may be invalid" — but Steam
+                // returns that exact same empty shape for ANY profile whose Game
+                // Details privacy is not Public, a fact this project neither
+                // controls nor can observe changing. The key is tested against
+                // the builder's OWN stored `steam_id` instead (a profile this
+                // project actually controls); if none is stored yet, it falls
+                // back to `tryValidateApiKeyOnly`, which validates the key alone,
+                // independent of any profile's privacy.
+                use conn = factory ()
                 try
-                    let testConfig: Steam.SteamConfig = {
-                        ApiKey = key
-                        SteamId = "76561197960435530" // Robin Walker (Valve employee, public profile)
-                    }
-                    let! games = Steam.getOwnedGames httpClient testConfig
-                    if List.isEmpty games then
-                        return Error "API key accepted but returned no results (may be invalid)"
-                    else
-                        // integration-r8kwd: a successful test also clears any standing
-                        // "key rejected" notice (acceptance criterion 4).
-                        use conn = factory ()
+                    let steamId = SettingsStore.getSetting conn "steam_id" |> Option.defaultValue ""
+                    let! probeResult =
+                        if not (System.String.IsNullOrWhiteSpace steamId) then
+                            let testConfig: Steam.SteamConfig = { ApiKey = key; SteamId = steamId }
+                            async {
+                                let! result = Steam.tryGetOwnedGames httpClient testConfig
+                                match result with
+                                | Ok [] -> return Choice1Of2 ()      // key valid, probe inconclusive
+                                | Ok (_ :: _) -> return Choice2Of2 (Ok ())
+                                | Error Steam.KeyRejected -> return Choice2Of2 (Error Steam.webApiKeyRejectedMessage)
+                                | Error (Steam.WebApiOtherFailure m) -> return Choice2Of2 (Error $"Steam API key validation failed: {m}")
+                            }
+                        else
+                            async {
+                                let! result = Steam.tryValidateApiKeyOnly httpClient key
+                                match result with
+                                | Ok () -> return Choice2Of2 (Ok ())
+                                | Error Steam.KeyRejected -> return Choice2Of2 (Error Steam.webApiKeyRejectedMessage)
+                                | Error (Steam.WebApiOtherFailure m) -> return Choice2Of2 (Error $"Steam API key validation failed: {m}")
+                            }
+                    match probeResult with
+                    | Choice1Of2 () ->
+                        // Key accepted; the probe target's response was empty. This is
+                        // NOT evidence the key is bad — never say "may be invalid".
+                        return Error "Steam API key accepted; the profile's Game Details privacy is not Public, or the account owns no games — this does not indicate a problem with the key"
+                    | Choice2Of2 (Ok ()) ->
+                        // integration-r8kwd: a successful, genuinely informative test
+                        // also clears any standing "key rejected" notice (acceptance
+                        // criterion 4).
                         SettingsStore.deleteSetting conn "steam_api_key_last_error"
                         return Ok ()
+                    | Choice2Of2 (Error msg) ->
+                        return Error msg
                 with ex ->
                     return Error $"Steam API key validation failed: {ex.Message}"
             }

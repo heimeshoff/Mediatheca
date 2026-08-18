@@ -382,7 +382,31 @@ module PlaytimeTracker =
                         eprintfn "[PlaytimeTracker] %s" reason
                         return Error reason
                     else
-                    let! recentGames = Steam.getRecentlyPlayedGames httpClient steamConfig
+                    // integration-k4vqm: `getRecentlyPlayedGames` throws on a
+                    // rejected/revoked Web API key, which used to escape as an
+                    // opaque `HttpRequestException` caught only by this
+                    // function's outer catch-all — recorded in `job_runs` but
+                    // never attributed to the Web API key, and never surfaced
+                    // as the same standing `steam_api_key_last_error` notice
+                    // Settings → Steam already renders for the family import
+                    // (integration-r8kwd). `tryGetRecentlyPlayedGames` makes
+                    // that rejection a typed, attributable, persisted outcome
+                    // instead. A genuinely empty (`Ok []`) result is left
+                    // alone — no recent play in the last two weeks is the
+                    // normal, common case for this endpoint and is not itself
+                    // evidence of anything wrong.
+                    let! recentGamesResult = Steam.tryGetRecentlyPlayedGames httpClient steamConfig
+                    match recentGamesResult with
+                    | Error Steam.KeyRejected ->
+                        withLock jobLock (fun () ->
+                            SettingsStore.setSetting conn "steam_api_key_last_error" Steam.webApiKeyRejectedMessage)
+                        return Error Steam.webApiKeyRejectedMessage
+                    | Error (Steam.WebApiOtherFailure m) ->
+                        return Error (sprintf "Playtime sync failed: %s" m)
+                    | Ok recentGames ->
+                    if not (List.isEmpty recentGames) then
+                        withLock jobLock (fun () ->
+                            SettingsStore.deleteSetting conn "steam_api_key_last_error")
                     let mutable sessionsRecorded = 0
                     let mutable gamesObserved = 0
                     let mutable gamesCreated = 0
