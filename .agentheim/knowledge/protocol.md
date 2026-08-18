@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-18 16:31 -- Batch started: [integration-w7ktb]
+
+**Type:** Work / Batch start
+**Tasks:** integration-w7ktb - Steam storefront calls are paced by the caller, not the Adapter — the family import paces not at all; move throttling into `Steam.fs` so every storefront caller inherits it
+**Parallel:** no (1 worker — user scoped this run to integration-w7ktb by name; integration-k4vqm and integration-p2hxn are equally ready and integration-n3vqa is unblocked, all three held to a later wave because they were not requested, not because of MAX_PARALLEL or conflict)
+
+---
+
 ## 2026-08-18 16:40 -- Modeling / Captured: integration-k4vqm - An empty `GetOwnedGames` response is treated as success everywhere
 
 **Type:** Modeling / Capture

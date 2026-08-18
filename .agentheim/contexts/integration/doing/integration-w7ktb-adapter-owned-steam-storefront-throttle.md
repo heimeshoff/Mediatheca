@@ -1,7 +1,7 @@
 ---
 id: integration-w7ktb
 title: Steam storefront calls are paced by the caller, not the Adapter — the family import paces not at all; move throttling into `Steam.fs` so every storefront caller inherits it
-status: todo
+status: doing
 type: bug
 context: integration
 created: 2026-08-18
