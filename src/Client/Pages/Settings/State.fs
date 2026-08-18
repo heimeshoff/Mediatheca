@@ -22,6 +22,87 @@ let private isReconnectRequired (message: string) : bool =
     not (System.String.IsNullOrEmpty(message))
     && message.ToLowerInvariant().Contains("reconnect required")
 
+/// integration-n3vqa: shared SSE consumer for both family-import endpoints
+/// (`/api/stream/import-steam-family` and `/api/stream/reenrich-steam-family`
+/// — the default incremental click and the explicit "Re-enrich all family
+/// games" action) — same envelope (`Sse.sseFrame`), same progress/complete/
+/// error event shapes, differing only in which Msg constructors the caller
+/// wants progress/completion dispatched through.
+let private streamSteamFamilyImport
+    (url: string)
+    (onProgress: SteamFamilyImportProgress -> Msg)
+    (onComplete: Result<SteamFamilyImportResult, string> -> Msg)
+    : Cmd<Msg> =
+    Cmd.ofEffect (fun dispatch ->
+        async {
+            try
+                let! response = jsFetch url |> Async.AwaitPromise
+                let reader: obj = response?body?getReader()
+                let mutable buffer = ""
+                let mutable reading = true
+                while reading do
+                    let! chunk = (reader?read() : JS.Promise<obj>) |> Async.AwaitPromise
+                    let isDone: bool = chunk?``done``
+                    if isDone then
+                        reading <- false
+                    else
+                        let value: obj = chunk?value
+                        let text = decodeBytes value
+                        buffer <- buffer + text
+                        let mutable idx = buffer.IndexOf("\n\n")
+                        while idx >= 0 do
+                            let message = buffer.[0..idx-1]
+                            buffer <- buffer.[idx+2..]
+                            let dataLine =
+                                if message.StartsWith("data: ") then message.[6..]
+                                else message
+                            if dataLine <> "" then
+                                let parsed: obj = JS.JSON.parse dataLine
+                                let eventType: string = parsed?``type``
+                                match eventType with
+                                | "progress" ->
+                                    let progress: SteamFamilyImportProgress = {
+                                        Current = parsed?current |> int
+                                        Total = parsed?total |> int
+                                        GameName = parsed?gameName |> string
+                                        Action = parsed?action |> string
+                                    }
+                                    dispatch (onProgress progress)
+                                | "complete" ->
+                                    let errors: string list =
+                                        let arr: obj array = parsed?errors
+                                        arr |> Array.map string |> Array.toList
+                                    let arrivals: SteamFamilyArrival list =
+                                        let arr: obj array = parsed?arrivals
+                                        arr
+                                        |> Array.map (fun a ->
+                                            { SteamFamilyArrival.AppId = a?appId |> int
+                                              Name = a?name |> string
+                                              AcquiredDate = if isNull a?acquiredDate then None else Some (a?acquiredDate |> string)
+                                              AddedBy = if isNull a?addedBy then None else Some (a?addedBy |> string) })
+                                        |> Array.toList
+                                    let sinceLastSync =
+                                        if isNull parsed?sinceLastSync then None else Some (parsed?sinceLastSync |> string)
+                                    let result: SteamFamilyImportResult = {
+                                        FamilyMembers = parsed?familyMembers |> int
+                                        GamesProcessed = parsed?gamesProcessed |> int
+                                        GamesCreated = parsed?gamesCreated |> int
+                                        FamilyOwnersSet = parsed?familyOwnersSet |> int
+                                        Arrivals = arrivals
+                                        SinceLastSync = sinceLastSync
+                                        Errors = errors
+                                    }
+                                    dispatch (onComplete (Ok result))
+                                | "error" ->
+                                    let errorMsg: string = parsed?message |> string
+                                    dispatch (onComplete (Error errorMsg))
+                                | _ -> ()
+                            idx <- buffer.IndexOf("\n\n")
+            with ex ->
+                dispatch (onComplete (Error ex.Message))
+        } |> Async.StartImmediate
+    )
+
 /// DOM id of the Projections section's outer card — the dirty banner's
 /// "Go to Projections" scroll target (administration-k3vmt).
 let projectionsSectionElementId = "settings-admin-projections"
@@ -158,6 +239,8 @@ let init () : Model * Cmd<Msg> =
       SteamFamilyImportResult = None
       ImportProgress = None
       ImportLog = []
+      IsReenrichingSteamFamily = false
+      SteamFamilyLastPersistedResult = None
       JellyfinServerUrl = ""
       JellyfinServerUrlInput = ""
       JellyfinUsername = ""
@@ -190,7 +273,7 @@ let init () : Model * Cmd<Msg> =
       JobsSectionLoaded = false
       SurgerySectionOpen = false
       SurgerySectionLoaded = false },
-    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_connect_status; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync; Cmd.ofMsg Load_steam_api_key_last_error ]
+    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_connect_status; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync; Cmd.ofMsg Load_steam_api_key_last_error; Cmd.ofMsg Load_steam_family_last_result ]
 
 let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
@@ -526,62 +609,7 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
 
     | Import_steam_family ->
         { model with IsImportingSteamFamily = true; SteamFamilyImportResult = None; ImportProgress = None; ImportLog = [] },
-        Cmd.ofEffect (fun dispatch ->
-            async {
-                try
-                    let! response = jsFetch "/api/stream/import-steam-family" |> Async.AwaitPromise
-                    let reader: obj = response?body?getReader()
-                    let mutable buffer = ""
-                    let mutable reading = true
-                    while reading do
-                        let! chunk = (reader?read() : JS.Promise<obj>) |> Async.AwaitPromise
-                        let isDone: bool = chunk?``done``
-                        if isDone then
-                            reading <- false
-                        else
-                            let value: obj = chunk?value
-                            let text = decodeBytes value
-                            buffer <- buffer + text
-                            let mutable idx = buffer.IndexOf("\n\n")
-                            while idx >= 0 do
-                                let message = buffer.[0..idx-1]
-                                buffer <- buffer.[idx+2..]
-                                let dataLine =
-                                    if message.StartsWith("data: ") then message.[6..]
-                                    else message
-                                if dataLine <> "" then
-                                    let parsed: obj = JS.JSON.parse dataLine
-                                    let eventType: string = parsed?``type``
-                                    match eventType with
-                                    | "progress" ->
-                                        let progress: SteamFamilyImportProgress = {
-                                            Current = parsed?current |> int
-                                            Total = parsed?total |> int
-                                            GameName = parsed?gameName |> string
-                                            Action = parsed?action |> string
-                                        }
-                                        dispatch (Steam_family_import_progress progress)
-                                    | "complete" ->
-                                        let errors: string list =
-                                            let arr: obj array = parsed?errors
-                                            arr |> Array.map string |> Array.toList
-                                        let result: SteamFamilyImportResult = {
-                                            FamilyMembers = parsed?familyMembers |> int
-                                            GamesProcessed = parsed?gamesProcessed |> int
-                                            GamesCreated = parsed?gamesCreated |> int
-                                            FamilyOwnersSet = parsed?familyOwnersSet |> int
-                                            Errors = errors
-                                        }
-                                        dispatch (Steam_family_import_completed (Ok result))
-                                    | "error" ->
-                                        let errorMsg: string = parsed?message |> string
-                                        dispatch (Steam_family_import_completed (Error errorMsg))
-                                    | _ -> ()
-                                idx <- buffer.IndexOf("\n\n")
-                with ex ->
-                    dispatch (Steam_family_import_completed (Error ex.Message))
-            } |> Async.StartImmediate
-        )
+        streamSteamFamilyImport "/api/stream/import-steam-family" Steam_family_import_progress Steam_family_import_completed
 
     | Steam_family_import_progress progress ->
         { model with
@@ -602,6 +630,32 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
         // Web-API-key-rejected notice (a different credential from the
         // family token `needsReconnect` above tracks) — reload it either way.
         Cmd.ofMsg Load_steam_api_key_last_error
+
+    // integration-n3vqa: "Re-enrich all family games" — the explicit second
+    // action, streamed identically to the default import but against the
+    // full-reenrich endpoint, and tracked under its own in-progress flag so
+    // the two actions' buttons/results never get confused for one another.
+    | Reenrich_steam_family ->
+        { model with IsReenrichingSteamFamily = true; SteamFamilyImportResult = None; ImportProgress = None; ImportLog = [] },
+        streamSteamFamilyImport "/api/stream/reenrich-steam-family" Steam_family_import_progress Steam_family_reenrich_completed
+
+    | Steam_family_reenrich_completed result ->
+        let needsReconnect =
+            match result with
+            | Error e -> isReconnectRequired e
+            | Ok _ -> false
+        { model with
+            IsReenrichingSteamFamily = false
+            SteamFamilyImportResult = Some result
+            ImportProgress = None
+            SteamNeedsReconnect = model.SteamNeedsReconnect || needsReconnect },
+        Cmd.ofMsg Load_steam_api_key_last_error
+
+    | Load_steam_family_last_result ->
+        model, Cmd.OfAsync.perform api.getSteamFamilyLastResult () Steam_family_last_result_loaded
+
+    | Steam_family_last_result_loaded lastResult ->
+        { model with SteamFamilyLastPersistedResult = lastResult }, Cmd.none
 
     // Jellyfin Integration
     | Load_jellyfin_settings ->

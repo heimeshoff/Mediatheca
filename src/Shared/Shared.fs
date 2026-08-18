@@ -1165,11 +1165,37 @@ type SteamFamilyMember = {
     IsMe: bool
 }
 
+/// A newly-acquired title reported by an incremental family import
+/// (integration-n3vqa) — "acquired" per Steam's own `rt_time_acquired`,
+/// whether the game is brand-new to the library or one a family member has
+/// just added to a title the caller already owns. Under ADR-0043 this is
+/// cache-shaped (Steam's own description of when a title arrived, always
+/// re-fetchable from `GetSharedLibraryApps`), not an event — it rides only
+/// in this result and the persisted `steam_family_last_result` blob.
+type SteamFamilyArrival = {
+    AppId: int
+    Name: string
+    AcquiredDate: string option
+    /// The family member who added it, when their Steam ID is mapped to a
+    /// Friends-BC slug (or "You" for the caller's own account) — None when
+    /// the owning Steam ID has no mapping yet.
+    AddedBy: string option
+}
+
 type SteamFamilyImportResult = {
     FamilyMembers: int
     GamesProcessed: int
     GamesCreated: int
     FamilyOwnersSet: int
+    /// Titles classified "newly acquired" this run (integration-n3vqa): any
+    /// brand-new game, plus any already-known game whose `rt_time_acquired`
+    /// postdates `SinceLastSync` — someone in the family buying a game the
+    /// caller already owns is still news.
+    Arrivals: SteamFamilyArrival list
+    /// The previous `steam_family_last_sync` value the arrivals above were
+    /// diffed against — None on a library's first-ever import (nothing to
+    /// diff against, so every app counts as an arrival).
+    SinceLastSync: string option
     Errors: string list
 }
 
@@ -1552,6 +1578,10 @@ type IMediathecaApi = {
     getJellyfinSyncStatus: unit -> Async<JellyfinSyncStatus>
     // Steam Family Last Sync
     getSteamFamilyLastSync: unit -> Async<string option>
+    /// The last completed family import's full result (integration-n3vqa),
+    /// including its arrivals list — persisted so Settings can re-render
+    /// "N new since ..." after a reload instead of only after a fresh click.
+    getSteamFamilyLastResult: unit -> Async<SteamFamilyImportResult option>
     // Steam Web API key rejection notice (integration-r8kwd): the last
     // "Steam Web API key rejected" message persisted after a 401 from the
     // GetOwnedGames supplement, or None once cleared (key saved/tested

@@ -419,6 +419,61 @@ module Api =
             | None -> return! addSeriesToLibraryImpl conn httpClient getTmdbConfig imageBasePath projectionHandlers tmdbId
         }
 
+    /// integration-n3vqa: encode/decode `SteamFamilyImportResult` (arrivals
+    /// included) for the `steam_family_last_result` SettingsStore blob —
+    /// same JSON-string-in-SettingsStore shape as `steam_family_members`
+    /// above, so Settings can re-render the last import's arrivals after a
+    /// reload instead of only right after a fresh click.
+    let private encodeSteamFamilyArrival (a: Mediatheca.Shared.SteamFamilyArrival) =
+        Thoth.Json.Net.Encode.object [
+            "appId", Thoth.Json.Net.Encode.int a.AppId
+            "name", Thoth.Json.Net.Encode.string a.Name
+            "acquiredDate", Thoth.Json.Net.Encode.option Thoth.Json.Net.Encode.string a.AcquiredDate
+            "addedBy", Thoth.Json.Net.Encode.option Thoth.Json.Net.Encode.string a.AddedBy
+        ]
+
+    let private decodeSteamFamilyArrival : Thoth.Json.Net.Decoder<Mediatheca.Shared.SteamFamilyArrival> =
+        Thoth.Json.Net.Decode.object (fun get -> {
+            Mediatheca.Shared.SteamFamilyArrival.AppId = get.Required.Field "appId" Thoth.Json.Net.Decode.int
+            Name = get.Required.Field "name" Thoth.Json.Net.Decode.string
+            AcquiredDate = get.Optional.Field "acquiredDate" Thoth.Json.Net.Decode.string
+            AddedBy = get.Optional.Field "addedBy" Thoth.Json.Net.Decode.string
+        })
+
+    let private encodeSteamFamilyImportResult (r: Mediatheca.Shared.SteamFamilyImportResult) : string =
+        Thoth.Json.Net.Encode.object [
+            "familyMembers", Thoth.Json.Net.Encode.int r.FamilyMembers
+            "gamesProcessed", Thoth.Json.Net.Encode.int r.GamesProcessed
+            "gamesCreated", Thoth.Json.Net.Encode.int r.GamesCreated
+            "familyOwnersSet", Thoth.Json.Net.Encode.int r.FamilyOwnersSet
+            "arrivals", r.Arrivals |> List.map encodeSteamFamilyArrival |> Thoth.Json.Net.Encode.list
+            "sinceLastSync", Thoth.Json.Net.Encode.option Thoth.Json.Net.Encode.string r.SinceLastSync
+            "errors", r.Errors |> List.map Thoth.Json.Net.Encode.string |> Thoth.Json.Net.Encode.list
+        ]
+        |> Thoth.Json.Net.Encode.toString 0
+
+    let private decodeSteamFamilyImportResult : Thoth.Json.Net.Decoder<Mediatheca.Shared.SteamFamilyImportResult> =
+        Thoth.Json.Net.Decode.object (fun get -> {
+            Mediatheca.Shared.SteamFamilyImportResult.FamilyMembers = get.Required.Field "familyMembers" Thoth.Json.Net.Decode.int
+            GamesProcessed = get.Required.Field "gamesProcessed" Thoth.Json.Net.Decode.int
+            GamesCreated = get.Required.Field "gamesCreated" Thoth.Json.Net.Decode.int
+            FamilyOwnersSet = get.Required.Field "familyOwnersSet" Thoth.Json.Net.Decode.int
+            Arrivals = get.Optional.Field "arrivals" (Thoth.Json.Net.Decode.list decodeSteamFamilyArrival) |> Option.defaultValue []
+            SinceLastSync = get.Optional.Field "sinceLastSync" Thoth.Json.Net.Decode.string
+            Errors = get.Optional.Field "errors" (Thoth.Json.Net.Decode.list Thoth.Json.Net.Decode.string) |> Option.defaultValue []
+        })
+
+    /// integration-n3vqa: `Incremental` (the default click) skips
+    /// `getSteamStoreDetails` and its downstream identity-card/facet/
+    /// release-date updates for apps `GameProjection.findBySteamAppId`
+    /// already knows — the fix for the burst-enumerate-everything traffic
+    /// shape Valve flagged. `FullReenrich` reproduces pre-n3vqa behaviour
+    /// (appdetails for every app, known or new) as an explicit second
+    /// action, never the default.
+    type SteamFamilyImportMode =
+        | Incremental
+        | FullReenrich
+
     let runSteamFamilyImport
         (conn: SqliteConnection)
         (httpClient: HttpClient)
@@ -427,6 +482,7 @@ module Api =
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
         (emit: SteamFamilyImportProgress -> unit)
+        (mode: SteamFamilyImportMode)
         : Async<Result<SteamFamilyImportResult, string>> = async {
             let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
                 executeCommandCore conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
@@ -489,6 +545,23 @@ module Api =
                             let mutable gamesCreated = 0
                             let mutable familyOwnersSet = 0
                             let mutable errors: string list = []
+                            let mutable arrivals: Mediatheca.Shared.SteamFamilyArrival list = []
+
+                            // integration-n3vqa: the cursor this run's "what's new"
+                            // diff is measured against — read BEFORE this run
+                            // overwrites `steam_family_last_sync` below. None on a
+                            // library's first-ever import (no prior sync to diff
+                            // against, so every app counts as an arrival).
+                            let previousLastSync = SettingsStore.getSetting conn "steam_family_last_sync"
+                            let previousLastSyncUnixSeconds =
+                                previousLastSync
+                                |> Option.bind (fun iso ->
+                                    match System.DateTimeOffset.TryParse(
+                                            iso,
+                                            System.Globalization.CultureInfo.InvariantCulture,
+                                            System.Globalization.DateTimeStyles.RoundtripKind) with
+                                    | true, dto -> Some (dto.ToUnixTimeSeconds())
+                                    | false, _ -> None)
 
                             // Steam's GetSharedLibraryApps may omit the authenticated user's
                             // own Steam ID from owner_steamids. Supplement with their owned
@@ -579,11 +652,42 @@ module Api =
                                             | Error _ -> ()
                                         | None -> ()
 
+                            // integration-n3vqa: a family member steamid this app
+                            // is credited to, resolved to a display label ("You"
+                            // for the caller, a Friends-BC slug where mapped) —
+                            // best-effort, first match wins; None when no owning
+                            // steamid on the app has a mapping yet.
+                            let ownerLabelFor (app: Steam.SteamSharedLibraryApp) : string option =
+                                app.OwnerSteamids
+                                |> List.tryPick (fun sid ->
+                                    if sid = userSteamId && not (System.String.IsNullOrWhiteSpace(userSteamId)) then Some "You"
+                                    else steamIdToFriendSlug |> Map.tryFind sid)
+
                             for app in enrichedApps do
                                 try
                                     gamesProcessed <- gamesProcessed + 1
 
                                     let existingByAppId = GameProjection.findBySteamAppId conn app.Appid
+                                    let isKnownByAppId = existingByAppId.IsSome
+                                    // "what's new" — any brand-new app, plus any
+                                    // already-known one whose rt_time_acquired
+                                    // postdates the previous sync (someone in the
+                                    // family bought a game the caller already
+                                    // owns is still news). No prior cursor (first
+                                    // -ever import) means everything is new.
+                                    let isNewlyAcquired =
+                                        not isKnownByAppId
+                                        || match previousLastSyncUnixSeconds with
+                                           | Some cursor -> app.RtTimeAcquired > 0 && int64 app.RtTimeAcquired > cursor
+                                           | None -> true
+                                    if isNewlyAcquired then
+                                        arrivals <- arrivals @ [ {
+                                            Mediatheca.Shared.SteamFamilyArrival.AppId = app.Appid
+                                            Name = app.Name
+                                            AcquiredDate = Steam.unixTimestampToDateString app.RtTimeAcquired
+                                            AddedBy = ownerLabelFor app
+                                        } ]
+
                                     match existingByAppId with
                                     | Some slug ->
                                         let sid = Games.streamId slug
@@ -595,22 +699,28 @@ module Api =
                                             Games.Serialization.toEventData
                                             (Games.Set_steam_library_date (Steam.unixTimestampToDateString app.RtTimeAcquired))
                                             projectionHandlers |> ignore
-                                        // Fetch Steam Store details for description, website, and facets
-                                        let! storeDetails = Steam.getSteamStoreDetails httpClient app.Appid
-                                        match storeDetails with
-                                        | Ok details ->
-                                            if details.AboutTheGame <> "" then
-                                                let desc =
-                                                    if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
-                                                    elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
-                                                    else ""
-                                                if desc <> "" then
-                                                    updateGameIdentityCache conn slug None (Some details.ShortDescription) None
-                                            if details.WebsiteUrl.IsSome then
-                                                updateGameIdentityCache conn slug None None (Some details.WebsiteUrl)
-                                            updateGameFacetsFromCategoryIds conn slug details.CategoryIds
-                                            updateGameReleaseDate conn slug details
-                                        | Error _ -> ()
+                                        // integration-n3vqa: the default (Incremental)
+                                        // path skips the Steam Store fetch entirely for
+                                        // an already-known app — this is the fix for
+                                        // the burst-enumerate-everything traffic shape.
+                                        // FullReenrich (the explicit second action)
+                                        // reproduces the old always-fetch behaviour.
+                                        if mode = FullReenrich then
+                                            let! storeDetails = Steam.getSteamStoreDetails httpClient app.Appid
+                                            match storeDetails with
+                                            | Ok details ->
+                                                if details.AboutTheGame <> "" then
+                                                    let desc =
+                                                        if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
+                                                        elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
+                                                        else ""
+                                                    if desc <> "" then
+                                                        updateGameIdentityCache conn slug None (Some details.ShortDescription) None
+                                                if details.WebsiteUrl.IsSome then
+                                                    updateGameIdentityCache conn slug None None (Some details.WebsiteUrl)
+                                                updateGameFacetsFromCategoryIds conn slug details.CategoryIds
+                                                updateGameReleaseDate conn slug details
+                                            | Error _ -> ()
                                         emit { Current = gamesProcessed; Total = total; GameName = app.Name; Action = "Matched" }
                                     | None ->
                                         let existingByName =
@@ -754,13 +864,23 @@ module Api =
                             // Persist last sync time for Steam Family
                             SettingsStore.setSetting conn "steam_family_last_sync" (System.DateTime.UtcNow.ToString("o"))
 
-                            return Ok {
-                                Mediatheca.Shared.SteamFamilyImportResult.FamilyMembers = memberMappings.Length
+                            let importResult : Mediatheca.Shared.SteamFamilyImportResult = {
+                                FamilyMembers = memberMappings.Length
                                 GamesProcessed = gamesProcessed
                                 GamesCreated = gamesCreated
                                 FamilyOwnersSet = familyOwnersSet
+                                Arrivals = arrivals
+                                SinceLastSync = previousLastSync
                                 Errors = errors
                             }
+                            // integration-n3vqa: persist the last completed
+                            // result (mirroring the `steam_family_members`
+                            // JSON-in-SettingsStore pattern above) so Settings
+                            // can re-render "N new since ..." after a reload,
+                            // not only right after a fresh click.
+                            SettingsStore.setSetting conn "steam_family_last_result" (encodeSteamFamilyImportResult importResult)
+
+                            return Ok importResult
             with ex ->
                 return Error $"Steam Family import failed: {ex.Message}"
         }
@@ -772,6 +892,7 @@ module Api =
         (getSteamConfig: unit -> Steam.SteamConfig)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
+        (mode: SteamFamilyImportMode)
         : HttpHandler =
         fun (next: HttpFunc) (ctx: Microsoft.AspNetCore.Http.HttpContext) ->
             task {
@@ -798,18 +919,19 @@ module Api =
                     |> Async.AwaitTask |> Async.RunSynchronously
 
                 let! result =
-                    runSteamFamilyImport conn httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers emit
+                    runSteamFamilyImport conn httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers emit mode
                     |> Async.StartAsTask
 
                 match result with
                 | Ok r ->
-                    let errorsJson =
-                        r.Errors
-                        |> List.map (fun e -> sprintf "\"%s\"" (e.Replace("\\", "\\\\").Replace("\"", "\\\"")))
-                        |> String.concat ","
-                    let json = sprintf "\"familyMembers\":%d,\"gamesProcessed\":%d,\"gamesCreated\":%d,\"familyOwnersSet\":%d,\"errors\":[%s]"
-                                    r.FamilyMembers r.GamesProcessed r.GamesCreated r.FamilyOwnersSet errorsJson
-                    do! writeEvent "complete" (sprintf "{%s}" json)
+                    // integration-n3vqa: built via the shared Thoth encoder (not
+                    // hand-rolled sprintf) now that the payload carries nested
+                    // arrivals objects — `errors` stays the final field so
+                    // `Sse.sseFrame`'s brace-trim (which strips ALL trailing
+                    // `}` characters) only ever sees one to strip, matching the
+                    // previous shape's `[...]}` ending.
+                    let json = encodeSteamFamilyImportResult r
+                    do! writeEvent "complete" json
                 | Error e ->
                     let escaped = e.Replace("\\", "\\\\").Replace("\"", "\\\"")
                     do! writeEvent "error" (sprintf "{\"message\":\"%s\"}" escaped)
@@ -4167,7 +4289,7 @@ module Api =
 
             importSteamFamily = fun () -> async {
                 use conn = factory ()
-                return! runSteamFamilyImport conn httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers (fun _ -> ())
+                return! runSteamFamilyImport conn httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers (fun _ -> ()) Incremental
             }
 
             // Connect with Steam (manual attach)
@@ -4435,6 +4557,19 @@ module Api =
             getSteamFamilyLastSync = fun () -> async {
                 use conn = factory ()
                 return SettingsStore.getSetting conn "steam_family_last_sync"
+            }
+
+            // integration-n3vqa: the last completed family import's full
+            // result (arrivals included) — lets Settings re-render "N new
+            // since ..." after a reload, not only right after a fresh click.
+            getSteamFamilyLastResult = fun () -> async {
+                use conn = factory ()
+                return
+                    SettingsStore.getSetting conn "steam_family_last_result"
+                    |> Option.bind (fun json ->
+                        match Thoth.Json.Net.Decode.fromString decodeSteamFamilyImportResult json with
+                        | Ok r -> Some r
+                        | Error _ -> None)
             }
 
             // Steam Web API key rejection (integration-r8kwd): the standing

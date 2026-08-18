@@ -1,15 +1,15 @@
 ---
 id: integration-n3vqa
 title: Incremental Steam Family import — answer "what's new in the family library since I last checked" and only enrich the newcomers
-status: doing
+status: done
 type: feature
 context: integration
 created: 2026-08-15
-completed:
+completed: 2026-08-18
 depends_on: [integration-r8kwd, design-system-001]
 blocks: []
 tags: [steam, steam-family, import, sync, settings, games]
-related_adrs: [0043, 0061]
+related_adrs: [0043, 0061, 0069]
 related_research: [steam-family-api-auto-token-refresh-2026-07-20]
 prior_art: [integration-hebjs, integration-004]
 ---
@@ -124,3 +124,68 @@ that making it *rare* is what keeps the feature usable.
     that conversation possible; capture it as a follow-on once this has proven itself. Note
     any recurring cadence needs integration-p2hxn's risk framing considered first — automated
     periodic Steam traffic is a different risk profile from a manual click.
+
+## Outcome
+
+Shipped. The default "Import Family Library" click now diffs `GetSharedLibraryApps`'
+response against `GameProjection.findBySteamAppId` before doing any per-app enrichment: a
+known app (appId hit) still gets `Set_steam_library_date`/family-owner commands but skips
+`Steam.getSteamStoreDetails` and every download entirely; a new app (no hit) still gets the
+full creation path unchanged. A steady-state import (zero new apps) now costs a fixed,
+enumerated 3 outbound Steam requests (family group, shared library, owned-games supplement)
+instead of one `appdetails` fetch per already-known title — the account-safety fix the task
+exists for. An **arrival** — any brand-new app, or an already-known one whose
+`rt_time_acquired` postdates the previous `steam_family_last_sync` — is named (game, acquired
+date, adding family member when mapped) in the new `SteamFamilyImportResult.Arrivals` and
+persisted whole (`steam_family_last_result`, JSON-in-SettingsStore) so Settings renders "N
+new since ..." after a reload, not only right after a fresh click. "Re-enrich all family
+games" is a new explicit second action (`/api/stream/reenrich-steam-family`,
+`Api.SteamFamilyImportMode.FullReenrich`) reproducing the old always-fetch-everything
+behaviour on demand.
+
+**Server:**
+- `src/Server/Api.fs` — `SteamFamilyImportMode` (`Incremental | FullReenrich`);
+  `runSteamFamilyImport` now takes the mode, reads `steam_family_last_sync` as the
+  pre-overwrite diff cursor, classifies each app (known-by-appId / newly-acquired), collects
+  `arrivals`, gates the `getSteamStoreDetails` fetch on `mode = FullReenrich` for known apps,
+  and persists `steam_family_last_result` via new `encodeSteamFamilyImportResult`/
+  `decodeSteamFamilyImportResult` helpers (mirroring the existing `steam_family_members`
+  JSON-in-SettingsStore pattern). `steamFamilyImportHandler` takes the mode and builds its
+  "complete" SSE payload via the same Thoth encoder instead of hand-rolled `sprintf`. New RPC
+  `getSteamFamilyLastResult`.
+- `src/Server/Composition.fs` — second SSE route `/api/stream/reenrich-steam-family` (mode
+  `FullReenrich`) alongside the existing `/api/stream/import-steam-family` (now explicit
+  `Incremental`).
+- `src/Shared/Shared.fs` — `SteamFamilyArrival`; `SteamFamilyImportResult` gained `Arrivals`
+  and `SinceLastSync`; `IMediathecaApi.getSteamFamilyLastResult`.
+
+**Client:**
+- `src/Client/Pages/Settings/Types.fs`/`State.fs` — `IsReenrichingSteamFamily`,
+  `SteamFamilyLastPersistedResult` (kept deliberately separate from the session-fresh
+  `SteamFamilyImportResult` — see ADR-0069 point 3, avoids hiding the primary import button
+  behind a stale "already done" reload state); shared `streamSteamFamilyImport` SSE consumer
+  used by both `Import_steam_family` and the new `Reenrich_steam_family`; `Load_steam_family_last_result`
+  fired on init.
+- `src/Client/Pages/Settings/Views.fs` — `arrivalsView` ("N new since ..." list, name/date/
+  added-by), rendered in both the fresh-completion panel and a "Last import" panel shown
+  before anything completes this session; new "Re-enrich all family games" secondary button.
+
+**Decisions:** ADR-0069 (mode threading, SSE-not-blocking-RPC for full re-enrich, the two
+separate result fields).
+
+**Tests:** `tests/Server.Tests/SteamFamilyIncrementalImportTests.fs` (7 new) — the exact
+baseline-total assertion (3 requests, zero appdetails, for a zero-new-apps default import),
+per-new-app appdetails growth, the known-app ownership/library-date regression guard, two
+arrival-classification cases (brand-new, and already-known-but-newly-acquired), the persisted
+last-result round trip, and the full-re-enrich-still-fetches-appdetails-for-known-apps case.
+`npm test`: 703 tests passing (run twice, stable), no live Steam call anywhere in the suite.
+`npm run build`: clean.
+
+## Notes (worker, 2026-08-18)
+
+- The `GetSharedLibraryApps` flags question was left untouched per the task's settled
+  answer — no live call was made to inspect the response shape (would have required an extra
+  live import, explicitly forbidden).
+- The by-name-match sub-branch (a title matched by name but with no Steam appId link yet)
+  keeps its full enrichment unconditionally in `Incremental` mode — it falls under "new" by
+  the task's own `findBySteamAppId`-hit/miss classification, not a fresh call by this worker.

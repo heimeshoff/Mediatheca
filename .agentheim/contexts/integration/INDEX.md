@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 16
+- **Doing:** 0
+- **Done:** 17
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **integration-n3vqa** — Incremental Steam Family import — answer "what's new in the family library since I last checked" and only enrich the newcomers (feature) — `doing/integration-n3vqa-incremental-family-import-whats-new.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **integration-n3vqa** — Incremental Steam Family import — answer "what's new in the family library since I last checked" and only enrich the newcomers (feature) — `done/integration-n3vqa-incremental-family-import-whats-new.md`
 - **integration-k4vqm** — An empty `GetOwnedGames` response is treated as success everywhere — the key test probes a third party's private profile and calls a good key "may be invalid", while the import and the scheduled sync silently degrade (bug) — `done/integration-k4vqm-empty-owned-games-is-not-success.md`
 - **integration-p2hxn** — Accept and document the MobileApp-from-datacenter-IP login signature as a known Steam account-flag risk — mitigations, a no-speculative-reconnect rule, and an escalation ladder (decision) — `done/integration-p2hxn-accept-document-steam-login-signature-risk.md`
 - **integration-w7ktb** — Steam storefront calls are paced by the caller, not the Adapter — the family import paces not at all; move throttling into `Steam.fs` so every storefront caller inherits it (bug) — `done/integration-w7ktb-adapter-owned-steam-storefront-throttle.md`
@@ -53,6 +53,7 @@ research touching this BC, and concept synthesis pages.
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0069** -- The Steam Family import diffs before it enriches: `GetSharedLibraryApps` is classified against `GameProjection.findBySteamAppId`, and only *new* apps get a store `appdetails` fetch — a steady-state import with zero new apps is a fixed **3** outbound Steam requests instead of one per title. *Arrivals* (new apps, plus already-known apps whose `rt_time_acquired` postdates `steam_family_last_sync`) are named with date and family member and persisted to `steam_family_last_result` so Settings survives a reload; per ADR-0043 an arrival is cache, not an event. A second explicit `FullReenrich` mode reproduces the old fetch-everything behaviour. Complements ADR-0066: that one owns request *spacing*, this one owns request *count* -- 2026-08-18 -- `knowledge/decisions/0069-incremental-family-import-diff-and-full-reenrich-wiring.md`
 - **0068** -- An empty Steam owned/recently-played-games response is **inconclusive**, not success and not failure (amends ADR-0065): `{"response":{}}` means *either* "owns nothing" *or* "Game details privacy is not Public", and no caller can tell which. `testSteamApiKey` probes the builder's own stored `steam_id` (falling back to a profile-independent key-only endpoint) instead of a hardcoded third-party SteamID, and yields three distinct outcomes — rejected / valid / valid-but-inconclusive. An empty family-import supplement no longer clears `steam_api_key_last_error`, and the scheduled playtime sync persists a `KeyRejected` notice instead of no-oping silently -- 2026-08-18 -- `knowledge/decisions/0068-steam-empty-owned-games-is-inconclusive-not-failure.md`
 - **0067** -- The Steam Connect QR ceremony's `MobileApp`-platform login from the Docker host's datacenter IP is an **accepted risk**, not a fixable defect: reversing ADR-0019 point 2 would force a permanent SteamKit2 + live-CM dependency into the server. Every claim about Valve's detection is labelled speculation. Establishes the no-speculative-reconnect rule (the QR ceremony runs only on an explicit "reconnect required" marker, never as a diagnostic first step) and a three-step escalation ladder with costs -- 2026-08-18 -- `knowledge/decisions/0067-steam-mobileapp-login-signature-accepted-risk-and-escalation-ladder.md`
 - **0066** -- Steam storefront calls are paced inside the Adapter, not by callers: one process-wide `Steam.throttleStorefrontCall` gate (a `SemaphoreSlim` held across the interval wait and the call itself, default 1500ms from the ~200 req/5min ceiling, injectable for tests) fronts every `store.steampowered.com` call — `appdetails`, trailers, search store-meta, and the Deck-compat store page — replacing eleven independently-remembered caller-owned `Async.Sleep`s, only three of which existed -- 2026-08-18 -- `knowledge/decisions/0066-steam-storefront-throttle-is-adapter-owned.md`

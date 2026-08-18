@@ -64,6 +64,17 @@ type Model = {
     SteamFamilyImportResult: Result<SteamFamilyImportResult, string> option
     ImportProgress: SteamFamilyImportProgress option
     ImportLog: (string * string) list
+    /// integration-n3vqa: "Re-enrich all family games" — the explicit
+    /// second action that reproduces the old always-fetch-everything
+    /// behaviour, kept distinct from `IsImportingSteamFamily` so the two
+    /// actions' buttons/progress never get confused for one another.
+    IsReenrichingSteamFamily: bool
+    /// The last completed import's persisted result, loaded once on mount
+    /// (`getSteamFamilyLastResult`) — kept separate from
+    /// `SteamFamilyImportResult` (which tracks THIS session's fresh
+    /// click) so a reload showing the last result never hides the "Import
+    /// Family Library" button behind a stale "already done" state.
+    SteamFamilyLastPersistedResult: SteamFamilyImportResult option
     // Jellyfin Integration
     JellyfinServerUrl: string
     JellyfinServerUrlInput: string
@@ -179,6 +190,13 @@ type Msg =
     | Import_steam_family
     | Steam_family_import_progress of SteamFamilyImportProgress
     | Steam_family_import_completed of Result<SteamFamilyImportResult, string>
+    /// integration-n3vqa: "Re-enrich all family games" — the explicit
+    /// second action, streamed the same way as the default import but
+    /// against `/api/stream/reenrich-steam-family`.
+    | Reenrich_steam_family
+    | Steam_family_reenrich_completed of Result<SteamFamilyImportResult, string>
+    | Load_steam_family_last_result
+    | Steam_family_last_result_loaded of SteamFamilyImportResult option
     // Jellyfin Integration
     | Load_jellyfin_settings
     | Jellyfin_settings_loaded of serverUrl: string * username: string

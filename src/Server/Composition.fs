@@ -478,7 +478,12 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         choose [
             route "/health" >=> text "ok"
             route "/api/stream/import-steam-family"
-                >=> Api.steamFamilyImportHandler connectionFactory httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers
+                >=> Api.steamFamilyImportHandler connectionFactory httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers Api.Incremental
+            // integration-n3vqa: the explicit "Re-enrich all family games"
+            // action — reproduces pre-n3vqa behaviour (Steam Store appdetails
+            // for every app, known or new). Never the default import click.
+            route "/api/stream/reenrich-steam-family"
+                >=> Api.steamFamilyImportHandler connectionFactory httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers Api.FullReenrich
             route "/api/stream/steam-connect"
                 >=> Api.steamConnectStreamHandler connectionFactory
             route "/api/stream/export-events"

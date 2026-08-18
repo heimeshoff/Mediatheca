@@ -35,6 +35,44 @@ let private lastSyncLabel (lastSync: string option) =
             prop.text (sprintf "Last synced: %s" (formatRelativeTime isoTime))
         ]
 
+/// integration-n3vqa: "N new since ..." — the arrivals list an incremental
+/// family import (or its persisted last-result, after a reload) reports.
+/// Shared by the fresh-completion panel and the "last import" reload panel
+/// so the two never drift in shape.
+let private arrivalsView (arrivals: SteamFamilyArrival list) (sinceLastSync: string option) =
+    if List.isEmpty arrivals then Html.none
+    else
+        let sinceLabel =
+            match sinceLastSync with
+            | Some iso -> sprintf "since %s" (formatRelativeTime iso)
+            | None -> "on this first import"
+        Html.div [
+            prop.className "mt-2"
+            prop.children [
+                Html.p [
+                    prop.className "font-bold"
+                    prop.text (sprintf "%d new %s:" arrivals.Length sinceLabel)
+                ]
+                Html.ul [
+                    prop.className "mt-1 text-sm space-y-0.5"
+                    prop.children (
+                        arrivals |> List.map (fun a ->
+                            Html.li [
+                                prop.children [
+                                    Html.span [ prop.className "font-medium"; prop.text a.Name ]
+                                    match a.AcquiredDate with
+                                    | Some d -> Html.span [ prop.className "text-base-content/50 font-mono text-xs ml-2"; prop.text d ]
+                                    | None -> Html.none
+                                    match a.AddedBy with
+                                    | Some who -> Html.span [ prop.className "text-base-content/50 text-xs ml-2"; prop.text (sprintf "— added by %s" who) ]
+                                    | None -> Html.none
+                                ]
+                            ])
+                    )
+                ]
+            ]
+        ]
+
 let private statusBadge configured (label: string) =
     Daisy.badge [
         if configured then badge.success else badge.warning
@@ -1068,6 +1106,62 @@ let private steamFamilyDetail (model: Model) (dispatch: Msg -> unit) =
                             ]
                         ]
 
+                    // integration-n3vqa: "Re-enrich all family games" — the
+                    // explicit second action reproducing today's (pre-n3vqa)
+                    // always-fetch-everything behaviour. Deliberately NOT
+                    // gated on `SteamFamilyImportResult.IsNone` like the
+                    // primary button above — it stays available even after a
+                    // default import has completed this session, since
+                    // "I want a full refresh" is a legitimate follow-up ask.
+                    if not model.IsImportingSteamFamily && not model.IsReenrichingSteamFamily then
+                        Html.div [
+                            prop.className "mb-4"
+                            prop.children [
+                                Daisy.button.button [
+                                    button.ghost
+                                    button.sm
+                                    prop.onClick (fun _ -> dispatch Reenrich_steam_family)
+                                    prop.disabled (
+                                        model.SteamFamilyToken = ""
+                                        || List.isEmpty model.SteamFamilyMembers
+                                        || not hasMappedMembers)
+                                    prop.text "Re-enrich all family games (full refresh, slower)"
+                                ]
+                            ]
+                        ]
+
+                    if model.IsReenrichingSteamFamily then
+                        Html.div [
+                            prop.className "flex items-center gap-2 text-sm mb-4"
+                            prop.children [
+                                Daisy.loading [ loading.spinner; loading.sm ]
+                                Html.span [ prop.text "Re-enriching all family games..." ]
+                            ]
+                        ]
+
+                    // Last import's persisted result (survives a reload) —
+                    // only shown before anything has completed THIS session,
+                    // since a fresh completion below always supersedes it.
+                    if model.SteamFamilyImportResult.IsNone && not model.IsImportingSteamFamily && not model.IsReenrichingSteamFamily then
+                        match model.SteamFamilyLastPersistedResult with
+                        | Some persisted ->
+                            Html.div [
+                                prop.className "mb-4"
+                                prop.children [
+                                    Daisy.alert [
+                                        prop.children [
+                                            Html.div [
+                                                Html.p [ prop.className "font-bold text-sm text-base-content/70"; prop.text "Last import" ]
+                                                arrivalsView persisted.Arrivals persisted.SinceLastSync
+                                                if List.isEmpty persisted.Arrivals then
+                                                    Html.p [ prop.className "text-sm text-base-content/50 mt-1"; prop.text "No new games since last time." ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        | None -> Html.none
+
                     // Live progress during import
                     if model.IsImportingSteamFamily then
                         Html.div [
@@ -1160,6 +1254,7 @@ let private steamFamilyDetail (model: Model) (dispatch: Msg -> unit) =
                                                     Html.li [ prop.text (sprintf "Family owners set: %d" result.FamilyOwnersSet) ]
                                                 ]
                                             ]
+                                            arrivalsView result.Arrivals result.SinceLastSync
                                             if not (List.isEmpty result.Errors) then
                                                 Html.div [
                                                     prop.className "mt-2"

@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-18 19:44 -- Task verified and completed: integration-n3vqa - Incremental Steam Family import — answer "what's new in the family library since I last checked" and only enrich the newcomers
+
+**Type:** Work / Task completion
+**Task:** integration-n3vqa - Incremental Steam Family import — answer "what's new in the family library since I last checked" and only enrich the newcomers
+**Summary:** incremental Steam Family import — diff the shared library, enrich only newcomers, and name what arrived
+**Duration:** 56m
+**Verification:** PASS (iteration 1)
+**Files changed:** 10
+**Tests added:** 7
+**ADRs written:** 0069
+
+---
+
 ## 2026-08-18 19:33 -- Task verified and completed: integration-k4vqm - An empty `GetOwnedGames` response is treated as success everywhere — the key test probes a third party's private profile and calls a good key "may be invalid", while the import and the scheduled sync silently degrade
 
 **Type:** Work / Task completion
