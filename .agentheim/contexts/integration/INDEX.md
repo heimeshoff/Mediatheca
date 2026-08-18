@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 3
+- **Todo:** 4
 - **Doing:** 0
 - **Done:** 13
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **integration-k4vqm** — An empty `GetOwnedGames` response is treated as success everywhere — the key test probes a third party's private profile and calls a good key "may be invalid", while the import and the scheduled sync silently degrade (bug) — `todo/integration-k4vqm-empty-owned-games-is-not-success.md`
 - **integration-w7ktb** — Steam storefront calls are paced by the caller, not the Adapter — the family import paces not at all; move throttling into `Steam.fs` so every storefront caller inherits it (bug) — `todo/integration-w7ktb-adapter-owned-steam-storefront-throttle.md`
 - **integration-p2hxn** — Accept and document the MobileApp-from-datacenter-IP login signature as a known Steam account-flag risk — mitigations, a no-speculative-reconnect rule, and an escalation ladder (decision) — `todo/integration-p2hxn-accept-document-steam-login-signature-risk.md`
 - **integration-n3vqa** — Incremental Steam Family import — answer "what's new in the family library since I last checked" and only enrich the newcomers (feature) — `todo/integration-n3vqa-incremental-family-import-whats-new.md`

@@ -137,6 +137,37 @@ request, not a library sweep:
 2. Click **Test Connection**. One request. Confirm it succeeds and the notice has cleared.
 3. Record the outcome here: root-cause confirmed (the old key was revoked) or refuted.
 
+### Half A outcome — 2026-08-18: ROOT CAUSE CONFIRMED
+
+The builder regenerated the Web API key at steamcommunity.com/dev/apikey, saved it in
+Settings → Steam, and ran **Test Connection**. Result: `API key accepted but returned no
+results (may be invalid)`.
+
+**That message confirms the hypothesis rather than undermining it.** It is
+`testSteamApiKey`'s empty-list branch (`Api.fs:3660`), which is only reachable **after a
+2xx** — a rejected key throws in `fetchJson`'s `EnsureSuccessStatusCode` and lands in the
+`with ex ->` branch as `Steam API key validation failed: … 401`. So Steam **accepted** the
+new key. The same credential path that threw 401 in production now returns 200 with only
+the key changed, which is the decisive evidence: the old key had been revoked, exactly as
+this task's Why predicted for Valve's compromise-flag remediation, and that revoked key is
+what produced the opaque `Steam Family import failed: … 401`.
+
+**Honest caveat:** Test Connection was never run against the *old* key (the builder
+regenerated first), so revocation is inferred from the production 401 plus the
+new-key-returns-200 contrast rather than observed directly at the moment of test. The chain
+is strong but one step short of airtight. If the builder noted whether
+steamcommunity.com/dev/apikey showed *no key registered* before regenerating, that would
+settle it outright — record it here if so.
+
+**The "returned no results" half is a separate, newly-found defect, NOT a key problem** —
+`testSteamApiKey` probes a hardcoded third-party SteamID (`76561197960435530`, commented
+"Robin Walker (Valve employee, public profile)") whose game-details privacy is outside this
+project's control, and `GetOwnedGames` answers `{"response":{}}` for any profile whose game
+details are not public. Captured as **integration-k4vqm**. The key itself is fine.
+
+**Half A is therefore closed and this task's diagnosis is settled.** Half B (a live family
+import) remains deferred to integration-n3vqa per below.
+
 **Half B — deferred, owner named.** *"A live family import succeeds end to end"* is **not**
 run now. It is discharged by **integration-n3vqa's** own builder gate: that task's first live
 import will be a small incremental one (a handful of requests) rather than today's

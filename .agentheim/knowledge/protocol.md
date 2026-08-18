@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-08-18 16:40 -- Modeling / Captured: integration-k4vqm - An empty `GetOwnedGames` response is treated as success everywhere
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** Found while closing integration-r8kwd's builder gate. The builder regenerated the Steam Web API key and clicked Test Connection; Settings reported *"API key accepted but returned no results (may be invalid)"* — a good key called bad. `testSteamApiKey` (`Api.fs:3653-3670`) does not test the builder's account at all: it substitutes a **hardcoded third-party SteamID** (`76561197960435530`, commented "Robin Walker (Valve employee, public profile)") and calls the key invalid when the response is empty. `GetOwnedGames` returns `{"response":{}}` for any profile whose *Game details* privacy is not public, so the verdict rides entirely on a stranger's privacy setting that this project neither controls nor can notice changing — the comment's "public profile" is a load-bearing assumption with nothing keeping it true. The deeper defect: an empty owned-games list is read as meaningful success in **three** places, when it genuinely means *either* "owns nothing" *or* "game details private" *or* "probe target changed" — (1) the key test collapses "rejected" and "valid but inconclusive" into one misleading verdict, reproducing for this credential the exact ambiguity r8kwd removed for the other; (2) the family-import supplement treats `Ok []` as success and **clears** the standing `steam_api_key_last_error` notice, silently wiping a warning and proceeding with no own-ownership; (3) the scheduled playtime sync records nothing, silently — the risk r8kwd explicitly flagged as out of its own scope, now given a home. Every acceptance criterion is satisfiable against a fake `HttpClient`; no live Steam traffic.
+
+---
+
+## 2026-08-18 16:40 -- Work / Builder gate closed: integration-r8kwd - root cause CONFIRMED
+
+**Type:** Modeling / Builder gate outcome
+**BC:** integration
+**Task:** integration-r8kwd (done)
+**Outcome:** **Root-cause hypothesis confirmed.** The builder regenerated the Web API key, saved it, and ran Test Connection. The resulting *"API key accepted but returned no results"* is `testSteamApiKey`'s empty-list branch, reachable **only after a 2xx** — a rejected key throws in `EnsureSuccessStatusCode` and surfaces as `Steam API key validation failed: … 401`. So Steam accepted the new key, and the same credential path that threw 401 in production now returns 200 with only the key changed: the old key had been revoked, exactly as r8kwd's Why predicted for Valve's compromise-flag remediation, and that is what produced the opaque `Steam Family import failed: … 401`. **Caveat recorded in the task:** Test Connection was never run against the *old* key (the builder regenerated first), so revocation is inferred from the production 401 plus the new-key contrast rather than observed at the moment of test — strong, one step short of airtight. The "no results" half is a separate defect, not a key problem → integration-k4vqm. Half A closed; Half B (a live family import) stays deferred to integration-n3vqa.
+
+---
+
 ## 2026-08-18 16:10 -- Modeling / Refined: integration-n3vqa - Incremental Steam Family import
 
 **Type:** Modeling / Refine
