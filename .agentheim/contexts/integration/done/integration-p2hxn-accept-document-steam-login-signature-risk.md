@@ -1,15 +1,15 @@
 ---
 id: integration-p2hxn
 title: Accept and document the MobileApp-from-datacenter-IP login signature as a known Steam account-flag risk — mitigations, a no-speculative-reconnect rule, and an escalation ladder
-status: doing
+status: done
 type: decision
 context: integration
 created: 2026-08-18
-completed:
+completed: 2026-08-18
 depends_on: []
 blocks: []
 tags: [steam, steam-connect, auth, token, security, risk, adr]
-related_adrs: [0019, 0061, 0065]
+related_adrs: [0019, 0061, 0065, 0067]
 related_research: [steam-family-api-auto-token-refresh-2026-07-20]
 prior_art: [integration-hebjs, integration-ygwsa, integration-r8kwd]
 ---
@@ -63,14 +63,14 @@ Write an ADR (scope: integration) that:
 
 ## Acceptance criteria
 
-- [ ] An ADR exists under `.agentheim/knowledge/decisions/` with `scope: integration`,
+- [x] An ADR exists under `.agentheim/knowledge/decisions/` with `scope: integration`,
       cross-referenced from ADR-0019 and ADR-0061 (and those two updated to point at it, so the
       note-in-passing now leads somewhere).
-- [ ] Every claim about Valve's detection is explicitly labelled speculation.
-- [ ] The ADR records the no-speculative-reconnect rule in a form a future worker or refiner
+- [x] Every claim about Valve's detection is explicitly labelled speculation.
+- [x] The ADR records the no-speculative-reconnect rule in a form a future worker or refiner
       can actually follow.
-- [ ] The escalation ladder names all three steps with their costs.
-- [ ] A "what would change this decision" section names a concrete trigger.
+- [x] The escalation ladder names all three steps with their costs.
+- [x] A "what would change this decision" section names a concrete trigger.
 
 ## Notes
 
@@ -87,3 +87,34 @@ Write an ADR (scope: integration) that:
   authorized devices). Valve's warning may be literal rather than a false positive — that
   question is outside this ADR's scope but must be answered before its "accepted risk" framing
   is sound.
+
+## Outcome
+
+Wrote ADR-0067 (`.agentheim/knowledge/decisions/0067-steam-mobileapp-login-signature-accepted-risk-and-escalation-ladder.md`),
+accepting the `MobileApp`-from-datacenter-IP login signature as a documented, currently
+unfixable-under-ADR-0019 risk. It: names the signature and labels the causal mechanism a
+hypothesis (Valve's heuristics are undocumented); explains why reversing ADR-0019 point 2
+would reintroduce a permanent SteamKit2/live-CM dependency; records the mitigations already
+live (user-click-only QR ceremony, mint-only-on-`Rejected`, integration-r8kwd's removal of
+the misattributed-401 reconnect loop); states the no-speculative-reconnect rule in a
+checkable form (`Start_steam_connect`/`SteamNeedsReconnect` may only be driven by an explicit
+"reconnect required" signal, never automatically, diagnostically, or for an unrelated
+credential's failure); defines the three-step escalation ladder (let ADR-0066/integration-n3vqa's
+enumeration-half fixes land and observe → the ADR-0019-point-4 browser-retrieval fallback,
+evaluated not built → reverse ADR-0019 point 2 as a last resort) with each step's cost; and
+names concrete reopening triggers (a third flag after the enumeration-half fixes have had a
+full usage cycle; a silently-invalidated refresh token; confirmed actual compromise, which
+would invalidate the ADR's premise entirely rather than feed its ladder).
+
+Cross-referenced both source ADRs: ADR-0019 point 2 and point 4 now point at ADR-0067 (and
+its `related_tasks` frontmatter includes this task); ADR-0061's Consequences section gained a
+new "Negative / accepted tradeoff" bullet promoting its passing "new device" note into a
+pointer at ADR-0067 (and its `related_tasks` frontmatter likewise updated). The `integration`
+BC README gained one Open Questions bullet naming the accepted risk and pointing at ADR-0067,
+so a future session reading the README first learns of it before touching `SteamConnect.fs`.
+
+No code changed — factual claims (platform type, persistent session, user-click-only trigger,
+the `"reconnect required: ..."` substring gate) were checked directly against
+`src/Server/SteamConnect.fs` and `src/Client/Pages/Settings/State.fs`/`Views.fs` before being
+asserted in the ADR. The optional code lever noted below (observable reconnect-frequency
+logging) was not built, per the task's own "optional, not required" framing.

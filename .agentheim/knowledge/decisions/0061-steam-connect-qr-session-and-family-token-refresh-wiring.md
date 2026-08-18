@@ -6,7 +6,7 @@ status: accepted
 date: 2026-08-07
 supersedes: []
 superseded_by: []
-related_tasks: [integration-hebjs, integration-ygwsa]
+related_tasks: [integration-hebjs, integration-ygwsa, integration-p2hxn]
 related_research: [steam-family-api-auto-token-refresh-2026-07-20]
 ---
 
@@ -136,6 +136,14 @@ builder gate proved live.
 
 ### Negative / accepted tradeoff
 
+- Each run of this QR ceremony opens a new `MobileApp`-platform, persistent-session Steam
+  login from the Docker host's IP — ordinarily a datacenter/VPS address for a self-hosted
+  deployment (ADR-0007), not a residential one. From Valve's side that plausibly reads as "a
+  new device signing in from a new location," and repeated reconnects in a short window would
+  only reinforce that reading. This was noticed here in passing; **ADR-0067 promotes it to a
+  named, accepted risk** with a no-speculative-reconnect rule and an escalation ladder — read
+  it before proposing to run this ceremony more often, or automatically, or before proposing to
+  reverse ADR-0019's platform choice to make the signature go away.
 - A mid-ceremony server restart orphans the in-memory QR session with no
   explicit cleanup — acceptable (single-user, short ceremony, cheap manual
   retry) but would need revisiting if Connect Steam ever needs to survive a

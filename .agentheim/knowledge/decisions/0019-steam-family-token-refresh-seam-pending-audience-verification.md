@@ -4,7 +4,7 @@ title: Steam Family token refresh — pure mint-and-retry seam shipped, live aud
 scope: integration
 status: accepted
 date: 2026-07-20
-related_tasks: [integration-ygwsa, integration-hebjs]
+related_tasks: [integration-ygwsa, integration-hebjs, integration-p2hxn]
 ---
 
 # ADR 0019: Steam Family token refresh — pure mint-and-retry seam shipped, live audience/scope verification deferred
@@ -53,7 +53,10 @@ or failing at this specific call.
    obtained with `AuthSessionDetails.PlatformType = MobileApp` and `IsPersistentSession =
    true`** (a `SteamClient`-platform token needs an authenticated CM connection to refresh
    as of an April 2025 Steam-side change — that would force a permanent SteamKit2 + live-CM
-   dependency into the server, which we want to avoid). A throwaway harness reflecting this
+   dependency into the server, which we want to avoid). **This platform choice is why the
+   resulting login session reads as "a `MobileApp`-platform session signing in from a
+   datacenter IP" — an accepted, currently-unfixable-under-this-decision risk; see ADR-0067
+   before proposing to reverse it.** A throwaway harness reflecting this
    shape lives in `spikes/steam-family-token-spike/` (`login.fsx`, `refresh-and-call.fsx`) —
    **UNEXECUTED**, written to the documented API but never run against the real Steam
    network. SteamKit2 only becomes a real `Server.fsproj` dependency if integration-hebjs's
@@ -75,7 +78,7 @@ or failing at this specific call.
    Steam-side audience assumption," and is strictly less invasive to `Server.fsproj` (no
    SteamKit2 dependency at all, still needs a browser profile signed into Steam). Community
    precedent (Chachigo's `FamilyBot`) uses exactly this approach and reports it as the only
-   one that works for them — weak but real signal in its favor as a fallback.
+   one that works for them — weak but real signal in its favor as a fallback. **This is now formally escalation-ladder step 2 in ADR-0067** (the accepted-risk ADR for the MobileApp-from-datacenter-IP login signature this platform choice produces) — still evaluated, not built; do not pre-spike it without a trigger named there.
 
 ## Consequences
 

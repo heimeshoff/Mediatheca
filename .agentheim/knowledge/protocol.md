@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-08-18 19:23 -- Task verified and completed: integration-p2hxn - Accept and document the MobileApp-from-datacenter-IP login signature as a known Steam account-flag risk — mitigations, a no-speculative-reconnect rule, and an escalation ladder
+
+**Type:** Work / Task completion
+**Task:** integration-p2hxn - Accept and document the MobileApp-from-datacenter-IP login signature as a known Steam account-flag risk — mitigations, a no-speculative-reconnect rule, and an escalation ladder
+**Summary:** accept and document the MobileApp-from-datacenter-IP Steam login signature as a known account-flag risk
+**Duration:** 42m
+**Verification:** PASS (iteration 1)
+**Files changed:** 5
+**Tests added:** 0
+**ADRs written:** 0067
+
+---
+
 ## 2026-08-18 18:37 -- Batch started: [integration-k4vqm, integration-p2hxn, integration-n3vqa]
 
 **Type:** Work / Batch start
