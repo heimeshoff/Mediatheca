@@ -1,7 +1,7 @@
 ---
 id: integration-p2hxn
 title: Accept and document the MobileApp-from-datacenter-IP login signature as a known Steam account-flag risk — mitigations, a no-speculative-reconnect rule, and an escalation ladder
-status: todo
+status: doing
 type: decision
 context: integration
 created: 2026-08-18

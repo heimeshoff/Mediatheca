@@ -1,7 +1,7 @@
 ---
 id: integration-n3vqa
 title: Incremental Steam Family import — answer "what's new in the family library since I last checked" and only enrich the newcomers
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-08-15

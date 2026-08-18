@@ -1,7 +1,7 @@
 ---
 id: integration-k4vqm
 title: An empty `GetOwnedGames` response is treated as success everywhere — the key test probes a third party's private profile and calls a good key "may be invalid", while the import and the scheduled sync silently degrade
-status: todo
+status: doing
 type: bug
 context: integration
 created: 2026-08-18

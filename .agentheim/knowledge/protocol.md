@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-08-18 18:37 -- Batch started: [integration-k4vqm, integration-p2hxn, integration-n3vqa]
+
+**Type:** Work / Batch start
+**Tasks:** integration-k4vqm - An empty `GetOwnedGames` response is treated as success everywhere — the key test probes a third party's private profile and calls a good key "may be invalid", while the import and the scheduled sync silently degrade, integration-p2hxn - Accept and document the MobileApp-from-datacenter-IP login signature as a known Steam account-flag risk — mitigations, a no-speculative-reconnect rule, and an escalation ladder, integration-n3vqa - Incremental Steam Family import — answer "what's new in the family library since I last checked" and only enrich the newcomers
+**Parallel:** yes (3 workers — the entire ready set; MAX_PARALLEL=3 held nothing back). Merge-order advisory: integration-k4vqm squash-merges before integration-n3vqa — both edit the family-import region of src/Server/Api.fs and the integration BC README (k4vqm changes the owned-games-supplement empty-response handling that n3vqa restructures), so a real 3-way conflict on n3vqa is expected-possible and will be surfaced, never auto-guessed. integration-p2hxn is ADR-only and overlaps neither.
+
+---
+
 ## 2026-08-18 18:06 -- Work session ended
 
 **Type:** Work / Session end
