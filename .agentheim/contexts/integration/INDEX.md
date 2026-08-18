@@ -77,7 +77,7 @@ research touching this BC, and concept synthesis pages.
 ## Concepts (opt-in synthesis pages)
 
 <!-- concepts:start -->
-<!-- no concept pages yet -->
+- **steam-account-flag-risk-surface** -- What Mediatheca's Steam account-hijack-flag risk is made of: three independent Steam surfaces that must never be conflated (family refresh token / Web API key / unauthenticated storefront), the two halves of the suspected signature -- enumeration (fixed: ADR-0066 spacing + ADR-0069 count) and login (accepted as unfixable under ADR-0019 pt 2) -- the no-speculative-reconnect rule, and the escalation ladder -- `contexts/integration/concepts/steam-account-flag-risk-surface.md`
 <!-- concepts:end -->
 
 ## Pointers
