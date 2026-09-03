@@ -303,4 +303,5 @@ Parts A/B and the post-deploy check were executed by the builder on 2026-09-03: 
 server backups under `/app/data/backups/` and the dev-machine `backups/` folder were deleted
 (both verified empty afterwards over SSH / on disk), then `/deploy` shipped the retired image.
 The first boot logged zero `StartupCutover` lines and the container came up healthy. The
-in-app drift check (expected 0/7) remains a builder-side observation from the Settings panel.
+in-app drift check from the Settings panel reported 0 discrepancies across all 7 projections
+(builder-observed 2026-09-03). Every acceptance criterion is now met.
