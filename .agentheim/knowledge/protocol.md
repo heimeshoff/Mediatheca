@@ -5,6 +5,28 @@ Newest entries on top.
 
 ---
 
+## 2026-09-03 20:14 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 36m (first "Batch started" 19:38 → 20:14)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** games-t69rb: 1
+**Commits:** 3 (batch start, task completion, this entry)
+**Vision-conformance:** none — batch aligns with vision. The one shipped task is a Games detail-page UX change (persistent card column, Journal-first default tab) — media-experience work; it touches no Out-of-Scope (v1) item (no trailer playback added, no Books/Trakt/intelligence scope) and adds no admin-console scope.
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task) — hand-classified; installed plugin 0.9.2 carries no `vacuum-guard.mjs`. `type: feature` → product-facing.
+**Carry-over:** none — working tree clean, no registered worktrees remain. A stray unregistered `.worktrees/infrastructure-r8kqt/src/Server/obj/` residue (three dotnet build files locked during that session's teardown, 17:36) was found and deleted; `.worktrees/` removed.
+
+**Session-start churn note:** 0 recognized machine-shape commits, 0 human commits since the 18:00 boundary — all six commits carry task trailers (infrastructure-r8kqt runbook records, administration-b3xqf rotation, games-t69rb capture). Nothing to re-align.
+
+**Human-eye pending (games-t69rb):** "switching tabs does not visibly reflow or flash the card column" is unticked in the task file — builder check on a real game page. The Playwright spec `tests/e2e/game-detail-persistent-cards.spec.ts` was written but not executed by the verifier (build + Expecto 685/685 + Vitest 16/16 were).
+
+**Harness notes:** (1) plugin 0.9.2's `checkpoint` manifest again did not fold in the vacated `doing/` path — staged explicitly, git recorded the move as a rename. (2) Worker's `FILES_CHANGED: 20` undercounted its own 22-path FILE_LIST (13 of them one-line `GameJournal.initialize` additions to server test fixtures, mechanical from the new DTO field). (3) Board is empty after this task — no ready work in any BC; vision.md has no "Open questions" section for the vacuum guard to surface.
+
+---
+
 ## 2026-09-03 20:11 -- Task verified and completed: games-t69rb - Game detail page — keep the right-hand card column (Links, play facets, friends, …) mounted across the Overview/Journal tabs so switching only swaps the content column, and open on the Journal tab when the game's journal document already has content, Overview otherwise
 
 **Type:** Work / Task completion
