@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-03 17:22 -- Batch started: [infrastructure-r8kqt]
+
+**Type:** Work / Batch start
+**Tasks:** infrastructure-r8kqt - Retire the one-shot cutover machinery and its backups once production has been stable for two weeks — delete StartupCutover.fs plus its tests and Composition call sites, revert ensureSafeCatchUp to Projection.startAllProjections, and remove the pre-cutover backup files from the server and dev volumes
+**Parallel:** no (1 worker — infrastructure-r8kqt is the only ready task across every BC; nothing held back)
+
+---
+
 ## 2026-09-03 17:20 -- Modeling / Promoted: infrastructure-r8kqt - Retire the one-shot cutover machinery and its backups once production has been stable for two weeks — delete StartupCutover.fs plus its tests and Composition call sites, revert ensureSafeCatchUp to Projection.startAllProjections, and remove the pre-cutover backup files from the server and dev volumes
 
 **Type:** Modeling / Promote
