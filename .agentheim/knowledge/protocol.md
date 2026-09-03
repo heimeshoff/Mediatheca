@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-09-03 17:51 -- Modeling / Refined: administration-b3xqf - Update the administration README's Offline demoted-event filter entry
+
+**Type:** Modeling / Refine
+**BC:** administration
+**Status after:** todo
+**Summary:** Grounded the stale-README follow-up against the tree: README line 28 is the only line naming the deleted `EventLogFilter.fs`/`StartupCutover.fs`; ADR-0052 already carries a retirement note, ADR-0058 does not; the runbook has its executed/retired header. Settled the open question in What: the entry is reframed as settled history (README's existing "retired"/"formerly" convention), the `StartupCutover.fs` compile-dependency anecdote is dropped in favour of a one-clause pointer to ADR-0058 (pointer over restatement), and a matching "Retirement note (2026-09-03)" is added to ADR-0058. Scope pinned to exactly two files, six machine-checkable criteria. No orchestrator round — pure documentation chore, findings were factual.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-09-03 17:40 -- Work session ended
 
 **Type:** Work / Session end
