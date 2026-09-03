@@ -5,6 +5,28 @@ Newest entries on top.
 
 ---
 
+## 2026-09-03 17:40 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 18m (first "Batch started" 17:22 → 17:40)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** infrastructure-r8kqt: 1
+**Commits:** 3 (batch start, task completion, this entry)
+**Vision-conformance:** none — batch aligns with vision. The one shipped task retires temporary cutover machinery, a dead sync gate, and a fired one-shot CLI (net −1116 lines); it adds no admin-console scope, pulls toward no Out-of-Scope (v1) item, and moves nothing away from Remaining v1 Work.
+**Batch mix:** 0% product-facing / 100% harness / 0% bookkeeping (1 task) — hand-classified; installed plugin 0.9.2 carries no `vacuum-guard.mjs`. `type: chore` touching real source (`Composition.fs`, `PlaytimeTracker.fs`, `Program.fs`, both fsprojs, four deleted modules) rather than purely bookkeeping surfaces.
+**Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed.
+
+**Session-start churn note:** one untrailed human commit since the last session-end boundary — `ed07f87 research for dashboard` (three research reports plus three root-level dashboard notes). Touches no governed surface; nothing to re-align. 0 recognized machine-shape commits, 1 human commit.
+
+**Builder runbook pending (from infrastructure-r8kqt):** Part B — delete the three server backups under `/app/data/backups` and the dev-machine stale inventory under `C:\Users\marco\app\mediatheca\backups\`; then `/deploy` and confirm the first boot logs zero `[StartupCutover]` lines with drift 0/7. The task file's checkboxes for those criteria are deliberately unticked. New backlog item `administration-b3xqf` (administration README's Offline demoted-event filter entry now cross-references deleted files) was filed by the worker and indexed.
+
+**Harness notes, carried forward:** (1) the `checkpoint` verb refuses every path as `outside-worktree` when the fileList is built from Git Bash's `$PWD` (POSIX `/c/...` form) — pass drive-letter paths. (2) Plugin 0.9.2's `checkpoint` manifest did not fold in the vacated `doing/` path; it was staged explicitly, and git recorded the move as a rename. (3) The main-tree `node_modules` junction was required again for `npm run build` and was unlinked before `git worktree remove --force`; main-tree `node_modules` verified intact afterwards (206 entries).
+
+---
+
 ## 2026-09-03 17:35 -- Task verified and completed: infrastructure-r8kqt - Retire the one-shot cutover machinery and its backups once production has been stable for two weeks — delete StartupCutover.fs plus its tests and Composition call sites, revert ensureSafeCatchUp to Projection.startAllProjections, and remove the pre-cutover backup files from the server and dev volumes
 
 **Type:** Work / Task completion
