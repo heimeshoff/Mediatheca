@@ -105,19 +105,6 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     // Initialize SettingsStore
     SettingsStore.initialize conn
 
-    // Pre-cutover whole-database safety copy (StartupCutover): VACUUM INTO a
-    // dated file under <data-dir>/backups/, taken BEFORE this release's
-    // silent migrations (the cache-tier renames, the one-time seed, the
-    // deprecated-column drops) first touch an existing store. No-op once the
-    // cutover has completed and on fresh installs. A failed backup only
-    // disables the automated cutover for this boot — the app still starts.
-    let cutoverBackupOk =
-        match StartupCutover.backupIfPending conn dbPath with
-        | Ok _ -> true
-        | Error reason ->
-            eprintfn "[StartupCutover] pre-cutover backup FAILED (%s) — the automated cutover will NOT run this boot" reason
-            false
-
     // Initialize JellyfinStore tables
     JellyfinStore.initialize conn
 
@@ -247,10 +234,8 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     // disposable read models (ADR-0002); a full rebuild is now an explicit
     // operator command from the Projections admin tab
     // (Administration.projectionRebuildStreamHandler) rather than something
-    // startup forces on every boot. Routed through StartupCutover so a boot
-    // after a crash inside the cutover's migrate→rebuild window rebuilds
-    // (drop + replay, always safe) instead of double-applying via catch-up.
-    StartupCutover.ensureSafeCatchUp conn projectionHandlers
+    // startup forces on every boot.
+    Projection.startAllProjections conn projectionHandlers
 
     // Seed the metadata cache tier from the now-guaranteed-to-exist
     // game_detail projection snapshot (administration-c3nvp) — gated on the
@@ -268,16 +253,6 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     // `genres` is deliberately excluded (ADR-0055) — see
     // GameProjection.dropDeprecatedColumns's doc comment.
     GameProjection.dropDeprecatedColumns conn
-
-    // The automated series + play-session cutover (plan.md Phases 4-5):
-    // drift check → compensating events → SeriesProjection rebuild, then
-    // dry-run gate → play-session migration → rebuild-all → final drift
-    // check. One-time (completion marker), idempotent on retry, and runs in
-    // this single-threaded startup window — before the web server serves a
-    // request and before any scheduled job starts, so no guard interleaving
-    // is possible. Skipped if the pre-cutover backup could not be taken.
-    if cutoverBackupOk then
-        StartupCutover.run conn dbPath projectionHandlers
 
     // Game journal (Notion-style blocks, plain storage) — table + one-time
     // migration of the old event-sourced game content blocks

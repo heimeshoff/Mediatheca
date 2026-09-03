@@ -92,21 +92,6 @@ let private countStatusChangeEvents (conn: SqliteConnection) (slug: string) : in
     |> List.length
 
 [<Tests>]
-let syncGateTests =
-    testList "PlaytimeTracker.syncGateOpen (pure)" [
-
-        testCase "refuses when legacy events are present and the migration marker is absent" <| fun _ ->
-            Expect.isFalse (PlaytimeTracker.syncGateOpen true false) "Should refuse — legacy events present, migration not completed"
-
-        testCase "permits when the migration marker is set, even with legacy events present" <| fun _ ->
-            Expect.isTrue (PlaytimeTracker.syncGateOpen true true) "Should permit once the migration marker is set"
-
-        testCase "permits when there are no legacy events at all, regardless of the marker" <| fun _ ->
-            Expect.isTrue (PlaytimeTracker.syncGateOpen false false) "A fresh install (no legacy events) is never gated"
-            Expect.isTrue (PlaytimeTracker.syncGateOpen false true) "Still permitted with the marker set and no legacy events"
-    ]
-
-[<Tests>]
 let manualSessionApiTests =
     testList "PlaytimeTracker manual sessions (natural key)" [
 

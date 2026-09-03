@@ -1,11 +1,11 @@
 ---
 id: infrastructure-r8kqt
 title: Retire the one-shot cutover machinery and its backups once production has been stable for two weeks — delete StartupCutover.fs plus its tests and Composition call sites, revert ensureSafeCatchUp to Projection.startAllProjections, and remove the pre-cutover backup files from the server and dev volumes
-status: backlog
+status: done
 type: chore
 context: infrastructure
 created: 2026-08-04
-completed:
+completed: 2026-09-03
 depends_on: []
 blocks: []
 tags: [cutover, cleanup, deployment, backups, startup, projections]
@@ -147,23 +147,56 @@ Line numbers are as of commit `344d0f6`; re-locate by name rather than trusting 
 
 ## Acceptance criteria
 
-- [ ] All three server backup files (including the 2026-08-05 wipe-import backup — only
-      on/after 2026-08-19) are gone from `/app/data/backups/`, and the dev-machine stale
-      inventory listed in Part B is deleted.
-- [ ] `grep -rn "StartupCutover" src/ tests/` returns no hits.
-- [ ] `Composition.fs` calls `Projection.startAllProjections conn projectionHandlers`
+- [ ] **(builder runbook pending)** All three server backup files (including the
+      2026-08-05 wipe-import backup — only on/after 2026-08-19) are gone from
+      `/app/data/backups/`, and the dev-machine stale inventory listed in Part B is
+      deleted.
+- [x] `grep -rn "StartupCutover" src/ tests/` returns no hits.
+- [x] `Composition.fs` calls `Projection.startAllProjections conn projectionHandlers`
       directly, with no `cutoverBackupOk` binding and no `StartupCutover.run` call.
-- [ ] `grep -rn "syncGateOpen\|migrationCompletedSettingKey\|hasLegacyPlayTimeEvents" src/ tests/`
+- [x] `grep -rn "syncGateOpen\|migrationCompletedSettingKey\|hasLegacyPlayTimeEvents" src/ tests/`
       returns no hits; the Steam sync job dispatches unconditionally.
-- [ ] `grep -rn "EventLogFilter\|filter-demoted-events" src/ tests/` returns no hits; the
+- [x] `grep -rn "EventLogFilter\|filter-demoted-events" src/ tests/` returns no hits; the
       purge runbook still exists and carries the executed/retired header note.
-- [ ] The silent migration calls listed in Part C step 4 are all still present and unchanged.
-- [ ] `npm test` passes and `npm run build` succeeds.
-- [ ] ADR-0052 still exists and carries a retirement note naming this task.
-- [ ] The deployed container boots healthy with zero `[StartupCutover]` log lines and a
-      drift check of 0 discrepancies across all 7 projections.
+- [x] The silent migration calls listed in Part C step 4 are all still present and unchanged.
+- [x] `npm test` passes and `npm run build` succeeds.
+- [x] ADR-0052 still exists and carries a retirement note naming this task.
+- [ ] **(builder runbook pending)** The deployed container boots healthy with zero
+      `[StartupCutover]` log lines and a drift check of 0 discrepancies across all 7
+      projections.
 
 ## Notes
+
+**Refined 2026-09-03 (window-closed grounding pass; promoted to todo):** both rollback
+windows have elapsed (2026-08-17 and 2026-08-19). The Part A precondition was run
+read-only from the modeling session on 2026-09-03 and is clean, so promotion's gate is met:
+
+- `docker logs --since 24h | grep -c 'StartupCutover] Phase'` → **0**. The benign
+  `cutover already completed — skipping` count was also 0, which is expected — the
+  container had been up 3 days (healthy), so no boot fell inside the 24h window.
+- `/api/stream/drift-check` → `totalDiscrepancies: 0` across all 7 projections
+  (Movie, Friend, ContentBlock, Catalog, Series, Game, PlaySession).
+- `/app/data/backups` holds exactly the three files Part B lists (~55 MB); the dev-machine
+  inventory in Part B was re-verified present, unchanged.
+
+Consequence for the execution split: the server and dev backups are now **expired**
+rollback points, not live ones. The one-way-ordering hazard below no longer constrains
+sequencing — a `/work` session may run Part C whenever it is claimed, and the builder runs
+Part B before or after at their convenience. Part A need not be repeated unless production
+has restarted or deployed since 2026-09-03.
+
+Source re-grounded against the working tree at this refinement (all named symbols still
+present, nothing moved or renamed; only file-position hints drifted — re-locate by name):
+`StartupCutoverTests.fs` is `Server.Tests.fsproj` line 50 (not 42); `EventLogFilter.fs` is
+`Server.fsproj` line 58 and `EventLogFilterTests.fs` is `Server.Tests.fsproj` line 51;
+the `StartupCutover.run` block in `Composition.fs` sits at ~275–281 (not ~266–274). The
+`syncGateOpen` doc-comment cross-reference at `StartupCutover.fs:23` goes away with that
+file. Part C step 4's five silent-migration calls are all still present in `Composition.fs`.
+
+`plan.md` disposition settled: it is **tracked**, not untracked — checked in by commit
+`648db9c` explicitly as "obsoleted by StartupCutover.fs/ADR-0052, kept for the record". It
+stays, on the same reasoning as the purge runbook (Part C step 6); it is out of this task's
+scope. The 2026-08-04 note below describing it as untracked is superseded.
 
 **Amended 2026-08-05 (post-purge review, builder-approved):** after `administration-z6ymt`'s
 live purge was executed on 2026-08-05, a review of what this task would actually leave
@@ -219,3 +252,47 @@ administration-z6ymt precedent and ADR-0056 (live actions are operator-executed,
 - Related: ADR-0052 (the automated cutover), ADR-0034 (VACUUM INTO backup discipline),
   `plan.md` (the now-executed cutover plan — a candidate for deletion in this same change if
   it was never committed).
+
+## Outcome
+
+Part C (worker-executable code deletion) is complete; all its acceptance criteria pass.
+Parts A/B and the post-deploy boot check are builder runbook steps and were **not**
+attempted here (no SSH, no live-database or `C:\Users\marco\app\` access) — see the
+unticked "(builder runbook pending)" items above.
+
+What was deleted/changed:
+- `src/Server/StartupCutover.fs` and `tests/Server.Tests/StartupCutoverTests.fs`, plus
+  their `<Compile>` entries in `src/Server/Server.fsproj` and
+  `tests/Server.Tests/Server.Tests.fsproj`.
+- `src/Server/Composition.fs`: removed the `cutoverBackupOk` pre-cutover backup block,
+  reverted `StartupCutover.ensureSafeCatchUp conn projectionHandlers` to
+  `Projection.startAllProjections conn projectionHandlers`, and removed the
+  `if cutoverBackupOk then StartupCutover.run …` block. The five silent-migration calls
+  (`MetadataCache.initialize`, `MetadataCache.seedFromProjections`,
+  `SeriesProjection.dropDeprecatedColumns`, `JellyfinStore.migrateFromProjections`,
+  `GameJournal.migrateFromContentBlocks`) are untouched and verified still present.
+- `src/Server/PlaytimeTracker.fs`: deleted the dead Steam-sync gate
+  (`syncGateOpen`, `migrationCompletedSettingKey`, and the gate check inside `runSync`);
+  the sync job now dispatches unconditionally after the API-key/Steam-ID presence check.
+  `tests/Server.Tests/PlaytimeTrackerTests.fs`'s pure `syncGateOpen` test list removed.
+- `src/Server/EventLogFilter.fs` and `tests/Server.Tests/EventLogFilterTests.fs` deleted
+  (plus their fsproj entries); the `filter-demoted-events` dispatch branch removed from
+  `Program.fs`'s `main`. `docs/runbooks/purge-demoted-metadata-events.md` kept as the
+  historical record, now with a prepended "executed 2026-08-05; filter tooling removed by
+  infrastructure-r8kqt" note.
+- ADR-0052 (`.agentheim/knowledge/decisions/0052-automated-startup-cutover-and-partial-coverage-integrity-identity.md`)
+  kept, with an appended "Retirement note (2026-09-03)" section naming this task.
+- The infrastructure BC README was checked and does not reference any of the retired
+  machinery — no changes needed.
+- Filed `administration-b3xqf` in `administration/backlog/` (new directory) — the
+  administration README's "Offline demoted-event filter" entry still describes
+  `EventLogFilter.fs`'s live API and is now stale; fixing it is cross-BC work out of this
+  task's scope.
+
+Verification: `npm test` — 660/660 passing. `npm run build` — client build green.
+
+Key files: `src/Server/Composition.fs`, `src/Server/PlaytimeTracker.fs`,
+`src/Server/Program.fs`, `src/Server/Server.fsproj`,
+`tests/Server.Tests/Server.Tests.fsproj`, `tests/Server.Tests/PlaytimeTrackerTests.fs`,
+`docs/runbooks/purge-demoted-metadata-events.md`,
+`.agentheim/knowledge/decisions/0052-automated-startup-cutover-and-partial-coverage-integrity-identity.md`.
