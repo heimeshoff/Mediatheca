@@ -1,11 +1,11 @@
 ---
 id: administration-b3xqf
 title: Update the administration README's Offline demoted-event filter entry — EventLogFilter.fs and StartupCutover.fs it cross-references were both deleted by infrastructure-r8kqt
-status: doing
+status: done
 type: chore
 context: administration
 created: 2026-09-03
-completed:
+completed: 2026-09-03
 depends_on: []
 blocks: []
 tags: [readme, cleanup, documentation]
@@ -77,24 +77,24 @@ This task touches no code. Scope is exactly two files: the administration README
 
 ## Acceptance criteria
 
-- [ ] The "Offline demoted-event filter" entry in
+- [x] The "Offline demoted-event filter" entry in
       `.agentheim/contexts/administration/README.md` is rewritten as history: it names the
       purge as executed (2026-08-05), names the tooling as retired by `infrastructure-r8kqt`
       (2026-09-03), points at the runbook and ADR-0058, and no longer describes
       `filterNdjson`, `purgeEligibleEventTypes`, or the `dotnet run … filter-demoted-events`
       invocation as live code.
-- [ ] `grep -n "StartupCutover" .agentheim/contexts/administration/README.md` returns at
+- [x] `grep -n "StartupCutover" .agentheim/contexts/administration/README.md` returns at
       most one line, and that line says the file was retired (points at ADR-0052/ADR-0058);
       the `playSessionPhase` compile-dependency narration is gone.
-- [ ] No sentence in the README asserts `EventLogFilter.fs` or `StartupCutover.fs` exists
+- [x] No sentence in the README asserts `EventLogFilter.fs` or `StartupCutover.fs` exists
       under `src/` — every remaining mention is past-tense or marked retired.
-- [ ] The README's other content is untouched: the diff to `README.md` is confined to the
+- [x] The README's other content is untouched: the diff to `README.md` is confined to the
       "Offline demoted-event filter" bullet (line 28 as of 2026-09-03).
-- [ ] ADR-0058 gains a `## Retirement note (2026-09-03)` section naming
+- [x] ADR-0058 gains a `## Retirement note (2026-09-03)` section naming
       `infrastructure-r8kqt` and stating that `EventLogFilter.fs` + its CLI branch and
       `StartupCutover.fs` are deleted; its frontmatter `status:` stays `accepted` (mirrors
       ADR-0052's treatment).
-- [ ] `grep -rn "EventLogFilter\|StartupCutover" src/ tests/ --include=*.fs --include=*.fsproj`
+- [x] `grep -rn "EventLogFilter\|StartupCutover" src/ tests/ --include=*.fs --include=*.fsproj`
       is empty before and after — this task changes no code, and `npm test` is not required.
 
 ## Notes
@@ -112,3 +112,16 @@ This task touches no code. Scope is exactly two files: the administration README
 - Compare the "Purge the 11 demoted metadata event types" entry in this BC's done-list
   (`administration-z6ymt`) and the infrastructure BC README, which `infrastructure-r8kqt`
   checked and found clean — the administration README is the only doc surface left.
+
+## Outcome
+
+Rewrote the "Offline demoted-event filter" bullet (README line 28) as settled history:
+names the purge as executed 2026-08-05, names the tooling as retired by
+`infrastructure-r8kqt` (2026-09-03), points at the runbook and ADR-0058, drops the
+`filterNdjson`/`purgeEligibleEventTypes`/CLI-invocation live-API narration, and reduces
+the `StartupCutover.fs` compile-dependency anecdote to a one-clause pointer per the task's
+"pointer over restatement" instruction. Appended a `## Retirement note (2026-09-03)`
+section to ADR-0058 naming `infrastructure-r8kqt` and stating both the CLI subcommand and
+`StartupCutover.fs`'s `playSessionPhase` guard are deleted; frontmatter `status:` left as
+`accepted`. Did not touch ADR-0052 or ADR-0056. All six grep-based acceptance criteria
+verified directly in the worktree.

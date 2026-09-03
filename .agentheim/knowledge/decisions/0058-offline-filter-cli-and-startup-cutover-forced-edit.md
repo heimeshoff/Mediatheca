@@ -72,3 +72,13 @@ COMPLETE in production 2026-08-03) stays out of this task's scope, as directed; 
 - A future worker retiring `StartupCutover.fs` outright should delete `playSessionPhase` (and its call
   site in `run`) entirely rather than treat this guard as permanent — it exists only to keep the build
   green across this task's deletion, not because the check has any ongoing value of its own.
+
+## Retirement note (2026-09-03)
+
+Retired by `infrastructure-r8kqt`. Both things this ADR decided the shape of are deleted: the
+`EventLogFilter.fs` module (`filterNdjson`, `purgeEligibleEventTypes`) and its `filter-demoted-events`
+CLI subcommand and dispatch branch in `Program.fs`'s `main`, and `StartupCutover.fs` — including the
+`playSessionPhase` guard Decision 2 introduced — are gone entirely, not just inert. `EventLogFilterTests.fs`
+was deleted alongside the module. This ADR stays as the historical record of the CLI shape decided for
+the one-shot purge (`administration-z6ymt`, run 2026-08-05) and of the compile dependency it uncovered
+in `StartupCutover.fs`; git history is the escape hatch for the deleted code itself.

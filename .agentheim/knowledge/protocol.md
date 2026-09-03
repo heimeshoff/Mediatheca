@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-03 18:00 -- Task verified and completed: administration-b3xqf - Update the administration README's Offline demoted-event filter entry — EventLogFilter.fs and StartupCutover.fs it cross-references were both deleted by infrastructure-r8kqt
+
+**Type:** Work / Task completion
+**Task:** administration-b3xqf - Update the administration README's Offline demoted-event filter entry — EventLogFilter.fs and StartupCutover.fs it cross-references were both deleted by infrastructure-r8kqt
+**Summary:** Reframed the administration README's Offline demoted-event filter bullet as settled history (purge executed 2026-08-05, tooling retired by infrastructure-r8kqt on 2026-09-03, pointers to the runbook and ADR-0058) and appended a Retirement note to ADR-0058 recording both the CLI subcommand and StartupCutover.fs's playSessionPhase guard as deleted.
+**Duration:** 3m30s
+**Verification:** PASS (iteration 1)
+**Files changed:** 2
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-09-03 17:55 -- Batch started: [administration-b3xqf]
 
 **Type:** Work / Batch start
