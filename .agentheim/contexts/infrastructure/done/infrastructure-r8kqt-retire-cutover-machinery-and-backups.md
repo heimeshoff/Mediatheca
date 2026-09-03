@@ -147,7 +147,7 @@ Line numbers are as of commit `344d0f6`; re-locate by name rather than trusting 
 
 ## Acceptance criteria
 
-- [ ] **(builder runbook pending)** All three server backup files (including the
+- [x] **(builder runbook done 2026-09-03)** All three server backup files (including the
       2026-08-05 wipe-import backup — only on/after 2026-08-19) are gone from
       `/app/data/backups/`, and the dev-machine stale inventory listed in Part B is
       deleted.
@@ -161,7 +161,7 @@ Line numbers are as of commit `344d0f6`; re-locate by name rather than trusting 
 - [x] The silent migration calls listed in Part C step 4 are all still present and unchanged.
 - [x] `npm test` passes and `npm run build` succeeds.
 - [x] ADR-0052 still exists and carries a retirement note naming this task.
-- [ ] **(builder runbook pending)** The deployed container boots healthy with zero
+- [x] **(builder runbook done 2026-09-03)** The deployed container boots healthy with zero
       `[StartupCutover]` log lines and a drift check of 0 discrepancies across all 7
       projections.
 
@@ -296,3 +296,11 @@ Key files: `src/Server/Composition.fs`, `src/Server/PlaytimeTracker.fs`,
 `tests/Server.Tests/Server.Tests.fsproj`, `tests/Server.Tests/PlaytimeTrackerTests.fs`,
 `docs/runbooks/purge-demoted-metadata-events.md`,
 `.agentheim/knowledge/decisions/0052-automated-startup-cutover-and-partial-coverage-integrity-identity.md`.
+
+## Builder runbook completed (2026-09-03)
+
+Parts A/B and the post-deploy check were executed by the builder on 2026-09-03: the three
+server backups under `/app/data/backups/` and the dev-machine `backups/` folder were deleted
+(both verified empty afterwards over SSH / on disk), then `/deploy` shipped the retired image.
+The first boot logged zero `StartupCutover` lines and the container came up healthy. The
+in-app drift check (expected 0/7) remains a builder-side observation from the Settings panel.
