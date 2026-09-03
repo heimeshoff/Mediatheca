@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-09-03 21:05 -- Modeling / Refined: infrastructure-r8kqt - Retire the one-shot cutover machinery and its backups
+
+**Type:** Modeling / Refine
+**BC:** infrastructure
+**Status after:** todo
+**Summary:** Window-closed grounding pass. Both rollback windows (2026-08-17, 2026-08-19) have elapsed, so the Part A precondition was run read-only from the modeling session: 0 `StartupCutover] Phase` log lines in 24h, container up 3 days healthy, drift check 0 discrepancies across all 7 projections, and `/app/data/backups` holds exactly the three inventoried files. Recorded in Notes that the backups are now expired rollback points, so the one-way-ordering hazard no longer constrains sequencing — Part C (worker) and Part B (builder) may run in either order. Re-grounded every named symbol against the working tree: all present, only fsproj/Composition line hints drifted (noted; task already says re-locate by name). Settled `plan.md`'s disposition — it is tracked (commit 648db9c, "kept for the record"), not untracked as the 2026-08-04 note claimed; it stays, out of scope, same reasoning as the purge runbook. No orchestrator round — third refinement, findings were factual corrections grounded directly in source and production state.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-08-08 15:35 -- Work session ended
 
 **Type:** Work / Session end

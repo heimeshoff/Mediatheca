@@ -165,6 +165,37 @@ Line numbers are as of commit `344d0f6`; re-locate by name rather than trusting 
 
 ## Notes
 
+**Refined 2026-09-03 (window-closed grounding pass; promoted to todo):** both rollback
+windows have elapsed (2026-08-17 and 2026-08-19). The Part A precondition was run
+read-only from the modeling session on 2026-09-03 and is clean, so promotion's gate is met:
+
+- `docker logs --since 24h | grep -c 'StartupCutover] Phase'` → **0**. The benign
+  `cutover already completed — skipping` count was also 0, which is expected — the
+  container had been up 3 days (healthy), so no boot fell inside the 24h window.
+- `/api/stream/drift-check` → `totalDiscrepancies: 0` across all 7 projections
+  (Movie, Friend, ContentBlock, Catalog, Series, Game, PlaySession).
+- `/app/data/backups` holds exactly the three files Part B lists (~55 MB); the dev-machine
+  inventory in Part B was re-verified present, unchanged.
+
+Consequence for the execution split: the server and dev backups are now **expired**
+rollback points, not live ones. The one-way-ordering hazard below no longer constrains
+sequencing — a `/work` session may run Part C whenever it is claimed, and the builder runs
+Part B before or after at their convenience. Part A need not be repeated unless production
+has restarted or deployed since 2026-09-03.
+
+Source re-grounded against the working tree at this refinement (all named symbols still
+present, nothing moved or renamed; only file-position hints drifted — re-locate by name):
+`StartupCutoverTests.fs` is `Server.Tests.fsproj` line 50 (not 42); `EventLogFilter.fs` is
+`Server.fsproj` line 58 and `EventLogFilterTests.fs` is `Server.Tests.fsproj` line 51;
+the `StartupCutover.run` block in `Composition.fs` sits at ~275–281 (not ~266–274). The
+`syncGateOpen` doc-comment cross-reference at `StartupCutover.fs:23` goes away with that
+file. Part C step 4's five silent-migration calls are all still present in `Composition.fs`.
+
+`plan.md` disposition settled: it is **tracked**, not untracked — checked in by commit
+`648db9c` explicitly as "obsoleted by StartupCutover.fs/ADR-0052, kept for the record". It
+stays, on the same reasoning as the purge runbook (Part C step 6); it is out of this task's
+scope. The 2026-08-04 note below describing it as untracked is superseded.
+
 **Amended 2026-08-05 (post-purge review, builder-approved):** after `administration-z6ymt`'s
 live purge was executed on 2026-08-05, a review of what this task would actually leave
 behind produced five amendments, all folded into What/Acceptance criteria above:
