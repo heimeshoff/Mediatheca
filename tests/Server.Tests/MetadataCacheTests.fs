@@ -484,6 +484,7 @@ let tests =
             let conn = createConnection ()
             SettingsStore.initialize conn
             GameProjection.handler.Init conn
+            GameJournal.initialize conn
             // series-m7fdk: seedFromProjections now also seeds series_metadata_cache
             // from series_detail in the same batch — series_detail must exist,
             // matching Composition.buildApp's real order (every projection handler
@@ -537,6 +538,7 @@ let tests =
             let conn = createConnection ()
             SettingsStore.initialize conn
             GameProjection.handler.Init conn
+            GameJournal.initialize conn
             // series-d5tpn dropped overview/tmdb_rating/episode_runtime from
             // `SeriesProjection.createTables`'s series_detail — a fresh
             // `SeriesProjection.handler.Init` no longer has these columns at
@@ -676,6 +678,7 @@ let tests =
             let conn = createConnection ()
             SettingsStore.initialize conn
             GameProjection.handler.Init conn
+            GameJournal.initialize conn
             SeriesProjection.handler.Init conn
             appendGameAdded conn "braid-2008"
             Projection.runProjection conn GameProjection.handler
@@ -734,6 +737,7 @@ let tests =
             let conn = createConnection ()
             SettingsStore.initialize conn
             GameProjection.handler.Init conn
+            GameJournal.initialize conn
             SeriesProjection.handler.Init conn
             appendGameAdded conn "braid-2008"
             appendGameAdded conn "another-game-2010"

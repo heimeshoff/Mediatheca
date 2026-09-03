@@ -57,6 +57,7 @@ let private bootstrap (conn: SqliteConnection) =
     SettingsStore.initialize conn
     ContentBlockProjection.handler.Init conn
     GameProjection.handler.Init conn
+    GameJournal.initialize conn
     PlaySessionProjection.handler.Init conn
     MetadataCache.initialize conn
 

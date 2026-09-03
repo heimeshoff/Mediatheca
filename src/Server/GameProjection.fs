@@ -764,7 +764,11 @@ module GameProjection =
               RecommendedBy = resolveFriendRefs conn recommendedBySlugs
               WantToPlayWith = resolveFriendRefs conn wantToPlayWithSlugs
               PlayedWith = resolveFriendRefs conn playedWithSlugs
-              ContentBlocks = ContentBlockProjection.getForMovieDetail conn slug }
+              ContentBlocks = ContentBlockProjection.getForMovieDetail conn slug
+              // games-t69rb: plain-storage journal table (not event-sourced,
+              // ADR-0043's re-derivability test) — re-read and re-derived
+              // fresh every call, same as every other cache-tier field above.
+              HasJournalContent = GameJournal.get conn slug |> JournalBlock.hasContent }
         )
 
     /// ADR-0053: composes the display-ready `PlayFacets` for one game by

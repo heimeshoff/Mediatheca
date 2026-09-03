@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-03 20:11 -- Task verified and completed: games-t69rb - Game detail page — keep the right-hand card column (Links, play facets, friends, …) mounted across the Overview/Journal tabs so switching only swaps the content column, and open on the Journal tab when the game's journal document already has content, Overview otherwise
+
+**Type:** Work / Task completion
+**Task:** games-t69rb - Game detail page — keep the right-hand card column (Links, play facets, friends, …) mounted across the Overview/Journal tabs so switching only swaps the content column, and open on the Journal tab when the game's journal document already has content, Overview otherwise
+**Summary:** The game detail page two-column grid is now the unconditional page frame — the right-hand card column (Links, play facets, friends, catalogs) stays mounted at the same DOM node across the Overview/Journal tabs — and the page opens Journal-first when the game journal document already has non-blank content, computed server-side via a new shared JournalBlock.hasContent rule.
+**Duration:** 32m
+**Verification:** PASS (iteration 1)
+**Files changed:** 20
+**Tests added:** 9
+**ADRs written:** none
+
+---
+
 ## 2026-09-03 19:38 -- Batch started: [games-t69rb]
 
 **Type:** Work / Batch start

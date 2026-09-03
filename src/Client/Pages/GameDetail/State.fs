@@ -67,13 +67,23 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         ]
 
     | Game_loaded game ->
+        // games-t69rb: the journal-first default is applied only on the
+        // page's first load for this game (`model.Game = None`, set fresh
+        // by `init` on every navigation to a new slug) — never on the
+        // refreshes every command triggers afterward, so a hand-picked tab
+        // survives a status/rating/friend edit re-fetch.
+        let isFirstLoad = model.Game.IsNone
+        let nextTab =
+            match isFirstLoad, game with
+            | true, Some g -> if g.HasJournalContent then Journal else Overview
+            | _ -> model.ActiveTab
         let cmds =
             match game with
             | Some g ->
                 [ Cmd.ofMsg Load_trailers
                   if g.HltbHours.IsNone then Cmd.ofMsg Fetch_hltb ]
             | None -> []
-        { model with Game = game; IsLoading = false }, Cmd.batch cmds
+        { model with Game = game; IsLoading = false; ActiveTab = nextTab }, Cmd.batch cmds
 
     | Friends_loaded friends ->
         { model with AllFriends = friends }, Cmd.none

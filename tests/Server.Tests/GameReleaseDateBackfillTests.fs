@@ -43,6 +43,7 @@ let private createConnection () =
     SettingsStore.initialize conn
     ContentBlockProjection.handler.Init conn
     GameProjection.handler.Init conn
+    GameJournal.initialize conn
     MetadataCache.initialize conn
     conn
 

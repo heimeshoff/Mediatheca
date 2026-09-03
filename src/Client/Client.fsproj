@@ -97,6 +97,8 @@
     <Compile Include="Views.fs" />
     <Compile Include="Smoke.test.fs" />
     <Compile Include="Pages\SeriesDetail\NextUp.test.fs" />
+    <Compile Include="Pages\GameDetail\JournalHasContent.test.fs" />
+    <Compile Include="Pages\GameDetail\DefaultTab.test.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
 

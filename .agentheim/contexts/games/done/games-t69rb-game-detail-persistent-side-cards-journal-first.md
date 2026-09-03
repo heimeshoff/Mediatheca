@@ -1,11 +1,11 @@
 ---
 id: games-t69rb
 title: Game detail page — keep the right-hand card column (Links, play facets, friends, …) mounted across the Overview/Journal tabs so switching only swaps the content column, and open on the Journal tab when the game's journal document already has content, Overview otherwise
-status: doing
+status: done
 type: feature
 context: games
 created: 2026-09-03
-completed:
+completed: 2026-09-03
 depends_on: [design-system-001]
 blocks: []
 tags: [game-detail, journal, tabs, layout, frontend]
@@ -65,26 +65,26 @@ Movies (no tabs). The journal-first default is a Games-page behaviour.
 
 ## Acceptance criteria
 
-- [ ] On a viewport ≥ `lg`, switching between Overview and Journal on a game
+- [x] On a viewport ≥ `lg`, switching between Overview and Journal on a game
       detail page leaves the right-hand card column rendered and in the same
       position; only the content column's children change. Verifiable via a
       Playwright check (ADR-0027) or a DOM assertion that the card column's
       element is the same node before and after the tab switch.
-- [ ] On a narrow viewport (single-column grid) the card column is still present
+- [x] On a narrow viewport (single-column grid) the card column is still present
       on the Journal tab, stacked below the journal content, exactly as it stacks
       below the Overview content today.
-- [ ] Opening a game whose journal document has at least one non-blank block
+- [x] Opening a game whose journal document has at least one non-blank block
       lands on the Journal tab; opening a game whose document is empty or
       consists only of blank blocks lands on Overview. Covered by client unit
       tests over the pure decision (`*.test.fs` via Vitest, ADR-0064) for:
       empty list, only-blank text blocks, one text block with content, one image
       block with `ImageRef` and empty `Content`.
-- [ ] After the builder manually selects a tab, a subsequent `Game_loaded`
+- [x] After the builder manually selects a tab, a subsequent `Game_loaded`
       caused by a command on the same page (e.g. changing the status) does not
       change the active tab. Covered by an MVU `update` test.
-- [ ] Navigating from one game to another (different slug) re-applies the
+- [x] Navigating from one game to another (different slug) re-applies the
       default-tab rule for the new game.
-- [ ] If `HasJournalContent` is added to `GameDetail`, `npm run build` and
+- [x] If `HasJournalContent` is added to `GameDetail`, `npm run build` and
       `npm test` pass, and the server computes it from the journal block table,
       not from a new event or projection column (the game journal is plain
       storage, not event-sourced — see the `Shared.fs` comment above
@@ -111,3 +111,71 @@ Movies (no tabs). The journal-first default is a Games-page behaviour.
   save on unmount).
 - Styleguide gate: `depends_on` design-system-001 (done) per the games README's
   Frontend gate; review the result against the live StyleGuide page.
+
+## Outcome
+
+Restructured `Pages/GameDetail/Views.fs` so the 12-col grid (`lg:col-span-8`
+content column + `lg:col-span-4` card column) is the unconditional page frame;
+the `match model.ActiveTab` now lives *inside* the content column's
+`prop.children`, wrapping the old Overview content in `React.fragment` (no
+extra DOM node, so `space-y-10` sibling spacing is unaffected) and rendering
+`JournalEditor.view model.Slug` for the Journal arm. The right ("Social &
+Activity") column div is written exactly once in the file, outside any
+tab-conditional branch — mounted for both tabs, same DOM node, same position.
+The narrow-viewport stacking criterion follows from the same code path: there
+is no separate mobile branch, only the existing responsive Tailwind classes
+(`grid-cols-1 lg:grid-cols-12`) on that one grid div — confirmed by
+inspection, not a separate mobile Playwright run.
+
+Added `HasJournalContent: bool` to `Shared.GameDetail`, computed in
+`GameProjection.getBySlug` via a new shared pure function
+`JournalBlock.hasContent : JournalBlockDto list -> bool` (Shared.fs, next to
+`JournalBlockDto`) applied to `GameJournal.get conn slug` — re-derived fresh
+on every call, no new event/column, per ADR-0043's re-derivability test.
+`GameDetail/State.fs`'s `Game_loaded` case applies the journal-first default
+only when `model.Game` was `None` going in (the page's first load for this
+game — root `State.fs` re-runs `Pages.GameDetail.State.init` on every slug
+change, which resets `Game` to `None`), leaving `ActiveTab` untouched on every
+later refresh, satisfying both the "survives a manual pick" and the
+"re-applies on navigation to a different game" criteria without any extra
+model state.
+
+Test coverage:
+- `Pages/GameDetail/JournalHasContent.test.fs` (Vitest/Fable.Mocha, 4 cases):
+  empty list, only-blank text blocks, one non-blank text block, one image
+  block with `ImageRef` and empty `Content` — the exact four scenarios the
+  acceptance criteria named.
+- `Pages/GameDetail/DefaultTab.test.fs` (Vitest/Fable.Mocha, 4 cases): calls
+  `GameDetail.State.update` directly with a `Unchecked.defaultof<IMediathecaApi>`
+  stand-in (safe here — `Game_loaded`'s reducer branch never touches `api`,
+  so faking ~100 unrelated RPC fields wasn't needed) — first-load-journal,
+  first-load-no-journal, manual-pick-survives-refresh, and
+  re-applies-on-navigation-to-a-new-game.
+- `tests/e2e/game-detail-persistent-cards.spec.ts` (Playwright, ADR-0027):
+  seeds a game via the hermetic `addGame` API (no TMDB/RAWG/Steam dependency),
+  saves one non-blank journal block via `saveGameJournal`, then asserts DOM
+  **node identity** (`elementHandle.isConnected` plus a same-reference
+  `page.evaluate` check) for the "Links" card-column heading across an
+  Overview→Journal tab switch at a 1280×900 (`lg`) viewport — a stale/
+  disconnected handle would mean React tore the subtree down and rebuilt a
+  lookalike, exactly what this task set out to prevent. Additive-only (one
+  new game + one journal save), no destructive-spec skip gate needed. Run
+  once locally against a temp `DATA_DIR` (never the live DB) — passed.
+
+Server-side fallout: `GameProjection.getBySlug` now also queries
+`game_journal_blocks` (via `GameJournal.get`), which several
+`tests/Server.Tests/*.fs` in-memory-connection setups didn't initialize
+(only a few files already called `GameJournal.initialize`). Added the missing
+`GameJournal.initialize conn` call to the 13 affected test files' setup
+helpers — idempotent (`CREATE TABLE IF NOT EXISTS`), no behavior change to
+what those files test.
+
+`npm run build`, `npm run test:client` (16/16), and `npm test` (685/685) all
+green. Last acceptance criterion (`[human-eye]`, no visible reflow/flash) not
+independently verified — left unticked per the task's own marking.
+
+Files: `src/Shared/Shared.fs`, `src/Server/GameProjection.fs`,
+`src/Client/Pages/GameDetail/{Views,State}.fs`, `src/Client/Client.fsproj`,
+`src/Client/Pages/GameDetail/{JournalHasContent,DefaultTab}.test.fs` (new),
+`tests/e2e/game-detail-persistent-cards.spec.ts` (new), 13
+`tests/Server.Tests/*.fs` setup fixes, `.agentheim/contexts/games/README.md`.

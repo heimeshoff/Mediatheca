@@ -208,6 +208,22 @@ type JournalBlockDto = {
     Width: float
 }
 
+/// games-t69rb: the "does this journal have anything to show" rule, shared
+/// between the server (computing `GameDetail.HasJournalContent` from
+/// `game_journal_blocks`, ADR-0043's re-derivability test — no new event,
+/// no projection column) and the client (unit-tested directly here, ADR-0064,
+/// rather than duplicated). A block counts as content if it carries
+/// non-whitespace `Content`, or an `ImageRef`/`Url` (image and link blocks
+/// carry no text) — structural-only blocks (`columnList`/`column`/`toggle`
+/// wrappers with nothing typed into them yet) don't count.
+module JournalBlock =
+    let hasContent (blocks: JournalBlockDto list) : bool =
+        blocks
+        |> List.exists (fun b ->
+            not (System.String.IsNullOrWhiteSpace b.Content)
+            || b.ImageRef.IsSome
+            || b.Url.IsSome)
+
 // Catalogs
 
 type CatalogEntryDto = {
@@ -998,6 +1014,10 @@ type GameDetail = {
     WantToPlayWith: FriendRef list
     PlayedWith: FriendRef list
     ContentBlocks: ContentBlockDto list
+    /// games-t69rb: server-computed via `JournalBlock.hasContent` over
+    /// `game_journal_blocks` — lets the client pick Journal-first vs.
+    /// Overview-first without a second round-trip to `getGameJournal`.
+    HasJournalContent: bool
 }
 
 type AddGameRequest = {

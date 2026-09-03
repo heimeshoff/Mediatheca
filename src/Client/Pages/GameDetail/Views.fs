@@ -1006,24 +1006,27 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                     ]
                             ]
                         ]
-                        // Tab content
-                        match model.ActiveTab with
-                        | Overview ->
-                            let visibleTrailers =
-                                model.Trailers
-                                |> List.filter (fun t -> not (Set.contains t.VideoUrl model.FailedTrailerUrls))
-                            let selectedTrailer =
-                                match model.PlayingTrailerUrl with
-                                | Some url ->
-                                    visibleTrailers |> List.tryFind (fun t -> t.VideoUrl = url)
-                                | None -> None
-                            Html.div [
-                                prop.className "grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10"
-                                prop.children [
-                                    // Left Column: Details
-                                    Html.div [
-                                        prop.className "lg:col-span-8 space-y-10"
-                                        prop.children [
+                        // Tab content: content column swaps per tab; the persistent
+                        // card column (right) stays mounted across Overview/Journal
+                        // (games-t69rb) so switching tabs never unmounts or moves it.
+                        Html.div [
+                            prop.className "grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10"
+                            prop.children [
+                                // Content Column
+                                Html.div [
+                                    prop.className "lg:col-span-8 space-y-10"
+                                    prop.children [
+                                        match model.ActiveTab with
+                                        | Overview ->
+                                            let visibleTrailers =
+                                                model.Trailers
+                                                |> List.filter (fun t -> not (Set.contains t.VideoUrl model.FailedTrailerUrls))
+                                            let selectedTrailer =
+                                                match model.PlayingTrailerUrl with
+                                                | Some url ->
+                                                    visibleTrailers |> List.tryFind (fun t -> t.VideoUrl = url)
+                                                | None -> None
+                                            React.fragment [
                                             // Trailers: video port on top, thumbnail strip below (only if >1 trailer)
                                             if not (List.isEmpty visibleTrailers) then
                                                 Html.section [
@@ -1174,12 +1177,19 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                             ]
                                                     ]
                                                 ]
-                                        ]
+                                            ]
+                                        | Journal ->
+                                            // Notion-style block editor — self-contained
+                                            // (loads and debounce-saves its own document)
+                                            JournalEditor.view model.Slug
                                     ]
-                                    // Right Column: Social & Activity
-                                    Html.div [
-                                        prop.className "lg:col-span-4 space-y-6"
-                                        prop.children [
+                                ]
+                                // Right Column: Social & Activity — persistent across
+                                // tabs (games-t69rb): mounted unconditionally so it
+                                // neither unmounts nor moves when the tab changes.
+                                Html.div [
+                                    prop.className "lg:col-span-4 space-y-6"
+                                    prop.children [
                                             // External Links
                                             panelCard [
                                                 Html.h3 [ prop.className "text-lg font-bold mb-4"; prop.text "Links" ]
@@ -1746,18 +1756,10 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                     prop.text err
                                                 ]
                                             | None -> ()
-                                        ]
                                     ]
                                 ]
                             ]
-                        | Journal ->
-                            Html.section [
-                                prop.children [
-                                    // Notion-style block editor — self-contained
-                                    // (loads and debounce-saves its own document)
-                                    JournalEditor.view model.Slug
-                                ]
-                            ]
+                        ]
                     ]
                 ]
                 // Friend picker modals

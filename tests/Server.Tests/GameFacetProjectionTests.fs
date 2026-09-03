@@ -26,6 +26,7 @@ let private createConnection () =
     SettingsStore.initialize conn
     ContentBlockProjection.handler.Init conn
     GameProjection.handler.Init conn
+    GameJournal.initialize conn
     PlaySessionProjection.handler.Init conn
     MetadataCache.initialize conn
     conn
@@ -82,6 +83,7 @@ let schemaTests =
             let conn = createConnection ()
             let before = allColumns conn "game_detail"
             GameProjection.handler.Init conn
+            GameJournal.initialize conn
             Expect.equal (allColumns conn "game_detail") before "Schema unchanged by a second Init"
 
         testCase "games-a7dqx shipped additively: family_owners and other non-demoted columns survive untouched" <| fun _ ->

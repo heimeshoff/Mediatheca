@@ -14,6 +14,7 @@ let private createInMemoryConnection () =
     // GameProjection.getBySlug joins with content_blocks, so initialize that table too
     ContentBlockProjection.handler.Init conn
     GameProjection.handler.Init conn
+    GameJournal.initialize conn
     PlaySessionProjection.handler.Init conn
     // games-a7dqx: GameProjection.getBySlug/getAll etc. now LEFT JOIN
     // game_metadata_cache — it must exist even though these tests don't

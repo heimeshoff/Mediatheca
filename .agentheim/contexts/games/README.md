@@ -170,6 +170,20 @@ Single user.
   existing" / "add as duplicate" / cancel) serves both RAWG and Steam imports. Cross-source
   dedup between simultaneous RAWG and Steam results is deliberately out of scope — both render
   in the merged poster grid with a RAWG/Steam source badge, and the user picks which to import.
+- **Game detail page layout** (games-t69rb): the two-column grid is the page frame, not a
+  per-tab concern — the right-hand card column (Links, play facets, friends/family owners,
+  catalogs, …) is mounted unconditionally beside the content column; only the content
+  column's children swap between the Overview and Journal tabs (`Pages/GameDetail/Views.fs`).
+  **Journal-first default:** a game opens on the Journal tab if its journal document already
+  has content, Overview otherwise — server-computed once per `getGameDetail` call as
+  `GameDetail.HasJournalContent` (`JournalBlock.hasContent` in `Shared.fs`, re-derived fresh
+  from `game_journal_blocks` every time, never cached — ADR-0043's re-derivability test; a
+  block counts as content if it carries non-whitespace `Content` or an `ImageRef`/`Url`).
+  The rule applies only on a page's first load for a game (`GameDetail/State.fs`'s
+  `Game_loaded`, gated on `model.Game.IsNone`) — never on the refetches every command
+  triggers afterward, so a tab the user picked by hand survives a status/rating/friend edit.
+  Navigating to a different game re-applies the rule, since the root `State.fs` re-runs
+  `Pages.GameDetail.State.init` (resetting `Game` to `None`) on every slug change.
 
 ## Aggregates
 
