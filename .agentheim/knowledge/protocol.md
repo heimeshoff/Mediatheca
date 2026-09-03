@@ -1,4 +1,19 @@
-# P
+# Protocol
+
+Chronological log of everything that happens in this project.
+Newest entries on top.
+
+---
+
+## 2026-09-03 19:25 -- Modeling / Captured: games-t69rb - Game detail page — persistent right-hand card column across Overview/Journal tabs, Journal-first when the game has journal content
+
+**Type:** Modeling / Capture
+**BC:** games
+**Filed to:** todo
+**Summary:** The game detail page's right-hand cards (Links, play facets, friends, catalogs, …) currently live inside the Overview tab arm and vanish on the Journal tab; the task lifts them out so the tab only swaps the content column. Adds a once-per-load default-tab rule: land on Journal when the game's journal document has a non-blank block, Overview otherwise, recommended via a HasJournalContent flag on the GameDetail DTO. Concrete enough to file straight to todo (styleguide gate design-system-001 already done).
+
+---
+
 ## 2026-09-03 18:00 -- Work session ended
 
 **Type:** Work / Session end
@@ -18,13 +33,6 @@
 **Builder runbook still pending (from infrastructure-r8kqt):** Part B — delete the three server backups under `/app/data/backups` and the dev-machine stale inventory under `C:\Users\marco\app\mediatheca\backups\`; then `/deploy` and confirm the first boot logs zero `[StartupCutover]` lines with drift 0/7.
 
 **Harness notes:** (1) the `checkpoint` verb rejected a fileList JSON with backslash-escaped `C:\...` paths when passed through Git Bash (`invalid-opts-json`); forward-slash drive-letter paths (`C:/...`) worked. (2) The source-repo `lib/task-lifecycle-cli.mjs` (0.9.2 tree) DID fold the vacated `doing/` path into the checkpoint manifest this time, unlike last session's cached plugin. (3) Board is empty after this task — no ready work remains in any BC.
-
----
-
-rotocol
-
-Chronological log of everything that happens in this project.
-Newest entries on top.
 
 ---
 

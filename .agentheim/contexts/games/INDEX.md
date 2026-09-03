@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 10
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **games-t69rb** — Game detail page — keep the right-hand card column (Links, play facets, friends, …) mounted across the Overview/Journal tabs so switching only swaps the content column, and open on the Journal tab when the game's journal document already has content, Overview otherwise (feature) — `todo/games-t69rb-game-detail-persistent-side-cards-journal-first.md`
 <!-- todo-list:end -->
 
 ### Doing
