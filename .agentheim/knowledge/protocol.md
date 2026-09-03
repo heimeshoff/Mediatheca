@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-03 17:51 -- Modeling / Promoted: administration-b3xqf - Update the administration README's Offline demoted-event filter entry — EventLogFilter.fs and StartupCutover.fs it cross-references were both deleted by infrastructure-r8kqt
+
+**Type:** Modeling / Promote
+**BC:** administration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-03 17:51 -- Modeling / Refined: administration-b3xqf - Update the administration README's Offline demoted-event filter entry
 
 **Type:** Modeling / Refine

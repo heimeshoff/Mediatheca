@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
-- **Todo:** 0
+- **Backlog:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 30
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **administration-b3xqf** — Update the administration README's Offline demoted-event filter entry — EventLogFilter.fs and StartupCutover.fs it cross-references were both deleted by infrastructure-r8kqt (chore) — `todo/administration-b3xqf-readme-stale-after-cutover-and-eventlogfilter-retirement.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -61,7 +62,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **administration-b3xqf** — Update the administration README's Offline demoted-event filter entry — EventLogFilter.fs and StartupCutover.fs it cross-references were both deleted by infrastructure-r8kqt (chore) — `backlog/administration-b3xqf-readme-stale-after-cutover-and-eventlogfilter-retirement.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC

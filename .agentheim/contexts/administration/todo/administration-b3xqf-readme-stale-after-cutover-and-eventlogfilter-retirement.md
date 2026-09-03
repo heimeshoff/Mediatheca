@@ -1,7 +1,7 @@
 ---
 id: administration-b3xqf
 title: Update the administration README's Offline demoted-event filter entry — EventLogFilter.fs and StartupCutover.fs it cross-references were both deleted by infrastructure-r8kqt
-status: backlog
+status: todo
 type: chore
 context: administration
 created: 2026-09-03
