@@ -1,5 +1,13 @@
 # Runbook: purge the 11 demoted Game metadata event types
 
+> **Executed 2026-08-05; filter tooling removed by infrastructure-r8kqt.**
+> The purge described below ran once, successfully, on 2026-08-05. The
+> `EventLogFilter.fs` CLI tool and its `filter-demoted-events` entry point
+> it depended on were deleted by `infrastructure-r8kqt` (2026-09-03) since
+> the purge they existed for is complete and does not recur — git history
+> is the escape hatch if it's ever needed again. This document stays as the
+> historical record of what was purged and how.
+
 Task: `administration-z6ymt`. Mechanism: ADR-0038's wipe-first import.
 Execution shape: ADR-0056 — operator-executed by hand through the Settings
 UI, never an automated boot routine. **Workers never touch the live

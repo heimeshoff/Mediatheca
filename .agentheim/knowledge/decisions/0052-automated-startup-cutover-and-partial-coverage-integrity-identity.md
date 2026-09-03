@@ -94,3 +94,16 @@ partial-coverage lumps report honestly.
   cut over.
 - Rehearsed end-to-end against a fresh copy of the production database before deploy; the
   rehearsal's abort is what surfaced the partial-coverage case.
+
+## Retirement note (2026-09-03)
+
+Retired by `infrastructure-r8kqt`. Production ran the post-cutover image continuously and
+crash-free for over two weeks past the 2026-08-03 cutover, and the completion marker made the
+module inert on every later boot. `StartupCutover.fs` and `StartupCutoverTests.fs` are deleted;
+`Composition.fs`'s `ensureSafeCatchUp` call reverted to a direct
+`Projection.startAllProjections conn projectionHandlers`, and the pre-cutover `VACUUM INTO`
+backup call and the cutover-run call site are removed. This ADR stays as the historical record
+of the decision and the mechanism it once ran; git history (commit `344d0f6` and earlier) is
+the escape hatch for the deleted code itself. The partial-coverage integrity identity described
+above belongs to `PlaySessionMigration.plan` and is unaffected — only the boot-time automation
+harness is retired.

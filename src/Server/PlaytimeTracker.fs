@@ -62,29 +62,6 @@ module PlaytimeTracker =
             let dt = DateTimeOffset.UnixEpoch.AddSeconds(float timestamp).LocalDateTime
             Some (toGamingDay syncHour dt)
 
-    /// The setting `games-h4mrd`'s one-time history migration writes on
-    /// success. Its presence (or the absence of any legacy
-    /// `Game_play_time_set` events at all — a fresh install) is what
-    /// un-gates `runSync` below. Not private: `Administration.fs`'s
-    /// migration executor writes this key on success, and must use the
-    /// SAME literal `runSync` reads.
-    [<Literal>]
-    let migrationCompletedSettingKey = "play_session_migration_completed"
-
-    /// Pure gate condition for the Steam sync (games-p6vkz): on a legacy
-    /// store, every game reconstitutes with `SteamObservedMinutes = 0`
-    /// (Game_play_time_set is a mandatory no-op in `Games.evolve`), so an
-    /// ungated sync running in the deploy-to-migration window would treat
-    /// every game as "first sight" and append `Prior_play_time_recorded`
-    /// lumps to streams `games-h4mrd`'s migration hasn't reached yet — its
-    /// per-stream idempotency refusal then permanently skips exactly those
-    /// streams, leaving their real history unreconstructed. The gate
-    /// self-retires: a fresh install has no legacy events and is never
-    /// gated; an existing install un-gates the moment the migration
-    /// completes. No setting to remove later, no UI.
-    let syncGateOpen (hasLegacyPlayTimeEvents: bool) (migrationCompleted: bool) : bool =
-        not hasLegacyPlayTimeEvents || migrationCompleted
-
     // Execute game command — local helper (same pattern as Api.executeCommand, needed because Api.fs is compiled later)
 
     /// Returns the events actually appended (empty if `decide` was a no-op),
@@ -369,19 +346,6 @@ module PlaytimeTracker =
                 if String.IsNullOrWhiteSpace(steamConfig.ApiKey) || String.IsNullOrWhiteSpace(steamConfig.SteamId) then
                     return Error "Steam API key and Steam ID must be configured"
                 else
-                    // games-p6vkz: the migration gate — checked once, up
-                    // front, exactly like the config-presence check above.
-                    // See `syncGateOpen`'s doc comment for the race this closes.
-                    let hasLegacyPlayTimeEvents, migrationCompleted =
-                        withLock jobLock (fun () ->
-                            (EventStore.getSampleEventForType conn "Game_play_time_set").IsSome,
-                            (SettingsStore.getSetting conn migrationCompletedSettingKey).IsSome)
-                    if not (syncGateOpen hasLegacyPlayTimeEvents migrationCompleted) then
-                        let reason =
-                            sprintf "Sync skipped: legacy Game_play_time_set events present and '%s' not yet set (play-session history migration has not completed)" migrationCompletedSettingKey
-                        eprintfn "[PlaytimeTracker] %s" reason
-                        return Error reason
-                    else
                     let! recentGames = Steam.getRecentlyPlayedGames httpClient steamConfig
                     let mutable sessionsRecorded = 0
                     let mutable gamesObserved = 0

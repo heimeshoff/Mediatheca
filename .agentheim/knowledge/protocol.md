@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-03 17:35 -- Task verified and completed: infrastructure-r8kqt - Retire the one-shot cutover machinery and its backups once production has been stable for two weeks — delete StartupCutover.fs plus its tests and Composition call sites, revert ensureSafeCatchUp to Projection.startAllProjections, and remove the pre-cutover backup files from the server and dev volumes
+
+**Type:** Work / Task completion
+**Task:** infrastructure-r8kqt - Retire the one-shot cutover machinery and its backups once production has been stable for two weeks — delete StartupCutover.fs plus its tests and Composition call sites, revert ensureSafeCatchUp to Projection.startAllProjections, and remove the pre-cutover backup files from the server and dev volumes
+**Summary:** Retired the one-shot startup-cutover machinery (StartupCutover.fs and its Composition.fs call sites), the dead PlaytimeTracker Steam-sync gate, and the fired EventLogFilter purge CLI, restoring the plain Projection.startAllProjections boot path; ADR-0052 and the purge runbook carry retirement notes. Builder-owned Parts A/B (live and dev backup deletion) and the post-deploy boot check remain as runbook steps.
+**Duration:** 13m40s
+**Verification:** PASS (iteration 1)
+**Files changed:** 12
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-09-03 17:22 -- Batch started: [infrastructure-r8kqt]
 
 **Type:** Work / Batch start

@@ -55,9 +55,7 @@
     <Compile Include="JellyfinSync.fs" />
     <Compile Include="EventFormatting.fs" />
     <Compile Include="Sse.fs" />
-    <Compile Include="EventLogFilter.fs" />
     <Compile Include="Administration.fs" />
-    <Compile Include="StartupCutover.fs" />
     <Compile Include="Api.fs" />
     <Compile Include="Composition.fs" />
     <Compile Include="Program.fs" />

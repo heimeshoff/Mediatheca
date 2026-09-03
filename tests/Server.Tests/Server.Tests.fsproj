@@ -47,8 +47,6 @@
     <Compile Include="GameDeckCompatProjectionTests.fs" />
     <Compile Include="GameReleaseDateBackfillTests.fs" />
     <Compile Include="GameReleaseDateProjectionTests.fs" />
-    <Compile Include="StartupCutoverTests.fs" />
-    <Compile Include="EventLogFilterTests.fs" />
     <Compile Include="JellyfinImportTests.fs" />
     <Compile Include="JellyfinMaterializeTests.fs" />
     <Compile Include="JellyfinStillTests.fs" />
