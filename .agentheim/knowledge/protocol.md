@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-03 17:55 -- Batch started: [administration-b3xqf]
+
+**Type:** Work / Batch start
+**Tasks:** administration-b3xqf - Update the administration README's Offline demoted-event filter entry — EventLogFilter.fs and StartupCutover.fs it cross-references were both deleted by infrastructure-r8kqt
+**Parallel:** no (1 worker — administration-b3xqf is the only ready task across every BC; nothing held back)
+
+---
+
 ## 2026-09-03 17:51 -- Modeling / Promoted: administration-b3xqf - Update the administration README's Offline demoted-event filter entry — EventLogFilter.fs and StartupCutover.fs it cross-references were both deleted by infrastructure-r8kqt
 
 **Type:** Modeling / Promote
