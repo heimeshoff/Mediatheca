@@ -1,7 +1,7 @@
 ---
 id: games-t69rb
 title: Game detail page — keep the right-hand card column (Links, play facets, friends, …) mounted across the Overview/Journal tabs so switching only swaps the content column, and open on the Journal tab when the game's journal document already has content, Overview otherwise
-status: todo
+status: doing
 type: feature
 context: games
 created: 2026-09-03

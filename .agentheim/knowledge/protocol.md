@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-03 19:38 -- Batch started: [games-t69rb]
+
+**Type:** Work / Batch start
+**Tasks:** games-t69rb - Game detail page — keep the right-hand card column (Links, play facets, friends, …) mounted across the Overview/Journal tabs so switching only swaps the content column, and open on the Journal tab when the game's journal document already has content, Overview otherwise
+**Parallel:** no (1 worker — games-t69rb is the only ready task across every BC; nothing held back)
+
+---
+
 ## 2026-09-03 19:25 -- Modeling / Captured: games-t69rb - Game detail page — persistent right-hand card column across Overview/Journal tabs, Journal-first when the game has journal content
 
 **Type:** Modeling / Capture
