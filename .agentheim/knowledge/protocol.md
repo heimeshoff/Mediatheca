@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-03 17:20 -- Modeling / Promoted: infrastructure-r8kqt - Retire the one-shot cutover machinery and its backups once production has been stable for two weeks — delete StartupCutover.fs plus its tests and Composition call sites, revert ensureSafeCatchUp to Projection.startAllProjections, and remove the pre-cutover backup files from the server and dev volumes
+
+**Type:** Modeling / Promote
+**BC:** infrastructure
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-03 21:05 -- Modeling / Refined: infrastructure-r8kqt - Retire the one-shot cutover machinery and its backups
 
 **Type:** Modeling / Refine
