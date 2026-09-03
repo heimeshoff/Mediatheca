@@ -25,7 +25,7 @@ research touching this BC, and concept synthesis pages.
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
-### Done (most recent first; older entries kept for prior-art search)
+### Done (most recent 30; older entries archived verbatim under `done-archive/` — kept for prior-art search, ADR-0039 convention)
 <!-- done-list:start -->
 - **administration-b3xqf** — Update the administration README's Offline demoted-event filter entry — EventLogFilter.fs and StartupCutover.fs it cross-references were both deleted by infrastructure-r8kqt (chore) — `done/administration-b3xqf-readme-stale-after-cutover-and-eventlogfilter-retirement.md`
 - **administration-z6ymt** — Purge the 11 demoted metadata event types from the event log via the ADR-0038 wipe-first import — offline type-level NDJSON filter plus operator-executed runbook (ADR-0056) — and retire the completed games-h4mrd play-session migration machinery in the same change (chore) — `done/administration-z6ymt-purge-demoted-metadata-events.md`
@@ -33,31 +33,6 @@ research touching this BC, and concept synthesis pages.
 - **administration-c3nvp** — Stand up the metadata cache tier — per-BC typed tables that survive Drop/Init/replay, seeded once from current projections, following the ImageStore and JellyfinStore precedents (feature) — `done/administration-c3nvp-metadata-cache-tier.md`
 - **administration-t9bzx** — Classify every durable table as Projected, Cache or Imperative in one registry, and derive projectionTables from it — replacing tribal knowledge currently encoded as scattered comments explaining omissions (refactor) — `done/administration-t9bzx-table-classification-registry.md`
 - **administration-k3vmt** — Dissolve the /admin console into Settings — its six tabs become inline collapsible sections below Data Imports, and the sidebar's bottom group drops to a single Settings button (refactor) — `done/administration-k3vmt-dissolve-admin-console-into-settings.md`
-- **administration-n8kqw** — Event log import — wipe-first path for a non-empty store: backup, preview + confirm, then wipe and re-import in one transaction (feature) — `done/administration-n8kqw-wipe-first-import.md`
-- **administration-svq3t** — Playwright e2e spec for the Surgery tab (edit/delete/rename + confirm dialogs + dirty banner) (feature) — `done/administration-svq3t-surgery-tab-e2e-spec.md`
-- **administration-jrflk** — Retire Administration.fs's three ambient module-level guards (runningJobs, rebuildingProjections, driftCheckInProgress) in favour of composition-root-owned per-instance state, closing the cross-file test-collision class the JobRunsTests name prefix papers over (bug) — `done/administration-jrflk-job-name-collision-test-flake.md`
-- **administration-wwc36** — Event surgery — raw edit/delete/rename with auto-backup, preview, and projections-dirty flag (feature) — `done/administration-wwc36-event-surgery-guardrails.md`
-- **administration-mz6kp** — Migrate Api.create/Administration.create and the raw Giraffe stream handlers from one shared SqliteConnection to per-request (factory-based) connections, retiring the ADR-0030 semaphore gate (refactor) — `done/administration-mz6kp-per-request-connection-migration.md`
-- **administration-qk3f7** — Add a formatEvent case for Game_rawg_id_set — the one real handled-but-unformattable drift the unknown-event report caught (bug) — `done/administration-qk3f7-game-rawg-id-set-formatter-gap.md`
-- **administration-xjmda** — Compensating-event composer — append corrective events from the admin UI (feature) — `done/administration-xjmda-compensating-event-composer.md`
-- **administration-btvqa** — Shadow-table replay drift detector — verify projection read models exactly match the event log (feature) — `done/administration-btvqa-projection-drift-integrity-checks.md`
-- **administration-gxd6e** — Unknown-event report — distinct event types no projection handler recognizes or formatEvent can't render, with counts and samples (feature) — `done/administration-gxd6e-unknown-event-report.md`
-- **administration-cx92m** — Audit whether the single shared SqliteConnection is safe under request×request concurrency, and decide per-operation connections vs. a global gate (spike) — `done/administration-cx92m-shared-connection-request-concurrency-audit.md`
-- **administration-nf3wk** — "Event Browser's \"No matches\" pagination-bar text is dead code — give the filter-empty state its own message instead" (bugfix) — `done/administration-nf3wk-dead-no-matches-branch.md`
-- **administration-h4k2p** — Fix trailing-comma malformed JSON in empty-payload SSE frames — extract one shared pure `sseFrame` helper the three SSE handlers call, so an empty-object payload can never emit `data: {"type":"complete",}`. Fixes the Projections-tab Rebuild button reporting every successful rebuild as a failure. (bug) — `done/administration-h4k2p-sse-empty-payload-trailing-comma-bug.md`
-- **administration-vrc56** — Event log export/import as NDJSON — stream out/in via plain Giraffe routes, preserving exact global_position, into an empty store only (feature) — `done/administration-vrc56-ndjson-export-import.md`
-- **administration-tj8n2** — Scheduled-job timers race on the shared SqliteConnection and crash the process — fix with a dedicated job connection plus a per-command lock (bug) — `done/administration-tj8n2-scheduled-job-catchup-connection-race.md`
-- **administration-a4d9b** — Assert the Events-tab Follow toggle's three live-tail behaviors via committed Playwright specs (feature) — `done/administration-a4d9b-playwright-follow-toggle-specs.md`
-- **administration-da908** — Prove a Playwright harness can drive the full Mediatheca stack and observe network traffic (spike) — `done/administration-da908-playwright-e2e-harness-spike.md`
-- **administration-h4br2** — Browser smoke-test the Events tab Follow toggle end-to-end (chore) — `done/administration-h4br2-event-browser-follow-smoke-test.md`
-- **administration-yamm5** — Job runs console — history, outcomes, and run-now for scheduled jobs (feature) — `done/administration-yamm5-job-runs-console.md`
-- **administration-xx3mw** — Image cache admin — orphan detection, size overview, purge (feature) — `done/administration-xx3mw-image-cache-admin.md`
-- **administration-qjcp4** — Projection dashboard — checkpoint/lag overview and rebuild-by-command with streamed progress (feature) — `done/administration-qjcp4-projection-dashboard-rebuild.md`
-- **administration-v4y9g** — Stream drill-in — per-stream timeline with formatted+raw views, projection state, cross-links (feature) — `done/administration-v4y9g-stream-drill-in-timeline.md`
-- **administration-mtf1f** — Event explorer live tail — follow mode for incoming events (feature) — `done/administration-mtf1f-event-live-tail.md`
-- **administration-hw74a** — Store health tab — event volume stats, largest streams, storage sizes (feature) — `done/administration-hw74a-store-health-stats.md`
-- **administration-g5dfy** — Event explorer — FTS payload search, time/position/BC filters, keyset pagination (feature) — `done/administration-g5dfy-event-explorer-search-filters-pagination.md`
-- **administration-p0jka** — Admin console foundation — IAdminApi contract, Administration.fs, /admin section with tabs (feature) — `done/administration-p0jka-admin-console-foundation.md`
 <!-- done-list:end -->
 
 ### Backlog
