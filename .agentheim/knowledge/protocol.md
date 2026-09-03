@@ -1,4 +1,27 @@
-# Protocol
+# P
+## 2026-09-03 18:00 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 5m (first "Batch started" 17:55 → 18:00)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** administration-b3xqf: 1
+**Commits:** 3 (batch start, task completion, this entry)
+**Vision-conformance:** none — batch aligns with vision. The one shipped task is a documentation-only chore (README entry reframed as history, ADR-0058 retirement note); it adds no admin-console scope, pulls toward no Out-of-Scope (v1) item, and moves nothing away from Remaining v1 Work.
+**Batch mix:** 0% product-facing / 100% harness / 0% bookkeeping (1 task) — `type: chore` touching a BC README and an ADR, which the helper's heuristic classes as harness rather than bookkeeping.
+**Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed.
+
+**Session-start churn note:** 0 recognized machine-shape commits, 1 human commit since the 17:40 boundary — `2f7e74a Merge branch 'fix-cutover'`, the builder's merge of the previous session's branch into main; it carries no content of its own beyond the already-trailed task commits it integrates. Touches no governed surface; nothing to re-align.
+
+**Builder runbook still pending (from infrastructure-r8kqt):** Part B — delete the three server backups under `/app/data/backups` and the dev-machine stale inventory under `C:\Users\marco\app\mediatheca\backups\`; then `/deploy` and confirm the first boot logs zero `[StartupCutover]` lines with drift 0/7.
+
+**Harness notes:** (1) the `checkpoint` verb rejected a fileList JSON with backslash-escaped `C:\...` paths when passed through Git Bash (`invalid-opts-json`); forward-slash drive-letter paths (`C:/...`) worked. (2) The source-repo `lib/task-lifecycle-cli.mjs` (0.9.2 tree) DID fold the vacated `doing/` path into the checkpoint manifest this time, unlike last session's cached plugin. (3) Board is empty after this task — no ready work remains in any BC.
+
+---
+
+rotocol
 
 Chronological log of everything that happens in this project.
 Newest entries on top.
