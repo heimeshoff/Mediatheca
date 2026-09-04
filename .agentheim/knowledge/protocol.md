@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-04 10:35 -- Modeling / Captured: integration-zwnh4 - Steam Connect QR login gets a stable, honest device identity; ADR-0067 amended after the third Valve alert
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** The third Valve account alert (2026-09-03 18:54 CEST, Muenster DE) was traced in production container logs to the Connect Steam QR ceremony at 16:54:30 UTC on a container redeployed at 16:39 UTC — not to the import. The alert location proves the production host is residential, disproving ADR-0067's datacenter-IP hypothesis; the enumeration fixes (ADR-0066/0069) were already live. What SteamKit2 sends by default is the real fingerprint: DeviceFriendlyName = "{MachineName} (SteamKit2)" (the random container id per deploy), WebsiteID "Client" on a MobileApp/Android9 session. The task fixes SteamConnect.fs (fixed name, "Mobile" website id, fixed OS type, pure + tested), amends ADR-0067 in place (retract the IP half, discharge ladder step 1, insert this as the cheapest rung before browser retrieval, add the reconnect-loop note), and syncs the README/concept prose. Concrete enough for todo directly.
+
+---
+
 ## 2026-09-03 20:14 -- Work session ended
 
 **Type:** Work / Session end

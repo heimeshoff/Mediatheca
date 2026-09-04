@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 17
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **integration-zwnh4** — Give the Steam Connect QR login a stable, honest device identity — a fixed device name, a "Mobile" website id and a fixed OS type instead of SteamKit2's per-deploy container-id defaults — and amend ADR-0067 with the corrected (home-IP, not datacenter) hypothesis after the third Valve alert (bug) — `todo/integration-zwnh4-steam-connect-stable-device-identity.md`
 <!-- todo-list:end -->
 
 ### Doing
