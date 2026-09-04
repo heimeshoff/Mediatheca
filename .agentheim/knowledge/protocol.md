@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-04 10:53 -- Task verified and completed: integration-zwnh4 - Give the Steam Connect QR login a stable, honest device identity — a fixed device name, a "Mobile" website id and a fixed OS type instead of SteamKit2's per-deploy container-id defaults — and amend ADR-0067 with the corrected (home-IP, not datacenter) hypothesis after the third Valve alert
+
+**Type:** Work / Task completion
+**Task:** integration-zwnh4 - Give the Steam Connect QR login a stable, honest device identity — a fixed device name, a "Mobile" website id and a fixed OS type instead of SteamKit2's per-deploy container-id defaults — and amend ADR-0067 with the corrected (home-IP, not datacenter) hypothesis after the third Valve alert
+**Summary:** The Steam Connect QR login now sends a fixed, honest device identity (a "Mediatheca" device name, STEAM_DEVICE_NAME-overridable, and a Mobile website id matching the MobileApp platform) instead of SteamKit2 per-deploy container-hostname defaults, and ADR-0067 is amended to retract the disproven datacenter-IP hypothesis in favor of the device-fingerprint one after the third Valve alert.
+**Duration:** 18m
+**Verification:** PASS (iteration 1)
+**Files changed:** 6
+**Tests added:** 8
+**ADRs written:** none
+
+---
+
 ## 2026-09-04 10:36 -- Batch started: [integration-zwnh4]
 
 **Type:** Work / Batch start

@@ -6,7 +6,7 @@ status: accepted
 date: 2026-08-18
 supersedes: []
 superseded_by: []
-related_tasks: [integration-p2hxn, integration-hebjs, integration-ygwsa, integration-r8kwd, integration-w7ktb, integration-n3vqa]
+related_tasks: [integration-p2hxn, integration-hebjs, integration-ygwsa, integration-r8kwd, integration-w7ktb, integration-n3vqa, integration-zwnh4]
 related_research: [steam-family-api-auto-token-refresh-2026-07-20]
 ---
 
@@ -189,3 +189,98 @@ this ADR (escalate up the ladder, not silently work around):
   false-positive-shaped side effect of Mediatheca's traffic, not evidence of genuine
   compromise; if that assumption is wrong, the correct response is an account-security
   incident response, not anything in this ADR's ladder.
+
+## Amended 2026-09-04 (integration-zwnh4)
+
+Valve raised a **third** "this account may have been accessed by someone else" alert on
+2026-09-03 at 18:54 CEST (location reported by Valve's own alert: Muenster, DE). Production
+container logs on `harbour` (the builder's home server) pin the trigger down exactly:
+
+| Time (UTC) | Event |
+|---|---|
+| 16:39:01 | `mediatheca` container redeployed — new hostname `0868c9f227f8` |
+| 16:54:30 | `GET /api/stream/steam-connect` — the QR ceremony (`SteamConnect.startConnect`) |
+| 16:54:46 | `GET /api/stream/import-steam-family` — the (already incremental) family import |
+
+16:54 UTC is 18:54 CEST, the minute in Valve's alert. The alert traces to the **QR login**,
+not the import.
+
+**The datacenter-IP half of point 1's hypothesis is retracted — it was factually wrong for
+this deployment.** `harbour` is the builder's home server in Münster; Valve's own alert location
+("Muenster, DE") confirms the login IP is residential, not a datacenter/VPS address. Point 2's
+"the datacenter-sourced IP is not separately fixable" reasoning and point 5 step 3's premise
+that reversing ADR-0019 removes a datacenter-sourced signature are accordingly also stale —
+there was never a datacenter IP to fix or trade away here. This does not change point 2's
+conclusion (the platform choice is still not casually reversible — see below), only the
+reasoning offered for why the login *looked* anomalous.
+
+**Replacement hypothesis: the device fingerprint, not the IP.** SteamKit2's
+`AuthSessionDetails` defaults, unless overridden, are: `DeviceFriendlyName =
+"{Environment.MachineName} (SteamKit2)"` (inside Docker, the random per-container hostname —
+`0868c9f227f8 (SteamKit2)` on this redeploy, a *different* string on every redeploy),
+`WebsiteID = "Client"` (the SteamKit2 default, not what the real Steam mobile app sends —
+node-steam-session's own MobileApp → `'Mobile'` mapping confirms `"Client"` is a website-id
+mismatch for this platform), and `ClientOSType` from `Utils.GetOSType()` (a runtime lookup,
+though `SteamConnect.fs` was already pinning this to `Android9` explicitly before this
+amendment). The replacement hypothesis: a `MobileApp`-platform QR login presenting a
+randomly-named "device" on every deploy, with a website id that doesn't match its own claimed
+platform, reads to Valve's undocumented abuse detection as a new, unrecognised device signing
+in — reinforced by the fact that a `MobileApp`-platform session performing a **QR** login is
+itself an inversion of the real Steam app's own role (the real app is the scanner, never the
+thing scanned). As with point 1's original wording, **this is a hypothesis, not a finding** —
+Valve's detection logic remains undocumented and unverifiable from outside Valve's system.
+
+**Ladder step 1 (point 5) is discharged.** ADR-0066 (storefront throttle) and ADR-0069 (import
+call-count reduction) were both live on the deploy the third alert traces to — the import at
+16:54:46 issued only its steady-state handful of requests, 16 seconds after the QR login. The
+enumeration half of the original two-part signature (Context, points 1) was already fixed at
+the time of this alert; whatever produced it, it wasn't an unthrottled sweep. Step 1's original
+instruction — "let the enumeration-half fixes land and observe" — has been satisfied: they
+landed, and a flag still occurred, isolating the remaining signature to the login half.
+
+**New ladder rung inserted ahead of browser retrieval — the stable device identity fix.**
+Before climbing to point 5's former step 2 (browser retrieval, now **step 3**) or former step 3
+(reversing ADR-0019 point 2, now **step 4**), integration-zwnh4 ships a cheaper rung: stop
+presenting a new, randomly-named "device" on every deploy. `SteamConnect.authSessionDetails`
+(`src/Server/SteamConnect.fs`) now sets `DeviceFriendlyName` to a fixed constant (`"Mediatheca"`
+by default, overridable via the `STEAM_DEVICE_NAME` environment variable — never derived from
+`Environment.MachineName` or the container hostname) and `WebsiteID = "Mobile"` (matching the
+`MobileApp` platform instead of SteamKit2's `"Client"` default). `PlatformType = MobileApp` and
+`IsPersistentSession = true` are unchanged — point 2's reasoning for that choice still holds,
+independent of the IP-half retraction above. This is now:
+
+  1. **Stable device identity** (integration-zwnh4, this amendment) — present a fixed,
+     recognisable device name and a platform-consistent website id on every QR ceremony instead
+     of a new one per deploy. Cost: one file, no new dependency, no behavior change to the
+     token-refresh path. Landed 2026-09-04.
+  2. **Let the enumeration-half fixes and this device-identity fix run for one ordinary usage
+     cycle and observe** — the same "give a cheap fix time to work before climbing" discipline
+     the original step 1 applied, reapplied to this new rung.
+  3. **The browser-retrieval fallback** (formerly step 2, ADR-0019 point 4) — semi-automated
+     retrieval of the family access token via a logged-in Chrome session, trading the login
+     session away entirely for a standing signed-in browser profile. Still evaluated, not
+     built.
+  4. **Reverse ADR-0019 point 2** (formerly step 3) — switch to `PlatformType = SteamClient`,
+     accepting a permanent SteamKit2 + live-CM dependency in the server. Still the last resort.
+
+  **A fourth alert**, after this device-identity fix has been live for at least one full
+  ordinary usage cycle, is the trigger to climb to step 3. Point 6's other two triggers (a
+  refresh token silently invalidated by Steam outside an explicit revocation; confirmation of
+  actual account compromise) are unchanged by this amendment.
+
+**Reconnect-loop mitigation note, added to point 3's mitigations.** The third alert's timeline
+shows Connect Steam run 16 seconds before the family import, immediately after a fresh deploy.
+Steam's own hijack-recovery flow commonly invalidates existing sessions as part of recovering
+a flagged account — if that happens here, the stored family refresh token would be silently
+revoked, and the next import would report "reconnect required", which per point 4's rule is a
+legitimate, non-speculative trigger to reconnect — but each such reconnect is itself a fresh QR
+login, i.e. exactly the signature this ADR is about, and running it *reactively* in a tight loop
+(alert → recovery revokes token → "reconnect required" → new QR ceremony → new alert) would be
+self-reinforcing for no benefit, same shape as the already-closed integration-r8kwd loop. Point
+4's rule already forbids running Connect Steam pre-emptively "to be safe" after an alert or a
+deploy — this note makes explicit that the rule applies here too: reconnect **only** when
+Settings surfaces the `"reconnect required: ..."`-driven "Reconnect Steam" prompt, never
+proactively after a redeploy and never "to be safe" after an alert. The builder can confirm
+this device-identity fix is taking effect by checking
+`store.steampowered.com/twofactor/manage` for a single stable "Mediatheca" device, rather than
+one `(SteamKit2)`-suffixed entry per past reconnect.

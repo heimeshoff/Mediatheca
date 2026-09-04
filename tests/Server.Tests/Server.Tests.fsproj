@@ -57,6 +57,7 @@
     <Compile Include="PlaytimeSyncKeyRejectionTests.fs" />
     <Compile Include="SteamStorefrontThrottleTests.fs" />
     <Compile Include="SteamFamilyIncrementalImportTests.fs" />
+    <Compile Include="SteamConnectDeviceIdentityTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

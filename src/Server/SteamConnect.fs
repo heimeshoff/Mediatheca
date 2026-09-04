@@ -53,6 +53,47 @@ module SteamConnect =
         let png = (new PngByteQRCode(qrData)).GetGraphic(10)
         "data:image/png;base64," + Convert.ToBase64String(png)
 
+    /// Name of the env var a builder can set to override the device name
+    /// this ceremony sends to Steam (e.g. "Mediatheca on harbour"). See
+    /// `authSessionDetails`.
+    [<Literal>]
+    let deviceNameEnvVar = "STEAM_DEVICE_NAME"
+
+    /// Fallback device name when `deviceNameEnvVar` is unset/blank. Fixed
+    /// and human-recognisable — never derived from the host's machine name
+    /// or the container hostname, which is what previously changed on every
+    /// deploy and produced a brand-new "device" per redeploy+reconnect (the
+    /// third Valve alert, ADR-0067 amendment 2026-09-04).
+    [<Literal>]
+    let defaultDeviceName = "Mediatheca"
+
+    /// Pure construction of the QR ceremony's `AuthSessionDetails` — the
+    /// stable device identity fix from ADR-0067's 2026-09-04 amendment.
+    /// Takes the override as a plain `string option` (rather than reading
+    /// the environment itself) so it stays a pure, unit-testable mapping;
+    /// `startConnect` reads `deviceNameEnvVar` once and passes the result in.
+    /// Sets every field SteamKit2's `SteamAuthentication` actually sends
+    /// (`device_friendly_name`, `platform_type`, `os_type`, `website_id`)
+    /// explicitly rather than relying on SteamKit2's per-host defaults:
+    /// `DeviceFriendlyName` fixed (never the host's machine name),
+    /// `WebsiteID = "Mobile"` (matching the `MobileApp` platform, not
+    /// SteamKit2's `"Client"` default), `ClientOSType` a fixed Android value
+    /// (never the SteamKit2 default OS-type lookup). `PlatformType =
+    /// MobileApp` and `IsPersistentSession = true` are unchanged from
+    /// ADR-0019 point 2 — not up for reconsideration here.
+    let authSessionDetails (deviceNameOverride: string option) : AuthSessionDetails =
+        let deviceName =
+            match deviceNameOverride with
+            | Some name when not (String.IsNullOrWhiteSpace name) -> name
+            | _ -> defaultDeviceName
+
+        AuthSessionDetails(
+            PlatformType = EAuthTokenPlatformType.k_EAuthTokenPlatformType_MobileApp,
+            IsPersistentSession = true,
+            ClientOSType = EOSType.Android9,
+            DeviceFriendlyName = deviceName,
+            WebsiteID = "Mobile")
+
     /// Kicks off a new QR login session in the background (connecting to
     /// Steam and beginning the QR auth handshake can take a couple of
     /// seconds) and returns its id immediately. Poll `status sessionId` for
@@ -82,12 +123,14 @@ module SteamConnect =
                     // (SteamClient platform): a SteamClient-platform token
                     // needs an authenticated CM connection to refresh, which
                     // is exactly what the ongoing refresh path
-                    // (`Steam.mintFamilyAccessToken`) avoids (ADR-0019).
-                    let authDetails =
-                        AuthSessionDetails(
-                            PlatformType = EAuthTokenPlatformType.k_EAuthTokenPlatformType_MobileApp,
-                            IsPersistentSession = true,
-                            ClientOSType = EOSType.Android9)
+                    // (`Steam.mintFamilyAccessToken`) avoids (ADR-0019). The
+                    // device identity (name/website id/OS type) is fixed and
+                    // stable across deploys — see `authSessionDetails` and
+                    // ADR-0067's 2026-09-04 amendment.
+                    let deviceNameOverride =
+                        Environment.GetEnvironmentVariable deviceNameEnvVar
+                        |> Option.ofObj
+                    let authDetails = authSessionDetails deviceNameOverride
 
                     let authSession =
                         steamClient.Authentication.BeginAuthSessionViaQRAsync(authDetails)

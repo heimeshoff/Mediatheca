@@ -1,11 +1,11 @@
 ---
 id: integration-zwnh4
 title: Give the Steam Connect QR login a stable, honest device identity — a fixed device name, a "Mobile" website id and a fixed OS type instead of SteamKit2's per-deploy container-id defaults — and amend ADR-0067 with the corrected (home-IP, not datacenter) hypothesis after the third Valve alert
-status: doing
+status: done
 type: bug
 context: integration
 created: 2026-09-04
-completed:
+completed: 2026-09-04
 depends_on: []
 blocks: []
 tags: [steam, steam-connect, auth, token, security, risk, adr, steamkit2]
@@ -110,24 +110,67 @@ is the act under suspicion (ADR-0067 point 4) and the live token is builder-only
 
 ## Acceptance criteria
 
-- [ ] `SteamConnect.fs` builds its `AuthSessionDetails` through a pure function whose result is
+- [x] `SteamConnect.fs` builds its `AuthSessionDetails` through a pure function whose result is
       asserted by an Expecto test: `DeviceFriendlyName` does not contain `Environment.MachineName`
       and does not contain `"(SteamKit2)"`; `WebsiteID = "Mobile"`; `PlatformType =
       k_EAuthTokenPlatformType_MobileApp`; `IsPersistentSession = true`; `ClientOSType` is a fixed
       Android value. Two consecutive calls return equal field values (stability).
-- [ ] With `STEAM_DEVICE_NAME` unset the device name is exactly `"Mediatheca"`; with it set the
+- [x] With `STEAM_DEVICE_NAME` unset the device name is exactly `"Mediatheca"`; with it set the
       device name is that value (test both via the pure function's input, not the process env).
-- [ ] A live-tree grep shows no remaining `Environment.MachineName` / `Utils.GetOSType` use in
+- [x] A live-tree grep shows no remaining `Environment.MachineName` / `Utils.GetOSType` use in
       `src/Server/SteamConnect.fs`.
-- [ ] ADR-0067 carries a dated 2026-09-04 amendment section that: retracts the datacenter-IP
+- [x] ADR-0067 carries a dated 2026-09-04 amendment section that: retracts the datacenter-IP
       half, records the third alert's UTC log timeline, marks ladder step 1 discharged, inserts
       the stable-device-identity rung before browser retrieval, names a fourth alert as the next
       trigger, and adds the reconnect-loop mitigation note. `related_tasks` includes
       `integration-zwnh4`.
-- [ ] `contexts/integration/README.md` line "Accepted risk, not yet resolved" and
+- [x] `contexts/integration/README.md` line "Accepted risk, not yet resolved" and
       `concepts/steam-account-flag-risk-surface.md` no longer say "datacenter"; both point at the
       amended ladder.
-- [ ] `npm test` passes; `npm run build` passes.
+- [x] `npm test` passes; `npm run build` passes.
+
+## Outcome
+
+`SteamConnect.fs` now builds its QR ceremony `AuthSessionDetails` through a pure
+`authSessionDetails : string option -> AuthSessionDetails` function: `DeviceFriendlyName`
+defaults to `"Mediatheca"` (never `Environment.MachineName`/container hostname), overridable via
+the `STEAM_DEVICE_NAME` env var (blank/whitespace override falls back to the default);
+`WebsiteID = "Mobile"` (was SteamKit2's `"Client"` default); `ClientOSType = Android9` fixed
+(unchanged, already explicit pre-fix); `PlatformType = MobileApp`/`IsPersistentSession = true`
+unchanged per ADR-0019 point 2 (out of scope here). `startConnect` reads `STEAM_DEVICE_NAME`
+once and passes it in, keeping the mapping itself pure and unit-testable without touching
+SteamKit2's network/CM connection. 8 new Expecto tests in
+`tests/Server.Tests/SteamConnectDeviceIdentityTests.fs` cover the default, the override, the
+blank-override fallback, the absence of the `(SteamKit2)` marker, `WebsiteID`, platform/session
+flags, OS type, and call-to-call stability.
+
+ADR-0067 carries a dated "Amended 2026-09-04 (integration-zwnh4)" section: retracts the
+datacenter-IP half of the original hypothesis (the third alert's login IP traced to the
+builder's own residential home server), records the third alert's UTC log timeline, marks
+former ladder step 1 (enumeration fixes) as discharged, inserts the stable-device-identity fix
+as the new cheapest rung ahead of browser retrieval (now step 3) and reversing ADR-0019 (now
+step 4), names a fourth alert as the trigger to climb further, and adds a reconnect-loop
+mitigation note (Steam hijack-recovery may silently revoke the stored refresh token; reconnect
+only on an explicit "reconnect required" prompt, never pre-emptively after a deploy or alert).
+`related_tasks` now includes `integration-zwnh4`.
+
+`contexts/integration/README.md`'s "Accepted risk, not yet resolved" line and
+`concepts/steam-account-flag-risk-surface.md` ("Login half", "Escalation ladder") were rewritten
+to drop the retracted datacenter-IP framing and describe the residential-IP finding, the
+device-fingerprint hypothesis, and the amended four-step ladder. The concept page's ubiquitous
+`authSessionDetails`/`STEAM_DEVICE_NAME` addition is also noted in the README's "Adapter"
+ubiquitous-language entry. No new ADR was written — the existing ADR-0067 was amended in place
+per the task's explicit instruction.
+
+`npm test`: 693/693 passing (685 pre-existing + 8 new). `npm run build`: client build succeeded;
+`dotnet build src/Server/Server.fsproj` succeeded with 0 warnings/errors.
+
+Key files: `src/Server/SteamConnect.fs`,
+`tests/Server.Tests/SteamConnectDeviceIdentityTests.fs`,
+`tests/Server.Tests/Server.Tests.fsproj`,
+`.agentheim/knowledge/decisions/0067-steam-mobileapp-login-signature-accepted-risk-and-escalation-ladder.md`,
+`.agentheim/contexts/integration/README.md`,
+`.agentheim/contexts/integration/concepts/steam-account-flag-risk-surface.md`.
 
 ## Notes
 
