@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-04 10:36 -- Batch started: [integration-zwnh4]
+
+**Type:** Work / Batch start
+**Tasks:** integration-zwnh4 - Give the Steam Connect QR login a stable, honest device identity — a fixed device name, a "Mobile" website id and a fixed OS type instead of SteamKit2's per-deploy container-id defaults — and amend ADR-0067 with the corrected (home-IP, not datacenter) hypothesis after the third Valve alert
+**Parallel:** no (1 worker — integration-zwnh4 is the only ready task across every BC; nothing held back)
+
+---
+
 ## 2026-09-04 10:35 -- Modeling / Captured: integration-zwnh4 - Steam Connect QR login gets a stable, honest device identity; ADR-0067 amended after the third Valve alert
 
 **Type:** Modeling / Capture

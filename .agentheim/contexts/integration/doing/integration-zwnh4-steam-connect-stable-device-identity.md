@@ -1,7 +1,7 @@
 ---
 id: integration-zwnh4
 title: Give the Steam Connect QR login a stable, honest device identity — a fixed device name, a "Mobile" website id and a fixed OS type instead of SteamKit2's per-deploy container-id defaults — and amend ADR-0067 with the corrected (home-IP, not datacenter) hypothesis after the third Valve alert
-status: todo
+status: doing
 type: bug
 context: integration
 created: 2026-09-04
