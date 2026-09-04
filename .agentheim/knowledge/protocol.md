@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-09-04 10:55 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 19m (first "Batch started" 10:36 → 10:55)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** integration-zwnh4: 1
+**Commits:** 3 (batch start, task completion, this entry)
+**Vision-conformance:** none — batch aligns with vision. The one shipped task is an integration bug fix (Steam Connect QR login sends a fixed device identity; ADR-0067 amended with the corrected home-IP hypothesis) — it serves the Steam Import workstream, touches no Out-of-Scope (v1) item and adds no admin-console scope. vision.md carries no "What success looks like"/"Non-goals" headings, so the pass was judgment against "Remaining v1 Work"/"Out of Scope (v1)".
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task) — `formatBatchMixLine` from the source-repo `lib/vacuum-guard.mjs` (installed plugin 0.9.2 carries no such module).
+**Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed.
+
+**Session-start churn note:** 0 recognized machine-shape commits, 0 human commits since the 2026-09-03 20:14 boundary — the single commit (02ad2a9, the integration-zwnh4 capture) carries its task trailer. Nothing to re-align.
+
+**Verifier observation, not acted on (scope):** ADR-0019 points 2 and 4 still carry the now-retracted "MobileApp-from-datacenter-IP" framing and call browser retrieval "escalation-ladder step 2" (it is step 3 after the ADR-0067 amendment). ADR-0061 Consequences has the same datacenter wording. Neither was in integration-zwnh4 sync list — a candidate for a small follow-up capture via `modeling`.
+
+**Builder-side, outside the task (from integration-zwnh4 Notes):** after Steam recovery, check `store.steampowered.com/twofactor/manage` for the `(SteamKit2)` devices and `steamcommunity.com/dev/apikey` for an unrecognised key; deploy this change before the next Connect Steam; do not click Connect Steam unless an import reports "reconnect required". A fourth alert after this is live for one ordinary usage cycle is the trigger to climb the amended ladder.
+
+**Harness notes:** (1) cached plugin 0.9.2 `checkpoint` again omitted the vacated `doing/` path from its manifest — staged explicitly, git recorded the move as a rename. (2) The worktree needed the root `node_modules` junctioned from the main tree for `npm run build` (removed via `rmdir` before `git worktree remove`; main copy verified intact). (3) Board is empty after this task — no ready work in any BC.
+
+---
+
 ## 2026-09-04 10:53 -- Task verified and completed: integration-zwnh4 - Give the Steam Connect QR login a stable, honest device identity — a fixed device name, a "Mobile" website id and a fixed OS type instead of SteamKit2's per-deploy container-id defaults — and amend ADR-0067 with the corrected (home-IP, not datacenter) hypothesis after the third Valve alert
 
 **Type:** Work / Task completion
