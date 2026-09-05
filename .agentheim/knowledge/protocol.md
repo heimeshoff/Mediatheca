@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-05 23:54 -- Batch started: [integration-v0xmv]
+
+**Type:** Work / Batch start
+**Tasks:** integration-v0xmv - Remove the Steam Connect QR login and the refresh-token mint path — the Steam Family import runs only on a browser-obtained access token pasted in Settings, and Mediatheca never performs a Steam login or token mint again
+**Parallel:** no (1 worker — integration-v0xmv is the only ready task across every BC; nothing held back)
+
+---
+
 ## 2026-09-05 23:50 -- Modeling / Captured: integration-v0xmv - Remove the Steam Connect QR login and refresh-token mint path; Steam Family import runs only on a browser-obtained access token pasted in Settings
 
 **Type:** Modeling / Capture

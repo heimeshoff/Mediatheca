@@ -1,7 +1,7 @@
 ---
 id: integration-v0xmv
 title: Remove the Steam Connect QR login and the refresh-token mint path — the Steam Family import runs only on a browser-obtained access token pasted in Settings, and Mediatheca never performs a Steam login or token mint again
-status: todo
+status: doing
 type: refactor
 context: integration
 created: 2026-09-05

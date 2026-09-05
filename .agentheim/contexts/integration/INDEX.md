@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 18
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **integration-v0xmv** — Remove the Steam Connect QR login and the refresh-token mint path — the Steam Family import runs only on a browser-obtained access token pasted in Settings, and Mediatheca never performs a Steam login or token mint again (refactor) — `todo/integration-v0xmv-remove-steam-connect-qr-login-manual-token-only.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **integration-v0xmv** — Remove the Steam Connect QR login and the refresh-token mint path — the Steam Family import runs only on a browser-obtained access token pasted in Settings, and Mediatheca never performs a Steam login or token mint again (refactor) — `doing/integration-v0xmv-remove-steam-connect-qr-login-manual-token-only.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
