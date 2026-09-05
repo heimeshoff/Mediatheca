@@ -1,15 +1,15 @@
 ---
 id: integration-v0xmv
 title: Remove the Steam Connect QR login and the refresh-token mint path — the Steam Family import runs only on a browser-obtained access token pasted in Settings, and Mediatheca never performs a Steam login or token mint again
-status: doing
+status: done
 type: refactor
 context: integration
 created: 2026-09-05
-completed:
+completed: 2026-09-05
 depends_on: [design-system-001]
 blocks: []
 tags: [steam, steam-family, auth, token, settings, import, account-safety, removal]
-related_adrs: [0019, 0061, 0065, 0067]
+related_adrs: [0019, 0061, 0065, 0067, 0070]
 related_research: [steam-family-api-auto-token-refresh-2026-07-20]
 prior_art: [integration-hebjs, integration-zwnh4, integration-p2hxn, integration-ygwsa, integration-r8kwd]
 ---
@@ -167,28 +167,31 @@ the token-retrieval instructions rewritten around the easier `ajaxgetasyncconfig
 
 ## Acceptance criteria
 
-- [ ] `src/Server/SteamConnect.fs`, `tests/Server.Tests/SteamConnectDeviceIdentityTests.fs`
+- [x] `src/Server/SteamConnect.fs`, `tests/Server.Tests/SteamConnectDeviceIdentityTests.fs`
       and `spikes/steam-family-token-spike/` no longer exist; `Server.fsproj` has no
       `SteamKit2` or `QRCoder` package reference; `dotnet build` and `npm run build` pass.
-- [ ] `grep -rn "IAuthenticationService\|SteamKit2\|steam_family_refresh_token\|reconnect required\|steam-connect" src/ tests/` returns only the startup cleanup that deletes the `steam_family_refresh_token` setting.
-- [ ] Startup deletes any stored `steam_family_refresh_token` (test: seed the setting in an
-      in-memory DB, run composition/init, assert it is gone).
-- [ ] `IMediathecaApi` has no `getSteamConnectionStatus`; the client compiles without any
+- [x] `grep -rn "IAuthenticationService\|SteamKit2\|steam_family_refresh_token\|reconnect required\|steam-connect" src/ tests/` returns only the startup cleanup that deletes the `steam_family_refresh_token` setting.
+- [x] Startup deletes any stored `steam_family_refresh_token` (test: seed the setting in an
+      in-memory DB, run composition/init, assert it is gone). *(The startup cleanup is
+      extracted as `Composition.deleteRetiredSteamRefreshToken` — directly unit-tested in
+      `SteamFamilyTokenTests.fs` without spinning up a full `WebApplication`; see Outcome.)*
+- [x] `IMediathecaApi` has no `getSteamConnectionStatus`; the client compiles without any
       Connect/QR state or messages.
-- [ ] Family member discovery and family import use only `steam_family_token`; an empty
+- [x] Family member discovery and family import use only `steam_family_token`; an empty
       token yields "Steam Family access token not configured" with no HTTP call; a 401/403
       from `IFamilyGroupsService` yields the `"family token rejected: "`-prefixed message
       and the Settings card shows the "paste a fresh token" warning — with no button that
       performs any Steam call.
-- [ ] Web API key rejection wording (ADR-0065) is unchanged and shares no prefix with the
+- [x] Web API key rejection wording (ADR-0065) is unchanged and shares no prefix with the
       family-token rejection message (test).
-- [ ] Settings → Steam Family shows the token how-to (`ajaxgetasyncconfig` → `webapi_token`)
+- [x] Settings → Steam Family shows the token how-to (`ajaxgetasyncconfig` → `webapi_token`)
       and the token input/Save as the primary step; the "Manual token entry (fallback)" and
       DevTools Network-tab instructions are gone; existing tokens still show as `****xxxx`.
-- [ ] Expecto and Vitest suites pass; no test references deleted symbols.
-- [ ] New ADR written and linked (`related_adrs` here, `related_tasks` there); ADR-0061
+- [x] Expecto and Vitest suites pass; no test references deleted symbols.
+- [x] New ADR written and linked (`related_adrs` here, `related_tasks` there); ADR-0061
       marked superseded by it; ADR-0019 and ADR-0067 amended in place as described; README
-      and concept page updated; INDEX adr-local list updated.
+      and concept page updated; INDEX adr-local list updated. *(INDEX update is the
+      conductor's, per the task-file protocol — not done by this worker.)*
 
 ## Notes
 
@@ -212,3 +215,50 @@ the token-retrieval instructions rewritten around the easier `ajaxgetasyncconfig
   `GetSharedLibraryApps` (`include_own`, `include_excluded`, `owner_steamids[]`,
   `exclude_reason`, `rt_time_acquired`) shape it describes is already what
   `Steam.fs`/`runSteamFamilyImport` implement; nothing new to add on the query side.
+
+## Outcome
+
+Deleted `src/Server/SteamConnect.fs`, the `/api/stream/steam-connect` route, the
+`SteamKit2`/`QRCoder` package references, `spikes/steam-family-token-spike/`, and
+`tests/Server.Tests/SteamConnectDeviceIdentityTests.fs`. In `src/Server/Steam.fs`, deleted
+`withTokenRefresh`, `TokenMinter`, `mintFamilyAccessToken`, `steamIdFromRefreshToken`,
+`GenerateAccessTokenResponse`, and the three `*WithRefresh` wrappers; kept `FamilyFetchError`
+and the plain `fetch*`/`get*` family functions, and added `familyTokenRejectedMessage`
+(`"family token rejected: ..."`, textually distinct from ADR-0065's Web API key wording) as
+`mapFamilyFetchError`'s new `Rejected` mapping. `src/Server/Composition.fs` extracted a
+directly-testable `deleteRetiredSteamRefreshToken` (called once at startup, idempotent) and
+removed the `/api/stream/steam-connect` route registration; `Api.fs`'s `runSteamFamilyImport`
+and `fetchSteamFamilyMembers` now read only `steam_family_token`, with no refresh-token
+re-reads. `IMediathecaApi.getSteamConnectionStatus` removed. Client: `Settings/Types.fs`/
+`State.fs` replaced `SteamConnected`/`IsConnectingSteam`/`SteamConnectQrDataUrl`/
+`SteamConnectError`/`SteamNeedsReconnect` and every Connect-related message with a single
+`SteamFamilyTokenRejected` flag (driven by the new prefix, cleared on a successful token save);
+`Views.fs` deleted the Connect/Reconnect block and QR image, promoted the token paste
+input to the primary step, and rewrote the how-to around `ajaxgetasyncconfig` → `webapi_token`.
+
+Wrote ADR-0070 (new), marked ADR-0061 `status: superseded` / `superseded_by: [0070]`, amended
+ADR-0019 (points 2 and 4, "yet" → permanent, browser fallback closed as will-not-build) and
+ADR-0067 (an appended 2026-09-05 amendment retiring the escalation ladder, the
+no-speculative-reconnect rule, and the device-identity rung) in place, and fixed the
+verifier-noted stale "MobileApp-from-datacenter-IP" wording in ADR-0019 and ADR-0061's
+Consequences. Updated the BC README's Adapter/Refresh token/Connect entries and Open Questions,
+and rewrote `concepts/steam-account-flag-risk-surface.md` to the settled two-surface state.
+
+Tests: `tests/Server.Tests/SteamFamilyTokenTests.fs` rewritten — 401/403 → `"family token
+rejected: "` mapping, prefix-distinctness from the Web API key message, empty-token
+"not configured, no HTTP call" for both `importSteamFamily` and `fetchSteamFamilyMembers`, and
+three new cases for `Composition.deleteRetiredSteamRefreshToken`. Updated
+`SteamFamilyImportOwnedGamesTests.fs`'s stale "reconnect required" assertion to check against
+the new prefix instead. Added `src/Client/Pages/Settings/FamilyTokenRejected.test.fs` (Vitest/
+Fable.Mocha) covering `Settings.State.update`'s family-token-rejected detection end to end.
+Expecto: 685/685 passing. Vitest: 20/20 passing (5 files). `npm run build` and
+`dotnet build src/Server/Server.fsproj` both clean.
+
+Key files: `src/Server/Steam.fs`, `src/Server/Api.fs`, `src/Server/Composition.fs`,
+`src/Server/Server.fsproj`, `src/Shared/Shared.fs`, `src/Client/Pages/Settings/{Types,State,
+Views}.fs`, `src/Client/Client.fsproj`, `tests/Server.Tests/{SteamFamilyTokenTests,
+SteamFamilyImportOwnedGamesTests}.fs`, `tests/Server.Tests/Server.Tests.fsproj`,
+`src/Client/Pages/Settings/FamilyTokenRejected.test.fs`,
+`.agentheim/knowledge/decisions/{0019,0061,0067,0070}-*.md`,
+`.agentheim/contexts/integration/README.md`,
+`.agentheim/contexts/integration/concepts/steam-account-flag-risk-surface.md`.

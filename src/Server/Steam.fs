@@ -510,60 +510,21 @@ module Steam =
                 return None
         }
 
-    // ── Family access-token mint-and-retry seam (integration-ygwsa spike) ──
+    // ── Family fetches (no mint-and-retry — integration-v0xmv) ──
     //
-    // Mirrors ADR-0011 (`Jellyfin.withReauthRetry`): surface a rejected token as
-    // data, then orchestrate the mint-and-retry purely so the exactly-once
-    // policy is unit-testable with plain lambdas — no HTTP, no SteamKit2, no
-    // SQLite. See ADR-0019 for the spike write-up: the *live* mint
-    // implementation (SteamKit2 QR/credentials login → stored refresh token →
-    // `IAuthenticationService/GenerateAccessTokenForApp` HTTP call) is
-    // UNVERIFIED against the real `IFamilyGroupsService` audience/scope — that
-    // empirical check is deferred to integration-hebjs. This seam is what
-    // hebjs should wire the real `mint`/`persist` lambdas into once it does.
+    // integration-v0xmv removed the mint-and-retry seam (`withTokenRefresh`,
+    // `TokenMinter`) and every Steam-login-capable path along with it: the
+    // family import runs only against a browser-obtained access token pasted
+    // by the user in Settings (ADR-0070). `FamilyFetchError` stays — the
+    // 401/403 distinction is still what lets the client tell "paste a fresh
+    // token" apart from "Steam is down".
 
     /// A failed family-API fetch, distinguishing a rejected/expired access
-    /// token (the trigger to mint a fresh one) from any other failure.
+    /// token (the trigger to prompt for a fresh pasted token) from any other
+    /// failure.
     type FamilyFetchError =
         | Rejected
         | FamilyOtherFailure of string
-
-    /// Mints a fresh access token from whatever long-lived credential the
-    /// caller has stored (a Steam refresh token, in the production shape).
-    /// Injected as a lambda so `withTokenRefresh` never has to know how
-    /// minting actually happens.
-    type TokenMinter = unit -> Async<Result<string, string>>
-
-    /// Runs a token-consuming fetch with an exactly-once mint-and-retry
-    /// policy: run `fetch` once with `token`; on `Error Rejected`, call `mint`
-    /// exactly once; on success persist the fresh token via `persist` and
-    /// retry `fetch` exactly once with it; a second `Rejected`, a failed
-    /// mint, or any `FamilyOtherFailure` returns a clear `Error` and never
-    /// loops. Same shape as `Jellyfin.withReauthRetry` (ADR-0011).
-    let withTokenRefresh
-        (token: string)
-        (fetch: string -> Async<Result<'a, FamilyFetchError>>)
-        (mint: TokenMinter)
-        (persist: string -> unit)
-        : Async<Result<'a, string>> =
-        async {
-            let! first = fetch token
-            match first with
-            | Ok value -> return Ok value
-            | Error (FamilyOtherFailure msg) -> return Error msg
-            | Error Rejected ->
-                let! minted = mint ()
-                match minted with
-                | Error e -> return Error (sprintf "Steam family token mint failed: %s" e)
-                | Ok freshToken ->
-                    persist freshToken
-                    let! retry = fetch freshToken
-                    match retry with
-                    | Ok value -> return Ok value
-                    | Error (FamilyOtherFailure msg) -> return Error msg
-                    | Error Rejected ->
-                        return Error "Steam rejected the family token again after minting a fresh one; aborting (no retry loop)"
-        }
 
     /// GET a family-service `url` with `accessToken`, returning `Error
     /// Rejected` on 401/403 instead of throwing (the plain
@@ -627,13 +588,21 @@ module Steam =
                 | Error e -> return Error (FamilyOtherFailure (sprintf "Failed to parse family group details: %s" e))
         }
 
+    /// Fixed, typed message for a rejected/expired family access token
+    /// (integration-v0xmv, ADR-0070). Prefixed distinctly from the Web API
+    /// key rejection message (ADR-0065 rule 3 — the two credentials require
+    /// two different user actions and must never share wording).
+    let familyTokenRejectedMessage =
+        "family token rejected: your Steam Family access token has expired or " +
+        "was rejected — paste a fresh one in Settings → Steam Family"
+
     let private mapFamilyFetchError = function
-        | Rejected -> "Rejected (HTTP 401/403)"
+        | Rejected -> familyTokenRejectedMessage
         | FamilyOtherFailure m -> m
 
-    /// Non-retrying siblings of the `fetch*` functions above, for the manual
-    /// -paste-only fallback path where there is no refresh token to mint a
-    /// replacement from.
+    /// Plain (non-retrying) family fetches — the only way in (integration-v0xmv):
+    /// there is no refresh token to mint a replacement from, so a rejected
+    /// token surfaces `familyTokenRejectedMessage` for the caller to show.
     let getFamilyGroupForUser (httpClient: HttpClient) (accessToken: string) : Async<Result<SteamFamilyGroupResponse, string>> =
         async {
             let! r = fetchFamilyGroupForUser httpClient accessToken
@@ -651,100 +620,6 @@ module Steam =
             let! r = fetchFamilyGroupDetail httpClient accessToken familyGroupId
             return r |> Result.mapError mapFamilyFetchError
         }
-
-    // ── Refresh-token minting (integration-hebjs) ──
-    //
-    // The empirical check ADR-0019 deferred has now run live and passed (see
-    // the task file): a MobileApp-platform, persistent-session refresh token
-    // (obtained via the one-time SteamKit2 QR login in `SteamConnect.fs`)
-    // mints access tokens over plain HTTP that carry exactly the
-    // audience/scope `IFamilyGroupsService` requires.
-
-    /// Decodes the `steamid` (JWT `sub` claim) out of a Steam refresh token —
-    /// `GenerateAccessTokenForApp` requires it as an explicit parameter
-    /// alongside the refresh token itself (confirmed live by the
-    /// integration-hebjs builder gate). Pure, no I/O — directly unit-testable
-    /// against a synthetic JWT-shaped string.
-    let steamIdFromRefreshToken (refreshToken: string) : Result<string, string> =
-        try
-            let parts = refreshToken.Split('.')
-            if parts.Length < 2 then
-                Error "Malformed Steam refresh token (not JWT-shaped)"
-            else
-                let payload = parts.[1].Replace('-', '+').Replace('_', '/')
-                let padded = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=')
-                let json = System.Text.Encoding.UTF8.GetString(System.Convert.FromBase64String(padded))
-                match Decode.fromString (Decode.field "sub" Decode.string) json with
-                | Ok steamId -> Ok steamId
-                | Error e -> Error (sprintf "Could not read steamid from refresh token: %s" e)
-        with ex ->
-            Error (sprintf "Could not decode Steam refresh token: %s" ex.Message)
-
-    type private GenerateAccessTokenResponse = { AccessToken: string }
-
-    let private decodeGenerateAccessTokenResponse: Decoder<GenerateAccessTokenResponse> =
-        Decode.object (fun get ->
-            get.Required.Field "response" (Decode.object (fun get2 -> {
-                AccessToken = get2.Required.Field "access_token" Decode.string
-            })))
-
-    /// Mints a fresh family-scope access token from a stored Steam refresh
-    /// token via a plain HTTP POST to
-    /// `IAuthenticationService/GenerateAccessTokenForApp` — no SteamKit2, no
-    /// CM connection (ADR-0019; the refresh token must have been obtained
-    /// with `PlatformType = MobileApp` and `IsPersistentSession = true`, see
-    /// `SteamConnect.fs`). This is the `TokenMinter` `withTokenRefresh`
-    /// expects. An empty/missing refresh token (no "Connect Steam" session
-    /// yet, or Valve invalidated it) short-circuits to a clear
-    /// reconnect-required error rather than attempting a doomed HTTP call —
-    /// mirrors ADR-0011's `Jellyfin.reauthThunk` missing-credentials case, so
-    /// callers can surface a "reconnect Steam" prompt instead of an opaque
-    /// failure.
-    let mintFamilyAccessToken (httpClient: HttpClient) (refreshToken: string) : Async<Result<string, string>> =
-        async {
-            if System.String.IsNullOrWhiteSpace(refreshToken) then
-                return Error "reconnect required: no Steam refresh token stored — use Connect Steam in Settings"
-            else
-                match steamIdFromRefreshToken refreshToken with
-                | Error e -> return Error e
-                | Ok steamId ->
-                    try
-                        use content =
-                            new FormUrlEncodedContent(
-                                dict [ "refresh_token", refreshToken; "steamid", steamId ]
-                                |> Seq.map (fun kv -> System.Collections.Generic.KeyValuePair(kv.Key, kv.Value)))
-                        let! response =
-                            httpClient.PostAsync(
-                                "https://api.steampowered.com/IAuthenticationService/GenerateAccessTokenForApp/v1/",
-                                content)
-                            |> Async.AwaitTask
-                        let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
-                        let status = int response.StatusCode
-                        if status = 401 || status = 403 then
-                            return Error "reconnect required: Steam rejected the stored refresh token — use Connect Steam in Settings"
-                        elif not response.IsSuccessStatusCode then
-                            return Error (sprintf "Failed to mint Steam access token (HTTP %d)" status)
-                        else
-                            match Decode.fromString decodeGenerateAccessTokenResponse body with
-                            | Ok r -> return Ok r.AccessToken
-                            | Error e -> return Error (sprintf "Failed to parse minted access token: %s" e)
-                    with ex ->
-                        return Error (sprintf "Failed to mint Steam access token: %s" ex.Message)
-        }
-
-    /// Self-healing family fetches: on a rejected/expired access token, mint
-    /// a fresh one from `refreshToken` and persist it via `persist`, then
-    /// retry once — mirrors `Jellyfin.getMoviesWithReauth` (ADR-0011).
-    /// `refreshToken` empty means "no Connect Steam session yet"; the mint
-    /// short-circuits to the reconnect-required error above.
-    let getFamilyGroupForUserWithRefresh (httpClient: HttpClient) (accessToken: string) (refreshToken: string) (persist: string -> unit) : Async<Result<SteamFamilyGroupResponse, string>> =
-        withTokenRefresh accessToken (fetchFamilyGroupForUser httpClient) (fun () -> mintFamilyAccessToken httpClient refreshToken) persist
-
-    let getSharedLibraryAppsWithRefresh (httpClient: HttpClient) (accessToken: string) (refreshToken: string) (familyGroupId: string) (persist: string -> unit) : Async<Result<SteamSharedLibraryApp list, string>> =
-        withTokenRefresh accessToken (fun token -> fetchSharedLibraryApps httpClient token familyGroupId) (fun () -> mintFamilyAccessToken httpClient refreshToken) persist
-
-    let getFamilyGroupWithRefresh (httpClient: HttpClient) (accessToken: string) (refreshToken: string) (familyGroupId: string) (persist: string -> unit) : Async<Result<SteamFamilyGroupResponse, string>> =
-        withTokenRefresh accessToken (fun token -> fetchFamilyGroupDetail httpClient token familyGroupId) (fun () -> mintFamilyAccessToken httpClient refreshToken) persist
 
     let getPlayerSummaries (httpClient: HttpClient) (apiKey: string) (steamIds: string list) : Async<Result<SteamPlayerSummary list, string>> =
         async {

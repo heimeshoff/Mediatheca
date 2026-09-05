@@ -6,7 +6,7 @@ status: accepted
 date: 2026-08-18
 supersedes: []
 superseded_by: []
-related_tasks: [integration-p2hxn, integration-hebjs, integration-ygwsa, integration-r8kwd, integration-w7ktb, integration-n3vqa, integration-zwnh4]
+related_tasks: [integration-p2hxn, integration-hebjs, integration-ygwsa, integration-r8kwd, integration-w7ktb, integration-n3vqa, integration-zwnh4, integration-v0xmv]
 related_research: [steam-family-api-auto-token-refresh-2026-07-20]
 ---
 
@@ -284,3 +284,50 @@ proactively after a redeploy and never "to be safe" after an alert. The builder 
 this device-identity fix is taking effect by checking
 `store.steampowered.com/twofactor/manage` for a single stable "Mediatheca" device, rather than
 one `(SteamKit2)`-suffixed entry per past reconnect.
+
+
+## Amended 2026-09-05 (integration-v0xmv) — the login half is removed, not accepted
+
+Valve escalated from a third alert to an explicit **permanent-ban threat** for further login-API
+misuse (builder, 2026-09-05). This ADR's entire framing — accept the login-shaped traffic as a
+risk, mitigate it, escalate up a ladder if it keeps recurring — assumed each further alert bought
+time to try the next cheaper mitigation. A ban threat removes that assumption: there is no
+mitigation cheaper than not performing the login at all, and no further alert is affordable to
+absorb while testing one. **integration-v0xmv deletes the QR ceremony, the refresh-token mint
+path, and every code path that can perform a Steam login or mint a Steam token, end to end** —
+`SteamConnect.fs`, the `/api/stream/steam-connect` route, `Steam.withTokenRefresh`/`TokenMinter`/
+`mintFamilyAccessToken`/`steamIdFromRefreshToken`, the stored `steam_family_refresh_token`
+setting (deleted on startup, one-time cleanup), and `spikes/steam-family-token-spike/`. The
+paste-a-token flow (`ajaxgetasyncconfig` → `webapi_token`), which ran without incident across
+every alert to date and performs no login of any kind, becomes the only way in — see ADR-0070.
+
+**What this retires, specifically:**
+- **The escalation ladder (point 5, plus its 2026-09-04 replacement rungs)** — there is no next
+  rung to climb to. Step 3 (browser-retrieval fallback) is now itself closed as *will not build*
+  by ADR-0070, not merely deferred: driving a browser through Steam's own login flow, even via
+  Chrome DevTools MCP instead of SteamKit2, is the same class of act this ADR was trying to
+  avoid triggering a fourth alert over. Step 4 (reversing ADR-0019 point 2 to `SteamClient`) is
+  moot — there is no login session left to give a platform to.
+- **The no-speculative-reconnect rule (point 4)** — retired with `Start_steam_connect`/
+  `SteamNeedsReconnect`, the code path it constrained. There is no reconnect ceremony left to
+  run speculatively or otherwise.
+- **The stable-device-identity rung (2026-09-04 amendment)** — retired with
+  `SteamConnect.authSessionDetails`, the code it fixed. A device identity, however honest, is
+  moot once the device never logs in again. The builder should still remove the "Mediatheca" /
+  "… (SteamKit2)" authorized-device entries at `store.steampowered.com/twofactor/manage` by hand
+  now that there is no cost to doing so (nothing will re-create them).
+- **Point 6's triggers** — moot; there is nothing left for a third/fourth alert, a silently
+  invalidated refresh token, or a confirmed-compromise finding to reopen. If Valve ever alerts on
+  this account again after this task, it cannot trace to anything this ADR governed.
+
+**What survives:** point 1's discipline (label causal claims about Valve's detection as
+hypotheses, never findings) and the retracted-datacenter-IP correction in the 2026-09-04
+amendment remain accurate historical record of what was tried and why it didn't hold. The
+compliance check of what remains after this removal — the residual gray area is the
+undocumented-but-read-only `IFamilyGroupsService` call, unchanged since before any of this ADR's
+incidents, made with a token the user's own browser already holds — is recorded in ADR-0070's
+Context, not repeated here.
+
+This ADR is **not** marked superseded: it remains the accurate record of an accepted-risk period
+that ran from 2026-08-18 to 2026-09-05 and the reasoning tried during it. ADR-0070 is the
+decision that ends that period.

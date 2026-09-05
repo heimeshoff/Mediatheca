@@ -40,6 +40,15 @@ let createConnectionFactory (dbPath: string) : unit -> SqliteConnection =
         EventStore.configureConnection conn
         conn
 
+/// integration-v0xmv (ADR-0070): the Steam Connect QR login and the
+/// refresh-token mint path are removed outright — Mediatheca must never hold
+/// a live Steam login credential again. Deletes any `steam_family_refresh_token`
+/// a prior build persisted; a one-time, idempotent no-op once the setting is
+/// already gone. Extracted from `buildApp` as its own top-level function so
+/// it is directly unit-testable without spinning up a full `WebApplication`.
+let deleteRetiredSteamRefreshToken (conn: SqliteConnection) : unit =
+    SettingsStore.deleteSetting conn "steam_family_refresh_token"
+
 /// Build (but do not run) the app. `urls` overrides Kestrel's bind address
 /// (ASPNETCORE_URLS / default) — used by the desktop shell to force a
 /// loopback-only, ephemeral-port bind (ADR-0007: no auth, so the desktop
@@ -164,6 +173,10 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         | None -> SettingsStore.setSetting conn "steam_id" id
         | Some _ -> ()
     | _ -> ()
+
+    // integration-v0xmv (ADR-0070): any `steam_family_refresh_token` persisted
+    // by a prior build is deleted on every startup — see `deleteRetiredSteamRefreshToken`.
+    deleteRetiredSteamRefreshToken conn
 
     // Dynamic TMDB config provider (reads from DB, falls back to env var).
     // administration-mz6kp (ADR-0033): these providers are invoked from
@@ -459,8 +472,6 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
             // for every app, known or new). Never the default import click.
             route "/api/stream/reenrich-steam-family"
                 >=> Api.steamFamilyImportHandler connectionFactory httpClient getRawgConfig getSteamConfig imageBasePath projectionHandlers Api.FullReenrich
-            route "/api/stream/steam-connect"
-                >=> Api.steamConnectStreamHandler connectionFactory
             route "/api/stream/export-events"
                 >=> Administration.exportEventsStreamHandler connectionFactory
             route "/api/stream/import-events"

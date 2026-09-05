@@ -1607,12 +1607,6 @@ type IMediathecaApi = {
     // GetOwnedGames supplement, or None once cleared (key saved/tested
     // successfully, or a subsequent supplement call succeeds).
     getSteamApiKeyLastError: unit -> Async<string option>
-    // Steam Connect (integration-hebjs): whether a one-time QR login has been
-    // completed, i.e. a refresh token is stored and family access tokens now
-    // mint automatically. The QR ceremony itself streams over
-    // /api/stream/steam-connect (SSE, same shape as steamFamilyImportHandler)
-    // rather than this RPC surface.
-    getSteamConnectionStatus: unit -> Async<bool>
     // View Settings
     getViewSettings: string -> Async<ViewSettings option>
     saveViewSettings: string -> ViewSettings -> Async<unit>

@@ -4,7 +4,7 @@ title: Steam Family token refresh — pure mint-and-retry seam shipped, live aud
 scope: integration
 status: accepted
 date: 2026-07-20
-related_tasks: [integration-ygwsa, integration-hebjs, integration-p2hxn]
+related_tasks: [integration-ygwsa, integration-hebjs, integration-p2hxn, integration-v0xmv]
 ---
 
 # ADR 0019: Steam Family token refresh — pure mint-and-retry seam shipped, live audience/scope verification deferred
@@ -53,10 +53,13 @@ or failing at this specific call.
    obtained with `AuthSessionDetails.PlatformType = MobileApp` and `IsPersistentSession =
    true`** (a `SteamClient`-platform token needs an authenticated CM connection to refresh
    as of an April 2025 Steam-side change — that would force a permanent SteamKit2 + live-CM
-   dependency into the server, which we want to avoid). **This platform choice is why the
-   resulting login session reads as "a `MobileApp`-platform session signing in from a
-   datacenter IP" — an accepted, currently-unfixable-under-this-decision risk; see ADR-0067
-   before proposing to reverse it.** A throwaway harness reflecting this
+   dependency into the server, which we want to avoid). **This platform choice is part of
+   what ADR-0067 named a login-shaped signature Valve's abuse detection may react to — see
+   ADR-0067 (as amended 2026-09-04: the login IP was confirmed residential, not datacenter,
+   retracting this point's original "datacenter IP" framing; the device fingerprint was the
+   live hypothesis instead) and ADR-0070 (2026-09-05: the login is removed outright, not
+   accepted as a risk, after a permanent-ban threat) before reading any further about this
+   choice.** A throwaway harness reflecting this
    shape lives in `spikes/steam-family-token-spike/` (`login.fsx`, `refresh-and-call.fsx`) —
    **UNEXECUTED**, written to the documented API but never run against the real Steam
    network. SteamKit2 only becomes a real `Server.fsproj` dependency if integration-hebjs's
@@ -78,7 +81,31 @@ or failing at this specific call.
    Steam-side audience assumption," and is strictly less invasive to `Server.fsproj` (no
    SteamKit2 dependency at all, still needs a browser profile signed into Steam). Community
    precedent (Chachigo's `FamilyBot`) uses exactly this approach and reports it as the only
-   one that works for them — weak but real signal in its favor as a fallback. **This is now formally escalation-ladder step 2 in ADR-0067** (the accepted-risk ADR for the MobileApp-from-datacenter-IP login signature this platform choice produces) — still evaluated, not built; do not pre-spike it without a trigger named there.
+   one that works for them — weak but real signal in its favor as a fallback. **Superseded by
+   ADR-0070 (2026-09-05): this fallback is now closed as *will not build*, not merely
+   evaluated-and-deferred** — driving a browser through Steam's own login flow is the same
+   class of act ADR-0070 removes every other instance of, ban-threat or not.
+
+## Amended 2026-09-05 (integration-v0xmv, see ADR-0070)
+
+Points 2–4 above described a *pending* decision: whether to keep the mint-and-retry seam's
+live SteamKit2/refresh-token path, evaluate it against an audience/scope check, and hold a
+browser-retrieval fallback in reserve. That pending-ness is now resolved, not by the audience
+check (it passed, see integration-hebjs) but by ADR-0070 removing the entire login-capable path
+after a Valve permanent-ban threat:
+
+- **Point 2's "not yet" is now permanent and absolute.** `Server.fsproj` will never carry a
+  SteamKit2 dependency for this feature again — not "yet", not conditionally. `withTokenRefresh`,
+  `TokenMinter`, `mintFamilyAccessToken`, and `steamIdFromRefreshToken` are deleted, not merely
+  unused.
+- **Points 3 and 4 are moot.** The empirical audience/scope check point 3 called for did run
+  (integration-hebjs) and did pass — but that result no longer matters, since the path it
+  validated is now deleted regardless of whether it worked. Point 4's browser-retrieval
+  fallback is closed as *will not build* (see its own note above), not merely superseded by
+  a "yet" becoming permanent.
+- **`FamilyFetchError` (`Rejected`/`FamilyOtherFailure`) and the `fetch*`/`get*` plain-fetch
+  functions in `Steam.fs` survive** — they carry no SteamKit2/login dependency and are exactly
+  what the paste-a-token-only shape ADR-0070 ships still needs.
 
 ## Consequences
 

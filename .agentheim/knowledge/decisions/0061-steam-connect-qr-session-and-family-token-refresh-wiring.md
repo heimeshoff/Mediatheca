@@ -2,11 +2,11 @@
 id: 0061
 title: Steam Connect QR session (in-memory + SSE) and the production wiring of Steam.withTokenRefresh into the Family adapter
 scope: integration
-status: accepted
+status: superseded
 date: 2026-08-07
 supersedes: []
-superseded_by: []
-related_tasks: [integration-hebjs, integration-ygwsa, integration-p2hxn]
+superseded_by: [0070]
+related_tasks: [integration-hebjs, integration-ygwsa, integration-p2hxn, integration-v0xmv]
 related_research: [steam-family-api-auto-token-refresh-2026-07-20]
 ---
 
@@ -137,13 +137,15 @@ builder gate proved live.
 ### Negative / accepted tradeoff
 
 - Each run of this QR ceremony opens a new `MobileApp`-platform, persistent-session Steam
-  login from the Docker host's IP — ordinarily a datacenter/VPS address for a self-hosted
-  deployment (ADR-0007), not a residential one. From Valve's side that plausibly reads as "a
-  new device signing in from a new location," and repeated reconnects in a short window would
-  only reinforce that reading. This was noticed here in passing; **ADR-0067 promotes it to a
-  named, accepted risk** with a no-speculative-reconnect rule and an escalation ladder — read
-  it before proposing to run this ceremony more often, or automatically, or before proposing to
-  reverse ADR-0019's platform choice to make the signature go away.
+  login. From Valve's side that plausibly reads as "a new device signing in," and repeated
+  reconnects in a short window would only reinforce that reading — **ADR-0067's 2026-09-04
+  amendment retracted this ADR's original "datacenter/VPS IP" framing** (the login IP was
+  confirmed residential; the live hypothesis became the SteamKit2 device fingerprint instead)
+  without changing this consequence's substance. This was noticed here in passing; ADR-0067
+  promoted it to a named, accepted risk with a no-speculative-reconnect rule and an escalation
+  ladder — **superseded 2026-09-05 by ADR-0070**, which removes this QR ceremony (and the whole
+  Connect/Reconnect session this ADR built) outright after a Valve permanent-ban threat, rather
+  than continuing to accept and mitigate the risk.
 - A mid-ceremony server restart orphans the in-memory QR session with no
   explicit cleanup — acceptable (single-user, short ceremony, cheap manual
   retry) but would need revisiting if Connect Steam ever needs to survive a

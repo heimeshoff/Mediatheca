@@ -136,7 +136,7 @@ let steamFamilyImportOwnedGamesSupplementTests =
                 let errorLine = importResult.Errors.Head
                 Expect.stringContains errorLine "Web API key" "The error names the Web API key, not the family token"
                 Expect.stringContains errorLine "steamcommunity.com/dev/apikey" "The error carries the regenerate remedy"
-                Expect.isFalse (errorLine.ToLowerInvariant().Contains("reconnect required")) "Never shares wording with the family-token reconnect message"
+                Expect.isFalse (errorLine.ToLowerInvariant().Contains("family token rejected")) "Never shares wording with the family-token rejection message (ADR-0065 rule 3 / ADR-0070)"
             | Error e -> failtestf "Expected the import to complete Ok despite the rejected Web API key, got Error %s" e
 
             let lastSync = SettingsStore.getSetting db.Connection "steam_family_last_sync"

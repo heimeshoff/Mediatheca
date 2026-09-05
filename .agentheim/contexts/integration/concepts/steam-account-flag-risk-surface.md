@@ -1,86 +1,75 @@
 ---
 name: steam-account-flag-risk-surface
-description: What Mediatheca's Steam account-hijack-flag risk is made of — three separate credentials, two halves of the signature, and which half is accepted as unfixable
+description: What Mediatheca's Steam account-hijack-flag risk was made of, and how it was settled — the login surface is deleted; two credentialed surfaces remain, both non-login
 context: integration
 created: 2026-08-18
-last_updated: 2026-09-04
+last_updated: 2026-09-05
 derived_from:
-  - 0019            # MobileApp platform choice + browser-retrieval fallback
-  - 0061            # QR session and family-token refresh wiring
+  - 0019            # MobileApp platform choice — now permanent-and-absolute per its 0070 amendment
+  - 0061            # QR session and family-token refresh wiring — superseded by 0070
   - 0065            # typed Web API key rejection, fault isolation
   - 0066            # Adapter-owned storefront throttle (spacing)
-  - 0067            # login signature accepted as risk; no-speculative-reconnect rule; ladder
+  - 0067            # login signature accepted as risk; retired by its 0070 amendment
   - 0068            # empty owned-games is inconclusive, not success
   - 0069            # incremental family import (count)
+  - 0070            # login removed outright; manual-token-only, permanently
   - steam-family-api-auto-token-refresh-2026-07-20
-  - integration-hebjs    # one-click family import
+  - integration-hebjs    # one-click family import (reversed by v0xmv)
   - integration-ygwsa    # family token spike
   - integration-r8kwd    # opaque 401 / reconnect loop removed
   - integration-w7ktb    # storefront pacing into the Adapter
   - integration-k4vqm    # empty-response handling at three call sites
   - integration-n3vqa    # diff-don't-re-import
-  - integration-p2hxn    # accepted-risk ADR
-  - integration-zwnh4    # stable device identity; the hosting-provider-IP hypothesis retracted
+  - integration-p2hxn    # accepted-risk ADR (superseded by v0xmv's removal)
+  - integration-zwnh4    # stable device identity (retired with the ceremony it fixed)
+  - integration-v0xmv    # settles this page: login deleted, manual-token-only
 max_lines: 60
 ---
 
 # Steam account-flag risk surface — concept
 
 ## What it is
-Valve has **three times** warned that this project's Steam traffic "resembles account hijacking".
-This page is the one picture of what that risk is made of, what has been done about it, and
-which part is accepted as unfixable. Every claim about *why* Valve flags accounts is
-speculation — its heuristics are undocumented (ADR-0067). The shape of our own traffic is not
-speculation, and is what the project can act on.
+Valve warned three times that this project's Steam traffic "resembles account hijacking," then
+threatened a **permanent ban** for further login-API use (2026-09-05). ADR-0070 settled this by
+deleting the login capability outright rather than continuing to mitigate it. This page is the
+settled picture: what surfaces remain, and why the login surface is gone for good.
 
-## Why it exists
-Beyond the incidents, the expensive failure here was **credential confusion**: a rejected Web
-API key was misattributed as a family-token failure, driving the builder into a repeated
-"Reconnect Steam" loop — every iteration opened a *fresh login session*, the exact signature
-under suspicion, self-reinforcing for no benefit (integration-r8kwd, ADR-0065). Knowing
-precisely which credential failed is an account-safety property, not tidy error handling.
+## Two independent surfaces remain — never conflate them
+- **Family access token** — a short-lived, **browser-obtained** token the user pastes into
+  Settings (`steam_family_token`). No login, no mint, no refresh token — the app only *uses* a
+  token the user's own logged-in browser already holds. A 401/403 maps to a fixed
+  `"family token rejected: "` message (ADR-0070); the only remedy is pasting a fresh one.
+- **Web API key** — separate credential, separate remedy (regenerate it); never conflated with
+  the family token (ADR-0065). **Storefront** — no credential at all, only rate limits (ADR-0066).
 
-## Three independent surfaces — never conflate them
-- **Family refresh token** — minted by the QR ceremony (`src/Server/SteamConnect.fs`, ADR-0061).
-  Only a failure of *this* can ever justify a reconnect. Routine re-minting via
-  `Steam.withTokenRefresh` is plain HTTP and cheap; the **QR ceremony is the rare, risky act**.
-- **Web API key** — separate credential, separate remedy (regenerate it); never a reconnect
-  reason (ADR-0065). **Storefront** — no credential at all, only rate limits (ADR-0066).
+## What was removed, and why
+The QR login (`SteamConnect.fs`, SteamKit2), the refresh-token mint-and-retry seam
+(`Steam.withTokenRefresh`/`mintFamilyAccessToken`), and the stored `steam_family_refresh_token`
+are deleted end to end (ADR-0070) — not merely deprecated. The third Valve alert traced, to the
+minute, to the QR login itself; a ban threat removed the option to keep testing cheaper
+mitigations (ADR-0067's escalation ladder, its no-speculative-reconnect rule, and its
+stable-device-identity fix are all retired with the code they governed). The browser-retrieval
+fallback ADR-0019/ADR-0067 held in reserve is now closed as *will not build* — driving a browser
+through Steam's own login is the same class of act, whoever drives it.
 
-## Current shape
-- **Login half — accepted, partly fixed** (ADR-0067, amended 2026-09-04): a `MobileApp`,
-  persistent-session QR login. A third alert (2026-09-03) traced the login IP to the builder's
-  own **residential** home server, retracting the earlier hosting-provider-IP hypothesis. Live
-  hypothesis now: the device fingerprint SteamKit2 sent by default (random per-deploy device
-  name, a platform-inconsistent website id) plus the QR-as-MobileApp inversion itself.
-  integration-zwnh4 fixed the fingerprint half — `SteamConnect.fs` sends a fixed device name
-  (`STEAM_DEVICE_NAME`-overridable) and `WebsiteID = "Mobile"`. Reversing the platform entirely
-  still costs a permanent SteamKit2 + live-CM dependency (ADR-0019 pt 2) — do not re-litigate blind.
-- **No-speculative-reconnect rule** (ADR-0067 pt 4): the QR ceremony runs *only* on an explicit
-  "reconnect required" signal — never speculatively, never on a timer, never as a diagnostic
-  first step for an unrelated Steam failure, and never pre-emptively after a redeploy or alert.
-- **Enumeration half — fixed**: request *spacing* is Adapter-owned (ADR-0066, one gate, 1500ms),
-  request *count* is import-owned (ADR-0069 — a steady-state import is 3 requests, not one per title).
-- **Ambiguity is not success** (ADR-0068): an empty `GetOwnedGames` means "owns nothing" *or*
-  "game details are private" — never evidence that a key is bad.
-- **Escalation ladder, amended** (ADR-0067 pt 5): enumeration fixes observed (discharged) →
-  stable device identity (integration-zwnh4, 2026-09-04, observe for one usage cycle) →
-  browser-retrieval fallback (ADR-0019 pt 4, evaluated not built) → reverse ADR-0019 pt 2 last
-  resort. A **fourth** alert after this fix is live is the next trigger to climb.
+## What's unaffected
+- **Enumeration fix stays fixed**: request spacing (ADR-0066) and count (ADR-0069) were never
+  part of the login-half removal — only the login itself was the ban-threat trigger.
+- **Ambiguity is not success** (ADR-0068): an empty `GetOwnedGames` still means "owns nothing" *or*
+  "game details are private" — never evidence a key is bad.
 
 ## Open questions
-- Whether the account was ever *actually* compromised — an unrecognised key at
-  `steamcommunity.com/dev/apikey`, unfamiliar authorized devices — rather than false-positived.
-  The "accepted risk" framing is only sound once this is answered (integration-p2hxn).
-- integration-r8kwd's builder gate — one live family import, end to end — remains undischarged;
-  it is now a small incremental import rather than a full sweep.
-- Whether a *scheduled* family import is ever justifiable: automated periodic traffic is a
-  different risk profile than a manual click; ADR-0067's framing must be weighed first.
+- Whether the account was ever *actually* compromised, independent of Mediatheca's traffic shape
+  — still open, still the builder's own action to take (was integration-p2hxn's precondition).
+- ~~Whether a scheduled family import is ever justifiable~~ **Settled 2026-09-05 (ADR-0070): no.**
+  Import stays a manual click, permanently — not "for now" pending a login surface that no longer
+  exists.
 
 ## See also
-- `[ADR 0067]` — the accepted-risk decision, the rule, and the ladder (start here)
-- `[ADR 0019]`, `[ADR 0061]` — why the login shape is what it is
-- `[ADR 0065]`, `[ADR 0068]` — credential attribution and response ambiguity
-- `[ADR 0066]`, `[ADR 0069]` — spacing and count
+- `[ADR 0070]` — the removal decision: manual-token-only, permanently (start here)
+- `[ADR 0067]` — the accepted-risk period this superseded, and why it stopped being sufficient
+- `[ADR 0019]`, `[ADR 0061]` — the login shape that used to exist, and why (historical)
+- `[ADR 0065]`, `[ADR 0068]` — credential attribution and response ambiguity (unaffected)
+- `[ADR 0066]`, `[ADR 0069]` — spacing and count (unaffected)
 - `[research/steam-family-api-auto-token-refresh-2026-07-20]`
-- `[done/integration-r8kwd]` — the reconnect loop, and why attribution is a safety property
+- `[done/integration-v0xmv]` — the removal task
