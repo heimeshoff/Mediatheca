@@ -5,6 +5,28 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 00:28 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 33m (first "Batch started" 23:54 → 00:28)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** integration-v0xmv: 1
+**Commits:** 3 (batch start, task completion, this entry)
+**Vision-conformance:** none — batch aligns with vision. The one shipped task is an integration refactor that removes the Steam login/token-mint path and keeps the Steam Family import alive on a user-pasted browser token — it protects the account the whole Steam Import workstream depends on, touches no Out-of-Scope (v1) item and adds no admin-console scope. vision.md carries no "What success looks like"/"Non-goals" headings, so the pass was judgment against "Remaining v1 Work"/"Out of Scope (v1)", as in prior sessions.
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task) — hand-classified; installed plugin 0.9.2 carries no `vacuum-guard.mjs`. `type: refactor` → product-facing.
+**Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed; the now-empty `spikes/` directory left by the squash-merge's file deletions is gone too.
+
+**Session-start churn note:** 0 recognized machine-shape commits, 0 human commits since the 2026-09-04 10:55 boundary — the single commit (85f103d, the integration-v0xmv capture) carries its task trailer. Nothing to re-align.
+
+**Builder-side, outside the task (from integration-v0xmv Notes):** (1) at `store.steampowered.com/twofactor/manage` remove the "Mediatheca" / "… (SteamKit2)" authorized devices; (2) deploy this change **before** the next family import; (3) fetch a fresh `webapi_token` from your own logged-in browser (`store.steampowered.com/pointssummary/ajaxgetasyncconfig`) and paste it in Settings → Steam Family — never script that step; (4) do not press any Steam-related button on the old deployed build in the meantime. First startup of the new build deletes the stored `steam_family_refresh_token`.
+
+**Harness notes:** (1) the `checkpoint` verb's opts JSON had to be written to a scratch file and read back — Windows backslash paths in an inline bash argument fail its JSON parse; forward-slash paths work. (2) The worktree again needed the root `node_modules` junctioned from the main tree for `npm run build` (removed via `rmdir` before `git worktree remove`; main copy verified intact, 206 entries). (3) Board is empty after this task — no ready work in any BC.
+
+---
+
 ## 2026-09-06 00:27 -- Task verified and completed: integration-v0xmv - Remove the Steam Connect QR login and the refresh-token mint path — the Steam Family import runs only on a browser-obtained access token pasted in Settings, and Mediatheca never performs a Steam login or token mint again
 
 **Type:** Work / Task completion
