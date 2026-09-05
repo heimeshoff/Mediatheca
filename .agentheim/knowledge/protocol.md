@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-05 23:50 -- Modeling / Captured: integration-v0xmv - Remove the Steam Connect QR login and refresh-token mint path; Steam Family import runs only on a browser-obtained access token pasted in Settings
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** Valve escalated from three hijack alerts to a permanent-ban threat for further misuse of the login API (2026-09-05). ADR-0067's amendment had already pinned the third alert to the SteamKit2 QR ceremony, so the task deletes `SteamConnect.fs`, the `/api/stream/steam-connect` route, the SteamKit2/QRCoder packages, the refresh-token mint path (`mintFamilyAccessToken`, `withTokenRefresh`, `*WithRefresh`), the stored `steam_family_refresh_token` and the spike scripts, and re-promotes the paste-a-token flow (with `ajaxgetasyncconfig` → `webapi_token` instructions) as the only way in. Compliance check of the remaining import shape against the Steam Web API Terms of Use recorded in the task: 2–3 read-only `IFamilyGroupsService` GETs on the user's own browser token, key-authenticated `GetOwnedGames`, throttled public `appdetails`; no login API call of any kind. Worker writes an ADR superseding 0061 and amending 0019/0067 (ladder retired; browser-retrieval fallback closed as will-not-build). Concrete enough for todo directly; orchestrator skipped — the removal seam was fully inventoried from source during capture.
+
+---
+
 ## 2026-09-04 10:55 -- Work session ended
 
 **Type:** Work / Session end
