@@ -796,8 +796,11 @@ let private steamFamilyDetail (model: Model) (dispatch: Msg -> unit) =
                                     Html.li [
                                         prop.children [
                                             Html.text "In the browser where you are logged into Steam, open "
-                                            Html.code [
-                                                prop.className "badge badge-ghost badge-sm"
+                                            Html.a [
+                                                prop.href "https://store.steampowered.com/pointssummary/ajaxgetasyncconfig"
+                                                prop.target "_blank"
+                                                prop.rel "noopener noreferrer"
+                                                prop.className "link link-primary font-mono"
                                                 prop.text "store.steampowered.com/pointssummary/ajaxgetasyncconfig"
                                             ]
                                         ]
