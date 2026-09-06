@@ -1,11 +1,11 @@
 ---
 id: intelligence-c3vqm
 title: Dashboard All-tab Games — cap poster size to the movie-poster size and drop the redundant In Focus crosshair
-status: doing
+status: done
 type: bug
 context: intelligence
 created: 2026-09-06
-completed:
+completed: 2026-09-06
 depends_on: [design-system-001]
 blocks: []
 tags: [dashboard, frontend, games, posters, sizing, in-focus]
@@ -129,3 +129,37 @@ has no unused-open warning.
   redundant.
 - The Books column next to Games is still `booksColumnPlaceholder` — out of
   scope; don't restructure the `xl:grid-cols-2` split itself.
+
+## Outcome
+
+Both fixes landed in `src/Client/Pages/Dashboard/Views.fs`:
+
+1. **Poster size cap** — `gamesInFocusPosterSection`'s grid className changed from
+   `grid grid-cols-2 sm:grid-cols-3 gap-3` (fraction-based `1fr` tracks) to
+   `grid grid-cols-[repeat(auto-fill,minmax(0,130px))] gap-3`. Tracks are now capped
+   at 130px wide; `.poster-image-container`'s `aspect-ratio: 2/3` (unchanged) yields
+   a 195px-tall poster, matching the filmstrip's fixed 196px movie-poster height.
+   As many 130px columns fit as the section width allows, left-packed, with leftover
+   space empty — no growth past the cap at any viewport width, and narrow viewports
+   still shrink tracks via `minmax(0, ...)` rather than overflowing.
+2. **Badge removal** — deleted the unconditional "Crosshair badge" `Html.div` block
+   from `gameInFocusPosterCard` (the `absolute top-1.5 left-1.5 z-10` wrapper around
+   `Icons.crosshairSmFilled ()`). Poster image, no-cover gamepad fallback, and
+   `DesignSystem.posterShine` untouched. `Icons.crosshairSmFilled` remains referenced
+   elsewhere in the same file (movie card, next-episode card), so no unused-open
+   warning.
+
+`movieToWatchPosterCard` / `movieToWatchFilmstripItem` and the `xl:grid-cols-2`
+Games/Books split were not touched, per the task's explicit exclusions.
+
+Verified via `npm run build` (clean Fable compile, 196 modules transformed) and
+`npm test` (685 Expecto tests passed, 0 failed). No unit tests added —
+TDD_SKIPPED: pure view-composition change (CSS class swap + JSX block deletion),
+no logic to assert; consistent with `intelligence-encn4` / `intelligence-p9m4t`
+precedent for this same file. Visual verification (poster sizing side-by-side with
+movie posters, hover/click-through) deferred to the conductor/browser smoke check
+per those same precedents.
+
+No BC README change — no new ubiquitous language, aggregates, events, or invariants
+introduced. No ADR — straightforward CSS-grid sizing fix with no meaningful
+alternative worth recording.

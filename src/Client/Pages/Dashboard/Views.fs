@@ -456,17 +456,6 @@ let private gameInFocusPosterCard (item: DashboardGameInFocus) =
                                     ]
                                 ]
 
-                            // Crosshair badge
-                            Html.div [
-                                prop.className "absolute top-1.5 left-1.5 z-10"
-                                prop.children [
-                                    Html.span [
-                                        prop.className "flex items-center justify-center w-6 h-6 rounded-full bg-warning/90 text-warning-content shadow-md"
-                                        prop.children [ Icons.crosshairSmFilled () ]
-                                    ]
-                                ]
-                            ]
-
                             Html.div [ prop.className DesignSystem.posterShine ]
                         ]
                     ]
@@ -490,7 +479,7 @@ let private gamesInFocusPosterSection (items: DashboardGameInFocus list) =
     else
         sectionOpen Icons.gamepad "Games" [
             Html.div [
-                prop.className "grid grid-cols-2 sm:grid-cols-3 gap-3"
+                prop.className "grid grid-cols-[repeat(auto-fill,minmax(0,130px))] gap-3"
                 prop.children [
                     for item in items do
                         gameInFocusPosterCard item

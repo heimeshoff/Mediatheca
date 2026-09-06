@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 9
+- **Doing:** 0
+- **Done:** 10
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **intelligence-c3vqm** — Dashboard All-tab Games — cap poster size to the movie-poster size and drop the redundant In Focus crosshair (bug) — `doing/intelligence-c3vqm-dashboard-game-poster-size-cap-drop-badge.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **intelligence-c3vqm** — Dashboard All-tab Games — cap poster size to the movie-poster size and drop the redundant In Focus crosshair (bug) — `done/intelligence-c3vqm-dashboard-game-poster-size-cap-drop-badge.md`
 - **intelligence-p4t7k** — Prune the New Games dashboard payload — server still computes and ships DashboardAllTab.NewGames but no client code reads it (refactor) — `done/intelligence-p4t7k-prune-dead-newgames-dashboard-payload.md`
 - **intelligence-f6cfv** — Dashboard "Next episode" card — watched-with friends become circular avatars pinned top-left; the In focus badge is dropped (refactor) — `done/intelligence-f6cfv-next-episode-card-avatars-top-left.md`
 - **intelligence-wecjh** — Dashboard Views.fs — delete the ~2000 lines of unreferenced view helpers left behind by the 3a rebuild (refactor) — `done/intelligence-wecjh-dashboard-views-dead-code-sweep.md`

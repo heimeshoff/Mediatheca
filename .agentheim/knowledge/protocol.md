@@ -13,6 +13,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 12:17 -- Task verified and completed: intelligence-c3vqm - Dashboard All-tab Games — cap poster size to the movie-poster size and drop the redundant In Focus crosshair
+
+**Type:** Work / Task completion
+**Task:** intelligence-c3vqm - Dashboard All-tab Games — cap poster size to the movie-poster size and drop the redundant In Focus crosshair
+**Summary:** Capped All-tab game poster tiles to a 130px auto-fill grid track (matching the movie filmstrip's fixed 196px height via the existing 2/3 aspect ratio) and dropped the redundant unconditional crosshair badge from game poster cards.
+**Duration:** 12m
+**Verification:** PASS (iteration 1)
+**Files changed:** 1
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-09-06 12:10 -- Modeling / Captured: intelligence-c3vqm - Dashboard All-tab Games — cap poster size to the movie-poster size and drop the redundant In Focus crosshair
 
 **Type:** Modeling / Capture
