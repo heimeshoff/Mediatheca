@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 8
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **intelligence-p4t7k** — Prune the New Games dashboard payload — server still computes and ships DashboardAllTab.NewGames but no client code reads it (refactor) — `todo/intelligence-p4t7k-prune-dead-newgames-dashboard-payload.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **intelligence-p4t7k** — Prune the New Games dashboard payload — server still computes and ships DashboardAllTab.NewGames but no client code reads it (refactor) — `doing/intelligence-p4t7k-prune-dead-newgames-dashboard-payload.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

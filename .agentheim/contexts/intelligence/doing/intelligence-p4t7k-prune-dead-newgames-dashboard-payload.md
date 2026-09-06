@@ -1,7 +1,7 @@
 ---
 id: intelligence-p4t7k
 title: Prune the New Games dashboard payload — server still computes and ships DashboardAllTab.NewGames but no client code reads it
-status: todo
+status: doing
 type: refactor
 context: intelligence
 created: 2026-09-06
