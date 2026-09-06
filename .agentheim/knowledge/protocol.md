@@ -15,6 +15,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 11:28 -- Modeling / Promoted: intelligence-p4t7k - Prune the New Games dashboard payload — server still computes and ships DashboardAllTab.NewGames but no client code reads it
+
+**Type:** Modeling / Promote
+**BC:** intelligence
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-06 10:37 -- Work session ended
 
 **Type:** Work / Session end
