@@ -1,7 +1,7 @@
 ---
 id: design-system-fryq7
 title: Remove the Movies / TV Series / Games items from the main menu (sidebar rail + mobile BottomNav) and delete their three list pages, plus every piece of code only those pages referenced — the Dashboard's per-media tabs already cover what they showed.
-status: todo
+status: doing
 type: refactor
 context: design-system
 created: 2026-09-06

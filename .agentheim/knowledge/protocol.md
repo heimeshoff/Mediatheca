@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 14:07 -- Batch started: [design-system-fryq7]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-fryq7 - Remove the Movies / TV Series / Games items from the main menu (sidebar rail + mobile BottomNav) and delete their three list pages, plus every piece of code only those pages referenced — the Dashboard's per-media tabs already cover what they showed.
+**Parallel:** no (1 worker — design-system-fryq7 became the only ready task once intelligence-qh8mj landed in done/; no other todo task exists in any BC)
+
+---
+
 ## 2026-09-06 14:04 -- Task verified and completed: intelligence-qh8mj - Dashboard Games tab gains an "Upcoming" poster rail — the unreleased-games view (soonest-first, TBA last) currently living only on the Games list page moves here before that page is deleted.
 
 **Type:** Work / Task completion
