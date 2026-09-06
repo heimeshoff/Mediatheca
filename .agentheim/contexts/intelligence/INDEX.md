@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 9
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **intelligence-c3vqm** — Dashboard All-tab Games — cap poster size to the movie-poster size and drop the redundant In Focus crosshair (bug) — `todo/intelligence-c3vqm-dashboard-game-poster-size-cap-drop-badge.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **intelligence-c3vqm** — Dashboard All-tab Games — cap poster size to the movie-poster size and drop the redundant In Focus crosshair (bug) — `doing/intelligence-c3vqm-dashboard-game-poster-size-cap-drop-badge.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

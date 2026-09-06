@@ -1,9 +1,18 @@
-# Protocol
+﻿# Protocol
 
 Chronological log of everything that happens in this project.
 Newest entries on top.
 
 ---
+## 2026-09-06 12:10 -- Modeling / Captured: design-system-hs4vm - Hidden-scrollbar primitive — the Dashboard's six horizontal poster rails carry `tailwind-scrollbar` classes for a plugin that was never installed, so the native scrollbar renders under every rail
+
+**Type:** Modeling / Capture
+**BC:** design-system
+**Filed to:** todo
+**Summary:** Builder asked for the Dashboard scrollbars under episodes and movies to be invisible. Investigation found the cause is dead code, not missing styling: all six horizontal poster rails in `Dashboard/Views.fs` carry `scrollbar-thin/-thumb/-track` utilities from the `tailwind-scrollbar` plugin, which is absent from both `package.json` and `index.css`'s `@plugin` directives — so Tailwind 4 emits nothing and the native scrollbar renders. Routed to design-system (scrollbar chrome is cross-cutting visual language) as a `.scrollbar-hidden` / `DesignSystem.scrollbarHidden` primitive covering Chromium and WebKitGTK, adopted at all six rails, with no new plugin dependency. Filed straight to todo — concrete and unambiguous. No orchestrator round, no ADR, no prior art (nothing in any BC has touched scrollbars before).
+
+---
+
 ## 2026-09-06 12:10 -- Modeling / Captured: intelligence-c3vqm - Dashboard All-tab Games — cap poster size to the movie-poster size and drop the redundant In Focus crosshair
 
 **Type:** Modeling / Capture
@@ -39,6 +48,14 @@ Newest entries on top.
 **Summary:** Code-fact refinement, no orchestrator round needed. Corrected the record name — the dead field lives on `DashboardAllTab` (the All-tab payload), not `DashboardGameStats` (the Games-tab stats block, untouched). Verified `DashboardNewGame` has only two references (definition + mapper) so it is deleted too; `resolveFriendRefs` stays (still used by the game-detail projection); no test references `DashboardAllTab`; no client code reads `NewGames`. Added the README "Retired" note correction to scope and a grep-clean criterion. No split, no ADR.
 **Split into:** none
 **ADRs written:** none
+
+---
+
+## 2026-09-06 12:05 -- Batch started: [intelligence-c3vqm]
+
+**Type:** Work / Batch start
+**Tasks:** intelligence-c3vqm - Dashboard All-tab Games — cap poster size to the movie-poster size and drop the redundant In Focus crosshair
+**Parallel:** no (1 worker — intelligence-c3vqm is the only ready task across every BC, nothing held back)
 
 ---
 

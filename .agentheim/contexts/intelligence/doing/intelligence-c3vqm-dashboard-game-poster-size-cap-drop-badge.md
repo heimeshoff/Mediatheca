@@ -1,7 +1,7 @@
 ---
 id: intelligence-c3vqm
 title: Dashboard All-tab Games — cap poster size to the movie-poster size and drop the redundant In Focus crosshair
-status: todo
+status: doing
 type: bug
 context: intelligence
 created: 2026-09-06
