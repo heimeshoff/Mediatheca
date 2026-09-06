@@ -36,6 +36,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 13:35 -- Modeling / Captured: design-system-fryq7 - Remove the Movies / TV Series / Games items from the main menu (sidebar rail + mobile BottomNav) and delete their three list pages, plus every piece of code only those pages referenced — the Dashboard's per-media tabs already cover what they showed.
+
+**Type:** Modeling / Capture
+**BC:** design-system
+**Filed to:** todo
+**Summary:** Builder asked to remove the Movies / TV Series / Games items from the main menu and their target list pages, plus dead code only those pages referenced. Routed to design-system (it owns the sidebar rail + BottomNav); filed straight to todo — the Dashboard's per-media tabs already replace the pages, and the only real entanglement is the global SearchModal being seeded from the three list models, which the task specifies as a fetch-on-open. Flagged that the Games page's Upcoming section (games-ev65k) and getUpcomingGames go with it. Styleguide gate met (design-system-001 done). No orchestrator round, no ADR.
+
+---
+
 ## 2026-09-06 12:34 -- Task verified and completed: design-system-hs4vm - Hidden-scrollbar primitive — the Dashboard's six horizontal poster rails carry `tailwind-scrollbar` classes for a plugin that was never installed, so the native scrollbar renders under every rail
 
 **Type:** Work / Task completion
