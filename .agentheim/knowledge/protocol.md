@@ -4,6 +4,17 @@ Chronological log of everything that happens in this project.
 Newest entries on top.
 
 ---
+## 2026-09-06 11:05 -- Modeling / Refined: intelligence-p4t7k - Prune the New Games dashboard payload — server still computes and ships DashboardAllTab.NewGames but no client code reads it
+
+**Type:** Modeling / Refine
+**BC:** intelligence
+**Status after:** backlog
+**Summary:** Code-fact refinement, no orchestrator round needed. Corrected the record name — the dead field lives on `DashboardAllTab` (the All-tab payload), not `DashboardGameStats` (the Games-tab stats block, untouched). Verified `DashboardNewGame` has only two references (definition + mapper) so it is deleted too; `resolveFriendRefs` stays (still used by the game-detail projection); no test references `DashboardAllTab`; no client code reads `NewGames`. Added the README "Retired" note correction to scope and a grep-clean criterion. No split, no ADR.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-09-06 10:37 -- Work session ended
 
 **Type:** Work / Session end

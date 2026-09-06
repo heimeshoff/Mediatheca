@@ -39,7 +39,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **intelligence-p4t7k** — Prune the New Games dashboard payload — server still computes and ships DashboardGameStats.NewGames but no client tab renders it (refactor) — `backlog/intelligence-p4t7k-prune-dead-newgames-dashboard-payload.md`
+- **intelligence-p4t7k** — Prune the New Games dashboard payload — server still computes and ships DashboardAllTab.NewGames but no client code reads it (refactor) — `backlog/intelligence-p4t7k-prune-dead-newgames-dashboard-payload.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
