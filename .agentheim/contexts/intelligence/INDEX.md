@@ -11,19 +11,19 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 2
-- **Doing:** 0
+- **Todo:** 1
+- **Doing:** 1
 - **Done:** 5
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
 - **intelligence-wecjh** — Dashboard Views.fs — delete the ~2000 lines of unreferenced view helpers left behind by the 3a rebuild (refactor) — `todo/intelligence-wecjh-dashboard-views-dead-code-sweep.md`
-- **intelligence-encn4** — Dashboard All-tab — Games and Books drop the card chrome and "Games In Focus" is renamed to "Games" (refactor) — `todo/intelligence-encn4-dashboard-games-books-open-sections.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **intelligence-encn4** — Dashboard All-tab — Games and Books drop the card chrome and "Games In Focus" is renamed to "Games" (refactor) — `doing/intelligence-encn4-dashboard-games-books-open-sections.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

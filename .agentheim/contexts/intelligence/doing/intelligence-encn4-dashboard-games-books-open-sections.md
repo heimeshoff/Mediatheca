@@ -1,7 +1,7 @@
 ---
 id: intelligence-encn4
 title: Dashboard All-tab — Games and Books drop the card chrome and "Games In Focus" is renamed to "Games"
-status: todo
+status: doing
 type: refactor
 context: intelligence
 created: 2026-09-06

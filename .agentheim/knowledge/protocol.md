@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 09:48 -- Batch started: [intelligence-encn4]
+
+**Type:** Work / Batch start
+**Tasks:** intelligence-encn4 - Dashboard All-tab — Games and Books drop the card chrome and "Games In Focus" is renamed to "Games"
+**Parallel:** no (1 worker — intelligence-encn4 is the only ready task across every BC; intelligence-wecjh is blocked behind it via depends_on and is picked up next wave)
+
+---
+
 ## 2026-09-06 09:31 -- Modeling / Captured: intelligence-wecjh - Dashboard Views.fs — delete the ~2000 lines of unreferenced view helpers left behind by the 3a rebuild
 
 **Type:** Modeling / Capture
