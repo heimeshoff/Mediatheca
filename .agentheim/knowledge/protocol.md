@@ -4,6 +4,25 @@ Chronological log of everything that happens in this project.
 Newest entries on top.
 
 ---
+## 2026-09-06 11:50 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 13m (first "Batch started" 11:37 → 11:50)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** intelligence-p4t7k: 1
+**Commits:** 3 (1 batch start, 1 task completion, this entry)
+**Vision-conformance:** none — batch aligns with vision. intelligence-p4t7k is a pure server-side deletion of a payload the builder already retired (via intelligence-wecjh); it removes per-load work from the Unified Dashboard's All-tab endpoint and touches nothing named under "Out of Scope (v1)". vision.md carries no "What success looks like"/"Non-goals" headings, so the pass was judgment against "Remaining v1 Work"/"Out of Scope (v1)", as in prior sessions.
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task, `type: refactor` in intelligence) — hand-classified.
+**Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed.
+
+**Verifier evidence beyond the worker's claim:** re-ran `npm test` (685 passed) and `npm run build` (clean Fable compile) from the worktree, confirmed `resolveFriendRefs` survives (GameProjection.fs:527, four call sites in the game-detail projection at 763–766), and confirmed the tree-wide grep for `NewGames|DashboardNewGame|getDashboardNewGames` is empty across `src/` and `tests/`.
+
+**Harness notes:** (1) Worktree again needed the root `node_modules` junctioned from the main tree (`mklink /J`, removed via `rmdir` before `git worktree remove`; main copy verified intact, 206 entries). (2) The `checkpoint` verb's opts JSON was written to a scratch file with forward-slash paths and read back, as in prior sessions. (3) The `work` SKILL.md references `skills/work/references/worker-return-format.md`; in plugin 0.9.2 the file actually lives at the plugin root `references/worker-return-format.md`. (4) Board is empty after this session — no todo or backlog work remains in any BC's `todo/`.
+
+---
 ## 2026-09-06 11:05 -- Modeling / Refined: intelligence-p4t7k - Prune the New Games dashboard payload — server still computes and ships DashboardAllTab.NewGames but no client code reads it
 
 **Type:** Modeling / Refine
