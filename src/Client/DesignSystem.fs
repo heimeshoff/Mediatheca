@@ -644,8 +644,8 @@ type FilmstripItem = {
 /// row's natural content width exceeds the section width, the whole thing
 /// -- sprockets, posters, and captions together, sized via a shared
 /// `w-max` block -- becomes one horizontally-scrollable piece (the single
-/// `overflow-x-auto` ancestor wrapping everything), never a static frame
-/// around an inner scroller. Interactive bits (`Href`/`OnNavigate`,
+/// `overflow-x-auto` ancestor wrapping everything, carrying
+/// `scrollbarHidden`), never a static frame around an inner scroller. Interactive bits (`Href`/`OnNavigate`,
 /// `InFocusBadge`, `JellyfinButton`) are caller-supplied per the
 /// `nextEpisodeHeroCard` precedent, so this module stays decoupled from
 /// `Feliz.Router` / `Icons` / URL helpers.
@@ -678,7 +678,11 @@ let filmstripRow (items: FilmstripItem list) : ReactElement =
             ]
         ]
     Html.div [
-        prop.className "overflow-x-auto"
+        // The strip's own scroll ancestor hides its native scrollbar
+        // (design-system-hs4vm): the well's clipped next poster is the
+        // overflow cue, and a bar under the sprockets breaks the filmstrip
+        // illusion the same way it broke the sibling poster rails.
+        prop.className ("overflow-x-auto " + scrollbarHidden)
         prop.children [
             Html.div [
                 prop.className "flex flex-col w-max min-w-full"
