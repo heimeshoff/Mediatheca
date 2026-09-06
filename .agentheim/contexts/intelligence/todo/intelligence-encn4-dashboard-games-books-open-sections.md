@@ -7,7 +7,7 @@ context: intelligence
 created: 2026-09-06
 completed:
 depends_on: [design-system-001]
-blocks: []
+blocks: [intelligence-wecjh]
 tags: [dashboard, layout, frontend, intelligence]
 related_adrs: []
 related_research: []
@@ -61,10 +61,10 @@ Out of scope: the Games tab's own sections (`sectionCard Icons.gamepad "New Game
 - The open-section helper already exists: `sectionOpen` (~line 177) wraps content in
   `.section-open` (`index.css` ~line 701 — "No background, no border — just structural
   spacing") plus `DesignSystem.animateFadeInUp`. No new helper needed, no CSS change needed.
-- **Dead code spotted while scoping, not in scope:** `gamesInFocusSection` (~line 629, the
-  list-row variant with the same `"Games In Focus"` title) has **no callers** anywhere in
-  `Views.fs`. Worth a separate capture if it should be deleted — do not remove it as part of
-  this task, and do not rename it either (the rename here is the All-tab poster section only).
+- **Dead code, captured separately as `intelligence-wecjh`:** `gamesInFocusSection` (~line 629,
+  the list-row variant with the same `"Games In Focus"` title) has no callers — and it turned out
+  to be one of 43 unreferenced definitions in this file. Do **not** remove or rename it here;
+  `intelligence-wecjh` sweeps them all and is sequenced to land after this task.
 - Prior art: `intelligence-dq8rk` introduced the Games/Books split and deliberately gave the
   Books placeholder "chrome matching the games column" — that criterion still holds, both
   columns just move to open chrome together. `intelligence-r4m2p` owns the responsive stacking

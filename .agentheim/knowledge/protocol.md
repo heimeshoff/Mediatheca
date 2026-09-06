@@ -5,6 +5,16 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 09:31 -- Modeling / Captured: intelligence-wecjh - Dashboard Views.fs — delete the ~2000 lines of unreferenced view helpers left behind by the 3a rebuild
+
+**Type:** Modeling / Capture
+**BC:** intelligence
+**Filed to:** todo
+**Summary:** Follow-up to the dead `gamesInFocusSection` spotted while scoping intelligence-encn4 — a transitive-closure scan of `Dashboard/Views.fs` found the single dead helper is one of **43 unreferenced top-level definitions, ~2000 of the file's 4419 lines (45%)**, residue from intelligence-dq8rk's 3a rebuild changing call sites without deleting definitions (F# does not warn on unused module-private lets, so `npm run build` never flagged it). Task carries the full verified inventory with line ranges and a bottom-up deletion order. Two findings surfaced while scoping and recorded rather than acted on: (1) `newGamesSection` is a **latent regression** — dq8rk explicitly kept New Games on the Games tab but `gamesTabView` never calls it, so the worker must ask the builder whether to re-wire or confirm the drop; (2) the server still projects and ships the unrendered `NewGames` payload (`Api.fs:2162`), left out of scope as a follow-up since it touches the `IMediathecaApi` contract. Sequenced behind intelligence-encn4, whose edits are line-referenced into the same file.
+
+---
+
+
 ## 2026-09-06 09:12 -- Modeling / Captured: intelligence-encn4 - Dashboard All-tab — Games and Books drop the card chrome and "Games In Focus" is renamed to "Games"
 
 **Type:** Modeling / Capture
