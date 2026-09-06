@@ -1,11 +1,11 @@
 ---
 id: intelligence-wecjh
 title: Dashboard Views.fs — delete the ~2000 lines of unreferenced view helpers left behind by the 3a rebuild
-status: doing
+status: done
 type: refactor
 context: intelligence
 created: 2026-09-06
-completed:
+completed: 2026-09-06
 depends_on: [intelligence-encn4]
 blocks: []
 tags: [dashboard, dead-code, cleanup, frontend, intelligence]
@@ -131,3 +131,71 @@ Two valid resolutions — **ask the builder, do not pick one silently**:
   `GameProjection.getDashboardNewGames`). Once this sweep settles which client sections are
   really gone, a follow-up can prune the corresponding `Shared` fields and projection queries.
   Do not attempt that here — it touches the `IMediathecaApi` contract and server tests.
+
+## Outcome
+
+Resolved the open question per the builder's instruction ("confirm the drop"): `newGamesSection`
+and `newGameItem` were deleted along with the rest of the dead set, and the intelligence BC
+README now records the New Games card as retired.
+
+**Method.** Wrote a throwaway Python scan (kept outside the worktree, in the session scratch
+dir) that parsed every top-level `let [private] <name>` in
+`src/Client/Pages/Dashboard/Views.fs` with its line span (97 defs found, matching the task's
+count), built a reference graph via word-boundary identifier matching mapping each occurrence to
+its enclosing definition, and iterated to a fixed point from a root set of `{view}` (the sole
+non-`private` def and the file's only external call site — confirmed via
+`grep -rn "Dashboard.Views" src/Client`, which shows only `src/Client/Views.fs:29` calling
+`Pages.Dashboard.Views.view`). The scan found exactly the same 43 dead names the task file
+listed (including `newGamesSection`/`newGameItem`, both dead — `gamesTabView` never calls
+`newGamesSection`, confirming dq8rk's stated Games-tab intent was never honoured and is now
+formally retired instead).
+
+Deletion was done by a second script that additionally classified every top-level `//`/`///`
+banner/doc-comment as belonging to whichever def followed it (skipping intervening blank lines
+and other comment lines), so that banners only get deleted when the def they introduce is dead,
+and stay put when a banner sits over a dead-then-live boundary (e.g. the "Stacked Bar Chart —
+Play Sessions" banner is retained because `chartColors`, the first def under it, survives while
+`chartColorClasses` and everything else in that group is dead). Deletions were applied bottom-up
+in one pass by line-range removal, preserving the file's CRLF line endings (verified before
+writing — a first draft naively translated CRLF to LF and was reverted via `git stash`/`drop`
+before any commit-worthy state was reached).
+
+**Result.** 14 contiguous dead runs, 1991 lines removed. `Views.fs`: 4418 -> 2427 lines (45%
+reduction, matching the task's ~2400-line estimate). Re-running the scan on the post-deletion
+file reports 54 total defs, 54 live, **0 dead** — the acceptance criterion's zero-unreferenced
+bar is met.
+
+**Verification performed:**
+- `npm run build` — clean, 196 modules transformed, no new warnings (only the pre-existing
+  unrelated `@property` CSS optimizer notice).
+- `npm test` — 685 passed, 0 failed (Expecto).
+- `npm run test:client` — 20 passed, 0 failed (Vitest/Fable.Mocha), only the pre-existing
+  unrelated FS0020 warning in `AdminProjections/Views.fs`.
+- `git diff --stat` on `Views.fs` shows only deletions in substance; the raw diff also contains
+  some `+`/`-` pairs of *identical* surviving text (e.g. `chartColors`, `seriesNextEpisodeCard`,
+  `gameInFocusPosterCard`) — this is Myers-diff realignment noise from one very large deletion,
+  not real edits. Confirmed by reading the resulting file directly at each of those functions
+  (`grep -n` + targeted `Read`): every one is complete and unmodified byte-for-byte relative to
+  its pre-change body.
+- **Browser smoke check deferred to the conductor** — the Chrome DevTools MCP tool is not
+  available to a worker. Static argument for why all four tabs render identically: the
+  post-deletion scan proves every surviving definition is reachable from `view`; every deleted
+  definition was, by the same reachability proof, unreachable *before* the change too (nothing
+  live called it); and spot-reads plus the clean build confirm no surviving function body was
+  altered. Since no live call site or live function body changed, the render tree of each tab
+  (All / Movies / TV Series / Games) is unchanged.
+
+**TDD_SKIPPED:** behaviour-preserving dead-code deletion, no new logic to assert; existing
+suites (`npm test`, `npm run test:client`) plus a clean `npm run build` and the zero-unreferenced
+scan are the regression net.
+
+**Follow-up captured:** `intelligence-p4t7k` (backlog) — prune the server-side `NewGames`
+payload (`Shared.DashboardGameStats.NewGames`, `GameProjection.getDashboardNewGames`,
+`Api.fs`'s dashboard handler), out of scope here per the task's explicit boundary.
+
+**Key files:**
+- `src/Client/Pages/Dashboard/Views.fs` — 4418 -> 2427 lines.
+- `.agentheim/contexts/intelligence/README.md` — added a "Retired" note under Ubiquitous
+  language documenting the New Games card's retirement.
+- `.agentheim/contexts/intelligence/backlog/intelligence-p4t7k-prune-dead-newgames-dashboard-payload.md`
+  — new follow-up task.

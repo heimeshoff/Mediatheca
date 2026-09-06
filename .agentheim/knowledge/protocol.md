@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 10:20 -- Task verified and completed: intelligence-wecjh - Dashboard Views.fs — delete the ~2000 lines of unreferenced view helpers left behind by the 3a rebuild
+
+**Type:** Work / Task completion
+**Task:** intelligence-wecjh - Dashboard Views.fs — delete the ~2000 lines of unreferenced view helpers left behind by the 3a rebuild
+**Summary:** Deleted all 43 unreachable view helpers (including newGamesSection/newGameItem, confirmed retired by the builder) from Dashboard/Views.fs, shrinking it from 4418 to 2427 lines with a zero-unreferenced-definitions scan, and recorded the New Games retirement in the intelligence BC README; follow-up intelligence-p4t7k captures the server-side NewGames payload prune.
+**Duration:** 21m
+**Verification:** PASS (iteration 1)
+**Files changed:** 3
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-09-06 10:12 -- Modeling / Captured: intelligence-f6cfv - Dashboard "Next episode" card — watched-with friends become circular avatars pinned top-left; the In focus badge is dropped
 
 **Type:** Modeling / Capture

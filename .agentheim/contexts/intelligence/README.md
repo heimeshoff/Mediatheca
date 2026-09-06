@@ -20,6 +20,13 @@ Single user.
 - **Watched-with stats** — friend-keyed counts of shared sessions.
 - **Person stats** — aggregate of one friend's contribution (sessions, items shared).
 
+**Retired:** the **New Games** card (dashboard section listing recently-added games) was dropped
+from the All tab by `intelligence-dq8rk`'s 3a rebuild and never re-wired onto the Games tab;
+`intelligence-wecjh` confirmed the drop (2026-09-06) and deleted the dead `newGamesSection` /
+`newGameItem` view helpers. The server still projects the underlying data
+(`GameProjection.getDashboardNewGames`, shipped as `DashboardGameStats.NewGames` on every
+dashboard load) — pruning that payload is a separate, not-yet-scheduled follow-up.
+
 ## Aggregates
 
 Intelligence **has no write aggregates**. All projections; all reads. Source streams are the events from Movies / Series / Games / Journal.

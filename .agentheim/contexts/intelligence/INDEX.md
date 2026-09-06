@@ -10,10 +10,10 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 1
-- **Doing:** 1
-- **Done:** 6
+- **Doing:** 0
+- **Done:** 7
 <!-- task-counts:end -->
 
 ### Todo
@@ -23,12 +23,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **intelligence-wecjh** — Dashboard Views.fs — delete the ~2000 lines of unreferenced view helpers left behind by the 3a rebuild (refactor) — `doing/intelligence-wecjh-dashboard-views-dead-code-sweep.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **intelligence-wecjh** — Dashboard Views.fs — delete the ~2000 lines of unreferenced view helpers left behind by the 3a rebuild (refactor) — `done/intelligence-wecjh-dashboard-views-dead-code-sweep.md`
 - **intelligence-encn4** — Dashboard All-tab — Games and Books drop the card chrome and "Games In Focus" is renamed to "Games" (refactor) — `done/intelligence-encn4-dashboard-games-books-open-sections.md`
 - **intelligence-t8n3q** — Dashboard library-search control needs a hover affordance — pointer cursor and a "Ctrl + K" tooltip (bug) — `done/intelligence-t8n3q-dashboard-search-hover-affordance.md`
 - **intelligence-p9m4t** — Dashboard "Movies to Watch" — wrap posters in the filmstrip well (feature) — `done/intelligence-p9m4t-movies-to-watch-filmstrip.md`
@@ -39,6 +39,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **intelligence-p4t7k** — Prune the New Games dashboard payload — server still computes and ships DashboardGameStats.NewGames but no client tab renders it (refactor) — `backlog/intelligence-p4t7k-prune-dead-newgames-dashboard-payload.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
