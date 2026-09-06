@@ -25,7 +25,7 @@ research touching this BC, and concept synthesis pages.
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
-### Done (most recent 30; older entries archived verbatim under `done-archive/` — kept for prior-art search, ADR-0039 convention)
+### Done (current-month entries live; older months archived verbatim under `done-archive/` — kept for prior-art search, ADR-0039 convention)
 <!-- done-list:start -->
 - **administration-b3xqf** — Update the administration README's Offline demoted-event filter entry — EventLogFilter.fs and StartupCutover.fs it cross-references were both deleted by infrastructure-r8kqt (chore) — `done/administration-b3xqf-readme-stale-after-cutover-and-eventlogfilter-retirement.md`
 - **administration-z6ymt** — Purge the 11 demoted metadata event types from the event log via the ADR-0038 wipe-first import — offline type-level NDJSON filter plus operator-executed runbook (ADR-0056) — and retire the completed games-h4mrd play-session migration machinery in the same change (chore) — `done/administration-z6ymt-purge-demoted-metadata-events.md`
