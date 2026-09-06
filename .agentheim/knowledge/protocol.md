@@ -3,6 +3,30 @@
 Chronological log of everything that happens in this project.
 Newest entries on top.
 
+## 2026-09-06 12:35 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 30m (first "Batch started" 12:05 → 12:35)
+**Completed:** 2 (first-try PASS: 2, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** intelligence-c3vqm: 1, design-system-hs4vm: 1
+**Commits:** 5 (2 batch starts, 2 task completions, this entry) — plus one concurrent `modeling` capture commit (f23d2a9, design-system-hs4vm) that landed on `main` mid-run and was picked up as a new ready task after intelligence-c3vqm completed
+**Vision-conformance:** none — batch aligns with vision. Both tasks are visual polish inside the Unified Dashboard workstream: intelligence-c3vqm pins All-tab game posters to the movie filmstrip's size and drops a badge that carried no information (In Focus is already expressed by which section the game sits in — the "Intent-driven" principle survives intact); design-system-hs4vm replaces dead `tailwind-scrollbar` classes on six existing rails with a working design-system primitive and adds no dependency. Neither touches anything named under "Out of Scope (v1)". vision.md carries no "What success looks like"/"Non-goals" headings, so the pass was judgment against "Remaining v1 Work"/"Out of Scope (v1)"/"Design Principles", as in prior sessions.
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (2 tasks, both `type: bug` — one intelligence, one design-system) — hand-classified.
+**Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed.
+
+**Verifier evidence beyond the workers' claims:** c3vqm — confirmed Tailwind actually emits the arbitrary `grid-cols-[repeat(auto-fill,minmax(0,130px))]` rule into the built stylesheet (not a dead string), that `movieToWatchPosterCard`/`movieToWatchFilmstripItem` keep their conditional crosshair, and that `Icons.crosshairSmFilled` still has three references in Views.fs; `npm test` 685/685. hs4vm — confirmed `.scrollbar-hidden` and its `::-webkit-scrollbar` rule land in the built CSS, the acceptance grep for `scrollbar-thin|-thumb|-track` is empty across `src/Client/`, `package.json`/`package-lock.json` untouched, `index.css` still has exactly two `@plugin` lines, and all six rails keep `overflow-x-auto snap-x snap-mandatory scroll-px-2` byte-identical; `npm run build` clean, `npm test` 685/685.
+
+**Verifier observation, not acted on (scope):** the first `npm test` run for c3vqm errored once on `JobRuns.reconciliation only runs at startup: a row that's genuinely running (guard held) is left alone by a later read` — a `NullReferenceException` in `SqliteConnection.Close()` inside `TempDb.Dispose` (`tests/Server.Tests/TestDb.fs:69`), a teardown race between the test's `Async.Start` background job and scope disposal. Re-run was fully green; hs4vm's run did not reproduce it. Server-side, unrelated to either client diff — a candidate for a small `modeling` capture to de-flake `TestDb.TempDb.Dispose`.
+
+**Browser verification not performed this session:** both changes are viewport-dependent visuals (poster cap across sm/lg/xl; scrollbar paint under the rails). The verifiers proved them from the emitted CSS rather than a running browser, and the local dev database is still empty (populated rails would not render anyway). Worth one glance on the deployed build.
+
+**Harness notes:** (1) Each worktree again needed the root `node_modules` junctioned from the main tree (`mklink /J`, removed via `rmdir` before `git worktree remove`; main copy verified intact, 206 entries, twice). (2) The `checkpoint`/`complete` verbs' opts JSON was written to a scratch file and read back via `process.argv[1]` (not `[2]` — `node -e` shifts argv), as in prior sessions. (3) Board is empty after this session — no todo, doing, or backlog work in any BC.
+
+---
+
 ---
 ## 2026-09-06 12:10 -- Modeling / Captured: design-system-hs4vm - Hidden-scrollbar primitive — the Dashboard's six horizontal poster rails carry `tailwind-scrollbar` classes for a plugin that was never installed, so the native scrollbar renders under every rail
 
