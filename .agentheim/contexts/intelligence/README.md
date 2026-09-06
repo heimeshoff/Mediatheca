@@ -49,6 +49,14 @@ None.
 
 Frontend tasks in this BC **must** `depends_on` the design-system styleguide task. See [[design-system]].
 
+**Card-local adaptation:** `DesignSystem.nextEpisodeHeroCard`'s watched-with avatar
+stack (top-left corner, overlapping `-space-x-3`, per-avatar `ring-2`) reuses the
+styleguide `heroCard` pattern but uses `ring-white/30` instead of the specimen's
+`ring-base-100` — the specimen's ring sits on `heroCard`'s flat gradient background,
+while this card's avatars sit on a photographic backdrop where the dark
+`ring-base-100` tone reads muddy. This is a per-card deviation, not a design-system
+change (`intelligence-f6cfv`).
+
 ## Open questions
 
 - Yearly intelligence reports (v2) — language not yet seeded.

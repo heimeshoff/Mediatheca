@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 1
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 7
+- **Doing:** 0
+- **Done:** 8
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **intelligence-f6cfv** — Dashboard "Next episode" card — watched-with friends become circular avatars pinned top-left; the In focus badge is dropped (refactor) — `doing/intelligence-f6cfv-next-episode-card-avatars-top-left.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **intelligence-f6cfv** — Dashboard "Next episode" card — watched-with friends become circular avatars pinned top-left; the In focus badge is dropped (refactor) — `done/intelligence-f6cfv-next-episode-card-avatars-top-left.md`
 - **intelligence-wecjh** — Dashboard Views.fs — delete the ~2000 lines of unreferenced view helpers left behind by the 3a rebuild (refactor) — `done/intelligence-wecjh-dashboard-views-dead-code-sweep.md`
 - **intelligence-encn4** — Dashboard All-tab — Games and Books drop the card chrome and "Games In Focus" is renamed to "Games" (refactor) — `done/intelligence-encn4-dashboard-games-books-open-sections.md`
 - **intelligence-t8n3q** — Dashboard library-search control needs a hover affordance — pointer cursor and a "Ctrl + K" tooltip (bug) — `done/intelligence-t8n3q-dashboard-search-hover-affordance.md`

@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 10:34 -- Task verified and completed: intelligence-f6cfv - Dashboard "Next episode" card — watched-with friends become circular avatars pinned top-left; the In focus badge is dropped
+
+**Type:** Work / Task completion
+**Task:** intelligence-f6cfv - Dashboard "Next episode" card — watched-with friends become circular avatars pinned top-left; the In focus badge is dropped
+**Summary:** Reworked the Dashboard Next episode hero card so watched-with friends render as an overlapping circular avatar stack pinned top-left (image or initial fallback, click-through to the friend page preserved), and dropped the In-focus badge from the card and its props; ring-white/30 recorded as a card-local adaptation in the intelligence README.
+**Duration:** 17m
+**Verification:** PASS (iteration 1)
+**Files changed:** 3
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-09-06 10:21 -- Batch started: [intelligence-f6cfv]
 
 **Type:** Work / Batch start

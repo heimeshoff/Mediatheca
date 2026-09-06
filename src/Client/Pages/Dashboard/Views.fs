@@ -393,7 +393,6 @@ let private seriesNextEpisodeCard (jellyfinServerUrl: string option) (item: Dash
                 EpisodeLabel = episodeLabel
                 BackdropRef = item.BackdropRef
                 PosterRef = item.PosterRef
-                InFocus = item.InFocus
                 Progress = seriesProgressOf item
                 WatchedWith =
                     item.WatchWithFriends

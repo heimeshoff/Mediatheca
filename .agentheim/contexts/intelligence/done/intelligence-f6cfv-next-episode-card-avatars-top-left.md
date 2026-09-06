@@ -1,11 +1,11 @@
 ---
 id: intelligence-f6cfv
 title: Dashboard "Next episode" card — watched-with friends become circular avatars pinned top-left; the In focus badge is dropped
-status: doing
+status: done
 type: refactor
 context: intelligence
 created: 2026-09-06
-completed:
+completed: 2026-09-06
 depends_on: [design-system-001, intelligence-wecjh]
 blocks: []
 tags: [dashboard, frontend, series, next-up, hero-card, friends, avatars]
@@ -120,3 +120,34 @@ The Series-tab next-up list rows use the separate page-local `friendPill` helper
   `npm run build` plus a look at the running dashboard.
 - The animated In-focus gold sweep (`design-system-bky6v`) is unaffected — this task
   removes a *usage*, not the effect.
+
+## Outcome
+Reworked `DesignSystem.nextEpisodeHeroCard` (`src/Client/DesignSystem.fs`, § "Next
+episode hero card"): dropped the `InFocus` field/badge, and replaced the bottom-scrim
+friend-pill row with an `absolute top-3 left-3 z-10` overlapping avatar stack
+(`flex items-center -space-x-3`, each avatar `w-10 h-10 rounded-full ring-2
+ring-white/30 overflow-hidden`, image `object-cover` with `alt`/`title` = friend name,
+or a `bg-line` circle with the uppercased first letter in `font-sans text-ink-secondary`
+when no image). Each avatar stays an `Html.a` with the friend's `Href`,
+`preventDefault()` + `stopPropagation()` then `OnClick()` — the click-handling moved
+unchanged from the old pill. `seriesNextEpisodeCard` in
+`src/Client/Pages/Dashboard/Views.fs` dropped its `InFocus = item.InFocus` line
+accordingly; `WatchedWith` construction was already unchanged data-wise. No
+`NextEpisodeHeroCardProps` construction exists in the StyleGuide page, so no edit was
+needed there; `statusBadge`/`InFocus`/the gold-sweep animation are untouched and still
+used by the styleguide's separate `heroCard` specimen.
+
+Chose `ring-white/30` over the styleguide's `ring-base-100` because this card's avatars
+sit on a photographic backdrop rather than `heroCard`'s flat gradient — noted as a
+card-local adaptation in the intelligence BC README (no ADR, no StyleGuide edit; see
+`design-system-001` gate).
+
+`npm run build` — clean Fable compile (single gate for both edited files, per task
+Notes). `npm run test:client` — 5 files / 20 tests, all green (pre-existing suite,
+none targeting this card). `TDD_SKIPPED`: UI task, view composition with no logic to
+assert; the client `*.test.fs` suite covers logic, not render output, consistent with
+`intelligence-h7v2q`'s precedent. Visual verification of the running dashboard is
+deferred to the conductor (Chrome DevTools MCP) — dev server not started here.
+
+Key files: `src/Client/DesignSystem.fs`, `src/Client/Pages/Dashboard/Views.fs`,
+`.agentheim/contexts/intelligence/README.md`.

@@ -823,7 +823,6 @@ type NextEpisodeHeroCardProps = {
     BackdropRef: string option
     /// Fallback background when `BackdropRef` is `None`.
     PosterRef: string option
-    InFocus: bool
     Progress: SeriesProgressProps
     WatchedWith: NextEpisodeHeroFriend list
     /// Fully-rendered, self-positioned (`absolute top-3 right-3 ...`) Jellyfin
@@ -834,9 +833,10 @@ type NextEpisodeHeroCardProps = {
 
 /// Cinematic "Next episode" hero card — the repeated, real-data variant of the
 /// styleguide's single-specimen `heroCard`. Backdrop fills the canvas, a bottom
-/// scrim overlay carries the series name, episode label, segmented progress, and
-/// watched-with friends (image + name, each linking to the friend's page), and
-/// the caller-supplied Jellyfin button (if any) sits top-right.
+/// scrim overlay carries the series name, episode label, and segmented progress,
+/// an overlapping avatar stack of watched-with friends (each linking to the
+/// friend's page) sits top-left, and the caller-supplied Jellyfin button (if
+/// any) sits top-right.
 let nextEpisodeHeroCard (props: NextEpisodeHeroCardProps) : ReactElement =
     let backgroundRef = props.BackdropRef |> Option.orElse props.PosterRef
     Html.div [
@@ -860,10 +860,43 @@ let nextEpisodeHeroCard (props: NextEpisodeHeroCardProps) : ReactElement =
             // index.css fades it in via the card wrapper's Tailwind `group`.
             Html.div [ prop.className posterShine ]
 
-            if props.InFocus then
+            // Watched-with friends, overlapping avatar stack — top-left corner,
+            // opposite the Jellyfin play button. Ring colour deviates from the
+            // styleguide's `heroCard` specimen (`ring-base-100`, a dark surface
+            // tone) to `ring-white/30` because this card's avatars sit over a
+            // photographic backdrop rather than the specimen's flat page
+            // background; a dark ring reads muddy there. Card-local adaptation,
+            // noted in the intelligence BC README per design-system-001.
+            if not props.WatchedWith.IsEmpty then
                 Html.div [
-                    prop.className "absolute top-3 left-3 z-10"
-                    prop.children [ statusBadge InFocus ]
+                    prop.className "absolute top-3 left-3 z-10 flex items-center -space-x-3"
+                    prop.children [
+                        for friend in props.WatchedWith do
+                            Html.a [
+                                prop.key friend.Name
+                                prop.href friend.Href
+                                prop.title friend.Name
+                                prop.onClick (fun e ->
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    friend.OnClick())
+                                prop.className "w-10 h-10 rounded-full ring-2 ring-white/30 overflow-hidden cursor-pointer"
+                                prop.children [
+                                    match friend.ImageRef with
+                                    | Some img ->
+                                        Html.img [
+                                            prop.src $"/images/{img}"
+                                            prop.alt friend.Name
+                                            prop.className "w-full h-full object-cover"
+                                        ]
+                                    | None ->
+                                        Html.div [
+                                            prop.className "w-full h-full bg-line flex items-center justify-center text-sm font-sans text-ink-secondary"
+                                            prop.text (friend.Name.Substring(0, 1).ToUpper())
+                                        ]
+                                ]
+                            ]
+                    ]
                 ]
 
             Html.div [
@@ -881,33 +914,6 @@ let nextEpisodeHeroCard (props: NextEpisodeHeroCardProps) : ReactElement =
                         ]
                     | None -> ()
                     seriesSeasonEpisodeProgress props.Progress
-                    if not props.WatchedWith.IsEmpty then
-                        Html.div [
-                            prop.className "flex items-center gap-1.5 flex-wrap"
-                            prop.children [
-                                for friend in props.WatchedWith do
-                                    Html.a [
-                                        prop.key friend.Name
-                                        prop.href friend.Href
-                                        prop.onClick (fun e ->
-                                            e.preventDefault()
-                                            e.stopPropagation()
-                                            friend.OnClick())
-                                        prop.className "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-white/10 text-white/80 hover:bg-white/20 hover:text-white transition-colors cursor-pointer"
-                                        prop.children [
-                                            match friend.ImageRef with
-                                            | Some img ->
-                                                Html.img [
-                                                    prop.src $"/images/{img}"
-                                                    prop.alt friend.Name
-                                                    prop.className "w-3.5 h-3.5 rounded-full object-cover"
-                                                ]
-                                            | None -> ()
-                                            Html.span [ prop.text friend.Name ]
-                                        ]
-                                    ]
-                            ]
-                        ]
                 ]
             ]
 
