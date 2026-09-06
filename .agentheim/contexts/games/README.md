@@ -83,10 +83,12 @@ Single user.
   decision log left open: a bare "Multi-player" tag with no other
   multiplayer signal resolves to `CoopOnline`).
   **UI (games-j6wkr):** `Components/PlayFacetsDisplay.fs` is the shared
-  badge/control vocabulary consumed by both `Pages/Games` (list cards +
-  client-side facet filters) and `Pages/GameDetail` (hero badges + a "Play
+  badge/control vocabulary consumed by `Pages/GameDetail` (hero badges + a "Play
   Facets" panel of seven Auto/On/Off segmented controls, VR getting the
-  4-option Auto/No VR/Supported/VR only variant). Badges cap at 4 — Solo,
+  4-option Auto/No VR/Supported/VR only variant) — `Pages/Games`, which used to
+  render the badges on list cards with a client-side facet filter, was deleted by
+  design-system-fryq7; the Dashboard's per-media Games tab has no play-facet
+  badges or filters of its own. Badges cap at 4 — Solo,
   Co-op (couch/online sub-label), Versus (couch/online sub-label), and a
   standalone Couch summary badge that fires on any couch-playable mode.
   Segmented controls always render the merged `PlayFacets` for display but
@@ -149,7 +151,7 @@ Single user.
   (`ComingSoon OR a parsed date still in the future` — deliberately NOT "unparseable implies
   unreleased", see ADR-0060) — the single flag the list-card badge
   (`Components/PlayFacetsDisplay.fs`'s `releaseDateBadge`), the detail-page treatment
-  (`releaseDateHero`), and the Games tab's Upcoming section (`GameProjection.getUpcomingGames`,
+  (`releaseDateHero`), and the Dashboard Games tab's Upcoming rail (moved off the standalone Games list page — deleted by design-system-fryq7 — onto the Dashboard by intelligence-qh8mj) (`GameProjection.getUpcomingGames`,
   soonest-first, TBA/unparseable last, absent when nothing is unreleased) all share, so the
   three surfaces can never disagree about what counts as upcoming.
 - **Stores** — e.g. Steam, GOG. A game can be in multiple.

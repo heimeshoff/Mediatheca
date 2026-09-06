@@ -3270,11 +3270,6 @@ module Api =
                 return GameProjection.getAll conn
             }
 
-            getUpcomingGames = fun () -> async {
-                use conn = factory ()
-                return GameProjection.getUpcomingGames conn
-            }
-
             getGameDetail = fun slug -> async {
                 use conn = factory ()
                 return GameProjection.getBySlug conn slug

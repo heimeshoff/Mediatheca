@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 14:33 -- Task verified and completed: design-system-fryq7 - Remove the Movies / TV Series / Games items from the main menu (sidebar rail + mobile BottomNav) and delete their three list pages, plus every piece of code only those pages referenced — the Dashboard's per-media tabs already cover what they showed.
+
+**Type:** Work / Task completion
+**Task:** design-system-fryq7 - Remove the Movies / TV Series / Games items from the main menu (sidebar rail + mobile BottomNav) and delete their three list pages, plus every piece of code only those pages referenced — the Dashboard's per-media tabs already cover what they showed.
+**Summary:** Removed the Movies / TV Series / Games items from the sidebar rail and BottomNav and deleted their three list pages plus every symbol only they kept alive; bare /movies|/series|/games URLs resolve to the Dashboard with the matching tab, and the global search modal now fetches its library snapshot on open
+**Duration:** 33m
+**Verification:** PASS (iteration 1)
+**Files changed:** 28
+**Tests added:** 9
+**ADRs written:** none
+
+---
+
 ## 2026-09-06 14:07 -- Batch started: [design-system-fryq7]
 
 **Type:** Work / Batch start

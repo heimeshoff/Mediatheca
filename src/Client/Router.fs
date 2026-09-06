@@ -4,11 +4,8 @@ open Feliz.Router
 
 type Page =
     | Dashboard
-    | Movie_list
     | Movie_detail of slug: string
-    | Series_list
     | Series_detail of slug: string
-    | Game_list
     | Game_detail of slug: string
     | Friend_list
     | Friend_detail of slug: string
@@ -29,11 +26,16 @@ module Route =
     let parseUrl (segments: string list) =
         match segments with
         | [] -> Dashboard
-        | [ "movies" ] -> Movie_list
+        // Bare /movies, /series, /games (old bookmarks / browser history from
+        // before design-system-fryq7 deleted the three list pages) resolve to
+        // the Dashboard rather than Not_found — Types.fs/State.fs's
+        // `Url_changed` handler reads the segments directly to pre-select the
+        // matching Dashboard tab via `PendingDashboardTab`.
+        | [ "movies" ] -> Dashboard
         | [ "movies"; slug ] -> Movie_detail slug
-        | [ "series" ] -> Series_list
+        | [ "series" ] -> Dashboard
         | [ "series"; slug ] -> Series_detail slug
-        | [ "games" ] -> Game_list
+        | [ "games" ] -> Dashboard
         | [ "games"; slug ] -> Game_detail slug
         | [ "friends" ] -> Friend_list
         | [ "friends"; slug ] -> Friend_detail slug
@@ -61,11 +63,8 @@ module Route =
     let toUrl (page: Page) =
         match page with
         | Dashboard -> Router.format ""
-        | Movie_list -> Router.format "movies"
         | Movie_detail slug -> Router.format ("movies", slug)
-        | Series_list -> Router.format "series"
         | Series_detail slug -> Router.format ("series", slug)
-        | Game_list -> Router.format "games"
         | Game_detail slug -> Router.format ("games", slug)
         | Friend_list -> Router.format "friends"
         | Friend_detail slug -> Router.format ("friends", slug)
@@ -79,11 +78,8 @@ module Route =
     let navigateTo (page: Page) =
         match page with
         | Dashboard -> Router.navigate ""
-        | Movie_list -> Router.navigate "movies"
         | Movie_detail slug -> Router.navigate ("movies", slug)
-        | Series_list -> Router.navigate "series"
         | Series_detail slug -> Router.navigate ("series", slug)
-        | Game_list -> Router.navigate "games"
         | Game_detail slug -> Router.navigate ("games", slug)
         | Friend_list -> Router.navigate "friends"
         | Friend_detail slug -> Router.navigate ("friends", slug)
@@ -103,24 +99,19 @@ module Route =
         | Settings | Stream_detail _ -> true
         | _ -> false
 
-    let isMoviesSection (page: Page) =
-        match page with
-        | Movie_list | Movie_detail _ -> true
-        | _ -> false
-
     let isFriendsSection (page: Page) =
         match page with
         | Friend_list | Friend_detail _ -> true
         | _ -> false
 
-    let isSeriesSection (page: Page) =
+    /// design-system-fryq7: the Movies/TV Series/Games menu items are gone —
+    /// their detail pages are reached from, and return to, the Dashboard, so
+    /// the rail highlights Dashboard while on any of the three, keeping the
+    /// rail's active item non-empty. Supersedes `isMoviesSection` /
+    /// `isSeriesSection` / `isGamesSection`.
+    let isDashboardSection (page: Page) =
         match page with
-        | Series_list | Series_detail _ -> true
-        | _ -> false
-
-    let isGamesSection (page: Page) =
-        match page with
-        | Game_list | Game_detail _ -> true
+        | Dashboard | Movie_detail _ | Series_detail _ | Game_detail _ -> true
         | _ -> false
 
     let isCatalogsSection (page: Page) =

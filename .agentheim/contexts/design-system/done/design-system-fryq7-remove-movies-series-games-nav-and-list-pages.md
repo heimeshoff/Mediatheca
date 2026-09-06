@@ -1,7 +1,7 @@
 ---
 id: design-system-fryq7
 title: Remove the Movies / TV Series / Games items from the main menu (sidebar rail + mobile BottomNav) and delete their three list pages, plus every piece of code only those pages referenced — the Dashboard's per-media tabs already cover what they showed.
-status: doing
+status: done
 type: refactor
 context: design-system
 created: 2026-09-06
@@ -66,3 +66,24 @@ Removing them also stops the app eagerly loading the full movie, series and game
 - Per-BC README deltas to report: design-system README "Layered sidebar nav" (item list), games README (Upcoming section / list-page filters), movies + series READMEs if they describe the list page.
 - `tests/e2e/game-detail-persistent-cards.spec.ts` only visits `/#/games/{slug}` — unaffected.
 - The current uncommitted edit in `src/Client/DesignSystem.fs` (filmstrip `scrollbarHidden`) is the builder's own WIP, unrelated — don't fold it into this task's diff.
+
+## Outcome
+
+Removed the Movies / TV Series / Games items from the sidebar rail and mobile BottomNav (`Components/Sidebar.fs`, `Components/BottomNav.fs` — top group is now Dashboard/Catalogs/Friends) and deleted their three flat list pages (`src/Client/Pages/Movies`, `Series`, `Games`) plus every piece of client/server code only those pages kept alive — the Dashboard's own per-media tabs already covered what they showed.
+
+**Navigation/router** (`src/Client/Router.fs`): `Movie_list`/`Series_list`/`Game_list` removed from the `Page` DU, `toUrl`, `navigateTo`. `Route.parseUrl` now resolves bare `/movies`, `/series`, `/games` to `Dashboard` (old bookmarks/history) while the parameterized `/movies/{slug}` etc. detail routes are untouched. `isMoviesSection`/`isSeriesSection`/`isGamesSection` are replaced by a single `Route.isDashboardSection` (Dashboard + the three detail pages), used by both the Sidebar and BottomNav so the rail always has a highlighted item on a detail page. `src/Client/State.fs`'s `Url_changed` handler reads the raw segments (not just the resolved `Page`) to pre-select the matching Dashboard tab via the existing `PendingDashboardTab` mechanism when a bare `/movies`/`/series`/`/games` URL is hit.
+
+**Root MVU** (`Types.fs`/`State.fs`/`Views.fs`): `MovieListModel`/`SeriesListModel`/`GameListModel` and their `_msg` cases are gone; `State.init` no longer issues `getMovies`/`getSeries`/`getGames` at app start. The three detail pages' "remove" success branches and not-found "Back to …" links (`MovieDetail`, `SeriesDetail`, `GameDetail` — both `State.fs` and `Views.fs`) now navigate to `""` (Dashboard) instead of the deleted list routes.
+
+**Search modal — the one real entanglement**: `SearchModal.initWithGames` (seeded synchronously from the three list models) is replaced by `SearchModal.init ()` (opens empty) plus a new `Library_loaded` message; `State.fs`'s `Open_search_modal` (root and Dashboard's own) now dispatch a `loadSearchLibraryCmd` that fetches `getMovies`/`getSeries`/`getGames` fresh on every open. The reducer step is pulled into a small pure `SearchModal.applyLibraryLoaded`, directly covered by `Components/SearchModal.test.fs`. `Import_completed`'s now-pointless `Load_movies`/`Load_series`/`Load_games` reload commands were dropped (nothing client-side needs refreshing anymore).
+
+**Dead code verified before deletion** — `npm run build` was the oracle:
+- `Pages.Games.Types.PlayFacetFilter` and `Route.isMoviesSection`/`isSeriesSection`/`isGamesSection` — confirmed no consumer outside the deleted pages, deleted.
+- `IMediathecaApi.getUpcomingGames` (Shared.fs) and its `Api.fs` handler — deleted (the deleted Games page's sole caller). `GameProjection.getUpcomingGames`, its Expecto tests, `ReleaseDate`/`IsUnreleased`/`ReleaseDateParsing`, and `PlayFacetsDisplay.releaseDateBadge` all remain untouched — the Dashboard Games tab's Upcoming rail (intelligence-qh8mj) still consumes them.
+- **Kept, contrary to the task's assumption** — `DesignSystem.statusBadgeLabel` and `PlayFacetsDisplay.facetBadges` both turned up live consumers outside the three deleted pages: `statusBadgeLabel` backs `DesignSystem.statusBadge`, which `Pages/GameDetail/Views.fs` (lines ~299, ~322) still calls; `facetBadges` backs `PlayFacetsDisplay.badgeRow`, which `Pages/GameDetail/Views.fs` (line ~945) still calls. Both stay.
+
+**StyleGuide** (`Pages/StyleGuide/Views.fs`): the "Sidebar Nav" specimen's top-group items were updated from Dashboard/Movies/TV Series to Dashboard/Catalogs/Friends, matching the live rail's real membership.
+
+**Tests**: `src/Client/Route.test.fs` (new, 7 cases) covers `Route.parseUrl`'s bare-segment-to-Dashboard resolution, the untouched detail routes, and `Route.isDashboardSection`. `src/Client/Components/SearchModal.test.fs` (new, 2 cases) covers the seeded-from-fetch path — an empty `init ()` finds nothing, `applyLibraryLoaded` (the `Library_loaded` reducer step) populates the snapshot and `filterLibrary` then finds matches. Both registered in `Client.fsproj`. `npm run build` clean, `npm run test:client` 29/29 passing (7 files), `npm test` (server Expecto) 686/686 passing (unchanged baseline — no server tests added or removed).
+
+**Cross-BC README edits** (applied by the conductor on `main` at integration, since a worker's README delta may only target its own BC): `.agentheim/contexts/games/README.md` — the "Release date" bullet's "Games tab's Upcoming section" now names the Dashboard Games tab's Upcoming rail (moved off the deleted list page by intelligence-qh8mj), and the "Play facets" bullet's UI sentence no longer lists `Pages/Games` as a consumer of `PlayFacetsDisplay`. No movies/series README bullets referenced the deleted list pages — nothing to change there.

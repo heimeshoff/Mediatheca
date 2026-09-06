@@ -724,12 +724,12 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
             ]
             Html.a [
                 prop.className "link link-primary mt-4 inline-block"
-                prop.href (Router.format "games")
+                prop.href (Router.format "")
                 prop.onClick (fun e ->
                     e.preventDefault()
-                    Router.navigate "games"
+                    Router.navigate ""
                 )
-                prop.text "Back to Games"
+                prop.text "Back to Dashboard"
             ]
         ]
     | false, Some game ->

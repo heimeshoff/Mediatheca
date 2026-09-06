@@ -17,11 +17,13 @@ type NavItem = {
 // Top group: primary destinations. Bottom group: pinned to the foot of the
 // rail via `mt-auto` (styleguide.md § 4 Sidebar nav — design-system-t4b9k,
 // active-tab treatment reverted to dir 3a's burgundy fill by design-system-grtw7).
+// design-system-fryq7: Movies/TV Series/Games are gone — the Dashboard's own
+// per-media tabs cover what those list pages showed, and every detail-page
+// "back" fallback already lands on the Dashboard (PendingDashboardTab). The
+// Dashboard item stays active while on a Movie/Series/Game detail page too
+// (Route.isDashboardSection), so the rail always has a highlighted item.
 let private topNavItems = [
-    { Label = "Dashboard"; Page = Dashboard; IsActive = (fun p -> p = Dashboard); Icon = Icons.dashboard; Href = Router.format "" }
-    { Label = "Movies"; Page = Movie_list; IsActive = Route.isMoviesSection; Icon = Icons.movie; Href = Router.format "movies" }
-    { Label = "TV Series"; Page = Series_list; IsActive = Route.isSeriesSection; Icon = Icons.tv; Href = Router.format "series" }
-    { Label = "Games"; Page = Game_list; IsActive = Route.isGamesSection; Icon = Icons.gamepad; Href = Router.format "games" }
+    { Label = "Dashboard"; Page = Dashboard; IsActive = Route.isDashboardSection; Icon = Icons.dashboard; Href = Router.format "" }
     { Label = "Catalogs"; Page = Catalog_list; IsActive = Route.isCatalogsSection; Icon = Icons.catalog; Href = Router.format "catalogs" }
     { Label = "Friends"; Page = Friend_list; IsActive = Route.isFriendsSection; Icon = Icons.friends; Href = Router.format "friends" }
 ]

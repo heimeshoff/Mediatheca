@@ -82,8 +82,12 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         Cmd.OfAsync.perform (fun () -> api.removeMovie model.Slug) () Movie_removed
 
     | Movie_removed (Ok ()) ->
+        // design-system-fryq7: the Movies list page is gone — a removed
+        // movie's detail page has nowhere of its own to return to, so this
+        // lands on the Dashboard (its per-media tabs cover what the list
+        // page showed).
         model,
-        Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate "movies")
+        Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate "")
 
     | Movie_removed (Error err) ->
         { model with Error = Some err }, Cmd.none

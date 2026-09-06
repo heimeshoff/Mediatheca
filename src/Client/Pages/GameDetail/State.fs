@@ -484,8 +484,10 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with HltbFetching = false; Error = Some err }, Cmd.none
 
     | Game_removed (Ok ()) ->
+        // design-system-fryq7: the Games list page is gone — see
+        // MovieDetail.State's identical Movie_removed handler.
         model,
-        Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate "games")
+        Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate "")
 
     | Game_removed (Error err) ->
         { model with Error = Some err }, Cmd.none

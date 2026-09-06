@@ -571,8 +571,10 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             () Series_removed (fun ex -> Series_removed (Error ex.Message))
 
     | Series_removed (Ok ()) ->
+        // design-system-fryq7: the Series list page is gone — see
+        // MovieDetail.State's identical Movie_removed handler.
         model,
-        Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate "series")
+        Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate "")
 
     | Series_removed (Error err) ->
         { model with Error = Some err }, Cmd.none

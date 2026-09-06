@@ -1525,10 +1525,6 @@ type IMediathecaApi = {
     addGameFromSteam: AddGameFromSteamRequest -> Async<Result<AddGameOutcome, string>>
     removeGame: string -> Async<Result<unit, string>>
     getGames: unit -> Async<GameListItem list>
-    /// games-ev65k: unreleased Steam-linked games, soonest release first,
-    /// TBA/unparseable last — the Games tab's Upcoming section. Absent
-    /// dismissed games (mirrors `getRecentlyAddedGames`'s status filter).
-    getUpcomingGames: unit -> Async<GameListItem list>
     getGameDetail: string -> Async<GameDetail option>
     setGameStatus: string -> GameStatus -> Async<Result<unit, string>>
     setGamePersonalRating: string -> int option -> Async<Result<unit, string>>

@@ -11,13 +11,25 @@ let private debounceCmd (ms: int) (msg: Msg) : Cmd<Msg> =
         Fable.Core.JS.setTimeout (fun () -> dispatch msg) ms |> ignore
     )
 
+/// design-system-fryq7: the search modal's local-library snapshot used to
+/// come for free from the three list pages' own already-loaded models. With
+/// those pages gone, this fetches a fresh snapshot on every modal open —
+/// batched into the modal's open Cmd rather than kept warm client-side.
+let private loadSearchLibraryCmd (api: IMediathecaApi) : Cmd<Msg> =
+    let loadAll = async {
+        let! movies = api.getMovies ()
+        let! series = api.getSeries ()
+        let! games = api.getGames ()
+        return movies, series, games
+    }
+    Cmd.OfAsync.perform
+        (fun () -> loadAll) ()
+        (fun (movies, series, games) -> Search_modal_msg (SearchModal.Library_loaded (movies, series, games)))
+
 let init (api: IMediathecaApi) (adminApi: IAdminApi) () : Model * Cmd<Msg> =
     let dashboardModel, dashboardCmd = Pages.Dashboard.State.init ()
-    let movieListModel, movieListCmd = Pages.Movies.State.init ()
     let movieDetailModel, movieDetailCmd = Pages.MovieDetail.State.init ""
-    let seriesListModel, seriesListCmd = Pages.Series.State.init ()
     let seriesDetailModel, seriesDetailCmd = Pages.SeriesDetail.State.init ""
-    let gameListModel, gameListCmd = Pages.Games.State.init ()
     let gameDetailModel, gameDetailCmd = Pages.GameDetail.State.init ""
     let friendListModel, friendListCmd = Pages.Friends.State.init ()
     let friendDetailModel, friendDetailCmd = Pages.FriendDetail.State.init ""
@@ -33,11 +45,8 @@ let init (api: IMediathecaApi) (adminApi: IAdminApi) () : Model * Cmd<Msg> =
         SuppressNextHistoryPush = false
         PendingDashboardTab = None
         DashboardModel = dashboardModel
-        MovieListModel = movieListModel
         MovieDetailModel = movieDetailModel
-        SeriesListModel = seriesListModel
         SeriesDetailModel = seriesDetailModel
-        GameListModel = gameListModel
         GameDetailModel = gameDetailModel
         FriendListModel = friendListModel
         FriendDetailModel = friendDetailModel
@@ -58,14 +67,6 @@ let init (api: IMediathecaApi) (adminApi: IAdminApi) () : Model * Cmd<Msg> =
             api.getDashboardAllTab ()
             (fun data -> Dashboard_msg (Pages.Dashboard.Types.AllTabLoaded data))
             (fun ex -> Dashboard_msg (Pages.Dashboard.Types.TabLoadError ex.Message))
-        Cmd.map Movie_list_msg movieListCmd
-        Cmd.map Series_list_msg seriesListCmd
-        // Games must load at startup like movies and series: the Ctrl+K search
-        // modal's Library tab filters a client-side snapshot of these three
-        // lists (SearchModal.filterLibrary), and the external tabs use them to
-        // exclude already-owned items from TMDB/RAWG results. Without this the
-        // snapshot has no games until the Games page is visited.
-        Cmd.map Game_list_msg gameListCmd
         Cmd.map Settings_msg settingsCmd
         // Trigger Jellyfin auto-sync on app visit
         Cmd.OfAsync.perform api.triggerJellyfinSync () JellyfinSyncTriggered
@@ -95,6 +96,10 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
     | None -> model, Cmd.none
     | Some searchModel ->
         match childMsg with
+        | SearchModal.Library_loaded (movies, series, games) ->
+            { model with SearchModal = Some (searchModel |> SearchModal.applyLibraryLoaded movies series games) },
+            Cmd.none
+
         | SearchModal.Close ->
             { model with SearchModal = None }, Cmd.none
 
@@ -306,19 +311,18 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
         | SearchModal.Import_completed result ->
             match result with
             | Ok (slug, mediaType) ->
-                let reloadCmd, navSegments =
+                // design-system-fryq7: the three list models this used to
+                // reload (`Load_movies`/`Load_series`/`Load_games`) are gone
+                // — the search modal fetches its own fresh snapshot on every
+                // open (`loadSearchLibraryCmd`), so nothing client-side needs
+                // refreshing here.
+                let navSegments =
                     match mediaType with
-                    | MediaType.Movie ->
-                        Cmd.ofMsg (Movie_list_msg Pages.Movies.Types.Load_movies), ("movies", slug)
-                    | MediaType.Series ->
-                        Cmd.ofMsg (Series_list_msg Pages.Series.Types.Load_series), ("series", slug)
-                    | MediaType.Game ->
-                        Cmd.ofMsg (Game_list_msg Pages.Games.Types.Load_games), ("games", slug)
+                    | MediaType.Movie -> ("movies", slug)
+                    | MediaType.Series -> ("series", slug)
+                    | MediaType.Game -> ("games", slug)
                 { model with SearchModal = None },
-                Cmd.batch [
-                    reloadCmd
-                    Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate (fst navSegments, snd navSegments))
-                ]
+                Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate (fst navSegments, snd navSegments))
             | Error err ->
                 { model with SearchModal = Some { searchModel with Error = Some err; IsImporting = false } }, Cmd.none
 
@@ -509,27 +513,25 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
                         { model.SettingsModel with
                             AdminModel = Pages.Admin.State.stopFollowing model.SettingsModel.AdminModel } }
             | _ -> model
+        // design-system-fryq7: bare /movies, /series, /games (old bookmarks —
+        // Route.parseUrl resolves them to Dashboard, not a list page anymore)
+        // pre-select the matching Dashboard tab the same way the detail pages'
+        // empty-history Go_back fallback does.
+        let model =
+            match segments with
+            | [ "movies" ] -> { model with PendingDashboardTab = Some Pages.Dashboard.Types.MoviesTab }
+            | [ "series" ] -> { model with PendingDashboardTab = Some Pages.Dashboard.Types.SeriesTab }
+            | [ "games" ] -> { model with PendingDashboardTab = Some Pages.Dashboard.Types.GamesTab }
+            | _ -> model
         match page with
-        | Movie_list ->
-            let childModel, childCmd = Pages.Movies.State.init ()
-            { model with MovieListModel = childModel },
-            Cmd.map Movie_list_msg childCmd
         | Movie_detail slug ->
             let childModel, childCmd = Pages.MovieDetail.State.init slug
             { model with MovieDetailModel = childModel },
             Cmd.map Movie_detail_msg childCmd
-        | Series_list ->
-            let childModel, childCmd = Pages.Series.State.init ()
-            { model with SeriesListModel = childModel },
-            Cmd.map Series_list_msg childCmd
         | Series_detail slug ->
             let childModel, childCmd = Pages.SeriesDetail.State.init slug
             { model with SeriesDetailModel = childModel },
             Cmd.map Series_detail_msg childCmd
-        | Game_list ->
-            let childModel, childCmd = Pages.Games.State.init ()
-            { model with GameListModel = childModel },
-            Cmd.map Game_list_msg childCmd
         | Game_detail slug ->
             let childModel, childCmd = Pages.GameDetail.State.init slug
             { model with GameDetailModel = childModel },
@@ -628,7 +630,7 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
                 Cmd.ofEffect (fun _ -> Route.navigateTo Dashboard)
 
     | Open_search_modal ->
-        { model with SearchModal = Some (SearchModal.initWithGames model.MovieListModel.Movies model.SeriesListModel.Series model.GameListModel.Games) }, Cmd.none
+        { model with SearchModal = Some (SearchModal.init ()) }, loadSearchLibraryCmd api
 
     | Search_modal_msg childMsg ->
         updateSearchModal api childMsg model
@@ -636,7 +638,7 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
     | Dashboard_msg childMsg ->
         match childMsg with
         | Pages.Dashboard.Types.Open_search_modal ->
-            { model with SearchModal = Some (SearchModal.initWithGames model.MovieListModel.Movies model.SeriesListModel.Series model.GameListModel.Games) }, Cmd.none
+            { model with SearchModal = Some (SearchModal.init ()) }, loadSearchLibraryCmd api
         | _ ->
             let childModel, childCmd = Pages.Dashboard.State.update api childMsg model.DashboardModel
             let extraCmd =
@@ -648,37 +650,13 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
             { model with DashboardModel = childModel },
             Cmd.batch [ Cmd.map Dashboard_msg childCmd; extraCmd ]
 
-    | Movie_list_msg childMsg ->
-        match childMsg with
-        | Pages.Movies.Types.Open_tmdb_search ->
-            { model with SearchModal = Some (SearchModal.initWithGames model.MovieListModel.Movies model.SeriesListModel.Series model.GameListModel.Games) }, Cmd.none
-        | _ ->
-            let childModel, childCmd = Pages.Movies.State.update api childMsg model.MovieListModel
-            { model with MovieListModel = childModel }, Cmd.map Movie_list_msg childCmd
-
     | Movie_detail_msg childMsg ->
         let childModel, childCmd = Pages.MovieDetail.State.update api childMsg model.MovieDetailModel
         { model with MovieDetailModel = childModel }, Cmd.map Movie_detail_msg childCmd
 
-    | Series_list_msg childMsg ->
-        match childMsg with
-        | Pages.Series.Types.Open_tmdb_search ->
-            { model with SearchModal = Some (SearchModal.initWithGames model.MovieListModel.Movies model.SeriesListModel.Series model.GameListModel.Games) }, Cmd.none
-        | _ ->
-            let childModel, childCmd = Pages.Series.State.update api childMsg model.SeriesListModel
-            { model with SeriesListModel = childModel }, Cmd.map Series_list_msg childCmd
-
     | Series_detail_msg childMsg ->
         let childModel, childCmd = Pages.SeriesDetail.State.update api childMsg model.SeriesDetailModel
         { model with SeriesDetailModel = childModel }, Cmd.map Series_detail_msg childCmd
-
-    | Game_list_msg childMsg ->
-        match childMsg with
-        | Pages.Games.Types.Open_search_modal ->
-            { model with SearchModal = Some (SearchModal.initWithGames model.MovieListModel.Movies model.SeriesListModel.Series model.GameListModel.Games) }, Cmd.none
-        | _ ->
-            let childModel, childCmd = Pages.Games.State.update api childMsg model.GameListModel
-            { model with GameListModel = childModel }, Cmd.map Game_list_msg childCmd
 
     | Game_detail_msg childMsg ->
         let childModel, childCmd = Pages.GameDetail.State.update api childMsg model.GameDetailModel

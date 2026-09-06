@@ -1545,12 +1545,12 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
             ]
             Html.a [
                 prop.className "link link-primary mt-4 inline-block"
-                prop.href (Router.format "series")
+                prop.href (Router.format "")
                 prop.onClick (fun e ->
                     e.preventDefault()
-                    Router.navigate "series"
+                    Router.navigate ""
                 )
-                prop.text "Back to Series"
+                prop.text "Back to Dashboard"
             ]
         ]
     | false, Some series ->

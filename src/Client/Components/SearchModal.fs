@@ -54,6 +54,7 @@ type Model = {
 }
 
 type Msg =
+    | Library_loaded of MovieListItem list * SeriesListItem list * GameListItem list
     | Query_changed of string
     | Tab_changed of SearchTab
     | Debounce_tmdb_expired of version: int
@@ -83,11 +84,17 @@ type Msg =
     | Hover_clear
     | Close
 
-let initWithGames (movies: MovieListItem list) (series: SeriesListItem list) (games: GameListItem list) : Model = {
+/// design-system-fryq7: the modal used to be seeded synchronously off the
+/// three list pages' own already-loaded models (`initWithGames`). With those
+/// pages gone, it opens with an empty library snapshot and the caller fetches
+/// fresh via `Library_loaded` on every open (see `State.fs`'s
+/// `Open_search_modal` handler) — no list model stays around client-side to
+/// seed from.
+let init () : Model = {
     Query = ""
-    LibraryMovies = movies
-    LibrarySeries = series
-    LibraryGames = games
+    LibraryMovies = []
+    LibrarySeries = []
+    LibraryGames = []
     TmdbResults = []
     RawgResults = []
     SteamResults = []
@@ -106,6 +113,12 @@ let initWithGames (movies: MovieListItem list) (series: SeriesListItem list) (ga
     PreviewCache = Map.empty
     DuplicatePrompt = None
 }
+
+/// The `Library_loaded` reducer step, pulled out as a plain function so the
+/// seeded-from-fetch path is directly testable (`SearchModal.test.fs`)
+/// without standing up the root `State.fs`/API plumbing around it.
+let applyLibraryLoaded (movies: MovieListItem list) (series: SeriesListItem list) (games: GameListItem list) (model: Model) : Model =
+    { model with LibraryMovies = movies; LibrarySeries = series; LibraryGames = games }
 
 let filterLibrary (query: string) (movies: MovieListItem list) (series: SeriesListItem list) (games: GameListItem list) : LibrarySearchResult list =
     if query = "" then []
