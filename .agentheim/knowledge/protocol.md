@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 09:57 -- Task verified and completed: intelligence-encn4 - Dashboard All-tab — Games and Books drop the card chrome and "Games In Focus" is renamed to "Games"
+
+**Type:** Work / Task completion
+**Task:** intelligence-encn4 - Dashboard All-tab — Games and Books drop the card chrome and "Games In Focus" is renamed to "Games"
+**Summary:** On the Dashboard All tab, the Games and Books columns now render as open sections (no card chrome) matching the Next episode / Movies to Watch rows above them, and the Games heading was shortened from "Games In Focus" to "Games"; the Games tab keeps its card chrome.
+**Duration:** 8m20s
+**Verification:** PASS (iteration 1)
+**Files changed:** 1
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-09-06 09:48 -- Batch started: [intelligence-encn4]
 
 **Type:** Work / Batch start

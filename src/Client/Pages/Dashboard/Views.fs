@@ -1252,7 +1252,7 @@ let private gamesInFocusPosterSection (items: DashboardGameInFocus list) =
     if List.isEmpty items then
         Html.none
     else
-        sectionCard Icons.gamepad "Games In Focus" [
+        sectionOpen Icons.gamepad "Games" [
             Html.div [
                 prop.className "grid grid-cols-2 sm:grid-cols-3 gap-3"
                 prop.children [
@@ -1953,7 +1953,7 @@ let private activitySection (activityDays: DashboardActivityDay list) (breakdown
 // ── Books placeholder (right column, matches Games column chrome) ──
 
 let private booksColumnPlaceholder =
-    sectionCard Icons.catalog "Books" [
+    sectionOpen Icons.catalog "Books" [
         Html.p [
             prop.className "text-base-content/40 text-sm font-medium text-center py-6"
             prop.text "Books coming soon."

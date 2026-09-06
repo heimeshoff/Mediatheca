@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 1
-- **Doing:** 1
-- **Done:** 5
+- **Doing:** 0
+- **Done:** 6
 <!-- task-counts:end -->
 
 ### Todo
@@ -23,12 +23,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **intelligence-encn4** — Dashboard All-tab — Games and Books drop the card chrome and "Games In Focus" is renamed to "Games" (refactor) — `doing/intelligence-encn4-dashboard-games-books-open-sections.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **intelligence-encn4** — Dashboard All-tab — Games and Books drop the card chrome and "Games In Focus" is renamed to "Games" (refactor) — `done/intelligence-encn4-dashboard-games-books-open-sections.md`
 - **intelligence-t8n3q** — Dashboard library-search control needs a hover affordance — pointer cursor and a "Ctrl + K" tooltip (bug) — `done/intelligence-t8n3q-dashboard-search-hover-affordance.md`
 - **intelligence-p9m4t** — Dashboard "Movies to Watch" — wrap posters in the filmstrip well (feature) — `done/intelligence-p9m4t-movies-to-watch-filmstrip.md`
 - **intelligence-h7v2q** — Dashboard "Next episode" — cinematic hero cards (backdrop + still + progress + watched-with + Jellyfin play) (feature) — `done/intelligence-h7v2q-next-episode-cinematic-hero-cards.md`

@@ -1,11 +1,11 @@
 ---
 id: intelligence-encn4
 title: Dashboard All-tab — Games and Books drop the card chrome and "Games In Focus" is renamed to "Games"
-status: doing
+status: done
 type: refactor
 context: intelligence
 created: 2026-09-06
-completed:
+completed: 2026-09-06
 depends_on: [design-system-001]
 blocks: [intelligence-wecjh]
 tags: [dashboard, layout, frontend, intelligence]
@@ -69,3 +69,21 @@ Out of scope: the Games tab's own sections (`sectionCard Icons.gamepad "New Game
   Books placeholder "chrome matching the games column" — that criterion still holds, both
   columns just move to open chrome together. `intelligence-r4m2p` owns the responsive stacking
   of this same split.
+
+## Outcome
+In `src/Client/Pages/Dashboard/Views.fs`, for the All-tab-only helpers:
+- `gamesInFocusPosterSection` (~line 1250): swapped `sectionCard Icons.gamepad "Games In Focus"`
+  for `sectionOpen Icons.gamepad "Games"`. Empty-list guard (`Html.none`) and the
+  `grid-cols-2 sm:grid-cols-3` poster grid untouched.
+- `booksColumnPlaceholder` (~line 1955): swapped `sectionCard Icons.catalog "Books"` for
+  `sectionOpen Icons.catalog "Books"`. "Books coming soon." placeholder text untouched.
+- `allTabView`'s two-column `grid grid-cols-1 xl:grid-cols-2 gap-4` wrapper (~line 1978) left
+  as-is — `intelligence-r4m2p`'s responsive split behaviour survives unchanged.
+- The Games tab's own `sectionCard Icons.gamepad "Games In Focus"` (line 633) was left
+  untouched, as was the dead `gamesInFocusSection` list-row variant (~line 629) reserved for
+  `intelligence-wecjh`.
+
+Verified via `npm run build` (clean, 196 modules transformed, no Fable/TS errors). No new
+production logic to unit-test — pure view-composition swap (two helper-name changes plus a
+title string), consistent with how `intelligence-dq8rk` and `intelligence-r4m2p` were verified.
+No BC README change — no new ubiquitous language, aggregates, events, or invariants introduced.
