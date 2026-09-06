@@ -36,6 +36,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 13:49 -- Batch started: [intelligence-qh8mj]
+
+**Type:** Work / Batch start
+**Tasks:** intelligence-qh8mj - Dashboard Games tab gains an "Upcoming" poster rail — the unreleased-games view (soonest-first, TBA last) currently living only on the Games list page moves here before that page is deleted.
+**Parallel:** no (1 worker — intelligence-qh8mj is the only ready task; design-system-fryq7 is blocked on it via depends_on and joins the next wave once it lands)
+
+---
+
 ## 2026-09-06 13:40 -- Modeling / Refined: design-system-fryq7 - Remove the Movies / TV Series / Games items from the main menu and delete their three list pages
 
 **Type:** Modeling / Refine

@@ -1,7 +1,7 @@
 ---
 id: intelligence-qh8mj
 title: Dashboard Games tab gains an "Upcoming" poster rail — the unreleased-games view (soonest-first, TBA last) currently living only on the Games list page moves here before that page is deleted.
-status: todo
+status: doing
 type: feature
 context: intelligence
 created: 2026-09-06
