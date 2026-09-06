@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 10:21 -- Batch started: [intelligence-f6cfv]
+
+**Type:** Work / Batch start
+**Tasks:** intelligence-f6cfv - Dashboard "Next episode" card — watched-with friends become circular avatars pinned top-left; the In focus badge is dropped
+**Parallel:** no (1 worker — intelligence-f6cfv was promoted mid-run by a concurrent modeling session and became ready when intelligence-wecjh landed; it is the only ready task across every BC, nothing held back)
+
+---
+
 ## 2026-09-06 10:20 -- Task verified and completed: intelligence-wecjh - Dashboard Views.fs — delete the ~2000 lines of unreferenced view helpers left behind by the 3a rebuild
 
 **Type:** Work / Task completion

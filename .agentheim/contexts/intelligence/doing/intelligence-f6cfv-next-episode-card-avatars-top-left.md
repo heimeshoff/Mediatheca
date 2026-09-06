@@ -1,7 +1,7 @@
 ---
 id: intelligence-f6cfv
 title: Dashboard "Next episode" card — watched-with friends become circular avatars pinned top-left; the In focus badge is dropped
-status: todo
+status: doing
 type: refactor
 context: intelligence
 created: 2026-09-06
