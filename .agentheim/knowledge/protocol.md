@@ -4,6 +4,14 @@ Chronological log of everything that happens in this project.
 Newest entries on top.
 
 ---
+## 2026-09-06 12:10 -- Modeling / Captured: intelligence-c3vqm - Dashboard All-tab Games — cap poster size to the movie-poster size and drop the redundant In Focus crosshair
+
+**Type:** Modeling / Capture
+**BC:** intelligence
+**Filed to:** todo
+**Summary:** Two builder complaints about the All tab's Games section, captured as one task after verifying both in code. (1) Game posters are a `grid-cols-2 sm:grid-cols-3` of `1fr` tracks over an `aspect-ratio: 2/3` container, so they scale with the section width and swing hard between `sm` and `xl` (the Games/Books split stays single-column until `xl`) — where movie posters are pinned to the filmstrip's fixed `h-[196px]`. Fix is a hard 130×196 cap. (2) `gameInFocusPosterCard` renders the crosshair badge unconditionally — for games `InFocus` *is* the status and the section lists only InFocus games, so it distinguishes nothing; same reasoning `intelligence-f6cfv` applied to the Next-episode card. The conditional badge on `movieToWatchPosterCard` stays. Filed straight to todo — one file, code facts verified, no orchestrator round needed.
+
+---
 ## 2026-09-06 11:50 -- Work session ended
 
 **Type:** Work / Session end
