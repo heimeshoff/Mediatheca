@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 09:12 -- Modeling / Captured: intelligence-encn4 - Dashboard All-tab — Games and Books drop the card chrome and "Games In Focus" is renamed to "Games"
+
+**Type:** Modeling / Capture
+**BC:** intelligence
+**Filed to:** todo
+**Summary:** The All tab's Games and Books columns still carry velvet-card chrome from the original 3a build while the TV and Movies rows above them are open sections, so the landing page reads as two flat rows followed by two boxes; both columns swap `sectionCard` for the existing `sectionOpen` helper and the Games heading loses its now-redundant "In Focus" qualifier (the All tab shows nothing but In Focus games). Two-line composition change in `Dashboard/Views.fs`, no CSS and no new helper — concrete enough for todo directly, orchestrator skipped. Noted in the task: `gamesInFocusSection` (the list-row variant) is dead code with no callers, deliberately left out of scope.
+
+---
+
 ## 2026-09-06 00:28 -- Work session ended
 
 **Type:** Work / Session end

@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 5
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **intelligence-encn4** — Dashboard All-tab — Games and Books drop the card chrome and "Games In Focus" is renamed to "Games" (refactor) — `todo/intelligence-encn4-dashboard-games-books-open-sections.md`
 <!-- todo-list:end -->
 
 ### Doing
