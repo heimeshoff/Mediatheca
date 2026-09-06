@@ -36,6 +36,26 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 13:40 -- Modeling / Refined: design-system-fryq7 - Remove the Movies / TV Series / Games items from the main menu and delete their three list pages
+
+**Type:** Modeling / Refine
+**BC:** design-system
+**Status after:** todo
+**Summary:** Builder resolved the flagged assumption — the Games list page's Upcoming section survives. fryq7 now depends_on intelligence-qh8mj (which moves Upcoming onto the Dashboard Games tab), keeps GameProjection.getUpcomingGames and its Expecto cases, and deletes only the now-unreferenced IMediathecaApi.getUpcomingGames endpoint; PlayFacetsDisplay.releaseDateBadge is expected to survive as the Dashboard rail's badge.
+**Split into:** none (companion task intelligence-qh8mj captured separately)
+**ADRs written:** none
+
+---
+
+## 2026-09-06 13:40 -- Modeling / Captured: intelligence-qh8mj - Dashboard Games tab gains an "Upcoming" poster rail — the unreleased-games view (soonest-first, TBA last) currently living only on the Games list page moves here before that page is deleted.
+
+**Type:** Modeling / Capture
+**BC:** intelligence
+**Filed to:** todo
+**Summary:** Builder chose to keep the Games list page's Upcoming section when design-system-fryq7 deletes that page: this task moves it onto the Dashboard Games tab first — a new Upcoming field on DashboardGamesTab fed by the existing, tested GameProjection.getUpcomingGames, rendered as a poster rail in the Games tab's section-card chrome, absent when empty. Filed to todo; it blocks design-system-fryq7. No orchestrator round, no ADR.
+
+---
+
 ## 2026-09-06 13:35 -- Modeling / Captured: design-system-fryq7 - Remove the Movies / TV Series / Games items from the main menu (sidebar rail + mobile BottomNav) and delete their three list pages, plus every piece of code only those pages referenced — the Dashboard's per-media tabs already cover what they showed.
 
 **Type:** Modeling / Capture

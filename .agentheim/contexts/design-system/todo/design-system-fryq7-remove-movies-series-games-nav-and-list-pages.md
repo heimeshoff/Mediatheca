@@ -6,7 +6,7 @@ type: refactor
 context: design-system
 created: 2026-09-06
 completed:
-depends_on: [design-system-001]
+depends_on: [design-system-001, intelligence-qh8mj]
 blocks: []
 tags: [navigation, sidebar, bottomnav, router, dead-code, movies, series, games]
 related_adrs: [0014]
@@ -40,8 +40,8 @@ Removing them also stops the app eagerly loading the full movie, series and game
 
 **Dead code that goes with the pages (verify each has no other consumer before deleting — `npm run build` is the oracle):**
 - `Pages.Games.Types.PlayFacetFilter` and the status/facet filter machinery (games-j6wkr, client-only).
-- `DesignSystem.statusBadgeLabel`, `PlayFacetsDisplay.facetBadges`, `PlayFacetsDisplay.releaseDateBadge` — the tree-wide grep found no consumer outside the three list Views.
-- The Games page's **Upcoming section** (games-ev65k) lives only on that page, so it goes with it, together with its end-to-end plumbing: `IMediathecaApi.getUpcomingGames` (Shared.fs), the `Api.fs` handler, `GameProjection.getUpcomingGames`, and its Expecto cases in `GameReleaseDateProjectionTests.fs` / `AddGameFromSteamTests.fs`. **Keep** `ReleaseDate` / `IsUnreleased` on the projection and DTOs plus `ReleaseDateParsing` — the detail page and the card "Upcoming" badge (`PlayFacetsDisplay`) still use them.
+- `DesignSystem.statusBadgeLabel`, `PlayFacetsDisplay.facetBadges` — the tree-wide grep found no consumer outside the three list Views (`releaseDateBadge` was on this list until intelligence-qh8mj adopted it; verify).
+- The Games page's **Upcoming section** (games-ev65k) has moved to the Dashboard Games tab by intelligence-qh8mj (a dependency of this task), which reads `GameProjection.getUpcomingGames` through `getDashboardGamesTab`. So **keep** `GameProjection.getUpcomingGames` and its Expecto cases, and keep `ReleaseDate` / `IsUnreleased` plus `ReleaseDateParsing`. Drop only the standalone `IMediathecaApi.getUpcomingGames` endpoint (Shared.fs + its `Api.fs` handler), which the deleted page was the sole caller of. `PlayFacetsDisplay.releaseDateBadge` is likewise expected to survive as the Dashboard rail's badge — re-check before deleting.
 - The three `Route.is*Section` predicates (replaced as above).
 
 ## Acceptance criteria
@@ -53,15 +53,15 @@ Removing them also stops the app eagerly loading the full movie, series and game
 - [ ] Deleting a movie / series / game from its detail page, and the detail pages' not-found "Back to …" links, navigate to the Dashboard — no navigation targets a removed route.
 - [ ] Opening the global search modal (sidebar button, keyboard shortcut, Dashboard) with a non-empty library still lists matching library movies, series and games in the local-results section; a search-modal `*.test.fs` or an e2e spec covers the seeded-from-fetch path.
 - [ ] Root `State.init` no longer issues `getMovies` / `getSeries` / `getGames` at app start.
-- [ ] `getUpcomingGames` no longer exists in `Shared.fs`, `Api.fs`, `GameProjection.fs`, or the tests; `ReleaseDate` / `IsUnreleased` and `ReleaseDateParsing` remain and their tests still pass.
-- [ ] `DesignSystem.statusBadgeLabel`, `PlayFacetsDisplay.facetBadges`, `PlayFacetsDisplay.releaseDateBadge`, `PlayFacetFilter`, and `Route.isMoviesSection` / `isSeriesSection` / `isGamesSection` are gone (or, if a consumer turned up, the task Outcome names it).
+- [ ] `IMediathecaApi.getUpcomingGames` and its `Api.fs` handler are gone; `GameProjection.getUpcomingGames` (now fed to the Dashboard by intelligence-qh8mj), its tests, `ReleaseDate` / `IsUnreleased` and `ReleaseDateParsing` remain and pass.
+- [ ] `DesignSystem.statusBadgeLabel`, `PlayFacetsDisplay.facetBadges`, `PlayFacetFilter`, and `Route.isMoviesSection` / `isSeriesSection` / `isGamesSection` are gone (or, if a consumer turned up, the task Outcome names it).
 - [ ] The StyleGuide "Sidebar Nav" specimen renders the same item set as the live rail.
 - [ ] `npm run build` is clean, `npm test` passes, `npm run test:client` passes.
 - [ ] The rail still shows an active item while on a Movie / Series / Game detail page (Dashboard highlighted). [human-eye]
 
 ## Notes
 
-- **Assumption flagged for the builder:** the Games list page's *Upcoming* section (games-ev65k) has no other home — removing the page removes that view of unreleased games. The task deletes it and its `getUpcomingGames` plumbing per the "dead code only they referenced" instruction. If it should survive, refine this task to move the section onto the Dashboard's Games tab first (intelligence BC) instead of deleting the query.
+- **Resolved 2026-09-06:** the builder chose to keep the Games list page's *Upcoming* section (games-ev65k) — intelligence-qh8mj moves it onto the Dashboard Games tab first, and this task now depends on it. Only the standalone `getUpcomingGames` API endpoint is deleted here; the projection query stays.
 - Prior art: **design-system-snpnv** shipped the list-page type scale (grid captions, page header, filter pills) — those primitives stay because Catalogs/Friends use them; only their three original consumers vanish. ADR-0014 governs the rail's active-state look; this task changes membership, not the look.
 - Per-BC README deltas to report: design-system README "Layered sidebar nav" (item list), games README (Upcoming section / list-page filters), movies + series READMEs if they describe the list page.
 - `tests/e2e/game-detail-persistent-cards.spec.ts` only visits `/#/games/{slug}` — unaffected.
