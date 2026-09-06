@@ -593,6 +593,24 @@ let inFocusPill : ReactElement =
         prop.text "✦ Focus"
     ]
 
+// ── Hidden scrollbar (§ 4 Hidden scrollbar, design-system-hs4vm) ──
+
+/// Hides the native scrollbar on a horizontally-scrollable snap rail
+/// (`.scrollbar-hidden` in index.css: `scrollbar-width: none` +
+/// `::-webkit-scrollbar { display: none }`, covering both engines the app
+/// ships — Chromium and WebKitGTK, ADR-0018). This composition owns only
+/// the scrollbar's (in)visibility; the caller keeps its own
+/// `overflow-x-auto` / `snap-x snap-mandatory` / `scroll-px-*` layout
+/// classes, the same division of labour as `underlineTab`/`filterPill`.
+///
+/// Every scroll input (wheel, trackpad, touch, keyboard) keeps working —
+/// this only suppresses the bar's paint. Only apply this to a rail whose
+/// overflow is otherwise cued (e.g. a snap filmstrip's partially-clipped
+/// next item) — a vertical scroll region or any container without a
+/// clipped-edge cue should keep its native scrollbar as the sole affordance
+/// that content extends beyond the viewport.
+let scrollbarHidden = "scrollbar-hidden"
+
 // ── Movies filmstrip (§ 4 Movies filmstrip) ──
 
 type FilmstripItem = {

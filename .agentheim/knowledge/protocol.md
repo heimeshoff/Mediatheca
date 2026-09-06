@@ -13,6 +13,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 12:34 -- Task verified and completed: design-system-hs4vm - Hidden-scrollbar primitive — the Dashboard's six horizontal poster rails carry `tailwind-scrollbar` classes for a plugin that was never installed, so the native scrollbar renders under every rail
+
+**Type:** Work / Task completion
+**Task:** design-system-hs4vm - Hidden-scrollbar primitive — the Dashboard's six horizontal poster rails carry `tailwind-scrollbar` classes for a plugin that was never installed, so the native scrollbar renders under every rail
+**Summary:** Minted the .scrollbar-hidden / DesignSystem.scrollbarHidden hidden-scrollbar primitive (Chromium + WebKitGTK) and adopted it at all six Dashboard poster rails, retiring the dead tailwind-scrollbar plugin classes tree-wide.
+**Duration:** 15m
+**Verification:** PASS (iteration 1)
+**Files changed:** 5
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-09-06 12:18 -- Batch started: [design-system-hs4vm]
 
 **Type:** Work / Batch start

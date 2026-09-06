@@ -1705,6 +1705,28 @@ let private velvetLobbyPatternsSection () =
                 prop.text "DesignSystem.filmstripRow [ { Key; PosterRef; Title; Meta; Href; OnNavigate; InFocusBadge; JellyfinButton } ]"
             ]
 
+            // ── Hidden scrollbar ──
+            subheading "Hidden Scrollbar"
+
+            Html.div [
+                prop.className ("flex gap-3 overflow-x-auto py-2 max-w-[420px] snap-x snap-mandatory " + DesignSystem.scrollbarHidden)
+                prop.children [
+                    for i in 1 .. 8 ->
+                        Html.div [
+                            prop.key i
+                            prop.className "flex-[0_0_80px] h-[110px] rounded-[var(--radius-poster)] bg-base-300 snap-start"
+                        ]
+                ]
+            ]
+            Html.p [
+                prop.className (DesignSystem.faintText + " mt-2")
+                prop.text "DesignSystem.scrollbarHidden -- native scrollbar suppressed (scrollbar-width: none + ::-webkit-scrollbar { display: none }), scroll input untouched. Drag/scroll the row above to confirm. Pair only with a rail whose overflow is otherwise cued, e.g. a snap filmstrip's clipped next item -- not a vertical scroll region."
+            ]
+            Html.code [
+                prop.className "text-xs font-mono text-primary/70 mt-2 block"
+                prop.text "prop.className (\"overflow-x-auto snap-x snap-mandatory ...\" + DesignSystem.scrollbarHidden)"
+            ]
+
             // ── Secondary media card ──
             subheading "Secondary Media Card"
 

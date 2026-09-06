@@ -1,11 +1,11 @@
 ---
 id: design-system-hs4vm
 title: Hidden-scrollbar primitive — the Dashboard's six horizontal poster rails carry `tailwind-scrollbar` classes for a plugin that was never installed, so the native scrollbar renders under every rail
-status: doing
+status: done
 type: bug
 context: design-system
 created: 2026-09-06
-completed:
+completed: 2026-09-06
 depends_on: []
 blocks: []
 tags: [ui, css, scrollbar, dashboard, styleguide]
@@ -105,3 +105,34 @@ requirement, and a plugin dependency for two declarations is not worth carrying.
   the primitive, the owning BC wires the application") — the six Dashboard sites are
   included here only because they are the existing carriers of the dead classes this task
   removes.
+
+## Outcome
+
+Minted `DesignSystem.scrollbarHidden` ("scrollbar-hidden") in `src/Client/DesignSystem.fs`,
+backed by a `.scrollbar-hidden` rule in `src/Client/index.css` (`scrollbar-width: none` +
+`::-webkit-scrollbar { display: none }`, covering Chromium and WebKitGTK per ADR-0018), in
+the same class-string-composition shape as `underlineTab`/`filterPill`. Adopted it at all
+six Dashboard poster rails in `src/Client/Pages/Dashboard/Views.fs` (Series Next Up open
+scroller, Recently Watched, Movies to Watch, Series tab Next Up, Recently Played, Recently
+Added — located by grepping `scrollbar-thin` rather than the stale captured line numbers,
+per the task preamble), replacing the dead `scrollbar-thin scrollbar-thumb-base-content/20
+scrollbar-track-transparent` `tailwind-scrollbar`-plugin classes while leaving each rail's
+`overflow-x-auto`, `snap-x snap-mandatory`, and `scroll-px-2` layout classes untouched. Added
+a "Hidden Scrollbar" specimen to the StyleGuide page (`src/Client/Pages/StyleGuide/Views.fs`,
+under "Movies Filmstrip") demonstrating a live scrollable rail with the primitive applied,
+per ADR-0015. Updated the design-system BC README's Ubiquitous language section with the new
+entry (including the accessibility pairing rule already stated in this task's Notes). No
+`tailwind-scrollbar` dependency or `@plugin` directive was added.
+
+Verified: `grep -rn "scrollbar-thin\|scrollbar-thumb\|scrollbar-track" src/Client/`
+(excluding `fable_modules/`) returns nothing; `npm run build` compiles clean and the emitted
+`deploy/public/assets/index-*.css` contains both `.scrollbar-hidden{scrollbar-width:none}`
+and `.scrollbar-hidden::-webkit-scrollbar{display:none}`; `npm test` passes (685/685). No
+`package.json`/`index.css` `@plugin` changes were made. TDD was not applied — see
+`TDD_SKIPPED` in the worker return: this is a pure CSS/class-string primitive with no
+testable logic beyond compile-time type-checking and the build's Tailwind-emission check,
+which stand in as the boot-and-validate gate; hiding a scrollbar via `scrollbar-width`/
+`::-webkit-scrollbar` is inert with respect to scroll input by construction (no browser
+disables wheel/touch/keyboard scrolling based on scrollbar visibility), so the "scroll still
+works" criterion needed no code change beyond the CSS itself and was confirmed by reasoning
+about the CSS properties rather than a runtime test.

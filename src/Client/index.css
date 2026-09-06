@@ -408,6 +408,24 @@ h1, h2, h3, h4, h5, h6 {
     background: repeating-linear-gradient(90deg, transparent 0 7px, oklch(0.3 0.01 60) 7px 15px, transparent 15px 22px);
 }
 
+/* § 4 Hidden scrollbar (design-system-hs4vm) — snap-filmstrip rails hide
+   their native scrollbar; the partially-clipped next poster is the overflow
+   cue, so a scrollbar underneath is page chrome the Velvet Lobby surfaces
+   never asked for. Covers both engines the app ships on: Chromium/WebKit
+   (dev + the Windows Photino shell) and WebKitGTK (the Linux Photino shell,
+   ADR-0018). Scroll input itself is untouched — wheel, trackpad, touch, and
+   keyboard all keep working; only the bar's paint is suppressed. Caller
+   keeps its own overflow-x-auto, snap-x, snap-mandatory, and scroll-px
+   layout classes; this composition owns only the scrollbar's (in)visibility.
+   Do not apply to a vertical scroll region or any container without a
+   clipped-edge overflow cue — see DesignSystem.scrollbarHidden. */
+.scrollbar-hidden {
+    scrollbar-width: none;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+}
+
 /* § 4 Section header — hairline rule that fades out. */
 .section-rule {
     height: 1px;
