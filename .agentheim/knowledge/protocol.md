@@ -13,6 +13,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 12:18 -- Batch started: [design-system-hs4vm]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-hs4vm - Hidden-scrollbar primitive — the Dashboard's six horizontal poster rails carry `tailwind-scrollbar` classes for a plugin that was never installed, so the native scrollbar renders under every rail
+**Parallel:** no (1 worker — design-system-hs4vm is the only ready task across every BC after the intelligence-c3vqm re-scan; it was captured to todo by a concurrent modeling session mid-run)
+
+---
+
 ## 2026-09-06 12:17 -- Task verified and completed: intelligence-c3vqm - Dashboard All-tab Games — cap poster size to the movie-poster size and drop the redundant In Focus crosshair
 
 **Type:** Work / Task completion

@@ -1,7 +1,7 @@
 ---
 id: design-system-hs4vm
 title: Hidden-scrollbar primitive — the Dashboard's six horizontal poster rails carry `tailwind-scrollbar` classes for a plugin that was never installed, so the native scrollbar renders under every rail
-status: todo
+status: doing
 type: bug
 context: design-system
 created: 2026-09-06
