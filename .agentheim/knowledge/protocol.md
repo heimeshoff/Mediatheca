@@ -4,6 +4,30 @@ Chronological log of everything that happens in this project.
 Newest entries on top.
 
 ---
+## 2026-09-06 10:37 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 49m (first "Batch started" 09:48 → 10:37)
+**Completed:** 3 (first-try PASS: 3, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** intelligence-encn4: 1, intelligence-wecjh: 1, intelligence-f6cfv: 1
+**Commits:** 7 (3 batch starts, 3 task completions, this entry) — plus one concurrent `modeling` capture commit (a6ba85a, intelligence-f6cfv) that landed on `main` mid-run and was picked up as a new ready task after intelligence-wecjh completed
+**Vision-conformance:** none — batch aligns with vision. All three tasks sit inside the Unified Dashboard workstream (All-tab section chrome, Dashboard/Views.fs code health, Next episode card). The All-tab semantics the vision names survive: the Games section still shows only In Focus games (heading shortened, content unchanged), the Next episode row still shows watch-with friends (as avatars instead of name pills), and the In focus badge drop removes a duplicate signal, not the In Focus sort. The Books placeholder chrome change is a visual stub already introduced by intelligence-dq8rk, not Books (v2) scope. vision.md carries no "What success looks like"/"Non-goals" headings, so the pass was judgment against "Remaining v1 Work"/"Out of Scope (v1)", as in prior sessions.
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (3 tasks, all `type: refactor` in intelligence) — hand-classified; installed plugin 0.9.2 carries no `vacuum-guard.mjs`.
+**Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed.
+
+**Builder decision recorded mid-run:** intelligence-wecjh's open question (re-wire `newGamesSection` on the Games tab vs. confirm the drop) was put to the builder before dispatch; answer: **confirm the drop**. Both helpers are deleted, the retirement is recorded in the intelligence README, and the worker filed `intelligence-p4t7k` (backlog) for the server-side `NewGames` payload prune.
+
+**Browser smoke check (conductor, Chrome DevTools MCP, served from `main` via `dotnet src/Server/bin/Debug/net9.0/Server.dll` run from the repo root):** after intelligence-wecjh, all four dashboard tabs (All / Movies / TV Series / Games) rendered with their expected sections and empty states and **zero console errors or warnings**; after intelligence-f6cfv, the rebuilt bundle loaded with zero console errors and the All tab's Books column renders as `.section-open` with no `.velvet-card` in `main` (intelligence-encn4 confirmed live). **Caveat:** the local dev database (`~/app/mediatheca/mediatheca.db`) is empty — `getMovies`/`getSeries`/`getGames` all return `[]` — so populated render paths (poster grids, Next episode cards, the new avatar stack) were not exercised in the browser. wecjh's identical-render criterion rests on the verifier's pure-deletion proof (`--diff-algorithm=patience` → 0 added lines, all 54 surviving definitions byte-identical); f6cfv's avatar look is unverified in a browser and worth a glance on the deployed build.
+
+**Verifier observation, not acted on (scope):** `friend.Name.Substring(0, 1)` in `DesignSystem.nextEpisodeHeroCard` throws on an empty friend name; `Friend_added` has no server-side non-empty-name guard. Not reachable via the normal add-friend flow — a candidate for a small `modeling` capture (guard the initial fallback, or validate the name at the aggregate).
+
+**Harness notes:** (1) `dotnet run --project src/Server/Server.fsproj` sets CWD to `src/Server`, and `Composition.fs` resolves static files from `CWD/deploy/public` — the SPA 404s unless the server is launched from the repo root. (2) Each worktree again needed the root `node_modules` junctioned from the main tree (`mklink /J`, removed via `rmdir` before `git worktree remove`; main copy verified intact, 206 entries, three times). (3) The `checkpoint` verb's opts JSON was written to a scratch file with forward-slash paths and read back, as last session. (4) Myers diff of a ~2000-line deletion showed 166 spurious `+` lines; `--diff-algorithm=patience` gave the true pure-deletion view and was handed to the verifier. (5) Board is empty after this session — `intelligence-p4t7k` sits in backlog, unrefined.
+
+---
+
 
 ## 2026-09-06 10:34 -- Task verified and completed: intelligence-f6cfv - Dashboard "Next episode" card — watched-with friends become circular avatars pinned top-left; the In focus badge is dropped
 
