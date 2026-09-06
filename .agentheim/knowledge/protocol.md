@@ -3,6 +3,7 @@
 Chronological log of everything that happens in this project.
 Newest entries on top.
 
+---
 ## 2026-09-06 12:35 -- Work session ended
 
 **Type:** Work / Session end
@@ -24,8 +25,6 @@ Newest entries on top.
 **Browser verification not performed this session:** both changes are viewport-dependent visuals (poster cap across sm/lg/xl; scrollbar paint under the rails). The verifiers proved them from the emitted CSS rather than a running browser, and the local dev database is still empty (populated rails would not render anyway). Worth one glance on the deployed build.
 
 **Harness notes:** (1) Each worktree again needed the root `node_modules` junctioned from the main tree (`mklink /J`, removed via `rmdir` before `git worktree remove`; main copy verified intact, 206 entries, twice). (2) The `checkpoint`/`complete` verbs' opts JSON was written to a scratch file and read back via `process.argv[1]` (not `[2]` — `node -e` shifts argv), as in prior sessions. (3) Board is empty after this session — no todo, doing, or backlog work in any BC.
-
----
 
 ---
 ## 2026-09-06 12:10 -- Modeling / Captured: design-system-hs4vm - Hidden-scrollbar primitive — the Dashboard's six horizontal poster rails carry `tailwind-scrollbar` classes for a plugin that was never installed, so the native scrollbar renders under every rail
