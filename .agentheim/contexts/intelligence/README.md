@@ -19,6 +19,7 @@ Single user.
 - **InFocus estimate** — how long the In Focus queue would take to clear (Games-specific).
 - **Watched-with stats** — friend-keyed counts of shared sessions.
 - **Person stats** — aggregate of one friend's contribution (sessions, items shared).
+- **Upcoming rail** (intelligence-qh8mj) — the Dashboard Games tab's poster rail of unreleased Steam-linked games, soonest-first with TBA last, sourced verbatim from `GameProjection.getUpcomingGames` via `DashboardGamesTab.Upcoming` (`Shared.fs`) — absent entirely (not empty-rendered) when nothing is upcoming. Moved here from the (now-deleted) Games list page by `intelligence-qh8mj`, ahead of `design-system-fryq7`.
 
 **Retired:** the **New Games** card (dashboard section listing recently-added games) was dropped
 from the All tab by `intelligence-dq8rk`'s 3a rebuild and never re-wired onto the Games tab;

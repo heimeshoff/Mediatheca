@@ -1,5 +1,6 @@
 module Mediatheca.Tests.GameReleaseDateProjectionTests
 
+open System.Net.Http
 open Expecto
 open Microsoft.Data.Sqlite
 open Mediatheca.Server
@@ -40,6 +41,32 @@ let private appendGameAdded (conn: SqliteConnection) (slug: string) (data: Games
     EventStore.appendToStream conn (Games.streamId slug) -1L
         [ Games.Serialization.toEventData (Games.Game_added_to_library data) ] |> ignore
     Projection.runProjection conn GameProjection.handler
+
+/// intelligence-qh8mj: bootstrap + api factory for exercising
+/// `IMediathecaApi.getDashboardGamesTab` end-to-end (not just the
+/// projection function it wraps), via the file-backed `TestDb` fixture —
+/// `Api.create` needs a `unit -> SqliteConnection` factory.
+let private bootstrapDashboardApi (conn: SqliteConnection) =
+    EventStore.initialize conn
+    SettingsStore.initialize conn
+    ContentBlockProjection.handler.Init conn
+    GameProjection.handler.Init conn
+    GameJournal.initialize conn
+    PlaySessionProjection.handler.Init conn
+    MetadataCache.initialize conn
+
+let private noImagesDir = "test-fixtures-do-not-exist/images"
+
+let private createDashboardApi (factory: unit -> SqliteConnection) : IMediathecaApi =
+    Api.create
+        factory
+        (new HttpClient())
+        (fun () -> ({ ApiKey = ""; ImageBaseUrl = "" } : Tmdb.TmdbConfig))
+        (fun () -> ({ ApiKey = "" } : Rawg.RawgConfig))
+        (fun () -> ({ ApiKey = ""; SteamId = "" } : Steam.SteamConfig))
+        (fun () -> ({ ServerUrl = ""; Username = ""; Password = ""; UserId = ""; AccessToken = "" } : Jellyfin.JellyfinConfig))
+        noImagesDir
+        [ ContentBlockProjection.handler; GameProjection.handler; PlaySessionProjection.handler ]
 
 [<Tests>]
 let tests =
@@ -146,4 +173,21 @@ let tests =
 
             let totalDiscrepancies = results |> List.sumBy (fun p -> List.length p.Discrepancies)
             Expect.equal totalDiscrepancies 0 "No projection write path was altered — release-date columns live in game_metadata_cache, never a Projected table"
+
+        testCase "intelligence-qh8mj: getDashboardGamesTab.Upcoming mirrors getUpcomingGames — soonest-first, released game excluded" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrapDashboardApi
+            let api = createDashboardApi db.Factory
+
+            appendGameAdded db.Connection "released-game-2020" (sampleGameData "Released Game" 2020)
+            MetadataCache.upsertGameReleaseDate db.Connection "released-game-2020" "17 Sep, 2020" (Some "2020-09-17") false
+
+            appendGameAdded db.Connection "tenebris-somnia-2026" (sampleGameData "Tenebris Somnia" 2026)
+            MetadataCache.upsertGameReleaseDate db.Connection "tenebris-somnia-2026" "October 2026" (Some "2026-10-01") true
+
+            appendGameAdded db.Connection "sooner-game-2026" (sampleGameData "Sooner Game" 2026)
+            MetadataCache.upsertGameReleaseDate db.Connection "sooner-game-2026" "1 Feb, 2026" (Some "2026-02-01") true
+
+            let dashboard = api.getDashboardGamesTab () |> Async.RunSynchronously
+            let upcomingSlugs = dashboard.Upcoming |> List.map (fun g -> g.Slug)
+            Expect.equal upcomingSlugs [ "sooner-game-2026"; "tenebris-somnia-2026" ] "Dashboard Games tab's Upcoming field is soonest-first and excludes the released game, matching GameProjection.getUpcomingGames"
     ]

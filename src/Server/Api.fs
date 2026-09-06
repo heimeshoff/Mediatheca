@@ -2409,6 +2409,7 @@ module Api =
                     HltbComparisons = hltbComparisons
                     InFocusEstimate = inFocusEstimate
                     MonthlyPlayTimePerGame = monthlyPlayTimePerGame
+                    Upcoming = GameProjection.getUpcomingGames conn
                     Stats = {
                         Mediatheca.Shared.DashboardGameStats.TotalGames = totalGames
                         TotalPlayTimeMinutes = totalPlayTime

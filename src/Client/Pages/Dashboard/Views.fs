@@ -2133,6 +2133,65 @@ let private gameRecentlyAddedPosterCard (item: GameListItem) =
         ]
     ]
 
+/// intelligence-qh8mj: the Upcoming rail's card — `gameRecentlyAddedPosterCard`'s
+/// shape (same 130px poster size, per intelligence-c3vqm), with the bottom
+/// line swapped for the release-date badge (games-ev65k's
+/// `PlayFacetsDisplay.releaseDateBadge`, "Upcoming" for a TBA date) instead
+/// of the release year.
+let private gameUpcomingPosterCard (item: GameListItem) =
+    Html.a [
+        prop.href (Router.format ("games", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("games", item.Slug)
+        )
+        prop.className "flex-shrink-0 w-[120px] sm:w-[130px] cursor-pointer group snap-start"
+        prop.children [
+            Html.div [
+                prop.className (DesignSystem.posterCard + " relative w-full")
+                prop.children [
+                    Html.div [
+                        prop.className (DesignSystem.posterImageContainer + " poster-shadow")
+                        prop.children [
+                            match item.CoverRef with
+                            | Some ref ->
+                                Html.img [
+                                    prop.src $"/images/{ref}"
+                                    prop.alt item.Name
+                                    prop.className DesignSystem.posterImage
+                                ]
+                            | None ->
+                                Html.div [
+                                    prop.className "flex flex-col items-center justify-center w-full h-full text-base-content/20 px-3 gap-2"
+                                    prop.children [
+                                        Icons.gamepad ()
+                                        Html.p [
+                                            prop.className "text-xs text-base-content/40 font-medium text-center line-clamp-2"
+                                            prop.text item.Name
+                                        ]
+                                    ]
+                                ]
+                            Html.div [ prop.className DesignSystem.posterShine ]
+                        ]
+                    ]
+                ]
+            ]
+            Html.div [
+                prop.className "mt-2 px-0.5"
+                prop.children [
+                    Html.p [
+                        prop.className "text-sm font-semibold truncate group-hover:text-primary transition-colors"
+                        prop.text item.Name
+                    ]
+                    Html.div [
+                        prop.className "mt-0.5"
+                        prop.children [ PlayFacetsDisplay.releaseDateBadge item.ReleaseDate ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+
 // ── Per-Game Color-Coded Monthly Play Time Chart ──
 
 let private perGameMonthlyPlayTimeChart (monthlyData: GameMonthlyPlayTime list) =
@@ -2316,6 +2375,19 @@ let private gamesTabView (data: DashboardGamesTab) (achievementsState: Achieveme
                     ]
                 ]
             ]
+
+            // Upcoming rail (games-ev65k, moved here by intelligence-qh8mj) —
+            // absent, not empty-rendered, when nothing is unreleased.
+            if not (List.isEmpty data.Upcoming) then
+                sectionCardOverflow Icons.calendar "Upcoming" [
+                    Html.div [
+                        prop.className ("flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory " + DesignSystem.scrollbarHidden)
+                        prop.children [
+                            for item in data.Upcoming do
+                                gameUpcomingPosterCard item
+                        ]
+                    ]
+                ]
 
             // Row 3: Status Distribution (pie) | Genre Breakdown (spider/radar)
             Html.div [

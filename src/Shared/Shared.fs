@@ -1140,6 +1140,11 @@ type DashboardGamesTab = {
     HltbComparisons: DashboardHltbComparison list
     InFocusEstimate: InFocusEstimate
     MonthlyPlayTimePerGame: GameMonthlyPlayTime list
+    /// games-ev65k, moved onto the Dashboard by intelligence-qh8mj: unreleased
+    /// Steam-linked games, soonest-first, TBA last — mirrors
+    /// `GameProjection.getUpcomingGames`. Empty when nothing is upcoming; the
+    /// client renders no "Upcoming" section at all in that case.
+    Upcoming: GameListItem list
 }
 
 // Steam Integration

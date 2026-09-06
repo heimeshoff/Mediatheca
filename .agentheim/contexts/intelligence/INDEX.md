@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 10
+- **Doing:** 0
+- **Done:** 11
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **intelligence-qh8mj** — Dashboard Games tab gains an "Upcoming" poster rail — the unreleased-games view (soonest-first, TBA last) currently living only on the Games list page moves here before that page is deleted. (feature) — `doing/intelligence-qh8mj-dashboard-games-tab-upcoming-rail.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **intelligence-qh8mj** — Dashboard Games tab gains an "Upcoming" poster rail — the unreleased-games view (soonest-first, TBA last) currently living only on the Games list page moves here before that page is deleted. (feature) — `done/intelligence-qh8mj-dashboard-games-tab-upcoming-rail.md`
 - **intelligence-c3vqm** — Dashboard All-tab Games — cap poster size to the movie-poster size and drop the redundant In Focus crosshair (bug) — `done/intelligence-c3vqm-dashboard-game-poster-size-cap-drop-badge.md`
 - **intelligence-p4t7k** — Prune the New Games dashboard payload — server still computes and ships DashboardAllTab.NewGames but no client code reads it (refactor) — `done/intelligence-p4t7k-prune-dead-newgames-dashboard-payload.md`
 - **intelligence-f6cfv** — Dashboard "Next episode" card — watched-with friends become circular avatars pinned top-left; the In focus badge is dropped (refactor) — `done/intelligence-f6cfv-next-episode-card-avatars-top-left.md`
