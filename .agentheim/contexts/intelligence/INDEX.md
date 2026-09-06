@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 1
 - **Done:** 6
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **intelligence-f6cfv** — Dashboard "Next episode" card — watched-with friends become circular avatars pinned top-left; the In focus badge is dropped (refactor) — `todo/intelligence-f6cfv-next-episode-card-avatars-top-left.md`
 <!-- todo-list:end -->
 
 ### Doing

@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 10:12 -- Modeling / Captured: intelligence-f6cfv - Dashboard "Next episode" card — watched-with friends become circular avatars pinned top-left; the In focus badge is dropped
+
+**Type:** Modeling / Capture
+**BC:** intelligence
+**Filed to:** todo
+**Summary:** The hero card built by intelligence-h7v2q renders watched-with friends as name pills at the *bottom* of the scrim, last in a four-item stack — the people you watched with end up the least prominent thing on the card while the tall overlay eats the backdrop. They move to the card's top-left as avatar-only circles (~40px, matching the Jellyfin play button opposite them), overlapping stack with a ring separator per the styleguide `heroCard` pattern, image where available and the uppercased first letter otherwise; the name drops out of the visual and survives as `title`/`alt`, and the friend-link click semantics (preventDefault + stopPropagation, no card click-through) are preserved verbatim. Builder decided in the modeling session that the **In focus badge is no longer needed on this card** — In Focus already earns those series their position through sorting — so the badge block and the `InFocus` prop are deleted outright, which is what frees the corner; `statusBadge` itself stays for the styleguide `heroCard`. Concrete enough for todo directly, orchestrator skipped. Sequenced behind `intelligence-wecjh` (in flight, deletes ~2000 line-referenced lines of the same `Dashboard/Views.fs` this task edits); Series-tab list rows and their page-local `friendPill` are explicitly out of scope.
+
+---
+
 ## 2026-09-06 09:57 -- Batch started: [intelligence-wecjh]
 
 **Type:** Work / Batch start
