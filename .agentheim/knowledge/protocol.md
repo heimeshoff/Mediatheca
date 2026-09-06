@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 14:36 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 46m (first "Batch started" 13:49 → 14:35)
+**Completed:** 2 (first-try PASS: 2, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** intelligence-qh8mj: 1, design-system-fryq7: 1
+**Commits:** 5 (2 batch starts, 2 task completions, this entry)
+**Vision-conformance:** none — batch aligns with vision. design-system-fryq7 is the vision's own sentence made concrete — "not a catalog to browse, but an intent-driven view of what's next": the three flat list pages and their menu items go, the Dashboard's per-media tabs remain the only browsing surface ("Unified, not siloed"). intelligence-qh8mj grows the Games tab ("Expandable over time") by relocating the Upcoming view rather than inventing a new surface, so nothing named under "Out of Scope (v1)" is touched. vision.md still carries no "What success looks like"/"Non-goals" headings, so the pass was judgment against "Remaining v1 Work"/"Out of Scope (v1)"/"Design Principles", as in prior sessions.
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (2 tasks) — `formatBatchMixLine` over `type: feature` (qh8mj) + `type: refactor` with product-only files (fryq7).
+**Carry-over:** left behind (user WIP, 1 file — `src/Client/DesignSystem.fs`, the builder's own filmstrip `scrollbarHidden` edit, present since session start and named as such in fryq7's task Notes); no registered worktrees remain, `.worktrees/` removed.
+
+**Verifier evidence beyond the workers' claims:** qh8mj — confirmed `PlayFacetsDisplay.releaseDateBadge` never degrades to `Html.none` for rail items because `getUpcomingGames` only returns `coming_soon = 1 OR parsed > now` rows; the rail's container class string is byte-identical to the Recently Played / Recently Added rails; `npm run build` clean, `npm test` 686/686 (+1). fryq7 — ran the acceptance grep for `format|navigate "movies|series|games"` in the worktree (empty), confirmed the only surviving `getUpcomingGames` hits are `GameProjection.getUpcomingGames` and its Dashboard caller, confirmed the two symbols the task assumed dead (`DesignSystem.statusBadgeLabel`, `PlayFacetsDisplay.facetBadges`) really have live `GameDetail` consumers (kept, named in the Outcome per the criterion); `npm run test:client` 29/29 across 7 files (up from 20/5), `npm test` 686/686 after one sanctioned re-run of a `JobRuns` timing flake.
+
+**Bookkeeping repairs made on `main` this session (conductor, not worker):** (1) `.agentheim/knowledge/protocol.md` had lost the blank line after the header `---`, so `prependProtocolEntry`'s `\n---\n\n` anchor was inserting new entries below the 12:35 session-end and 12:10 capture entries; re-ordered those two into timestamp order and restored the blank line — every prepend since lands at the top again. (2) `applyReadmeDelta` splits on `\n` while every BC README is CRLF, so qh8mj's `append` disposed `appended-fallback` at end-of-file (moved into `## Ubiquitous language` by hand) and fryq7's `replace` disposed `merged` as a duplicate bullet (collapsed into a true replace by hand); the conductor's delta helper now normalizes CRLF before applying. Worth a plugin-side fix in `lib/readme-delta.mjs`. (3) Cross-BC README edits a worker cannot report in `README_DELTA` (games README "Release date" + "Play facets" bullets, made stale by qh8mj/fryq7) were applied by hand on `main` in fryq7's integrating commit.
+
+**Browser verification not performed this session:** both tasks carry a [human-eye] criterion (Upcoming rail rhythm in the Games tab; Dashboard highlighted on a detail page). Verifiers proved the predicates and classes from source; one glance on the running app is still due.
+
+**Harness notes:** root `node_modules` junctioned into each worktree via `mklink /J` and removed via `rmdir` before `git worktree remove` (main copy verified intact, 206 entries, twice). `scoped-commit` refuses paths whose deletion is already staged by the squash-merge (`pathspec did not match`) — pass only the non-deleted paths; the staged deletions ride the commit anyway. Board is empty after this session — no todo, doing, or backlog work in any BC.
+
+---
+
 ## 2026-09-06 14:33 -- Task verified and completed: design-system-fryq7 - Remove the Movies / TV Series / Games items from the main menu (sidebar rail + mobile BottomNav) and delete their three list pages, plus every piece of code only those pages referenced — the Dashboard's per-media tabs already cover what they showed.
 
 **Type:** Work / Task completion
