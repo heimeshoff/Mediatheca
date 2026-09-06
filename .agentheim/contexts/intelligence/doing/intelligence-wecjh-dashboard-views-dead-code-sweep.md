@@ -1,7 +1,7 @@
 ---
 id: intelligence-wecjh
 title: Dashboard Views.fs — delete the ~2000 lines of unreferenced view helpers left behind by the 3a rebuild
-status: todo
+status: doing
 type: refactor
 context: intelligence
 created: 2026-09-06
