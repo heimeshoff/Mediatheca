@@ -381,15 +381,6 @@ type DashboardPlaySession = {
     MinutesPlayed: int
 }
 
-type DashboardNewGame = {
-    Slug: string
-    Name: string
-    Year: int
-    CoverRef: string option
-    AddedDate: string
-    FamilyOwners: FriendRef list
-}
-
 type DashboardCrossMediaStats = {
     TotalMovieMinutes: int
     TotalSeriesMinutes: int
@@ -427,7 +418,6 @@ type DashboardAllTab = {
     GamesInFocus: DashboardGameInFocus list
     GamesRecentlyPlayed: DashboardGameRecentlyPlayed list
     PlaySessions: DashboardPlaySession list
-    NewGames: DashboardNewGame list
     JellyfinServerUrl: string option
     CrossMediaStats: DashboardCrossMediaStats
     ActivityDays: DashboardActivityDay list

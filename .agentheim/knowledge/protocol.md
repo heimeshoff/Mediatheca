@@ -15,6 +15,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-06 11:49 -- Task verified and completed: intelligence-p4t7k - Prune the New Games dashboard payload — server still computes and ships DashboardAllTab.NewGames but no client code reads it
+
+**Type:** Work / Task completion
+**Task:** intelligence-p4t7k - Prune the New Games dashboard payload — server still computes and ships DashboardAllTab.NewGames but no client code reads it
+**Summary:** Pruned the dead New Games dashboard payload end to end — removed Shared.DashboardNewGame and DashboardAllTab.NewGames, deleted GameProjection.getDashboardNewGames, removed its call and assignment in Api.fs getDashboardAllTab, and corrected the intelligence README Retired note to name DashboardAllTab and state the prune is complete.
+**Duration:** 10m
+**Verification:** PASS (iteration 1)
+**Files changed:** 4
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-09-06 11:38 -- Batch started: [intelligence-p4t7k]
 
 **Type:** Work / Batch start

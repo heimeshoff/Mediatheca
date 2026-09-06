@@ -1,11 +1,11 @@
 ---
 id: intelligence-p4t7k
 title: Prune the New Games dashboard payload — server still computes and ships DashboardAllTab.NewGames but no client code reads it
-status: doing
+status: done
 type: refactor
 context: intelligence
 created: 2026-09-06
-completed:
+completed: 2026-09-06
 depends_on: []
 blocks: []
 tags: [dashboard, dead-code, cleanup, server, intelligence]
@@ -70,19 +70,19 @@ with no client edits.
 
 ## Acceptance criteria
 
-- [ ] `DashboardAllTab` in `src/Shared/Shared.fs` no longer has a `NewGames` field.
-- [ ] The `DashboardNewGame` record type is deleted from `src/Shared/Shared.fs`.
-- [ ] `GameProjection.getDashboardNewGames` is deleted from `src/Server/GameProjection.fs`;
+- [x] `DashboardAllTab` in `src/Shared/Shared.fs` no longer has a `NewGames` field.
+- [x] The `DashboardNewGame` record type is deleted from `src/Shared/Shared.fs`.
+- [x] `GameProjection.getDashboardNewGames` is deleted from `src/Server/GameProjection.fs`;
       `resolveFriendRefs` remains (still used by the game-detail projection).
-- [ ] `Api.fs`'s `getDashboardAllTab` handler neither calls `getDashboardNewGames` nor assigns
+- [x] `Api.fs`'s `getDashboardAllTab` handler neither calls `getDashboardNewGames` nor assigns
       `NewGames`.
-- [ ] `grep -rn "NewGames\|DashboardNewGame\|getDashboardNewGames" src/ tests/ --include=*.fs`
+- [x] `grep -rn "NewGames\|DashboardNewGame\|getDashboardNewGames" src/ tests/ --include=*.fs`
       returns nothing.
-- [ ] No file under `src/Client/` is modified (the field was never read there).
-- [ ] The intelligence README's "Retired" note says the server payload is pruned and names
+- [x] No file under `src/Client/` is modified (the field was never read there).
+- [x] The intelligence README's "Retired" note says the server payload is pruned and names
       `DashboardAllTab`; it no longer calls the prune a pending follow-up.
-- [ ] `npm test` passes (Expecto).
-- [ ] `npm run build` is clean (Fable compile proves no client consumer existed).
+- [x] `npm test` passes (Expecto).
+- [x] `npm run build` is clean (Fable compile proves no client consumer existed).
 
 ## Notes
 
@@ -97,3 +97,40 @@ with no client edits.
 - The `game_detail.steam_library_date` column and the projection that fills it are untouched —
   only the dashboard read is removed. If a "recently added games" surface ever returns, the data
   is still there; only the query needs re-adding.
+
+## Outcome
+
+Deleted the dead `NewGames` payload end to end, exactly per the four numbered steps:
+
+1. `src/Shared/Shared.fs` — removed the `DashboardNewGame` record and the
+   `NewGames: DashboardNewGame list` field from `DashboardAllTab`.
+2. `src/Server/GameProjection.fs` — deleted `getDashboardNewGames`; `resolveFriendRefs` (private,
+   still used by four fields in the game-detail projection) is untouched.
+3. `src/Server/Api.fs` — removed the `let newGames = GameProjection.getDashboardNewGames conn 10`
+   binding and the `NewGames = newGames` field in `getDashboardAllTab`'s response record.
+4. `.agentheim/contexts/intelligence/README.md` — rewrote the "Retired" paragraph: it now states
+   `intelligence-p4t7k` pruned the server-side payload (naming `GameProjection.getDashboardNewGames`
+   and `Shared.DashboardAllTab.NewGames`) and that the dashboard no longer computes or ships New
+   Games data at all — no more "pending follow-up" language.
+
+Verification:
+- `grep -rn "NewGames\|DashboardNewGame\|getDashboardNewGames" src/ tests/ --include=*.fs` → no
+  matches (exit code 1).
+- `git status --porcelain` confirms only `Shared.fs`, `GameProjection.fs`, `Api.fs`, and the
+  intelligence README changed — nothing under `src/Client/`.
+- `npm test` (Expecto) → 685 tests run, 685 passed, 0 failed.
+- `npm run build` (Fable production build) → clean, `✓ built in 58.04s`, only the pre-existing
+  unrelated daisyUI `@property` CSS-optimizer warning and the chunk-size advisory.
+- `npm run test:client` (Vitest/Fable.Mocha) → 5 test files, 20 tests, all passed; only the
+  pre-existing unrelated FS0020 warning in `AdminProjections/Views.fs` (same one noted by
+  `intelligence-wecjh`).
+
+**TDD_SKIPPED:** pure behaviour-preserving dead-code deletion — no new logic to assert, and no
+test in the tree ever constructed or asserted on `DashboardAllTab.NewGames`. `npm test`,
+`npm run test:client`, and `npm run build` together are the regression net proving nothing broke.
+
+**Key files:**
+- `src/Shared/Shared.fs`
+- `src/Server/GameProjection.fs`
+- `src/Server/Api.fs`
+- `.agentheim/contexts/intelligence/README.md`

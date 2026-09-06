@@ -2159,7 +2159,6 @@ module Api =
                 let gamesInFocus = GameProjection.getGamesInFocus conn
                 let gamesRecentlyPlayed = GameProjection.getGamesRecentlyPlayed conn 6
                 let playSessions = PlaytimeTracker.getDashboardPlaySessions conn 14
-                let newGames = GameProjection.getDashboardNewGames conn 10
                 let jellyfinServerUrl = SettingsStore.getSetting conn "jellyfin_server_url"
 
                 // Cross-media stats
@@ -2228,7 +2227,6 @@ module Api =
                     GamesInFocus = gamesInFocus
                     GamesRecentlyPlayed = gamesRecentlyPlayed
                     PlaySessions = playSessions
-                    NewGames = newGames
                     JellyfinServerUrl =
                         jellyfinServerUrl
                         |> Option.bind (fun s -> if System.String.IsNullOrWhiteSpace(s) then None else Some s)

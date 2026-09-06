@@ -23,9 +23,9 @@ Single user.
 **Retired:** the **New Games** card (dashboard section listing recently-added games) was dropped
 from the All tab by `intelligence-dq8rk`'s 3a rebuild and never re-wired onto the Games tab;
 `intelligence-wecjh` confirmed the drop (2026-09-06) and deleted the dead `newGamesSection` /
-`newGameItem` view helpers. The server still projects the underlying data
-(`GameProjection.getDashboardNewGames`, shipped as `DashboardGameStats.NewGames` on every
-dashboard load) — pruning that payload is a separate, not-yet-scheduled follow-up.
+`newGameItem` view helpers. `intelligence-p4t7k` pruned the server-side payload
+(`GameProjection.getDashboardNewGames` and `Shared.DashboardAllTab.NewGames`) end to end — the
+dashboard no longer computes or ships New Games data at all.
 
 ## Aggregates
 
