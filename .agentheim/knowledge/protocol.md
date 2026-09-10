@@ -15,7 +15,7 @@ Newest entries on top.
 **Escalated after verification:** 0
 **Dispatches:** integration-qb7tk: 2
 **Commits:** 3 (batch start, task completion, this entry)
-**Vision-conformance:** none — batch aligns with vision. The one shipped task is a qBittorrent adapter + Settings credentials card (integration BC, generic) feeding the "Remove local copy" workstream; it honors the Replayable design principle (third-party state cached, not evented — ADR-0070) and adds no Out-of-Scope (v1) item. vision.md still carries no "What success looks like"/"Non-goals" headings, so the pass was judgment against "Remaining v1 Work"/"Out of Scope (v1)"/"Design Principles". Note: the Out-of-Scope list still names "Jellyfin sync (v2)" although Jellyfin sync shipped long ago — a stale vision line, not a drift signal.
+**Vision-conformance:** none — batch aligns with vision. The one shipped task is a qBittorrent adapter + Settings credentials card (integration BC, generic) feeding the "Remove local copy" workstream; it honors the Replayable design principle (third-party state cached, not evented — ADR-0071) and adds no Out-of-Scope (v1) item. vision.md still carries no "What success looks like"/"Non-goals" headings, so the pass was judgment against "Remaining v1 Work"/"Out of Scope (v1)"/"Design Principles". Note: the Out-of-Scope list still names "Jellyfin sync (v2)" although Jellyfin sync shipped long ago — a stale vision line, not a drift signal.
 **Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task) — `formatBatchMixLine` from the source-repo `lib/vacuum-guard.mjs` (installed plugin 0.9.2 carries no such module).
 **Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed.
 
@@ -47,7 +47,7 @@ Newest entries on top.
 **Type:** Work / Verification failure
 **Task:** integration-qb7tk - qBittorrent adapter and Settings card — URL, username and password stored and tested from Settings exactly like Jellyfin's, plus a typed-error `Qbittorrent.fs` adapter that integration-r4vzm builds on
 **Iteration:** 1 of 3
-**Reasons:** Acceptance criterion 2 (`testQbittorrentConnection` returns Ok with app version + torrent count / Error naming authentication) has no test coverage — `Qbittorrent.testConnection` and its Api wrapper are never exercised; everything else passed (npm test 702/0, npm run build clean, scope confined, README updated, ADR-0070 point 7 honored)
+**Reasons:** Acceptance criterion 2 (`testQbittorrentConnection` returns Ok with app version + torrent count / Error naming authentication) has no test coverage — `Qbittorrent.testConnection` and its Api wrapper are never exercised; everything else passed (npm test 702/0, npm run build clean, scope confined, README updated, ADR-0071 point 7 honored)
 **Iteration hint:** likely-fixable
 **Next:** re-dispatched worker
 
@@ -76,7 +76,7 @@ Newest entries on top.
 **Status after:** backlog (each part promoted separately, see the Promoted entries above)
 **Summary:** Orchestrator + architect pass confirmed all five open questions — projection-only removal under ADR-0043 (no domain event; the item's play state is imported first through the existing event paths), warn-never-refuse hit-and-run with named constants, season/episode targets deferred, every matched torrent listed and acknowledged (the tick is not a selection), qBittorrent credentials in SettingsStore with an in-memory per-operation session. Two hazards added: pack torrents whose content path is an ancestor of the target (pre-unticked, extra-file count shown) and a time-of-check race closed by re-matching a fresh torrent list at execute time. Delete order fixed as torrents → Jellyfin item → verify → clear ids so the plan is always re-derivable after a partial failure (no saga state). Mount roots come from env vars with defaults; an unmapped path refuses loudly. The original task was too large for one worker session and is now three sequential tasks.
 **Split into:** integration-qb7tk (qBittorrent adapter + Settings card), integration-r4vzm (server-side plan/execute flow, no UI), integration-mqsd3 (detail-page action + confirmation dialog)
-**ADRs written:** 0070
+**ADRs written:** 0071
 
 ---
 

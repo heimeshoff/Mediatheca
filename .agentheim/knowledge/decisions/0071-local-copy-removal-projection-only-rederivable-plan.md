@@ -1,5 +1,5 @@
 ---
-id: 0070
+id: 0071
 title: Local copy removal is projection-only cache invalidation run as a re-derivable plan, not a domain event and not a persisted saga — delete order makes the live world the resume state
 scope: integration
 status: accepted
@@ -11,7 +11,9 @@ related_tasks: [integration-mqsd3, integration-r4vzm, integration-qb7tk]
 related_research: []
 ---
 
-# ADR 0070: Local copy removal is projection-only cache invalidation run as a re-derivable plan
+# ADR 0071: Local copy removal is projection-only cache invalidation run as a re-derivable plan
+
+> **Note on ADR numbering:** drafted as ADR-0070 on 2026-09-10 on a branch that lacked integration-v0xmv's ADR-0070 (2026-09-05); renumbered to 0071 at rebase time per ADR-0058.
 
 ## Context
 

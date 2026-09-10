@@ -1,6 +1,6 @@
 ---
 id: integration-r4vzm
-title: Local copy removal, server side — a plan-then-execute flow (no UI) that imports the item's Jellyfin play state, deletes the acknowledged torrents with files from qBittorrent, DELETEs the Jellyfin item, verifies both gone, then clears the Jellyfin ids; pure `LocalCopyRemoval.fs` seams, Jellyfin DELETE support, per-item `JellyfinStore` clears (ADR-0070)
+title: Local copy removal, server side — a plan-then-execute flow (no UI) that imports the item's Jellyfin play state, deletes the acknowledged torrents with files from qBittorrent, DELETEs the Jellyfin item, verifies both gone, then clears the Jellyfin ids; pure `LocalCopyRemoval.fs` seams, Jellyfin DELETE support, per-item `JellyfinStore` clears (ADR-0071)
 status: backlog
 type: feature
 context: integration
@@ -9,7 +9,7 @@ completed:
 depends_on: [integration-qb7tk]
 blocks: [integration-mqsd3]
 tags: [jellyfin, qbittorrent, sync, movies, series, storage]
-related_adrs: [0011, 0043, 0070]
+related_adrs: [0011, 0043, 0071]
 related_research: []
 prior_art: [integration-002, integration-m4k7p, integration-001]
 ---
@@ -25,7 +25,7 @@ verifiable by tests and `curl`, so the UI task is pure client work.
 
 ## What
 
-Two `IMediathecaApi` members over a **plan-then-execute** split (ADR-0070):
+Two `IMediathecaApi` members over a **plan-then-execute** split (ADR-0071):
 
 - `planLocalCopyRemoval: LocalCopyTarget -> Async<Result<RemovalPlan, string>>`
 - `removeLocalCopy: LocalCopyTarget * acknowledgedHashes: string list -> Async<RemovalOutcome>`
@@ -77,7 +77,7 @@ DeleteJellyfinItem | Verify | ClearLinks`:
    event-producing paths (`Movies.Record_watch_session` via a new pure
    `JellyfinImport.syncMovieWatchHistory` seam extracted from `runJellyfinImport`;
    `Series.Mark_episode_watched` via the existing `syncSeriesWatchHistory`). Doctrinally
-   mandatory (ADR-0043 / ADR-0070): Jellyfin discards the item's user data with the item.
+   mandatory (ADR-0043 / ADR-0071): Jellyfin discards the item's user data with the item.
 2. **ResolvePath** / 3. **MatchTorrents** — rebuild the plan from a **fresh**
    `torrents/info`; the matched hash set must equal the acknowledged set, else
    `Failure (MatchTorrents, "the torrent list changed since the dialog was shown — reopen
@@ -148,7 +148,7 @@ interleaves with step 7.
       SQLite.
 - [ ] `JellyfinImport.syncMovieWatchHistory` exists as a pure seam; `runJellyfinImport` calls
       it and the existing `JellyfinImportTests.fs` still pass.
-- [ ] No new event case is added to `Movies.fs` or `Series.fs` (grep-checkable; ADR-0070).
+- [ ] No new event case is added to `Movies.fs` or `Series.fs` (grep-checkable; ADR-0071).
 - [ ] Live on harbour via `curl` against the two API routes: a movie with a Jellyfin id →
       after `removeLocalCopy`, `GET /Items/{id}` is 404, the hash is absent from
       `torrents/info`, `jellyfin_movie` has no row for the slug. A series → every torrent
@@ -164,7 +164,7 @@ interleaves with step 7.
 
 **Refinement decisions (2026-09-10, orchestrator + architect confirmed; edit to override):**
 
-1. Projection-only, no event — ADR-0070; the Journal is uninvolved.
+1. Projection-only, no event — ADR-0071; the Journal is uninvolved.
 2. Hit-and-run: warn, never refuse; constants, not settings.
 3. Season / single-episode targets: follow-ups.
 4. Cross-seed and pack torrents: everything listed, everything acknowledged; a pack

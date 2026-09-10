@@ -3,7 +3,7 @@ module Mediatheca.Tests.QbittorrentTests
 /// integration-qb7tk: the qBittorrent WebUI adapter. `login` maps
 /// qBittorrent's odd HTTP-200-with-a-text-body auth contract onto a typed
 /// `Result`, `withSession` is a login-once-use-once wrapper with no
-/// persisted cookie (ADR-0070 point 7 -- deliberately not the ADR-0011
+/// persisted cookie (ADR-0071 point 7 -- deliberately not the ADR-0011
 /// re-auth-and-retry shape), and the request-building functions never leak
 /// vendor JSON or send an `Origin`/`Referer` header. All HTTP is faked via
 /// a recording `HttpMessageHandler`, same pattern as

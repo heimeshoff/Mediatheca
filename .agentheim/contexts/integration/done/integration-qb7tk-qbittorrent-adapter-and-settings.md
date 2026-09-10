@@ -9,7 +9,7 @@ completed: 2026-09-10
 depends_on: [design-system-001]
 blocks: [integration-r4vzm]
 tags: [qbittorrent, settings, adapter, storage]
-related_adrs: [0011, 0070]
+related_adrs: [0011, 0071]
 related_research: []
 prior_art: [integration-002, integration-003]
 ---
@@ -104,7 +104,7 @@ integration-r4vzm (the server-side removal flow) is the first and only caller of
 `deleteTorrents`, and integration-mqsd3 is the UI on top of that. Once this ships,
 the harbour fleet docs get a one-line note that mediatheca holds qBittorrent credentials.
 
-**Decisions:** ADR-0070 (projection-only removal) is referenced for context only; this
+**Decisions:** ADR-0071 (projection-only removal) is referenced for context only; this
 task makes no event-vs-cache call of its own.
 
 ## Outcome
@@ -119,7 +119,7 @@ credentials, nothing that deletes wired to a UI yet.
   maps HTTP 200 + `Ok.` to a session (SID parsed out of `Set-Cookie`), HTTP 200 + `Fails.`
   and HTTP 403 to `AuthFailed`, transport faults to `OtherFailure`. `withSession` is
   login-once-use-once (no persisted cookie, no ADR-0011-shaped re-auth-and-retry, per
-  ADR-0070 point 7). `listTorrents`, `listFiles`, `deleteTorrents` (hashes joined `|`,
+  ADR-0071 point 7). `listTorrents`, `listFiles`, `deleteTorrents` (hashes joined `|`,
   `deleteFiles=true|false` — exists as a typed primitive; integration-r4vzm is its first
   caller) and `getAppVersion`/`testConnection` round out the adapter. No request ever
   carries an `Origin`/`Referer` header.
@@ -146,7 +146,7 @@ credentials, nothing that deletes wired to a UI yet.
 - Verified: `npm run build` (196 modules, clean) and `npm test` (702 Expecto tests, all
   green, including the 9 new ones). The qBittorrent card's rendering itself is
   [human-eye] per the task's own acceptance criterion — not separately screenshotted here.
-- No new ADR: ADR-0070 point 7 already records the no-persisted-session decision this task
+- No new ADR: ADR-0071 point 7 already records the no-persisted-session decision this task
   implements; nothing here rose to a fresh "why this, not the obvious alternative" call.
 
 **Iteration 2 (2026-09-10):** closed the verifier's gap on acceptance criterion 2. Added a
@@ -165,7 +165,7 @@ stays clean. No production code changed — this iteration is test-only.
 **REASONS:**
 - Acceptance criterion 2 ("`testQbittorrentConnection` against a reachable qBittorrent returns `Ok` with the app version and torrent count; against wrong credentials returns `Error` naming authentication (not a generic HTTP error)") has no coverage of any kind. `Qbittorrent.testConnection` (`src/Server/Qbittorrent.fs:218`) and its API wrapper (`src/Server/Api.fs:4635`) are never called by any test — a repo-wide grep for `testConnection`/`testQbittorrent` in `tests/` returns nothing, and none of the 9 new cases in `tests/Server.Tests/QbittorrentTests.fs` exercise it. The success half (version string + torrent *count* tuple) and the "authentication, not generic HTTP" error wording are both entirely unasserted, even though the file's own `RecordingHandler` already serves `/auth/login` + `/app/version` + `/torrents/info` in the Origin/Referer case (`QbittorrentTests.fs:875-894`) and would make this a ~10-line test. The task's `## Outcome` claims no live/harbour verification of this round-trip either, so there is neither a test nor an inspectable artifact for this criterion.
 - Secondary (not on its own a FAIL): criterion 1's first half ("`SettingsStore` holds `qbittorrent_url`/`qbittorrent_username`/`qbittorrent_password` after saving from Settings") rests only on reading the three literal `SettingsStore.setSetting` calls at `src/Server/Api.fs:4627-4629`; accepted here as inspection evidence, but integration-r4vzm depends on those exact key names, so a round-trip test would be cheap insurance while the next worker is in this file.
-- Everything else checked out and is not the reason for this verdict: `npm test` → 702 passed / 0 failed, exit 0; `npm run build` → clean; scope is confined to the task's own files; the BC README's Adapter + new "Session (qBittorrent)" entries match the diff; the diff honors ADR-0070 point 7 (login-once-use-once, no persisted SID) and correctly does *not* mirror ADR-0011's re-auth seam, so no new ADR is owed; no protocol/INDEX/git tampering; check 8 skipped (integration declares no `## Runtime surface`); the `[human-eye]` criterion 9 is builder eye-check pending (structural parity with `jellyfinDetail` via the same `integrationCard`/`statusBadge`/`feedbackAlert`/`Daisy.input` compositions is present).
+- Everything else checked out and is not the reason for this verdict: `npm test` → 702 passed / 0 failed, exit 0; `npm run build` → clean; scope is confined to the task's own files; the BC README's Adapter + new "Session (qBittorrent)" entries match the diff; the diff honors ADR-0071 point 7 (login-once-use-once, no persisted SID) and correctly does *not* mirror ADR-0011's re-auth seam, so no new ADR is owed; no protocol/INDEX/git tampering; check 8 skipped (integration declares no `## Runtime surface`); the `[human-eye]` criterion 9 is builder eye-check pending (structural parity with `jellyfinDetail` via the same `integrationCard`/`statusBadge`/`feedbackAlert`/`Daisy.input` compositions is present).
 
 **SUGGESTED_FIX:** Add two Expecto cases to `tests/Server.Tests/QbittorrentTests.fs` using the existing `RecordingHandler`: one where login returns `Ok.` + `Set-Cookie`, `/app/version` returns e.g. `v4.6.0` and `/torrents/info` returns a two-element fixture, asserting `testConnection` yields `Ok ("v4.6.0", 2)`; and one where login returns HTTP 200 + `Fails.`, asserting `testConnection` yields `Error AuthFailed` (the shape `Api.fs` maps to the "authentication failed: check the username and password" wording). Optionally add a SettingsStore round-trip test for the three `qbittorrent_*` keys.
 

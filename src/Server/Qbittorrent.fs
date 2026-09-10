@@ -8,7 +8,7 @@ open Thoth.Json.Net
 /// qBittorrent WebUI adapter (integration-qb7tk). Read + credentials + a
 /// "Test connection" round-trip only -- `deleteTorrents` exists here as a
 /// typed primitive, but integration-r4vzm (the server-side removal flow) is
-/// its first and only caller. See ADR-0070 point 7 for why this module gets
+/// its first and only caller. See ADR-0071 point 7 for why this module gets
 /// no ADR-0011-shaped persisted re-auth-and-retry: a qBittorrent `SID` is
 /// seconds old and one cheap POST away, unlike a Jellyfin token that goes
 /// stale over weeks.
@@ -115,7 +115,7 @@ module Qbittorrent =
     /// Login-once-use-once: logs in exactly once and hands the resulting
     /// `Session` to `operation`. The `SID` lives only for the duration of
     /// this call -- there is no persisted cookie and no re-auth-and-retry
-    /// seam (ADR-0070 point 7; deliberately not the ADR-0011 shape).
+    /// seam (ADR-0071 point 7; deliberately not the ADR-0011 shape).
     let withSession
         (httpClient: HttpClient)
         (config: QbittorrentConfig)

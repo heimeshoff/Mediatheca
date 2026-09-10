@@ -9,7 +9,7 @@ completed:
 depends_on: [design-system-001, integration-r4vzm]
 blocks: []
 tags: [jellyfin, qbittorrent, movies, series, storage, ui]
-related_adrs: [0016, 0064, 0070]
+related_adrs: [0016, 0064, 0071]
 related_research: []
 prior_art: [integration-003]
 ---
@@ -25,7 +25,7 @@ should also be the place that says "and now it is not" — and it should be *cer
 files are gone from the disk and the item is gone from Jellyfin's database, not "probably
 gone after the next scan".
 
-The server-side flow (plan-then-execute, verified, projection-only — ADR-0070) ships in
+The server-side flow (plan-then-execute, verified, projection-only — ADR-0071) ships in
 integration-r4vzm. This task is the button and the dialog on top of it.
 
 ## What
@@ -84,7 +84,7 @@ Single-episode and season entry points are follow-ups.
 **Refinement (2026-09-10):** the original capture was split three ways — integration-qb7tk
 (qBittorrent adapter + Settings card), integration-r4vzm (server-side plan/execute flow, all
 the failure semantics and tests), and this task (UI). All decisions — projection-only
-(ADR-0070), warn-never-refuse, everything-listed-everything-acknowledged, pack-torrent
+(ADR-0071), warn-never-refuse, everything-listed-everything-acknowledged, pack-torrent
 handling, env-var mount roots, SettingsStore credentials — are recorded in r4vzm's Notes.
 
 **Escape hatch:** if the series entry point runs long, ship movie-only here and capture the

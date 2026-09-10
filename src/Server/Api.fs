@@ -4518,7 +4518,7 @@ module Api =
             // qBittorrent Integration (integration-qb7tk): credentials +
             // "Test connection" only, ahead of any destructive flow. Unlike
             // Jellyfin's combined "Test & Save", the setter is a distinct
-            // member -- testing never persists (ADR-0070 point 7: a
+            // member -- testing never persists (ADR-0071 point 7: a
             // qBittorrent session is cheap to reacquire, so there is no
             // stored-token round-trip to validate here, just credentials).
             getQbittorrentSettings = fun () -> async {
