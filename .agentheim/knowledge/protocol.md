@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-09-10 18:31 -- Modeling / Refined: integration-r4vzm - Local copy removal, server side (second pass, code-grounded after integration-qb7tk shipped)
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** todo (promoted in the same session — see the Promoted entry above)
+**Summary:** Checked every seam the first pass named against the code as it stands after integration-qb7tk: the qBittorrent adapter, `JellyfinStore`, `JellyfinImport`, `Jellyfin.withReauthRetry`/`FetchError`, `JellyfinSync`'s in-progress flag, and the pinned test files all match. Two corrections: (1) torrents now match against the **deletion scope** (the movie's own folder, the bare file when it sits in a library root, the show folder for a series) instead of the Jellyfin file path — the first rule would have classified every ordinary one-folder movie torrent as a `PackAncestor` and pre-unticked it with a warning; the library-root rejection is now "fewer than two segments below the Jellyfin root" instead of hardcoded `movies`/`shows`; a hand-made mixed subfolder is an accepted, visible-by-name hazard. (2) The env-var precedent (`STEAM_DEVICE_NAME`) was deleted with integration-v0xmv; the mount roots now follow `Composition.fs`'s `TMDB_API_KEY`/`STEAM_ID` read without seeding SettingsStore. The two live-on-harbour criteria are marked builder-run after deploy so no worker touches the live system. Dependency integration-qb7tk is done; readiness gate passed.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-09-10 18:14 -- Work session ended
 
 **Type:** Work / Session end
