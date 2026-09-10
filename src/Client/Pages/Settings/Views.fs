@@ -1492,6 +1492,130 @@ let private jellyfinDetail (model: Model) (dispatch: Msg -> unit) =
         ]
     ]
 
+// ── qBittorrent Detail ──
+
+/// integration-qb7tk: credentials + a "Test connection" round-trip, ahead
+/// of any destructive flow. Same Elmish shape as the Jellyfin card above
+/// (*Input fields, IsTesting*/IsSaving*, *TestResult/*SaveResult), but Test
+/// and Save are two distinct buttons/results rather than Jellyfin's
+/// combined "Test & Save" -- the setter here never runs implicitly as a
+/// side effect of testing.
+let private qbittorrentDetail (model: Model) (dispatch: Msg -> unit) =
+    Html.div [
+        prop.children [
+            Html.p [
+                prop.className "text-base-content/70 mb-4 text-sm"
+                prop.children [
+                    Html.text "Connect to qBittorrent's WebUI so \"Remove local copy\" can find and delete torrents. Enter the WebUI URL and credentials below."
+                ]
+            ]
+
+            if model.QbittorrentUrl <> "" then
+                Html.div [
+                    prop.className "mb-3 flex items-center gap-2 text-sm text-base-content/60"
+                    prop.children [
+                        Html.span [ prop.text "URL:" ]
+                        Html.span [ prop.className "font-mono"; prop.text model.QbittorrentUrl ]
+                    ]
+                ]
+
+            if model.QbittorrentUsername <> "" then
+                Html.div [
+                    prop.className "mb-3 flex items-center gap-2 text-sm text-base-content/60"
+                    prop.children [
+                        Html.span [ prop.text "User:" ]
+                        Html.span [ prop.className "font-mono"; prop.text model.QbittorrentUsername ]
+                    ]
+                ]
+
+            // URL input
+            Html.div [
+                prop.className "form-control mb-3"
+                prop.children [
+                    Daisy.label [
+                        prop.className "label"
+                        prop.children [ Html.span [ prop.className "label-text"; prop.text "WebUI URL" ] ]
+                    ]
+                    Daisy.input [
+                        prop.className "w-full"
+                        prop.placeholder "http://your-server:8080"
+                        prop.value model.QbittorrentUrlInput
+                        prop.onChange (Qbittorrent_url_input_changed >> dispatch)
+                    ]
+                ]
+            ]
+
+            // Username input
+            Html.div [
+                prop.className "form-control mb-3"
+                prop.children [
+                    Daisy.label [
+                        prop.className "label"
+                        prop.children [ Html.span [ prop.className "label-text"; prop.text "Username" ] ]
+                    ]
+                    Daisy.input [
+                        prop.className "w-full"
+                        prop.placeholder "admin"
+                        prop.value model.QbittorrentUsernameInput
+                        prop.onChange (Qbittorrent_username_input_changed >> dispatch)
+                    ]
+                ]
+            ]
+
+            // Password input
+            Html.div [
+                prop.className "form-control mb-4"
+                prop.children [
+                    Daisy.label [
+                        prop.className "label"
+                        prop.children [ Html.span [ prop.className "label-text"; prop.text "Password" ] ]
+                    ]
+                    Daisy.input [
+                        prop.className "w-full"
+                        prop.type' "password"
+                        prop.placeholder "password"
+                        prop.value model.QbittorrentPasswordInput
+                        prop.onChange (Qbittorrent_password_input_changed >> dispatch)
+                    ]
+                ]
+            ]
+
+            feedbackAlert model.QbittorrentTestResult
+            feedbackAlert model.QbittorrentSaveResult
+
+            // Buttons
+            Html.div [
+                prop.className "flex gap-2 mb-4"
+                prop.children [
+                    Daisy.button.button [
+                        button.outline
+                        button.sm
+                        if model.IsTestingQbittorrent then button.disabled
+                        prop.onClick (fun _ -> dispatch Test_qbittorrent_connection)
+                        prop.disabled model.IsTestingQbittorrent
+                        prop.children [
+                            if model.IsTestingQbittorrent then
+                                Daisy.loading [ loading.spinner; loading.sm ]
+                            Html.text "Test connection"
+                        ]
+                    ]
+                    Daisy.button.button [
+                        button.primary
+                        button.sm
+                        if model.IsSavingQbittorrent then button.disabled
+                        prop.onClick (fun _ -> dispatch Save_qbittorrent_settings)
+                        prop.disabled model.IsSavingQbittorrent
+                        prop.children [
+                            if model.IsSavingQbittorrent then
+                                Daisy.loading [ loading.spinner; loading.sm ]
+                            Html.text "Save"
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+
 // ── Main View ──
 
 let view (model: Model) (dispatch: Msg -> unit) =
@@ -1561,6 +1685,13 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         "Watch history sync from media server"
                         (statusBadge (model.JellyfinServerUrl <> "" && model.JellyfinUsername <> "") (if model.JellyfinServerUrl <> "" && model.JellyfinUsername <> "" then "Connected" else "Not configured"))
                         (jellyfinDetail model dispatch)
+
+                    integrationCard
+                        Icons.bolt
+                        "qBittorrent"
+                        "Torrent client for \"Remove local copy\""
+                        (statusBadge (model.QbittorrentUrl <> "" && model.QbittorrentUsername <> "") (if model.QbittorrentUrl <> "" && model.QbittorrentUsername <> "" then "Connected" else "Not configured"))
+                        (qbittorrentDetail model dispatch)
                 ]
             ]
 

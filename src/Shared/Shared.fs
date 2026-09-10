@@ -1345,6 +1345,16 @@ type JellyfinSyncStatus =
     | SyncCompleted of result: JellyfinImportResult * lastSyncTime: string
     | SyncFailed of error: string * lastSyncTime: string option
 
+// qBittorrent Integration (integration-qb7tk): credentials + a "Test
+// connection" round-trip, mirroring Jellyfin's shape, shipped ahead of any
+// destructive flow (integration-r4vzm builds "Remove local copy" on the
+// server-side adapter this DTO fronts). The password never leaves the
+// server -- this DTO carries only what Settings needs to render "connected".
+type QbittorrentSettings = {
+    Url: string
+    Username: string
+}
+
 // View Settings
 
 type ViewSortField = ByReleaseDate | ByName | ByRating | ByWatchOrder
@@ -1587,6 +1597,10 @@ type IMediathecaApi = {
     // Jellyfin Auto-Sync
     triggerJellyfinSync: unit -> Async<JellyfinSyncTriggerResult>
     getJellyfinSyncStatus: unit -> Async<JellyfinSyncStatus>
+    // qBittorrent Integration (integration-qb7tk)
+    getQbittorrentSettings: unit -> Async<QbittorrentSettings>
+    setQbittorrentCredentials: string * string * string -> Async<Result<unit, string>>
+    testQbittorrentConnection: string * string * string -> Async<Result<string, string>>
     // Steam Family Last Sync
     getSteamFamilyLastSync: unit -> Async<string option>
     /// The last completed family import's full result (integration-n3vqa),

@@ -249,6 +249,15 @@ let init () : Model * Cmd<Msg> =
       JellyfinScanResult = None
       IsImportingJellyfin = false
       JellyfinImportResult = None
+      QbittorrentUrl = ""
+      QbittorrentUrlInput = ""
+      QbittorrentUsername = ""
+      QbittorrentUsernameInput = ""
+      QbittorrentPasswordInput = ""
+      IsTestingQbittorrent = false
+      IsSavingQbittorrent = false
+      QbittorrentTestResult = None
+      QbittorrentSaveResult = None
       PlaytimeSyncStatus = None
       JellyfinLastSyncTime = None
       JellyfinSyncStatus = None
@@ -268,7 +277,7 @@ let init () : Model * Cmd<Msg> =
       JobsSectionLoaded = false
       SurgerySectionOpen = false
       SurgerySectionLoaded = false },
-    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync; Cmd.ofMsg Load_steam_api_key_last_error; Cmd.ofMsg Load_steam_family_last_result ]
+    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_qbittorrent_settings; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync; Cmd.ofMsg Load_steam_api_key_last_error; Cmd.ofMsg Load_steam_family_last_result ]
 
 let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
@@ -655,6 +664,53 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
 
     | Jellyfin_import_completed result ->
         { model with IsImportingJellyfin = false; JellyfinImportResult = Some result; JellyfinScanResult = None }, Cmd.none
+
+    // qBittorrent Integration (integration-qb7tk)
+    | Load_qbittorrent_settings ->
+        model, Cmd.OfAsync.perform api.getQbittorrentSettings () Qbittorrent_settings_loaded
+
+    | Qbittorrent_settings_loaded settings ->
+        { model with
+            QbittorrentUrl = settings.Url
+            QbittorrentUrlInput = settings.Url
+            QbittorrentUsername = settings.Username
+            QbittorrentUsernameInput = settings.Username },
+        Cmd.none
+
+    | Qbittorrent_url_input_changed value ->
+        { model with QbittorrentUrlInput = value; QbittorrentTestResult = None; QbittorrentSaveResult = None }, Cmd.none
+
+    | Qbittorrent_username_input_changed value ->
+        { model with QbittorrentUsernameInput = value; QbittorrentTestResult = None; QbittorrentSaveResult = None }, Cmd.none
+
+    | Qbittorrent_password_input_changed value ->
+        { model with QbittorrentPasswordInput = value; QbittorrentTestResult = None; QbittorrentSaveResult = None }, Cmd.none
+
+    | Test_qbittorrent_connection ->
+        { model with IsTestingQbittorrent = true; QbittorrentTestResult = None },
+        Cmd.OfAsync.either api.testQbittorrentConnection (model.QbittorrentUrlInput, model.QbittorrentUsernameInput, model.QbittorrentPasswordInput)
+            Qbittorrent_test_result
+            (fun ex -> Qbittorrent_test_result (Error ex.Message))
+
+    | Qbittorrent_test_result result ->
+        { model with IsTestingQbittorrent = false; QbittorrentTestResult = Some result }, Cmd.none
+
+    | Save_qbittorrent_settings ->
+        { model with IsSavingQbittorrent = true; QbittorrentSaveResult = None },
+        Cmd.OfAsync.either api.setQbittorrentCredentials (model.QbittorrentUrlInput, model.QbittorrentUsernameInput, model.QbittorrentPasswordInput)
+            Qbittorrent_save_result
+            (fun ex -> Qbittorrent_save_result (Error ex.Message))
+
+    | Qbittorrent_save_result result ->
+        let saveResult =
+            match result with
+            | Ok () -> Ok "Credentials saved"
+            | Error e -> Error e
+        let cmd =
+            match result with
+            | Ok () -> Cmd.ofMsg Load_qbittorrent_settings
+            | Error _ -> Cmd.none
+        { model with IsSavingQbittorrent = false; QbittorrentSaveResult = Some saveResult }, cmd
 
     // Sync Status
     | Load_playtime_sync_status ->

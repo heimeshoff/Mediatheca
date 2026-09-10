@@ -4515,6 +4515,43 @@ module Api =
                     return Error $"Jellyfin connection test failed: {ex.Message}"
             }
 
+            // qBittorrent Integration (integration-qb7tk): credentials +
+            // "Test connection" only, ahead of any destructive flow. Unlike
+            // Jellyfin's combined "Test & Save", the setter is a distinct
+            // member -- testing never persists (ADR-0070 point 7: a
+            // qBittorrent session is cheap to reacquire, so there is no
+            // stored-token round-trip to validate here, just credentials).
+            getQbittorrentSettings = fun () -> async {
+                use conn = factory ()
+                return {
+                    Url = SettingsStore.getSetting conn "qbittorrent_url" |> Option.defaultValue ""
+                    Username = SettingsStore.getSetting conn "qbittorrent_username" |> Option.defaultValue ""
+                }
+            }
+
+            setQbittorrentCredentials = fun (url, username, password) -> async {
+                use conn = factory ()
+                try
+                    SettingsStore.setSetting conn "qbittorrent_url" url
+                    SettingsStore.setSetting conn "qbittorrent_username" username
+                    SettingsStore.setSetting conn "qbittorrent_password" password
+                    return Ok ()
+                with ex ->
+                    return Error $"Failed to save qBittorrent credentials: {ex.Message}"
+            }
+
+            testQbittorrentConnection = fun (url, username, password) -> async {
+                let config: Qbittorrent.QbittorrentConfig = { Url = url; Username = username; Password = password }
+                let! result = Qbittorrent.testConnection httpClient config
+                match result with
+                | Ok (version, torrentCount) ->
+                    return Ok (sprintf "Connected -- qBittorrent %s, %d torrent(s)" version torrentCount)
+                | Error Qbittorrent.AuthFailed ->
+                    return Error "qBittorrent authentication failed: check the username and password"
+                | Error (Qbittorrent.OtherFailure msg) ->
+                    return Error $"qBittorrent connection test failed: {msg}"
+            }
+
             getViewSettings = fun key -> async {
                 use conn = factory ()
                 match SettingsStore.getSetting conn ("view:" + key) with

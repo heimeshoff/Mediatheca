@@ -80,6 +80,21 @@ type Model = {
     JellyfinScanResult: Result<JellyfinScanResult, string> option
     IsImportingJellyfin: bool
     JellyfinImportResult: Result<JellyfinImportResult, string> option
+    // qBittorrent Integration (integration-qb7tk): credentials + a "Test
+    // connection" round-trip, ahead of any destructive flow
+    // (integration-r4vzm/mqsd3 build "Remove local copy" on the server-side
+    // adapter this card's Save button configures). Same Elmish shape as the
+    // Jellyfin card above, but Test and Save are two distinct actions/results
+    // rather than Jellyfin's combined "Test & Save".
+    QbittorrentUrl: string
+    QbittorrentUrlInput: string
+    QbittorrentUsername: string
+    QbittorrentUsernameInput: string
+    QbittorrentPasswordInput: string
+    IsTestingQbittorrent: bool
+    IsSavingQbittorrent: bool
+    QbittorrentTestResult: Result<string, string> option
+    QbittorrentSaveResult: Result<string, string> option
     // Sync Status
     PlaytimeSyncStatus: PlaytimeSyncStatus option
     JellyfinLastSyncTime: string option
@@ -196,6 +211,16 @@ type Msg =
     | Jellyfin_scan_completed of Result<JellyfinScanResult, string>
     | Import_jellyfin_watch_history
     | Jellyfin_import_completed of Result<JellyfinImportResult, string>
+    // qBittorrent Integration (integration-qb7tk)
+    | Load_qbittorrent_settings
+    | Qbittorrent_settings_loaded of QbittorrentSettings
+    | Qbittorrent_url_input_changed of string
+    | Qbittorrent_username_input_changed of string
+    | Qbittorrent_password_input_changed of string
+    | Test_qbittorrent_connection
+    | Qbittorrent_test_result of Result<string, string>
+    | Save_qbittorrent_settings
+    | Qbittorrent_save_result of Result<unit, string>
     // Sync Status
     | Load_playtime_sync_status
     | Playtime_sync_status_loaded of PlaytimeSyncStatus

@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-09-10 18:11 -- Task verified and completed: integration-qb7tk - qBittorrent adapter and Settings card — URL, username and password stored and tested from Settings exactly like Jellyfin's, plus a typed-error `Qbittorrent.fs` adapter (login, list torrents with ratio and seeding time, list a torrent's files, delete with files) that integration-r4vzm builds on
+
+**Type:** Work / Task completion
+**Task:** integration-qb7tk - qBittorrent adapter and Settings card — URL, username and password stored and tested from Settings exactly like Jellyfin's, plus a typed-error `Qbittorrent.fs` adapter (login, list torrents with ratio and seeding time, list a torrent's files, delete with files) that integration-r4vzm builds on
+**Summary:** Shipped the typed qBittorrent adapter (Qbittorrent.fs: login-once-use-once session, torrents/info + files decoders, deleteTorrents primitive, no Origin/Referer) with its Settings card and SettingsStore credential storage, mirroring the Jellyfin card without its ADR-0011 re-auth seam; iteration 2 closed the verifier gap with testConnection success/auth-failure coverage and a SettingsStore round-trip test
+**Duration:** 38m
+**Verification:** PASS (iteration 2)
+**Files changed:** 10
+**Tests added:** 12
+**ADRs written:** none
+
+---
+
+## 2026-09-10 17:54 -- Verification failed: integration-qb7tk - qBittorrent adapter and Settings card
+
+**Type:** Work / Verification failure
+**Task:** integration-qb7tk - qBittorrent adapter and Settings card — URL, username and password stored and tested from Settings exactly like Jellyfin's, plus a typed-error `Qbittorrent.fs` adapter that integration-r4vzm builds on
+**Iteration:** 1 of 3
+**Reasons:** Acceptance criterion 2 (`testQbittorrentConnection` returns Ok with app version + torrent count / Error naming authentication) has no test coverage — `Qbittorrent.testConnection` and its Api wrapper are never exercised; everything else passed (npm test 702/0, npm run build clean, scope confined, README updated, ADR-0070 point 7 honored)
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-09-10 17:33 -- Batch started: [integration-qb7tk]
 
 **Type:** Work / Batch start
