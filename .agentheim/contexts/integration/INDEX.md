@@ -11,19 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 2
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 19
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **integration-qb7tk** — qBittorrent adapter and Settings card — URL, username and password stored and tested from Settings exactly like Jellyfin's, plus a typed-error `Qbittorrent.fs` adapter (login, list torrents with ratio and seeding time, list a torrent's files, delete with files) that integration-r4vzm builds on (feature) — `todo/integration-qb7tk-qbittorrent-adapter-and-settings.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
-<!-- no tasks in doing -->
+- **integration-qb7tk** — qBittorrent adapter and Settings card — URL, username and password stored and tested from Settings exactly like Jellyfin's, plus a typed-error `Qbittorrent.fs` adapter (login, list torrents with ratio and seeding time, list a torrent's files, delete with files) that integration-r4vzm builds on (feature) — `doing/integration-qb7tk-qbittorrent-adapter-and-settings.md`
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)

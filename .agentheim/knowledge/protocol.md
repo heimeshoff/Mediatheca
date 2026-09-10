@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-10 17:33 -- Batch started: [integration-qb7tk]
+
+**Type:** Work / Batch start
+**Tasks:** integration-qb7tk - qBittorrent adapter and Settings card — URL, username and password stored and tested from Settings exactly like Jellyfin's, plus a typed-error `Qbittorrent.fs` adapter (login, list torrents with ratio and seeding time, list a torrent's files, delete with files) that integration-r4vzm builds on
+**Parallel:** no (1 worker — integration-qb7tk is the only ready task across every BC; nothing held back)
+
+---
+
 ## 2026-09-10 17:25 -- Modeling / Promoted: integration-qb7tk - qBittorrent adapter and Settings card — URL, username and password stored and tested from Settings exactly like Jellyfin's, plus a typed-error `Qbittorrent.fs` adapter (login, list torrents with ratio and seeding time, list a torrent's files, delete with files) that integration-r4vzm builds on
 
 **Type:** Modeling / Promote
