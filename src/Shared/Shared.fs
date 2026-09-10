@@ -1355,6 +1355,68 @@ type QbittorrentSettings = {
     Username: string
 }
 
+// Local Copy Removal (integration-r4vzm, ADR-0071): "Remove local copy" is
+// projection-only cache invalidation run as a re-derivable plan-then-execute
+// flow, not a domain event and not a persisted saga. Whole movies and whole
+// series only -- season/single-episode targets are follow-ups.
+type LocalCopyTarget =
+    | MovieTarget of slug: string
+    | SeriesTarget of slug: string
+
+/// How a live torrent's content path relates to the deletion scope (what
+/// Jellyfin will actually remove). `PackAncestor` names a torrent whose OWN
+/// folder is a strict ancestor of the scope -- deleting it with files would
+/// also delete sibling files outside the scope.
+type MatchKind =
+    | ExactOrInside
+    | PackAncestor of extraFileCount: int
+
+/// A hit-and-run risk is a warning, never a refusal (ADR-0071 point 2) -- the
+/// user decides; the tick just starts un-set.
+type SeedRisk =
+    | Safe
+    | HitAndRun of reason: string
+
+type PlannedTorrent = {
+    Hash: string
+    Name: string
+    Ratio: float
+    /// Seeding time in whole days. `System.TimeSpan` stays a server-only
+    /// (`Qbittorrent.TorrentInfo`) concern -- this is the wire-safe,
+    /// display-ready value.
+    SeedingTimeDays: float
+    Match: MatchKind
+    Risk: SeedRisk
+    /// `false` whenever `Risk = HitAndRun _` or `Match = PackAncestor _`.
+    PreTicked: bool
+}
+
+type RemovalCase =
+    | TorrentsPresent
+    | FilesOnly
+    | AlreadyGoneInJellyfin
+    | PathOutsideMountMap
+
+type RemovalPlan = {
+    Path: string
+    Case: RemovalCase
+    Torrents: PlannedTorrent list
+}
+
+type RemovalStep =
+    | PreserveWatchHistory
+    | ResolvePath
+    | MatchTorrents
+    | DeleteTorrents
+    | DeleteJellyfinItem
+    | Verify
+    | ClearLinks
+
+type RemovalOutcome = {
+    Completed: RemovalStep list
+    Failure: (RemovalStep * string) option
+}
+
 // View Settings
 
 type ViewSortField = ByReleaseDate | ByName | ByRating | ByWatchOrder
@@ -1601,6 +1663,10 @@ type IMediathecaApi = {
     getQbittorrentSettings: unit -> Async<QbittorrentSettings>
     setQbittorrentCredentials: string * string * string -> Async<Result<unit, string>>
     testQbittorrentConnection: string * string * string -> Async<Result<string, string>>
+    // Local copy removal (integration-r4vzm, ADR-0071): plan-then-execute,
+    // server-side only for now -- the UI is integration-mqsd3.
+    planLocalCopyRemoval: LocalCopyTarget -> Async<Result<RemovalPlan, string>>
+    removeLocalCopy: LocalCopyTarget * string list -> Async<RemovalOutcome>
     // Steam Family Last Sync
     getSteamFamilyLastSync: unit -> Async<string option>
     /// The last completed family import's full result (integration-n3vqa),

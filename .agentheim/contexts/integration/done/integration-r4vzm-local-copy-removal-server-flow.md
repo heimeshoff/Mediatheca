@@ -1,11 +1,11 @@
 ---
 id: integration-r4vzm
 title: Local copy removal, server side — a plan-then-execute flow (no UI) that imports the item's Jellyfin play state, deletes the acknowledged torrents with files from qBittorrent, DELETEs the Jellyfin item, verifies both gone, then clears the Jellyfin ids; pure `LocalCopyRemoval.fs` seams, Jellyfin DELETE support, per-item `JellyfinStore` clears (ADR-0071)
-status: doing
+status: done
 type: feature
 context: integration
 created: 2026-09-10
-completed:
+completed: 2026-09-10
 depends_on: [integration-qb7tk]
 blocks: [integration-mqsd3]
 tags: [jellyfin, qbittorrent, sync, movies, series, storage]
@@ -133,52 +133,55 @@ lock; a small `isSyncInProgress` beside it is the injectable guard), so the sync
 
 ## Acceptance criteria
 
-- [ ] `mapJellyfinPath` is unit-tested with the default roots and custom roots, and yields
+- [x] `mapJellyfinPath` is unit-tested with the default roots and custom roots, and yields
       `PathOutsideMountMap` for a path not under the Jellyfin root.
-- [ ] `isAncestorOf` is unit-tested at the segment boundary (`/x/Dune` vs `/x/Dune 2`).
-- [ ] `deletionScope` is unit-tested: a movie in its own folder → the folder; a bare-file
+- [x] `isAncestorOf` is unit-tested at the segment boundary (`/x/Dune` vs `/x/Dune 2`).
+- [x] `deletionScope` is unit-tested: a movie in its own folder → the folder; a bare-file
       movie directly in a library root → the file; a series → the show folder.
-- [ ] `matchTorrents` is unit-tested with fixture `TorrentInfo` lists: a movie in its own
+- [x] `matchTorrents` is unit-tested with fixture `TorrentInfo` lists: a movie in its own
       folder (torrent content path is the folder, Jellyfin path is the file →
       `ExactOrInside`), a bare-file movie (`ExactOrInside`), a multi-torrent series (every
       torrent `ExactOrInside`), two cross-seeds on the same folder (both listed), a pack
       torrent whose content path is a strict ancestor of the scope (`PackAncestor n` with
       the right `n`), and zero matches (`FilesOnly`).
-- [ ] `plan` rejects a target whose deletion scope is the Jellyfin root or a library root
+- [x] `plan` rejects a target whose deletion scope is the Jellyfin root or a library root
       (fewer than two segments below the root) — unit-tested.
-- [ ] `classifySeedRisk` is unit-tested at both threshold boundaries, for the flagged case,
+- [x] `classifySeedRisk` is unit-tested at both threshold boundaries, for the flagged case,
       and for the `-1` and `9999` sentinels.
-- [ ] `PlannedTorrent.PreTicked` is `false` for every `HitAndRun` and every `PackAncestor`
+- [x] `PlannedTorrent.PreTicked` is `false` for every `HitAndRun` and every `PackAncestor`
       row and `true` otherwise — unit-tested.
-- [ ] `execute` is unit-tested with fixture lambdas: full success in step order; the
+- [x] `execute` is unit-tested with fixture lambdas: full success in step order; the
       watch-history lambda fires before any delete lambda; a watch-history failure aborts
       before any delete; an acknowledged set that differs from the fresh match set fails at
       `MatchTorrents` with nothing deleted; a torrent-delete failure aborts before the
       Jellyfin delete; a Jellyfin-delete failure (including a second 401 after one re-auth)
       aborts before `clearLinks`; a verify failure after both deletes still does **not** call
       `clearLinks`; `FilesOnly` skips `deleteTorrents`.
-- [ ] `execute` refuses while the injected sync-in-progress guard reports true — unit-tested.
-- [ ] `Jellyfin.getItemWithReauth` maps 404 to `Ok None` and `deleteItemWithReauth` maps
+- [x] `execute` refuses while the injected sync-in-progress guard reports true — unit-tested.
+- [x] `Jellyfin.getItemWithReauth` maps 404 to `Ok None` and `deleteItemWithReauth` maps
       404 to `Ok ()`; both are built on `withReauthRetry` (401-then-success lambda pair).
       The existing six `JellyfinReauthTests.fs` tests are unchanged and pass.
-- [ ] `JellyfinStore.getSeriesJellyfinId` exists; `clearSeriesJellyfinId` removes the series
+- [x] `JellyfinStore.getSeriesJellyfinId` exists; `clearSeriesJellyfinId` removes the series
       row and all its episode rows; calling any clear twice is a no-op — tested on in-memory
       SQLite.
-- [ ] `JellyfinImport.syncMovieWatchHistory` exists as a pure seam; `runJellyfinImport` calls
+- [x] `JellyfinImport.syncMovieWatchHistory` exists as a pure seam; `runJellyfinImport` calls
       it and the existing `JellyfinImportTests.fs` still pass.
-- [ ] No new event case is added to `Movies.fs` or `Series.fs` (grep-checkable; ADR-0071).
+- [x] No new event case is added to `Movies.fs` or `Series.fs` (grep-checkable; ADR-0071).
 - [ ] Live on harbour via `curl` against the two API routes (builder-run after deploy — a
       worker or verifier never touches harbour): a movie with a Jellyfin id →
       after `removeLocalCopy`, `GET /Items/{id}` is 404, the hash is absent from
       `torrents/info`, `jellyfin_movie` has no row for the slug. A series → every torrent
       under its show folder gone, the series item 404, no `jellyfin_series` /
       `jellyfin_episode` rows for the slug.
+      **Pending the builder's post-deploy check — not performed by this worker.**
 - [ ] The movie's files and the show folder are gone from `/mnt/media/files` on harbour
       (the mediatheca container has no mount of it — builder checks over ssh). [human-eye]
+      **Pending the builder's post-deploy check — not performed by this worker.**
 - [ ] Play state recorded in Jellyfin after the last sync is visible in Mediatheca after the
       removal — live check by the builder with a movie marked played in Jellyfin right
       before removal.
-- [ ] `npm run build` and `npm test` pass.
+      **Pending the builder's post-deploy check — not performed by this worker.**
+- [x] `npm run build` and `npm test` pass.
 
 ## Notes
 
@@ -223,3 +226,69 @@ delete semantics, no `/mnt/media/files` mount in the mediatheca container).
 
 **README:** on completion add **Local copy** / **Removal plan** entries to the Integration
 ubiquitous language (the worker's README update).
+
+## Outcome
+
+Shipped the whole server-side "Remove local copy" flow behind two new `IMediathecaApi`
+members, `planLocalCopyRemoval` and `removeLocalCopy`, exactly as scoped — no UI (that's
+integration-mqsd3).
+
+- **`src/Server/LocalCopyRemoval.fs`** (new) — every pure seam from the task's **What**:
+  `mapJellyfinPath`, `isAncestorOf`, `deletionScope`, `matchTorrents`, `classifySeedRisk`
+  (named constants `minRatio = 1.0`, `minSeedingDays = 14.0`), plus the two orchestrators
+  `planLocalCopyRemoval` (`PlanEffects` record) and `execute` (`ExecuteEffects` record).
+  `execute` is a fixed-order, abort-on-first-failure railway
+  (PreserveWatchHistory → ResolvePath → MatchTorrents → DeleteTorrents →
+  DeleteJellyfinItem → Verify → ClearLinks) implemented as nested `match` (no early-return
+  primitive in F#, so each step's success case nests the remaining steps). `RemovalPlan`,
+  `RemovalOutcome`, `LocalCopyTarget`, `MatchKind`, `SeedRisk`, `PlannedTorrent`,
+  `RemovalCase`, `RemovalStep` live in `src/Shared/Shared.fs` (wire-crossing types on the
+  `IMediathecaApi` contract) — `PlannedTorrent.SeedingTimeDays: float` stands in for
+  `Qbittorrent.TorrentInfo.SeedingTime: System.TimeSpan`, which stays server-only.
+- **`src/Server/Jellyfin.fs`** — `JellyfinBaseItem.Path: string option` (additive);
+  `fetchJsonWithAuth` generalized into `sendWithAuth (httpMethod) …` with the GET wrapper
+  kept byte-for-byte (ADR-0011's pinned `JellyfinReauthTests.fs` untouched, still 6 tests,
+  still green); new `getItemWithReauth` (`GET /Items/{id}`, 404 → `Ok None`) and
+  `deleteItemWithReauth` (`DELETE /Items/{id}`, 404 → `Ok ()`), both built on
+  `withReauthRetry`. No `NotFound` case added to `FetchError` — a 404 folds into
+  `OtherFailure "HTTP 404"` and is unfolded back into a success one layer up in each of the
+  two new functions.
+- **`src/Server/JellyfinStore.fs`** — `getSeriesJellyfinId` (the missing getter),
+  `clearMovieJellyfinId`, `clearSeriesJellyfinId` (cascades to `jellyfin_episode`),
+  `clearEpisodeJellyfinId`. All `DELETE … WHERE`, idempotent. `clearAll` untouched and
+  never called by the removal flow.
+- **`src/Server/JellyfinImport.fs`** — `syncMovieWatchHistory` (+ `MovieWatchSyncResult`),
+  the movie sibling of `syncSeriesWatchHistory`, extracted from `Api.runJellyfinImport`'s
+  previously-inline Phase 2 movie loop with identical semantics (existsOnDate /
+  getRuntime / writeSession injected).
+- **`src/Server/JellyfinSync.fs`** — `isSyncInProgress ()`, a thin same-lock reader beside
+  `getSyncStatus`, wired as `execute`'s `IsSyncInProgress` guard.
+- **`src/Server/Api.fs`** — `runJellyfinImport`'s movie Phase 2 now delegates to
+  `JellyfinImport.syncMovieWatchHistory` via a factored `movieWatchHistoryEffects` helper
+  (shared with `removeLocalCopy`'s preserve-watch-history step); the series `writeEpisode`
+  closure is likewise factored into `seriesWatchHistoryWriteEpisode`. `planLocalCopyRemoval`
+  and `removeLocalCopy` wire real SQLite/HTTP effects (`JellyfinStore`, `Qbittorrent.withSession`
+  — a fresh login per operation, ADR-0071 point 7 — `Jellyfin.getItemWithReauth`/
+  `deleteItemWithReauth`) into `LocalCopyRemoval.planLocalCopyRemoval`/`execute`.
+- **`src/Server/Composition.fs`** — `getQbittorrentConfig` (mirrors `getJellyfinConfig`'s
+  shape) and `mountRoots` (env vars `JELLYFIN_MEDIA_ROOT`/`QBITTORRENT_DOWNLOAD_ROOT`,
+  defaulted, read once, never seeded into `SettingsStore`), threaded into `Api.create`'s two
+  new parameters.
+- **Tests** (60 new `testCase`s, all green): `LocalCopyRemovalTests.fs` (41 — every pure
+  function plus `plan`/`execute` fixture-lambda coverage matching every listed acceptance
+  scenario), `JellyfinItemTests.fs` (6, new file — `getItemWithReauth`/`deleteItemWithReauth`
+  against a fake `HttpMessageHandler`, 200/404/401-then-retry), `JellyfinStoreTests.fs`
+  (8, new file, in-memory SQLite), 5 new `syncMovieWatchHistory` cases appended to
+  `JellyfinImportTests.fs`. Full suite: `npm test` → 758 passed, 0 failed. `npm run build`
+  (Fable/Vite client typecheck, exercising the new Shared.fs types) green.
+  Eight existing `Api.create` call sites across other test files were updated for the two
+  new parameters (mechanical — a fixture qBittorrent config + `LocalCopyRemoval.defaultMountRoots`).
+
+The three [human-eye]/builder-run acceptance criteria (live-on-harbour `curl` checks, the
+`/mnt/media/files` ssh check, the live play-state-after-removal check) are explicitly left
+unticked above — they are the builder's post-deploy responsibility per this task's own
+Rule 7, not a worker's.
+
+No new ADR: ADR-0071 (already written by the prior modeling pass) covers every design
+decision this task implements; nothing here needed a fresh "why this, not the obvious
+alternative" beyond what it already records.

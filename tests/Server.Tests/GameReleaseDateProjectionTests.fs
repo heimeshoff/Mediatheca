@@ -65,6 +65,8 @@ let private createDashboardApi (factory: unit -> SqliteConnection) : IMediatheca
         (fun () -> ({ ApiKey = "" } : Rawg.RawgConfig))
         (fun () -> ({ ApiKey = ""; SteamId = "" } : Steam.SteamConfig))
         (fun () -> ({ ServerUrl = ""; Username = ""; Password = ""; UserId = ""; AccessToken = "" } : Jellyfin.JellyfinConfig))
+        (fun () -> ({ Url = ""; Username = ""; Password = "" } : Qbittorrent.QbittorrentConfig))
+        LocalCopyRemoval.defaultMountRoots
         noImagesDir
         [ ContentBlockProjection.handler; GameProjection.handler; PlaySessionProjection.handler ]
 

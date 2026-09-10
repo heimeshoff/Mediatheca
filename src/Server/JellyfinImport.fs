@@ -83,6 +83,66 @@ module JellyfinImport =
           Errors = errors
           Failed = not (List.isEmpty errors) }
 
+    /// Outcome of syncing movie watch history -- the movie sibling of
+    /// `SeriesWatchSyncResult`.
+    type MovieWatchSyncResult = {
+        MoviesAdded: int
+        ItemsSkipped: int
+        Errors: string list
+        Failed: bool
+    }
+
+    /// Sync watch history for a batch of (slug, jellyfin movie item) pairs.
+    /// Extracted from `Api.runJellyfinImport`'s previously-inline Phase 2
+    /// movie loop (integration-r4vzm) so `LocalCopyRemoval.execute`'s
+    /// mandatory preserve-watch-history step (ADR-0071) can reuse the exact
+    /// same write-session logic for a single movie without duplicating it --
+    /// the movie sibling of `syncSeriesWatchHistory`, same fault-isolation
+    /// idiom (a bad movie is recorded into `Errors` and the loop continues).
+    ///
+    /// - `existsOnDate` slug -> date -> whether a watch session already
+    ///   exists on that date (skip -- never double-record a re-sync)
+    /// - `getRuntime`   slug -> the movie's runtime in minutes, if known
+    /// - `writeSession` slug -> date -> runtime -> Result<unit, string>
+    let syncMovieWatchHistory
+        (movieBatch: (string * JellyfinBaseItem) list)
+        (existsOnDate: string -> string -> bool)
+        (getRuntime: string -> int option)
+        (writeSession: string -> string -> int option -> Result<unit, string>)
+        : MovieWatchSyncResult =
+
+        let mutable moviesAdded = 0
+        let mutable itemsSkipped = 0
+        let mutable errors: string list = []
+
+        for (slug, item) in movieBatch do
+            try
+                let played = item.UserData |> Option.map (fun ud -> ud.Played) |> Option.defaultValue false
+                if not played then
+                    itemsSkipped <- itemsSkipped + 1
+                else
+                    let watchDate =
+                        item.UserData
+                        |> Option.bind (fun ud -> ud.LastPlayedDate)
+                        |> Option.map (fun d -> d.Substring(0, min 10 d.Length))
+                        |> Option.defaultValue (System.DateTime.UtcNow.ToString("yyyy-MM-dd"))
+                    if existsOnDate slug watchDate then
+                        itemsSkipped <- itemsSkipped + 1
+                    else
+                        try
+                            match writeSession slug watchDate (getRuntime slug) with
+                            | Ok () -> moviesAdded <- moviesAdded + 1
+                            | Error e -> errors <- errors @ [ sprintf "Movie '%s': %s" slug e ]
+                        with ex ->
+                            errors <- errors @ [ sprintf "Movie '%s' threw: %s" slug ex.Message ]
+            with ex ->
+                errors <- errors @ [ sprintf "Movie '%s' aborted: %s" slug ex.Message ]
+
+        { MoviesAdded = moviesAdded
+          ItemsSkipped = itemsSkipped
+          Errors = errors
+          Failed = not (List.isEmpty errors) }
+
     /// A season/episode metadata row built from Jellyfin to fill a gap TMDB has
     /// not (yet) covered. Aired numbering matches the TMDB-seeded projection, so
     /// no remap layer is needed. `Runtime` is already in minutes.

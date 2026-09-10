@@ -93,6 +93,8 @@ let private createApi (factory: unit -> SqliteConnection) (httpClient: HttpClien
         (fun () -> ({ ApiKey = "" } : Rawg.RawgConfig)) // empty RAWG key: no RAWG calls, keeps the counted total deterministic
         (fun () -> steamConfig)
         (fun () -> ({ ServerUrl = ""; Username = ""; Password = ""; UserId = ""; AccessToken = "" } : Jellyfin.JellyfinConfig))
+        (fun () -> ({ Url = ""; Username = ""; Password = "" } : Qbittorrent.QbittorrentConfig))
+        LocalCopyRemoval.defaultMountRoots
         noImagesDir
         allProjectionHandlers
 

@@ -70,6 +70,13 @@ module JellyfinSync =
             | Error _ -> ()
         | None -> ()
 
+    /// Whether a sync is currently running -- the small injectable guard
+    /// `LocalCopyRemoval.execute` uses to refuse interleaving with this
+    /// module's `clearAll` + repopulate (integration-r4vzm, ADR-0071 point
+    /// 5). Reads the same flag `getSyncStatus` does, under the same lock.
+    let isSyncInProgress () : bool =
+        lock syncLock (fun () -> syncInProgress)
+
     /// Get current sync status
     let getSyncStatus () : JellyfinSyncStatus =
         lock syncLock (fun () ->

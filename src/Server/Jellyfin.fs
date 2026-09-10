@@ -48,6 +48,10 @@ module Jellyfin =
         // season/episode the TMDB-fed projection lacks can be built from Jellyfin.
         PremiereDate: string option
         PrimaryImageTag: string option
+        // Filesystem path on the Jellyfin server (integration-r4vzm): the seam
+        // "Remove local copy" maps onto qBittorrent's mount to find matching
+        // torrents. Additive -- no existing call site changes.
+        Path: string option
     }
 
     type JellyfinItemsResponse = {
@@ -97,6 +101,7 @@ module Jellyfin =
             PrimaryImageTag =
                 get.Optional.Field "ImageTags" (Decode.object (fun g -> g.Optional.Field "Primary" Decode.string))
                 |> Option.bind id
+            Path = get.Optional.Field "Path" Decode.string
         })
 
     let private decodeItemsResponse: Decoder<JellyfinItemsResponse> =
@@ -128,13 +133,21 @@ module Jellyfin =
         | Unauthorized
         | OtherFailure of string
 
-    /// GET the URL with the given token. A 401/403 returns `Error Unauthorized`
-    /// instead of throwing (the previous `EnsureSuccessStatusCode` threw on every
-    /// non-success), so the caller can decide to re-authenticate and retry.
-    let private fetchJsonWithAuth (httpClient: HttpClient) (url: string) (token: string) : Async<Result<string, FetchError>> =
+    /// Send the URL with the given token and HTTP method. A 401/403 returns
+    /// `Error Unauthorized` instead of throwing (the previous
+    /// `EnsureSuccessStatusCode` threw on every non-success), so the caller
+    /// can decide to re-authenticate and retry. Generalized from the
+    /// original GET-only `fetchJsonWithAuth` (integration-r4vzm) so
+    /// `deleteItemWithReauth`'s DELETE can share it -- the GET wrapper right
+    /// below keeps its exact original shape so ADR-0011's pinned
+    /// `JellyfinReauthTests.fs` stay untouched. No `NotFound` case is added
+    /// to `FetchError`: a 404 folds into `OtherFailure "HTTP 404"` like any
+    /// other non-2xx, and callers that care (`getItemWithReauth` /
+    /// `deleteItemWithReauth`) unfold it back into a success one layer up.
+    let private sendWithAuth (httpMethod: HttpMethod) (httpClient: HttpClient) (url: string) (token: string) : Async<Result<string, FetchError>> =
         async {
             try
-                use request = new HttpRequestMessage(HttpMethod.Get, url)
+                use request = new HttpRequestMessage(httpMethod, url)
                 request.Headers.Add("Authorization", authHeader token)
                 let! response = httpClient.SendAsync(request) |> Async.AwaitTask
                 let status = int response.StatusCode
@@ -148,6 +161,11 @@ module Jellyfin =
             with ex ->
                 return Error (OtherFailure ex.Message)
         }
+
+    /// GET the URL with the given token. Unchanged shape from before the
+    /// `sendWithAuth` generalization above.
+    let private fetchJsonWithAuth (httpClient: HttpClient) (url: string) (token: string) : Async<Result<string, FetchError>> =
+        sendWithAuth HttpMethod.Get httpClient url token
 
     /// Run a token-consuming fetch with an exactly-once re-auth-and-retry policy
     /// (integration-002, ADR 0010 follow-up).
@@ -290,6 +308,48 @@ module Jellyfin =
             (fun token -> fetchEpisodeItems httpClient config.ServerUrl config.UserId token seriesId)
             (reauthThunk httpClient config)
             persistAuth
+
+    /// `GET /Items/{id}` (integration-r4vzm, ADR-0071): resolves a single
+    /// item by id -- "Remove local copy" reads its `Path` to find the
+    /// matching torrents. A 404 maps to `Ok None` (already gone in
+    /// Jellyfin), unfolded here from `sendWithAuth`'s generic `OtherFailure
+    /// "HTTP 404"` since no `NotFound` case is added to `FetchError`. Built
+    /// on `withReauthRetry` like every other self-healing fetch.
+    let getItemWithReauth (httpClient: HttpClient) (config: JellyfinConfig) (persistAuth: JellyfinAuthResult -> unit) (itemId: string) : Async<Result<JellyfinBaseItem option, string>> =
+        async {
+            let url = sprintf "%s/Items/%s" (config.ServerUrl.TrimEnd('/')) itemId
+            let! result =
+                withReauthRetry
+                    config.AccessToken
+                    (fun token -> sendWithAuth HttpMethod.Get httpClient url token)
+                    (reauthThunk httpClient config)
+                    persistAuth
+            match result with
+            | Ok body ->
+                match Decode.fromString decodeBaseItem body with
+                | Ok item -> return Ok (Some item)
+                | Error e -> return Error (sprintf "Failed to parse item response: %s" e)
+            | Error msg when msg = "HTTP 404" -> return Ok None
+            | Error msg -> return Error msg
+        }
+
+    /// `DELETE /Items/{id}` (integration-r4vzm, ADR-0071): a 404 maps to
+    /// `Ok ()` (already gone -- idempotent, matching every other step in the
+    /// removal flow). Built on `withReauthRetry`.
+    let deleteItemWithReauth (httpClient: HttpClient) (config: JellyfinConfig) (persistAuth: JellyfinAuthResult -> unit) (itemId: string) : Async<Result<unit, string>> =
+        async {
+            let url = sprintf "%s/Items/%s" (config.ServerUrl.TrimEnd('/')) itemId
+            let! result =
+                withReauthRetry
+                    config.AccessToken
+                    (fun token -> sendWithAuth HttpMethod.Delete httpClient url token)
+                    (reauthThunk httpClient config)
+                    persistAuth
+            match result with
+            | Ok _ -> return Ok ()
+            | Error msg when msg = "HTTP 404" -> return Ok ()
+            | Error msg -> return Error msg
+        }
 
     /// Binary sibling of `fetchJsonWithAuth` (integration-007): identical auth
     /// header and 401/403 -> `Unauthorized` mapping, but reads the response body

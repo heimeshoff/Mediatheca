@@ -212,6 +212,27 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
           UserId = SettingsStore.getSetting conn "jellyfin_user_id" |> Option.defaultValue ""
           AccessToken = SettingsStore.getSetting conn "jellyfin_access_token" |> Option.defaultValue "" }
 
+    // Dynamic qBittorrent config provider (reads from DB) -- mirrors
+    // `getJellyfinConfig`'s shape (integration-r4vzm).
+    let getQbittorrentConfig () : Qbittorrent.QbittorrentConfig =
+        use conn = connectionFactory ()
+        { Url = SettingsStore.getSetting conn "qbittorrent_url" |> Option.defaultValue ""
+          Username = SettingsStore.getSetting conn "qbittorrent_username" |> Option.defaultValue ""
+          Password = SettingsStore.getSetting conn "qbittorrent_password" |> Option.defaultValue "" }
+
+    // Mount root mapping for "Remove local copy" (integration-r4vzm,
+    // ADR-0071): a deployment fact, not a user setting -- read once from env
+    // vars the way TMDB_API_KEY/STEAM_ID are, but held in a plain config
+    // record handed to the API, never seeded into SettingsStore.
+    let mountRoots : LocalCopyRemoval.MountRoots =
+        let envRoot (name: string) (fallback: string) =
+            Environment.GetEnvironmentVariable(name)
+            |> Option.ofObj
+            |> Option.filter (fun s -> s <> "")
+            |> Option.defaultValue fallback
+        { JellyfinRoot = envRoot "JELLYFIN_MEDIA_ROOT" LocalCopyRemoval.defaultMountRoots.JellyfinRoot
+          QbittorrentRoot = envRoot "QBITTORRENT_DOWNLOAD_ROOT" LocalCopyRemoval.defaultMountRoots.QbittorrentRoot }
+
     // Dynamic Steam config provider (reads from DB, falls back to env var)
     let getSteamConfig () : Steam.SteamConfig =
         use conn = connectionFactory ()
@@ -441,7 +462,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     let adminGuards = Administration.makeGuards ()
 
     // Create API
-    let api = Api.create connectionFactory httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig imageBasePath projectionHandlers
+    let api = Api.create connectionFactory httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig getQbittorrentConfig mountRoots imageBasePath projectionHandlers
     let adminApi = Administration.create connectionFactory dbPath imageBasePath projectionHandlers scheduledJobs jobRunRecorder adminGuards
 
     let remotingHandler =

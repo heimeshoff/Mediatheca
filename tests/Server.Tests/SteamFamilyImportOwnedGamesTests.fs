@@ -79,6 +79,8 @@ let private createApi (factory: unit -> SqliteConnection) (httpClient: HttpClien
         (fun () -> ({ ApiKey = "" } : Rawg.RawgConfig))
         (fun () -> ({ ApiKey = "revoked-key"; SteamId = "76561198000000000" } : Steam.SteamConfig))
         (fun () -> ({ ServerUrl = ""; Username = ""; Password = ""; UserId = ""; AccessToken = "" } : Jellyfin.JellyfinConfig))
+        (fun () -> ({ Url = ""; Username = ""; Password = "" } : Qbittorrent.QbittorrentConfig))
+        LocalCopyRemoval.defaultMountRoots
         noImagesDir
         allProjectionHandlers
 

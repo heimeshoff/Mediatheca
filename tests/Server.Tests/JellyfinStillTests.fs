@@ -84,6 +84,7 @@ let private mkEp (season: int) (episode: int) : JellyfinBaseItem = {
     ParentIndexNumber = Some season
     PremiereDate = Some "2026-05-26T00:00:00.0000000Z"
     PrimaryImageTag = None
+    Path = None
 }
 
 [<Tests>]

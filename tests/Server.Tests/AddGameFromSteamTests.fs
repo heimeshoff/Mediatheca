@@ -88,6 +88,8 @@ let private createApi (factory: unit -> SqliteConnection) (httpClient: HttpClien
         (fun () -> ({ ApiKey = "" } : Rawg.RawgConfig))
         (fun () -> ({ ApiKey = ""; SteamId = "" } : Steam.SteamConfig))
         (fun () -> ({ ServerUrl = ""; Username = ""; Password = ""; UserId = ""; AccessToken = "" } : Jellyfin.JellyfinConfig))
+        (fun () -> ({ Url = ""; Username = ""; Password = "" } : Qbittorrent.QbittorrentConfig))
+        LocalCopyRemoval.defaultMountRoots
         noImagesDir
         allProjectionHandlers
 

@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-10 19:13 -- Task verified and completed: integration-r4vzm - Local copy removal, server side — a plan-then-execute flow (no UI) that imports the item's Jellyfin play state, deletes the acknowledged torrents with files from qBittorrent, DELETEs the Jellyfin item, verifies both gone, then clears the Jellyfin ids; pure `LocalCopyRemoval.fs` seams, Jellyfin DELETE support, per-item `JellyfinStore` clears (ADR-0071)
+
+**Type:** Work / Task completion
+**Task:** integration-r4vzm - Local copy removal, server side — a plan-then-execute flow (no UI) that imports the item's Jellyfin play state, deletes the acknowledged torrents with files from qBittorrent, DELETEs the Jellyfin item, verifies both gone, then clears the Jellyfin ids; pure `LocalCopyRemoval.fs` seams, Jellyfin DELETE support, per-item `JellyfinStore` clears (ADR-0071)
+**Summary:** Shipped the server-side Remove local copy flow: planLocalCopyRemoval/removeLocalCopy API members over a pure LocalCopyRemoval.fs (mount-path mapping, deletion scope, torrent matching, seed-risk, plan/execute orchestrators), Jellyfin GET/DELETE /Items/{id} on withReauthRetry, per-item JellyfinStore clears, and the extracted JellyfinImport.syncMovieWatchHistory seam; no UI (integration-mqsd3)
+**Duration:** 29m
+**Verification:** PASS (iteration 1)
+**Files changed:** 24
+**Tests added:** 60
+**ADRs written:** none
+
+---
+
 ## 2026-09-10 18:43 -- Batch started: [integration-r4vzm]
 
 **Type:** Work / Batch start

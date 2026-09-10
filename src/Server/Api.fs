@@ -14,6 +14,14 @@ module Api =
         if System.String.IsNullOrEmpty(html) then ""
         else Regex.Replace(html, "<[^>]+>", "")
 
+    /// `Qbittorrent.QbittorrentError` -> a plain message, the sibling of how
+    /// `Jellyfin.withReauthRetry`'s errors are already flattened to strings
+    /// at this boundary (integration-r4vzm).
+    let private qbErrorToString (e: Qbittorrent.QbittorrentError) : string =
+        match e with
+        | Qbittorrent.AuthFailed -> "qBittorrent authentication failed"
+        | Qbittorrent.OtherFailure msg -> msg
+
     /// games-v4nqe: read-modify-write helper shared by every converted Steam
     /// emission site below. Reads the current `game_metadata_cache` identity
     /// card, overrides only the fields the caller actually passes `Some` for
@@ -928,6 +936,74 @@ module Api =
                 return! earlyReturn ctx
             }
 
+    /// Effects for `JellyfinImport.syncMovieWatchHistory`, factored out so
+    /// both `runJellyfinImport`'s bulk Phase 2 loop and
+    /// `removeLocalCopy`'s mandatory preserve-watch-history step
+    /// (integration-r4vzm, ADR-0071) write watch sessions identically.
+    let private movieWatchHistoryEffects
+        (conn: SqliteConnection)
+        (movieProjections: Projection.ProjectionHandler list)
+        : (string -> string -> bool) * (string -> int option) * (string -> string -> int option -> Result<unit, string>) =
+        let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
+            executeCommandCore conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
+        let existsOnDate (slug: string) (date: string) : bool =
+            conn
+            |> Db.newCommand "SELECT COUNT(*) as cnt FROM watch_sessions WHERE movie_slug = @slug AND SUBSTR(date, 1, 10) = @date"
+            |> Db.setParams [ "slug", SqlType.String slug; "date", SqlType.String date ]
+            |> Db.querySingle (fun (rd: System.Data.IDataReader) -> rd.ReadInt32 "cnt")
+            |> Option.defaultValue 0
+            |> fun c -> c > 0
+        let getRuntime (slug: string) : int option =
+            conn
+            |> Db.newCommand "SELECT runtime FROM movie_detail WHERE slug = @slug"
+            |> Db.setParams [ "slug", SqlType.String slug ]
+            |> Db.querySingle (fun (rd: System.Data.IDataReader) ->
+                if rd.IsDBNull(rd.GetOrdinal("runtime")) then None
+                else Some (rd.ReadInt32 "runtime"))
+            |> Option.flatten
+        let writeSession (slug: string) (date: string) (runtime: int option) : Result<unit, string> =
+            let sessionData: Movies.WatchSessionRecordedData = {
+                SessionId = System.Guid.NewGuid().ToString("N")
+                Date = date
+                Duration = runtime
+                FriendSlugs = []
+            }
+            let sid = Movies.streamId slug
+            executeCommand
+                conn sid
+                Movies.Serialization.fromStoredEvent
+                Movies.reconstitute
+                Movies.decide
+                Movies.Serialization.toEventData
+                (Movies.Record_watch_session sessionData)
+                movieProjections
+        (existsOnDate, getRuntime, writeSession)
+
+    /// The series sibling of `movieWatchHistoryEffects`'s `writeSession`,
+    /// factored out for the same reason -- reused by `removeLocalCopy`'s
+    /// preserve-watch-history step.
+    let private seriesWatchHistoryWriteEpisode
+        (conn: SqliteConnection)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        : string -> string -> int -> int -> string -> Result<unit, string> =
+        let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
+            executeCommandCore conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
+        fun (slug: string) (defaultRewatchId: string) (seasonNum: int) (epNum: int) (watchDate: string) ->
+            let sid = Series.streamId slug
+            executeCommand
+                conn sid
+                Series.Serialization.fromStoredEvent
+                Series.reconstitute
+                Series.decide
+                Series.Serialization.toEventData
+                (Series.Mark_episode_watched {
+                    RewatchId = defaultRewatchId
+                    SeasonNumber = seasonNum
+                    EpisodeNumber = epNum
+                    Date = watchDate
+                })
+                projectionHandlers
+
     let runJellyfinImport
         (conn: SqliteConnection)
         (httpClient: HttpClient)
@@ -936,8 +1012,6 @@ module Api =
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
         : Async<Result<JellyfinImportResult, string>> = async {
-            let executeCommand conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers =
-                executeCommandCore conn streamId fromStoredEvent reconstitute decide toEventData command projectionHandlers
             try
                 let config = getJellyfinConfig ()
                 if System.String.IsNullOrWhiteSpace(config.AccessToken) || System.String.IsNullOrWhiteSpace(config.UserId) then
@@ -1009,62 +1083,27 @@ module Api =
                                 | None -> ()
                             | None -> ()
 
-                        // Phase 2: Sync watch history
+                        // Phase 2: Sync watch history. Matched-with-tmdb movies go into a
+                        // batch (isolating a bad write from the rest, integration-001's
+                        // pattern); an unmatched or tmdb-less item is skipped right here
+                        // exactly as before, since JellyfinImport.syncMovieWatchHistory
+                        // (integration-r4vzm) only ever sees already-matched items.
+                        let mutable movieBatch: (string * Jellyfin.JellyfinBaseItem) list = []
                         for item in jellyfinMovies do
-                            let played = item.UserData |> Option.map (fun ud -> ud.Played) |> Option.defaultValue false
                             let tmdbId =
                                 item.ProviderIds.Tmdb
                                 |> Option.bind (fun s -> match System.Int32.TryParse(s) with true, v -> Some v | _ -> None)
-                            match played, tmdbId with
-                            | true, Some tid ->
+                            match tmdbId with
+                            | Some tid ->
                                 match Map.tryFind tid moviesByTmdbId with
-                                | Some (slug, _name) ->
-                                    let lastPlayedDate =
-                                        item.UserData
-                                        |> Option.bind (fun ud -> ud.LastPlayedDate)
-                                        |> Option.map (fun d -> d.Substring(0, min 10 d.Length))
-                                        |> Option.defaultValue (System.DateTime.UtcNow.ToString("yyyy-MM-dd"))
-                                    // Check if a watch session already exists on this date
-                                    let existsOnDate =
-                                        conn
-                                        |> Db.newCommand "SELECT COUNT(*) as cnt FROM watch_sessions WHERE movie_slug = @slug AND SUBSTR(date, 1, 10) = @date"
-                                        |> Db.setParams [ "slug", SqlType.String slug; "date", SqlType.String lastPlayedDate ]
-                                        |> Db.querySingle (fun (rd: System.Data.IDataReader) -> rd.ReadInt32 "cnt")
-                                        |> Option.defaultValue 0
-                                        |> fun c -> c > 0
-                                    if existsOnDate then
-                                        itemsSkipped <- itemsSkipped + 1
-                                    else
-                                        let runtime =
-                                            conn
-                                            |> Db.newCommand "SELECT runtime FROM movie_detail WHERE slug = @slug"
-                                            |> Db.setParams [ "slug", SqlType.String slug ]
-                                            |> Db.querySingle (fun (rd: System.Data.IDataReader) ->
-                                                if rd.IsDBNull(rd.GetOrdinal("runtime")) then None
-                                                else Some (rd.ReadInt32 "runtime"))
-                                            |> Option.flatten
-                                        let sessionId = System.Guid.NewGuid().ToString("N")
-                                        let sessionData: Movies.WatchSessionRecordedData = {
-                                            SessionId = sessionId
-                                            Date = lastPlayedDate
-                                            Duration = runtime
-                                            FriendSlugs = []
-                                        }
-                                        let sid = Movies.streamId slug
-                                        let result =
-                                            executeCommand
-                                                conn sid
-                                                Movies.Serialization.fromStoredEvent
-                                                Movies.reconstitute
-                                                Movies.decide
-                                                Movies.Serialization.toEventData
-                                                (Movies.Record_watch_session sessionData)
-                                                movieProjections
-                                        match result with
-                                        | Ok () -> moviesAdded <- moviesAdded + 1
-                                        | Error e -> errors <- errors @ [sprintf "Movie '%s': %s" slug e]
+                                | Some (slug, _name) -> movieBatch <- movieBatch @ [ (slug, item) ]
                                 | None -> itemsSkipped <- itemsSkipped + 1
-                            | _ -> itemsSkipped <- itemsSkipped + 1
+                            | None -> itemsSkipped <- itemsSkipped + 1
+                        let (existsOnDate, getRuntime, writeSession) = movieWatchHistoryEffects conn movieProjections
+                        let movieWatchSync = JellyfinImport.syncMovieWatchHistory movieBatch existsOnDate getRuntime writeSession
+                        moviesAdded <- moviesAdded + movieWatchSync.MoviesAdded
+                        itemsSkipped <- itemsSkipped + movieWatchSync.ItemsSkipped
+                        errors <- errors @ movieWatchSync.Errors
 
                     // --- Series episode watch sync (REQ-305) ---
                     let! seriesResult = Jellyfin.getSeriesWithReauth httpClient config persistAuth
@@ -1186,21 +1225,7 @@ module Api =
                                     with ex -> Error ex.Message)
                         errors <- errors @ materializeResult.Errors
 
-                        let writeEpisode (slug: string) (defaultRewatchId: string) (seasonNum: int) (epNum: int) (watchDate: string) : Result<unit, string> =
-                            let sid = Series.streamId slug
-                            executeCommand
-                                conn sid
-                                Series.Serialization.fromStoredEvent
-                                Series.reconstitute
-                                Series.decide
-                                Series.Serialization.toEventData
-                                (Series.Mark_episode_watched {
-                                    RewatchId = defaultRewatchId
-                                    SeasonNumber = seasonNum
-                                    EpisodeNumber = epNum
-                                    Date = watchDate
-                                })
-                                projectionHandlers
+                        let writeEpisode = seriesWatchHistoryWriteEpisode conn projectionHandlers
 
                         let watchSync =
                             JellyfinImport.syncSeriesWatchHistory
@@ -1445,6 +1470,8 @@ module Api =
         (getRawgConfig: unit -> Rawg.RawgConfig)
         (getSteamConfig: unit -> Steam.SteamConfig)
         (getJellyfinConfig: unit -> Jellyfin.JellyfinConfig)
+        (getQbittorrentConfig: unit -> Qbittorrent.QbittorrentConfig)
+        (mountRoots: LocalCopyRemoval.MountRoots)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
         : IMediathecaApi =
@@ -4550,6 +4577,165 @@ module Api =
                     return Error "qBittorrent authentication failed: check the username and password"
                 | Error (Qbittorrent.OtherFailure msg) ->
                     return Error $"qBittorrent connection test failed: {msg}"
+            }
+
+            // Local copy removal (integration-r4vzm, ADR-0071): plan-then-execute
+            // across Jellyfin + qBittorrent. `LocalCopyRemoval.fs` holds every pure
+            // seam (path mapping, deletion-scope, torrent matching, seed-risk,
+            // the `execute` orchestrator) -- the members below only wire real
+            // effects (SQLite reads, HTTP calls) into it. No UI yet
+            // (integration-mqsd3).
+            planLocalCopyRemoval = fun target -> async {
+                use conn = factory ()
+                let mutable jfConfig = getJellyfinConfig ()
+                let qbConfig = getQbittorrentConfig ()
+                let persistAuth (auth: Jellyfin.JellyfinAuthResult) =
+                    SettingsStore.setSetting conn "jellyfin_user_id" auth.UserId
+                    SettingsStore.setSetting conn "jellyfin_access_token" auth.AccessToken
+                    jfConfig <- { jfConfig with UserId = auth.UserId; AccessToken = auth.AccessToken }
+                let resolveJellyfinId () =
+                    match target with
+                    | MovieTarget slug -> JellyfinStore.getMovieJellyfinId conn slug
+                    | SeriesTarget slug -> JellyfinStore.getSeriesJellyfinId conn slug
+                let effects: LocalCopyRemoval.PlanEffects = {
+                    ResolveJellyfinId = resolveJellyfinId
+                    FetchItem = fun itemId -> Jellyfin.getItemWithReauth httpClient jfConfig persistAuth itemId
+                    ListTorrents = fun () -> async {
+                        let! r = Qbittorrent.withSession httpClient qbConfig (fun session -> Qbittorrent.listTorrents httpClient qbConfig session)
+                        return r |> Result.mapError qbErrorToString
+                    }
+                    ListFiles = fun t -> async {
+                        let! r = Qbittorrent.withSession httpClient qbConfig (fun session -> Qbittorrent.listFiles httpClient qbConfig session t.Hash)
+                        return r |> Result.mapError qbErrorToString
+                    }
+                }
+                return! LocalCopyRemoval.planLocalCopyRemoval mountRoots effects target
+            }
+
+            removeLocalCopy = fun (target, acknowledgedHashes) -> async {
+                use conn = factory ()
+                let mutable jfConfig = getJellyfinConfig ()
+                let qbConfig = getQbittorrentConfig ()
+                let persistAuth (auth: Jellyfin.JellyfinAuthResult) =
+                    SettingsStore.setSetting conn "jellyfin_user_id" auth.UserId
+                    SettingsStore.setSetting conn "jellyfin_access_token" auth.AccessToken
+                    jfConfig <- { jfConfig with UserId = auth.UserId; AccessToken = auth.AccessToken }
+                // Resolved once, up front -- every effect below closes over the
+                // same id so a mid-flow JellyfinStore write can't shift it.
+                let jellyfinIdOpt =
+                    match target with
+                    | MovieTarget slug -> JellyfinStore.getMovieJellyfinId conn slug
+                    | SeriesTarget slug -> JellyfinStore.getSeriesJellyfinId conn slug
+
+                let listTorrentsEff () : Async<Result<Qbittorrent.TorrentInfo list, string>> = async {
+                    let! r = Qbittorrent.withSession httpClient qbConfig (fun session -> Qbittorrent.listTorrents httpClient qbConfig session)
+                    return r |> Result.mapError qbErrorToString
+                }
+                let listFilesEff (t: Qbittorrent.TorrentInfo) : Async<Result<string list, string>> = async {
+                    let! r = Qbittorrent.withSession httpClient qbConfig (fun session -> Qbittorrent.listFiles httpClient qbConfig session t.Hash)
+                    return r |> Result.mapError qbErrorToString
+                }
+
+                // Step 1 (ADR-0071): import the target's Jellyfin play state through
+                // the existing event-producing paths before any delete -- Jellyfin
+                // discards user data with the item.
+                let preserveWatchHistory () : Async<Result<unit, string>> = async {
+                    match jellyfinIdOpt with
+                    | None -> return Ok () // already gone in Jellyfin -- nothing to preserve
+                    | Some jellyfinId ->
+                        match target with
+                        | MovieTarget slug ->
+                            let! itemResult = Jellyfin.getItemWithReauth httpClient jfConfig persistAuth jellyfinId
+                            match itemResult with
+                            | Error e -> return Error (sprintf "failed to import play state: %s" e)
+                            | Ok None -> return Ok ()
+                            | Ok (Some item) ->
+                                let (existsOnDate, getRuntime, writeSession) = movieWatchHistoryEffects conn movieProjections
+                                let result = JellyfinImport.syncMovieWatchHistory [ (slug, item) ] existsOnDate getRuntime writeSession
+                                if result.Failed then return Error (String.concat "; " result.Errors) else return Ok ()
+                        | SeriesTarget slug ->
+                            let! episodesResult = Jellyfin.getEpisodesWithReauth httpClient jfConfig persistAuth jellyfinId
+                            match episodesResult with
+                            | Error e -> return Error (sprintf "failed to import play state: %s" e)
+                            | Ok episodes ->
+                                let writeEpisode = seriesWatchHistoryWriteEpisode conn projectionHandlers
+                                let result =
+                                    JellyfinImport.syncSeriesWatchHistory
+                                        [ (slug, episodes) ]
+                                        (SeriesProjection.getDefaultRewatchId conn)
+                                        (SeriesProjection.getWatchedEpisodesForSession conn)
+                                        writeEpisode
+                                if result.Failed then return Error (String.concat "; " result.Errors) else return Ok ()
+                }
+
+                // Steps 2/3: re-resolve the deletion scope from a FRESH Jellyfin
+                // fetch -- closes the time-of-check/time-of-use window together
+                // with `execute`'s fresh torrent re-match.
+                let resolveScope () : Async<Result<string option, string>> = async {
+                    match jellyfinIdOpt with
+                    | None -> return Ok None
+                    | Some jellyfinId ->
+                        let! itemResult = Jellyfin.getItemWithReauth httpClient jfConfig persistAuth jellyfinId
+                        match itemResult with
+                        | Error e -> return Error e
+                        | Ok None -> return Ok None
+                        | Ok (Some item) ->
+                            match item.Path with
+                            | None -> return Ok None
+                            | Some path ->
+                                match LocalCopyRemoval.mapJellyfinPath (mountRoots.JellyfinRoot, mountRoots.QbittorrentRoot) path with
+                                | None -> return Ok None
+                                | Some mappedPath -> return Ok (Some (LocalCopyRemoval.deletionScope mountRoots.QbittorrentRoot target mappedPath))
+                }
+
+                let deleteTorrentsEff (hashes: string list) : Async<Result<unit, string>> = async {
+                    let! r = Qbittorrent.withSession httpClient qbConfig (fun session -> Qbittorrent.deleteTorrents httpClient qbConfig session hashes true)
+                    return r |> Result.mapError qbErrorToString
+                }
+
+                let deleteJellyfinItemEff () : Async<Result<unit, string>> = async {
+                    match jellyfinIdOpt with
+                    | None -> return Ok ()
+                    | Some jellyfinId -> return! Jellyfin.deleteItemWithReauth httpClient jfConfig persistAuth jellyfinId
+                }
+
+                // Step 6: confirm the Jellyfin item is gone (404) AND none of the
+                // acknowledged hashes remain in a fresh torrents/info.
+                let verifyGoneEff () : Async<Result<bool, string>> = async {
+                    match jellyfinIdOpt with
+                    | None -> return Ok true
+                    | Some jellyfinId ->
+                        let! itemResult = Jellyfin.getItemWithReauth httpClient jfConfig persistAuth jellyfinId
+                        match itemResult with
+                        | Error e -> return Error e
+                        | Ok (Some _) -> return Ok false
+                        | Ok None ->
+                            let! torrentsResult = listTorrentsEff ()
+                            match torrentsResult with
+                            | Error e -> return Error e
+                            | Ok liveTorrents ->
+                                let liveHashes = liveTorrents |> List.map (fun t -> t.Hash) |> Set.ofList
+                                let stillPresent = acknowledgedHashes |> List.exists (fun h -> liveHashes |> Set.contains h)
+                                return Ok (not stillPresent)
+                }
+
+                let clearLinksEff () =
+                    match target with
+                    | MovieTarget slug -> JellyfinStore.clearMovieJellyfinId conn slug
+                    | SeriesTarget slug -> JellyfinStore.clearSeriesJellyfinId conn slug
+
+                let effects: LocalCopyRemoval.ExecuteEffects = {
+                    IsSyncInProgress = JellyfinSync.isSyncInProgress
+                    PreserveWatchHistory = preserveWatchHistory
+                    ResolveScope = resolveScope
+                    ListTorrents = listTorrentsEff
+                    ListFiles = listFilesEff
+                    DeleteTorrents = deleteTorrentsEff
+                    DeleteJellyfinItem = deleteJellyfinItemEff
+                    VerifyGone = verifyGoneEff
+                    ClearLinks = clearLinksEff
+                }
+                return! LocalCopyRemoval.execute effects acknowledgedHashes
             }
 
             getViewSettings = fun key -> async {

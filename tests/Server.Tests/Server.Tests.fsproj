@@ -50,8 +50,11 @@
     <Compile Include="JellyfinImportTests.fs" />
     <Compile Include="JellyfinMaterializeTests.fs" />
     <Compile Include="JellyfinStillTests.fs" />
+    <Compile Include="JellyfinStoreTests.fs" />
     <Compile Include="JellyfinReauthTests.fs" />
+    <Compile Include="JellyfinItemTests.fs" />
     <Compile Include="QbittorrentTests.fs" />
+    <Compile Include="LocalCopyRemovalTests.fs" />
     <Compile Include="SteamFamilyTokenTests.fs" />
     <Compile Include="AddGameFromSteamTests.fs" />
     <Compile Include="SteamFamilyImportOwnedGamesTests.fs" />

@@ -92,6 +92,49 @@ module JellyfinStore =
         ]
         |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "jellyfin_id")
 
+    /// Missing before integration-r4vzm ("Remove local copy" needs the
+    /// series' Jellyfin id to resolve its `Path`) -- every other getter had
+    /// a sibling already.
+    let getSeriesJellyfinId (conn: SqliteConnection) (seriesSlug: string) : string option =
+        conn
+        |> Db.newCommand "SELECT jellyfin_id FROM jellyfin_series WHERE series_slug = @slug"
+        |> Db.setParams [ "slug", SqlType.String seriesSlug ]
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "jellyfin_id")
+
+    // Per-item clears (integration-r4vzm, ADR-0071 point 1): unlike
+    // `clearAll` (a full-sync repopulate primitive), these remove exactly
+    // one item's link after "Remove local copy" has verified both systems
+    // are gone -- `DELETE ... WHERE`, hence idempotent; calling any of them
+    // twice is a no-op.
+
+    let clearMovieJellyfinId (conn: SqliteConnection) (movieSlug: string) : unit =
+        conn
+        |> Db.newCommand "DELETE FROM jellyfin_movie WHERE movie_slug = @slug"
+        |> Db.setParams [ "slug", SqlType.String movieSlug ]
+        |> Db.exec
+
+    /// Cascades to the series' `jellyfin_episode` rows -- a series removal
+    /// takes the whole show folder with it, so no per-episode link should
+    /// survive it either.
+    let clearSeriesJellyfinId (conn: SqliteConnection) (seriesSlug: string) : unit =
+        conn
+        |> Db.newCommand """
+            DELETE FROM jellyfin_series WHERE series_slug = @slug;
+            DELETE FROM jellyfin_episode WHERE series_slug = @slug;
+        """
+        |> Db.setParams [ "slug", SqlType.String seriesSlug ]
+        |> Db.exec
+
+    let clearEpisodeJellyfinId (conn: SqliteConnection) (seriesSlug: string) (seasonNumber: int) (episodeNumber: int) : unit =
+        conn
+        |> Db.newCommand "DELETE FROM jellyfin_episode WHERE series_slug = @slug AND season_number = @season AND episode_number = @episode"
+        |> Db.setParams [
+            "slug", SqlType.String seriesSlug
+            "season", SqlType.Int32 seasonNumber
+            "episode", SqlType.Int32 episodeNumber
+        ]
+        |> Db.exec
+
     /// One-time migration: copy Jellyfin data from old projection tables into JellyfinStore tables.
     /// Defensive — silently ignores missing source tables or columns.
     let migrateFromProjections (conn: SqliteConnection) : unit =
