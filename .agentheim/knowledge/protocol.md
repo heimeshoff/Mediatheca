@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-09-10 20:07 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 27m (first "Batch started" 19:40 → 20:07)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** integration-mqsd3: 1
+**Commits:** 3 (batch start, task completion, this entry)
+**Vision-conformance:** none — batch aligns with vision. The one shipped task is the UI half of "Remove local copy" (integration BC, generic): a paper-overlay dialog (ADR-0016) over integration-r4vzm's plan/execute API, client-tested per ADR-0064, reload-don't-patch after success so the projection stays the source of truth. vision.md still has no "What success looks like"/"Non-goals" headings; judged against "Remaining v1 Work"/"Out of Scope (v1)"/"Design Principles". The stale "Trakt.tv / Jellyfin sync (v2)" Out-of-Scope line remains a vision-text staleness, not a drift signal.
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task) — `type: feature`, all touched files product surfaces.
+**Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed.
+
+**Session-start churn note:** 0 recognized machine-shape commits, 0 human commits since the 2026-09-10 19:16 boundary — both commits (21564bd refine, 65da8af promote) carry the integration-mqsd3 trailer. Nothing to re-align.
+
+**Verification history:** iteration 1 PASS — `npm run build` clean, 759 server tests (+1 in `SeriesProjectionReadsTests.fs`), 43 client tests (+14 in `LocalCopyRemovalDialog.test.fs`). Verifier audited paper-overlay conformance by hand against `design-rules.md` (the design-check Skill is not in the verifier's toolset): no backdrop-filter, no translucent fills, no colour literals. Two advisory nits, not violations: the action pill repeats the sibling "Search on IPTorrents" raw Tailwind string; per-torrent rows use `velvetCard` inside the modal (opaque, non-floating content). Task Outcome says "16 test cases", runners show 15 — immaterial.
+
+**Builder checks pending (post-deploy, live on harbour — never a worker/verifier action):** after a successful removal the movie page shows neither "Play in Jellyfin" nor "Remove local copy" without a browser reload or a Jellyfin sync, and the series page loses "Remove local copy"; plus the three [human-eye] criteria — hit-and-run copy legible without a warning wall, pack warning visibly more prominent than the ratio flag, the outcome reads as progress not a log dump. The r4vzm builder checks (curl the plan/execute API, ssh-verify files gone, play-state preserved, `JELLYFIN_MEDIA_ROOT`/`QBITTORRENT_DOWNLOAD_ROOT` match harbour's mounts) are still outstanding from the previous session.
+
+**Harness notes:** (1) cached plugin 0.9.2 `checkpoint` again omitted the vacated `doing/` path from its manifest — staged explicitly, git recorded the move as a rename. (2) The `claim`/`checkpoint` CLI's inline-JSON third argument fails under Git Bash with Windows backslash paths ("Bad escaped character"); worked around by writing the opts JSON to the scratchpad and reading it in-process. (3) Root `node_modules` junctioned into the worktree for `npm run build`/`test:client`, removed via `rmdir` before `git worktree remove`; main copy verified intact. (4) Board is empty across every BC; follow-ups named in the task (series "Play in Jellyfin" link, season-level and single-episode removal, hard-refuse hit-and-run mode) are uncaptured.
+
+---
+
 ## 2026-09-10 20:04 -- Task verified and completed: integration-mqsd3 - "Remove local copy" — the action on the movie and series detail pages, with a paper-overlay confirmation dialog showing the resolved path, the case, and one acknowledged row per matched torrent (ratio, seeding time, hit-and-run flag, pack warning), then the step-by-step outcome; UI over integration-r4vzm's plan/execute API
 
 **Type:** Work / Task completion
