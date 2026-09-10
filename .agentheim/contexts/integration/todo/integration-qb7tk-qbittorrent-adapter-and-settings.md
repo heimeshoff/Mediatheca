@@ -1,7 +1,7 @@
 ---
 id: integration-qb7tk
 title: qBittorrent adapter and Settings card — URL, username and password stored and tested from Settings exactly like Jellyfin's, plus a typed-error `Qbittorrent.fs` adapter (login, list torrents with ratio and seeding time, list a torrent's files, delete with files) that integration-r4vzm builds on
-status: backlog
+status: todo
 type: feature
 context: integration
 created: 2026-09-10

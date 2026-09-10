@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-10 17:25 -- Modeling / Promoted: integration-qb7tk - qBittorrent adapter and Settings card — URL, username and password stored and tested from Settings exactly like Jellyfin's, plus a typed-error `Qbittorrent.fs` adapter (login, list torrents with ratio and seeding time, list a torrent's files, delete with files) that integration-r4vzm builds on
+
+**Type:** Modeling / Promote
+**BC:** integration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-10 17:40 -- Modeling / Refined: integration-mqsd3 - "Remove local copy" (split three ways: qb7tk adapter → r4vzm server flow → mqsd3 UI)
 
 **Type:** Modeling / Refine
