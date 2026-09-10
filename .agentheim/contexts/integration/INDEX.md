@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
-- **Todo:** 0
+- **Backlog:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 21
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **integration-mqsd3** — "Remove local copy" — the action on the movie and series detail pages, with a paper-overlay confirmation dialog showing the resolved path, the case, and one acknowledged row per matched torrent (ratio, seeding time, hit-and-run flag, pack warning), then the step-by-step outcome; UI over integration-r4vzm's plan/execute API (feature) — `todo/integration-mqsd3-remove-local-copy-from-jellyfin-and-qbittorrent.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -52,7 +53,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **integration-mqsd3** — "Remove local copy" — the action on the movie and series detail pages, with a paper-overlay confirmation dialog showing the resolved path, the case, and one acknowledged row per matched torrent (ratio, seeding time, hit-and-run flag, pack warning), then the step-by-step outcome; UI over integration-r4vzm's plan/execute API (feature) — `backlog/integration-mqsd3-remove-local-copy-from-jellyfin-and-qbittorrent.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC

@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-10 19:38 -- Modeling / Promoted: integration-mqsd3 - "Remove local copy" — the action on the movie and series detail pages, with a paper-overlay confirmation dialog showing the resolved path, the case, and one acknowledged row per matched torrent (ratio, seeding time, hit-and-run flag, pack warning), then the step-by-step outcome; UI over integration-r4vzm's plan/execute API
+
+**Type:** Modeling / Promote
+**BC:** integration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-10 19:38 -- Modeling / Refined: integration-mqsd3 - "Remove local copy" UI (second pass, code-grounded after integration-r4vzm shipped)
 
 **Type:** Modeling / Refine
