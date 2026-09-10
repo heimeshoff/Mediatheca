@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
+- **Backlog:** 3
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 19
@@ -50,11 +50,15 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **integration-qb7tk** — qBittorrent adapter and Settings card — URL, username and password stored and tested from Settings exactly like Jellyfin's, plus a typed-error `Qbittorrent.fs` adapter (login, list torrents with ratio and seeding time, list a torrent's files, delete with files) that integration-r4vzm builds on (feature) — `backlog/integration-qb7tk-qbittorrent-adapter-and-settings.md`
+- **integration-r4vzm** — Local copy removal, server side — a plan-then-execute flow (no UI) that imports the item's Jellyfin play state, deletes the acknowledged torrents with files from qBittorrent, DELETEs the Jellyfin item, verifies both gone, then clears the Jellyfin ids; pure `LocalCopyRemoval.fs` seams, Jellyfin DELETE support, per-item `JellyfinStore` clears (ADR-0070) (feature) — `backlog/integration-r4vzm-local-copy-removal-server-flow.md`
+- **integration-mqsd3** — "Remove local copy" — the action on the movie and series detail pages, with a paper-overlay confirmation dialog showing the resolved path, the case, and one acknowledged row per matched torrent (ratio, seeding time, hit-and-run flag, pack warning), then the step-by-step outcome; UI over integration-r4vzm's plan/execute API (feature) — `backlog/integration-mqsd3-remove-local-copy-from-jellyfin-and-qbittorrent.md`
 <!-- backlog-list:end -->
 
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0070** -- Local copy removal is projection-only cache invalidation run as a re-derivable plan: no domain event (ADR-0043 re-derivability applied to Jellyfin item presence; the one event-worthy step — preserving the item's play state — runs first through the existing event paths), plan-then-execute in a fixed order (torrents → Jellyfin item → verify → clear `jellyfin_*` rows) chosen so the plan is always re-derivable from the live world after a partial failure — no saga state; every matched torrent must be acknowledged; qBittorrent's SID gets no ADR-0011 retry seam -- 2026-09-10 -- `knowledge/decisions/0070-local-copy-removal-projection-only-rederivable-plan.md`
 - **0070** -- Mediatheca **never performs a Steam login or mints a Steam token**: the Steam Connect QR ceremony (`SteamConnect.fs`, SteamKit2/QRCoder), the `/api/stream/steam-connect` route, the stored `steam_family_refresh_token` and the `withTokenRefresh`/`mintFamilyAccessToken` seam are deleted after Valve's permanent-ban threat (2026-09-05); the Steam Family import runs only on a browser-obtained `webapi_token` pasted in Settings, a 401/403 surfaces as `"family token rejected: ..."` (wording-distinct from the Web API key rejection, ADR-0065), and the browser-retrieval fallback is closed as *will not build*. Supersedes ADR-0061; amends ADR-0019 and ADR-0067 in place (escalation ladder and no-speculative-reconnect rule retired with the code) -- 2026-09-05 -- `knowledge/decisions/0070-steam-family-import-manual-token-only-no-login-ever.md`
 - **0069** -- The Steam Family import diffs before it enriches: `GetSharedLibraryApps` is classified against `GameProjection.findBySteamAppId`, and only *new* apps get a store `appdetails` fetch — a steady-state import with zero new apps is a fixed **3** outbound Steam requests instead of one per title. *Arrivals* (new apps, plus already-known apps whose `rt_time_acquired` postdates `steam_family_last_sync`) are named with date and family member and persisted to `steam_family_last_result` so Settings survives a reload; per ADR-0043 an arrival is cache, not an event. A second explicit `FullReenrich` mode reproduces the old fetch-everything behaviour. Complements ADR-0066: that one owns request *spacing*, this one owns request *count* -- 2026-08-18 -- `knowledge/decisions/0069-incremental-family-import-diff-and-full-reenrich-wiring.md`
 - **0068** -- An empty Steam owned/recently-played-games response is **inconclusive**, not success and not failure (amends ADR-0065): `{"response":{}}` means *either* "owns nothing" *or* "Game details privacy is not Public", and no caller can tell which. `testSteamApiKey` probes the builder's own stored `steam_id` (falling back to a profile-independent key-only endpoint) instead of a hardcoded third-party SteamID, and yields three distinct outcomes — rejected / valid / valid-but-inconclusive. An empty family-import supplement no longer clears `steam_api_key_last_error`, and the scheduled playtime sync persists a `KeyRejected` notice instead of no-oping silently -- 2026-08-18 -- `knowledge/decisions/0068-steam-empty-owned-games-is-inconclusive-not-failure.md`

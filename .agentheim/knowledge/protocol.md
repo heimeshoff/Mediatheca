@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-09-10 17:40 -- Modeling / Refined: integration-mqsd3 - "Remove local copy" (split three ways: qb7tk adapter → r4vzm server flow → mqsd3 UI)
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** backlog (each part promoted separately, see the Promoted entries above)
+**Summary:** Orchestrator + architect pass confirmed all five open questions — projection-only removal under ADR-0043 (no domain event; the item's play state is imported first through the existing event paths), warn-never-refuse hit-and-run with named constants, season/episode targets deferred, every matched torrent listed and acknowledged (the tick is not a selection), qBittorrent credentials in SettingsStore with an in-memory per-operation session. Two hazards added: pack torrents whose content path is an ancestor of the target (pre-unticked, extra-file count shown) and a time-of-check race closed by re-matching a fresh torrent list at execute time. Delete order fixed as torrents → Jellyfin item → verify → clear ids so the plan is always re-derivable after a partial failure (no saga state). Mount roots come from env vars with defaults; an unmapped path refuses loudly. The original task was too large for one worker session and is now three sequential tasks.
+**Split into:** integration-qb7tk (qBittorrent adapter + Settings card), integration-r4vzm (server-side plan/execute flow, no UI), integration-mqsd3 (detail-page action + confirmation dialog)
+**ADRs written:** 0070
+
+---
+
 ## 2026-09-10 16:36 -- Modeling / Captured: integration-mqsd3 - "Remove local copy" button (qBittorrent + Jellyfin)
 
 **Type:** Modeling / Capture

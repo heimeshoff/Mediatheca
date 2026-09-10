@@ -1,83 +1,94 @@
 ---
 id: integration-mqsd3
-title: "Remove local copy" button — delete the torrent and its files from qBittorrent and the item from Jellyfin in one deterministic, verified flow, then clear the Jellyfin link in Mediatheca
+title: "Remove local copy" — the action on the movie and series detail pages, with a paper-overlay confirmation dialog showing the resolved path, the case, and one acknowledged row per matched torrent (ratio, seeding time, hit-and-run flag, pack warning), then the step-by-step outcome; UI over integration-r4vzm's plan/execute API
 status: backlog
 type: feature
 context: integration
 created: 2026-09-10
 completed:
-depends_on: [design-system-001]
+depends_on: [design-system-001, integration-r4vzm]
 blocks: []
-tags: [jellyfin, qbittorrent, sync, movies, series, settings, storage]
-related_adrs: [0011]
+tags: [jellyfin, qbittorrent, movies, series, storage, ui]
+related_adrs: [0016, 0064, 0070]
 related_research: []
-prior_art: [integration-002]
+prior_art: [integration-003]
 ---
 
 ## Why
 
 Mediatheca already knows which movies and series exist on the home server (the Jellyfin id
-is stored per movie, series and episode, and the detail page shows a Play button when it is
-set). Removing a local copy is today a three-place manual chore: stop and delete the torrent
-in the qBittorrent UI, wait for or trigger a Jellyfin library scan, and hope the Jellyfin
-item actually disappears. The library app that shows "this is on the server" should also be
-the place that says "and now it is not" — and it should be *certain* the files are gone from
-the disk and the item is gone from Jellyfin's database, not "probably gone after the next
-scan".
+is stored per movie, series and episode, and the movie detail page shows a Play button when
+it is set). Removing a local copy is today a three-place manual chore: stop and delete the
+torrent in the qBittorrent UI, wait for or trigger a Jellyfin library scan, and hope the
+Jellyfin item actually disappears. The library app that shows "this is on the server"
+should also be the place that says "and now it is not" — and it should be *certain* the
+files are gone from the disk and the item is gone from Jellyfin's database, not "probably
+gone after the next scan".
+
+The server-side flow (plan-then-execute, verified, projection-only — ADR-0070) ships in
+integration-r4vzm. This task is the button and the dialog on top of it.
 
 ## What
 
-A **Remove local copy** action on the movie detail page (and on series / season / episode
-where a Jellyfin id exists) that runs this sequence server-side and reports each step:
+A **Remove local copy** action on the movie detail page (beside "Play in Jellyfin",
+`MovieDetail/Views.fs`) and on the series detail page, shown when the item has a Jellyfin
+id. Clicking it calls `planLocalCopyRemoval` and opens a confirmation dialog
+(`DesignSystem.modalPanel`, paper overlay — ADR-0016) that shows:
 
-1. **Preserve watch history first.** Import this item's Jellyfin play state into Mediatheca
-   before anything is deleted — Jellyfin drops the item's user data together with the item.
-2. **Resolve the item's path** from Jellyfin (`GET /Items/{id}` → `Path`).
-3. **Match torrents in qBittorrent** whose `content_path` / `save_path` lies under that
-   path after swapping the mount prefix (Jellyfin sees `/media/...`, qBittorrent sees
-   `/downloads/...`; both are `/mnt/media/files` on the host). A movie matches one torrent,
-   a series matches every torrent under its show folder, an episode matches one file.
-4. **Delete the torrents with their files** — `POST /api/v2/torrents/delete` with
-   `deleteFiles=true`.
-5. **Delete the Jellyfin item** — `DELETE /Items/{id}`. Jellyfin removes what the torrent
-   delete left behind (a movie's own folder, artwork sidecars it wrote next to a bare file)
-   and drops the database row. It tolerates files that are already gone.
-6. **Verify** — `GET /Items/{id}` returns 404 and qBittorrent no longer lists the hashes.
-   Only then clear the Jellyfin id(s) in Mediatheca and record that the local copy was
-   removed. Any failure before the verify step stops the flow and is shown to the user
-   with the step it failed at; nothing is silently half-done.
+- the resolved path (`font-mono`);
+- a case banner: torrents present / files only (torrent already gone) / already gone in
+  Jellyfin / path outside the mount map (the last two are dead ends: no Remove button, a
+  one-line explanation);
+- one row per matched torrent: name, **ratio** and **seeding time** (`font-mono`), a
+  hit-and-run flag when `Risk = HitAndRun`, and a distinct **pack warning** ("also
+  contains N other files") when `Match = PackAncestor n`;
+- one checkbox per torrent row, initialised from `PreTicked` (flagged and pack rows start
+  un-ticked). **Remove** enables only when every row is ticked — the tick is an
+  acknowledgement, not a selection (the server deletes the files under every matched
+  torrent regardless, and rejects a partial set).
 
-A confirmation dialog precedes the action and shows: the resolved path, the matched torrents
-with their **ratio and seeding time** (private-tracker hit-and-run risk), and which case the
-item is in (torrent still present vs. torrent already removed, files only).
+Confirming calls `removeLocalCopy target acknowledgedHashes`. The dialog then shows the
+outcome step by step (`RemovalOutcome.Completed` in order, and the failing step + reason if
+`Failure` is set, with a "Try again" that re-plans from scratch). On success the page
+reloads its detail DTO so the Play button and the action itself disappear at once.
+
+Policy is warn, never refuse (integration-r4vzm Notes). Targets: movie and whole series.
+Single-episode and season entry points are follow-ups.
 
 ## Acceptance criteria
 
-- [ ] A movie with a Jellyfin id shows a "Remove local copy" action; after confirming, the
-      Jellyfin item returns 404, its files are gone from `/mnt/media/files`, the torrent is
-      gone from qBittorrent, and the movie's Play button is gone without waiting for the next
-      Jellyfin sync.
-- [ ] Removing a series removes every torrent under its show folder, the show folder itself,
-      and the Jellyfin series item; the series and all its episodes lose their Jellyfin ids.
-- [ ] An item whose torrent was already removed from qBittorrent (files only, no torrent)
-      is handled: the dialog says so, and the Jellyfin delete alone removes the files and
-      the database row.
-- [ ] The item's Jellyfin play state is imported into Mediatheca before deletion and is still
-      visible afterwards (watched status / last played).
-- [ ] The confirmation dialog shows each matched torrent's ratio and seeding time before the
-      user confirms.
-- [ ] A failure at any step (qBittorrent unreachable, Jellyfin 401 after one re-auth, delete
-      rejected) aborts the remaining steps and surfaces the failing step; the Jellyfin id is
-      **not** cleared unless the verify step passed.
-- [ ] qBittorrent credentials (URL, username, password) are stored and tested from Settings
-      the same way the Jellyfin credentials are; the qBittorrent Web API is used with its
-      normal auth (no "bypass auth for localhost" — behind the Tailscale sidecar every client
-      looks like localhost).
-- [ ] The Jellyfin calls reuse `Jellyfin.withReauthRetry` (ADR-0011) — no second auth path.
+- [ ] A movie with a Jellyfin id shows "Remove local copy" on its detail page; a movie
+      without one does not. Same for a series. (Client unit test on the view-model
+      predicate, ADR-0064.)
+- [ ] The dialog's MVU `update` is unit-tested (ADR-0064): rows initialise from
+      `PreTicked`; Remove is disabled while any row is un-ticked and enabled when all are
+      ticked; the `FilesOnly` case enables Remove with no rows; the `AlreadyGoneInJellyfin`
+      and `PathOutsideMountMap` cases render no Remove button.
+- [ ] The acknowledged hashes sent to `removeLocalCopy` are exactly the ticked rows' hashes
+      (client unit test on the command payload).
+- [ ] After a successful removal on harbour, the movie page shows neither "Play in
+      Jellyfin" nor "Remove local copy" without a page reload or a Jellyfin sync.
+- [ ] A `Failure` outcome renders the failing step's name and reason, and "Try again"
+      re-runs `planLocalCopyRemoval` (client unit test on the message flow).
+- [ ] Every surface is paper overlay per ADR-0016 — no translucency, no `backdrop-filter`
+      (`design-check` passes on the new view code).
+- [ ] `npm run build`, `npm test` and `npm run test:client` pass.
 - [ ] The dialog's copy makes the hit-and-run risk legible without reading like a warning
       wall. [human-eye]
+- [ ] The pack warning is visibly more prominent than the ratio flag — it is the row that
+      deletes files the user did not ask to remove. [human-eye]
+- [ ] The step-by-step outcome reads as progress, not as a log dump. [human-eye]
 
 ## Notes
+
+**Refinement (2026-09-10):** the original capture was split three ways — integration-qb7tk
+(qBittorrent adapter + Settings card), integration-r4vzm (server-side plan/execute flow, all
+the failure semantics and tests), and this task (UI). All decisions — projection-only
+(ADR-0070), warn-never-refuse, everything-listed-everything-acknowledged, pack-torrent
+handling, env-var mount roots, SettingsStore credentials — are recorded in r4vzm's Notes.
+
+**Escape hatch:** if the series entry point runs long, ship movie-only here and capture the
+series entry point as its own client-only task; the server supports both targets.
 
 **Verified on harbour 2026-09-10 (infrastructure side needs no change):**
 
@@ -99,23 +110,8 @@ item is in (torrent still present vs. torrent already removed, files only).
   a mixed folder → the file plus same-basename artwork sidecars. Item and its user data are
   removed from the database. Path already missing → still removes the row.
 - Both services are reached from the mediatheca container over the tailnet through its own
-  sidecar (`https://jellyfin.elver-minor.ts.net/` today; `https://qb.elver-minor.ts.net/`
-  would be the same mechanism).
+  sidecar. The mediatheca container has **no** mount of `/mnt/media/files`.
 
-**Open questions for refinement:**
-
-- Hit-and-run policy: warn only, or refuse to delete a torrent below the tracker's minimum
-  ratio / seed time? (Builder's call — the tracker is IPTorrents.)
-- Season granularity: a season maps cleanly only if its episodes live in a season subfolder;
-  otherwise offer whole-series and single-episode only.
-- Modelling: is "local copy removed" a domain event on the Movies / Series aggregate (fits
-  the event-sourced style, and the Journal might want to know) or projection-only like the
-  Jellyfin id itself? The nightly Jellyfin sync's `JellyfinStore.clearAll` + repopulate would
-  drop the id eventually anyway; the button must not rely on that.
-- Cross-seed guard: if more than one torrent matches the same files, list them all and require
-  an explicit tick per torrent rather than deleting silently.
-- Where do qBittorrent credentials live — SettingsStore like Jellyfin (preferred, mirrors the
-  existing pattern), or the stack `.env` on harbour?
-
-Related: the harbour repo's fleet docs should get a one-line note once this ships, since
-mediatheca would then hold qBittorrent credentials.
+**Follow-ups (capture separately when wanted):** season-level removal (needs a season id
+store); single-episode entry point; a hard-refuse hit-and-run mode; the harbour fleet docs
+note that mediatheca holds qBittorrent credentials (lands with integration-qb7tk).
