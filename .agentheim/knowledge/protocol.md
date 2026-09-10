@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-09-10 19:38 -- Modeling / Refined: integration-mqsd3 - "Remove local copy" UI (second pass, code-grounded after integration-r4vzm shipped)
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** todo (promoted in the same session — see the Promoted entry above)
+**Summary:** Checked every client seam against the code as it stands after integration-r4vzm: the two `IMediathecaApi` members and their wire types in `Shared.fs`, the movie page's action row and its existing "Remove movie" confirm, the series page's action row and model, `ModalPanel`/`DesignSystem.modalPanel`, the `*.test.fs` harness and `Client.fsproj` test block. Two corrections: (1) `Shared.SeriesDetail` carries no `JellyfinId` and the series page never loads the Jellyfin server URL, so the series entry point needs one small server addition — the DTO field, populated in `SeriesProjection.getBySlug` via r4vzm's `JellyfinStore.getSeriesJellyfinId`, mirroring `MovieProjection`; the task is no longer "pure client work". (2) No client test inspects an Elmish `Cmd`, and the tests' `Unchecked.defaultof<IMediathecaApi>` is `null` in Fable, so the dialog is specified as a shared `Components/LocalCopyRemovalDialog.fs` phase machine (`Planning | PlanFailed | Confirming of plan * ticked | Removing of acknowledged | Finished of outcome`) whose `update` takes a plain effects record, with pure `acknowledgedHashes`/`canRemove` seams — every criterion is now assertable on the model. Wire shapes corrected to what shipped (`removeLocalCopy` takes a tuple, `SeedingTimeDays`, `AlreadyGoneInJellyfin` with an empty path, the sync-in-progress refusal is an outcome not an exception). Live-on-harbour criterion marked builder-run after deploy. Orchestrator not re-dispatched — the design decisions were settled in the first pass (r4vzm Notes, ADR-0071); this pass verified seams against code. Readiness gate passed: dependencies design-system-001 and integration-r4vzm are both done.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-09-10 19:16 -- Work session ended
 
 **Type:** Work / Session end
