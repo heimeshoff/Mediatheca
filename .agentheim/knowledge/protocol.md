@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-09-10 19:16 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 33m (first "Batch started" 18:43 → 19:16)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** integration-r4vzm: 1
+**Commits:** 3 (batch start, task completion, this entry)
+**Vision-conformance:** none — batch aligns with vision. The one shipped task is the server-side half of "Remove local copy" (integration BC, generic): projection-only cache invalidation per ADR-0071, the item's play state preserved first through the existing `Record_watch_session` / `Mark_episode_watched` paths (Replayable principle honored, no new event), no UI. vision.md still has no "What success looks like"/"Non-goals" headings; judged against "Remaining v1 Work"/"Out of Scope (v1)"/"Design Principles". The stale "Trakt.tv / Jellyfin sync (v2)" Out-of-Scope line remains a vision-text staleness, not a drift signal.
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task) — `type: feature`, all touched files product surfaces.
+**Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed.
+
+**Session-start churn note:** 0 recognized machine-shape commits, 0 human commits since the 2026-09-10 18:14 boundary — both commits (ddf508e refine, 0266284 promote) carry the integration-r4vzm trailer. Nothing to re-align.
+
+**Verification history:** iteration 1 PASS — 758 tests (+60 across `LocalCopyRemovalTests.fs`, `JellyfinItemTests.fs`, `JellyfinStoreTests.fs`, `JellyfinImportTests.fs`), `npm run build` clean, the six pinned `JellyfinReauthTests.fs` untouched, no new event case in Movies/Series, mount roots read in `Composition.fs` via env and not seeded into SettingsStore.
+
+**Builder checks pending (post-deploy, live on harbour — never a worker/verifier action):** the two `curl` criteria against `planLocalCopyRemoval` / `removeLocalCopy` (movie → Jellyfin 404, hash gone from `torrents/info`, no `jellyfin_movie` row; series → same plus no `jellyfin_series`/`jellyfin_episode` rows), the ssh check that the files are gone from `/mnt/media/files` [human-eye], and the play-state-preserved check with a movie marked played right before removal. `JELLYFIN_MEDIA_ROOT` / `QBITTORRENT_DOWNLOAD_ROOT` env vars default to `/media` / `/downloads` — confirm they match harbour's mounts before the first live removal.
+
+**Harness notes:** (1) cached plugin 0.9.2 `checkpoint` again omitted the vacated `doing/` path from its manifest — staged explicitly, git recorded the move as a rename. (2) Root `node_modules` junctioned into the worktree for `npm run build`, removed via `rmdir` before `git worktree remove`; main copy verified intact. (3) Board is empty; integration-mqsd3 (the detail-page action + confirmation dialog) sits in backlog blocked on this task, now unblocked for promotion. (4) vision.md has no "## Open questions" section, so the vacuum guard had nothing to surface.
+
+---
+
 ## 2026-09-10 19:13 -- Task verified and completed: integration-r4vzm - Local copy removal, server side — a plan-then-execute flow (no UI) that imports the item's Jellyfin play state, deletes the acknowledged torrents with files from qBittorrent, DELETEs the Jellyfin item, verifies both gone, then clears the Jellyfin ids; pure `LocalCopyRemoval.fs` seams, Jellyfin DELETE support, per-item `JellyfinStore` clears (ADR-0071)
 
 **Type:** Work / Task completion
