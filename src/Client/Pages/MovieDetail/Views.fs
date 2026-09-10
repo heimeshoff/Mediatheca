@@ -998,6 +998,18 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                                     Html.span [ prop.text "Search on IPTorrents" ]
                                                                 ]
                                                             ]
+                                                        // Remove local copy (integration-mqsd3) — distinct from the
+                                                        // "Remove movie" library-entry removal below; this removes
+                                                        // the files from Jellyfin/qBittorrent.
+                                                        if LocalCopyRemovalDialog.showRemoveLocalCopy movie.JellyfinId then
+                                                            Html.button [
+                                                                prop.className "inline-flex items-center gap-2 bg-base-content/10 hover:bg-base-content/20 text-base-content/70 hover:text-base-content px-4 py-2 rounded-full text-sm font-semibold transition-colors cursor-pointer"
+                                                                prop.onClick (fun _ -> dispatch Open_local_copy_removal)
+                                                                prop.children [
+                                                                    Icons.trash ()
+                                                                    Html.span [ prop.text "Remove local copy" ]
+                                                                ]
+                                                            ]
                                                         // Trailer button
                                                         match model.TrailerKey with
                                                         | Some _ ->
@@ -1290,5 +1302,14 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                 // Event History Modal
                 if model.ShowEventHistory then
                     EventHistoryModal.view $"Movie-{model.Slug}" (fun () -> dispatch Close_event_history)
+                // Remove local copy dialog (integration-mqsd3)
+                match model.LocalCopyRemoval with
+                | Some childModel ->
+                    LocalCopyRemovalDialog.view
+                        childModel
+                        (Local_copy_removal_msg >> dispatch)
+                        (fun () -> dispatch Close_local_copy_removal)
+                        (fun () -> dispatch Local_copy_removal_done)
+                | None -> ()
             ]
         ]

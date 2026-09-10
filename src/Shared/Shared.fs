@@ -766,6 +766,10 @@ type SeriesDetail = {
     /// NextEpisodeAirDate is None (e.g. TMDB has announced season 4 returns
     /// on a date but no episodes posted yet).
     NextSeasonAirDate: string option
+    /// The series' Jellyfin item id, from `JellyfinStore.getSeriesJellyfinId`
+    /// (integration-mqsd3) -- mirrors `MovieDetail.JellyfinId`. Drives
+    /// "Remove local copy" visibility on the series detail page.
+    JellyfinId: string option
 }
 
 type ReturningSoonItem = {

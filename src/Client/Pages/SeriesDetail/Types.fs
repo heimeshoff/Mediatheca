@@ -1,6 +1,7 @@
 module Mediatheca.Client.Pages.SeriesDetail.Types
 
 open Mediatheca.Shared
+open Mediatheca.Client.Components
 
 type SeriesTab = Overview | Episodes
 
@@ -44,6 +45,9 @@ type Model = {
     ShowEventHistory: bool
     IsRefreshing: bool
     RefreshMessage: string option
+    /// integration-mqsd3: the "Remove local copy" dialog, shared with
+    /// MovieDetail. `None` when not open.
+    LocalCopyRemoval: LocalCopyRemovalDialog.Model option
     Error: string option
 }
 
@@ -138,3 +142,10 @@ type Msg =
     // Manual TMDB refresh
     | Refresh_from_tmdb
     | Refresh_from_tmdb_result of Result<unit, string>
+    // Remove local copy (integration-mqsd3) — distinct from
+    // Confirm_remove_series/Remove_series, which remove the library entry;
+    // this removes the files.
+    | Open_local_copy_removal
+    | Local_copy_removal_msg of LocalCopyRemovalDialog.Msg
+    | Close_local_copy_removal
+    | Local_copy_removal_done

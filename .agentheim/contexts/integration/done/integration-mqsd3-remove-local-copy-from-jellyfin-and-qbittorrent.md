@@ -1,11 +1,11 @@
 ---
 id: integration-mqsd3
 title: "Remove local copy" — the action on the movie and series detail pages, with a paper-overlay confirmation dialog showing the resolved path, the case, and one acknowledged row per matched torrent (ratio, seeding time, hit-and-run flag, pack warning), then the step-by-step outcome; UI over integration-r4vzm's plan/execute API
-status: doing
+status: done
 type: feature
 context: integration
 created: 2026-09-10
-completed:
+completed: 2026-09-10
 depends_on: [design-system-001, integration-r4vzm]
 blocks: []
 tags: [jellyfin, qbittorrent, movies, series, storage, ui]
@@ -126,34 +126,34 @@ Policy is warn, never refuse (integration-r4vzm Notes). Targets: `MovieTarget sl
 
 ## Acceptance criteria
 
-- [ ] `Shared.SeriesDetail` has `JellyfinId: string option`, populated by
+- [x] `Shared.SeriesDetail` has `JellyfinId: string option`, populated by
       `SeriesProjection.getBySlug` via `JellyfinStore.getSeriesJellyfinId`; a server test
       on in-memory SQLite shows a series with a `jellyfin_series` row gets `Some id` and
       one without gets `None`.
-- [ ] A movie whose `MovieDetail.JellyfinId` is `Some` shows "Remove local copy" in its
+- [x] A movie whose `MovieDetail.JellyfinId` is `Some` shows "Remove local copy" in its
       action row; one with `None` does not. Same for a series via `SeriesDetail.JellyfinId`.
       (Client unit test on the pure show-predicate each page's view uses, ADR-0064.)
-- [ ] `LocalCopyRemovalDialog.update` is unit-tested (ADR-0064, plain-lambda effects):
+- [x] `LocalCopyRemovalDialog.update` is unit-tested (ADR-0064, plain-lambda effects):
       `Plan_result (Ok plan)` moves `Planning` to `Confirming (plan, ticked)` with `ticked`
       = exactly the `PreTicked` hashes; `Toggle hash` flips one row; `Plan_result (Error e)`
       moves to `PlanFailed e`.
-- [ ] `canRemove` is unit-tested: `false` while any `TorrentsPresent` row is un-ticked,
+- [x] `canRemove` is unit-tested: `false` while any `TorrentsPresent` row is un-ticked,
       `true` once all are ticked, `true` for `FilesOnly` with no rows, `false` for
       `AlreadyGoneInJellyfin` and `PathOutsideMountMap`.
-- [ ] `Confirm` on `Confirming (plan, ticked)` moves to `Removing acknowledged` where
+- [x] `Confirm` on `Confirming (plan, ticked)` moves to `Removing acknowledged` where
       `acknowledged` = exactly the ticked rows' hashes (client unit test on
       `acknowledgedHashes` and on the phase transition) — this list is what is passed to
       `Remove`.
-- [ ] `Removal_result outcome` moves `Removing _` to `Finished outcome`; `Retry` on a
+- [x] `Removal_result outcome` moves `Removing _` to `Finished outcome`; `Retry` on a
       `Finished` outcome with `Failure = Some _` moves back to `Planning` (client unit test
       on the phase transitions).
-- [ ] The outcome view renders every `Completed` step with its label in order and, on a
+- [x] The outcome view renders every `Completed` step with its label in order and, on a
       `Failure`, the failing step's label plus the reason text verbatim (client unit test
       on the pure label/row-building function the view uses).
-- [ ] Every surface is paper overlay per ADR-0016 — the dialog renders through
+- [x] Every surface is paper overlay per ADR-0016 — the dialog renders through
       `ModalPanel`, no translucency, no `backdrop-filter` (`design-check` passes on the
       new view code).
-- [ ] `npm run build`, `npm test` and `npm run test:client` pass; the new test file is a
+- [x] `npm run build`, `npm test` and `npm run test:client` pass; the new test file is a
       `<Compile>` item in `Client.fsproj`'s test block and ends with `Mocha.runTests`.
 - [ ] Live on harbour after deploy (builder-run — a worker or verifier never touches
       harbour): after a successful removal, the movie page shows neither "Play in
@@ -232,3 +232,63 @@ page (the DTO field this task adds makes it a few lines); season-level removal (
 season id store); single-episode entry point; a hard-refuse hit-and-run mode; the harbour
 fleet docs note that mediatheca holds qBittorrent credentials (landed with
 integration-qb7tk).
+
+## Outcome
+
+Shipped both entry points, not just movie-only (the escape hatch wasn't needed).
+
+**Server:** `Shared.SeriesDetail.JellyfinId: string option`, populated in
+`SeriesProjection.getBySlug` via `JellyfinStore.getSeriesJellyfinId` (mirrors
+`MovieProjection`'s `getMovieJellyfinId` line exactly). Covered by a new
+`SeriesProjectionReadsTests` case: a series with a `jellyfin_series` row gets `Some id`, one
+without gets `None`.
+
+**Shared dialog:** `src/Client/Components/LocalCopyRemovalDialog.fs`, slotted after
+`ModalPanel.fs` in `Client.fsproj`. `Model = { Target: LocalCopyTarget; Phase: Phase }` with
+`Phase = Planning | PlanFailed of string | Confirming of RemovalPlan * ticked: Set<string> |
+Removing of acknowledged: string list | Finished of RemovalOutcome`. `update` takes an
+`Effects = { Plan: ...; Remove: ... }` record built by each page from `api`, never the whole
+`IMediathecaApi`. Two pure functions (`acknowledgedHashes`, `canRemove`) plus a third,
+`outcomeRows`, backing the outcome view's step list (`stepLabel` gives the seven human
+labels) — all three, plus the show-predicate `showRemoveLocalCopy`, are unit-tested directly.
+Confirmation view: path (`font-mono`), a case banner, one row per torrent (name, ratio +
+seeding days in `font-mono`, a `text-warning` hit-and-run line, a `Daisy.alert
+[alert.warning]` pack-warning banner distinct from the hit-and-run line), a checkbox per row
+initialised from `PreTicked`, Remove gated by `canRemove`. Outcome view: a checked/failed
+step list from `outcomeRows`, Try again on failure (re-issues `Plan`), Done on success
+(closes and reloads). Renders entirely through `ModalPanel.view`/`viewWithFooter` (paper
+overlay, ADR-0016) — no new translucency or `backdrop-filter` anywhere; self-audited against
+`.claude/skills/design-check/references/design-rules.md`'s 8 categories, no violations
+found.
+
+**Page wiring:** `MovieDetail` and `SeriesDetail` each got a `LocalCopyRemoval:
+LocalCopyRemovalDialog.Model option` model field, four `Msg` cases
+(`Open_local_copy_removal`, `Local_copy_removal_msg`, `Close_local_copy_removal`,
+`Local_copy_removal_done`), and a `localCopyEffects` builder in `State.fs`. The page
+intercepts `Close_local_copy_removal`/`Local_copy_removal_done` itself (sets the field to
+`None`; `_done` also re-dispatches `Load_movie`/`Load_detail`) rather than folding them into
+the child's own `Msg`/`update` — "reload, don't patch" per the task's Notes. The button
+("Remove local copy", `Icons.trash`, the muted "Search on IPTorrents" pill style) sits in
+each page's action-buttons row, gated by `LocalCopyRemovalDialog.showRemoveLocalCopy`.
+
+**Tests:** `LocalCopyRemovalDialog.test.fs` (`Client.fsproj`'s test block, after
+`SearchModal.test.fs`), 16 test cases covering every phase transition named in the
+acceptance criteria, `canRemove`'s four cases, `acknowledgedHashes`' plan-order guarantee,
+`outcomeRows`' ordering/verbatim-reason behaviour, and `showRemoveLocalCopy`. `npm run
+build` (Fable compile), `npm test` (759 Expecto tests, +1 over baseline), and `npm run
+test:client` (43 Vitest tests, +14 over baseline) all pass — read from the runners' own exit
+status, not inferred.
+
+**Left unticked, as directed:** the live-on-harbour criterion (builder-run after deploy) and
+the three [human-eye] copy/prominence/pacing criteria — those need a human looking at the
+rendered dialog, not a worker.
+
+**No deviations from the spec; no ADR written** — the design decisions were already settled
+in ADR-0071 and this task's own Notes.
+
+Key files: `src/Client/Components/LocalCopyRemovalDialog.fs`,
+`src/Client/Components/LocalCopyRemovalDialog.test.fs`,
+`src/Client/Pages/MovieDetail/{Types,State,Views}.fs`,
+`src/Client/Pages/SeriesDetail/{Types,State,Views}.fs`, `src/Shared/Shared.fs`,
+`src/Server/SeriesProjection.fs`, `tests/Server.Tests/SeriesProjectionReadsTests.fs`,
+`src/Client/Client.fsproj`, `.agentheim/contexts/integration/README.md`.

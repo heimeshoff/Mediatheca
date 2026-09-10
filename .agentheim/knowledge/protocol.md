@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-10 20:04 -- Task verified and completed: integration-mqsd3 - "Remove local copy" — the action on the movie and series detail pages, with a paper-overlay confirmation dialog showing the resolved path, the case, and one acknowledged row per matched torrent (ratio, seeding time, hit-and-run flag, pack warning), then the step-by-step outcome; UI over integration-r4vzm's plan/execute API
+
+**Type:** Work / Task completion
+**Task:** integration-mqsd3 - "Remove local copy" — the action on the movie and series detail pages, with a paper-overlay confirmation dialog showing the resolved path, the case, and one acknowledged row per matched torrent (ratio, seeding time, hit-and-run flag, pack warning), then the step-by-step outcome; UI over integration-r4vzm's plan/execute API
+**Summary:** Shipped the "Remove local copy" button and paper-overlay dialog on the movie and series detail pages — a shared LocalCopyRemovalDialog phase machine (Planning/PlanFailed/Confirming/Removing/Finished) over integration-r4vzm's plan/execute API with pure acknowledgedHashes/canRemove/outcomeRows seams, plus SeriesDetail.JellyfinId populated by SeriesProjection.getBySlug
+**Duration:** 24m
+**Verification:** PASS (iteration 1)
+**Files changed:** 13
+**Tests added:** 15
+**ADRs written:** none
+
+---
+
 ## 2026-09-10 19:39 -- Batch started: [integration-mqsd3]
 
 **Type:** Work / Batch start

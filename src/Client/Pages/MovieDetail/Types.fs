@@ -1,6 +1,7 @@
 module Mediatheca.Client.Pages.MovieDetail.Types
 
 open Mediatheca.Shared
+open Mediatheca.Client.Components
 
 type Model = {
     Slug: string
@@ -20,6 +21,9 @@ type Model = {
     ConfirmingRemove: bool
     ShowEventHistory: bool
     JellyfinServerUrl: string option
+    /// integration-mqsd3: the "Remove local copy" dialog, shared with
+    /// SeriesDetail. `None` when not open.
+    LocalCopyRemoval: LocalCopyRemovalDialog.Model option
     Error: string option
 }
 
@@ -90,3 +94,9 @@ type Msg =
     | Open_event_history
     | Close_event_history
     | Jellyfin_server_url_loaded of string
+    // Remove local copy (integration-mqsd3) — distinct from Remove_movie,
+    // which removes the library entry; this removes the files.
+    | Open_local_copy_removal
+    | Local_copy_removal_msg of LocalCopyRemovalDialog.Msg
+    | Close_local_copy_removal
+    | Local_copy_removal_done

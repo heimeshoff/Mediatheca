@@ -2,7 +2,16 @@ module Mediatheca.Client.Pages.SeriesDetail.State
 
 open Elmish
 open Mediatheca.Shared
+open Mediatheca.Client.Components
 open Mediatheca.Client.Pages.SeriesDetail.Types
+
+/// The plain-lambda effects `LocalCopyRemovalDialog.update` needs, built from
+/// the real `api` (integration-mqsd3 — see the component for why not the
+/// whole `api`).
+let private localCopyEffects (api: IMediathecaApi) : LocalCopyRemovalDialog.Effects = {
+    Plan = api.planLocalCopyRemoval
+    Remove = api.removeLocalCopy
+}
 
 let private activeRewatchId (model: Model) : string =
     match model.SelectedRewatchId with
@@ -36,6 +45,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       ShowEventHistory = false
       IsRefreshing = false
       RefreshMessage = None
+      LocalCopyRemoval = None
       Error = None },
     Cmd.batch [
         Cmd.ofMsg Load_detail
@@ -599,3 +609,23 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Refresh_from_tmdb_result (Error err) ->
         { model with IsRefreshing = false; Error = Some $"Refresh failed: {err}" }, Cmd.none
+
+    | Open_local_copy_removal ->
+        let childModel, childCmd = LocalCopyRemovalDialog.init (localCopyEffects api) (SeriesTarget model.Slug)
+        { model with LocalCopyRemoval = Some childModel }, Cmd.map Local_copy_removal_msg childCmd
+
+    | Local_copy_removal_msg childMsg ->
+        match model.LocalCopyRemoval with
+        | None -> model, Cmd.none
+        | Some childModel ->
+            let updated, childCmd = LocalCopyRemovalDialog.update (localCopyEffects api) childMsg childModel
+            { model with LocalCopyRemoval = Some updated }, Cmd.map Local_copy_removal_msg childCmd
+
+    | Close_local_copy_removal ->
+        { model with LocalCopyRemoval = None }, Cmd.none
+
+    | Local_copy_removal_done ->
+        // "Reload, don't patch" (integration-mqsd3 What) — the projection is
+        // the source of truth for "is it on the server", not a client-side
+        // patch of JellyfinId to None.
+        { model with LocalCopyRemoval = None }, Cmd.ofMsg Load_detail

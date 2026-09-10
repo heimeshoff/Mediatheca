@@ -2,7 +2,16 @@ module Mediatheca.Client.Pages.MovieDetail.State
 
 open Elmish
 open Mediatheca.Shared
+open Mediatheca.Client.Components
 open Mediatheca.Client.Pages.MovieDetail.Types
+
+/// The plain-lambda effects `LocalCopyRemovalDialog.update` needs, built from
+/// the real `api` (integration-mqsd3 — see the component for why not the
+/// whole `api`).
+let private localCopyEffects (api: IMediathecaApi) : LocalCopyRemovalDialog.Effects = {
+    Plan = api.planLocalCopyRemoval
+    Remove = api.removeLocalCopy
+}
 
 let init (slug: string) : Model * Cmd<Msg> =
     { Slug = slug
@@ -22,6 +31,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       ConfirmingRemove = false
       ShowEventHistory = false
       JellyfinServerUrl = None
+      LocalCopyRemoval = None
       Error = None },
     Cmd.batch [
         Cmd.ofMsg (Load_movie slug)
@@ -432,3 +442,23 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Jellyfin_server_url_loaded url ->
         let serverUrl = if System.String.IsNullOrWhiteSpace(url) then None else Some url
         { model with JellyfinServerUrl = serverUrl }, Cmd.none
+
+    | Open_local_copy_removal ->
+        let childModel, childCmd = LocalCopyRemovalDialog.init (localCopyEffects api) (MovieTarget model.Slug)
+        { model with LocalCopyRemoval = Some childModel }, Cmd.map Local_copy_removal_msg childCmd
+
+    | Local_copy_removal_msg childMsg ->
+        match model.LocalCopyRemoval with
+        | None -> model, Cmd.none
+        | Some childModel ->
+            let updated, childCmd = LocalCopyRemovalDialog.update (localCopyEffects api) childMsg childModel
+            { model with LocalCopyRemoval = Some updated }, Cmd.map Local_copy_removal_msg childCmd
+
+    | Close_local_copy_removal ->
+        { model with LocalCopyRemoval = None }, Cmd.none
+
+    | Local_copy_removal_done ->
+        // "Reload, don't patch" (integration-mqsd3 What) — the projection is
+        // the source of truth for "is it on the server", not a client-side
+        // patch of JellyfinId to None.
+        { model with LocalCopyRemoval = None }, Cmd.ofMsg (Load_movie model.Slug)

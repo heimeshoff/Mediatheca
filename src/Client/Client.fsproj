@@ -15,6 +15,7 @@
     <Compile Include="Components\JournalEditor.fs" />
     <Compile Include="Components\EditableDateInput.fs" />
     <Compile Include="Components\ModalPanel.fs" />
+    <Compile Include="Components\LocalCopyRemovalDialog.fs" />
     <Compile Include="Components\PosterCard.fs" />
     <Compile Include="Components\EntryList.fs" />
     <Compile Include="Components\ActionMenu.fs" />
@@ -89,6 +90,7 @@
     <Compile Include="Smoke.test.fs" />
     <Compile Include="Route.test.fs" />
     <Compile Include="Components\SearchModal.test.fs" />
+    <Compile Include="Components\LocalCopyRemovalDialog.test.fs" />
     <Compile Include="Pages\SeriesDetail\NextUp.test.fs" />
     <Compile Include="Pages\GameDetail\JournalHasContent.test.fs" />
     <Compile Include="Pages\GameDetail\DefaultTab.test.fs" />

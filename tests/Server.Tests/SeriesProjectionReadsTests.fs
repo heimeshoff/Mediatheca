@@ -188,6 +188,26 @@ let getBySlugTests =
                 Expect.isTrue
                     (detail.Seasons |> List.forall (fun s -> s.Episodes |> List.forall (fun e -> e.MetadataPending)))
                     "vacuously true over an empty season list — no episode exists that is NOT metadata-pending"
+
+        // integration-mqsd3: SeriesDetail.JellyfinId mirrors MovieDetail's
+        // getMovieJellyfinId-backed field -- "Remove local copy" on the
+        // series page keys off it.
+        testCase "JellyfinId is Some when a jellyfin_series row exists, None otherwise" <| fun _ ->
+            use conn = newConn ()
+            seedSeries conn "linked-show" 500 None []
+            seedSeries conn "unlinked-show" 501 None []
+            JellyfinStore.setSeriesJellyfinId conn "linked-show" "jf-series-500"
+
+            let linked = SeriesProjection.getBySlug conn "linked-show" None
+            let unlinked = SeriesProjection.getBySlug conn "unlinked-show" None
+
+            match linked with
+            | None -> failtest "expected linked-show to be found"
+            | Some detail -> Expect.equal detail.JellyfinId (Some "jf-series-500") "a jellyfin_series row yields Some id"
+
+            match unlinked with
+            | None -> failtest "expected unlinked-show to be found"
+            | Some detail -> Expect.equal detail.JellyfinId None "no jellyfin_series row yields None"
     ]
 
 [<Tests>]
