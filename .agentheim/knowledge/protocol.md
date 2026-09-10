@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-09-10 18:14 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 41m (first "Batch started" 17:33 → 18:14)
+**Completed:** 1 (first-try PASS: 0, re-dispatched: 1, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** integration-qb7tk: 2
+**Commits:** 3 (batch start, task completion, this entry)
+**Vision-conformance:** none — batch aligns with vision. The one shipped task is a qBittorrent adapter + Settings credentials card (integration BC, generic) feeding the "Remove local copy" workstream; it honors the Replayable design principle (third-party state cached, not evented — ADR-0070) and adds no Out-of-Scope (v1) item. vision.md still carries no "What success looks like"/"Non-goals" headings, so the pass was judgment against "Remaining v1 Work"/"Out of Scope (v1)"/"Design Principles". Note: the Out-of-Scope list still names "Jellyfin sync (v2)" although Jellyfin sync shipped long ago — a stale vision line, not a drift signal.
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task) — `formatBatchMixLine` from the source-repo `lib/vacuum-guard.mjs` (installed plugin 0.9.2 carries no such module).
+**Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed.
+
+**Session-start churn note:** 0 recognized machine-shape commits, 0 human commits since the 2026-09-04 10:55 boundary — all three commits (cbf3dbd capture, 14f09de refine, ab78eff promote) carry task trailers. Nothing to re-align.
+
+**Verification history:** iteration 1 FAIL — acceptance criterion 2 (`testQbittorrentConnection` success + auth-failure shapes) had no test; everything else was already green. Iteration 2 added the two `testConnection` cases plus a SettingsStore round-trip for the three `qbittorrent_*` keys → PASS (705 tests, build clean).
+
+**Builder eye-check pending:** criterion 9 (`[human-eye]`) — the qBittorrent card on Settings beside the Jellyfin card. Structural parity confirmed by the verifier (`integrationCard`/`statusBadge`/`feedbackAlert`/`Daisy.input`), not rendered. Also from the task Notes: once deployed, the harbour fleet docs get a one-line note that mediatheca holds qBittorrent credentials.
+
+**Harness notes:** (1) cached plugin 0.9.2 `checkpoint` again omitted the vacated `doing/` path from its manifest — staged explicitly, git recorded the move as a rename. (2) `checkpoint`'s JSON opts choke on backslash-escaped Windows paths through Bash — forward-slash paths work. (3) Root `node_modules` junctioned into the worktree for `npm run build`, removed via `rmdir` before `git worktree remove`; main copy verified intact. (4) Board is empty after this task; integration-r4vzm (server-side removal flow) sits in backlog blocked on this task, now unblocked for promotion.
+
+---
+
 ## 2026-09-10 18:11 -- Task verified and completed: integration-qb7tk - qBittorrent adapter and Settings card — URL, username and password stored and tested from Settings exactly like Jellyfin's, plus a typed-error `Qbittorrent.fs` adapter (login, list torrents with ratio and seeding time, list a torrent's files, delete with files) that integration-r4vzm builds on
 
 **Type:** Work / Task completion
