@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 1
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 20
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **integration-r4vzm** — Local copy removal, server side — a plan-then-execute flow (no UI) that imports the item's Jellyfin play state, deletes the acknowledged torrents with files from qBittorrent, DELETEs the Jellyfin item, verifies both gone, then clears the Jellyfin ids; pure `LocalCopyRemoval.fs` seams, Jellyfin DELETE support, per-item `JellyfinStore` clears (ADR-0071) (feature) — `todo/integration-r4vzm-local-copy-removal-server-flow.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **integration-r4vzm** — Local copy removal, server side — a plan-then-execute flow (no UI) that imports the item's Jellyfin play state, deletes the acknowledged torrents with files from qBittorrent, DELETEs the Jellyfin item, verifies both gone, then clears the Jellyfin ids; pure `LocalCopyRemoval.fs` seams, Jellyfin DELETE support, per-item `JellyfinStore` clears (ADR-0071) (feature) — `doing/integration-r4vzm-local-copy-removal-server-flow.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

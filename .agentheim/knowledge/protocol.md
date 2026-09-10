@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-10 18:43 -- Batch started: [integration-r4vzm]
+
+**Type:** Work / Batch start
+**Tasks:** integration-r4vzm - Local copy removal, server side — a plan-then-execute flow (no UI) that imports the item's Jellyfin play state, deletes the acknowledged torrents with files from qBittorrent, DELETEs the Jellyfin item, verifies both gone, then clears the Jellyfin ids; pure `LocalCopyRemoval.fs` seams, Jellyfin DELETE support, per-item `JellyfinStore` clears (ADR-0071)
+**Parallel:** no (1 worker — integration-r4vzm is the only ready task across every BC; nothing held back)
+
+---
+
 ## 2026-09-10 18:33 -- Modeling / Promoted: integration-r4vzm - Local copy removal, server side — a plan-then-execute flow (no UI) that imports the item's Jellyfin play state, deletes the acknowledged torrents with files from qBittorrent, DELETEs the Jellyfin item, verifies both gone, then clears the Jellyfin ids; pure `LocalCopyRemoval.fs` seams, Jellyfin DELETE support, per-item `JellyfinStore` clears (ADR-0071)
 
 **Type:** Modeling / Promote

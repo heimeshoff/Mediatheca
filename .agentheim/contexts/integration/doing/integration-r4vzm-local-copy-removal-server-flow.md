@@ -1,7 +1,7 @@
 ---
 id: integration-r4vzm
 title: Local copy removal, server side — a plan-then-execute flow (no UI) that imports the item's Jellyfin play state, deletes the acknowledged torrents with files from qBittorrent, DELETEs the Jellyfin item, verifies both gone, then clears the Jellyfin ids; pure `LocalCopyRemoval.fs` seams, Jellyfin DELETE support, per-item `JellyfinStore` clears (ADR-0071)
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-09-10
