@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-10 16:36 -- Modeling / Captured: integration-mqsd3 - "Remove local copy" button (qBittorrent + Jellyfin)
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** backlog
+**Summary:** One-click removal of a local copy from the movie/series detail page: import the item's Jellyfin play state, match torrents by path, delete them with files from qBittorrent, DELETE the Jellyfin item, verify both are gone, then clear the Jellyfin id. Feasibility verified live on harbour (paths line up, Jellyfin user may delete, uid 1000 everywhere); open questions on hit-and-run policy, season granularity and event-vs-projection keep it in backlog.
+
+---
+
 ## 2026-09-06 14:36 -- Work session ended
 
 **Type:** Work / Session end
