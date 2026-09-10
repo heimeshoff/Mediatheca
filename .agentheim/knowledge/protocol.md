@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-10 19:39 -- Batch started: [integration-mqsd3]
+
+**Type:** Work / Batch start
+**Tasks:** integration-mqsd3 - "Remove local copy" — the action on the movie and series detail pages, with a paper-overlay confirmation dialog showing the resolved path, the case, and one acknowledged row per matched torrent (ratio, seeding time, hit-and-run flag, pack warning), then the step-by-step outcome; UI over integration-r4vzm's plan/execute API
+**Parallel:** no (1 worker — integration-mqsd3 is the only ready task across every BC; nothing held back)
+
+---
+
 ## 2026-09-10 19:38 -- Modeling / Promoted: integration-mqsd3 - "Remove local copy" — the action on the movie and series detail pages, with a paper-overlay confirmation dialog showing the resolved path, the case, and one acknowledged row per matched torrent (ratio, seeding time, hit-and-run flag, pack warning), then the step-by-step outcome; UI over integration-r4vzm's plan/execute API
 
 **Type:** Modeling / Promote

@@ -1,7 +1,7 @@
 ---
 id: integration-mqsd3
 title: "Remove local copy" — the action on the movie and series detail pages, with a paper-overlay confirmation dialog showing the resolved path, the case, and one acknowledged row per matched torrent (ratio, seeding time, hit-and-run flag, pack warning), then the step-by-step outcome; UI over integration-r4vzm's plan/execute API
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-09-10
