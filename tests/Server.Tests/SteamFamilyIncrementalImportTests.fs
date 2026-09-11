@@ -89,6 +89,7 @@ let private createApi (factory: unit -> SqliteConnection) (httpClient: HttpClien
     Api.create
         factory
         httpClient
+        (Qbittorrent.createHttpClient ()) // ADR-0072: qBittorrent uses its own cookie-jar-free client
         (fun () -> ({ ApiKey = ""; ImageBaseUrl = "" } : Tmdb.TmdbConfig))
         (fun () -> ({ ApiKey = "" } : Rawg.RawgConfig)) // empty RAWG key: no RAWG calls, keeps the counted total deterministic
         (fun () -> steamConfig)

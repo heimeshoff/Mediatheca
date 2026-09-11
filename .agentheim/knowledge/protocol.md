@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-11 09:50 -- Hotfix: qBittorrent 5.x login contract (integration)
+
+**Type:** Hotfix / Conductor
+**Trigger:** first live "Test connection" against qBittorrent 5.2.3 reported "authentication failed" while qBittorrent's log recorded `WebAPI login success` for the same request.
+**Root cause:** integration-qb7tk implemented the 4.x wiki contract (HTTP 200 `Ok.`/`Fails.`, cookie `SID`); 5.x answers a good login with HTTP 204 + cookie `QBT_SID_<port>` and a bad one with HTTP 401. Additionally the shared `HttpClient`'s cookie jar replayed the session cookie on the next login. Verified against `release-5.2.3` source and a single live probe (one `invalid credentials` entry in qBittorrent's log, username `mediatheca-probe`).
+**Decision:** ADR-0072 — `Session` carries the cookie name, success = 2xx + session cookie, 401/403 → `AuthFailed`, dedicated `UseCookies=false` client for qBittorrent.
+**Outcome:** fix + tests, redeployed via `/deploy`. No task file (hotfix on a shipped task); ADR + README updated.
+
 ## 2026-09-10 20:07 -- Work session ended
 
 **Type:** Work / Session end

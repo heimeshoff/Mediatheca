@@ -1,8 +1,9 @@
 module Mediatheca.Tests.QbittorrentTests
 
-/// integration-qb7tk: the qBittorrent WebUI adapter. `login` maps
-/// qBittorrent's odd HTTP-200-with-a-text-body auth contract onto a typed
-/// `Result`, `withSession` is a login-once-use-once wrapper with no
+/// integration-qb7tk: the qBittorrent WebUI adapter. `login` maps both of
+/// qBittorrent's auth contracts -- 4.x HTTP-200-with-a-text-body + `SID`
+/// cookie, 5.x HTTP 204/401 + `QBT_SID_<port>` cookie (ADR-0072) -- onto a
+/// typed `Result`, `withSession` is a login-once-use-once wrapper with no
 /// persisted cookie (ADR-0071 point 7 -- deliberately not the ADR-0011
 /// re-auth-and-retry shape), and the request-building functions never leak
 /// vendor JSON or send an `Origin`/`Referer` header. All HTTP is faked via
@@ -54,7 +55,17 @@ let private jsonResponse (json: string) =
     resp.Content <- new StringContent(json, Encoding.UTF8, "application/json")
     resp
 
+/// qBittorrent 5.x login success (ADR-0072): HTTP 204, empty body, and the
+/// session cookie named `QBT_SID_<webui-port>` -- verbatim the raw form
+/// qBittorrent 5.2.3 emits (`QNetworkCookie::toRawForm`, `expires` with its
+/// embedded commas, `SameSite=Lax` under CSRF protection).
 let private okLoginResponse (sid: string) =
+    let resp = textResponse HttpStatusCode.NoContent ""
+    resp.Headers.Add("Set-Cookie", sprintf "QBT_SID_8080=%s; expires=Fri, 11-Sep-2026 10:33:20 GMT; HttpOnly; path=/; SameSite=Lax" sid)
+    resp
+
+/// qBittorrent 4.x login success: HTTP 200 + body "Ok." + cookie `SID`.
+let private legacyOkLoginResponse (sid: string) =
     let resp = textResponse HttpStatusCode.OK "Ok."
     resp.Headers.Add("Set-Cookie", sprintf "SID=%s; HttpOnly; path=/" sid)
     resp
@@ -62,7 +73,7 @@ let private okLoginResponse (sid: string) =
 let private config: QbittorrentConfig =
     { Url = "http://qbt.local:8080"; Username = "admin"; Password = "secret" }
 
-let private session: Session = { Sid = "test-sid" }
+let private session: Session = { CookieName = "QBT_SID_8080"; Sid = "test-sid" }
 
 [<Tests>]
 let qbittorrentTests =
@@ -70,19 +81,44 @@ let qbittorrentTests =
 
         testList "login" [
 
-            testCase "HTTP 200 + \"Ok.\" -> a session carrying the SID cookie" <| fun _ ->
+            testCase "5.x: HTTP 204 + QBT_SID_<port> cookie -> a session carrying that cookie's name and value (ADR-0072)" <| fun _ ->
                 let handler = new RecordingHandler(fun _ -> okLoginResponse "abc123")
                 use http = new HttpClient(handler)
                 let result = login http config |> Async.RunSynchronously
-                match result with
-                | Ok s -> Expect.equal s.Sid "abc123" "Extracted the SID value out of Set-Cookie"
-                | Error e -> failtestf "Expected a session, got Error %A" e
+                Expect.equal result (Ok { CookieName = "QBT_SID_8080"; Sid = "abc123" })
+                    "An empty 204 with the 5.x session cookie is a successful login; the cookie NAME is kept for the round-trip"
 
-            testCase "HTTP 200 + \"Fails.\" -> AuthFailed (bad credentials)" <| fun _ ->
+            testCase "4.x: HTTP 200 + \"Ok.\" + SID cookie -> a session under the legacy name" <| fun _ ->
+                let handler = new RecordingHandler(fun _ -> legacyOkLoginResponse "abc123")
+                use http = new HttpClient(handler)
+                let result = login http config |> Async.RunSynchronously
+                Expect.equal result (Ok { CookieName = "SID"; Sid = "abc123" }) "The 4.x contract still logs in"
+
+            testCase "5.x: HTTP 401 -> AuthFailed (bad credentials)" <| fun _ ->
+                let handler = new RecordingHandler(fun _ -> textResponse HttpStatusCode.Unauthorized "Unauthorized")
+                use http = new HttpClient(handler)
+                let result = login http config |> Async.RunSynchronously
+                Expect.equal result (Error AuthFailed) "5.x answers wrong credentials with 401; that is AuthFailed, not a generic HTTP error"
+
+            testCase "4.x: HTTP 200 + \"Fails.\" -> AuthFailed (bad credentials)" <| fun _ ->
                 let handler = new RecordingHandler(fun _ -> textResponse HttpStatusCode.OK "Fails.")
                 use http = new HttpClient(handler)
                 let result = login http config |> Async.RunSynchronously
                 Expect.equal result (Error AuthFailed) "Bad credentials map to AuthFailed, not a generic HTTP error"
+
+            testCase "2xx without any session cookie -> OtherFailure naming the status (the 'already logged in' answer, never a success)" <| fun _ ->
+                let handler = new RecordingHandler(fun _ -> textResponse HttpStatusCode.NoContent "")
+                use http = new HttpClient(handler)
+                let result = login http config |> Async.RunSynchronously
+                match result with
+                | Error (OtherFailure msg) ->
+                    Expect.stringContains msg "HTTP 204" "Names the status"
+                    Expect.stringContains msg "session cookie" "Says what was missing"
+                | other -> failtestf "Expected OtherFailure, got %A" other
+
+            testCase "The adapter's own HttpClient handler has no cookie jar (UseCookies = false), so no session leaks into the next login" <| fun _ ->
+                use handler = createHandler ()
+                Expect.isFalse handler.UseCookies "A cookie jar would replay the previous session cookie on the next login"
 
             testCase "HTTP 403 -> AuthFailed (client banned)" <| fun _ ->
                 let handler = new RecordingHandler(fun _ -> textResponse HttpStatusCode.Forbidden "")
@@ -181,8 +217,8 @@ let qbittorrentTests =
             let cookiesSent =
                 followUps
                 |> List.map (fun r -> r.Headers.GetValues("Cookie") |> Seq.head)
-            Expect.equal cookiesSent [ "SID=session-1"; "SID=session-2" ]
-                "The SID is sent as an explicit Cookie header matching that operation's own session"
+            Expect.equal cookiesSent [ "QBT_SID_8080=session-1"; "QBT_SID_8080=session-2" ]
+                "The session is sent back as an explicit Cookie header under the exact name qBittorrent issued it, matching that operation's own session"
 
         testCase "No request built by the adapter carries an Origin or Referer header" <| fun _ ->
             let handler =
@@ -226,7 +262,13 @@ let qbittorrentTests =
                 let result = testConnection http config |> Async.RunSynchronously
                 Expect.equal result (Ok ("v4.6.0", 2)) "Reports the app version and current torrent count"
 
-            testCase "Wrong credentials -> Error AuthFailed (authentication, not a generic HTTP error)" <| fun _ ->
+            testCase "Wrong credentials (5.x, HTTP 401) -> Error AuthFailed (authentication, not a generic HTTP error)" <| fun _ ->
+                let handler = new RecordingHandler(fun _ -> textResponse HttpStatusCode.Unauthorized "Unauthorized")
+                use http = new HttpClient(handler)
+                let result = testConnection http config |> Async.RunSynchronously
+                Expect.equal result (Error AuthFailed) "Bad credentials surface as AuthFailed, not a generic HTTP error"
+
+            testCase "Wrong credentials (4.x, HTTP 200 \"Fails.\") -> Error AuthFailed" <| fun _ ->
                 let handler = new RecordingHandler(fun _ -> textResponse HttpStatusCode.OK "Fails.")
                 use http = new HttpClient(handler)
                 let result = testConnection http config |> Async.RunSynchronously

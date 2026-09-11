@@ -20,18 +20,24 @@ module Qbittorrent =
         Password: string
     }
 
-    /// The sibling of `Jellyfin.FetchError`. qBittorrent answers a bad
-    /// login with HTTP 200 + body "Fails." (or HTTP 403 when the client is
-    /// banned for too many failed attempts) rather than a 401, so this is a
-    /// distinct shape from Jellyfin's -- both non-`Ok.` login outcomes, and
-    /// every 403 on an authenticated call, map to `AuthFailed`.
+    /// The sibling of `Jellyfin.FetchError`. qBittorrent's login contract
+    /// differs by version (ADR-0072): 4.x answers a bad login with HTTP 200
+    /// + body "Fails." (success: HTTP 200 + "Ok."), while 5.x answers a bad
+    /// login with HTTP 401 (success: HTTP 204, empty body -- the session
+    /// cookie is the only success signal). A banned client gets HTTP 403 on
+    /// either. All of those, plus every 403 on an authenticated call, map
+    /// to `AuthFailed`.
     type QbittorrentError =
         | AuthFailed
         | OtherFailure of string
 
-    /// The `SID` cookie value, live only for the duration of one
-    /// `withSession` operation (login-once-use-once, never persisted).
-    type Session = { Sid: string }
+    /// The session cookie qBittorrent handed back on login -- its NAME as
+    /// well as its value, because 5.x names it `QBT_SID_<webui-port>` (e.g.
+    /// `QBT_SID_8080`) while 4.x named it `SID`, and qBittorrent only
+    /// recognises a session that comes back under the same name. Live only
+    /// for the duration of one `withSession` operation (login-once-use-once,
+    /// never persisted).
+    type Session = { CookieName: string; Sid: string }
 
     type TorrentInfo = {
         Hash: string
@@ -66,28 +72,56 @@ module Qbittorrent =
 
     let private baseUrl (config: QbittorrentConfig) = config.Url.TrimEnd('/')
 
-    /// Adds the session's `SID` cookie as an explicit request header. No
+    /// The handler behind this adapter's `HttpClient` has NO cookie jar
+    /// (ADR-0072). .NET's default handler remembers every `Set-Cookie` and
+    /// replays it on later requests to the same host -- so a second `login`
+    /// would carry the previous operation's session cookie, qBittorrent
+    /// would answer "already logged in" (2xx, no new `Set-Cookie`), and
+    /// login-once-use-once would silently become one shared session. The
+    /// explicit `withCookie` header is the only cookie this adapter sends.
+    let createHandler () : HttpClientHandler = new HttpClientHandler(UseCookies = false)
+
+    /// The `HttpClient` every qBittorrent call must go through -- see
+    /// `createHandler`. Never the app-wide shared client.
+    let createHttpClient () : HttpClient = new HttpClient(createHandler ())
+
+    /// Adds the session cookie as an explicit request header, under the
+    /// exact name qBittorrent issued it (`SID` or `QBT_SID_<port>`). No
     /// `Origin` or `Referer` header is ever added -- qBittorrent's CSRF
     /// check rejects cross-origin browsers, not server-to-server calls
     /// without an `Origin`.
     let private withCookie (session: Session) (request: HttpRequestMessage) =
-        request.Headers.Add("Cookie", sprintf "SID=%s" session.Sid)
+        request.Headers.Add("Cookie", sprintf "%s=%s" session.CookieName session.Sid)
         request
 
-    let private extractSid (response: HttpResponseMessage) : string option =
+    let private isSessionCookieName (name: string) =
+        name = "SID" || name.StartsWith("QBT_SID_")
+
+    /// Picks the session cookie out of the login response's `Set-Cookie`
+    /// header(s): the `name=value` pair is always the first `;`-separated
+    /// segment; the name is `SID` (4.x) or `QBT_SID_<port>` (5.x).
+    let private extractSession (response: HttpResponseMessage) : Session option =
         match response.Headers.TryGetValues("Set-Cookie") with
         | true, values ->
             values
             |> Seq.tryPick (fun cookie ->
-                cookie.Split(';')
-                |> Array.tryFind (fun part -> part.Trim().StartsWith("SID="))
-                |> Option.map (fun part -> part.Trim().Substring("SID=".Length)))
+                let nameValue = cookie.Split(';').[0].Trim()
+                match nameValue.IndexOf('=') with
+                | -1 -> None
+                | idx ->
+                    let name = nameValue.Substring(0, idx).Trim()
+                    let value = nameValue.Substring(idx + 1).Trim()
+                    if isSessionCookieName name && value <> "" then Some { CookieName = name; Sid = value }
+                    else None)
         | false, _ -> None
 
-    /// `POST /api/v2/auth/login` (form `username`/`password`). qBittorrent
-    /// answers HTTP 200 with body "Ok." on success and "Fails." on bad
-    /// credentials, and 403 when the client is banned -- both non-"Ok."
-    /// outcomes are `AuthFailed`.
+    /// `POST /api/v2/auth/login` (form `username`/`password`). Success is
+    /// any 2xx that carries a session cookie -- 5.x: HTTP 204 + `QBT_SID_<port>`;
+    /// 4.x: HTTP 200 "Ok." + `SID`. Bad credentials are HTTP 401 (5.x) or
+    /// HTTP 200 "Fails." (4.x); a banned client is HTTP 403 -- all three are
+    /// `AuthFailed`. A 2xx WITHOUT a session cookie is not a success: that is
+    /// qBittorrent's answer to a request that already carried a valid
+    /// session, which this adapter never sends on purpose (`createHandler`).
     let login (httpClient: HttpClient) (config: QbittorrentConfig) : Async<Result<Session, QbittorrentError>> =
         async {
             try
@@ -96,18 +130,19 @@ module Qbittorrent =
                 request.Content <- new FormUrlEncodedContent(dict [ "username", config.Username; "password", config.Password ])
                 let! response = httpClient.SendAsync(request) |> Async.AwaitTask
                 let status = int response.StatusCode
-                if status = 403 then
+                if status = 401 || status = 403 then
                     return Error AuthFailed
+                elif not response.IsSuccessStatusCode then
+                    return Error (OtherFailure (sprintf "HTTP %d" status))
                 else
-                    let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
-                    if not response.IsSuccessStatusCode then
-                        return Error (OtherFailure (sprintf "HTTP %d" status))
-                    elif body.Trim() = "Ok." then
-                        match extractSid response with
-                        | Some sid -> return Ok { Sid = sid }
-                        | None -> return Error (OtherFailure "qBittorrent login succeeded but returned no SID cookie")
-                    else
-                        return Error AuthFailed
+                    match extractSession response with
+                    | Some session -> return Ok session
+                    | None ->
+                        let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+                        if body.Trim() = "Fails." then
+                            return Error AuthFailed
+                        else
+                            return Error (OtherFailure (sprintf "qBittorrent login answered HTTP %d without a session cookie (SID / QBT_SID_<port>)" status))
             with ex ->
                 return Error (OtherFailure ex.Message)
         }

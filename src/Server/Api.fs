@@ -1466,6 +1466,7 @@ module Api =
     let create
         (factory: unit -> SqliteConnection)
         (httpClient: HttpClient)
+        (qbittorrentHttpClient: HttpClient)
         (getTmdbConfig: unit -> Tmdb.TmdbConfig)
         (getRawgConfig: unit -> Rawg.RawgConfig)
         (getSteamConfig: unit -> Steam.SteamConfig)
@@ -4569,7 +4570,7 @@ module Api =
 
             testQbittorrentConnection = fun (url, username, password) -> async {
                 let config: Qbittorrent.QbittorrentConfig = { Url = url; Username = username; Password = password }
-                let! result = Qbittorrent.testConnection httpClient config
+                let! result = Qbittorrent.testConnection qbittorrentHttpClient config
                 match result with
                 | Ok (version, torrentCount) ->
                     return Ok (sprintf "Connected -- qBittorrent %s, %d torrent(s)" version torrentCount)
@@ -4601,11 +4602,11 @@ module Api =
                     ResolveJellyfinId = resolveJellyfinId
                     FetchItem = fun itemId -> Jellyfin.getItemWithReauth httpClient jfConfig persistAuth itemId
                     ListTorrents = fun () -> async {
-                        let! r = Qbittorrent.withSession httpClient qbConfig (fun session -> Qbittorrent.listTorrents httpClient qbConfig session)
+                        let! r = Qbittorrent.withSession qbittorrentHttpClient qbConfig (fun session -> Qbittorrent.listTorrents qbittorrentHttpClient qbConfig session)
                         return r |> Result.mapError qbErrorToString
                     }
                     ListFiles = fun t -> async {
-                        let! r = Qbittorrent.withSession httpClient qbConfig (fun session -> Qbittorrent.listFiles httpClient qbConfig session t.Hash)
+                        let! r = Qbittorrent.withSession qbittorrentHttpClient qbConfig (fun session -> Qbittorrent.listFiles qbittorrentHttpClient qbConfig session t.Hash)
                         return r |> Result.mapError qbErrorToString
                     }
                 }
@@ -4628,11 +4629,11 @@ module Api =
                     | SeriesTarget slug -> JellyfinStore.getSeriesJellyfinId conn slug
 
                 let listTorrentsEff () : Async<Result<Qbittorrent.TorrentInfo list, string>> = async {
-                    let! r = Qbittorrent.withSession httpClient qbConfig (fun session -> Qbittorrent.listTorrents httpClient qbConfig session)
+                    let! r = Qbittorrent.withSession qbittorrentHttpClient qbConfig (fun session -> Qbittorrent.listTorrents qbittorrentHttpClient qbConfig session)
                     return r |> Result.mapError qbErrorToString
                 }
                 let listFilesEff (t: Qbittorrent.TorrentInfo) : Async<Result<string list, string>> = async {
-                    let! r = Qbittorrent.withSession httpClient qbConfig (fun session -> Qbittorrent.listFiles httpClient qbConfig session t.Hash)
+                    let! r = Qbittorrent.withSession qbittorrentHttpClient qbConfig (fun session -> Qbittorrent.listFiles qbittorrentHttpClient qbConfig session t.Hash)
                     return r |> Result.mapError qbErrorToString
                 }
 
@@ -4689,7 +4690,7 @@ module Api =
                 }
 
                 let deleteTorrentsEff (hashes: string list) : Async<Result<unit, string>> = async {
-                    let! r = Qbittorrent.withSession httpClient qbConfig (fun session -> Qbittorrent.deleteTorrents httpClient qbConfig session hashes true)
+                    let! r = Qbittorrent.withSession qbittorrentHttpClient qbConfig (fun session -> Qbittorrent.deleteTorrents qbittorrentHttpClient qbConfig session hashes true)
                     return r |> Result.mapError qbErrorToString
                 }
 

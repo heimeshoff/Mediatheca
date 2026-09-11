@@ -45,6 +45,7 @@ let private createApi (factory: unit -> SqliteConnection) (httpClient: HttpClien
     Api.create
         factory
         httpClient
+        (Qbittorrent.createHttpClient ()) // ADR-0072: qBittorrent uses its own cookie-jar-free client
         (fun () -> ({ ApiKey = ""; ImageBaseUrl = "" } : Tmdb.TmdbConfig))
         (fun () -> ({ ApiKey = "" } : Rawg.RawgConfig))
         (fun () -> ({ ApiKey = ""; SteamId = "" } : Steam.SteamConfig))

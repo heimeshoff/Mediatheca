@@ -61,6 +61,7 @@ let private createDashboardApi (factory: unit -> SqliteConnection) : IMediatheca
     Api.create
         factory
         (new HttpClient())
+        (Qbittorrent.createHttpClient ()) // ADR-0072: qBittorrent uses its own cookie-jar-free client
         (fun () -> ({ ApiKey = ""; ImageBaseUrl = "" } : Tmdb.TmdbConfig))
         (fun () -> ({ ApiKey = "" } : Rawg.RawgConfig))
         (fun () -> ({ ApiKey = ""; SteamId = "" } : Steam.SteamConfig))

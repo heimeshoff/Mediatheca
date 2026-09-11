@@ -248,6 +248,10 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
 
     let httpClient = new HttpClient()
 
+    // qBittorrent gets its own cookie-jar-free client (ADR-0072): the shared
+    // one would remember the session cookie and replay it on the next login.
+    let qbittorrentHttpClient = Qbittorrent.createHttpClient ()
+
     // Image storage
     let imageBasePath = Path.Combine(dataDir, "images")
     if not (Directory.Exists(imageBasePath)) then
@@ -462,7 +466,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     let adminGuards = Administration.makeGuards ()
 
     // Create API
-    let api = Api.create connectionFactory httpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig getQbittorrentConfig mountRoots imageBasePath projectionHandlers
+    let api = Api.create connectionFactory httpClient qbittorrentHttpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig getQbittorrentConfig mountRoots imageBasePath projectionHandlers
     let adminApi = Administration.create connectionFactory dbPath imageBasePath projectionHandlers scheduledJobs jobRunRecorder adminGuards
 
     let remotingHandler =
