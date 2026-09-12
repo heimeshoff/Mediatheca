@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-12 17:20 -- Task verified and completed: design-system-m2v88 - Grow / shared-element FLIP motion primitive — a new `Motion.fs` with a pure `Flip.plan`, a WAAPI `snapshot`/`play`/`growSurface` shell, `flipKey`, a reduced-motion gate, `--duration-grow` (0.5s) / `--ease-grow` tokens, and a StyleGuide specimen (ADR-0073)
+
+**Type:** Work / Task completion
+**Task:** design-system-m2v88 - Grow / shared-element FLIP motion primitive — a new `Motion.fs` with a pure `Flip.plan`, a WAAPI `snapshot`/`play`/`growSurface` shell, `flipKey`, a reduced-motion gate, `--duration-grow` (0.5s) / `--ease-grow` tokens, and a StyleGuide specimen (ADR-0073)
+**Summary:** Shipped the grow/shared-element FLIP motion vocabulary — src/Client/Motion.fs (pure Flip.plan, DOM shell snapshot/play/growSurface/cancel, flipKey, prefersReducedMotion, growDurationMs/growEasing mirroring new --duration-grow/--ease-grow CSS tokens) plus a live "Grow Transition" StyleGuide specimen, per ADR-0073
+**Duration:** 17m
+**Verification:** PASS (iteration 1)
+**Files changed:** 6
+**Tests added:** 8
+**ADRs written:** none
+
+---
+
 ## 2026-09-12 16:51 -- Batch started: [design-system-m2v88]
 
 **Type:** Work / Batch start

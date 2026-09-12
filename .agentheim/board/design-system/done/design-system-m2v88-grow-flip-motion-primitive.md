@@ -1,7 +1,7 @@
 ---
 id: design-system-m2v88
 title: Grow / shared-element FLIP motion primitive — a new `Motion.fs` with a pure `Flip.plan`, a WAAPI `snapshot`/`play`/`growSurface` shell, `flipKey`, a reduced-motion gate, `--duration-grow` (0.5s) / `--ease-grow` tokens, and a StyleGuide specimen (ADR-0073)
-status: doing
+status: done
 type: feature
 context: design-system
 created: 2026-09-12
@@ -90,3 +90,20 @@ worker picks; the public surface below is what matters):
   reduced-motion freeze stance.
 - Consumer: `intelligence-m09d4`. Any later two-subtree swap elsewhere (a detail-page tab, a
   re-flowing list) can reuse this without new vocabulary.
+
+## Outcome
+
+Shipped the grow / shared-element FLIP motion primitive (ADR-0073) as the design-system half of the dashboard card grow animation.
+
+- **`src/Client/Motion.fs`** — `Box` (viewport-coordinate rect) and `FlipMove` (`Key`, `Dx`, `Dy`, `FadeIn`) records; `Flip.plan : Map<string,Box> -> Map<string,Box> -> FlipMove list`, the pure core (intersection of the two key maps only, a key present in just one map ignored, a 0.5px sub-pixel move threshold on position, `FadeIn = true` whenever the box's width or height changed between snapshots — including a size-only change with no position change, since that still needs a fade); `Flip.snapshot`/`Flip.play` (WAAPI `Element.animate`, translate-only, `fill: "none"`, no-op under reduced motion) and `growSurface`/`cancel` as the untested DOM shell, all built on `emitJsExpr` (this codebase's established Fable escape hatch — no typed WAAPI `Animation`/`matchMedia` binding exists in its Fable.Browser.Dom); `flipKey` emitting `prop.key` + `data-flip-key` from one value; `prefersReducedMotion` gating `play`/`growSurface`.
+- **`src/Client/index.css`** — `--duration-grow: 0.5s` and `--ease-grow: cubic-bezier(0.16, 1, 0.3, 1)`, mirrored by `Motion.growDurationMs`/`Motion.growEasing` with a comment on each side naming the mirror (WAAPI needs a `getComputedStyle` round trip to read a CSS custom property, so the codebase keeps a hand-synced copy instead).
+- **`src/Client/DesignSystem.fs`** — a doc-comment cross-reference added next to the existing `goldLeafSweep`/`leaveTransition`/`crossFade` vocabulary pointing at `Motion.fs` for the new primitive (the primitive itself lives in `Motion.fs`, not `DesignSystem.fs`, per the task's own compile-order note).
+- **`src/Client/Pages/StyleGuide/Views.fs`** — a new "Grow Transition" specimen (`growTransitionSpecimen`, a `[<ReactComponent>]`) under the existing "Velvet Lobby Patterns" → "Motion" subsection: four toy tiles toggle between a compact row and a grown grid; a `useLayoutEffect` snapshots-before/plays-after using `Motion.Flip.snapshot`/`plan`/`play`, the same snapshot/commit/play shape `intelligence-m09d4` wires onto the real dashboard cards.
+- **`src/Client/Client.fsproj`** — `Motion.fs` compiled right after `Router.fs` (before `DesignSystem.fs`); `Motion.test.fs` compiled alongside the other `*.test.fs` files.
+- **`src/Client/Motion.test.fs`** — 8 Fable.Mocha/Vitest tests covering `Flip.plan` (equal-size translate with `FadeIn = false`; a size change yields `FadeIn = true` even at zero position delta; before-only and after-only keys produce no move; a sub-threshold move is dropped; a move that clears the threshold on only one axis still animates; the plan's length never exceeds `min(|before|, |after|)`) and `flipKey` (both `key` and `data-flip-key` are emitted from one value, inspected via `unbox<string * obj>` since `IReactProperty` compiles to a plain `[key, value]` tuple in this Feliz version).
+
+`npm run build` (Fable compile, 1 pre-existing unrelated FS0020 warning in `Pages/AdminProjections/Views.fs`), `npm test` (769 Expecto tests), and `npm run test:client` (60 Vitest tests, 8 new) all pass — verified independently by the verifier from the worktree.
+
+Scope held to the design-system half only — `src/Client/Pages/Dashboard/*` and `State.fs`'s `scrollToExpandedCardCmd` were not touched; that wiring is `intelligence-m09d4`.
+
+**Verifier observation for the builder's [human-eye] check, not a criterion:** `Flip.play` runs the `FadeIn` opacity `0 -> 1` over the full `growDurationMs` rather than reusing `--duration-crossfade` as ADR-0073 §1 phrases it. The aggressive `--ease-grow` ease-out front-loads it (~0.95 opacity by 200ms) so it should still read as a short fade, but every tile in the StyleGuide specimen changes size, so the fade is visible on all four.

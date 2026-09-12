@@ -289,6 +289,15 @@ let leaveTransitionLeaving = "leave-transition leave-transition-leaving"
 /// tab-panel swap. *Where* it fires is BC behavior, not owned here.
 let crossFade = "cross-fade"
 
+/// Grow / shared-element FLIP primitive (0.5s, `--duration-grow`/`--ease-grow`,
+/// ADR-0073) — key-based FLIP played through WAAPI, for a two-subtree swap
+/// (e.g. the dashboard's expandable cards) where items already on screen
+/// should visibly travel to their new positions rather than snap. See
+/// `Motion.fs`: `Motion.Flip.plan`/`snapshot`/`play`, `Motion.growSurface`,
+/// `Motion.flipKey`, `Motion.prefersReducedMotion`. *Where* it fires (which
+/// cards participate, the effect that plays it) is BC behavior, not owned
+/// here.
+
 // ── Status badges (§ 4 Status badges) ──
 
 /// The five-state lifecycle vocabulary the status-badge pattern renders.

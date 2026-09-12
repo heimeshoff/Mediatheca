@@ -1372,6 +1372,60 @@ let private componentsSection () =
 // The re-skinned recurring patterns from the design brief's 3a/3b/3c/3d
 // boards: typed Feliz compositions in DesignSystem.fs, specimens here.
 
+/// Grow / shared-element FLIP specimen (ADR-0073, design-system-m2v88): four
+/// toy tiles toggle between a compact row and a grown grid. Toggling snapshots
+/// the tiles' boxes before the layout change, then plays the FLIP travel
+/// after React commits the new layout -- the same snapshot/commit/play shape
+/// intelligence-m09d4 wires onto the real dashboard cards.
+[<ReactComponent>]
+let private growTransitionSpecimen () =
+    let expanded, setExpanded = React.useState false
+    let containerRef = React.useRef<Browser.Types.HTMLElement option>(None)
+    let beforeSnapshot = React.useRef<Map<string, Motion.Box> option>(None)
+    let liveAnimations = React.useRef<obj list>([])
+
+    React.useLayoutEffect(
+        (fun () ->
+            match containerRef.current, beforeSnapshot.current with
+            | Some root, Some before ->
+                liveAnimations.current |> List.iter Motion.cancel
+                let after = Motion.Flip.snapshot root
+                let moves = Motion.Flip.plan before after
+                liveAnimations.current <- Motion.Flip.play root moves
+                beforeSnapshot.current <- None
+            | _ -> ()),
+        [| box expanded |]
+    )
+
+    let toggle () =
+        containerRef.current |> Option.iter (fun root -> beforeSnapshot.current <- Some (Motion.Flip.snapshot root))
+        setExpanded (not expanded)
+
+    Html.div [
+        prop.className "flex flex-col gap-3 mt-3 max-w-2xl"
+        prop.children [
+            Html.button [
+                prop.className "btn btn-sm btn-outline w-fit"
+                prop.text (if expanded then "Collapse" else "Expand")
+                prop.onClick (fun _ -> toggle ())
+            ]
+            Html.div [
+                prop.ref (fun el -> containerRef.current <- (if isNull el then None else Some (unbox el)))
+                prop.className (if expanded then "grid grid-cols-2 gap-3" else "flex gap-3")
+                prop.children [
+                    for i in 1 .. 4 ->
+                        Html.div (
+                            Motion.flipKey (string i)
+                            @ [ prop.className
+                                    ("rounded-[var(--radius-poster)] bg-primary/30 border border-primary/50 flex items-center justify-center text-xs font-mono transition-none "
+                                     + (if expanded then "h-24 w-full" else "h-16 w-16"))
+                                prop.text (string i) ]
+                        )
+                ]
+            ]
+        ]
+    ]
+
 [<ReactComponent>]
 let private velvetLobbyPatternsSection () =
     let rating, setRating = React.useState 3
@@ -1799,8 +1853,16 @@ let private velvetLobbyPatternsSection () =
                     Html.code [ prop.className "text-xs font-mono text-primary/70 block"; prop.text "DesignSystem.goldLeafSweep    (\"gold-sweep\", ~3.2s linear infinite)" ]
                     Html.code [ prop.className "text-xs font-mono text-primary/70 block"; prop.text "DesignSystem.leaveTransition / .leaveTransitionLeaving (400ms ease-out)" ]
                     Html.code [ prop.className "text-xs font-mono text-primary/70 block"; prop.text "DesignSystem.crossFade         (200ms)" ]
+                    Html.code [ prop.className "text-xs font-mono text-primary/70 block"; prop.text "Motion.Flip.plan/snapshot/play, Motion.growSurface, Motion.flipKey (0.5s, --duration-grow/--ease-grow)" ]
                 ]
             ]
+
+            // ── Grow transition ──
+            subheading "Grow Transition"
+
+            decision "The fourth motion primitive (ADR-0073, design-system-m2v88): a key-based FLIP played through WAAPI, for a two-subtree swap where items already on screen should visibly travel to their new positions rather than snap -- e.g. the dashboard's expandable cards (intelligence-m09d4). Design-system ships the vocabulary in Motion.fs (Motion.Flip.plan/snapshot/play, Motion.growSurface, Motion.flipKey, Motion.prefersReducedMotion) and this specimen; the owning BC decides which cards participate and wires the effect. Click Expand below -- the tiles travel to their grown positions over --duration-grow (0.5s). With prefers-reduced-motion: reduce emulated, they snap with no travel."
+
+            growTransitionSpecimen ()
         ]
     ]
 

@@ -88,6 +88,14 @@
     --duration-slow: 0.4s;      /* leave-transition (fade + collapse) */
     --duration-crossfade: 0.2s; /* cross-fade (e.g. dashboard tab swap) */
     --sweep: 3.2s linear infinite;
+
+    /* Grow / shared-element FLIP primitive (ADR-0073, design-system-m2v88).
+       Mirrored as F# constants Motion.growDurationMs / Motion.growEasing in
+       Motion.fs -- WAAPI's Element.animate cannot read a CSS custom property
+       without a getComputedStyle round trip, so both sides carry the value
+       and must be kept in sync by hand. */
+    --duration-grow: 0.5s;
+    --ease-grow: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Velvet Lobby retires uppercase as the default heading treatment — Instrument
