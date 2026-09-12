@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-12 20:12 -- Modeling / Captured: intelligence-cs2dm - Collapsing a dashboard card remounts every collapsed card (fade-in-up replays, and the grown surface's DOM node is repurposed into a sibling card) — give `growingTabArea`'s two render branches stable keys so the collapsed subtree really stays mounted across expand/collapse (ADR-0073 §3/§4)
+
+**Type:** Modeling / Capture
+**BC:** intelligence
+**Filed to:** todo
+**Summary:** Two builder-reported symptoms after design-system-btmdx — collapse still fades the initial items, and on the Movies tab collapsing Recently Watched leaves Recently Added showing Recently Watched's large tiles with its own content below — share one root cause: growingTabArea's two render branches (flat list vs invisible-wrapper + surface) are unkeyed, so React reconciles them by index and remounts every collapsed card on each expand and collapse (replaying chromeClass's animate-fade-in-up) and repurposes the surface node as a sibling card. Fix: stable prop.key on the always-present content wrapper and on the surface, so the collapsed subtree really stays mounted as ADR-0073 §3/§4 already describe. Filed straight to todo: root cause read from code, criteria concrete.
+
+---
+
 ## 2026-09-12 19:49 -- Work session ended
 
 **Type:** Work / Session end
