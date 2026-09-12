@@ -1,7 +1,7 @@
 ---
 id: intelligence-m09d4
 title: Dashboard card expand/collapse grows in place — the card surface and its already-rendered items travel to their expanded positions in ~0.5s via the design-system FLIP primitive, later-fetched items join below without disturbing them, and the 50ms scroll guess in State.fs is retired (ADR-0073)
-status: todo
+status: doing
 type: feature
 context: intelligence
 created: 2026-09-12

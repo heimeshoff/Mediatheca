@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-12 17:21 -- Batch started: [intelligence-m09d4]
+
+**Type:** Work / Batch start
+**Tasks:** intelligence-m09d4 - Dashboard card expand/collapse grows in place — the card surface and its already-rendered items travel to their expanded positions in ~0.5s via the design-system FLIP primitive, later-fetched items join below without disturbing them, and the 50ms scroll guess in State.fs is retired (ADR-0073)
+**Parallel:** no (1 worker — intelligence-m09d4 is the only ready task across every BC; it unblocked this session when its dependency design-system-m2v88 completed. Nothing held back by the cap)
+
+---
+
 ## 2026-09-12 17:20 -- Task verified and completed: design-system-m2v88 - Grow / shared-element FLIP motion primitive — a new `Motion.fs` with a pure `Flip.plan`, a WAAPI `snapshot`/`play`/`growSurface` shell, `flipKey`, a reduced-motion gate, `--duration-grow` (0.5s) / `--ease-grow` tokens, and a StyleGuide specimen (ADR-0073)
 
 **Type:** Work / Task completion
