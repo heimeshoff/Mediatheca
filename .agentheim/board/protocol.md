@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-09-12 20:46 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 26m (first "Batch started" 20:18 → 20:46)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** intelligence-cs2dm: 1
+**Commits:** 3 (batch start, task integration, this entry)
+**Vision-conformance:** none — batch aligns with vision. The one task fixes a remount defect on dashboard card expand/collapse the builder reported on the running app, serving "Unified Dashboard" / "Remaining v1 Work" and the "Intent-driven" design principle; it touches no "Out of Scope (v1)" item. vision.md still has no "What success looks like"/"Non-goals" headings — `extractVisionSections` returns two empty lists, so this judgement was made against "Unified Dashboard"/"Remaining v1 Work"/"Out of Scope (v1)"/"Design Principles", as the prior three sessions also did.
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task) — `type: bug`, both touched files product surfaces (`src/Client/Pages/Dashboard/Views.fs`, `tests/e2e/dashboard-card-collapse-persists.spec.ts`).
+**Carry-over:** none — working tree clean, no registered worktrees remain. `.worktrees/` held regenerated .NET `obj/` residue (3 files each) under `design-system-btmdx`, `intelligence-m09d4` and `intelligence-cs2dm` — not registered worktrees, no source, recreated after earlier sessions' teardown (most likely Ionide in VS Code re-restoring the removed worktrees' `Server.fsproj`); deleted as build residue and `.worktrees/` removed.
+
+**Session-start churn note:** 0 recognized machine-shape commits, 0 human commits since the 2026-09-12 19:49 boundary — both commits in the window (`cf88717` session-end bookkeeping, `50c1140` the cs2dm capture) carry a `[<task-id>]` trailer. Nothing flagged; `whats-next.md` not written.
+
+**Verification history:** intelligence-cs2dm PASS iteration 1. The verifier re-ran all three suites from the worktree (build exit 0 with only the pre-existing FS0020; Expecto 769/0; Vitest 61 / 10 files) and also ran the worker's new Playwright spec itself (1 passed, cold-started against an isolated temp `DATA_DIR`, no live DB touched). It confirmed structurally that `prop.ref setContainerRef` still sits on the root of every `[data-flip-key]` in both states and that `#dashboard-expanded-card` remains a sibling of the hidden clone rather than an ancestor — the class of defect that failed intelligence-m09d4's iteration 1 is not reintroduced. README delta on the intelligence `Card grow` bullet disposed `applied` (through the LF-normalise/CRLF-restore wrapper; the upstream `lib/readme-delta.mjs` CRLF bug is still open). The worker could not reproduce symptom 2's exact Movies-tab artifact (no TMDB API key in the sandbox to seed movies; with empty cards the index-remap happens to line up correctly) and confirmed the same root mechanism hermetically on the Games tab instead.
+
+**Builder checks pending (the three [human-eye] criteria on intelligence-cs2dm):** collapsing any dashboard card — the cards reappear in place with no fade-in-up entrance, on the All tab and the Movies tab; Movies tab — expand Recently Watched, let it finish, collapse: Recently Added shows only its own content and both cards are normal collapsed height (and reversed); rapid expand/collapse toggling leaves no stale content, height, or stuck transform. The verifier flagged one residual layout risk worth a glance during these: the collapsed-state outer container changed from `flex flex-col gap-4` to `grid grid-cols-1` (flex-col moved one level down into the keyed wrapper), so horizontal poster rails now sit inside a grid item — collapsed-state rail width should be eyeballed.
+
+**Harness notes:** same as prior sessions — verbs invoked against the local source install at `C:\src\heimeshoff\agentic\agentheim\lib\`; all JSON opts written to scratchpad files; root `node_modules` junctioned into the worktree and removed via `rmdir` before `git worktree remove`, main copy verified intact. Two new notes: (1) the verifier flagged that the worker verified TDD red/green with a bare `git stash` on `Views.fs` — the stash stack is shared across worktrees, so a temporary WIP commit is the safer technique; nothing was lost here. (2) `references/worker-return-format.md` gained an ADR-0080 sidecar-write requirement upstream mid-session; this session's worker prompt predated it and returned in-transcript normally.
+
+---
+
 ## 2026-09-12 20:45 -- Task verified and completed: intelligence-cs2dm - Collapsing a dashboard card remounts every collapsed card (fade-in-up replays, and the grown surface's DOM node is repurposed into a sibling card) — give `growingTabArea`'s two render branches stable keys so the collapsed subtree really stays mounted across expand/collapse (ADR-0073 §3/§4)
 
 **Type:** Work / Task completion
