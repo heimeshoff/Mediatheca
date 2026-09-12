@@ -1,7 +1,7 @@
 ---
 id: intelligence-cs2dm
 title: Collapsing a dashboard card remounts every collapsed card (fade-in-up replays, and the grown surface's DOM node is repurposed into a sibling card) — give `growingTabArea`'s two render branches stable keys so the collapsed subtree really stays mounted across expand/collapse (ADR-0073 §3/§4)
-status: todo
+status: doing
 type: bug
 context: intelligence
 created: 2026-09-12

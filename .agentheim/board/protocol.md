@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-12 20:17 -- Batch started: [intelligence-cs2dm]
+
+**Type:** Work / Batch start
+**Tasks:** intelligence-cs2dm - Collapsing a dashboard card remounts every collapsed card (fade-in-up replays, and the grown surface's DOM node is repurposed into a sibling card) — give `growingTabArea`'s two render branches stable keys so the collapsed subtree really stays mounted across expand/collapse (ADR-0073 §3/§4)
+**Parallel:** no (1 worker — intelligence-cs2dm is the only task in todo/ across every BC; nothing held back by the cap)
+
+---
+
 ## 2026-09-12 20:12 -- Modeling / Captured: intelligence-cs2dm - Collapsing a dashboard card remounts every collapsed card (fade-in-up replays, and the grown surface's DOM node is repurposed into a sibling card) — give `growingTabArea`'s two render branches stable keys so the collapsed subtree really stays mounted across expand/collapse (ADR-0073 §3/§4)
 
 **Type:** Modeling / Capture
