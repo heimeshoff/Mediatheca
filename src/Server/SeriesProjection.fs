@@ -1468,7 +1468,7 @@ module SeriesProjection =
     /// two views), plus retargeting the "is this series finished" filter from
     /// `sl.episode_count` to the view's count so a series can still surface
     /// here once the materialized column stops being maintained.
-    let getRecentlyFinished (conn: SqliteConnection) : Mediatheca.Shared.SeriesListItem list =
+    let getRecentlyFinished (conn: SqliteConnection) (limit: int option) : Mediatheca.Shared.SeriesListItem list =
         conn
         |> Db.newCommand """
             SELECT sl.slug, sl.name, sl.year, sl.poster_ref, sl.genres, sl.status,
@@ -1487,8 +1487,9 @@ module SeriesProjection =
             ) lw ON lw.series_slug = sl.slug
             WHERE COALESCE(ec.episode_count, 0) > 0 AND sl.watched_episode_count >= COALESCE(ec.episode_count, 0) AND sl.abandoned = 0
             ORDER BY lw.last_watched_date DESC NULLS LAST
-            LIMIT 10
+            LIMIT @limit
         """
+        |> Db.setParams [ "limit", SqlType.Int32 (RowLimit.toSql limit) ]
         |> Db.query (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
             let genres =
@@ -1532,7 +1533,7 @@ module SeriesProjection =
     /// unretargeted, `series-x9mfp`) — `TmdbRating` from `series_metadata_cache`,
     /// `SeasonCount`/`EpisodeCount`/`NextUp` from the two views, since
     /// `series_list`'s own materialized columns are gone.
-    let getRecentlyAbandoned (conn: SqliteConnection) : Mediatheca.Shared.SeriesListItem list =
+    let getRecentlyAbandoned (conn: SqliteConnection) (limit: int option) : Mediatheca.Shared.SeriesListItem list =
         conn
         |> Db.newCommand """
             SELECT sl.slug, sl.name, sl.year, sl.poster_ref, sl.genres, sl.status,
@@ -1551,8 +1552,9 @@ module SeriesProjection =
             ) lw ON lw.series_slug = sl.slug
             WHERE sl.abandoned = 1
             ORDER BY lw.last_watched_date DESC NULLS LAST
-            LIMIT 10
+            LIMIT @limit
         """
+        |> Db.setParams [ "limit", SqlType.Int32 (RowLimit.toSql limit) ]
         |> Db.query (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
             let genres =
@@ -1710,7 +1712,7 @@ module SeriesProjection =
               EpisodeCount = rd.ReadInt32 "episode_count" })
 
     // Dashboard: Most watched with (friends from rewatch sessions, by episode count)
-    let getSeriesTopWatchedWith (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardSeriesWatchedWith list =
+    let getSeriesTopWatchedWith (conn: SqliteConnection) (limit: int option) : Mediatheca.Shared.DashboardSeriesWatchedWith list =
         // Get all rewatch sessions with friends
         let sessionsWithFriends =
             conn
@@ -1734,7 +1736,7 @@ module SeriesProjection =
             |> List.groupBy fst
             |> List.map (fun (slug, entries) -> slug, entries |> List.sumBy snd)
             |> List.sortByDescending snd
-            |> List.truncate limit
+            |> RowLimit.truncate limit
         // Resolve friend details
         friendEpisodeCounts
         |> List.choose (fun (slug, epCount) ->
@@ -1798,7 +1800,7 @@ module SeriesProjection =
     /// Dashboard: returning/in-production series with a known future air date
     /// (episode air_date preferred, falls back to season air_date). Ordered
     /// ascending by next air date. Limited to `limit` results.
-    let getReturningSoon (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.ReturningSoonItem list =
+    let getReturningSoon (conn: SqliteConnection) (limit: int option) : Mediatheca.Shared.ReturningSoonItem list =
         let today = todayLocal()
         // Collect all candidate series with their earliest future date.
         let candidates =
@@ -1838,7 +1840,7 @@ module SeriesProjection =
                 } : Mediatheca.Shared.ReturningSoonItem)
             | None, None -> None)
         |> List.sortBy (fun (item: Mediatheca.Shared.ReturningSoonItem) -> item.NextAirDate)
-        |> List.truncate limit
+        |> RowLimit.truncate limit
 
     // Cross-media: Monthly series minutes for last 12 months
     let getMonthlySeriesMinutes (conn: SqliteConnection) : (string * int) list =

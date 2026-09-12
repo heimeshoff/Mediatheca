@@ -2185,7 +2185,7 @@ module Api =
                 let seriesNextUp = SeriesProjection.getDashboardSeriesNextUp conn (Some 11)
                 let moviesToWatch = MovieProjection.getMoviesToWatch conn
                 let gamesInFocus = GameProjection.getGamesInFocus conn
-                let gamesRecentlyPlayed = GameProjection.getGamesRecentlyPlayed conn 6
+                let gamesRecentlyPlayed = GameProjection.getGamesRecentlyPlayed conn (Some 6)
                 let playSessions = PlaytimeTracker.getDashboardPlaySessions conn 14
                 let jellyfinServerUrl = SettingsStore.getSetting conn "jellyfin_server_url"
 
@@ -2281,7 +2281,7 @@ module Api =
 
             getDashboardMoviesTab = fun () -> async {
                 use conn = factory ()
-                let recentlyAdded = MovieProjection.getRecentlyAddedMovies conn 10
+                let recentlyAdded = MovieProjection.getRecentlyAddedMovies conn (Some 10)
                 let totalMovies =
                     conn
                     |> Db.newCommand "SELECT COUNT(*) as cnt FROM movie_list"
@@ -2301,11 +2301,11 @@ module Api =
                 let watchlistCount = MovieProjection.getWatchlistCount conn
                 let ratingDistribution = MovieProjection.getRatingDistribution conn
                 let genreDistribution = MovieProjection.getGenreDistribution conn
-                let recentlyWatched = MovieProjection.getRecentlyWatched conn 10
+                let recentlyWatched = MovieProjection.getRecentlyWatched conn (Some 10)
                 let monthlyActivity = MovieProjection.getMonthlyActivity conn
-                let topActors = MovieProjection.getTopActors conn 5
-                let topDirectors = MovieProjection.getTopDirectors conn 5
-                let topWatchedWith = MovieProjection.getTopWatchedWith conn 5
+                let topActors = MovieProjection.getTopActors conn (Some 5)
+                let topDirectors = MovieProjection.getTopDirectors conn (Some 5)
+                let topWatchedWith = MovieProjection.getTopWatchedWith conn (Some 5)
                 let countryDistribution = MovieProjection.getCountryDistribution conn
                 let moviesToWatch = MovieProjection.getMoviesToWatch conn
                 let jellyfinServerUrl = SettingsStore.getSetting conn "jellyfin_server_url"
@@ -2336,8 +2336,8 @@ module Api =
             getDashboardSeriesTab = fun () -> async {
                 use conn = factory ()
                 let nextUp = SeriesProjection.getDashboardSeriesNextUp conn None
-                let recentlyFinished = SeriesProjection.getRecentlyFinished conn
-                let recentlyAbandoned = SeriesProjection.getRecentlyAbandoned conn
+                let recentlyFinished = SeriesProjection.getRecentlyFinished conn (Some 10)
+                let recentlyAbandoned = SeriesProjection.getRecentlyAbandoned conn (Some 10)
                 let totalSeries =
                     conn
                     |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_list"
@@ -2364,8 +2364,8 @@ module Api =
                 let genreDistribution = SeriesProjection.getSeriesGenreDistribution conn
                 let monthlyActivity = SeriesProjection.getMonthlyEpisodeActivity conn
                 let episodeActivity = SeriesProjection.getEpisodeActivity conn
-                let topWatchedWith = SeriesProjection.getSeriesTopWatchedWith conn 5
-                let returningSoon = SeriesProjection.getReturningSoon conn 5
+                let topWatchedWith = SeriesProjection.getSeriesTopWatchedWith conn (Some 5)
+                let returningSoon = SeriesProjection.getReturningSoon conn (Some 5)
                 let jellyfinServerUrl = SettingsStore.getSetting conn "jellyfin_server_url"
                 return {
                     Mediatheca.Shared.DashboardSeriesTab.NextUp = nextUp
@@ -2393,8 +2393,8 @@ module Api =
 
             getDashboardGamesTab = fun () -> async {
                 use conn = factory ()
-                let recentlyAdded = GameProjection.getRecentlyAddedGames conn 10
-                let recentlyPlayed = GameProjection.getGamesRecentlyPlayed conn 10
+                let recentlyAdded = GameProjection.getRecentlyAddedGames conn (Some 10)
+                let recentlyPlayed = GameProjection.getGamesRecentlyPlayed conn (Some 10)
                 let totalGames =
                     conn
                     |> Db.newCommand "SELECT COUNT(*) as cnt FROM game_list"
@@ -2456,6 +2456,50 @@ module Api =
                         CompletedPerYear = completedPerYear
                     }
                 }
+            }
+
+            // Dashboard card expansion: the card's query with its row limit
+            // lifted. Each tab query above passes `Some n`; this passes `None`.
+            getDashboardCardItems = fun query -> async {
+                use conn = factory ()
+                match query with
+                | SeriesNextUpQuery ->
+                    return SeriesNextUpItems (SeriesProjection.getDashboardSeriesNextUp conn None)
+                | MoviesToWatchQuery ->
+                    return MoviesToWatchItems (MovieProjection.getMoviesToWatch conn)
+                | GamesInFocusQuery ->
+                    return GamesInFocusItems (GameProjection.getGamesInFocus conn)
+                | MoviesRecentlyWatchedQuery ->
+                    return RecentlyWatchedMovieItems (MovieProjection.getRecentlyWatched conn None)
+                | MoviesRecentlyAddedQuery ->
+                    return MovieItems (MovieProjection.getRecentlyAddedMovies conn None)
+                | MoviesTopActorsQuery ->
+                    return PersonItems (MovieProjection.getTopActors conn None)
+                | MoviesTopDirectorsQuery ->
+                    return PersonItems (MovieProjection.getTopDirectors conn None)
+                | MoviesTopWatchedWithQuery ->
+                    return MovieWatchedWithItems (MovieProjection.getTopWatchedWith conn None)
+                | SeriesReturningSoonQuery ->
+                    return ReturningSoonItems (SeriesProjection.getReturningSoon conn None)
+                | SeriesRecentlyFinishedQuery ->
+                    return SeriesItems (SeriesProjection.getRecentlyFinished conn None)
+                | SeriesRecentlyAbandonedQuery ->
+                    return SeriesItems (SeriesProjection.getRecentlyAbandoned conn None)
+                | SeriesTopWatchedWithQuery ->
+                    return SeriesWatchedWithItems (SeriesProjection.getSeriesTopWatchedWith conn None)
+                | GamesRecentlyPlayedQuery ->
+                    return RecentlyPlayedGameItems (GameProjection.getGamesRecentlyPlayed conn None)
+                | GamesRecentlyAddedQuery ->
+                    return GameItems (GameProjection.getRecentlyAddedGames conn None)
+                | GamesUpcomingQuery ->
+                    return GameItems (GameProjection.getUpcomingGames conn)
+                | SteamRecentAchievementsQuery ->
+                    // Steam's cache keeps only the ten most recent unlocks, so
+                    // expanding this card shows the same ten the card already
+                    // shows. Lifting that cap is a Steam-side change.
+                    match! Steam.getRecentAchievements httpClient (getSteamConfig ()) with
+                    | Ok achievements -> return AchievementItems achievements
+                    | Error message -> return failwith message
             }
 
             addFriend = fun name -> async {

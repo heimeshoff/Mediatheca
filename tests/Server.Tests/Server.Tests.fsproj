@@ -61,6 +61,7 @@
     <Compile Include="PlaytimeSyncKeyRejectionTests.fs" />
     <Compile Include="SteamStorefrontThrottleTests.fs" />
     <Compile Include="SteamFamilyIncrementalImportTests.fs" />
+    <Compile Include="DashboardCardExpansionTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

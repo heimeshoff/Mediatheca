@@ -71,7 +71,7 @@ let tests =
             appendGameAdded conn "hades-2020" sampleGameData
             MetadataCache.upsertGameDeckCompat conn "hades-2020" Playable
 
-            let recent = GameProjection.getRecentlyAddedGames conn 10 |> List.tryFind (fun g -> g.Slug = "hades-2020")
+            let recent = GameProjection.getRecentlyAddedGames conn (Some 10) |> List.tryFind (fun g -> g.Slug = "hades-2020")
             Expect.equal (recent |> Option.map (fun g -> g.DeckCompat)) (Some Playable) "getRecentlyAddedGames reads the cached verdict too"
 
         testCase "checkProjectionDrift stays zero for GameProjection after a Deck-compat write — the column lives in the cache tier only" <| fun _ ->

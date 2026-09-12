@@ -583,7 +583,7 @@ module MovieProjection =
               InFocus = rd.ReadInt32 "in_focus" <> 0 }
         )
 
-    let getRecentlyAddedMovies (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.MovieListItem list =
+    let getRecentlyAddedMovies (conn: SqliteConnection) (limit: int option) : Mediatheca.Shared.MovieListItem list =
         conn
         |> Db.newCommand """
             SELECT slug, name, year, poster_ref, genres, tmdb_rating, in_focus
@@ -592,7 +592,7 @@ module MovieProjection =
             ORDER BY rowid DESC
             LIMIT @limit
         """
-        |> Db.setParams [ "limit", SqlType.Int32 limit ]
+        |> Db.setParams [ "limit", SqlType.Int32 (RowLimit.toSql limit) ]
         |> Db.query (fun (rd: IDataReader) ->
             let genresJson = rd.ReadString "genres"
             let genres =
@@ -656,7 +656,7 @@ module MovieProjection =
         |> List.truncate 10
 
     // Dashboard: Recently watched movies
-    let getRecentlyWatched (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardRecentlyWatched list =
+    let getRecentlyWatched (conn: SqliteConnection) (limit: int option) : Mediatheca.Shared.DashboardRecentlyWatched list =
         conn
         |> Db.newCommand """
             SELECT m.slug, m.name, m.year, m.poster_ref, ws.date, ws.friends
@@ -665,7 +665,7 @@ module MovieProjection =
             ORDER BY ws.date DESC
             LIMIT @limit
         """
-        |> Db.setParams [ "limit", SqlType.Int32 limit ]
+        |> Db.setParams [ "limit", SqlType.Int32 (RowLimit.toSql limit) ]
         |> Db.query (fun (rd: IDataReader) ->
             let friendsJson = rd.ReadString "friends"
             let friendSlugs =
@@ -699,7 +699,7 @@ module MovieProjection =
             rd.ReadInt32 "minutes")
 
     // Dashboard: Top actors (by movies watched)
-    let getTopActors (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardPersonStats list =
+    let getTopActors (conn: SqliteConnection) (limit: int option) : Mediatheca.Shared.DashboardPersonStats list =
         conn
         |> Db.newCommand """
             SELECT cm.name, cm.image_ref, COUNT(DISTINCT ws.movie_slug) as movie_count
@@ -710,7 +710,7 @@ module MovieProjection =
             ORDER BY movie_count DESC
             LIMIT @limit
         """
-        |> Db.setParams [ "limit", SqlType.Int32 limit ]
+        |> Db.setParams [ "limit", SqlType.Int32 (RowLimit.toSql limit) ]
         |> Db.query (fun (rd: IDataReader) ->
             { Mediatheca.Shared.DashboardPersonStats.Name = rd.ReadString "name"
               ImageRef =
@@ -722,7 +722,7 @@ module MovieProjection =
     // Note: Directors are stored in the full credits (FullCreditsDto) but not in a separate crew table.
     // We use cast_members data as best available; directors require a separate crew store.
     // For now, return empty — this can be enhanced when a crew_members table is available.
-    let getTopDirectors (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardPersonStats list =
+    let getTopDirectors (conn: SqliteConnection) (limit: int option) : Mediatheca.Shared.DashboardPersonStats list =
         // Check if crew_members / movie_crew tables exist
         let tableExists =
             try
@@ -744,7 +744,7 @@ module MovieProjection =
                 ORDER BY movie_count DESC
                 LIMIT @limit
             """
-            |> Db.setParams [ "limit", SqlType.Int32 limit ]
+            |> Db.setParams [ "limit", SqlType.Int32 (RowLimit.toSql limit) ]
             |> Db.query (fun (rd: IDataReader) ->
                 { Mediatheca.Shared.DashboardPersonStats.Name = rd.ReadString "name"
                   ImageRef =
@@ -753,7 +753,7 @@ module MovieProjection =
                   MovieCount = rd.ReadInt32 "movie_count" })
 
     // Dashboard: Top friends watched with
-    let getTopWatchedWith (conn: SqliteConnection) (limit: int) : Mediatheca.Shared.DashboardWatchedWithStats list =
+    let getTopWatchedWith (conn: SqliteConnection) (limit: int option) : Mediatheca.Shared.DashboardWatchedWithStats list =
         // Aggregate friend slugs from watch session JSON arrays
         let allFriendSlugs =
             conn
@@ -767,7 +767,7 @@ module MovieProjection =
             |> List.concat
             |> List.countBy id
             |> List.sortByDescending snd
-            |> List.truncate limit
+            |> RowLimit.truncate limit
         // Resolve friend names
         let friendMap =
             if List.isEmpty friendCounts then Map.empty

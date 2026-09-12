@@ -913,7 +913,7 @@ module GameProjection =
                 else Some (rd.ReadString "cover_ref") }
         )
 
-    let getGamesRecentlyPlayed (conn: SqliteConnection) (limit: int) : DashboardGameRecentlyPlayed list =
+    let getGamesRecentlyPlayed (conn: SqliteConnection) (limit: int option) : DashboardGameRecentlyPlayed list =
         conn
         |> Db.newCommand """
             SELECT ps.game_slug, gl.name, gl.cover_ref, gl.total_play_time, mc.hltb_hours, MAX(ps.date) as last_played
@@ -925,7 +925,7 @@ module GameProjection =
             ORDER BY last_played DESC
             LIMIT @limit
         """
-        |> Db.setParams [ "limit", SqlType.Int32 limit ]
+        |> Db.setParams [ "limit", SqlType.Int32 (RowLimit.toSql limit) ]
         |> Db.query (fun (rd: IDataReader) ->
             { DashboardGameRecentlyPlayed.Slug = rd.ReadString "game_slug"
               Name = rd.ReadString "name"
@@ -939,7 +939,7 @@ module GameProjection =
                 else Some (rd.ReadDouble "hltb_hours") }
         )
 
-    let getRecentlyAddedGames (conn: SqliteConnection) (limit: int) : GameListItem list =
+    let getRecentlyAddedGames (conn: SqliteConnection) (limit: int option) : GameListItem list =
         conn
         |> Db.newCommand """
             SELECT gl.slug, gl.name, gl.year, gl.cover_ref, gl.genres, gl.status, gl.total_play_time, mc.hltb_hours, gl.personal_rating, gl.rawg_rating,
@@ -955,7 +955,7 @@ module GameProjection =
             ORDER BY gl.rowid DESC
             LIMIT @limit
         """
-        |> Db.setParams [ "limit", SqlType.Int32 limit ]
+        |> Db.setParams [ "limit", SqlType.Int32 (RowLimit.toSql limit) ]
         |> Db.query (fun (rd: IDataReader) ->
             let genres =
                 if rd.IsDBNull(rd.GetOrdinal("genres")) then []

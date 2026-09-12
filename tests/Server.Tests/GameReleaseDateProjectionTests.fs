@@ -161,7 +161,7 @@ let tests =
             appendGameAdded conn "tenebris-somnia-2026" (sampleGameData "Tenebris Somnia" 2026)
             MetadataCache.upsertGameReleaseDate conn "tenebris-somnia-2026" "October 2026" (Some "2026-10-01") true
 
-            let recent = GameProjection.getRecentlyAddedGames conn 10 |> List.tryFind (fun g -> g.Slug = "tenebris-somnia-2026")
+            let recent = GameProjection.getRecentlyAddedGames conn (Some 10) |> List.tryFind (fun g -> g.Slug = "tenebris-somnia-2026")
             Expect.equal (recent |> Option.map (fun g -> g.ReleaseDate.IsUnreleased)) (Some true) "getRecentlyAddedGames reads the cached release date too"
 
         testCase "checkProjectionDrift stays zero for GameProjection after a release-date write — the columns live in the cache tier only" <| fun _ ->

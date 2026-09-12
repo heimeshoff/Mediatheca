@@ -95,6 +95,7 @@
     <Compile Include="Pages\GameDetail\JournalHasContent.test.fs" />
     <Compile Include="Pages\GameDetail\DefaultTab.test.fs" />
     <Compile Include="Pages\Settings\FamilyTokenRejected.test.fs" />
+    <Compile Include="Pages\Dashboard\ExpandCard.test.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
 

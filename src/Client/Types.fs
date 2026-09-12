@@ -31,6 +31,9 @@ type Msg =
     | Url_changed of string list
     | Go_back
     | Open_search_modal
+    /// Document-level Escape (KeyboardListener). Collapses the dashboard's
+    /// expanded card; the search modal handles its own Escape on its input.
+    | Escape_pressed
     | Search_modal_msg of SearchModal.Msg
     | Dashboard_msg of Pages.Dashboard.Types.Msg
     | Movie_detail_msg of Pages.MovieDetail.Types.Msg

@@ -76,78 +76,219 @@ let private headerLine (activeTab: DashboardTab) (dispatch: Msg -> unit) =
 
 // ── Section card wrapper ──
 
-let private sectionCard (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
+/// The chrome a dashboard section wears. An expanded card keeps its collapsed
+/// chrome, so it still reads as the same card — only grown.
+type private Chrome =
+    /// Velvet card; body stacked in a column.
+    | Card
+    /// Velvet card clipping its overflow (for horizontal scrollers).
+    | CardOverflow
+    /// Title + content, no card chrome.
+    | Open
+
+let private chromeClass (chrome: Chrome) =
+    match chrome with
+    | Card -> DesignSystem.velvetCard + " p-4 " + DesignSystem.animateFadeInUp
+    | CardOverflow -> DesignSystem.velvetCard + " p-4 " + DesignSystem.animateFadeInUp + " overflow-hidden"
+    | Open -> "section-open " + DesignSystem.animateFadeInUp
+
+/// Icon + title, with any trailing controls (expand/collapse) pushed to the
+/// card's top-right corner.
+let private sectionHeader (icon: unit -> ReactElement) (title: string) (trailing: ReactElement list) =
     Html.div [
-        prop.className (DesignSystem.velvetCard + " p-4 " + DesignSystem.animateFadeInUp)
+        prop.className "flex items-center gap-2 mb-3"
         prop.children [
-            Html.div [
-                prop.className "flex items-center gap-2 mb-3"
-                prop.children [
-                    Html.span [
-                        prop.className "text-primary/70"
-                        prop.children [ icon () ]
-                    ]
-                    Html.h2 [
-                        prop.className "text-lg font-display uppercase tracking-wider"
-                        prop.text title
-                    ]
-                ]
+            Html.span [
+                prop.className "text-primary/70"
+                prop.children [ icon () ]
             ]
+            Html.h2 [
+                prop.className "text-lg font-display uppercase tracking-wider"
+                prop.text title
+            ]
+            if not (List.isEmpty trailing) then
+                Html.div [
+                    prop.className "ml-auto flex items-center gap-2"
+                    prop.children trailing
+                ]
+        ]
+    ]
+
+let private section (chrome: Chrome) (trailing: ReactElement list) (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
+    Html.div [
+        prop.className (chromeClass chrome)
+        prop.children [
+            sectionHeader icon title trailing
             Html.div [
-                prop.className "flex flex-col"
+                match chrome with
+                | Card -> prop.className "flex flex-col"
+                | CardOverflow | Open -> ()
                 prop.children children
             ]
         ]
     ]
+
+let private sectionCard (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
+    section Card [] icon title children
 
 /// Section card that allows overflow (for horizontal scrollers)
 let private sectionCardOverflow (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
-    Html.div [
-        prop.className (DesignSystem.velvetCard + " p-4 " + DesignSystem.animateFadeInUp + " overflow-hidden")
-        prop.children [
-            Html.div [
-                prop.className "flex items-center gap-2 mb-3"
-                prop.children [
-                    Html.span [
-                        prop.className "text-primary/70"
-                        prop.children [ icon () ]
-                    ]
-                    Html.h2 [
-                        prop.className "text-lg font-display uppercase tracking-wider"
-                        prop.text title
-                    ]
-                ]
-            ]
-            Html.div [
-                prop.children children
-            ]
-        ]
-    ]
+    section CardOverflow [] icon title children
 
-// ── Section: Open (title + content, no card chrome) ──
-
+/// Section: Open (title + content, no card chrome)
 let private sectionOpen (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
+    section Open [] icon title children
+
+/// The horizontal poster rail every scroller card uses when collapsed.
+let private posterScroller (children: ReactElement list) =
     Html.div [
-        prop.className ("section-open " + DesignSystem.animateFadeInUp)
-        prop.children [
-            Html.div [
-                prop.className "flex items-center gap-2 mb-3"
-                prop.children [
-                    Html.span [
-                        prop.className "text-primary/70"
-                        prop.children [ icon () ]
-                    ]
-                    Html.h2 [
-                        prop.className "text-lg font-display uppercase tracking-wider"
-                        prop.text title
-                    ]
+        prop.className ("flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory " + DesignSystem.scrollbarHidden)
+        prop.children children
+    ]
+
+let private emptyNote (text: string) =
+    Html.div [
+        prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
+        prop.text text
+    ]
+
+// ── Expandable cards ──
+//
+// Every query-backed card gets the same default: an expand button in its
+// top-right corner. Expanded, the card grows over the whole tab area (the
+// other cards stay mounted but hidden underneath, so the page keeps its
+// height and scroll position) and shows its query with the row limit lifted.
+// A horizontal scroller re-flows into a wrapping row; a vertical list
+// re-flows into a grid.
+
+/// How the expanded card lays out its items, derived from its collapsed shape.
+type private ExpandedLayout =
+    /// Collapsed: horizontal poster scroller. Expanded: the same fixed-width
+    /// tiles, wrapping.
+    | WrappingRow
+    /// Collapsed: vertical list rows. Expanded: the rows re-flowed into
+    /// responsive grid columns.
+    | TileGrid
+    /// Collapsed: already an auto-fill poster grid. Expanded: the same grid,
+    /// uncapped.
+    | PosterGrid
+
+let private expandedLayoutClass (layout: ExpandedLayout) =
+    match layout with
+    | WrappingRow -> "flex flex-wrap gap-3 py-2 px-2"
+    | TileGrid -> "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-1"
+    | PosterGrid -> "grid grid-cols-[repeat(auto-fill,minmax(0,130px))] gap-3"
+
+type private ExpandableCard<'item> = {
+    Card: DashboardCard
+    Chrome: Chrome
+    Icon: unit -> ReactElement
+    Title: string
+    /// The collapsed body, rendered from the tab's limited items as before.
+    Collapsed: ReactElement list
+    ExpandedLayout: ExpandedLayout
+    /// The tab's own limited items — what the expanded card shows until the
+    /// unlimited fetch lands (or if it fails).
+    Items: 'item list
+    /// Picks this card's items out of the fetched result; None on a shape
+    /// mismatch, which falls back to `Items`.
+    Unpack: DashboardCardItems -> 'item list option
+    RenderItem: 'item -> ReactElement
+}
+
+/// A card's two faces, closed over its item type, so a tab can keep all its
+/// cards in one list and look the expanded one up by identity.
+type private CardHandle = {
+    Handle: DashboardCard
+    CollapsedView: ReactElement
+    ExpandedView: ExpandedItems -> ReactElement
+}
+
+let private headerIconButton (icon: unit -> ReactElement) (label: string) (onClick: unit -> unit) =
+    Html.button [
+        prop.className "p-1.5 rounded-lg text-base-content/50 hover:text-base-content hover:bg-base-300/40 transition-colors cursor-pointer"
+        prop.title label
+        prop.ariaLabel label
+        prop.onClick (fun _ -> onClick ())
+        prop.children [ icon () ]
+    ]
+
+let private expandable (dispatch: Msg -> unit) (spec: ExpandableCard<'item>) : CardHandle =
+    let collapsed =
+        section spec.Chrome
+            [ headerIconButton Icons.arrowsPointingOut "Expand" (fun () -> dispatch (ExpandCard spec.Card)) ]
+            spec.Icon spec.Title spec.Collapsed
+    let expanded (state: ExpandedItems) =
+        let items =
+            match state with
+            | ExpandedReady fetched -> spec.Unpack fetched |> Option.defaultValue spec.Items
+            | ExpandedLoading | ExpandedFailed _ -> spec.Items
+        let status =
+            match state with
+            | ExpandedLoading ->
+                Html.span [
+                    prop.className "loading loading-spinner loading-xs text-primary/70"
+                    prop.title "Loading everything"
+                ]
+            | ExpandedReady _ ->
+                Html.span [
+                    prop.className "font-mono text-xs text-base-content/50"
+                    prop.text (string (List.length items))
+                ]
+            | ExpandedFailed message ->
+                Html.span [
+                    prop.className "text-xs text-warning/70"
+                    prop.title message
+                    prop.text "Showing the first few only"
+                ]
+        Html.div [
+            prop.id State.expandedCardElementId
+            prop.className (chromeClass spec.Chrome + " col-start-1 row-start-1 z-10 scroll-mt-20")
+            prop.children [
+                sectionHeader spec.Icon spec.Title [
+                    status
+                    headerIconButton Icons.arrowsPointingIn "Collapse" (fun () -> dispatch CollapseCard)
+                ]
+                Html.div [
+                    prop.className (expandedLayoutClass spec.ExpandedLayout)
+                    prop.children (items |> List.map spec.RenderItem)
                 ]
             ]
-            Html.div [
-                prop.children children
+        ]
+    { Handle = spec.Card; CollapsedView = collapsed; ExpandedView = expanded }
+
+/// The active tab's content, with the expanded card (if any) grown over it.
+/// Both sit in the same grid cell: the cell is as tall as the taller of the
+/// two, so the page keeps its height while the other cards are hidden
+/// underneath rather than unmounted.
+let private tabArea (expanded: ExpandedCard option) (cards: CardHandle list) (content: ReactElement list) =
+    let grown =
+        expanded
+        |> Option.bind (fun e ->
+            cards
+            |> List.tryFind (fun c -> c.Handle = e.Card)
+            |> Option.map (fun c -> c.ExpandedView e.Items))
+    match grown with
+    | None ->
+        Html.div [
+            prop.className "flex flex-col gap-4"
+            prop.children content
+        ]
+    | Some surface ->
+        Html.div [
+            // `grid-cols-1` = `minmax(0, 1fr)`: without the 0 floor the single column
+            // would grow to the hidden scrollers' min-content width and push the
+            // expanded card (and its collapse button) far past the viewport.
+            prop.className "grid grid-cols-1"
+            prop.children [
+                Html.div [
+                    prop.className "col-start-1 row-start-1 flex flex-col gap-4 invisible"
+                    prop.ariaHidden true
+                    prop.children content
+                ]
+                surface
             ]
         ]
-    ]
 
 // ── TV Series: Next Up (list row — used by Series tab) ──
 
@@ -309,17 +450,6 @@ let private movieToWatchFilmstripItem (jellyfinServerUrl: string option) (item: 
         JellyfinButton = jellyfinButton
     }
 
-/// Dashboard All-tab "Movies to Watch" — posters inside the filmstrip well
-/// (`DesignSystem.filmstripRow`), replacing the plain poster scroller
-/// (intelligence-p9m4t; upgrades the section built by intelligence-dq8rk).
-let private moviesToWatchPosterSection (jellyfinServerUrl: string option) (items: DashboardMovieToWatch list) =
-    if List.isEmpty items then
-        Html.none
-    else
-        sectionOpen Icons.movie "Movies to Watch" [
-            DesignSystem.filmstripRow (items |> List.map (movieToWatchFilmstripItem jellyfinServerUrl))
-        ]
-
 // ── Stacked Bar Chart — Play Sessions (All tab) ──
 
 /// Chart color palette -- 8 distinct colors from the theme
@@ -406,20 +536,6 @@ let private seriesNextEpisodeCard (jellyfinServerUrl: string option) (item: Dash
         ]
     ]
 
-let private seriesNextUpOpenScroller (jellyfinServerUrl: string option) (items: DashboardSeriesNextUp list) =
-    if List.isEmpty items then
-        Html.none
-    else
-        sectionOpen Icons.tv "Next episode" [
-            Html.div [
-                prop.className ("flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory " + DesignSystem.scrollbarHidden)
-                prop.children [
-                    for item in items do
-                        seriesNextEpisodeCard jellyfinServerUrl item
-                ]
-            ]
-        ]
-
 // ── Games: In Focus — Poster Cards (restyle) ──
 
 let private gameInFocusPosterCard (item: DashboardGameInFocus) =
@@ -473,20 +589,6 @@ let private gameInFocusPosterCard (item: DashboardGameInFocus) =
         ]
     ]
 
-let private gamesInFocusPosterSection (items: DashboardGameInFocus list) =
-    if List.isEmpty items then
-        Html.none
-    else
-        sectionOpen Icons.gamepad "Games" [
-            Html.div [
-                prop.className "grid grid-cols-[repeat(auto-fill,minmax(0,130px))] gap-3"
-                prop.children [
-                    for item in items do
-                        gameInFocusPosterCard item
-                ]
-            ]
-        ]
-
 // ── Steam Achievements Card ──
 
 let private achievementItem (achievement: SteamAchievement) =
@@ -532,8 +634,9 @@ let private achievementItem (achievement: SteamAchievement) =
         ]
     ]
 
-let private achievementsSection (state: AchievementsState) =
-    sectionCard Icons.trophy "Recent Achievements" [
+/// The collapsed body of the "Recent Achievements" card.
+let private achievementsBody (state: AchievementsState) : ReactElement list =
+    [
         match state with
         | AchievementsNotLoaded | AchievementsLoading ->
             Html.div [
@@ -582,25 +685,69 @@ let private booksColumnPlaceholder =
 
 // ── All Tab — 3a layout: TV row, Movies row, Games/Books split ──
 
-let private allTabView (data: DashboardAllTab) =
-    Html.div [
-        prop.className "flex flex-col gap-4"
-        prop.children [
-            // 1. TV Series — full-width Next Up poster row (no hero lead card)
-            seriesNextUpOpenScroller data.JellyfinServerUrl data.SeriesNextUp
-
-            // 2. Movies to Watch — full-width poster row
-            moviesToWatchPosterSection data.JellyfinServerUrl data.MoviesToWatch
-
-            // 3. Games (left) / Books (right) two-column split — stays single-column
-            // until xl (raised from lg) so both columns get comfortable room rather
-            // than squeezing two-up at mid widths.
-            Html.div [
-                prop.className "grid grid-cols-1 xl:grid-cols-2 gap-4"
-                prop.children [
-                    gamesInFocusPosterSection data.GamesInFocus
-                    booksColumnPlaceholder
+let private allTabView (data: DashboardAllTab) (expanded: ExpandedCard option) (dispatch: Msg -> unit) =
+    // 1. TV Series — full-width Next Up poster row (no hero lead card)
+    let nextEpisode =
+        expandable dispatch {
+            Card = AllNextEpisode
+            Chrome = Open
+            Icon = Icons.tv
+            Title = "Next episode"
+            Collapsed = [ posterScroller [ for item in data.SeriesNextUp do seriesNextEpisodeCard data.JellyfinServerUrl item ] ]
+            ExpandedLayout = WrappingRow
+            Items = data.SeriesNextUp
+            Unpack = (function SeriesNextUpItems items -> Some items | _ -> None)
+            RenderItem = seriesNextEpisodeCard data.JellyfinServerUrl
+        }
+    // 2. Movies to Watch — posters inside the filmstrip well
+    // (`DesignSystem.filmstripRow`, intelligence-p9m4t). Expanded, the
+    // sprocketed strip gives way to the Movies tab's poster tiles, wrapping.
+    let moviesToWatch =
+        expandable dispatch {
+            Card = AllMoviesToWatch
+            Chrome = Open
+            Icon = Icons.movie
+            Title = "Movies to Watch"
+            Collapsed = [ DesignSystem.filmstripRow (data.MoviesToWatch |> List.map (movieToWatchFilmstripItem data.JellyfinServerUrl)) ]
+            ExpandedLayout = WrappingRow
+            Items = data.MoviesToWatch
+            Unpack = (function MoviesToWatchItems items -> Some items | _ -> None)
+            RenderItem = movieToWatchPosterCard data.JellyfinServerUrl
+        }
+    // 3. Games in focus — already an auto-fill poster grid when collapsed.
+    let games =
+        expandable dispatch {
+            Card = AllGamesInFocus
+            Chrome = Open
+            Icon = Icons.gamepad
+            Title = "Games"
+            Collapsed = [
+                Html.div [
+                    prop.className (expandedLayoutClass PosterGrid)
+                    prop.children [ for item in data.GamesInFocus do gameInFocusPosterCard item ]
                 ]
+            ]
+            ExpandedLayout = PosterGrid
+            Items = data.GamesInFocus
+            Unpack = (function GamesInFocusItems items -> Some items | _ -> None)
+            RenderItem = gameInFocusPosterCard
+        }
+    tabArea expanded [ nextEpisode; moviesToWatch; games ] [
+        if not (List.isEmpty data.SeriesNextUp) then
+            nextEpisode.CollapsedView
+
+        if not (List.isEmpty data.MoviesToWatch) then
+            moviesToWatch.CollapsedView
+
+        // Games (left) / Books (right) two-column split — stays single-column
+        // until xl (raised from lg) so both columns get comfortable room rather
+        // than squeezing two-up at mid widths.
+        Html.div [
+            prop.className "grid grid-cols-1 xl:grid-cols-2 gap-4"
+            prop.children [
+                if not (List.isEmpty data.GamesInFocus) then
+                    games.CollapsedView
+                booksColumnPlaceholder
             ]
         ]
     ]
@@ -808,109 +955,109 @@ let private monthlyActivityChart (activity: (string * int * int) list) =
 
 // ── Person Stats (Actors / Directors) ──
 
+let private personStatsItem (person: DashboardPersonStats) =
+    Html.div [
+        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/30 transition-colors"
+        prop.children [
+            // Person image or placeholder
+            match person.ImageRef with
+            | Some imageRef ->
+                Html.img [
+                    prop.src (sprintf "/images/%s" imageRef)
+                    prop.alt person.Name
+                    prop.className "w-10 h-10 rounded-full object-cover flex-shrink-0"
+                ]
+            | None ->
+                Html.div [
+                    prop.className "w-10 h-10 rounded-full bg-base-300/60 flex items-center justify-center flex-shrink-0"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-sm text-base-content/40 font-medium"
+                            prop.text (person.Name.Substring(0, 1).ToUpper())
+                        ]
+                    ]
+                ]
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.p [
+                        prop.className "font-semibold text-sm truncate"
+                        prop.text person.Name
+                    ]
+                    Html.p [
+                        prop.className "text-xs text-base-content/50"
+                        prop.text (sprintf "%d movie%s" person.MovieCount (if person.MovieCount = 1 then "" else "s"))
+                    ]
+                ]
+            ]
+        ]
+    ]
+
 let private personStatsSection (people: DashboardPersonStats list) (emptyMessage: string) =
     if List.isEmpty people then
-        Html.div [
-            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
-            prop.text emptyMessage
-        ]
+        emptyNote emptyMessage
     else
         Html.div [
             prop.className "flex flex-col gap-2"
             prop.children [
                 for person in people do
-                    Html.div [
-                        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/30 transition-colors"
-                        prop.children [
-                            // Person image or placeholder
-                            match person.ImageRef with
-                            | Some imageRef ->
-                                Html.img [
-                                    prop.src (sprintf "/images/%s" imageRef)
-                                    prop.alt person.Name
-                                    prop.className "w-10 h-10 rounded-full object-cover flex-shrink-0"
-                                ]
-                            | None ->
-                                Html.div [
-                                    prop.className "w-10 h-10 rounded-full bg-base-300/60 flex items-center justify-center flex-shrink-0"
-                                    prop.children [
-                                        Html.span [
-                                            prop.className "text-sm text-base-content/40 font-medium"
-                                            prop.text (person.Name.Substring(0, 1).ToUpper())
-                                        ]
-                                    ]
-                                ]
-                            Html.div [
-                                prop.className "flex-1 min-w-0"
-                                prop.children [
-                                    Html.p [
-                                        prop.className "font-semibold text-sm truncate"
-                                        prop.text person.Name
-                                    ]
-                                    Html.p [
-                                        prop.className "text-xs text-base-content/50"
-                                        prop.text (sprintf "%d movie%s" person.MovieCount (if person.MovieCount = 1 then "" else "s"))
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
+                    personStatsItem person
             ]
         ]
 
 // ── Most Watched With (Friends) ──
 
+let private watchedWithItem (friend: DashboardWatchedWithStats) =
+    Html.a [
+        prop.href (Router.format ("friends", friend.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("friends", friend.Slug)
+        )
+        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
+        prop.children [
+            match friend.ImageRef with
+            | Some imageRef ->
+                Html.img [
+                    prop.src (sprintf "/images/%s" imageRef)
+                    prop.alt friend.Name
+                    prop.className "w-10 h-10 rounded-full object-cover flex-shrink-0"
+                ]
+            | None ->
+                Html.div [
+                    prop.className "w-10 h-10 rounded-full bg-base-300/60 flex items-center justify-center flex-shrink-0"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-sm text-base-content/40 font-medium"
+                            prop.text (friend.Name.Substring(0, 1).ToUpper())
+                        ]
+                    ]
+                ]
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.p [
+                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                        prop.text friend.Name
+                    ]
+                    Html.p [
+                        prop.className "text-xs text-base-content/50"
+                        prop.text (sprintf "%d session%s" friend.SessionCount (if friend.SessionCount = 1 then "" else "s"))
+                    ]
+                ]
+            ]
+        ]
+    ]
+
 let private watchedWithSection (watchedWith: DashboardWatchedWithStats list) =
     if List.isEmpty watchedWith then
-        Html.div [
-            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
-            prop.text "No shared sessions yet"
-        ]
+        emptyNote "No shared sessions yet"
     else
         Html.div [
             prop.className "flex flex-col gap-2"
             prop.children [
                 for friend in watchedWith do
-                    Html.a [
-                        prop.href (Router.format ("friends", friend.Slug))
-                        prop.onClick (fun e ->
-                            e.preventDefault()
-                            Router.navigate ("friends", friend.Slug)
-                        )
-                        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
-                        prop.children [
-                            match friend.ImageRef with
-                            | Some imageRef ->
-                                Html.img [
-                                    prop.src (sprintf "/images/%s" imageRef)
-                                    prop.alt friend.Name
-                                    prop.className "w-10 h-10 rounded-full object-cover flex-shrink-0"
-                                ]
-                            | None ->
-                                Html.div [
-                                    prop.className "w-10 h-10 rounded-full bg-base-300/60 flex items-center justify-center flex-shrink-0"
-                                    prop.children [
-                                        Html.span [
-                                            prop.className "text-sm text-base-content/40 font-medium"
-                                            prop.text (friend.Name.Substring(0, 1).ToUpper())
-                                        ]
-                                    ]
-                                ]
-                            Html.div [
-                                prop.className "flex-1 min-w-0"
-                                prop.children [
-                                    Html.p [
-                                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
-                                        prop.text friend.Name
-                                    ]
-                                    Html.p [
-                                        prop.className "text-xs text-base-content/50"
-                                        prop.text (sprintf "%d session%s" friend.SessionCount (if friend.SessionCount = 1 then "" else "s"))
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
+                    watchedWithItem friend
             ]
         ]
 
@@ -1050,99 +1197,133 @@ let private recentlyWatchedPosterCard (item: DashboardRecentlyWatched) =
 
 // ── Movies Tab View ──
 
-let private moviesTabView (data: DashboardMoviesTab) =
-    Html.div [
-        prop.className "flex flex-col gap-4"
-        prop.children [
-            // Stats badges
-            movieStatsRow data.Stats
-
-            // Row 1: Recently Watched (~2/3) | Recently Added (~1/3)
-            Html.div [
-                prop.className "grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4"
-                prop.children [
-                    // Recently Watched — horizontal poster scroller
-                    sectionCardOverflow Icons.movie "Recently Watched" [
-                        if List.isEmpty data.RecentlyWatched then
-                            Html.div [
-                                prop.className "flex items-center justify-center py-8 text-base-content/40 text-sm"
-                                prop.text "No movies watched yet"
-                            ]
-                        else
-                            Html.div [
-                                prop.className ("flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory " + DesignSystem.scrollbarHidden)
-                                prop.children [
-                                    for item in data.RecentlyWatched do
-                                        recentlyWatchedPosterCard item
-                                ]
-                            ]
-                    ]
-                    // Recently Added — narrower column, list format
-                    sectionCard Icons.movie "Recently Added" [
-                        if List.isEmpty data.RecentlyAdded then
-                            Html.div [
-                                prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
-                                prop.text "No recently added movies"
-                            ]
-                        else
-                            for item in data.RecentlyAdded |> List.truncate 6 do
-                                movieRecentlyAddedItem item
-                    ]
-                ]
+let private moviesTabView (data: DashboardMoviesTab) (expanded: ExpandedCard option) (dispatch: Msg -> unit) =
+    // Recently Watched — horizontal poster scroller
+    let recentlyWatched =
+        expandable dispatch {
+            Card = MoviesRecentlyWatched
+            Chrome = CardOverflow
+            Icon = Icons.movie
+            Title = "Recently Watched"
+            Collapsed = [
+                if List.isEmpty data.RecentlyWatched then
+                    emptyNote "No movies watched yet"
+                else
+                    posterScroller [ for item in data.RecentlyWatched do recentlyWatchedPosterCard item ]
             ]
-
-            // Row 2: Monthly Activity (50%) | Ratings Distribution (50%)
-            Html.div [
-                prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
-                prop.children [
-                    sectionCard Icons.calendar "Monthly Activity" [
-                        monthlyActivityChart data.Stats.MonthlyActivity
-                    ]
-                    sectionCard Icons.star "Ratings Distribution" [
-                        ratingsDistributionChart data.Stats.RatingDistribution
-                    ]
-                ]
+            ExpandedLayout = WrappingRow
+            Items = data.RecentlyWatched
+            Unpack = (function RecentlyWatchedMovieItems items -> Some items | _ -> None)
+            RenderItem = recentlyWatchedPosterCard
+        }
+    // Recently Added — narrower column, list format
+    let recentlyAdded =
+        expandable dispatch {
+            Card = MoviesRecentlyAdded
+            Chrome = Card
+            Icon = Icons.movie
+            Title = "Recently Added"
+            Collapsed = [
+                if List.isEmpty data.RecentlyAdded then
+                    emptyNote "No recently added movies"
+                else
+                    for item in data.RecentlyAdded |> List.truncate 6 do
+                        movieRecentlyAddedItem item
             ]
+            ExpandedLayout = TileGrid
+            Items = data.RecentlyAdded
+            Unpack = (function MovieItems items -> Some items | _ -> None)
+            RenderItem = movieRecentlyAddedItem
+        }
+    // Movies to Watch — full-width horizontal poster scroller
+    let moviesToWatch =
+        expandable dispatch {
+            Card = MoviesToWatch
+            Chrome = CardOverflow
+            Icon = Icons.movie
+            Title = "Movies to Watch"
+            Collapsed = [ posterScroller [ for item in data.MoviesToWatch do movieToWatchPosterCard data.JellyfinServerUrl item ] ]
+            ExpandedLayout = WrappingRow
+            Items = data.MoviesToWatch
+            Unpack = (function MoviesToWatchItems items -> Some items | _ -> None)
+            RenderItem = movieToWatchPosterCard data.JellyfinServerUrl
+        }
+    let people (card: DashboardCard) (title: string) (items: DashboardPersonStats list) (emptyMessage: string) =
+        expandable dispatch {
+            Card = card
+            Chrome = Card
+            Icon = Icons.user
+            Title = title
+            Collapsed = [ personStatsSection items emptyMessage ]
+            ExpandedLayout = TileGrid
+            Items = items
+            Unpack = (function PersonItems items -> Some items | _ -> None)
+            RenderItem = personStatsItem
+        }
+    let topActors = people MoviesTopActors "Most Watched Actors" data.TopActors "No actor data yet"
+    let topDirectors = people MoviesTopDirectors "Most Watched Directors" data.TopDirectors "No director data yet"
+    let topWatchedWith =
+        expandable dispatch {
+            Card = MoviesTopWatchedWith
+            Chrome = Card
+            Icon = Icons.friends
+            Title = "Most Watched With"
+            Collapsed = [ watchedWithSection data.TopWatchedWith ]
+            ExpandedLayout = TileGrid
+            Items = data.TopWatchedWith
+            Unpack = (function MovieWatchedWithItems items -> Some items | _ -> None)
+            RenderItem = watchedWithItem
+        }
+    tabArea expanded [ recentlyWatched; recentlyAdded; moviesToWatch; topActors; topDirectors; topWatchedWith ] [
+        // Stats badges
+        movieStatsRow data.Stats
 
-            // Row 3: Movies to Watch — full-width horizontal poster scroller
-            if not (List.isEmpty data.MoviesToWatch) then
-                sectionCardOverflow Icons.movie "Movies to Watch" [
-                    Html.div [
-                        prop.className ("flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory " + DesignSystem.scrollbarHidden)
-                        prop.children [
-                            for item in data.MoviesToWatch do
-                                movieToWatchPosterCard data.JellyfinServerUrl item
-                        ]
-                    ]
-                ]
-
-            // Row 4: Most Watched Actors | Most Watched Directors | Most Watched With
-            Html.div [
-                prop.className "grid grid-cols-1 md:grid-cols-3 gap-4"
-                prop.children [
-                    sectionCard Icons.user "Most Watched Actors" [
-                        personStatsSection data.TopActors "No actor data yet"
-                    ]
-                    sectionCard Icons.user "Most Watched Directors" [
-                        personStatsSection data.TopDirectors "No director data yet"
-                    ]
-                    sectionCard Icons.friends "Most Watched With" [
-                        watchedWithSection data.TopWatchedWith
-                    ]
-                ]
+        // Row 1: Recently Watched (~2/3) | Recently Added (~1/3)
+        Html.div [
+            prop.className "grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4"
+            prop.children [
+                recentlyWatched.CollapsedView
+                recentlyAdded.CollapsedView
             ]
-
-            // Row 5: Genre Breakdown — pie/donut chart
-            sectionCard Icons.tag "Genre Breakdown" [
-                Charts.donutChart data.Stats.GenreDistribution "No genre data yet"
-            ]
-
-            // Country distribution (bonus, kept from before)
-            if not (List.isEmpty data.Stats.CountryDistribution) then
-                sectionCard Icons.globe "Movie Origins" [
-                    countryDistributionBars data.Stats.CountryDistribution
-                ]
         ]
+
+        // Row 2: Monthly Activity (50%) | Ratings Distribution (50%)
+        Html.div [
+            prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
+            prop.children [
+                sectionCard Icons.calendar "Monthly Activity" [
+                    monthlyActivityChart data.Stats.MonthlyActivity
+                ]
+                sectionCard Icons.star "Ratings Distribution" [
+                    ratingsDistributionChart data.Stats.RatingDistribution
+                ]
+            ]
+        ]
+
+        // Row 3: Movies to Watch — full-width horizontal poster scroller
+        if not (List.isEmpty data.MoviesToWatch) then
+            moviesToWatch.CollapsedView
+
+        // Row 4: Most Watched Actors | Most Watched Directors | Most Watched With
+        Html.div [
+            prop.className "grid grid-cols-1 md:grid-cols-3 gap-4"
+            prop.children [
+                topActors.CollapsedView
+                topDirectors.CollapsedView
+                topWatchedWith.CollapsedView
+            ]
+        ]
+
+        // Row 5: Genre Breakdown — pie/donut chart
+        sectionCard Icons.tag "Genre Breakdown" [
+            Charts.donutChart data.Stats.GenreDistribution "No genre data yet"
+        ]
+
+        // Country distribution (bonus, kept from before)
+        if not (List.isEmpty data.Stats.CountryDistribution) then
+            sectionCard Icons.globe "Movie Origins" [
+                countryDistributionBars data.Stats.CountryDistribution
+            ]
     ]
 
 // ── Series Tab ──
@@ -1326,57 +1507,57 @@ let private seriesRatingsDistributionChart (distribution: (int * int) list) =
 
 // ── Series Most Watched With (Friends) ──
 
+let private seriesWatchedWithItem (friend: DashboardSeriesWatchedWith) =
+    Html.a [
+        prop.href (Router.format ("friends", friend.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("friends", friend.Slug)
+        )
+        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
+        prop.children [
+            match friend.ImageRef with
+            | Some imageRef ->
+                Html.img [
+                    prop.src (sprintf "/images/%s" imageRef)
+                    prop.alt friend.Name
+                    prop.className "w-10 h-10 rounded-full object-cover flex-shrink-0"
+                ]
+            | None ->
+                Html.div [
+                    prop.className "w-10 h-10 rounded-full bg-base-300/60 flex items-center justify-center flex-shrink-0"
+                    prop.children [
+                        Html.span [
+                            prop.className "text-sm text-base-content/40 font-medium"
+                            prop.text (friend.Name.Substring(0, 1).ToUpper())
+                        ]
+                    ]
+                ]
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.p [
+                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                        prop.text friend.Name
+                    ]
+                    Html.p [
+                        prop.className "text-xs text-base-content/50"
+                        prop.text (sprintf "%d episode%s together" friend.EpisodeCount (if friend.EpisodeCount = 1 then "" else "s"))
+                    ]
+                ]
+            ]
+        ]
+    ]
+
 let private seriesWatchedWithSection (watchedWith: DashboardSeriesWatchedWith list) =
     if List.isEmpty watchedWith then
-        Html.div [
-            prop.className "flex items-center justify-center py-6 text-base-content/40 text-sm"
-            prop.text "No shared rewatch sessions yet"
-        ]
+        emptyNote "No shared rewatch sessions yet"
     else
         Html.div [
             prop.className "flex flex-col gap-2"
             prop.children [
                 for friend in watchedWith do
-                    Html.a [
-                        prop.href (Router.format ("friends", friend.Slug))
-                        prop.onClick (fun e ->
-                            e.preventDefault()
-                            Router.navigate ("friends", friend.Slug)
-                        )
-                        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
-                        prop.children [
-                            match friend.ImageRef with
-                            | Some imageRef ->
-                                Html.img [
-                                    prop.src (sprintf "/images/%s" imageRef)
-                                    prop.alt friend.Name
-                                    prop.className "w-10 h-10 rounded-full object-cover flex-shrink-0"
-                                ]
-                            | None ->
-                                Html.div [
-                                    prop.className "w-10 h-10 rounded-full bg-base-300/60 flex items-center justify-center flex-shrink-0"
-                                    prop.children [
-                                        Html.span [
-                                            prop.className "text-sm text-base-content/40 font-medium"
-                                            prop.text (friend.Name.Substring(0, 1).ToUpper())
-                                        ]
-                                    ]
-                                ]
-                            Html.div [
-                                prop.className "flex-1 min-w-0"
-                                prop.children [
-                                    Html.p [
-                                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
-                                        prop.text friend.Name
-                                    ]
-                                    Html.p [
-                                        prop.className "text-xs text-base-content/50"
-                                        prop.text (sprintf "%d episode%s together" friend.EpisodeCount (if friend.EpisodeCount = 1 then "" else "s"))
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
+                    seriesWatchedWithItem friend
             ]
         ]
 
@@ -1557,130 +1738,155 @@ let private returningCountdown (isoDate: string) : string option =
         else Some (sprintf "in %d days" days)
     | _ -> None
 
-let private returningSoonCard (items: ReturningSoonItem list) =
-    if List.isEmpty items then
-        Html.none
-    else
-        sectionCard Icons.tv "Returning Soon" [
-            Html.div [
-                prop.className "flex flex-col gap-2"
-                prop.children [
-                    for item in items do
-                        Html.a [
-                            prop.href (Router.format ("series", item.Slug))
-                            prop.onClick (fun e ->
-                                e.preventDefault()
-                                Router.navigate ("series", item.Slug))
-                            prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
-                            prop.children [
-                                PosterCard.thumbnail item.PosterRef item.Name
-                                Html.div [
-                                    prop.className "flex-1 min-w-0"
-                                    prop.children [
-                                        Html.p [
-                                            prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
-                                            prop.text item.Name
-                                        ]
-                                        Html.div [
-                                            prop.className "flex items-center gap-1.5 text-xs text-base-content/50"
-                                            prop.children [
-                                                Html.span [
-                                                    prop.text (
-                                                        (if item.IsSeasonLevel then "Returns " else "Airs ")
-                                                        + formatReturningDate item.NextAirDate)
-                                                ]
-                                                match returningCountdown item.NextAirDate with
-                                                | Some countdown ->
-                                                    Html.span [
-                                                        prop.className "text-primary/70"
-                                                        prop.text (sprintf "(%s)" countdown)
-                                                    ]
-                                                | None -> ()
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                ]
-            ]
-        ]
-
-let private seriesTabView (data: DashboardSeriesTab) =
-    // Filter out abandoned series from Next Up
-    let nextUpItems = data.NextUp |> List.filter (fun s -> not s.IsAbandoned)
-    Html.div [
-        prop.className "flex flex-col gap-4"
+let private returningSoonItem (item: ReturningSoonItem) =
+    Html.a [
+        prop.href (Router.format ("series", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("series", item.Slug))
+        prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/50 transition-colors cursor-pointer group"
         prop.children [
-            // 1. Stats badges
-            seriesStatsRow data.Stats
-
-            // Row 1: Next Up — full-width horizontal poster scroller
-            if not (List.isEmpty nextUpItems) then
-                sectionCardOverflow Icons.tv "Next Up" [
+            PosterCard.thumbnail item.PosterRef item.Name
+            Html.div [
+                prop.className "flex-1 min-w-0"
+                prop.children [
+                    Html.p [
+                        prop.className "font-semibold text-sm truncate group-hover:text-primary transition-colors"
+                        prop.text item.Name
+                    ]
                     Html.div [
-                        prop.className ("flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory " + DesignSystem.scrollbarHidden)
+                        prop.className "flex items-center gap-1.5 text-xs text-base-content/50"
                         prop.children [
-                            for item in nextUpItems do
-                                seriesTabPosterCard data.JellyfinServerUrl item
+                            Html.span [
+                                prop.text (
+                                    (if item.IsSeasonLevel then "Returns " else "Airs ")
+                                    + formatReturningDate item.NextAirDate)
+                            ]
+                            match returningCountdown item.NextAirDate with
+                            | Some countdown ->
+                                Html.span [
+                                    prop.className "text-primary/70"
+                                    prop.text (sprintf "(%s)" countdown)
+                                ]
+                            | None -> ()
                         ]
                     ]
                 ]
+            ]
+        ]
+    ]
 
-            // Returning Soon — up to 5 returning series sorted ascending by next air date
-            if not (List.isEmpty data.ReturningSoon) then
-                returningSoonCard data.ReturningSoon
-
-            // Row 2: Recently Finished | Recently Abandoned (side-by-side)
-            if not (List.isEmpty data.RecentlyFinished) || not (List.isEmpty data.RecentlyAbandoned) then
+let private seriesTabView (data: DashboardSeriesTab) (expanded: ExpandedCard option) (dispatch: Msg -> unit) =
+    // Filter out abandoned series from Next Up
+    let withoutAbandoned (items: DashboardSeriesNextUp list) =
+        items |> List.filter (fun s -> not s.IsAbandoned)
+    let nextUpItems = withoutAbandoned data.NextUp
+    // Next Up — full-width horizontal poster scroller
+    let nextUp =
+        expandable dispatch {
+            Card = SeriesNextUp
+            Chrome = CardOverflow
+            Icon = Icons.tv
+            Title = "Next Up"
+            Collapsed = [ posterScroller [ for item in nextUpItems do seriesTabPosterCard data.JellyfinServerUrl item ] ]
+            ExpandedLayout = WrappingRow
+            Items = nextUpItems
+            Unpack = (function SeriesNextUpItems items -> Some (withoutAbandoned items) | _ -> None)
+            RenderItem = seriesTabPosterCard data.JellyfinServerUrl
+        }
+    // Returning Soon — up to 5 returning series sorted ascending by next air date
+    let returningSoon =
+        expandable dispatch {
+            Card = SeriesReturningSoon
+            Chrome = Card
+            Icon = Icons.tv
+            Title = "Returning Soon"
+            Collapsed = [
                 Html.div [
-                    prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
-                    prop.children [
-                        if not (List.isEmpty data.RecentlyFinished) then
-                            sectionCard Icons.trophy "Recently Finished" [
-                                for item in data.RecentlyFinished do
-                                    seriesCompactItem item (
-                                        Html.span [
-                                            prop.className "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-success/15 text-success flex-shrink-0"
-                                            prop.text "Finished"
-                                        ]
-                                    )
-                            ]
-                        if not (List.isEmpty data.RecentlyAbandoned) then
-                            sectionCard Icons.tv "Recently Abandoned" [
-                                for item in data.RecentlyAbandoned do
-                                    seriesCompactItem item (
-                                        Html.span [
-                                            prop.className "inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-error/15 text-error flex-shrink-0"
-                                            prop.text "Abandoned"
-                                        ]
-                                    )
-                            ]
-                    ]
+                    prop.className "flex flex-col gap-2"
+                    prop.children [ for item in data.ReturningSoon do returningSoonItem item ]
                 ]
+            ]
+            ExpandedLayout = TileGrid
+            Items = data.ReturningSoon
+            Unpack = (function ReturningSoonItems items -> Some items | _ -> None)
+            RenderItem = returningSoonItem
+        }
+    let badge (className: string) (text: string) =
+        Html.span [
+            prop.className ("inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0 " + className)
+            prop.text text
+        ]
+    let recentSeries (card: DashboardCard) (icon: unit -> ReactElement) (title: string) (items: SeriesListItem list) (itemBadge: ReactElement) =
+        expandable dispatch {
+            Card = card
+            Chrome = Card
+            Icon = icon
+            Title = title
+            Collapsed = [ for item in items do seriesCompactItem item itemBadge ]
+            ExpandedLayout = TileGrid
+            Items = items
+            Unpack = (function SeriesItems items -> Some items | _ -> None)
+            RenderItem = (fun item -> seriesCompactItem item itemBadge)
+        }
+    let recentlyFinished =
+        recentSeries SeriesRecentlyFinished Icons.trophy "Recently Finished" data.RecentlyFinished (badge "bg-success/15 text-success" "Finished")
+    let recentlyAbandoned =
+        recentSeries SeriesRecentlyAbandoned Icons.tv "Recently Abandoned" data.RecentlyAbandoned (badge "bg-error/15 text-error" "Abandoned")
+    // Most watched with (friends)
+    let topWatchedWith =
+        expandable dispatch {
+            Card = SeriesTopWatchedWith
+            Chrome = Card
+            Icon = Icons.friends
+            Title = "Most Watched With"
+            Collapsed = [ seriesWatchedWithSection data.TopWatchedWith ]
+            ExpandedLayout = TileGrid
+            Items = data.TopWatchedWith
+            Unpack = (function SeriesWatchedWithItems items -> Some items | _ -> None)
+            RenderItem = seriesWatchedWithItem
+        }
+    tabArea expanded [ nextUp; returningSoon; recentlyFinished; recentlyAbandoned; topWatchedWith ] [
+        // 1. Stats badges
+        seriesStatsRow data.Stats
 
-            // Row 3: Monthly Activity | Ratings Distribution | Genre Breakdown (pie chart)
+        // Row 1: Next Up
+        if not (List.isEmpty nextUpItems) then
+            nextUp.CollapsedView
+
+        if not (List.isEmpty data.ReturningSoon) then
+            returningSoon.CollapsedView
+
+        // Row 2: Recently Finished | Recently Abandoned (side-by-side)
+        if not (List.isEmpty data.RecentlyFinished) || not (List.isEmpty data.RecentlyAbandoned) then
             Html.div [
-                prop.className "grid grid-cols-1 md:grid-cols-3 gap-4"
+                prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
                 prop.children [
-                    sectionCard Icons.calendar "Monthly Activity" [
-                        monthlyEpisodeActivityChart data.Stats.MonthlyActivity
-                    ]
-                    sectionCard Icons.star "Ratings Distribution" [
-                        seriesRatingsDistributionChart data.Stats.RatingDistribution
-                    ]
-                    sectionCard Icons.tag "Genre Breakdown" [
-                        Charts.donutChart data.Stats.GenreDistribution "No genre data"
-                    ]
+                    if not (List.isEmpty data.RecentlyFinished) then
+                        recentlyFinished.CollapsedView
+                    if not (List.isEmpty data.RecentlyAbandoned) then
+                        recentlyAbandoned.CollapsedView
                 ]
             ]
 
-            // Most watched with (friends)
-            if not (List.isEmpty data.TopWatchedWith) then
-                sectionCard Icons.friends "Most Watched With" [
-                    seriesWatchedWithSection data.TopWatchedWith
+        // Row 3: Monthly Activity | Ratings Distribution | Genre Breakdown (pie chart)
+        Html.div [
+            prop.className "grid grid-cols-1 md:grid-cols-3 gap-4"
+            prop.children [
+                sectionCard Icons.calendar "Monthly Activity" [
+                    monthlyEpisodeActivityChart data.Stats.MonthlyActivity
                 ]
+                sectionCard Icons.star "Ratings Distribution" [
+                    seriesRatingsDistributionChart data.Stats.RatingDistribution
+                ]
+                sectionCard Icons.tag "Genre Breakdown" [
+                    Charts.donutChart data.Stats.GenreDistribution "No genre data"
+                ]
+            ]
         ]
+
+        if not (List.isEmpty data.TopWatchedWith) then
+            topWatchedWith.CollapsedView
     ]
 
 // ── Games Tab ──
@@ -2329,109 +2535,115 @@ let private perGameMonthlyPlayTimeChart (monthlyData: GameMonthlyPlayTime list) 
             ]
         ]
 
-let private gamesTabView (data: DashboardGamesTab) (achievementsState: AchievementsState) (dispatch: Msg -> unit) =
-    Html.div [
-        prop.className "flex flex-col gap-4"
-        prop.children [
-            // Stats badges
-            gameStatsRow data.Stats
+let private gamesTabView (data: DashboardGamesTab) (achievementsState: AchievementsState) (expanded: ExpandedCard option) (dispatch: Msg -> unit) =
+    // Recently Played | Recently Added | Upcoming — poster scrollers
+    let posterRail (card: DashboardCard) (icon: unit -> ReactElement) (title: string) (items: 'item list) (emptyMessage: string) (unpack: DashboardCardItems -> 'item list option) (render: 'item -> ReactElement) =
+        expandable dispatch {
+            Card = card
+            Chrome = CardOverflow
+            Icon = icon
+            Title = title
+            Collapsed = [
+                if List.isEmpty items then
+                    emptyNote emptyMessage
+                else
+                    posterScroller [ for item in items do render item ]
+            ]
+            ExpandedLayout = WrappingRow
+            Items = items
+            Unpack = unpack
+            RenderItem = render
+        }
+    let recentlyPlayed =
+        posterRail GamesRecentlyPlayed Icons.hourglass "Recently Played" data.RecentlyPlayed "No games played yet"
+            (function RecentlyPlayedGameItems items -> Some items | _ -> None)
+            gameRecentlyPlayedPosterCard
+    let recentlyAdded =
+        posterRail GamesRecentlyAdded Icons.gamepad "Recently Added" data.RecentlyAdded "No games added yet"
+            (function GameItems items -> Some items | _ -> None)
+            gameRecentlyAddedPosterCard
+    // Upcoming rail (games-ev65k, moved here by intelligence-qh8mj) —
+    // absent, not empty-rendered, when nothing is unreleased.
+    let upcoming =
+        posterRail GamesUpcoming Icons.calendar "Upcoming" data.Upcoming "Nothing upcoming"
+            (function GameItems items -> Some items | _ -> None)
+            gameUpcomingPosterCard
+    let achievements =
+        expandable dispatch {
+            Card = GamesRecentAchievements
+            Chrome = Card
+            Icon = Icons.trophy
+            Title = "Recent Achievements"
+            Collapsed = achievementsBody achievementsState
+            ExpandedLayout = TileGrid
+            Items =
+                match achievementsState with
+                | AchievementsReady items -> items
+                | AchievementsNotLoaded | AchievementsLoading | AchievementsError _ -> []
+            Unpack = (function AchievementItems items -> Some items | _ -> None)
+            RenderItem = achievementItem
+        }
+    tabArea expanded [ recentlyPlayed; recentlyAdded; upcoming; achievements ] [
+        // Stats badges
+        gameStatsRow data.Stats
 
-            // Row 1: In-Focus Estimate hero card (full width)
-            inFocusEstimateCard data.InFocusEstimate
+        // Row 1: In-Focus Estimate hero card (full width)
+        inFocusEstimateCard data.InFocusEstimate
 
-            // Row 2: Recently Played | Recently Added (poster scrollers)
-            Html.div [
-                prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
-                prop.children [
-                    sectionCardOverflow Icons.hourglass "Recently Played" [
-                            if List.isEmpty data.RecentlyPlayed then
-                                Html.div [
-                                    prop.className "flex items-center justify-center py-8 text-base-content/40 text-sm"
-                                    prop.text "No games played yet"
-                                ]
-                            else
-                                Html.div [
-                                    prop.className ("flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory " + DesignSystem.scrollbarHidden)
-                                    prop.children [
-                                        for item in data.RecentlyPlayed do
-                                            gameRecentlyPlayedPosterCard item
-                                    ]
-                                ]
-                        ]
-                    sectionCardOverflow Icons.gamepad "Recently Added" [
-                        if List.isEmpty data.RecentlyAdded then
-                            Html.div [
-                                prop.className "flex items-center justify-center py-8 text-base-content/40 text-sm"
-                                prop.text "No games added yet"
-                            ]
-                        else
-                            Html.div [
-                                prop.className ("flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory " + DesignSystem.scrollbarHidden)
-                                prop.children [
-                                    for item in data.RecentlyAdded do
-                                        gameRecentlyAddedPosterCard item
-                                ]
-                            ]
-                    ]
+        // Row 2: Recently Played | Recently Added (poster scrollers)
+        Html.div [
+            prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
+            prop.children [
+                recentlyPlayed.CollapsedView
+                recentlyAdded.CollapsedView
+            ]
+        ]
+
+        if not (List.isEmpty data.Upcoming) then
+            upcoming.CollapsedView
+
+        // Row 3: Status Distribution (pie) | Genre Breakdown (spider/radar)
+        Html.div [
+            prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
+            prop.children [
+                sectionCard Icons.chartBar "Status Distribution" [
+                    Charts.donutChart data.Stats.StatusDistribution "No games yet"
+                ]
+                sectionCard Icons.tag "Genre Breakdown" [
+                    Charts.radarChart data.Stats.GenreDistribution "No genre data yet"
                 ]
             ]
+        ]
 
-            // Upcoming rail (games-ev65k, moved here by intelligence-qh8mj) —
-            // absent, not empty-rendered, when nothing is unreleased.
-            if not (List.isEmpty data.Upcoming) then
-                sectionCardOverflow Icons.calendar "Upcoming" [
-                    Html.div [
-                        prop.className ("flex gap-3 overflow-x-auto py-2 px-2 scroll-px-2 snap-x snap-mandatory " + DesignSystem.scrollbarHidden)
-                        prop.children [
-                            for item in data.Upcoming do
-                                gameUpcomingPosterCard item
-                        ]
-                    ]
+        // Row 4: Monthly Play Time (2/3) | Recent Achievements (1/3)
+        Html.div [
+            prop.className "grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4"
+            prop.children [
+                sectionCard Icons.calendar "Monthly Play Time" [
+                    perGameMonthlyPlayTimeChart data.MonthlyPlayTimePerGame
                 ]
+                achievements.CollapsedView
+            ]
+        ]
 
-            // Row 3: Status Distribution (pie) | Genre Breakdown (spider/radar)
-            Html.div [
-                prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
-                prop.children [
-                    sectionCard Icons.chartBar "Status Distribution" [
-                        Charts.donutChart data.Stats.StatusDistribution "No games yet"
-                    ]
-                    sectionCard Icons.tag "Genre Breakdown" [
-                        Charts.radarChart data.Stats.GenreDistribution "No genre data yet"
-                    ]
-                ]
+        // Additional sections below the main layout
+        // HLTB comparison chart
+        if not (List.isEmpty data.HltbComparisons) then
+            sectionCard Icons.hourglass "Your Time vs HLTB" [
+                hltbComparisonChart data.HltbComparisons
             ]
 
-            // Row 4: Monthly Play Time (2/3) | Recent Achievements (1/3)
-            Html.div [
-                prop.className "grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4"
-                prop.children [
-                    sectionCard Icons.calendar "Monthly Play Time" [
-                        perGameMonthlyPlayTimeChart data.MonthlyPlayTimePerGame
+        // Ratings and completed per year
+        Html.div [
+            prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
+            prop.children [
+                sectionCard Icons.star "Ratings Distribution" [
+                    gameRatingsDistributionChart data.Stats.RatingDistribution
+                ]
+                if not (List.isEmpty data.Stats.CompletedPerYear) then
+                    sectionCard Icons.trophy "Games Retired Per Year" [
+                        gamesCompletedPerYearChart data.Stats.CompletedPerYear
                     ]
-                    achievementsSection achievementsState
-                ]
-            ]
-
-            // Additional sections below the main layout
-            // HLTB comparison chart
-            if not (List.isEmpty data.HltbComparisons) then
-                sectionCard Icons.hourglass "Your Time vs HLTB" [
-                    hltbComparisonChart data.HltbComparisons
-                ]
-
-            // Ratings and completed per year
-            Html.div [
-                prop.className "grid grid-cols-1 md:grid-cols-2 gap-4"
-                prop.children [
-                    sectionCard Icons.star "Ratings Distribution" [
-                        gameRatingsDistributionChart data.Stats.RatingDistribution
-                    ]
-                    if not (List.isEmpty data.Stats.CompletedPerYear) then
-                        sectionCard Icons.trophy "Games Retired Per Year" [
-                            gamesCompletedPerYearChart data.Stats.CompletedPerYear
-                        ]
-                ]
             ]
         ]
     ]
@@ -2467,19 +2679,19 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         match model.ActiveTab with
                         | All ->
                             match model.AllTabData with
-                            | Some data -> allTabView data
+                            | Some data -> allTabView data model.Expanded dispatch
                             | None -> loadingView
                         | MoviesTab ->
                             match model.MoviesTabData with
-                            | Some data -> moviesTabView data
+                            | Some data -> moviesTabView data model.Expanded dispatch
                             | None -> loadingView
                         | SeriesTab ->
                             match model.SeriesTabData with
-                            | Some data -> seriesTabView data
+                            | Some data -> seriesTabView data model.Expanded dispatch
                             | None -> loadingView
                         | GamesTab ->
                             match model.GamesTabData with
-                            | Some data -> gamesTabView data model.Achievements dispatch
+                            | Some data -> gamesTabView data model.Achievements model.Expanded dispatch
                             | None -> loadingView
                 ]
             ]

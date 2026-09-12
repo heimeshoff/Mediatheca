@@ -4,6 +4,21 @@ open System
 open Microsoft.Data.Sqlite
 open Donald
 
+/// Optional row cap for the dashboard read queries: the collapsed card passes
+/// `Some n`, the expanded card (`getDashboardCardItems`) passes `None` to lift it.
+module RowLimit =
+
+    /// SQLite treats a negative LIMIT as "no upper bound", so one `LIMIT @limit`
+    /// clause serves both the capped and the unlimited query.
+    let toSql (limit: int option) : int =
+        limit |> Option.defaultValue -1
+
+    /// In-memory counterpart for the queries that aggregate in F# after reading.
+    let truncate (limit: int option) (items: 'a list) : 'a list =
+        match limit with
+        | Some n -> List.truncate n items
+        | None -> items
+
 module Projection =
 
     type ProjectionHandler = {

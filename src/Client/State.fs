@@ -635,6 +635,15 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
     | Search_modal_msg childMsg ->
         updateSearchModal api childMsg model
 
+    | Escape_pressed ->
+        match model.SearchModal, model.CurrentPage with
+        | None, Dashboard ->
+            model, Cmd.ofMsg (Dashboard_msg Pages.Dashboard.Types.CollapseCard)
+        | _ ->
+            // An open search modal owns Escape itself; other pages have no
+            // expanded card to collapse.
+            model, Cmd.none
+
     | Dashboard_msg childMsg ->
         match childMsg with
         | Pages.Dashboard.Types.Open_search_modal ->

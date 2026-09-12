@@ -1162,6 +1162,48 @@ type SteamAchievement = {
     UnlockTime: string
 }
 
+// Dashboard card expansion
+
+/// The query behind one expandable dashboard card, asked for *without* the
+/// row limit the collapsed card applies. Expanding a card grows it over the
+/// whole tab area and shows the query's full result. One case per distinct
+/// query, not per card: the All tab's "Next episode" and the Series tab's
+/// "Next Up" are two cards over `SeriesNextUpQuery`.
+type DashboardCardQuery =
+    | SeriesNextUpQuery
+    | MoviesToWatchQuery
+    | GamesInFocusQuery
+    | MoviesRecentlyWatchedQuery
+    | MoviesRecentlyAddedQuery
+    | MoviesTopActorsQuery
+    | MoviesTopDirectorsQuery
+    | MoviesTopWatchedWithQuery
+    | SeriesReturningSoonQuery
+    | SeriesRecentlyFinishedQuery
+    | SeriesRecentlyAbandonedQuery
+    | SeriesTopWatchedWithQuery
+    | GamesRecentlyPlayedQuery
+    | GamesRecentlyAddedQuery
+    | GamesUpcomingQuery
+    | SteamRecentAchievementsQuery
+
+/// The unlimited result of a `DashboardCardQuery`, in the same item shape the
+/// collapsed card already renders, so the expanded card reuses its item view.
+type DashboardCardItems =
+    | SeriesNextUpItems of DashboardSeriesNextUp list
+    | MoviesToWatchItems of DashboardMovieToWatch list
+    | GamesInFocusItems of DashboardGameInFocus list
+    | RecentlyWatchedMovieItems of DashboardRecentlyWatched list
+    | MovieItems of MovieListItem list
+    | PersonItems of DashboardPersonStats list
+    | MovieWatchedWithItems of DashboardWatchedWithStats list
+    | ReturningSoonItems of ReturningSoonItem list
+    | SeriesItems of SeriesListItem list
+    | SeriesWatchedWithItems of DashboardSeriesWatchedWith list
+    | RecentlyPlayedGameItems of DashboardGameRecentlyPlayed list
+    | GameItems of GameListItem list
+    | AchievementItems of SteamAchievement list
+
 type SteamOwnedGame = {
     AppId: int
     Name: string
@@ -1543,6 +1585,8 @@ type IMediathecaApi = {
     getDashboardMoviesTab: unit -> Async<DashboardMoviesTab>
     getDashboardSeriesTab: unit -> Async<DashboardSeriesTab>
     getDashboardGamesTab: unit -> Async<DashboardGamesTab>
+    /// A dashboard card's query with its row limit lifted (card expansion).
+    getDashboardCardItems: DashboardCardQuery -> Async<DashboardCardItems>
     // Settings
     getTmdbApiKey: unit -> Async<string>
     setTmdbApiKey: string -> Async<Result<unit, string>>

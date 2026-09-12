@@ -16,6 +16,8 @@ let private KeyboardListener (dispatch: Msg -> unit) =
             if (ke.ctrlKey || ke.metaKey) && ke.key = "k" then
                 ke.preventDefault()
                 dispatch Open_search_modal
+            elif ke.key = "Escape" then
+                dispatch Escape_pressed
         Browser.Dom.document.addEventListener("keydown", handler)
         React.createDisposable (fun () ->
             Browser.Dom.document.removeEventListener("keydown", handler)
