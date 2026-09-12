@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-12 19:31 -- Batch started: [design-system-btmdx]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-btmdx - Surviving FLIP items must never fade — drop `FadeIn` from `Motion.fs` so an item present in both the collapsed and expanded view only ever translates (ADR-0073 §1 amended)
+**Parallel:** no (1 worker — design-system-btmdx is the only task in todo/ across every BC; nothing held back by the cap)
+
+---
+
 ## 2026-09-12 19:23 -- Modeling / Captured: design-system-btmdx - Surviving FLIP items must never fade — drop `FadeIn` from `Motion.fs` so an item present in both the collapsed and expanded view only ever translates (ADR-0073 §1 amended)
 
 **Type:** Modeling / Capture

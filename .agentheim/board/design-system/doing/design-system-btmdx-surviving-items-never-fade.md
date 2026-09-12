@@ -1,7 +1,7 @@
 ---
 id: design-system-btmdx
 title: Surviving FLIP items must never fade — drop `FadeIn` from `Motion.fs` so an item present in both the collapsed and expanded view only ever translates (ADR-0073 §1 amended)
-status: todo
+status: doing
 type: bug
 context: design-system
 created: 2026-09-12
