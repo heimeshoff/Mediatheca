@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-09-12 18:22 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 1h32m (first "Batch started" 16:51 → 18:23)
+**Completed:** 2 (first-try PASS: 1, re-dispatched: 1, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** design-system-m2v88: 1, intelligence-m09d4: 2
+**Commits:** 5 (2 batch start, 2 task integration, this entry)
+**Vision-conformance:** none — batch aligns with vision. Both tasks serve "Remaining v1 Work → Unified Dashboard" ("individual tabs will grow over time with more stats and intelligence") and the "Intent-driven" design principle; neither touches an "Out of Scope (v1)" item, and the admin-console boundary clause's tie-break (media experience wins) is not in play since this session was entirely media experience. vision.md still has no "What success looks like"/"Non-goals" headings — `extractVisionSections` returns two empty lists, so this judgement was made against "Remaining v1 Work"/"Out of Scope (v1)"/"Design Principles", as the 2026-09-10 session also did. The stale "Trakt.tv / Jellyfin sync (v2)" Out-of-Scope line remains a vision-text staleness, not a drift signal.
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (2 tasks) — both `type: feature`, all touched files product surfaces under `src/Client/`.
+**Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed.
+
+**Session-start churn note:** 0 recognized machine-shape commits, 3 human commits since the 2026-09-10 20:07 boundary. `74e1ab8` (expandable dashboard cards) is the surface both tasks build on and was already re-grounded by the 2026-09-12 16:45 modeling pass; `0a343bb` (qBittorrent 5.x login contract, ADR-0072) is recorded as a hotfix at 2026-09-11 09:50; `1dfb0b5` is the ADR-0078 two-root layout migration itself — a pure path move. Nothing needed re-alignment.
+
+**Verification history:** design-system-m2v88 PASS iteration 1. intelligence-m09d4 FAIL iteration 1 → PASS iteration 2. The iteration-1 FAIL was a genuine catch, not a nit: `tabArea` deliberately keeps the collapsed subtree mounted `invisible`, so while a card is grown every item's `data-flip-key` exists twice in the DOM; `Motion.Flip.play` resolves its element with `querySelector`, which returns the first (hidden) match, so on expand every transform landed on an invisible clone and no item visibly travelled — the exact behaviour the task exists to replace, and the hazard ADR-0073 already names as its rejection reason (a) against the View Transitions API. The same pass also caught that the task's `## What` requirement for card-scoped flip keys had been deferred to a self-filed follow-up bug (`intelligence-fk3p9`) rather than implemented. Iteration 2 fixed both — scoping only the *play* lookup (never the snapshot, which must still span the whole container for the before→after key connection to survive the subtree swap) and threading a required `card: DashboardCard` parameter through every renderer so a missing scope is a compile error — and dropped the follow-up as fixed rather than carried.
+
+**Builder checks pending (the six [human-eye] criteria on intelligence-m09d4 — never a worker/verifier action):** expanding a poster rail (Movies to Watch) — posters slide upward to the top of the viewport, no whole-list fade, fetched posters fill below without disturbing them; a list card re-flowing into tiles (Recently Finished, Most Watched With) — no text stretching, the tier that takes `Flip.plan`'s `FadeIn` size-changed path; collapse mirrors expand within the same ~0.5s budget; `prefers-reduced-motion: reduce` shows no travel; rapid expand/collapse toggling leaves nothing stuck. Plus design-system-m2v88's own StyleGuide "Grow Transition" specimen. The verifier flagged one asymmetry worth watching, within doctrine: the effect scrolls on expand only (ADR-0073 §6), so on collapse the document shortens and the browser may clamp `scrollTop`, and because boxes are viewport coordinates that clamp is carried into the travel.
+
+**Harness notes:** (1) **`lib/readme-delta.mjs` silently mis-applies every delta on a CRLF file.** `SECTION_HEADER_RE = /^## (.+)$/` never matches a line ending in `\r` (JS `.` excludes line terminators; `$` without `/m` demands true end-of-string), so `findSectionLineRange` returns null for every section, `applyReadmeDelta` reports `appended-fallback`, and the bullet lands at the END of the document with the stale one left in place — a silent duplicate, not a refusal. Hit on the design-system README (CRLF); reverted and re-applied through an LF-normalise/CRLF-restore wrapper, disposition then `applied`. Suggested fix upstream: `/^## (.+?)\r?$/` or normalise inside `applyReadmeDelta`, plus a CRLF fixture. (2) The homedir→cache→semver-max bootstrap resolves to cached plugin `0.9.2`, whose `lib/` predates `scoped-commit.mjs`, `layout-migration.mjs`, `merge-conflict-ladder.mjs` and the `migrate`/`bounce`/`log`/`index-add` verbs; the `0.9.3` cache entry is a partial copy with no `lib/` at all. Every verb this session was therefore invoked against the local source install at `C:\src\heimeshoff\agentic\agentheim\lib\`. (3) Inline-JSON CLI arguments remain unusable under Git Bash — Windows backslash paths break JSON escaping and backticked identifiers are eaten by command substitution inside double quotes; all opts were written to scratchpad files and read in-process. One protocol `Reasons:` line was written with its backticked identifiers stripped by this and repaired in place. (4) Root `node_modules` junctioned into each worktree for `npm run build`/`test:client`, removed via `rmdir` before `git worktree remove`; main copy verified intact both times.
+
+---
+
 ## 2026-09-12 18:20 -- Task verified and completed: intelligence-m09d4 - Dashboard card expand/collapse grows in place — the card surface and its already-rendered items travel to their expanded positions in ~0.5s via the design-system FLIP primitive, later-fetched items join below without disturbing them, and the 50ms scroll guess in State.fs is retired (ADR-0073)
 
 **Type:** Work / Task completion
