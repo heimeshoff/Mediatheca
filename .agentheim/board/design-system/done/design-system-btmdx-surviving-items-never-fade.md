@@ -1,7 +1,7 @@
 ---
 id: design-system-btmdx
 title: Surviving FLIP items must never fade — drop `FadeIn` from `Motion.fs` so an item present in both the collapsed and expanded view only ever translates (ADR-0073 §1 amended)
-status: doing
+status: done
 type: bug
 context: design-system
 created: 2026-09-12
@@ -102,3 +102,15 @@ says "not a subtree swap-and-fade" and never claimed survivors fade.
   re-flowing into a grid tile turns out to visibly snap its internal layout, that is a separate
   observation to capture on its own evidence — not a reason to reinstate a fade on every
   surviving item.
+
+## Outcome
+
+Removed the fade from the grow/shared-element FLIP motion primitive per ADR-0073 §1's amendment: a surviving item now only ever translates.
+
+- **`src/Client/Motion.fs`** — `FlipMove` loses its `FadeIn` field (now just `{ Key; Dx; Dy }`). `Flip.plan` no longer computes `sizeChanged`; a move is dropped exactly when both `Dx`/`Dy` are under the 0.5px sub-pixel threshold, with no size-based carve-out — the "size-only change still needs to fade in" comment is gone. `Flip.play`'s `emitJsExpr` call lost the `move.FadeIn` ternary; it now always emits the single `translate(dx,dy) -> none` keyframe pair with no opacity channel. Module and function doc comments updated to match (no more "fade-vs-stretch rule").
+- **`src/Client/Motion.test.fs`** — the two `FadeIn`-specific cases are rewritten in place (still 8 total): "equal-size boxes that moved yield a pure translate" (dropped the `FadeIn = false` assertion, now asserts the plain `FlipMove` record) and "a pure resize with no position delta produces no move" (inverts the old "a size change yields `FadeIn = true`" case into `Expect.isEmpty`). The other six cases are unchanged.
+- No change needed to `src/Client/Pages/StyleGuide/Views.fs`: the existing "Grow Transition" caption ("the tiles travel to their grown positions … with prefers-reduced-motion: reduce emulated, they snap with no travel") never claimed size-changed items fade, so it already reads correctly with the new behavior.
+- `grep -rn FadeIn src/Client/` returns only the pre-existing, unrelated `DesignSystem.animateFadeIn`/`animateFadeInUp` CSS-class tokens (used across several page views) — no reference to the removed `FlipMove.FadeIn` field remains.
+- `npm run build` (Fable typecheck + Vite bundle), `npm test` (769 Expecto tests), and `npm run test:client` (61 Vitest tests, including all 8 `Motion.test.fs` cases) all pass.
+
+Not verified here (human-eye acceptance criteria — expanding/collapsing a real dashboard card and eyeballing the StyleGuide specimen) — the code change is unconditional and covered by the rewritten unit tests, so there is no fade code path left to exercise.

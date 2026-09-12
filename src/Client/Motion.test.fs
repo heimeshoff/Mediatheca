@@ -14,19 +14,17 @@ let private box (left: float) (top: float) (width: float) (height: float) : Box 
 
 let motionTests =
     testList "Motion.Flip.plan" [
-        testCase "equal-size boxes that moved yield a pure translate with FadeIn = false" <| fun () ->
+        testCase "equal-size boxes that moved yield a pure translate" <| fun () ->
             let before = Map.ofList [ "a", box 100.0 200.0 50.0 50.0 ]
             let after = Map.ofList [ "a", box 10.0 20.0 50.0 50.0 ]
             let moves = Flip.plan before after
-            Expect.equal moves [ { Key = "a"; Dx = 90.0; Dy = 180.0; FadeIn = false } ] "translate is before - after, FadeIn is false when size is unchanged"
+            Expect.equal moves [ { Key = "a"; Dx = 90.0; Dy = 180.0 } ] "translate is before - after"
 
-        testCase "a size change yields FadeIn = true" <| fun () ->
+        testCase "a pure resize with no position delta produces no move" <| fun () ->
             let before = Map.ofList [ "a", box 0.0 0.0 80.0 110.0 ]
             let after = Map.ofList [ "a", box 0.0 0.0 200.0 60.0 ]
             let moves = Flip.plan before after
-            match moves with
-            | [ move ] -> Expect.isTrue move.FadeIn "box width/height changed between snapshots, so FadeIn must be true"
-            | other -> failwithf "expected exactly one move, got %A" other
+            Expect.isEmpty moves "a size-only change with no position change has nothing to translate, so it is dropped like any other sub-threshold move"
 
         testCase "a key present only in the before map produces no move" <| fun () ->
             let before = Map.ofList [ "a", box 0.0 0.0 10.0 10.0; "gone", box 5.0 5.0 10.0 10.0 ]

@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-12 19:48 -- Task verified and completed: design-system-btmdx - Surviving FLIP items must never fade — drop `FadeIn` from `Motion.fs` so an item present in both the collapsed and expanded view only ever translates (ADR-0073 §1 amended)
+
+**Type:** Work / Task completion
+**Task:** design-system-btmdx - Surviving FLIP items must never fade — drop `FadeIn` from `Motion.fs` so an item present in both the collapsed and expanded view only ever translates (ADR-0073 §1 amended)
+**Summary:** Dropped `FadeIn` from the FLIP motion primitive — `FlipMove` is now `{ Key; Dx; Dy }`, `Flip.play` emits translate-only WAAPI keyframes unconditionally, and `Flip.plan` drops a pure resize with no position delta as a sub-threshold move; a surviving item only ever translates (ADR-0073 §1/§9, already amended)
+**Duration:** 15m
+**Verification:** PASS (iteration 1)
+**Files changed:** 2
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-09-12 19:31 -- Batch started: [design-system-btmdx]
 
 **Type:** Work / Batch start

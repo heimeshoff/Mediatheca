@@ -4,8 +4,8 @@
 /// container ref, and the effect that plays the plan.
 ///
 /// Split, per ADR-0073 §9: `Flip.plan` is the pure arithmetic core — every
-/// judgement (intersection of the two key sets, the sub-pixel threshold, the
-/// fade-vs-stretch rule) lives there and is unit-tested (`Motion.test.fs`).
+/// judgement (intersection of the two key sets, the sub-pixel threshold)
+/// lives there and is unit-tested (`Motion.test.fs`).
 /// `Flip.snapshot` / `Flip.play` / `growSurface` are the DOM shell — they
 /// touch `getBoundingClientRect`, WAAPI `Element.animate`, and `matchMedia`,
 /// and are deliberately untested (same division as
@@ -29,15 +29,13 @@ type Box = {
 }
 
 /// One key's FLIP travel: translate by (Dx, Dy) from its old on-screen
-/// position to its new one. `FadeIn` is true when the box's measured size
-/// changed between the two snapshots (e.g. a list row re-flowing into a grid
-/// tile) — translate alone would visibly stretch such content, so the caller
-/// layers an opacity fade on top of the travel instead of scaling.
+/// position to its new one. Translate-only, unconditionally — an item
+/// present in both snapshots only ever moves, never fades (ADR-0073 §1,
+/// amended 2026-09-12 / design-system-btmdx).
 type FlipMove = {
     Key: string
     Dx: float
     Dy: float
-    FadeIn: bool
 }
 
 /// `--duration-grow` mirrored from index.css. WAAPI's `Element.animate` takes
@@ -70,11 +68,14 @@ module Flip =
     /// Pure core: for every key present in BOTH maps (a key present in only
     /// one — appeared or disappeared between snapshots — produces no move),
     /// compute the translate that would carry `before`'s box onto `after`'s
-    /// box, drop it if both axes are under the sub-pixel threshold, and flag
-    /// `FadeIn` when the box's width or height changed. The inversion
-    /// convention: `Dx`/`Dy` is `before - after`, so a caller starts the
-    /// element at `translate(Dx, Dy)` (visually where it used to be) and
-    /// animates to `translate(0)` / `none` (its real, new position).
+    /// box, and drop it if both axes are under the sub-pixel threshold. A
+    /// pure resize with no position delta has nothing to animate here —
+    /// translate-only, no fade (ADR-0073 §1, amended 2026-09-12 /
+    /// design-system-btmdx) — so it is dropped like any other sub-threshold
+    /// move. The inversion convention: `Dx`/`Dy` is `before - after`, so a
+    /// caller starts the element at `translate(Dx, Dy)` (visually where it
+    /// used to be) and animates to `translate(0)` / `none` (its real, new
+    /// position).
     let plan (before: Map<string, Box>) (after: Map<string, Box>) : FlipMove list =
         before
         |> Map.toList
@@ -84,16 +85,10 @@ module Flip =
             | Some afterBox ->
                 let dx = beforeBox.Left - afterBox.Left
                 let dy = beforeBox.Top - afterBox.Top
-                let sizeChanged =
-                    abs (beforeBox.Width - afterBox.Width) >= subPixelThreshold
-                    || abs (beforeBox.Height - afterBox.Height) >= subPixelThreshold
-                // A size-only change (no position change) still needs to fade in, so
-                // only the position component is subject to the sub-pixel threshold —
-                // a box that merely resized in place is not "didn't move".
-                if abs dx < subPixelThreshold && abs dy < subPixelThreshold && not sizeChanged then
+                if abs dx < subPixelThreshold && abs dy < subPixelThreshold then
                     None
                 else
-                    Some { Key = key; Dx = dx; Dy = dy; FadeIn = sizeChanged })
+                    Some { Key = key; Dx = dx; Dy = dy })
 
     /// DOM shell: read every `[data-flip-key]` descendant of `root` in
     /// viewport coordinates. Untested — see the module doc comment.
@@ -109,11 +104,10 @@ module Flip =
 
     /// DOM shell: invert each planned move on its matching
     /// `[data-flip-key="…"]` descendant of `root` via WAAPI `Element.animate`
-    /// — translate-only (`translate(dx,dy) -> none`), with an opacity
-    /// `0 -> 1` fade layered on top for moves whose box size changed
-    /// (`FadeIn`), over `growDurationMs`/`growEasing`, `fill: "none"` so the
-    /// element snaps back to its untransformed state with no cleanup step and
-    /// no inline-style residue.
+    /// — translate-only (`translate(dx,dy) -> none`), unconditionally, no
+    /// opacity channel, over `growDurationMs`/`growEasing`, `fill: "none"` so
+    /// the element snaps back to its untransformed state with no cleanup step
+    /// and no inline-style residue.
     ///
     /// Returns the live animation handles (there is no typed WAAPI
     /// `Animation` binding in this codebase's Fable.Browser.Dom, so they are
@@ -133,8 +127,8 @@ module Flip =
                     None
                 else
                     let anim: obj =
-                        emitJsExpr (el, move.Dx, move.Dy, move.FadeIn, growDurationMs, growEasing)
-                            "$0.animate($3 ? [{ transform: 'translate(' + $1 + 'px, ' + $2 + 'px)', opacity: 0 }, { transform: 'none', opacity: 1 }] : [{ transform: 'translate(' + $1 + 'px, ' + $2 + 'px)' }, { transform: 'none' }], { duration: $4, easing: $5, fill: 'none' })"
+                        emitJsExpr (el, move.Dx, move.Dy, growDurationMs, growEasing)
+                            "$0.animate([{ transform: 'translate(' + $1 + 'px, ' + $2 + 'px)' }, { transform: 'none' }], { duration: $3, easing: $4, fill: 'none' })"
                     Some anim)
 
 /// `Motion.flipKey key` emits both the React `key` (`prop.key`) and the DOM
