@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-12 19:23 -- Modeling / Captured: design-system-btmdx - Surviving FLIP items must never fade — drop `FadeIn` from `Motion.fs` so an item present in both the collapsed and expanded view only ever translates (ADR-0073 §1 amended)
+
+**Type:** Modeling / Capture
+**BC:** design-system
+**Filed to:** todo
+**Summary:** Surviving FLIP items must never fade. Flip.plan sets FadeIn on any size change and Flip.play layers opacity 0->1 on those items, but plan only ever returns keys present in BOTH snapshots — so the fade's only audience is the surviving items, which should read as one continuous motion. Drop FadeIn from FlipMove and make Flip.play translate-only unconditionally; the threshold carve-out for size-only changes goes with it. ADR-0073 §1 and §9 amended in place as part of this capture. Filed straight to todo: decision settled, criteria concrete.
+
+---
+
 ## 2026-09-12 18:22 -- Work session ended
 
 **Type:** Work / Session end

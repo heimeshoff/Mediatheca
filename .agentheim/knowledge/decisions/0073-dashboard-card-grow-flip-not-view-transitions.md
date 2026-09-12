@@ -6,7 +6,7 @@ status: accepted
 date: 2026-09-12
 supersedes: []
 superseded_by: []
-related_tasks: [design-system-m2v88, intelligence-m09d4]
+related_tasks: [design-system-m2v88, intelligence-m09d4, design-system-btmdx]
 related_research: []
 ---
 
@@ -51,11 +51,19 @@ anchored to React's own commit phase, not to dispatch.
 1. **Technique: key-based FLIP, translate-only, played through WAAPI `Element.animate`.**
    Measure a `key -> box` map before the state change, re-measure after commit, animate
    each surviving key from `translate(dx, dy)` to `none` over `--duration-grow`.
-   - **Translate-only, no `scale`.** Poster tiles are the same fixed width in both
-     layouts, so translate is exact for them; list rows re-flowing into grid tiles do
-     change width, and a FLIP scale there would visibly stretch text. Items whose box
-     size changed instead get a short opacity fade on top of the travel, reusing the
-     existing 200ms cross-fade vocabulary.
+   - **Translate-only, no `scale`, and no fade either.** Poster tiles are the same
+     fixed width in both layouts, so translate is exact for them; list rows re-flowing
+     into grid tiles do change width, and a FLIP scale there would visibly stretch
+     text. An earlier draft of this decision gave items whose box size changed a short
+     opacity fade on top of the travel, to mask the row's internal reflow at the
+     instant its box resized. **Amended 2026-09-12 (design-system-btmdx), after the
+     builder saw it running:** that fade is removed outright. `plan` only ever returns
+     keys present in BOTH snapshots, so its only possible audience was the *surviving*
+     items — exactly the set that should read as continuous motion — and any tile whose
+     geometry shifted even slightly between rail and grid tripped it, so survivors
+     appeared to fade in and out. A surviving item only ever translates. This is a
+     change of intent on seeing the real thing, not a correction of a mistake: the
+     masking rationale was sound in the abstract and simply lost to what it cost.
    - **WAAPI, not CSS class toggling.** Default `fill: "none"` means the element returns
      to its untransformed state with no cleanup step, no inline-style residue, and no
      forced reflow between "invert" and "play". In-flight `Animation` handles are held in
@@ -128,8 +136,11 @@ anchored to React's own commit phase, not to dispatch.
 9. **Testability line: the arithmetic is pure, the DOM is shell.**
    `Motion.Flip.plan : Map<string, Box> -> Map<string, Box> -> FlipMove list` takes plain
    records, is unit-tested under Vitest/jsdom (ADR-0064) with no layout engine involved,
-   and owns every judgement in the feature: sub-pixel threshold, "size changed, so also
-   fade", keys only in the before map (ignored), keys only in the after map (ignored).
+   and owns every judgement in the feature: sub-pixel threshold, keys only in the before
+   map (ignored), keys only in the after map (ignored). (It used to also own a "size
+   changed, so also fade" rule; decision 1's 2026-09-12 amendment removed the fade, and
+   with it the threshold carve-out that kept a size-only change in place alive as a move
+   — a pure resize with no position delta now has nothing to animate and is dropped.)
    `snapshot`/`play`/`growSurface` touch `getBoundingClientRect`, `Element.animate` and
    `matchMedia` and are deliberately untested — the same division as
    `LocalCopyRemovalDialog`'s pure phase machine over an untested async shell.

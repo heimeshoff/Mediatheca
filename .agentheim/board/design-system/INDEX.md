@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 24
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **design-system-btmdx** — Surviving FLIP items must never fade — drop `FadeIn` from `Motion.fs` so an item present in both the collapsed and expanded view only ever translates (ADR-0073 §1 amended) (bug) — `todo/design-system-btmdx-surviving-items-never-fade.md`
 <!-- todo-list:end -->
 
 ### Doing
