@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-12 16:51 -- Batch started: [design-system-m2v88]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-m2v88 - Grow / shared-element FLIP motion primitive — a new `Motion.fs` with a pure `Flip.plan`, a WAAPI `snapshot`/`play`/`growSurface` shell, `flipKey`, a reduced-motion gate, `--duration-grow` (0.5s) / `--ease-grow` tokens, and a StyleGuide specimen (ADR-0073)
+**Parallel:** no (1 worker — design-system-m2v88 is the only ready task across every BC; intelligence-m09d4 is in todo/ but blocked on it via depends_on and is held for the next wave, not capped out)
+
+---
+
 ## 2026-09-12 16:45 -- Modeling / Refined: intelligence-m09d4 - Dashboard card expand/collapse grows in place
 
 **Type:** Modeling / Refine

@@ -1,7 +1,7 @@
 ---
 id: design-system-m2v88
 title: Grow / shared-element FLIP motion primitive — a new `Motion.fs` with a pure `Flip.plan`, a WAAPI `snapshot`/`play`/`growSurface` shell, `flipKey`, a reduced-motion gate, `--duration-grow` (0.5s) / `--ease-grow` tokens, and a StyleGuide specimen (ADR-0073)
-status: todo
+status: doing
 type: feature
 context: design-system
 created: 2026-09-12
