@@ -706,21 +706,23 @@ let filmstripRow (items: FilmstripItem list) : ReactElement =
                                     for item in items do
                                         match item.Href, item.OnNavigate with
                                         | None, None ->
-                                            Html.div [
-                                                prop.key item.Key
+                                            Html.div (Motion.flipKey item.Key @ [
                                                 prop.className tileWrapperClass
                                                 prop.children [ posterTile item ]
-                                            ]
+                                            ])
                                         | href, onNavigate ->
-                                            Html.a [
-                                                prop.key item.Key
+                                            // `Motion.flipKey` (ADR-0073): the caller's `Key` is
+                                            // already a stable domain identifier (e.g. a slug), the
+                                            // same one an expanded surface's item renderer keys on,
+                                            // so the filmstrip's tile can travel into the grown grid.
+                                            Html.a (Motion.flipKey item.Key @ [
                                                 prop.href (href |> Option.defaultValue "#")
                                                 prop.className (tileWrapperClass + " cursor-pointer")
                                                 prop.onClick (fun e ->
                                                     e.preventDefault()
                                                     onNavigate |> Option.iter (fun f -> f ()))
                                                 prop.children [ posterTile item ]
-                                            ]
+                                            ])
                                 ]
                             ]
                             Html.div [ prop.className "filmstrip-sprocket mt-[7px]" ]

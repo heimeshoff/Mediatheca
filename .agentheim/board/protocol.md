@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-09-12 18:20 -- Task verified and completed: intelligence-m09d4 - Dashboard card expand/collapse grows in place — the card surface and its already-rendered items travel to their expanded positions in ~0.5s via the design-system FLIP primitive, later-fetched items join below without disturbing them, and the 50ms scroll guess in State.fs is retired (ADR-0073)
+
+**Type:** Work / Task completion
+**Task:** intelligence-m09d4 - Dashboard card expand/collapse grows in place — the card surface and its already-rendered items travel to their expanded positions in ~0.5s via the design-system FLIP primitive, later-fetched items join below without disturbing them, and the 50ms scroll guess in State.fs is retired (ADR-0073)
+**Summary:** Wired the design-system FLIP primitive into the dashboard card expand/collapse — growingTabArea snapshots on click and plays item travel plus the card-box height grow from one useLayoutEffect against the visible face, card-scoped flip keys, and the 50ms scroll guess in State.fs retired
+**Duration:** 52m
+**Verification:** PASS (iteration 2)
+**Files changed:** 4
+**Tests added:** 1
+**ADRs written:** none
+
+---
+
+## 2026-09-12 17:57 -- Verification failed: intelligence-m09d4 - Dashboard card expand/collapse grows in place
+
+**Type:** Work / Verification failure
+**Task:** intelligence-m09d4 - Dashboard card expand/collapse grows in place
+**Iteration:** 1 of 3
+**Reasons:** expand animates the hidden collapsed clone, not the grown surface — `tabArea` keeps both faces mounted, so every item key appears twice and `Flip.play`'s `querySelector` resolves the first (invisible) match, so no item visibly travels on expand (collapse is unaffected, making the directions asymmetric); the `## What` requirement that flip keys be card-scoped is unimplemented and was deferred to a follow-up bug instead; secondary — the layout effect re-fires on `ExpandedItemsLoaded` and re-issues the instant scroll
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-09-12 17:21 -- Batch started: [intelligence-m09d4]
 
 **Type:** Work / Batch start

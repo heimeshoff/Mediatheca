@@ -27,6 +27,7 @@ from the All tab by `intelligence-dq8rk`'s 3a rebuild and never re-wired onto th
 `newGameItem` view helpers. `intelligence-p4t7k` pruned the server-side payload
 (`GameProjection.getDashboardNewGames` and `Shared.DashboardAllTab.NewGames`) end to end — the
 dashboard no longer computes or ships New Games data at all.
+- **Card grow** (intelligence-m09d4, ADR-0073) — expanding or collapsing a dashboard card is a key-based FLIP travel, not a subtree swap-and-fade: items shared between the collapsed and expanded views (keyed on slug / person name / achievement composite id via `Motion.flipKey`, each card-scoped through `cardItemKey` so two cards that can list the same underlying item never collide) slide from their collapsed on-screen position to their expanded one in ~0.5s, while the card's own surface grows/shrinks height independently. `Views.fs`'s `growingTabArea` owns the choreography (snapshot-on-click, one `useLayoutEffect` for both directions, playing the FLIP against the visible face only since the collapsed subtree stays mounted `invisible` underneath); the `Expanded: ExpandedCard option` model shape is unchanged.
 
 ## Aggregates
 

@@ -2,6 +2,7 @@ module Mediatheca.Client.Pages.Dashboard.Views
 
 open Feliz
 open Feliz.Router
+open Fable.Core.JsInterop
 open Mediatheca.Client.Pages.Dashboard.Types
 open Mediatheca.Shared
 open Mediatheca.Client
@@ -86,11 +87,23 @@ type private Chrome =
     /// Title + content, no card chrome.
     | Open
 
-let private chromeClass (chrome: Chrome) =
+/// The chrome's classes without the fade-in-up mount entrance — shared by
+/// `chromeClass` (collapsed cards, which do want the entrance) and
+/// `expandedChromeClass` (the grown surface, which does not: it enters via
+/// the FLIP travel and the height grow only, ADR-0073 §6a).
+let private chromeBaseClass (chrome: Chrome) =
     match chrome with
-    | Card -> DesignSystem.velvetCard + " p-4 " + DesignSystem.animateFadeInUp
-    | CardOverflow -> DesignSystem.velvetCard + " p-4 " + DesignSystem.animateFadeInUp + " overflow-hidden"
-    | Open -> "section-open " + DesignSystem.animateFadeInUp
+    | Card -> DesignSystem.velvetCard + " p-4"
+    | CardOverflow -> DesignSystem.velvetCard + " p-4 overflow-hidden"
+    | Open -> "section-open"
+
+let private chromeClass (chrome: Chrome) =
+    chromeBaseClass chrome + " " + DesignSystem.animateFadeInUp
+
+/// The expanded surface's chrome (ADR-0073 §6a): same chrome as its
+/// collapsed self, minus the fade-in-up mount entrance.
+let private expandedChromeClass (chrome: Chrome) =
+    chromeBaseClass chrome
 
 /// Icon + title, with any trailing controls (expand/collapse) pushed to the
 /// card's top-right corner.
@@ -114,8 +127,11 @@ let private sectionHeader (icon: unit -> ReactElement) (title: string) (trailing
         ]
     ]
 
-let private section (chrome: Chrome) (trailing: ReactElement list) (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
+let private section (chrome: Chrome) (elementId: string option) (trailing: ReactElement list) (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
     Html.div [
+        match elementId with
+        | Some id -> prop.id id
+        | None -> ()
         prop.className (chromeClass chrome)
         prop.children [
             sectionHeader icon title trailing
@@ -129,15 +145,15 @@ let private section (chrome: Chrome) (trailing: ReactElement list) (icon: unit -
     ]
 
 let private sectionCard (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
-    section Card [] icon title children
+    section Card None [] icon title children
 
 /// Section card that allows overflow (for horizontal scrollers)
 let private sectionCardOverflow (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
-    section CardOverflow [] icon title children
+    section CardOverflow None [] icon title children
 
 /// Section: Open (title + content, no card chrome)
 let private sectionOpen (icon: unit -> ReactElement) (title: string) (children: ReactElement list) =
-    section Open [] icon title children
+    section Open None [] icon title children
 
 /// The horizontal poster rail every scroller card uses when collapsed.
 let private posterScroller (children: ReactElement list) =
@@ -213,9 +229,30 @@ let private headerIconButton (icon: unit -> ReactElement) (label: string) (onCli
         prop.children [ icon () ]
     ]
 
+/// DOM id of a card's own collapsed surface (distinct from
+/// `State.expandedCardElementId`, which is shared by whichever card is
+/// currently grown). `growingTabArea`'s wrapped dispatch reads this — for
+/// the card about to expand, or the card that just collapsed back into
+/// place — to measure the height `Motion.growSurface` animates from/to
+/// (ADR-0073 §1's card-box grow, independent of the item FLIP travel).
+let private collapsedCardElementId (card: DashboardCard) = $"dashboard-collapsed-card-{card}"
+
+/// Card-scoped `data-flip-key` (ADR-0073 / this task's `## What`): prefixes
+/// an item's own identifier with the card it is rendered under, so two
+/// cards that can list the same underlying item at the same time — either
+/// two cards in the *same* tab (e.g. Games' "Recently Added" and "Upcoming"
+/// can both list a newly-added, unreleased game) or the same query read by
+/// two different tabs (`AllNextEpisode`/`SeriesNextUp` both reading
+/// `SeriesNextUpQuery`) — never collide on `data-flip-key`. The collapsed
+/// and expanded faces of the *same* card always call this with that card's
+/// own value, so the key still matches across the swap — that shared key is
+/// what makes the travel work at all.
+let private cardItemKey (card: DashboardCard) (itemKey: string) = $"{card}-{itemKey}"
+
 let private expandable (dispatch: Msg -> unit) (spec: ExpandableCard<'item>) : CardHandle =
     let collapsed =
         section spec.Chrome
+            (Some (collapsedCardElementId spec.Card))
             [ headerIconButton Icons.arrowsPointingOut "Expand" (fun () -> dispatch (ExpandCard spec.Card)) ]
             spec.Icon spec.Title spec.Collapsed
     let expanded (state: ExpandedItems) =
@@ -243,7 +280,7 @@ let private expandable (dispatch: Msg -> unit) (spec: ExpandableCard<'item>) : C
                 ]
         Html.div [
             prop.id State.expandedCardElementId
-            prop.className (chromeClass spec.Chrome + " col-start-1 row-start-1 z-10 scroll-mt-20")
+            prop.className (expandedChromeClass spec.Chrome + " col-start-1 row-start-1 z-10 scroll-mt-20")
             prop.children [
                 sectionHeader spec.Icon spec.Title [
                     status
@@ -257,25 +294,138 @@ let private expandable (dispatch: Msg -> unit) (spec: ExpandableCard<'item>) : C
         ]
     { Handle = spec.Card; CollapsedView = collapsed; ExpandedView = expanded }
 
-/// The active tab's content, with the expanded card (if any) grown over it.
-/// Both sit in the same grid cell: the cell is as tall as the taller of the
-/// two, so the page keeps its height while the other cards are hidden
-/// underneath rather than unmounted.
-let private tabArea (expanded: ExpandedCard option) (cards: CardHandle list) (content: ReactElement list) =
+/// The active tab's content, with the expanded card (if any) grown over it
+/// (ADR-0073). Both sit in the same grid cell: the cell is as tall as the
+/// taller of the two, so the page keeps its height while the other cards are
+/// hidden underneath rather than unmounted.
+///
+/// Owns the FLIP choreography: `containerRef` is the root every
+/// `[data-flip-key]` item (across every card in the tab, collapsed or
+/// grown) is snapshotted from. `build` gets a `dispatch` that snapshots the
+/// tab area — and the specific card's own surface height, for the
+/// independent card-box grow — immediately before forwarding `ExpandCard`/
+/// `CollapseCard`, so `expandable`'s buttons (built inside `build`) never
+/// see the raw model `dispatch` directly. One `useLayoutEffect`, keyed on
+/// `expanded`, serves both directions: it fires post-commit (React's actual
+/// commit point — see ADR-0073's `withReactSynchronous` finding — not a
+/// `setTimeout` guess), scrolls the expanded surface into view *instantly*
+/// (before the after-snapshot, so the travel carries the scroll shift), then
+/// plays the item FLIP and the surface height grow.
+[<ReactComponent>]
+let private growingTabArea (expanded: ExpandedCard option) (dispatch: Msg -> unit) (build: (Msg -> unit) -> CardHandle list * ReactElement list) =
+    let containerRef = React.useRef<Browser.Types.HTMLElement option>(None)
+    let beforeSnapshot = React.useRef<Map<string, Motion.Box> option>(None)
+    let liveAnimations = React.useRef<obj list>([])
+    // The card whose surface height is about to transition, and its
+    // pre-transition height — captured at click time, independent of the
+    // per-item FLIP snapshot above (ADR-0073 §1's "card box itself" grow).
+    let pendingSurfaceHeight = React.useRef<(DashboardCard * float) option>(None)
+    let liveGrowAnimation = React.useRef<obj>(null)
+
+    let snapshotAndDispatch (msg: Msg) =
+        containerRef.current |> Option.iter (fun root -> beforeSnapshot.current <- Some (Motion.Flip.snapshot root))
+        match msg with
+        | ExpandCard card ->
+            let el = Browser.Dom.document.getElementById (collapsedCardElementId card)
+            if not (isNull el) then
+                pendingSurfaceHeight.current <- Some (card, el.getBoundingClientRect().height)
+        | CollapseCard ->
+            expanded
+            |> Option.iter (fun e ->
+                let el = Browser.Dom.document.getElementById State.expandedCardElementId
+                if not (isNull el) then
+                    pendingSurfaceHeight.current <- Some (e.Card, el.getBoundingClientRect().height))
+        | _ -> ()
+        dispatch msg
+
+    // The layout effect's own dependency: the *card identity* (or absence of
+    // one), not the whole `ExpandedCard` record — `ExpandedItemsLoaded`
+    // allocates a fresh record with the same `Card` when the unlimited fetch
+    // lands, and that must not re-fire the effect (no re-scroll, no replay).
+    // A plain string compares by value in JS (unlike an `Option` wrapper,
+    // which would be a fresh object every render), so this is a real
+    // "did the expanded card change" check, not a reference check.
+    let expandedCardKey = expanded |> Option.map (fun e -> string e.Card) |> Option.defaultValue ""
+
+    React.useLayoutEffect(
+        (fun () ->
+            // Cancel every in-flight handle first (ADR-0073: rapid toggling
+            // must never leave a stray transform) — before the scroll, so the
+            // scroll target is measured against a settled surface, not one
+            // mid-grow from a still-playing previous animation.
+            liveAnimations.current |> List.iter Motion.cancel
+            Motion.cancel liveGrowAnimation.current
+
+            match expanded with
+            | Some _ ->
+                let el = Browser.Dom.document.getElementById State.expandedCardElementId
+                if not (isNull el) then
+                    el?scrollIntoView ({| behavior = "instant"; block = "start" |})
+            | None -> ()
+
+            (match containerRef.current, beforeSnapshot.current with
+             | Some root, Some before ->
+                 let after = Motion.Flip.snapshot root
+                 let moves = Motion.Flip.plan before after
+                 // `root` (the whole tab area) is right for the *snapshots* —
+                 // that is what connects a collapsed box to its expanded
+                 // element across the swap — but `tabArea` keeps the
+                 // collapsed subtree mounted `invisible` while a card is
+                 // grown, so an expanding item's `data-flip-key` exists
+                 // twice: the hidden clone (first in document order) and the
+                 // visible grown surface (second). `Flip.play`'s
+                 // `querySelector` returns the *first* match, so playing
+                 // against `root` would land every move on the hidden clone.
+                 // Scoping the play lookup to the surface (the visible face
+                 // when expanded) excludes the hidden clone entirely, since
+                 // it is a sibling of the surface, not a descendant of it.
+                 // On collapse the surface has already unmounted, so `root`
+                 // itself has no duplicates and is the right (only) choice.
+                 let playRoot =
+                     match expanded with
+                     | Some _ ->
+                         let el = Browser.Dom.document.getElementById State.expandedCardElementId
+                         if isNull el then root else (unbox el : Browser.Types.HTMLElement)
+                     | None -> root
+                 liveAnimations.current <- Motion.Flip.play playRoot moves
+             | _ -> ())
+            beforeSnapshot.current <- None
+
+            (match pendingSurfaceHeight.current with
+             | Some (card, fromHeight) ->
+                 let afterElId =
+                     match expanded with
+                     | Some e when e.Card = card -> State.expandedCardElementId
+                     | _ -> collapsedCardElementId card
+                 let afterEl = Browser.Dom.document.getElementById afterElId
+                 if not (isNull afterEl) then
+                     liveGrowAnimation.current <-
+                         Motion.growSurface afterEl fromHeight (afterEl.getBoundingClientRect().height)
+                         |> Option.defaultValue null
+             | None -> ())
+            pendingSurfaceHeight.current <- None),
+        [| box expandedCardKey |]
+    )
+
+    let cards, content = build snapshotAndDispatch
     let grown =
         expanded
         |> Option.bind (fun e ->
             cards
             |> List.tryFind (fun c -> c.Handle = e.Card)
             |> Option.map (fun c -> c.ExpandedView e.Items))
+    let setContainerRef (el: Browser.Types.Element) =
+        containerRef.current <- (if isNull el then None else Some (unbox el))
     match grown with
     | None ->
         Html.div [
+            prop.ref setContainerRef
             prop.className "flex flex-col gap-4"
             prop.children content
         ]
     | Some surface ->
         Html.div [
+            prop.ref setContainerRef
             // `grid-cols-1` = `minmax(0, 1fr)`: without the 0 floor the single column
             // would grow to the hidden scrollers' min-content width and push the
             // expanded card (and its collapse button) far past the viewport.
@@ -310,8 +460,8 @@ let private friendPill (friend: FriendRef) =
 
 // ── Movies to Watch — Poster Cards (All tab) ──
 
-let private movieToWatchPosterCard (jellyfinServerUrl: string option) (item: DashboardMovieToWatch) =
-    Html.a [
+let private movieToWatchPosterCard (card: DashboardCard) (jellyfinServerUrl: string option) (item: DashboardMovieToWatch) =
+    Html.a (Motion.flipKey (cardItemKey card item.Slug) @ [
         prop.href (Router.format ("movies", item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
@@ -394,7 +544,7 @@ let private movieToWatchPosterCard (jellyfinServerUrl: string option) (item: Das
                 ]
             ]
         ]
-    ]
+    ])
 
 /// "Movies to Watch" filmstrip item — wraps a `DashboardMovieToWatch` into a
 /// `DesignSystem.FilmstripItem`. The InFocus crosshair badge and the
@@ -403,7 +553,7 @@ let private movieToWatchPosterCard (jellyfinServerUrl: string option) (item: Das
 /// design-system row as pre-rendered, self-positioned slots, and the nav
 /// target is handed in as an `Href` + `OnNavigate` callback pair -- same
 /// caller-supplied-slot shape as `seriesNextEpisodeCard` (intelligence-h7v2q).
-let private movieToWatchFilmstripItem (jellyfinServerUrl: string option) (item: DashboardMovieToWatch) : DesignSystem.FilmstripItem =
+let private movieToWatchFilmstripItem (card: DashboardCard) (jellyfinServerUrl: string option) (item: DashboardMovieToWatch) : DesignSystem.FilmstripItem =
     let inFocusBadge =
         if item.InFocus then
             Some (
@@ -440,7 +590,14 @@ let private movieToWatchFilmstripItem (jellyfinServerUrl: string option) (item: 
             )
         | _ -> None
     {
-        DesignSystem.FilmstripItem.Key = item.Slug
+        // Card-scoped (`cardItemKey`, ADR-0073): this doubles as the plain
+        // React key (design-system's `filmstripRow` uses `Key` for both
+        // `prop.key` and, via `Motion.flipKey`, `data-flip-key`) — a longer,
+        // still-unique string doesn't break the reconciliation use, and the
+        // scoping is what lets the collapsed filmstrip tile match its
+        // expanded `movieToWatchPosterCard` counterpart without colliding
+        // with any other card's use of the same slug.
+        DesignSystem.FilmstripItem.Key = cardItemKey card item.Slug
         PosterRef = item.PosterRef
         Title = item.Name
         Meta = string item.Year
@@ -484,7 +641,7 @@ let private seriesProgressOf (item: DashboardSeriesNextUp) : DesignSystem.Series
 /// The Jellyfin play button is built here (it needs `Icons.play` and the
 /// `jellyfinPlayUrl` helper, both page-local) and handed to the design-system
 /// card as a pre-rendered, self-positioned slot.
-let private seriesNextEpisodeCard (jellyfinServerUrl: string option) (item: DashboardSeriesNextUp) =
+let private seriesNextEpisodeCard (card: DashboardCard) (jellyfinServerUrl: string option) (item: DashboardSeriesNextUp) =
     let episodeLabel =
         if item.NextUpSeason > 0 then
             Some $"S{item.NextUpSeason}E{item.NextUpEpisode}: {item.NextUpTitle}"
@@ -510,7 +667,7 @@ let private seriesNextEpisodeCard (jellyfinServerUrl: string option) (item: Dash
                 ]
             )
         | _ -> None
-    Html.a [
+    Html.a (Motion.flipKey (cardItemKey card item.Slug) @ [
         prop.href (Router.format ("series", item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
@@ -534,12 +691,12 @@ let private seriesNextEpisodeCard (jellyfinServerUrl: string option) (item: Dash
                 JellyfinButton = jellyfinButton
             }
         ]
-    ]
+    ])
 
 // ── Games: In Focus — Poster Cards (restyle) ──
 
-let private gameInFocusPosterCard (item: DashboardGameInFocus) =
-    Html.a [
+let private gameInFocusPosterCard (card: DashboardCard) (item: DashboardGameInFocus) =
+    Html.a (Motion.flipKey (cardItemKey card item.Slug) @ [
         prop.href (Router.format ("games", item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
@@ -587,12 +744,12 @@ let private gameInFocusPosterCard (item: DashboardGameInFocus) =
                 ]
             ]
         ]
-    ]
+    ])
 
 // ── Steam Achievements Card ──
 
-let private achievementItem (achievement: SteamAchievement) =
-    Html.div [
+let private achievementItem (card: DashboardCard) (achievement: SteamAchievement) =
+    Html.div (Motion.flipKey (cardItemKey card (string achievement.GameAppId + "-" + achievement.AchievementName)) @ [
         prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/30 transition-colors"
         prop.children [
             // Achievement icon
@@ -632,10 +789,10 @@ let private achievementItem (achievement: SteamAchievement) =
                 ]
             ]
         ]
-    ]
+    ])
 
 /// The collapsed body of the "Recent Achievements" card.
-let private achievementsBody (state: AchievementsState) : ReactElement list =
+let private achievementsBody (card: DashboardCard) (state: AchievementsState) : ReactElement list =
     [
         match state with
         | AchievementsNotLoaded | AchievementsLoading ->
@@ -668,7 +825,7 @@ let private achievementsBody (state: AchievementsState) : ReactElement list =
                 Html.div [
                     prop.children [
                         for achievement in achievements do
-                            achievementItem achievement
+                            achievementItem card achievement
                     ]
                 ]
     ]
@@ -686,6 +843,7 @@ let private booksColumnPlaceholder =
 // ── All Tab — 3a layout: TV row, Movies row, Games/Books split ──
 
 let private allTabView (data: DashboardAllTab) (expanded: ExpandedCard option) (dispatch: Msg -> unit) =
+  growingTabArea expanded dispatch (fun dispatch ->
     // 1. TV Series — full-width Next Up poster row (no hero lead card)
     let nextEpisode =
         expandable dispatch {
@@ -693,11 +851,11 @@ let private allTabView (data: DashboardAllTab) (expanded: ExpandedCard option) (
             Chrome = Open
             Icon = Icons.tv
             Title = "Next episode"
-            Collapsed = [ posterScroller [ for item in data.SeriesNextUp do seriesNextEpisodeCard data.JellyfinServerUrl item ] ]
+            Collapsed = [ posterScroller [ for item in data.SeriesNextUp do seriesNextEpisodeCard AllNextEpisode data.JellyfinServerUrl item ] ]
             ExpandedLayout = WrappingRow
             Items = data.SeriesNextUp
             Unpack = (function SeriesNextUpItems items -> Some items | _ -> None)
-            RenderItem = seriesNextEpisodeCard data.JellyfinServerUrl
+            RenderItem = seriesNextEpisodeCard AllNextEpisode data.JellyfinServerUrl
         }
     // 2. Movies to Watch — posters inside the filmstrip well
     // (`DesignSystem.filmstripRow`, intelligence-p9m4t). Expanded, the
@@ -708,11 +866,11 @@ let private allTabView (data: DashboardAllTab) (expanded: ExpandedCard option) (
             Chrome = Open
             Icon = Icons.movie
             Title = "Movies to Watch"
-            Collapsed = [ DesignSystem.filmstripRow (data.MoviesToWatch |> List.map (movieToWatchFilmstripItem data.JellyfinServerUrl)) ]
+            Collapsed = [ DesignSystem.filmstripRow (data.MoviesToWatch |> List.map (movieToWatchFilmstripItem AllMoviesToWatch data.JellyfinServerUrl)) ]
             ExpandedLayout = WrappingRow
             Items = data.MoviesToWatch
             Unpack = (function MoviesToWatchItems items -> Some items | _ -> None)
-            RenderItem = movieToWatchPosterCard data.JellyfinServerUrl
+            RenderItem = movieToWatchPosterCard AllMoviesToWatch data.JellyfinServerUrl
         }
     // 3. Games in focus — already an auto-fill poster grid when collapsed.
     let games =
@@ -724,15 +882,16 @@ let private allTabView (data: DashboardAllTab) (expanded: ExpandedCard option) (
             Collapsed = [
                 Html.div [
                     prop.className (expandedLayoutClass PosterGrid)
-                    prop.children [ for item in data.GamesInFocus do gameInFocusPosterCard item ]
+                    prop.children [ for item in data.GamesInFocus do gameInFocusPosterCard AllGamesInFocus item ]
                 ]
             ]
             ExpandedLayout = PosterGrid
             Items = data.GamesInFocus
             Unpack = (function GamesInFocusItems items -> Some items | _ -> None)
-            RenderItem = gameInFocusPosterCard
+            RenderItem = gameInFocusPosterCard AllGamesInFocus
         }
-    tabArea expanded [ nextEpisode; moviesToWatch; games ] [
+    [ nextEpisode; moviesToWatch; games ],
+    [
         if not (List.isEmpty data.SeriesNextUp) then
             nextEpisode.CollapsedView
 
@@ -750,7 +909,7 @@ let private allTabView (data: DashboardAllTab) (expanded: ExpandedCard option) (
                 booksColumnPlaceholder
             ]
         ]
-    ]
+    ])
 
 // ── Movies Tab ──
 
@@ -955,8 +1114,8 @@ let private monthlyActivityChart (activity: (string * int * int) list) =
 
 // ── Person Stats (Actors / Directors) ──
 
-let private personStatsItem (person: DashboardPersonStats) =
-    Html.div [
+let private personStatsItem (card: DashboardCard) (person: DashboardPersonStats) =
+    Html.div (Motion.flipKey (cardItemKey card person.Name) @ [
         prop.className "flex items-center gap-3 p-2 rounded-lg hover:bg-base-300/30 transition-colors"
         prop.children [
             // Person image or placeholder
@@ -991,9 +1150,9 @@ let private personStatsItem (person: DashboardPersonStats) =
                 ]
             ]
         ]
-    ]
+    ])
 
-let private personStatsSection (people: DashboardPersonStats list) (emptyMessage: string) =
+let private personStatsSection (card: DashboardCard) (people: DashboardPersonStats list) (emptyMessage: string) =
     if List.isEmpty people then
         emptyNote emptyMessage
     else
@@ -1001,14 +1160,14 @@ let private personStatsSection (people: DashboardPersonStats list) (emptyMessage
             prop.className "flex flex-col gap-2"
             prop.children [
                 for person in people do
-                    personStatsItem person
+                    personStatsItem card person
             ]
         ]
 
 // ── Most Watched With (Friends) ──
 
-let private watchedWithItem (friend: DashboardWatchedWithStats) =
-    Html.a [
+let private watchedWithItem (card: DashboardCard) (friend: DashboardWatchedWithStats) =
+    Html.a (Motion.flipKey (cardItemKey card friend.Slug) @ [
         prop.href (Router.format ("friends", friend.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
@@ -1047,9 +1206,9 @@ let private watchedWithItem (friend: DashboardWatchedWithStats) =
                 ]
             ]
         ]
-    ]
+    ])
 
-let private watchedWithSection (watchedWith: DashboardWatchedWithStats list) =
+let private watchedWithSection (card: DashboardCard) (watchedWith: DashboardWatchedWithStats list) =
     if List.isEmpty watchedWith then
         emptyNote "No shared sessions yet"
     else
@@ -1057,7 +1216,7 @@ let private watchedWithSection (watchedWith: DashboardWatchedWithStats list) =
             prop.className "flex flex-col gap-2"
             prop.children [
                 for friend in watchedWith do
-                    watchedWithItem friend
+                    watchedWithItem card friend
             ]
         ]
 
@@ -1108,8 +1267,8 @@ let private countryDistributionBars (distribution: (string * int) list) =
 
 // ── Recently Added Item ──
 
-let private movieRecentlyAddedItem (item: MovieListItem) =
-    Html.a [
+let private movieRecentlyAddedItem (card: DashboardCard) (item: MovieListItem) =
+    Html.a (Motion.flipKey (cardItemKey card item.Slug) @ [
         prop.href (Router.format ("movies", item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
@@ -1132,12 +1291,12 @@ let private movieRecentlyAddedItem (item: MovieListItem) =
                 ]
             ]
         ]
-    ]
+    ])
 
 // ── Recently Watched Poster Card (for horizontal scroller) ──
 
-let private recentlyWatchedPosterCard (item: DashboardRecentlyWatched) =
-    Html.a [
+let private recentlyWatchedPosterCard (card: DashboardCard) (item: DashboardRecentlyWatched) =
+    Html.a (Motion.flipKey (cardItemKey card item.Slug) @ [
         prop.href (Router.format ("movies", item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
@@ -1193,11 +1352,12 @@ let private recentlyWatchedPosterCard (item: DashboardRecentlyWatched) =
                 ]
             ]
         ]
-    ]
+    ])
 
 // ── Movies Tab View ──
 
 let private moviesTabView (data: DashboardMoviesTab) (expanded: ExpandedCard option) (dispatch: Msg -> unit) =
+  growingTabArea expanded dispatch (fun dispatch ->
     // Recently Watched — horizontal poster scroller
     let recentlyWatched =
         expandable dispatch {
@@ -1209,12 +1369,12 @@ let private moviesTabView (data: DashboardMoviesTab) (expanded: ExpandedCard opt
                 if List.isEmpty data.RecentlyWatched then
                     emptyNote "No movies watched yet"
                 else
-                    posterScroller [ for item in data.RecentlyWatched do recentlyWatchedPosterCard item ]
+                    posterScroller [ for item in data.RecentlyWatched do recentlyWatchedPosterCard MoviesRecentlyWatched item ]
             ]
             ExpandedLayout = WrappingRow
             Items = data.RecentlyWatched
             Unpack = (function RecentlyWatchedMovieItems items -> Some items | _ -> None)
-            RenderItem = recentlyWatchedPosterCard
+            RenderItem = recentlyWatchedPosterCard MoviesRecentlyWatched
         }
     // Recently Added — narrower column, list format
     let recentlyAdded =
@@ -1228,12 +1388,12 @@ let private moviesTabView (data: DashboardMoviesTab) (expanded: ExpandedCard opt
                     emptyNote "No recently added movies"
                 else
                     for item in data.RecentlyAdded |> List.truncate 6 do
-                        movieRecentlyAddedItem item
+                        movieRecentlyAddedItem MoviesRecentlyAdded item
             ]
             ExpandedLayout = TileGrid
             Items = data.RecentlyAdded
             Unpack = (function MovieItems items -> Some items | _ -> None)
-            RenderItem = movieRecentlyAddedItem
+            RenderItem = movieRecentlyAddedItem MoviesRecentlyAdded
         }
     // Movies to Watch — full-width horizontal poster scroller
     let moviesToWatch =
@@ -1242,11 +1402,11 @@ let private moviesTabView (data: DashboardMoviesTab) (expanded: ExpandedCard opt
             Chrome = CardOverflow
             Icon = Icons.movie
             Title = "Movies to Watch"
-            Collapsed = [ posterScroller [ for item in data.MoviesToWatch do movieToWatchPosterCard data.JellyfinServerUrl item ] ]
+            Collapsed = [ posterScroller [ for item in data.MoviesToWatch do movieToWatchPosterCard MoviesToWatch data.JellyfinServerUrl item ] ]
             ExpandedLayout = WrappingRow
             Items = data.MoviesToWatch
             Unpack = (function MoviesToWatchItems items -> Some items | _ -> None)
-            RenderItem = movieToWatchPosterCard data.JellyfinServerUrl
+            RenderItem = movieToWatchPosterCard MoviesToWatch data.JellyfinServerUrl
         }
     let people (card: DashboardCard) (title: string) (items: DashboardPersonStats list) (emptyMessage: string) =
         expandable dispatch {
@@ -1254,11 +1414,11 @@ let private moviesTabView (data: DashboardMoviesTab) (expanded: ExpandedCard opt
             Chrome = Card
             Icon = Icons.user
             Title = title
-            Collapsed = [ personStatsSection items emptyMessage ]
+            Collapsed = [ personStatsSection card items emptyMessage ]
             ExpandedLayout = TileGrid
             Items = items
             Unpack = (function PersonItems items -> Some items | _ -> None)
-            RenderItem = personStatsItem
+            RenderItem = personStatsItem card
         }
     let topActors = people MoviesTopActors "Most Watched Actors" data.TopActors "No actor data yet"
     let topDirectors = people MoviesTopDirectors "Most Watched Directors" data.TopDirectors "No director data yet"
@@ -1268,13 +1428,14 @@ let private moviesTabView (data: DashboardMoviesTab) (expanded: ExpandedCard opt
             Chrome = Card
             Icon = Icons.friends
             Title = "Most Watched With"
-            Collapsed = [ watchedWithSection data.TopWatchedWith ]
+            Collapsed = [ watchedWithSection MoviesTopWatchedWith data.TopWatchedWith ]
             ExpandedLayout = TileGrid
             Items = data.TopWatchedWith
             Unpack = (function MovieWatchedWithItems items -> Some items | _ -> None)
-            RenderItem = watchedWithItem
+            RenderItem = watchedWithItem MoviesTopWatchedWith
         }
-    tabArea expanded [ recentlyWatched; recentlyAdded; moviesToWatch; topActors; topDirectors; topWatchedWith ] [
+    [ recentlyWatched; recentlyAdded; moviesToWatch; topActors; topDirectors; topWatchedWith ],
+    [
         // Stats badges
         movieStatsRow data.Stats
 
@@ -1324,7 +1485,7 @@ let private moviesTabView (data: DashboardMoviesTab) (expanded: ExpandedCard opt
             sectionCard Icons.globe "Movie Origins" [
                 countryDistributionBars data.Stats.CountryDistribution
             ]
-    ]
+    ])
 
 // ── Series Tab ──
 
@@ -1507,8 +1668,8 @@ let private seriesRatingsDistributionChart (distribution: (int * int) list) =
 
 // ── Series Most Watched With (Friends) ──
 
-let private seriesWatchedWithItem (friend: DashboardSeriesWatchedWith) =
-    Html.a [
+let private seriesWatchedWithItem (card: DashboardCard) (friend: DashboardSeriesWatchedWith) =
+    Html.a (Motion.flipKey (cardItemKey card friend.Slug) @ [
         prop.href (Router.format ("friends", friend.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
@@ -1547,9 +1708,9 @@ let private seriesWatchedWithItem (friend: DashboardSeriesWatchedWith) =
                 ]
             ]
         ]
-    ]
+    ])
 
-let private seriesWatchedWithSection (watchedWith: DashboardSeriesWatchedWith list) =
+let private seriesWatchedWithSection (card: DashboardCard) (watchedWith: DashboardSeriesWatchedWith list) =
     if List.isEmpty watchedWith then
         emptyNote "No shared rewatch sessions yet"
     else
@@ -1557,12 +1718,12 @@ let private seriesWatchedWithSection (watchedWith: DashboardSeriesWatchedWith li
             prop.className "flex flex-col gap-2"
             prop.children [
                 for friend in watchedWith do
-                    seriesWatchedWithItem friend
+                    seriesWatchedWithItem card friend
             ]
         ]
 
-let private seriesCompactItem (item: SeriesListItem) (badge: ReactElement) =
-    Html.a [
+let private seriesCompactItem (card: DashboardCard) (item: SeriesListItem) (badge: ReactElement) =
+    Html.a (Motion.flipKey (cardItemKey card item.Slug) @ [
         prop.href (Router.format ("series", item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
@@ -1591,15 +1752,15 @@ let private seriesCompactItem (item: SeriesListItem) (badge: ReactElement) =
                 ]
             ]
         ]
-    ]
+    ])
 
 /// Poster card for series tab Next Up scroller — includes progress bar and episode info
-let private seriesTabPosterCard (jellyfinServerUrl: string option) (item: DashboardSeriesNextUp) =
+let private seriesTabPosterCard (card: DashboardCard) (jellyfinServerUrl: string option) (item: DashboardSeriesNextUp) =
     let progressPct =
         if item.EpisodeCount > 0 then
             float item.WatchedEpisodeCount / float item.EpisodeCount * 100.0
         else 0.0
-    Html.a [
+    Html.a (Motion.flipKey (cardItemKey card item.Slug) @ [
         prop.href (Router.format ("series", item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
@@ -1713,7 +1874,7 @@ let private seriesTabPosterCard (jellyfinServerUrl: string option) (item: Dashbo
                 ]
             ]
         ]
-    ]
+    ])
 
 let private formatReturningDate (isoDate: string) : string =
     let trimmed =
@@ -1738,8 +1899,8 @@ let private returningCountdown (isoDate: string) : string option =
         else Some (sprintf "in %d days" days)
     | _ -> None
 
-let private returningSoonItem (item: ReturningSoonItem) =
-    Html.a [
+let private returningSoonItem (card: DashboardCard) (item: ReturningSoonItem) =
+    Html.a (Motion.flipKey (cardItemKey card item.Slug) @ [
         prop.href (Router.format ("series", item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
@@ -1774,9 +1935,10 @@ let private returningSoonItem (item: ReturningSoonItem) =
                 ]
             ]
         ]
-    ]
+    ])
 
 let private seriesTabView (data: DashboardSeriesTab) (expanded: ExpandedCard option) (dispatch: Msg -> unit) =
+  growingTabArea expanded dispatch (fun dispatch ->
     // Filter out abandoned series from Next Up
     let withoutAbandoned (items: DashboardSeriesNextUp list) =
         items |> List.filter (fun s -> not s.IsAbandoned)
@@ -1788,11 +1950,11 @@ let private seriesTabView (data: DashboardSeriesTab) (expanded: ExpandedCard opt
             Chrome = CardOverflow
             Icon = Icons.tv
             Title = "Next Up"
-            Collapsed = [ posterScroller [ for item in nextUpItems do seriesTabPosterCard data.JellyfinServerUrl item ] ]
+            Collapsed = [ posterScroller [ for item in nextUpItems do seriesTabPosterCard SeriesNextUp data.JellyfinServerUrl item ] ]
             ExpandedLayout = WrappingRow
             Items = nextUpItems
             Unpack = (function SeriesNextUpItems items -> Some (withoutAbandoned items) | _ -> None)
-            RenderItem = seriesTabPosterCard data.JellyfinServerUrl
+            RenderItem = seriesTabPosterCard SeriesNextUp data.JellyfinServerUrl
         }
     // Returning Soon — up to 5 returning series sorted ascending by next air date
     let returningSoon =
@@ -1804,13 +1966,13 @@ let private seriesTabView (data: DashboardSeriesTab) (expanded: ExpandedCard opt
             Collapsed = [
                 Html.div [
                     prop.className "flex flex-col gap-2"
-                    prop.children [ for item in data.ReturningSoon do returningSoonItem item ]
+                    prop.children [ for item in data.ReturningSoon do returningSoonItem SeriesReturningSoon item ]
                 ]
             ]
             ExpandedLayout = TileGrid
             Items = data.ReturningSoon
             Unpack = (function ReturningSoonItems items -> Some items | _ -> None)
-            RenderItem = returningSoonItem
+            RenderItem = returningSoonItem SeriesReturningSoon
         }
     let badge (className: string) (text: string) =
         Html.span [
@@ -1823,11 +1985,11 @@ let private seriesTabView (data: DashboardSeriesTab) (expanded: ExpandedCard opt
             Chrome = Card
             Icon = icon
             Title = title
-            Collapsed = [ for item in items do seriesCompactItem item itemBadge ]
+            Collapsed = [ for item in items do seriesCompactItem card item itemBadge ]
             ExpandedLayout = TileGrid
             Items = items
             Unpack = (function SeriesItems items -> Some items | _ -> None)
-            RenderItem = (fun item -> seriesCompactItem item itemBadge)
+            RenderItem = (fun item -> seriesCompactItem card item itemBadge)
         }
     let recentlyFinished =
         recentSeries SeriesRecentlyFinished Icons.trophy "Recently Finished" data.RecentlyFinished (badge "bg-success/15 text-success" "Finished")
@@ -1840,13 +2002,14 @@ let private seriesTabView (data: DashboardSeriesTab) (expanded: ExpandedCard opt
             Chrome = Card
             Icon = Icons.friends
             Title = "Most Watched With"
-            Collapsed = [ seriesWatchedWithSection data.TopWatchedWith ]
+            Collapsed = [ seriesWatchedWithSection SeriesTopWatchedWith data.TopWatchedWith ]
             ExpandedLayout = TileGrid
             Items = data.TopWatchedWith
             Unpack = (function SeriesWatchedWithItems items -> Some items | _ -> None)
-            RenderItem = seriesWatchedWithItem
+            RenderItem = seriesWatchedWithItem SeriesTopWatchedWith
         }
-    tabArea expanded [ nextUp; returningSoon; recentlyFinished; recentlyAbandoned; topWatchedWith ] [
+    [ nextUp; returningSoon; recentlyFinished; recentlyAbandoned; topWatchedWith ],
+    [
         // 1. Stats badges
         seriesStatsRow data.Stats
 
@@ -1887,7 +2050,7 @@ let private seriesTabView (data: DashboardSeriesTab) (expanded: ExpandedCard opt
 
         if not (List.isEmpty data.TopWatchedWith) then
             topWatchedWith.CollapsedView
-    ]
+    ])
 
 // ── Games Tab ──
 
@@ -2231,8 +2394,8 @@ let private gamesCompletedPerYearChart (data: (int * int) list) =
             ]
         ]
 
-let private gameRecentlyPlayedPosterCard (item: DashboardGameRecentlyPlayed) =
-    Html.a [
+let private gameRecentlyPlayedPosterCard (card: DashboardCard) (item: DashboardGameRecentlyPlayed) =
+    Html.a (Motion.flipKey (cardItemKey card item.Slug) @ [
         prop.href (Router.format ("games", item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
@@ -2283,10 +2446,10 @@ let private gameRecentlyPlayedPosterCard (item: DashboardGameRecentlyPlayed) =
                 ]
             ]
         ]
-    ]
+    ])
 
-let private gameRecentlyAddedPosterCard (item: GameListItem) =
-    Html.a [
+let private gameRecentlyAddedPosterCard (card: DashboardCard) (item: GameListItem) =
+    Html.a (Motion.flipKey (cardItemKey card item.Slug) @ [
         prop.href (Router.format ("games", item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
@@ -2337,15 +2500,15 @@ let private gameRecentlyAddedPosterCard (item: GameListItem) =
                 ]
             ]
         ]
-    ]
+    ])
 
 /// intelligence-qh8mj: the Upcoming rail's card — `gameRecentlyAddedPosterCard`'s
 /// shape (same 130px poster size, per intelligence-c3vqm), with the bottom
 /// line swapped for the release-date badge (games-ev65k's
 /// `PlayFacetsDisplay.releaseDateBadge`, "Upcoming" for a TBA date) instead
 /// of the release year.
-let private gameUpcomingPosterCard (item: GameListItem) =
-    Html.a [
+let private gameUpcomingPosterCard (card: DashboardCard) (item: GameListItem) =
+    Html.a (Motion.flipKey (cardItemKey card item.Slug) @ [
         prop.href (Router.format ("games", item.Slug))
         prop.onClick (fun e ->
             e.preventDefault()
@@ -2396,7 +2559,7 @@ let private gameUpcomingPosterCard (item: GameListItem) =
                 ]
             ]
         ]
-    ]
+    ])
 
 // ── Per-Game Color-Coded Monthly Play Time Chart ──
 
@@ -2536,8 +2699,10 @@ let private perGameMonthlyPlayTimeChart (monthlyData: GameMonthlyPlayTime list) 
         ]
 
 let private gamesTabView (data: DashboardGamesTab) (achievementsState: AchievementsState) (expanded: ExpandedCard option) (dispatch: Msg -> unit) =
+  growingTabArea expanded dispatch (fun dispatch ->
     // Recently Played | Recently Added | Upcoming — poster scrollers
-    let posterRail (card: DashboardCard) (icon: unit -> ReactElement) (title: string) (items: 'item list) (emptyMessage: string) (unpack: DashboardCardItems -> 'item list option) (render: 'item -> ReactElement) =
+    let posterRail (card: DashboardCard) (icon: unit -> ReactElement) (title: string) (items: 'item list) (emptyMessage: string) (unpack: DashboardCardItems -> 'item list option) (render: DashboardCard -> 'item -> ReactElement) =
+        let renderItem = render card
         expandable dispatch {
             Card = card
             Chrome = CardOverflow
@@ -2547,12 +2712,12 @@ let private gamesTabView (data: DashboardGamesTab) (achievementsState: Achieveme
                 if List.isEmpty items then
                     emptyNote emptyMessage
                 else
-                    posterScroller [ for item in items do render item ]
+                    posterScroller [ for item in items do renderItem item ]
             ]
             ExpandedLayout = WrappingRow
             Items = items
             Unpack = unpack
-            RenderItem = render
+            RenderItem = renderItem
         }
     let recentlyPlayed =
         posterRail GamesRecentlyPlayed Icons.hourglass "Recently Played" data.RecentlyPlayed "No games played yet"
@@ -2574,16 +2739,17 @@ let private gamesTabView (data: DashboardGamesTab) (achievementsState: Achieveme
             Chrome = Card
             Icon = Icons.trophy
             Title = "Recent Achievements"
-            Collapsed = achievementsBody achievementsState
+            Collapsed = achievementsBody GamesRecentAchievements achievementsState
             ExpandedLayout = TileGrid
             Items =
                 match achievementsState with
                 | AchievementsReady items -> items
                 | AchievementsNotLoaded | AchievementsLoading | AchievementsError _ -> []
             Unpack = (function AchievementItems items -> Some items | _ -> None)
-            RenderItem = achievementItem
+            RenderItem = achievementItem GamesRecentAchievements
         }
-    tabArea expanded [ recentlyPlayed; recentlyAdded; upcoming; achievements ] [
+    [ recentlyPlayed; recentlyAdded; upcoming; achievements ],
+    [
         // Stats badges
         gameStatsRow data.Stats
 
@@ -2646,7 +2812,7 @@ let private gamesTabView (data: DashboardGamesTab) (achievementsState: Achieveme
                     ]
             ]
         ]
-    ]
+    ])
 
 // ── Loading spinner ──
 

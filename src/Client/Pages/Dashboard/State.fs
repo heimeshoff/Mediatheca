@@ -1,7 +1,6 @@
 module Mediatheca.Client.Pages.Dashboard.State
 
 open Elmish
-open Fable.Core.JsInterop
 open Mediatheca.Shared
 open Mediatheca.Client.Pages.Dashboard.Types
 
@@ -40,20 +39,12 @@ let private fetchExpandedItems (api: IMediathecaApi) (card: DashboardCard) : Cmd
         (fun items -> ExpandedItemsLoaded (card, Ok items))
         (fun ex -> ExpandedItemsLoaded (card, Error ex.Message))
 
-/// DOM id of the expanded card's surface. Expanding a card that sits far down
-/// the page scrolls this into view, so the grown card starts where the tab
-/// area starts rather than leaving the reader looking at its lower half.
+/// DOM id of the expanded card's surface. `Views.fs`'s `growingTabArea` reads
+/// this to scroll the grown card into view (instantly, from its
+/// `useLayoutEffect`, ADR-0073 §1/§6) — the 50ms `setTimeout` guess that used
+/// to live here is retired; the layout effect fires after React's own commit,
+/// which is the actual thing the guess was standing in for.
 let expandedCardElementId = "dashboard-expanded-card"
-
-let private scrollToExpandedCardCmd : Cmd<Msg> =
-    Cmd.ofEffect (fun _ ->
-        Fable.Core.JS.setTimeout
-            (fun () ->
-                let el = Browser.Dom.document.getElementById expandedCardElementId
-                if not (isNull el) then
-                    el?scrollIntoView ({| behavior = "smooth"; block = "start" |}))
-            50
-        |> ignore)
 
 let init () : Model * Cmd<Msg> =
     { ActiveTab = All
@@ -122,7 +113,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | ExpandCard card ->
         { model with Expanded = Some { Card = card; Items = ExpandedLoading } },
-        Cmd.batch [ fetchExpandedItems api card; scrollToExpandedCardCmd ]
+        fetchExpandedItems api card
 
     | CollapseCard ->
         { model with Expanded = None }, Cmd.none

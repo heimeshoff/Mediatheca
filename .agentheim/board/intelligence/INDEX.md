@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 11
+- **Doing:** 0
+- **Done:** 12
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **intelligence-m09d4** — Dashboard card expand/collapse grows in place — the card surface and its already-rendered items travel to their expanded positions in ~0.5s via the design-system FLIP primitive, later-fetched items join below without disturbing them, and the 50ms scroll guess in State.fs is retired (ADR-0073) (feature) — `doing/intelligence-m09d4-dashboard-expand-flip-grow-animation.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **intelligence-m09d4** — Dashboard card expand/collapse grows in place — the card surface and its already-rendered items travel to their expanded positions in ~0.5s via the design-system FLIP primitive, later-fetched items join below without disturbing them, and the 50ms scroll guess in State.fs is retired (ADR-0073) (feature) — `done/intelligence-m09d4-dashboard-expand-flip-grow-animation.md`
 - **intelligence-qh8mj** — Dashboard Games tab gains an "Upcoming" poster rail — the unreleased-games view (soonest-first, TBA last) currently living only on the Games list page moves here before that page is deleted. (feature) — `done/intelligence-qh8mj-dashboard-games-tab-upcoming-rail.md`
 - **intelligence-c3vqm** — Dashboard All-tab Games — cap poster size to the movie-poster size and drop the redundant In Focus crosshair (bug) — `done/intelligence-c3vqm-dashboard-game-poster-size-cap-drop-badge.md`
 - **intelligence-p4t7k** — Prune the New Games dashboard payload — server still computes and ships DashboardAllTab.NewGames but no client code reads it (refactor) — `done/intelligence-p4t7k-prune-dead-newgames-dashboard-payload.md`

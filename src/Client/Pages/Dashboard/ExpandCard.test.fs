@@ -91,6 +91,10 @@ let expandCardTests =
             let updated, _ = update fakeApi (SwitchTab SeriesTab) expanded
             Expect.isNone updated.Expanded "an expansion belongs to the tab it was opened on"
 
+        testCase "ExpandCard's command is the fetch alone, no scroll batch (ADR-0073)" <| fun () ->
+            let _, cmd = update fakeApi (ExpandCard MoviesRecentlyAdded) (loaded ())
+            Expect.equal (List.length cmd) 1 "the 50ms scroll guess is retired; the layout effect owns the scroll"
+
         testCase "two cards over one query share it, with the abandoned-filter left to the view" <| fun () ->
             Expect.equal (DashboardCard.query AllNextEpisode) SeriesNextUpQuery "All tab's Next episode"
             Expect.equal (DashboardCard.query SeriesNextUp) SeriesNextUpQuery "Series tab's Next Up"
