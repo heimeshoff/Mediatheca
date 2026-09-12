@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-09-12 19:49 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 23m (first "Batch started" 19:29 → 19:52)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Dispatches:** design-system-btmdx: 1
+**Commits:** 3 (batch start, task integration, this entry)
+**Vision-conformance:** none — batch aligns with vision. The one task removes a fade the builder rejected on the running dashboard card grow, serving "Remaining v1 Work → Unified Dashboard" and the "Intent-driven" design principle; it touches no "Out of Scope (v1)" item. vision.md still has no "What success looks like"/"Non-goals" headings — `extractVisionSections` returns two empty lists, so this judgement was made against "Remaining v1 Work"/"Out of Scope (v1)"/"Design Principles", as the 2026-09-10 and 2026-09-12 18:22 sessions also did.
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task) — `type: bug`, both touched files product surfaces under `src/Client/`.
+**Carry-over:** none — working tree clean, no registered worktrees remain, `.worktrees/` removed.
+
+**Session-start churn note:** 0 recognized machine-shape commits, 0 human commits since the 2026-09-12 18:22 boundary — both commits in the window (`161bfad` session-end bookkeeping, `09d8a0b` the btmdx capture) carry a `[<task-id>]` trailer. Nothing flagged; `whats-next.md` not written.
+
+**Verification history:** design-system-btmdx PASS iteration 1. The verifier independently confirmed the two judgement calls the worker made beyond the spec's letter: (1) the "no `FadeIn` under `src/Client/`" criterion is met in intent — the only surviving matches are the pre-existing, unrelated `DesignSystem.animateFadeIn`/`animateFadeInUp` Tailwind class tokens, present unchanged on the batch-start commit; (2) `src/Client/Pages/StyleGuide/Views.fs` was correctly left untouched — the "Grow Transition" caption never claimed size-changed items fade. README delta on the design-system `Motion primitive` bullet disposed `applied` (through the LF-normalise/CRLF-restore wrapper noted last session; the upstream `lib/readme-delta.mjs` CRLF bug is still open).
+
+**Builder checks pending (the two [human-eye] criteria on design-system-btmdx):** expanding and collapsing a dashboard card — every item present in both views only moves, no item fades in or out at either end, on a poster rail (Movies to Watch), a list card that re-flows into tiles (Recently Finished), and a games card; and the StyleGuide "Grow Transition" specimen's four tiles travel without fading.
+
+**Harness notes:** same three as the 18:22 entry, unchanged — verbs invoked against the local source install at `C:\src\heimeshoff\agentic\agentheim\lib\` (cached 0.9.2/0.9.3 unusable); all JSON opts written to scratchpad files; root `node_modules` junctioned into the worktree and removed via `rmdir` before `git worktree remove`, main copy verified intact. One new note: hand-composing a `scoped-commit` path list inside a bash-quoted `node -e` string stripped every backslash from the Windows paths (`git add` refused them as outside the repository) — building the list from a small `.mjs` script taking the paths as argv worked first time.
+
+---
+
 ## 2026-09-12 19:48 -- Task verified and completed: design-system-btmdx - Surviving FLIP items must never fade — drop `FadeIn` from `Motion.fs` so an item present in both the collapsed and expanded view only ever translates (ADR-0073 §1 amended)
 
 **Type:** Work / Task completion
