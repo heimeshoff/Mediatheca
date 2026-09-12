@@ -61,8 +61,16 @@ anchored to React's own commit phase, not to dispatch.
      forced reflow between "invert" and "play". In-flight `Animation` handles are held in
      a ref and `cancel()`ed on re-entry, so spam-clicking expand/collapse cannot leave a
      stray transform behind.
-   - **Boxes are measured in document coordinates** (`rect.left + window.scrollX`,
-     `rect.top + window.scrollY`), so a concurrent smooth scroll cannot skew the delta.
+   - **Boxes are measured in viewport coordinates, with the scroll settled first.** The
+     travel the builder wants is *on screen*: the posters already visible slide upward to
+     the top of the screen, and the new entries fill the rest below. So the layout effect
+     scrolls the expanded card into view **instantly** (`behavior: "instant"`, never
+     smooth) *before* taking the after-snapshot, and both snapshots are plain
+     `getBoundingClientRect` values. The inverted transform then covers the scroll shift
+     as well as the layout shift, and what plays is exactly the on-screen journey. (An
+     earlier draft measured in document coordinates to tolerate a concurrent smooth
+     scroll; that would have hidden the upward travel behind a viewport jump, the
+     opposite of the ask.)
    - **The card box itself** animates its measured `height` (old px -> new px) with
      `overflow: hidden`, a single layout-animated element whose children's transforms stay
      independent of it. If that ever costs frames, the escape hatch is a compositor-only
@@ -91,8 +99,15 @@ anchored to React's own commit phase, not to dispatch.
    transitioning `None <-> Some` animates.
 
 6. **`scrollToExpandedCardCmd` is retired from `State.fs`.** The scroll moves into the
-   same layout effect, ahead of `play`, where React guarantees it runs post-commit. This
-   deletes the 50ms guess rather than racing it.
+   same layout effect, ahead of the after-snapshot and `play`, where React guarantees it
+   runs post-commit. It is an instant scroll, not a smooth one: the smoothness the user
+   sees is the FLIP travel, which already carries the scroll shift (see 1). This deletes
+   the 50ms guess rather than racing it.
+
+6a. **The expanded surface drops `animate-fade-in-up`.** `chromeClass` currently gives
+   every card, expanded or not, the fade-in-up entrance; on the expanded surface that is
+   the "fully expanded list fades in" the builder rejected. The grown surface enters via
+   the FLIP travel and the height grow only.
 
 7. **The vocabulary/application split follows the design-system motion doctrine.**
    design-system owns: the `--duration-grow` / `--ease-grow` tokens (mirrored as F#

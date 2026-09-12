@@ -33,7 +33,9 @@ into the dashboard.
 Add `src/Client/Motion.fs` (compiled before `DesignSystem.fs`, or as a section of it — the
 worker picks; the public surface below is what matters):
 
-- `Box` (document-coordinate `Left`/`Top`/`Width`/`Height`) and `FlipMove`
+- `Box` (viewport-coordinate `Left`/`Top`/`Width`/`Height`, plain `getBoundingClientRect`
+  values — the caller settles any scroll *before* the after-snapshot, so the travel that
+  plays is the on-screen journey including the scroll shift) and `FlipMove`
   (`Key`, `Dx`, `Dy`, `FadeIn: bool`) records.
 - **Pure** `Flip.plan : Map<string, Box> -> Map<string, Box> -> FlipMove list` — the
   intersection of the two key maps only (keys present in just one map are ignored), a
@@ -41,7 +43,8 @@ worker picks; the public surface below is what matters):
   the box's width or height changed (so a list row re-flowing into a grid tile fades
   rather than stretches — translate-only, never `scale`).
 - DOM shell: `Flip.snapshot : Browser.Types.Element -> Map<string, Box>` reading every
-  `[data-flip-key]` descendant via `getBoundingClientRect` plus `window.scrollX`/`scrollY`;
+  `[data-flip-key]` descendant via `getBoundingClientRect` (viewport coordinates, no scroll
+  offset added — see `Box`);
   `Flip.play : Browser.Types.Element -> FlipMove list -> Animation list` inverting each
   move with `Element.animate` (`translate(dx,dy)` → `none`, optional opacity `0 → 1` over
   the cross-fade duration, `fill: "none"`, `--duration-grow`/`--ease-grow`); `growSurface`

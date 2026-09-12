@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-09-12 16:45 -- Modeling / Refined: intelligence-m09d4 - Dashboard card expand/collapse grows in place
+
+**Type:** Modeling / Refine
+**BC:** intelligence (and design-system-m2v88's Box/snapshot wording)
+**Status after:** todo
+**Summary:** Builder ran the app expecting the captured tasks to be built; nothing had been — what they saw is 74e1ab8's `animate-fade-in-up` on the expanded surface. Their description of the intended effect (existing movies slide upward to the top of the screen, new entries fill the rest below) is now the poster-rail acceptance criterion. Consequences: the scroll-into-view becomes instant and runs before the after-snapshot; FLIP boxes are viewport coordinates (not document coordinates) so the travel carries the scroll shift; the expanded surface drops `animate-fade-in-up`. ADR-0073 amended in place (decision 1 coordinates, decision 6, new 6a) — unshipped, no worker has read it.
+**Split into:** none
+**ADRs written:** none (0073 amended)
+
+---
+
 ## 2026-09-12 16:40 -- Modeling / Captured: intelligence-m09d4 - Dashboard card expand/collapse grows in place — the card surface and its already-rendered items travel to their expanded positions in ~0.5s via the design-system FLIP primitive, later-fetched items join below without disturbing them, and the 50ms scroll guess in State.fs is retired (ADR-0073)
 
 **Type:** Modeling / Capture
