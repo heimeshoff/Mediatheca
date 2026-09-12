@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-12 16:40 -- Modeling / Captured: intelligence-m09d4 - Dashboard card expand/collapse grows in place — the card surface and its already-rendered items travel to their expanded positions in ~0.5s via the design-system FLIP primitive, later-fetched items join below without disturbing them, and the 50ms scroll guess in State.fs is retired (ADR-0073)
+
+**Type:** Modeling / Capture
+**BC:** intelligence
+**Filed to:** todo
+**Summary:** Intelligence half of the dashboard card grow animation: wire the FLIP primitive into expand/collapse so the card surface and its already-rendered items travel to their expanded positions in ~0.5s, later-fetched items append without disturbing them, and State.fs's 50ms scroll guess is retired (ADR-0073). Depends on design-system-m2v88.
+
+---
+
+## 2026-09-12 16:40 -- Modeling / Captured: design-system-m2v88 - Grow / shared-element FLIP motion primitive — a new `Motion.fs` with a pure `Flip.plan`, a WAAPI `snapshot`/`play`/`growSurface` shell, `flipKey`, a reduced-motion gate, `--duration-grow` (0.5s) / `--ease-grow` tokens, and a StyleGuide specimen (ADR-0073)
+
+**Type:** Modeling / Capture
+**BC:** design-system
+**Filed to:** todo
+**Summary:** Design-system half of the dashboard card grow animation: a reusable key-based FLIP motion primitive (pure Flip.plan + WAAPI shell, flipKey, reduced-motion gate, --duration-grow 0.5s token, StyleGuide specimen), per ADR-0073. Filed straight to todo: technique settled, criteria concrete.
+
+---
+
 ## 2026-09-11 09:50 -- Hotfix: qBittorrent 5.x login contract (integration)
 
 **Type:** Hotfix / Conductor
