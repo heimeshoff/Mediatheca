@@ -1,0 +1,62 @@
+﻿# design-system -- Index
+
+Catalog of everything in this bounded context: tasks by status, ADRs scoped to this BC,
+research touching this BC, and concept synthesis pages.
+
+> Updated by: `model` (tasks), `work` (BC-scoped ADRs, concept page links), `research` (BC-scoped reports).
+
+---
+
+## Tasks by status
+
+<!-- task-counts:start -->
+- **Backlog:** 0
+- **Todo:** 0
+- **Doing:** 0
+- **Done:** 23
+<!-- task-counts:end -->
+
+### Todo
+<!-- todo-list:start -->
+<!-- todo-list:end -->
+
+### Doing
+<!-- doing-list:start -->
+<!-- no tasks in doing -->
+<!-- doing-list:end -->
+
+### Done (most recent first; older entries kept for prior-art search)
+<!-- done-list:start -->
+- **design-system-fryq7** — Remove the Movies / TV Series / Games items from the main menu (sidebar rail + mobile BottomNav) and delete their three list pages, plus every piece of code only those pages referenced — the Dashboard's per-media tabs already cover what they showed. (refactor) — `done/design-system-fryq7-remove-movies-series-games-nav-and-list-pages.md`
+- **design-system-hs4vm** — Hidden-scrollbar primitive — the Dashboard's six horizontal poster rails carry `tailwind-scrollbar` classes for a plugin that was never installed, so the native scrollbar renders under every rail (bug) — `done/design-system-hs4vm-hidden-scrollbar-primitive.md`
+- **design-system-mz9v7** — Season-rail + per-episode progress primitives in DesignSystem — `progressSeasons` (one line per season, gold when touched, brown when untouched) and `progressEpisodes` (one segment per episode of a single season, driven by a per-episode watched flag instead of a fill count), with StyleGuide specimens (feature) — `done/design-system-mz9v7-season-rail-and-per-episode-progress.md`
+- **design-system-n8zqr** — Desktop sidebar rail collapses to icons only — a persisted manual toggle in the rail header, with a paper-overlay tooltip supplying each icon's label while collapsed (feature) — `done/design-system-n8zqr-sidebar-collapsible-icons-only.md`
+- **design-system-m2wvc** — Sidebar active nav item — drop the gold inset-left bar; burgundy fill + gold icon carry the active state alone (retracts that half of ADR-0014's dir-3a treatment) (refactor) — `done/design-system-m2wvc-nav-active-drop-inset-left-bar.md`
+- **design-system-x7k2p** — Sync README lifecycle-status vocabulary with the five-state unification (ADR-0042) (chore) — `done/design-system-x7k2p-lifecycle-status-vocabulary-readme-sync.md`
+- **design-system-vk7rd** — Sidebar bottom group (Admin/Settings) must pin to the bottom of the viewport, not the bottom of the document — the rail is `min-h-screen` and stretches with page content, so on any scrolling page the group sits below the fold (bug) — `done/design-system-vk7rd-sidebar-rail-viewport-pinned.md`
+- **design-system-q4ebg** — "DaisyUI 5 dropped the whole `bordered` modifier family — four surviving `select.bordered`/`textarea.bordered` call sites emit FS0039 and throw at render, blanking the SPA root (reintroduced one day after design-system-dib4q fixed the `input` half)" (bug) — `done/design-system-q4ebg-daisyui5-bordered-select-textarea.md`
+- **design-system-dib4q** — DaisyUI 5 input-bordered migration — remove the removed modifier from all inputs (bug) — `done/design-system-dib4q-daisyui5-input-bordered-migration.md`
+- **design-system-k9p3v** — Underline tab pattern — reusable DesignSystem component (dir 3a header tabs) (feature) — `done/design-system-k9p3v-underline-tab-pattern.md`
+- **design-system-pv3mq** -- Retire glassmorphism — overlays become paper/solid material (supersede ADR-0006) -- `done/design-system-pv3mq-retire-glassmorphism-paper-material.md`
+- **design-system-sg8kd** -- Retire styleguide.md — in-app StyleGuide page is authoritative (supersede ADR-0009) -- `done/design-system-sg8kd-retire-styleguide-md.md`
+- **design-system-grtw7** -- Sidebar nav — align with dir 3a (full revert to burgundy active tab, supersedes ADR-0013) -- `done/design-system-grtw7-sidebar-3a-alignment.md`
+- **design-system-fq3vp** -- Compact on-poster "✦ Focus" pill (3c grid badge variant) -- `done/design-system-fq3vp-compact-on-poster-focus-pill.md`
+- **design-system-bky6v** -- In-focus signifiers must animate — gold sweep on status badge and poster frame -- `done/design-system-bky6v-in-focus-gold-sweep-animation.md`
+- **design-system-wd5zk** -- Movies filmstrip — full-width 3a proportions (flex-1 posters, ~196px tall) -- `done/design-system-wd5zk-filmstrip-3a-sizing.md`
+- **design-system-snpnv** -- Typography — adopt dir 3c's list-page type scale (grid captions, page header, filter pills) -- `done/design-system-snpnv-typography-3c-list-page-scale.md`
+- **design-system-t4b9k** -- Layered sidebar nav — ivory active tab, curved-corner boundary -- `done/design-system-t4b9k-layered-sidebar-nav.md`
+- **design-system-h3q8n** -- Velvet Lobby re-skin — component patterns & motion -- `done/design-system-h3q8n-velvet-lobby-component-patterns.md`
+- **design-system-r7k2m** -- Velvet Lobby re-skin — tokens & type foundation -- `done/design-system-r7k2m-velvet-lobby-tokens-type-foundation.md`
+- **design-system-003** -- Add ActionMenu specimen to the live StyleGuide page -- `done/design-system-003-actionmenu-styleguide-specimen.md`
+- **design-system-002** -- Point design-check skill's "Source of Truth" at styleguide.md -- `done/design-system-002-pointer-design-check-styleguide.md`
+- **design-system-001** -- Formalize the existing styleguide as a reviewable document -- `done/design-system-001-formalize-styleguide.md`
+<!-- done-list:end -->
+
+### Backlog
+<!-- backlog-list:start -->
+<!-- backlog-list:end -->
+
+
+## Pointers
+
+- Knowledge half (ADRs / research / concepts / BC README) for this BC: `../../knowledge/contexts/design-system/INDEX.md`
