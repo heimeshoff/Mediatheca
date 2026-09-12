@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-12 20:45 -- Task verified and completed: intelligence-cs2dm - Collapsing a dashboard card remounts every collapsed card (fade-in-up replays, and the grown surface's DOM node is repurposed into a sibling card) — give `growingTabArea`'s two render branches stable keys so the collapsed subtree really stays mounted across expand/collapse (ADR-0073 §3/§4)
+
+**Type:** Work / Task completion
+**Task:** intelligence-cs2dm - Collapsing a dashboard card remounts every collapsed card (fade-in-up replays, and the grown surface's DOM node is repurposed into a sibling card) — give `growingTabArea`'s two render branches stable keys so the collapsed subtree really stays mounted across expand/collapse (ADR-0073 §3/§4)
+**Summary:** growingTabArea now renders one keyed structure in both expand states — a stable prop.key "content" wrapper (always mounted, only its visibility/placement classes change) and a stable prop.key "surface" sibling (mounted only when a card is grown) — so React mounts/unmounts the surface on its own instead of reconciling the two shapes by index, which used to remount every collapsed card on each expand/collapse and could repurpose the surface's DOM node as a sibling card
+**Duration:** 25m
+**Verification:** PASS (iteration 1)
+**Files changed:** 2
+**Tests added:** 1
+**ADRs written:** none
+
+---
+
 ## 2026-09-12 20:17 -- Batch started: [intelligence-cs2dm]
 
 **Type:** Work / Batch start

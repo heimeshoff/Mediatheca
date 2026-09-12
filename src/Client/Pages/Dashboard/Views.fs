@@ -279,6 +279,12 @@ let private expandable (dispatch: Msg -> unit) (spec: ExpandableCard<'item>) : C
                     prop.text "Showing the first few only"
                 ]
         Html.div [
+            // Stable `prop.key "surface"` (intelligence-cs2dm, ADR-0073 §3/§4):
+            // the sibling key that lets React mount/unmount the grown surface
+            // on its own, without ever reconciling it against the collapsed
+            // content wrapper (keyed `"content"`, see `growingTabArea`) by
+            // index.
+            prop.key "surface"
             prop.id State.expandedCardElementId
             prop.className (expandedChromeClass spec.Chrome + " col-start-1 row-start-1 z-10 scroll-mt-20")
             prop.children [
@@ -323,6 +329,16 @@ let private growingTabArea (expanded: ExpandedCard option) (dispatch: Msg -> uni
     let liveGrowAnimation = React.useRef<obj>(null)
 
     let snapshotAndDispatch (msg: Msg) =
+        // With the collapsed content wrapper now genuinely persisting across
+        // expand/collapse (intelligence-cs2dm), the *before* snapshot taken
+        // here at collapse time finds every surviving item's `[data-flip-key]`
+        // TWICE — the still-mounted hidden clone (first in document order)
+        // and the visible grown surface (second) — because both are still in
+        // the DOM at click time. `Motion.Flip.snapshot` builds its map with
+        // `Map.ofArray`, which keeps the LAST entry per key, i.e. the
+        // surface's box. That is the correct "from" for the collapse travel
+        // (the on-screen box, not the hidden one) — do not "fix" this by
+        // deduping or reordering the query.
         containerRef.current |> Option.iter (fun root -> beforeSnapshot.current <- Some (Motion.Flip.snapshot root))
         match msg with
         | ExpandCard card ->
@@ -416,29 +432,43 @@ let private growingTabArea (expanded: ExpandedCard option) (dispatch: Msg -> uni
             |> Option.map (fun c -> c.ExpandedView e.Items))
     let setContainerRef (el: Browser.Types.Element) =
         containerRef.current <- (if isNull el then None else Some (unbox el))
-    match grown with
-    | None ->
+    let isGrown = grown.IsSome
+    // Stable `prop.key "content"` (intelligence-cs2dm, ADR-0073 §3/§4): this
+    // wrapper is rendered in BOTH the `Expanded = None` and `Expanded = Some`
+    // states — only its placement/visibility classes differ — so React never
+    // reconciles it against the (keyed `"surface"`) grown surface by index.
+    // Before this fix the two states were structurally different trees
+    // (a flat `flex` list vs. an `invisible`-wrapper + surface grid),
+    // reconciled positionally: expanding repurposed collapsed cards' DOM
+    // nodes as the wrapper/surface and remounted the rest (replaying
+    // `chromeClass`'s mount entrance on every collapsed card, every time),
+    // and collapsing repurposed the surface's own node as whichever sibling
+    // card sat at the same index. With both siblings keyed, the content
+    // wrapper's DOM nodes — and every card inside it — now genuinely persist
+    // across every expand and collapse, which is the premise ADR-0073 §3/§4
+    // and the README's `Card grow` bullet already describe.
+    let contentWrapper =
         Html.div [
-            prop.ref setContainerRef
-            prop.className "flex flex-col gap-4"
+            prop.key "content"
+            prop.className (
+                if isGrown then "col-start-1 row-start-1 flex flex-col gap-4 invisible"
+                else "flex flex-col gap-4"
+            )
+            prop.ariaHidden isGrown
             prop.children content
         ]
-    | Some surface ->
-        Html.div [
-            prop.ref setContainerRef
-            // `grid-cols-1` = `minmax(0, 1fr)`: without the 0 floor the single column
-            // would grow to the hidden scrollers' min-content width and push the
-            // expanded card (and its collapse button) far past the viewport.
-            prop.className "grid grid-cols-1"
-            prop.children [
-                Html.div [
-                    prop.className "col-start-1 row-start-1 flex flex-col gap-4 invisible"
-                    prop.ariaHidden true
-                    prop.children content
-                ]
-                surface
-            ]
-        ]
+    Html.div [
+        prop.ref setContainerRef
+        // `grid-cols-1` = `minmax(0, 1fr)`: without the 0 floor the single column
+        // would grow to the hidden scrollers' min-content width and push the
+        // expanded card (and its collapse button) far past the viewport. Used
+        // in both states now, so the content wrapper's grid placement classes
+        // above are meaningful even before a card is ever expanded.
+        prop.className "grid grid-cols-1"
+        prop.children (
+            contentWrapper :: (grown |> Option.map List.singleton |> Option.defaultValue [])
+        )
+    ]
 
 // ── TV Series: Next Up (list row — used by Series tab) ──
 
