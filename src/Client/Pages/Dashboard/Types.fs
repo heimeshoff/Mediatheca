@@ -42,7 +42,11 @@ module DashboardCard =
     let query (card: DashboardCard) : DashboardCardQuery =
         match card with
         | AllNextEpisode | SeriesNextUp -> SeriesNextUpQuery
-        | AllMoviesToWatch | MoviesToWatch -> MoviesToWatchQuery
+        // intelligence-b1nz5: split from `MoviesToWatch`'s query — the
+        // All-tab card also lingers on recently-watched movies; the Movies
+        // tab's own card stays strictly unwatched-only.
+        | AllMoviesToWatch -> AllMoviesToWatchQuery
+        | MoviesToWatch -> MoviesToWatchQuery
         | AllGamesInFocus -> GamesInFocusQuery
         | MoviesRecentlyWatched -> MoviesRecentlyWatchedQuery
         | MoviesRecentlyAdded -> MoviesRecentlyAddedQuery

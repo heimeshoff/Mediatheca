@@ -580,7 +580,51 @@ module MovieProjection =
               JellyfinId =
                 if rd.IsDBNull(rd.GetOrdinal("jellyfin_id")) then None
                 else Some (rd.ReadString "jellyfin_id")
-              InFocus = rd.ReadInt32 "in_focus" <> 0 }
+              InFocus = rd.ReadInt32 "in_focus" <> 0
+              // This card is strictly unwatched-only (see the `NOT IN
+              // watch_sessions` clause above) — never a lingering item.
+              IsFinished = false }
+        )
+
+    /// intelligence-b1nz5: the All-tab "Movies to Watch" rail keeps a movie
+    /// watched in the last 7 days on screen (any movie, not just one that
+    /// was already In Focus / on Jellyfin) so the "I just finished this"
+    /// moment is visible for a few days, the same way
+    /// `SeriesProjection.getDashboardSeriesNextUp` already does for series.
+    /// The Movies tab's own "Movies to Watch" card (`getMoviesToWatch`
+    /// above) keeps its strict unwatched-only list unchanged — that tab
+    /// already has its own "Recently Watched" section — so this is a
+    /// separate function rather than a flag on the existing one.
+    let getAllTabMoviesToWatch (conn: SqliteConnection) : Mediatheca.Shared.DashboardMovieToWatch list =
+        conn
+        |> Db.newCommand """
+            SELECT ml.slug, ml.name, ml.year, ml.poster_ref, ml.in_focus,
+                   jm.jellyfin_id,
+                   (SELECT MAX(date) FROM watch_sessions WHERE movie_slug = ml.slug) as last_watched_date
+            FROM movie_list ml
+            LEFT JOIN jellyfin_movie jm ON jm.movie_slug = ml.slug
+            WHERE
+                ( (ml.in_focus = 1 OR jm.jellyfin_id IS NOT NULL)
+                  AND ml.slug NOT IN (SELECT DISTINCT movie_slug FROM watch_sessions) )
+                OR
+                ( (SELECT MAX(date) FROM watch_sessions WHERE movie_slug = ml.slug) >= date('now', '-7 days') )
+            ORDER BY
+                CASE WHEN (SELECT MAX(date) FROM watch_sessions WHERE movie_slug = ml.slug) >= date('now', '-7 days') THEN 0 ELSE 1 END,
+                last_watched_date DESC,
+                ml.rowid DESC
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            { Mediatheca.Shared.DashboardMovieToWatch.Slug = rd.ReadString "slug"
+              Name = rd.ReadString "name"
+              Year = rd.ReadInt32 "year"
+              PosterRef =
+                if rd.IsDBNull(rd.GetOrdinal("poster_ref")) then None
+                else Some (rd.ReadString "poster_ref")
+              JellyfinId =
+                if rd.IsDBNull(rd.GetOrdinal("jellyfin_id")) then None
+                else Some (rd.ReadString "jellyfin_id")
+              InFocus = rd.ReadInt32 "in_focus" <> 0
+              IsFinished = not (rd.IsDBNull(rd.GetOrdinal("last_watched_date"))) }
         )
 
     let getRecentlyAddedMovies (conn: SqliteConnection) (limit: int option) : Mediatheca.Shared.MovieListItem list =

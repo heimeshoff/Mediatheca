@@ -120,6 +120,51 @@ module GameProjection =
             conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN facet_override_vr TEXT" |> Db.exec
         with _ -> ()
 
+        // intelligence-b1nz5: WHEN a game was retired, event-derived (written
+        // by the `Game_status_changed Retired` handler below from that
+        // event's own `StoredEvent.Timestamp`, therefore replayable,
+        // therefore a projection column — same reasoning as
+        // `prior_play_time`, games-p6vkz). NULL means "not currently
+        // retired, or retired before this column existed and not yet
+        // backfilled below". Any other status change clears it.
+        try
+            conn |> Db.newCommand "ALTER TABLE game_list ADD COLUMN retired_at TEXT" |> Db.exec
+        with _ -> ()
+
+        // Backfill: a game already `Retired` with no `retired_at` (i.e.
+        // retired before this column existed) takes the timestamp of its
+        // latest `Game_status_changed` event whose status is `Retired` or
+        // the legacy `Completed` (renamed Retired, games-status-vocabulary-
+        // reconcile). MAX() over the raw `events.timestamp` text naturally
+        // picks the LATEST such event even across a retire -> InFocus ->
+        // retire-again history, since ISO-8601 "o"-format timestamps sort
+        // lexicographically. Reads the raw stored text rather than
+        // re-serialising a parsed `DateTimeOffset`, so the backfilled value
+        // is byte-identical to what a freshly-projected row would carry.
+        // Idempotent — only NULL rows are touched, so re-running this on
+        // every startup changes nothing once backfilled. A `Retired` game
+        // with no matching event (shouldn't happen) stays NULL.
+        //
+        // Wrapped in try/with, same as every other migration above: the
+        // shadow-replay drift detector (ADR-0031, `Projection.replayIntoShadow`)
+        // calls this same `Init` against a throwaway connection that
+        // deliberately has no `events` table — every row there is instead
+        // populated correctly through the ordinary `Game_status_changed`
+        // handler below as the log replays, so skipping the backfill there
+        // is a no-op, not a gap.
+        try
+            conn
+            |> Db.newCommand """
+                UPDATE game_list SET retired_at = (
+                    SELECT MAX(e.timestamp) FROM events e
+                    WHERE e.stream_id = 'Game-' || game_list.slug
+                      AND e.event_type = 'Game_status_changed'
+                      AND json_extract(e.data, '$.status') IN ('Retired', 'Completed'))
+                WHERE status = 'Retired' AND retired_at IS NULL
+            """
+            |> Db.exec
+        with _ -> ()
+
     /// games-v4nqe: drops the now-fully-unread columns the emission cutover
     /// makes dead — description/short_description/website_url/hltb_*/
     /// play_modes/steam_last_played are cache-derived or query-time-derived
@@ -311,9 +356,19 @@ module GameProjection =
 
                 | Games.Game_status_changed status ->
                     let statusStr = encodeGameStatus status
+                    // intelligence-b1nz5: `retired_at` records WHEN a game
+                    // was retired, sourced from this event's own
+                    // `StoredEvent.Timestamp` (event-derived, therefore
+                    // replayable). Any other status change clears it — a
+                    // game only ever lingers on the "just retired" rail
+                    // immediately after its most recent retirement.
+                    let retiredAt =
+                        match status with
+                        | Retired -> SqlType.String (event.Timestamp.ToString("o"))
+                        | _ -> SqlType.Null
                     conn
-                    |> Db.newCommand "UPDATE game_list SET status = @status WHERE slug = @slug"
-                    |> Db.setParams [ "slug", SqlType.String slug; "status", SqlType.String statusStr ]
+                    |> Db.newCommand "UPDATE game_list SET status = @status, retired_at = @retired_at WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "status", SqlType.String statusStr; "retired_at", retiredAt ]
                     |> Db.exec
                     conn
                     |> Db.newCommand "UPDATE game_detail SET status = @status WHERE slug = @slug"
@@ -901,16 +956,32 @@ module GameProjection =
 
     // Dashboard queries
 
+    /// intelligence-b1nz5: keeps a retired game on the rail for 7 days after
+    /// `retired_at`, the same "just finished this" linger
+    /// `SeriesProjection.getDashboardSeriesNextUp` gives a finished series.
+    /// Lingering (retired) items sort ahead of the InFocus items, most
+    /// recently retired first; the InFocus items keep their existing
+    /// rowid-DESC order among themselves.
     let getGamesInFocus (conn: SqliteConnection) : DashboardGameInFocus list =
         conn
-        |> Db.newCommand "SELECT slug, name, year, cover_ref FROM game_list WHERE status = 'InFocus' ORDER BY rowid DESC"
+        |> Db.newCommand """
+            SELECT slug, name, year, cover_ref, status, retired_at
+            FROM game_list
+            WHERE status = 'InFocus'
+               OR (status = 'Retired' AND retired_at IS NOT NULL AND retired_at >= date('now', '-7 days'))
+            ORDER BY
+                CASE WHEN status = 'Retired' THEN 0 ELSE 1 END,
+                retired_at DESC,
+                rowid DESC
+        """
         |> Db.query (fun (rd: IDataReader) ->
             { DashboardGameInFocus.Slug = rd.ReadString "slug"
               Name = rd.ReadString "name"
               Year = rd.ReadInt32 "year"
               CoverRef =
                 if rd.IsDBNull(rd.GetOrdinal("cover_ref")) then None
-                else Some (rd.ReadString "cover_ref") }
+                else Some (rd.ReadString "cover_ref")
+              IsRetired = rd.ReadString "status" = "Retired" }
         )
 
     let getGamesRecentlyPlayed (conn: SqliteConnection) (limit: int option) : DashboardGameRecentlyPlayed list =

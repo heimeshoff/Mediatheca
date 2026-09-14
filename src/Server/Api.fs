@@ -2183,7 +2183,7 @@ module Api =
             getDashboardAllTab = fun () -> async {
                 use conn = factory ()
                 let seriesNextUp = SeriesProjection.getDashboardSeriesNextUp conn (Some 11)
-                let moviesToWatch = MovieProjection.getMoviesToWatch conn
+                let moviesToWatch = MovieProjection.getAllTabMoviesToWatch conn
                 let gamesInFocus = GameProjection.getGamesInFocus conn
                 let gamesRecentlyPlayed = GameProjection.getGamesRecentlyPlayed conn (Some 6)
                 let playSessions = PlaytimeTracker.getDashboardPlaySessions conn 14
@@ -2467,6 +2467,8 @@ module Api =
                     return SeriesNextUpItems (SeriesProjection.getDashboardSeriesNextUp conn None)
                 | MoviesToWatchQuery ->
                     return MoviesToWatchItems (MovieProjection.getMoviesToWatch conn)
+                | AllMoviesToWatchQuery ->
+                    return MoviesToWatchItems (MovieProjection.getAllTabMoviesToWatch conn)
                 | GamesInFocusQuery ->
                     return GamesInFocusItems (GameProjection.getGamesInFocus conn)
                 | MoviesRecentlyWatchedQuery ->

@@ -1,7 +1,7 @@
 ---
 id: intelligence-b1nz5
 title: All-tab dashboard — a watched movie stays on "Movies to Watch" and a retired game stays on "Games" for 7 days, marked finished, the same way a finished series already lingers on "Next episode"
-status: doing
+status: done
 type: feature
 context: intelligence
 created: 2026-09-14
@@ -158,3 +158,19 @@ styleguide.
   the builder deploys. The worker never runs them against it by hand.
 - Styleguide gate: `depends_on: [design-system-001]` per the intelligence README's frontend
   gate.
+
+## Outcome
+
+Extended the series dashboard's "finished item lingers for 7 days, marked green" rule to movies and games on the All tab.
+
+**Movies ("Movies to Watch", All tab):** added `MovieProjection.getAllTabMoviesToWatch`, a new query separate from the existing `getMoviesToWatch` (which now stays wired to the Movies tab's own card, unchanged and strictly unwatched-only). The new query keeps everything the base rail shows (unwatched + (In Focus or Jellyfin-linked)) plus any movie — regardless of whether it was ever In Focus or on Jellyfin — whose latest `watch_sessions.date` is within the last 7 days, ordered lingering-first (most recent watch first) then the rail's existing rowid-DESC order. `DashboardMovieToWatch` gained `IsFinished: bool`. To keep the two cards' queries genuinely independent end-to-end, `DashboardCardQuery` gained a new `AllMoviesToWatchQuery` case (`Api.getDashboardCardItems`'s expanded-card match, `DashboardCard.query`'s `AllMoviesToWatch -> AllMoviesToWatchQuery` vs `MoviesToWatch -> MoviesToWatchQuery`); both still answer in the shared `MoviesToWatchItems` shape since the DTO is unchanged.
+
+**Games ("Games" rail, All tab):** added an event-derived `game_list.retired_at TEXT` column (idempotent `ALTER TABLE`), written by the `Game_status_changed Retired` handler from that event's own `StoredEvent.Timestamp` (`.ToString("o")`, matching the raw `events.timestamp` text format byte-for-byte) and cleared to NULL on any other status change. A one-time, idempotent startup backfill in `GameProjection.createTables` fills `retired_at` for every already-Retired game whose `retired_at` is still NULL, taking `MAX(events.timestamp)` over that game's `Game_status_changed` events whose status is `Retired` or the legacy `Completed` — `MAX` over ISO-8601 text naturally picks the latest even across a retire → InFocus → retire-again history. The backfill query is wrapped in `try/with` (matching every other migration in this function) because `Projection.replayIntoShadow` (ADR-0031's drift detector) calls the same `Init` against a shadow connection that deliberately has no `events` table — discovered via the full Expecto run (`ProjectionDriftTests.fs` failing), fixed by the same idempotent-migration idiom already used throughout `createTables`; the shadow's rows get `retired_at` correctly anyway, through the ordinary event-replay handler. `getGamesInFocus` now also returns `status = 'Retired'` games whose `retired_at` is within the last 7 days, ordered retired-lingering-first (most recent first) then the existing InFocus rowid-DESC order; `DashboardGameInFocus` gained `IsRetired: bool`.
+
+**Client:** both `movieToWatchPosterCard`/`movieToWatchFilmstripItem` and `gameInFocusPosterCard` (`src/Client/Pages/Dashboard/Views.fs`) render a new shared `finishedBadge` helper — a green "Watched"/"Retired" pill in the same top-left corner the movie's InFocus crosshair uses, replacing it (and dropping the Jellyfin play button) for a finished movie. FLIP keys (`Motion.flipKey`, `cardItemKey`) are unchanged, so lingering items keep traveling correctly between collapsed and expanded views (ADR-0073).
+
+Updated the one pre-existing client test that encoded the old shared-query assumption (`ExpandCard.test.fs`'s "two cards over one query share it" case) to assert the new split instead, and added 17 new Expecto cases (`tests/Server.Tests/DashboardLingerTests.fs`) covering: the movie 7-day linger boundary and In-Focus-unchanged behavior, the Movies tab's continued strictness, movie linger ordering, the `Game_status_changed` handler's set/clear of `retired_at` (with raw-timestamp format-parity assertions), the startup backfill (legacy NULL rows, the retire→InFocus→retire-again pick-the-second case, non-Retired/already-set rows left untouched, idempotence), `getGamesInFocus`'s 7-day boundary and ordering, and `getDashboardCardItems` returning the same lingering sets as the collapsed `getDashboardAllTab` payload for both rails.
+
+`npm run build` (Fable+Vite) is clean. Full Expecto suite: 786/786 passed (up from 769 baseline + 17 new). Full Vitest suite: 62/62 passed (up from 61 baseline + 1 new).
+
+Key files: `src/Shared/Shared.fs`, `src/Server/MovieProjection.fs`, `src/Server/GameProjection.fs`, `src/Server/Api.fs`, `src/Client/Pages/Dashboard/Types.fs`, `src/Client/Pages/Dashboard/Views.fs`, `src/Client/Pages/Dashboard/ExpandCard.test.fs`, `tests/Server.Tests/DashboardLingerTests.fs`.

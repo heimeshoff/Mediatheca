@@ -488,6 +488,23 @@ let private friendPill (friend: FriendRef) =
         ]
     ]
 
+/// intelligence-b1nz5: the "just finished this" mark shared by a lingering
+/// movie ("Watched") and a lingering game ("Retired") on the All-tab rails —
+/// same success-green voice the "Recently Finished" series badge already
+/// uses (`badge "bg-success/15 text-success" "Finished"` in `seriesTabView`),
+/// pinned top-left over the poster like the InFocus crosshair it stands in
+/// for.
+let private finishedBadge (text: string) =
+    Html.div [
+        prop.className "absolute top-1.5 left-1.5 z-10"
+        prop.children [
+            Html.span [
+                prop.className "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-success/90 text-success-content shadow-md"
+                prop.text text
+            ]
+        ]
+    ]
+
 // ── Movies to Watch — Poster Cards (All tab) ──
 
 let private movieToWatchPosterCard (card: DashboardCard) (jellyfinServerUrl: string option) (item: DashboardMovieToWatch) =
@@ -524,8 +541,12 @@ let private movieToWatchPosterCard (card: DashboardCard) (jellyfinServerUrl: str
                                     ]
                                 ]
 
-                            // Crosshair badge — only for in-focus movies
-                            if item.InFocus then
+                            // Finished mark takes over the same corner the
+                            // InFocus crosshair uses — a lingering, just-
+                            // watched movie has nothing left "to focus on".
+                            if item.IsFinished then
+                                finishedBadge "Watched"
+                            elif item.InFocus then
                                 Html.div [
                                     prop.className "absolute top-1.5 left-1.5 z-10"
                                     prop.children [
@@ -536,24 +557,26 @@ let private movieToWatchPosterCard (card: DashboardCard) (jellyfinServerUrl: str
                                     ]
                                 ]
 
-                            // Jellyfin play button overlay (bottom-right) — always visible ghost style
-                            match jellyfinServerUrl, item.JellyfinId with
-                            | Some serverUrl, Some jellyfinId ->
-                                Html.a [
-                                    prop.href (jellyfinPlayUrl serverUrl jellyfinId)
-                                    prop.target "_blank"
-                                    prop.rel "noopener noreferrer"
-                                    prop.onClick (fun e -> e.stopPropagation())
-                                    prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100 border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg cursor-pointer"
-                                    prop.title "Play in Jellyfin"
-                                    prop.children [
-                                        Html.span [
-                                            prop.className "w-4 h-4"
-                                            prop.children [ Icons.play () ]
+                            // Jellyfin play button overlay (bottom-right) — always visible ghost
+                            // style; dropped for a finished item (already watched, nothing to play).
+                            if not item.IsFinished then
+                                match jellyfinServerUrl, item.JellyfinId with
+                                | Some serverUrl, Some jellyfinId ->
+                                    Html.a [
+                                        prop.href (jellyfinPlayUrl serverUrl jellyfinId)
+                                        prop.target "_blank"
+                                        prop.rel "noopener noreferrer"
+                                        prop.onClick (fun e -> e.stopPropagation())
+                                        prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100 border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg cursor-pointer"
+                                        prop.title "Play in Jellyfin"
+                                        prop.children [
+                                            Html.span [
+                                                prop.className "w-4 h-4"
+                                                prop.children [ Icons.play () ]
+                                            ]
                                         ]
                                     ]
-                                ]
-                            | _ -> ()
+                                | _ -> ()
 
                             Html.div [ prop.className DesignSystem.posterShine ]
                         ]
@@ -585,7 +608,9 @@ let private movieToWatchPosterCard (card: DashboardCard) (jellyfinServerUrl: str
 /// caller-supplied-slot shape as `seriesNextEpisodeCard` (intelligence-h7v2q).
 let private movieToWatchFilmstripItem (card: DashboardCard) (jellyfinServerUrl: string option) (item: DashboardMovieToWatch) : DesignSystem.FilmstripItem =
     let inFocusBadge =
-        if item.InFocus then
+        if item.IsFinished then
+            Some (finishedBadge "Watched")
+        elif item.InFocus then
             Some (
                 Html.div [
                     prop.className "absolute top-1.5 left-1.5 z-10"
@@ -600,25 +625,28 @@ let private movieToWatchFilmstripItem (card: DashboardCard) (jellyfinServerUrl: 
         else
             None
     let jellyfinButton =
-        match jellyfinServerUrl, item.JellyfinId with
-        | Some serverUrl, Some jellyfinId ->
-            Some (
-                Html.a [
-                    prop.href (jellyfinPlayUrl serverUrl jellyfinId)
-                    prop.target "_blank"
-                    prop.rel "noopener noreferrer"
-                    prop.onClick (fun e -> e.stopPropagation())
-                    prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100 border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg cursor-pointer"
-                    prop.title "Play in Jellyfin"
-                    prop.children [
-                        Html.span [
-                            prop.className "w-4 h-4"
-                            prop.children [ Icons.play () ]
+        if item.IsFinished then
+            None
+        else
+            match jellyfinServerUrl, item.JellyfinId with
+            | Some serverUrl, Some jellyfinId ->
+                Some (
+                    Html.a [
+                        prop.href (jellyfinPlayUrl serverUrl jellyfinId)
+                        prop.target "_blank"
+                        prop.rel "noopener noreferrer"
+                        prop.onClick (fun e -> e.stopPropagation())
+                        prop.className "absolute bottom-2 right-2 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-base-100 border border-base-content/15 text-primary hover:bg-primary hover:text-primary-content transition-all shadow-lg cursor-pointer"
+                        prop.title "Play in Jellyfin"
+                        prop.children [
+                            Html.span [
+                                prop.className "w-4 h-4"
+                                prop.children [ Icons.play () ]
+                            ]
                         ]
                     ]
-                ]
-            )
-        | _ -> None
+                )
+            | _ -> None
     {
         // Card-scoped (`cardItemKey`, ADR-0073): this doubles as the plain
         // React key (design-system's `filmstripRow` uses `Key` for both
@@ -758,6 +786,9 @@ let private gameInFocusPosterCard (card: DashboardCard) (item: DashboardGameInFo
                                         ]
                                     ]
                                 ]
+
+                            if item.IsRetired then
+                                finishedBadge "Retired"
 
                             Html.div [ prop.className DesignSystem.posterShine ]
                         ]

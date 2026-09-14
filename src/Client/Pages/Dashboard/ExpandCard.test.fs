@@ -98,7 +98,15 @@ let expandCardTests =
         testCase "two cards over one query share it, with the abandoned-filter left to the view" <| fun () ->
             Expect.equal (DashboardCard.query AllNextEpisode) SeriesNextUpQuery "All tab's Next episode"
             Expect.equal (DashboardCard.query SeriesNextUp) SeriesNextUpQuery "Series tab's Next Up"
-            Expect.equal (DashboardCard.query AllMoviesToWatch) (DashboardCard.query MoviesToWatch) "Movies to Watch on both tabs"
+
+        // intelligence-b1nz5: the All tab's "Movies to Watch" card lingers on
+        // recently-watched movies; the Movies tab's own card stays strictly
+        // unwatched-only. Sharing one query would have forced that choice on
+        // both tabs at once, so each now runs its own query.
+        testCase "the All tab's Movies to Watch card has its own query, separate from the Movies tab's strict one" <| fun () ->
+            Expect.equal (DashboardCard.query AllMoviesToWatch) AllMoviesToWatchQuery "All tab lingers on recently-watched movies"
+            Expect.equal (DashboardCard.query MoviesToWatch) MoviesToWatchQuery "Movies tab stays strictly unwatched-only"
+            Expect.notEqual (DashboardCard.query AllMoviesToWatch) (DashboardCard.query MoviesToWatch) "the two cards no longer share a query"
     ]
 
 Mocha.runTests expandCardTests |> ignore

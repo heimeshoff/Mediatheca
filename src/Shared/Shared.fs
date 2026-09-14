@@ -355,6 +355,12 @@ type DashboardMovieToWatch = {
     PosterRef: string option
     JellyfinId: string option
     InFocus: bool
+    /// intelligence-b1nz5: true when this item is on the All-tab rail only
+    /// because it was watched within the last 7 days (the "just finished
+    /// this" linger, mirroring `DashboardSeriesNextUp.IsFinished`). Always
+    /// `false` on the Movies tab's own strictly-unwatched "Movies to Watch"
+    /// card (`MovieProjection.getMoviesToWatch`).
+    IsFinished: bool
 }
 
 type DashboardGameInFocus = {
@@ -362,6 +368,11 @@ type DashboardGameInFocus = {
     Name: string
     Year: int
     CoverRef: string option
+    /// intelligence-b1nz5: true when this item is on the rail only because
+    /// it was retired within the last 7 days (the "just retired this"
+    /// linger, mirroring `DashboardMovieToWatch.IsFinished` /
+    /// `DashboardSeriesNextUp.IsFinished`).
+    IsRetired: bool
 }
 
 type DashboardGameRecentlyPlayed = {
@@ -1172,6 +1183,12 @@ type SteamAchievement = {
 type DashboardCardQuery =
     | SeriesNextUpQuery
     | MoviesToWatchQuery
+    /// intelligence-b1nz5: the All-tab "Movies to Watch" card's own query —
+    /// split from `MoviesToWatchQuery` because the two cards' underlying
+    /// projections diverge (this one also lingers on recently-watched
+    /// movies; the Movies tab's `MoviesToWatchQuery` stays strictly
+    /// unwatched-only).
+    | AllMoviesToWatchQuery
     | GamesInFocusQuery
     | MoviesRecentlyWatchedQuery
     | MoviesRecentlyAddedQuery

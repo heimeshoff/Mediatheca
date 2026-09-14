@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-14 16:11 -- Task verified and completed: intelligence-b1nz5 - All-tab dashboard — a watched movie stays on "Movies to Watch" and a retired game stays on "Games" for 7 days, marked finished, the same way a finished series already lingers on "Next episode"
+
+**Type:** Work / Task completion
+**Task:** intelligence-b1nz5 - All-tab dashboard — a watched movie stays on "Movies to Watch" and a retired game stays on "Games" for 7 days, marked finished, the same way a finished series already lingers on "Next episode"
+**Summary:** A watched movie now lingers on the All-tab "Movies to Watch" rail for 7 days (marked "Watched", any movie — not just In Focus/Jellyfin ones — while the Movies tab's own card stays strictly unwatched-only via a new split query), and a retired game lingers on the "Games" rail for 7 days (marked "Retired") via a new event-derived `game_list.retired_at` column with an idempotent startup backfill for already-retired games — the same "just finished this" linger `SeriesProjection.getDashboardSeriesNextUp` already gives a finished series.
+**Duration:** 28m
+**Verification:** PASS (iteration 1)
+**Files changed:** 9
+**Tests added:** 18
+**ADRs written:** none
+
+---
+
 ## 2026-09-14 15:40 -- Batch started: [intelligence-b1nz5]
 
 **Type:** Work / Batch start
