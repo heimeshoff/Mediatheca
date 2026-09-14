@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-14 15:29 -- Modeling / Captured: intelligence-b1nz5 - All-tab dashboard — a watched movie stays on "Movies to Watch" and a retired game stays on "Games" for 7 days, marked finished, the same way a finished series already lingers on "Next episode"
+
+**Type:** Modeling / Capture
+**BC:** intelligence
+**Filed to:** todo
+**Summary:** Builder wants finished movies and retired games to linger on the All-tab dashboard like finished series already do (7 days after latest watched episode, green). Movies to Watch keeps any movie watched in the last 7 days (All tab only; Movies tab stays strict); the Games rail keeps games retired in the last 7 days via a new event-derived game_list.retired_at column; both get a finished/retired mark and sort first. Filed to todo: window, movie scope, retirement timestamp and look all decided with the builder.
+
+---
+
 ## 2026-09-12 20:46 -- Work session ended
 
 **Type:** Work / Session end
