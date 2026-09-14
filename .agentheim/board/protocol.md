@@ -5,6 +5,34 @@ Newest entries on top.
 
 ---
 
+## 2026-09-14 16:13 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 31m (first "Batch started" 15:42 → 16:13)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** intelligence-b1nz5: 1
+**Commits:** 3 (batch start, task integration, this entry)
+**Vision-conformance:** none — batch aligns with vision. The one task extends the finished-series 7-day linger to movies and games on the All tab, serving "Unified Dashboard" / "Remaining v1 Work" and the "In Focus" core concept (a finished item visibly leaves the queue instead of vanishing); it touches no "Out of Scope (v1)" item. vision.md still has no "What success looks like"/"Non-goals" headings — `extractVisionSections` returns two empty lists, so this judgement was made against "Unified Dashboard"/"Remaining v1 Work"/"Out of Scope (v1)"/"Design Principles", as the prior four sessions also did.
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task) — `type: feature`, all nine touched files product surfaces under `src/` and `tests/`.
+**Carry-over:** none — working tree clean, no registered worktrees remain; `.worktrees/` removed after the one stranded RESULT sidecar (`intelligence-b1nz5.iter-1.md`, its worktree already torn down) was swept.
+
+**Result source (intelligence-b1nz5, ADR-0080 §6):** sidecar · layout both+sentinel · sidecar present — the first task in this project whose worker wrote the sidecar; `selectResultSource` picked it first-try, no repairs.
+
+**Session-start churn note:** 0 recognized machine-shape commits, 0 human commits since the 2026-09-12 20:46 boundary — all three commits in the window (`8c203b6` session-end bookkeeping, `ddd045e` capture, `b637fd2` refine) carry a `[<task-id>]` trailer. Nothing flagged; `whats-next.md` not written.
+
+**Verification history:** intelligence-b1nz5 PASS iteration 1. The verifier re-ran all three suites from the worktree (build exit 0 with only the pre-existing FS0020; Expecto 786/0, up from 769; Vitest 62 / 10 files, up from 61), walked every non-[human-eye] criterion to a named Expecto case in `tests/Server.Tests/DashboardLingerTests.fs`, confirmed the Movies tab and the `MoviesToWatchQuery` card still call the untouched strict query while only the All-tab call sites moved to `getAllTabMoviesToWatch`, and checked that `retired_at` on both paths is `DateTimeOffset.UtcNow.ToString("o")` (EventStore.appendToStream vs the handler), so text comparison against `date('now','-7 days')` is sound. FLIP keys untouched (ADR-0073). No ADR required: the boot-time idempotent backfill follows ADR-0056's automate-at-boot branch and the event-derived column follows the `prior_play_time`/ADR-0044 precedent. README delta on the intelligence `Linger window` bullet disposed `applied` (through the LF-normalise/CRLF-restore wrapper; the upstream `lib/readme-delta.mjs` CRLF bug is still open). The worker found one thing the task didn't foresee: `Projection.replayIntoShadow` (ADR-0031) calls the same `Init` against a shadow connection without an `events` table, so the backfill is wrapped in the same `try/with` idiom the other migrations use.
+
+**Builder checks pending (the one [human-eye] criterion on intelligence-b1nz5):** on the All tab, a movie watched in the last 7 days shows a green "Watched" pill top-left (replacing the In Focus crosshair and the Jellyfin play button) and a game retired in the last 7 days shows a green "Retired" pill — both should read as "done" and sit naturally with the finished series card's green treatment. Also worth a glance after deploy: the `retired_at` backfill runs once at startup and any game retired in the 7 days before the deploy will appear on the Games rail immediately — intended, per the task.
+
+**Harness notes:** the homedir plugin cache `0.9.5/lib/` is complete this session, so every verb ran from it directly (`node <cache>/0.9.5/lib/task-lifecycle-cli.mjs <verb>`), no local-checkout fallback. Two new gotchas: (1) a bash quoted heredoc written through the Bash tool collapses `\\` to `\` inside the file — the scoped-commit runner's cwd came out as `C:srcheimeshoff…` and `execFile('git')` failed with a bare ENOENT that looked like git missing from PATH; writing the runner via the Write tool with forward-slash paths fixed it. (2) `scoped-commit` refuses an already-staged deletion by absolute path (`pathspec did not match`) — pass the deleted `todo/` path only while its deletion is still unstaged. Same as prior sessions: JSON opts in scratchpad files, root `node_modules` junctioned into the worktree and `rmdir`'d before `git worktree remove` (main copy verified intact, 210 entries). Pre-loaded ADRs/prior art/return format were handed to the worker as one assembled scratchpad file rather than pasted inline, to keep the conductor lean; the worker read it and returned in the strict shape first time.
+
+---
+
 ## 2026-09-14 16:11 -- Task verified and completed: intelligence-b1nz5 - All-tab dashboard — a watched movie stays on "Movies to Watch" and a retired game stays on "Games" for 7 days, marked finished, the same way a finished series already lingers on "Next episode"
 
 **Type:** Work / Task completion
