@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-14 15:40 -- Batch started: [intelligence-b1nz5]
+
+**Type:** Work / Batch start
+**Tasks:** intelligence-b1nz5 - All-tab dashboard — a watched movie stays on "Movies to Watch" and a retired game stays on "Games" for 7 days, marked finished, the same way a finished series already lingers on "Next episode"
+**Parallel:** no (1 worker — intelligence-b1nz5 is the only task in todo/ across every BC; nothing held back by the cap)
+
+---
+
 ## 2026-09-14 15:37 -- Modeling / Refined: intelligence-b1nz5 - All-tab dashboard — a watched movie stays on "Movies to Watch" and a retired game stays on "Games" for 7 days, marked finished
 
 **Type:** Modeling / Refine

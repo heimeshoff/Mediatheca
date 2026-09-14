@@ -1,7 +1,7 @@
 ---
 id: intelligence-b1nz5
 title: All-tab dashboard — a watched movie stays on "Movies to Watch" and a retired game stays on "Games" for 7 days, marked finished, the same way a finished series already lingers on "Next episode"
-status: todo
+status: doing
 type: feature
 context: intelligence
 created: 2026-09-14
