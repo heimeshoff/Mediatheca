@@ -67,9 +67,31 @@ finished, and is visibly marked as finished.**
   `retired_at` is within the last 7 days**.
 - `DashboardGameInFocus` gains a retired flag/date for the view.
 - The expanded card (`GamesInFocusQuery`) follows the same rule.
-- Existing already-retired games get `retired_at = NULL` from the ALTER and so don't linger.
-  That's correct: they were retired long ago. A projection rebuild would fill it in from
-  history.
+- **Backfill already-retired games** (builder, 2026-09-14): right after the ALTER, in the same
+  idempotent `createTables` step, fill every `game_list` row with `status = 'Retired' AND
+  retired_at IS NULL` from the event store. Use the timestamp of the **latest**
+  `Game_status_changed` event on that game's stream (`stream_id = 'Game-' || slug`) whose
+  `data` status is `Retired` **or the legacy `Completed`** (`Completed` was renamed
+  `Retired`, games-status-vocabulary-reconcile; see `decodeGameStatus`). In SQL, roughly:
+
+  ```sql
+  UPDATE game_list SET retired_at = (
+      SELECT MAX(e.timestamp) FROM events e
+      WHERE e.stream_id = 'Game-' || game_list.slug
+        AND e.event_type = 'Game_status_changed'
+        AND json_extract(e.data, '$.status') IN ('Retired', 'Completed'))
+  WHERE status = 'Retired' AND retired_at IS NULL
+  ```
+
+  The backfill must write the **same text format** the event handler writes, so the 7-day
+  comparison and ordering work the same for backfilled and freshly projected rows. The
+  simplest way is to store the raw `events.timestamp` string in both paths, rather than
+  re-serialising `StoredEvent.Timestamp`. Check that the stored format compares correctly
+  against `date('now', '-7 days')` and normalise in the query if it doesn't. A Retired game
+  with no matching event (shouldn't happen) stays NULL.
+  Running it again changes nothing (only NULL rows are touched). A game genuinely retired in
+  the last 7 days before this ships will therefore appear on the rail right after deploy.
+  That's intended.
 
 ### Ordering
 
@@ -95,6 +117,12 @@ styleguide.
 - [ ] The Movies tab's "Movies to Watch" payload still excludes every watched movie.
 - [ ] Projecting `Game_status_changed Retired` sets `game_list.retired_at` to that event's
       timestamp; a later `Game_status_changed` to any other status clears it (Expecto).
+- [ ] Startup backfill (Expecto, in-memory SQLite with seeded events): a `Retired` game whose
+      `retired_at` is NULL gets the timestamp of its latest `Game_status_changed` →
+      `Retired`/`Completed` event (retired → InFocus → retired again picks the second);
+      non-Retired games and rows that already have `retired_at` are untouched; running
+      `createTables` twice is a no-op; the backfilled value uses the same format as a
+      handler-projected one.
 - [ ] A game retired within the last 7 days appears in `DashboardAllTab.GamesInFocus`; one
       retired 8+ days ago, or with `retired_at` NULL, does not; InFocus games still appear.
 - [ ] `getDashboardCardItems` for `MoviesToWatchQuery` (All-tab card) and `GamesInFocusQuery`
@@ -126,7 +154,7 @@ styleguide.
 - The 7-day window is shared with series. If it's worth a named constant, a small shared
   helper is fine, but don't refactor the series query's behaviour.
 - **Never touch the live database.** Fixtures and in-memory SQLite only. The `retired_at`
-  column arrives via the idempotent ALTER on next server start; any backfill/rebuild on the
-  live DB is a builder action, not the worker's.
+  column *and its backfill* ship as code in `createTables` and run on the live DB only when
+  the builder deploys. The worker never runs them against it by hand.
 - Styleguide gate: `depends_on: [design-system-001]` per the intelligence README's frontend
   gate.

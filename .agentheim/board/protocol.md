@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-14 15:37 -- Modeling / Refined: intelligence-b1nz5 - All-tab dashboard — a watched movie stays on "Movies to Watch" and a retired game stays on "Games" for 7 days, marked finished
+
+**Type:** Modeling / Refine
+**BC:** intelligence
+**Status after:** todo
+**Summary:** Builder asked that already-retired games get their empty retired_at filled from the event that retired them. Added an idempotent startup backfill in GameProjection.createTables: each Retired game with NULL retired_at takes the timestamp of its latest Game_status_changed event whose status is Retired (or legacy Completed), in the same text format the handler writes; plus an Expecto criterion covering re-retire, untouched rows, idempotence and format parity. Ships as code, never run by hand against the live DB.
+
+---
+
 ## 2026-09-14 15:29 -- Modeling / Captured: intelligence-b1nz5 - All-tab dashboard — a watched movie stays on "Movies to Watch" and a retired game stays on "Games" for 7 days, marked finished, the same way a finished series already lingers on "Next episode"
 
 **Type:** Modeling / Capture
