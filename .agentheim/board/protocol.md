@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 01:52 -- Research: Goodreads reading progress and book metadata sources
+
+**Type:** Research
+**Requested by:** model
+**Report:** knowledge/research/goodreads-reading-progress-and-book-metadata-sources-2026-09-16.md
+**Review:** PASS (iteration 2) — iteration 1 FAIL overturned the report's central negative (the reviewer found the public `user_status/list/{id}?format=rss` feed carries numeric progress); researcher re-verified live and corrected in place
+**Summary:**
+- The Goodreads developer API is dead (no keys since 2020-12-08, no successor) — the setting a Goodreads integration needs is the user id, not a key.
+- Public, key-free, cookie-free RSS feeds still work for a public profile: the shelf feed (`review/list_rss/{id}?shelf=…`, 100-item cap, book id/ISBN/cover/ratings/dates, no progress) and the user-status feed (`user_status/list/{id}?format=rss`, paginated, "is on page N of M of Title" / "N% done with Title" / "is finished with Title" as text, no book id — title-only join).
+- Open Library (key-less, ISBN endpoints, covers host, `identifiers.goodreads`, 1–3 req/s by User-Agent) is the fit for search/metadata; Google Books requires a key; Hardcover is the token-based fallback with page progress; StoryGraph has no API.
+**Unverified (labelled):** ISBNdb pricing tiers; Hardcover's exact GraphQL shape and limits; Google Books quota figures.
+
+---
+
 ## 2026-09-14 16:13 -- Work session ended
 
 **Type:** Work / Session end

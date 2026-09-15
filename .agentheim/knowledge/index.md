@@ -11,6 +11,7 @@ For BC-scoped artifacts, see each BC's `INDEX.md`.
 ## Bounded contexts
 
 <!-- bc-list:start -->
+- **books** -- Owns the **Book aggregate** — audiobooks, print and ebooks as library entries with external ids (ISBN, Open Library, Audible ASIN, Goodreads id), a Games-shaped status lifecycle and event-sourced **reading-progress observations** sourced from Audible, Goodreads or the user. Source of truth for "am I reading this", "how far am I", "did I finish it". -- `contexts/books/INDEX.md`
 - **administration** -- **Operational plumbing.** Settings, event store, projection mechanics, event browser, image storage. The infrastructure surface that keeps the single-user app running and inspectable. -- `contexts/administration/INDEX.md`
 - **curation** -- User-created **collections** that group media across types — ordered lists of movies / series / games — plus **content blocks** (free-form annotations attached to catalogs and detail pages). The "I made a list" half of the app. -- `contexts/curation/INDEX.md`
 - **design-system** -- The **cross-cutting visual language** for Mediatheca's UI. Owns typography, color tokens, the dim theme, the paper-overlay rules for floating surfaces (ADR-0016, retired glassmorphism), Feliz/DaisyUI component patterns, and the in-app StyleGuide page. Gates frontend work in every BC. -- `contexts/design-system/INDEX.md`
@@ -48,7 +49,7 @@ Research reports relevant to more than one BC (or to the project as a whole). BC
 reports are listed in each BC's `INDEX.md`.
 
 <!-- research-global:start -->
-<!-- no cross-BC research yet -->
+- **goodreads-reading-progress-and-book-metadata-sources** -- The Goodreads API is dead (no keys since 2020-12-08); the public shelf RSS (`review/list_rss/{id}?shelf=`, 100-item cap, no progress field) and the public user-status RSS (`user_status/list/{id}?format=rss`, carries "page N of M" / "N% done" as text, title-only join) need no key or cookie; Open Library (key-less, ISBN join, `identifiers.goodreads`) vs Google Books (key required) vs Hardcover (token, page progress) for search/metadata -- 2026-09-16 -- `knowledge/research/goodreads-reading-progress-and-book-metadata-sources-2026-09-16.md`
 <!-- research-global:end -->
 
 ## Pointers
