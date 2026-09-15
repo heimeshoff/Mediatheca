@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 01:55 -- Modeling / Captured: integration-dhctm - Audible adapter and Settings card — an imported audible-cli auth file (never a login or device registration, ADR-0074) with refresh-token → access-token minting, a "Test connection" that names the customer and marketplace, unauthenticated catalog search and product detail with Audnexus as metadata fallback, and `addBookFromAudible`
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** Audible adapter and Settings card under ADR-0074: an imported audible-cli auth file (never a login or device registration), refresh-token to access-token minting with one retry, Test connection, unauthenticated catalog search and product detail with Audnexus fallback, addBookFromAudible, and the audible auth file rejected standing notice.
+
+---
+
 ## 2026-09-16 01:55 -- Modeling / Captured: integration-c8d4x - Open Library adapter — keyword search, ISBN and work lookup, cover download, an adapter-owned 1 req/s throttle with an identifying User-Agent — plus the `searchOpenLibraryBooks` / `addBookFromOpenLibrary` API that turns a search hit into a Book with its metadata cache slice filled
 
 **Type:** Modeling / Capture
