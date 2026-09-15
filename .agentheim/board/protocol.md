@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 01:55 -- Modeling / Captured: intelligence-dnv2y - Dashboard Books tab and All-tab "Reading" rail — the All tab's "Books coming soon" placeholder becomes a Currently Reading card (In Focus books with progress bars and source badges, finished books lingering 7 days marked "Finished"), plus a Books tab with Currently Reading, Recently Finished, Recently Added and a reading-stats block, and reading days on the activity heatmap
+
+**Type:** Modeling / Capture
+**BC:** intelligence
+**Filed to:** todo
+**Summary:** Dashboard Books tab and All-tab Reading rail replacing the Books coming soon placeholder: In Focus books with progress bars, 7-day finished linger (b1nz5 pattern), Recently Finished / Recently Added, reading stats, reading days on the heatmap, expand-in-place with FLIP keys.
+
+---
+
 ## 2026-09-16 01:55 -- Modeling / Captured: books-f33e2 - Book detail page at /books/{slug} mirroring the movie detail page — cover hero with title/authors/year/format, a reading-progress bar with source badge and a manual "update progress" control (page or percent), the Games-shaped status control, personal rating, description/narrators/series/length from the cache, external links, recommended-by friends, progress history, content blocks, event history and remove
 
 **Type:** Modeling / Capture
