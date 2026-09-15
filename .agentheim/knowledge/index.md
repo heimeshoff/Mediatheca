@@ -49,6 +49,7 @@ Research reports relevant to more than one BC (or to the project as a whole). BC
 reports are listed in each BC's `INDEX.md`.
 
 <!-- research-global:start -->
+- **audible-api-surface-and-listening-progress** -- No official Audible API; the unofficial `api.audible.<tld>/1.0` surface: catalog search and product detail work unauthenticated (verified live), `/1.0/library` with `percent_complete`/`is_finished` needs a device-registered client whose refresh token only `/auth/register` can mint; an audible-cli auth file carries `refresh_token`/`adp_token`/`device_private_key`/`locale_code` and `POST /auth/token` refreshes access tokens without any login; Audnexus is the key-less ASIN metadata fallback (no title search) -- 2026-09-16 -- `knowledge/research/audible-api-surface-and-listening-progress-2026-09-16.md`
 - **goodreads-reading-progress-and-book-metadata-sources** -- The Goodreads API is dead (no keys since 2020-12-08); the public shelf RSS (`review/list_rss/{id}?shelf=`, 100-item cap, no progress field) and the public user-status RSS (`user_status/list/{id}?format=rss`, carries "page N of M" / "N% done" as text, title-only join) need no key or cookie; Open Library (key-less, ISBN join, `identifiers.goodreads`) vs Google Books (key required) vs Hardcover (token, page progress) for search/metadata -- 2026-09-16 -- `knowledge/research/goodreads-reading-progress-and-book-metadata-sources-2026-09-16.md`
 <!-- research-global:end -->
 

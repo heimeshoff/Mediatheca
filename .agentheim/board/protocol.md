@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 01:53 -- Research: Audible API surface and listening progress
+
+**Type:** Research
+**Requested by:** model
+**Report:** knowledge/research/audible-api-surface-and-listening-progress-2026-09-16.md
+**Review:** PASS (iteration 3) — iterations 1 and 2 failed on response_groups / image_sizes endpoint attribution (library vs catalog, then search vs detail); each fixed against the raw mkb79 docs. Iteration 1's reviewer also confirmed live that catalog search needs no credential.
+**Summary:**
+- No official Audible API. Catalog search (`/1.0/catalog/products?keywords=`) and product detail (`/1.0/catalog/products/{asin}`, includes `series`) work unauthenticated on `api.audible.com` and `api.audible.de`; `/1.0/library` (`percent_complete`, `is_finished`, `listening_status`) returns 403 without auth.
+- The only route to a library credential is Amazon OAuth + `POST /auth/register` device registration — even the external-browser login variant registers from the calling program. A user-run `audible-cli quickstart` auth file carries `refresh_token`, `adp_token`, `device_private_key`, `locale_code`, `customer_info`; `POST https://api.amazon.<tld>/auth/token` (five form fields, no grant_type) mints 60-minute access tokens from it without any login.
+- Audnexus (`api.audnex.us/books/{asin}`) is a live, key-less metadata fallback (cover, narrators, series, description, runtime; no title search; 100 req/min); its maintainer points new work at AudiobookDB but keeps it online.
+**Unverified (labelled):** refresh-token lifetime; absence of ban reports is absence of evidence; whether the `x-main` cookie scrape exposes progress; audible-cli export column list.
+
+---
+
 ## 2026-09-16 01:52 -- Research: Goodreads reading progress and book metadata sources
 
 **Type:** Research
