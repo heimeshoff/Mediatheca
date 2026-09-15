@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 01:55 -- Modeling / Captured: curation-cyxbc - Books in catalogs — a catalog entry can reference a book (RoutePrefix "books", cover as poster), with `getCatalogsForBook` / add-to-catalog on the book detail page and books in the catalog detail list, the same conformist treatment catalogs give movies, series and games
+
+**Type:** Modeling / Capture
+**BC:** curation
+**Filed to:** backlog
+**Summary:** Books as catalog entries (RoutePrefix books, getCatalogsForBook, Catalogs card on the book page). Backlog: needs the CatalogEntryDto key shape confirmed before promotion.
+
+---
+
 ## 2026-09-16 01:55 -- Modeling / Captured: journal-k52j1 - Reading activity in the Journal — fold `book_progress` observation days and `Book_status_changed Finished` into the cross-media activity timeline, "Recently Read" list and monthly breakdown alongside watch sessions, episodes and play sessions
 
 **Type:** Modeling / Capture

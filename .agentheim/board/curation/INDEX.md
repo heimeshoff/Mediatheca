@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 0
@@ -32,6 +32,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **curation-cyxbc** — Books in catalogs — a catalog entry can reference a book (RoutePrefix "books", cover as poster), with `getCatalogsForBook` / add-to-catalog on the book detail page and books in the catalog detail list, the same conformist treatment catalogs give movies, series and games (feature) — `backlog/curation-cyxbc-books-in-catalogs.md`
 <!-- no tasks in backlog -->
 <!-- backlog-list:end -->
 
