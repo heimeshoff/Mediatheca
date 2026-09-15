@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 01:55 -- Modeling / Captured: integration-c8d4x - Open Library adapter — keyword search, ISBN and work lookup, cover download, an adapter-owned 1 req/s throttle with an identifying User-Agent — plus the `searchOpenLibraryBooks` / `addBookFromOpenLibrary` API that turns a search hit into a Book with its metadata cache slice filled
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** Open Library adapter (search.json, /isbn, /works, covers) with an identifying User-Agent and adapter-owned throttles, plus searchOpenLibraryBooks / addBookFromOpenLibrary / refreshBookFromOpenLibrary. The key-less book search and metadata source ADR-0075 picks.
+
+---
+
 ## 2026-09-16 01:55 -- Modeling / Captured: books-y9kxy - Book aggregate, projection, metadata cache slice and API — the server core of the new Books BC (identity card, external ids, format, Games-shaped status, event-sourced reading-progress observations, personal rating, recommended-by), registered in every Administration registry, with MediaType.Book threaded through Shared
 
 **Type:** Modeling / Capture
