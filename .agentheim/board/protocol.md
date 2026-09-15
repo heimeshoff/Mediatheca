@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 01:55 -- Modeling / Captured: books-f33e2 - Book detail page at /books/{slug} mirroring the movie detail page — cover hero with title/authors/year/format, a reading-progress bar with source badge and a manual "update progress" control (page or percent), the Games-shaped status control, personal rating, description/narrators/series/length from the cache, external links, recommended-by friends, progress history, content blocks, event history and remove
+
+**Type:** Modeling / Capture
+**BC:** books
+**Filed to:** todo
+**Summary:** Book detail page at /books/{slug} mirroring MovieDetail: cover hero, progress bar with source badge and a paper-overlay manual update-progress control, Games-shaped status control, rating, cache-fed details, external links, recommended-by, progress history, content blocks, event history, remove; e2e for the 100 % -> Finished rule.
+
+---
+
 ## 2026-09-16 01:55 -- Modeling / Captured: books-g7g1j - Search modal Books tab — Open Library (default on) and Audible (default on, no credential needed) as selectable sources with source badges on a merged cover grid, the existing duplicate-prompt flow for import, library books in the Library tab, and navigation to the new book detail route
 
 **Type:** Modeling / Capture
