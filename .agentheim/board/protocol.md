@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 01:55 -- Modeling / Captured: integration-y2ak4 - Goodreads reading progress from the public user-status feed — parse "is on page N of M of Title" / "is N% done with Title" / "finished reading" items from `user_status/list/{id}?format=rss`, join them to currently-reading books by normalized title, and emit `Observe_reading_progress` (source Goodreads) as part of the shelf sync, idempotent across runs
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** Goodreads reading progress from the public user-status RSS feed: parse page-N-of-M / N%-done / finished items, join by normalized title to currently-reading books, emit Observe_reading_progress (source Goodreads) inside the shelf sync, idempotent via a persisted last-status marker. Originally a spike; the review gate verified the feed live, so captured as a feature.
+
+---
+
 ## 2026-09-16 01:55 -- Modeling / Captured: integration-wmqn3 - Goodreads adapter, Settings card and daily shelf sync — the user's public Goodreads user id (no key exists, no cookie ever, ADR-0075) drives a sync of the currently-reading / read / to-read shelf feeds into book statuses, ratings and finished dates, importing unknown currently-reading books through Open Library by ISBN
 
 **Type:** Modeling / Capture
