@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 01:55 -- Modeling / Captured: journal-k52j1 - Reading activity in the Journal — fold `book_progress` observation days and `Book_status_changed Finished` into the cross-media activity timeline, "Recently Read" list and monthly breakdown alongside watch sessions, episodes and play sessions
+
+**Type:** Modeling / Capture
+**BC:** journal
+**Filed to:** backlog
+**Summary:** Fold reading days and book finishes into the Journal's recent-activity list, monthly breakdown and cross-media stats. Backlog: needs a decision on entry granularity and rail placement.
+
+---
+
 ## 2026-09-16 01:55 -- Modeling / Captured: intelligence-dnv2y - Dashboard Books tab and All-tab "Reading" rail — the All tab's "Books coming soon" placeholder becomes a Currently Reading card (In Focus books with progress bars and source badges, finished books lingering 7 days marked "Finished"), plus a Books tab with Currently Reading, Recently Finished, Recently Added and a reading-stats block, and reading days on the activity heatmap
 
 **Type:** Modeling / Capture

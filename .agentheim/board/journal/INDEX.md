@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 1
@@ -32,6 +32,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **journal-k52j1** — Reading activity in the Journal — fold `book_progress` observation days and `Book_status_changed Finished` into the cross-media activity timeline, "Recently Read" list and monthly breakdown alongside watch sessions, episodes and play sessions (feature) — `backlog/journal-k52j1-reading-activity-in-the-journal.md`
 <!-- no tasks in backlog -->
 <!-- backlog-list:end -->
 
