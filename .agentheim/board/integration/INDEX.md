@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 3
+- **Todo:** 4
 - **Doing:** 0
 - **Done:** 22
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **integration-wmqn3** — Goodreads adapter, Settings card and daily shelf sync — the user's public Goodreads user id (no key exists, no cookie ever, ADR-0075) drives a sync of the currently-reading / read / to-read shelf feeds into book statuses, ratings and finished dates, importing unknown currently-reading books through Open Library by ISBN (feature) — `todo/integration-wmqn3-goodreads-shelf-sync-settings-card.md`
 - **integration-jjvg2** — Audible library import and daily listening-progress sync — "Import Audible library" creates a Book per library title (matched by ASIN) and a scheduled "Audible progress sync" job reads `/1.0/library` `percent_complete`/`is_finished` into `Observe_reading_progress` commands, with the run recorded as a job run and a rejected auth file surfaced as a standing notice (feature) — `todo/integration-jjvg2-audible-library-import-and-progress-sync.md`
 - **integration-dhctm** — Audible adapter and Settings card — an imported audible-cli auth file (never a login or device registration, ADR-0074) with refresh-token → access-token minting, a "Test connection" that names the customer and marketplace, unauthenticated catalog search and product detail with Audnexus as metadata fallback, and `addBookFromAudible` (feature) — `todo/integration-dhctm-audible-adapter-auth-file-settings-search.md`
 - **integration-c8d4x** — Open Library adapter — keyword search, ISBN and work lookup, cover download, an adapter-owned 1 req/s throttle with an identifying User-Agent — plus the `searchOpenLibraryBooks` / `addBookFromOpenLibrary` API that turns a search hit into a Book with its metadata cache slice filled (feature) — `todo/integration-c8d4x-open-library-adapter-search-isbn-covers.md`

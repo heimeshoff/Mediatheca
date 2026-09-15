@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 01:55 -- Modeling / Captured: integration-wmqn3 - Goodreads adapter, Settings card and daily shelf sync — the user's public Goodreads user id (no key exists, no cookie ever, ADR-0075) drives a sync of the currently-reading / read / to-read shelf feeds into book statuses, ratings and finished dates, importing unknown currently-reading books through Open Library by ISBN
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** Goodreads adapter, Settings card (user id, not a key — no API exists; no cookie ever, ADR-0075) and a daily shelf sync of currently-reading / read / to-read feeds into statuses, ratings and finished dates, importing unknown currently-reading books via Open Library by ISBN.
+
+---
+
 ## 2026-09-16 01:55 -- Modeling / Captured: integration-jjvg2 - Audible library import and daily listening-progress sync — "Import Audible library" creates a Book per library title (matched by ASIN) and a scheduled "Audible progress sync" job reads `/1.0/library` `percent_complete`/`is_finished` into `Observe_reading_progress` commands, with the run recorded as a job run and a rejected auth file surfaced as a standing notice
 
 **Type:** Modeling / Capture
