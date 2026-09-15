@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 01:55 -- Modeling / Captured: books-y9kxy - Book aggregate, projection, metadata cache slice and API — the server core of the new Books BC (identity card, external ids, format, Games-shaped status, event-sourced reading-progress observations, personal rating, recommended-by), registered in every Administration registry, with MediaType.Book threaded through Shared
+
+**Type:** Modeling / Capture
+**BC:** books
+**Filed to:** todo
+**Summary:** Server core of the new Books BC: Book aggregate with identity card, external ids, format, Games-shaped status and event-sourced reading-progress observations (ADR-0076), BookProjection with book_list/book_detail/book_progress, book_metadata_cache slice, every Administration registry, MediaType.Book and the Remoting surface. No UI, no adapters. Filed directly to todo — decisions made in modeling, builder asleep.
+
+---
+
 ## 2026-09-16 01:53 -- Research: Audible API surface and listening progress
 
 **Type:** Research
