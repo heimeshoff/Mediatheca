@@ -2,7 +2,7 @@
 topic: Goodreads reading-progress access and book metadata/search sources for a "search modal" (Books bounded context)
 date: 2026-09-16
 requested_by: model
-related_tasks: []
+related_tasks: [integration-wmqn3, integration-y2ak4, integration-c8d4x, books-y9kxy]
 ---
 
 # Research: Goodreads reading progress + book metadata sources

@@ -8,7 +8,7 @@ Losing track of what you've watched, played, and read across multiple platforms.
 
 ## Target User
 
-Single user (self-hosted). Someone who actively tracks movies, TV series, and games, watches with friends, and wants an opinionated dashboard that surfaces what matters — not a catalog to browse, but an intent-driven view of what's next.
+Single user (self-hosted). Someone who actively tracks movies, TV series, games and books, watches with friends, and wants an opinionated dashboard that surfaces what matters — not a catalog to browse, but an intent-driven view of what's next.
 
 ## Core Concept: In Focus
 
@@ -32,11 +32,17 @@ A cross-cutting concept that lets the user signal intent — "I want to engage w
 - Any recognized play session automatically pulls a game (from any status) into InFocus
 - InFocus games appear on the main dashboard
 
+### Books (recognized 2026-09-16)
+- A status in the lifecycle, the Games shape: Backlog → **InFocus** → Finished / Abandoned
+- InFocus means "reading or listening to this now, or next"
+- Any reading-progress observation that moves the percent forward pulls a book (from any unfinished status) into InFocus; reaching 100 % (or the source saying "finished") moves it to Finished
+- InFocus books appear on the main dashboard with their progress bar and the source of the progress (Audible, Goodreads, or entered by hand)
+
 ## Unified Dashboard
 
 The dashboard is the landing page — a tabbed view across all media types.
 
-### Tabs: All | Movies | TV Series | Games
+### Tabs: All | Movies | TV Series | Games | Books
 
 ### All Tab (default landing page)
 
@@ -62,6 +68,11 @@ The curated overview. Answers "what's next?" at a glance.
 - Sorted by most recent play session
 - ~5-6 items
 
+**Books: Reading**
+- InFocus books, most recently progressed first, each with its progress percent and source
+- Finished books linger for 7 days marked Finished, then leave
+- ~5-6 items
+
 ### Movies Tab
 - Recently added movies (newest first, filtered out once watched)
 - Stats and details: total watch time, recent watch sessions
@@ -78,6 +89,11 @@ The curated overview. Answers "what's next?" at a glance.
 - Recently played games
 - Completion progress vs HowLongToBeat averages
 - Play time stats
+- Expandable over time
+
+### Books Tab
+- Currently reading (with progress), recently finished, recently added
+- Reading stats: finished this year, pages read / hours listened
 - Expandable over time
 
 ## Remaining v1 Work
@@ -102,6 +118,13 @@ The curated overview. Answers "what's next?" at a glance.
 - Display comparison on game detail page (your play time vs average)
 - Show on Games dashboard tab
 
+### Books — Audible + Goodreads (recognized 2026-09-16, pulled forward from v2)
+Books join movies, series and games as the fourth media type, served the way TMDB serves movies and Steam serves games: configured in Settings, searchable in the search modal, a detail page, and progress that comes from the outside.
+- **Sources:** Audible (audiobooks — catalog search needs no credential; the library and listening progress come through an auth file the user generates on their own machine with `audible-cli`, never a login performed by Mediatheca — ADR-0074) and Goodreads (no API exists any more — the public shelf and user-status RSS feeds, keyed by the user's Goodreads user id, give shelf membership, ratings and "page N of M" progress without any key or cookie — ADR-0075). Open Library is the key-less search/metadata source for print books.
+- **Progress:** a reading-progress observation (percent, source, date) is an event, like a Steam play session; length and description are cache (ADR-0076). Manual progress entry on the detail page is the always-available fallback.
+- **Surfaces:** Settings cards (Audible, Goodreads), search-modal Books tab (Open Library + Audible sources), `/books/{slug}` detail page, dashboard Books tab and All-tab Reading rail, scheduled progress/shelf sync jobs.
+- **Later:** reading activity in the Journal, books in catalogs.
+
 ### Operability & Observability — Admin Console (recognized 2026-07-21)
 The event-sourced store (ADR-0002) is only as trustworthy as it is inspectable. The `/admin` console gives the single user, **in an operator role**, the tools to see into and maintain the substrate the rest of the app is built on. This workstream was previously unlisted — the work skill's vision-conformance pass surfaced that a whole arc of admin-console work served no named roadmap item; it is absorbed here as recognized v1 work at the builder's direction.
 - **Shipped:** tabbed `/admin` shell + its own `IAdminApi` contract (ADR-0017); event explorer with FTS5 payload search, composable filters, and keyset pagination (ADR-0020), plus a live-tail Follow mode (ADR-0023); Health tab — event volume, per-BC breakdown, storage sizes (ADR-0021); per-stream drill-in — formatted+raw history, projection state, cross-links (ADR-0022); projection dashboard — checkpoint/lag overview and rebuild-by-command with streamed progress (ADR-0024).
@@ -110,7 +133,7 @@ The event-sourced store (ADR-0002) is only as trustworthy as it is inspectable. 
 
 ## Out of Scope (v1)
 
-- Books (v2)
+- ~~Books (v2)~~ — pulled into v1 on 2026-09-16, see "Books — Audible + Goodreads" above
 - Trakt.tv / Jellyfin sync (v2)
 - Yearly intelligence reports (v2)
 - Friend-level intelligence (v2)

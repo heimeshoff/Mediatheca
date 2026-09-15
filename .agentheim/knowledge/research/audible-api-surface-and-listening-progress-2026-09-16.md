@@ -2,7 +2,7 @@
 topic: Audible API surface for catalog metadata and listening progress (official, unofficial, and Audnexus)
 date: 2026-09-16
 requested_by: model
-related_tasks: []
+related_tasks: [integration-dhctm, integration-jjvg2, books-y9kxy]
 ---
 
 # Research: Audible API surface and listening-progress access

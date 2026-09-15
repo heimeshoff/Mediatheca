@@ -22,8 +22,14 @@ Mediatheca is a personal media library + diary + intelligence hub built on event
 - **Classification:** core
 - **Key actors:** Single user.
 
+### Books
+- **Purpose:** Owns the Book aggregate — audiobooks, print and ebooks as library entries with an identity card, external ids (ISBN-13, Open Library work/edition, Audible ASIN, Goodreads book id), a single format, a Games-shaped status lifecycle, personal rating, and event-sourced reading-progress observations.
+- **Core language:** Book, identity card, external id, format, status (Backlog → InFocus → Finished / Abandoned), reading progress, progress observation (percent, position, source: Audible | Goodreads | Manual, observed-on), length, finished on.
+- **Classification:** core
+- **Key actors:** Single user. Recognized 2026-09-16 (previously v2 / out of scope).
+
 ### Journal
-- **Purpose:** The cross-media diary. Surfaces *when* media was experienced and *with whom*. Aggregates watch sessions (Movies), episode-watched events (Series), and play sessions (Games) into a unified activity timeline that powers heatmaps, "recently watched", and yearly intelligence.
+- **Purpose:** The cross-media diary. Surfaces *when* media was experienced and *with whom*. Aggregates watch sessions (Movies), episode-watched events (Series), play sessions (Games) and reading days (Books) into a unified activity timeline that powers heatmaps, "recently watched", and yearly intelligence.
 - **Core language:** Activity, session, watch session, play session, episode watched, watched-with, played-with, recent activity, activity day.
 - **Classification:** core
 - **Key actors:** Single user.
@@ -49,8 +55,8 @@ Mediatheca is a personal media library + diary + intelligence hub built on event
 - **Notes:** Mostly projections that read from Movies / Series / Games / Journal event streams. Yearly intelligence reports and friend-level intelligence are v2.
 
 ### Integration
-- **Purpose:** Adapters to external systems — TMDB, RAWG, Steam, HowLongToBeat, Jellyfin. Translates external shapes into commands the core BCs accept; scheduled sync jobs pull external state on a cadence.
-- **Core language:** Import, sync, refresh, scheduled job, external id (TMDB id, RAWG id, Steam appId), adapter.
+- **Purpose:** Adapters to external systems — TMDB, RAWG, Steam, HowLongToBeat, Jellyfin, qBittorrent, and for Books: Open Library, Audible, Audnexus, Goodreads. Translates external shapes into commands the core BCs accept; scheduled sync jobs pull external state on a cadence.
+- **Core language:** Import, sync, refresh, scheduled job, external id (TMDB id, RAWG id, Steam appId, ISBN, Open Library key, Audible ASIN, Goodreads book id), adapter, auth file (Audible, ADR-0074), public feed (Goodreads, ADR-0075).
 - **Classification:** generic
 - **Key actors:** External services + single user (triggering manual syncs).
 
@@ -78,16 +84,16 @@ Mediatheca is a personal media library + diary + intelligence hub built on event
 - **Friends → Movies / Series / Games / Curation** (upstream, published language).
   Friends emits `Friend_added` / `Friend_updated`. Downstream BCs reference friends by `slug` and copy `name` / `imageRef` into their own projections. Friends never call into the media BCs.
 
-- **Movies / Series / Games → Journal** (upstream, published events).
-  Watch sessions, episode-watched events, and play session events are published by the three media BCs. Journal's projections subscribe and assemble the cross-media activity timeline. Journal does not write commands back.
+- **Movies / Series / Games / Books → Journal** (upstream, published events).
+  Watch sessions, episode-watched events, play session events and reading-progress observations are published by the four media BCs. Journal's projections subscribe and assemble the cross-media activity timeline. Journal does not write commands back.
 
-- **Movies / Series / Games + Journal → Intelligence** (upstream).
+- **Movies / Series / Games / Books + Journal → Intelligence** (upstream).
   Intelligence projections fold all upstream event streams into derived stats. No coupling back upstream.
 
-- **Integration → Movies / Series / Games** (upstream → downstream, anticorruption layer).
-  External APIs (TMDB / RAWG / Steam / HLTB / Jellyfin) are wrapped by adapters in Integration. Adapters write through **two output channels** (ADR-0043): commands (`Add_movie`, `Add_game`, `Set_hltb_hours`, `Refresh_series_from_tmdb`, …) for facts that must be replayable domain history, and direct cache writes into projection columns for re-derivable third-party metadata (ratings, artwork, episode/season detail) that a refresh can always re-fetch. Core BCs never see external shapes directly.
+- **Integration → Movies / Series / Games / Books** (upstream → downstream, anticorruption layer).
+  External APIs (TMDB / RAWG / Steam / HLTB / Jellyfin) are wrapped by adapters in Integration. Adapters write through **two output channels** (ADR-0043): commands (`Add_movie`, `Add_game`, `Set_hltb_hours`, `Refresh_series_from_tmdb`, …) for facts that must be replayable domain history, and direct cache writes into projection columns for re-derivable third-party metadata (ratings, artwork, episode/season detail) that a refresh can always re-fetch. Core BCs never see external shapes directly. For Books the same two channels apply: `Add_book_to_library` / `Link_external_id` / `Observe_reading_progress` / `Change_status` are commands (a progress observation is the user's engagement — ADR-0076), while description, length, narrators and series go to `book_metadata_cache`.
 
-- **Curation → Movies / Series / Games** (downstream, conformist).
+- **Curation → Movies / Series / Games (→ Books, planned: curation-cyxbc)** (downstream, conformist).
   Catalogs reference media by `(MediaType, mediaId)` and rely on whatever those BCs expose. Curation conforms to the core BCs' published refs; it doesn't push language back.
 
 - **Administration ↔ everything** (shared kernel: the event store + image store + the metadata cache).
@@ -98,6 +104,6 @@ Mediatheca is a personal media library + diary + intelligence hub built on event
 
 ## Notes on classification
 
-- **Core:** Movies, Series, Games, Journal, Intelligence — these are the reason the app exists. Differentiation lives here.
+- **Core:** Movies, Series, Games, Books, Journal, Intelligence — these are the reason the app exists. Differentiation lives here.
 - **Supporting:** Friends, Curation, Design system — necessary, custom-built, but not the heart of the value proposition.
 - **Generic:** Integration, Administration, Infrastructure — boring plumbing where boring choices are correct.
