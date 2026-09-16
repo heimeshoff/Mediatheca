@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 23:20 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 22m (scoped run — builder named curation-n2nkm; curation-tb0nn was ready but not dispatched)
+**Completed:** 1 (first-try PASS: 0, re-dispatched: 1, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** curation-n2nkm: 2 (iteration 1 FAIL — formatter carried only the block count, no owner/excerpt/"(empty document)" and no formatEvent-level tests; iteration 2 PASS)
+**Commits:** 3 (1 batch-start, 1 integration, 1 session-end)
+**Vision-conformance:** none — batch aligns with vision (vision.md carries no "What success looks like" / "Non-goals" sections; judged against the Design Principles: an Administration Health-tab / event-browser formatter for the user's own Notes history serves the Replayable principle and inspects, never mutates, the log)
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task)
+**Carry-over:** none — working tree clean (2 stranded RESULT sidecars swept; worktree torn down with its node_modules junction unlinked first, main node_modules intact at 210 entries; on main after the batch: npm run build OK, Vitest 108/108; Expecto not re-run on main because a dev server was listening on port 5000 — the verifier's run in the source-identical worktree was 922/922). Builder follow-up: the [human-eye] criterion — Health tab on harbour after deploy, Notes_saved gone from the Unformattable list.
+
+---
+
 ## 2026-09-16 23:17 -- Task verified and completed: curation-n2nkm - "`Notes_saved` is unformattable — `EventFormatting.formatEvent` dispatches by stream prefix and has no `Notes-` arm, so every Notes stream shows in the Health tab's Unformattable list and renders nothing in the event browser; add `formatNotesEvent` (block count + first text excerpt) and the guard test"
 
 **Type:** Work / Task completion
