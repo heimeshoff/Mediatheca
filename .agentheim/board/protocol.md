@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 23:01 -- Batch started: [curation-n2nkm]
+
+**Type:** Work / Batch start
+**Tasks:** curation-n2nkm - "`Notes_saved` is unformattable — `EventFormatting.formatEvent` dispatches by stream prefix and has no `Notes-` arm, so every Notes stream shows in the Health tab's Unformattable list and renders nothing in the event browser; add `formatNotesEvent` (block count + first text excerpt) and the guard test"
+**Parallel:** scoped — builder named curation-n2nkm; 1 other ready task (curation-tb0nn) not dispatched this run
+
+---
+
 ## 2026-09-16 22:48 -- Modeling / Captured: curation-n2nkm - "`Notes_saved` is unformattable — `EventFormatting.formatEvent` dispatches by stream prefix and has no `Notes-` arm, so every Notes stream shows in the Health tab's Unformattable list and renders nothing in the event browser; add `formatNotesEvent` (block count + first text excerpt) and the guard test"
 
 **Type:** Modeling / Capture

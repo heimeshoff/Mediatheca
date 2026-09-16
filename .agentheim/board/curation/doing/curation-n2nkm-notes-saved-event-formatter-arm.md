@@ -1,7 +1,7 @@
 ---
 id: curation-n2nkm
 title: "`Notes_saved` is unformattable — `EventFormatting.formatEvent` dispatches by stream prefix and has no `Notes-` arm, so every Notes stream shows in the Health tab's Unformattable list and renders nothing in the event browser; add `formatNotesEvent` (block count + first text excerpt) and the guard test"
-status: todo
+status: doing
 type: bug
 context: curation
 created: 2026-09-16
