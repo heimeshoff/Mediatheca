@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 04:45 -- Batch started: [integration-wmqn3]
+
+**Type:** Work / Batch start
+**Tasks:** integration-wmqn3 - Goodreads adapter, Settings card and daily shelf sync — the user's public Goodreads user id (no key exists, no cookie ever, ADR-0075) drives a sync of the currently-reading / read / to-read shelf feeds into book statuses, ratings and finished dates, importing unknown currently-reading books through Open Library by ISBN
+**Parallel:** yes (adds 1 worker beside the still-running books-f33e2 — integration-wmqn3 became ready when integration-dhctm integrated; books-g7g1j and intelligence-dnv2y stay blocked on books-f33e2)
+
+---
+
 ## 2026-09-16 04:45 -- Task verified and completed: integration-dhctm - Audible adapter and Settings card — an imported audible-cli auth file (never a login or device registration, ADR-0074) with refresh-token → access-token minting, a "Test connection" that names the customer and marketplace, unauthenticated catalog search and product detail with Audnexus as metadata fallback, and `addBookFromAudible`
 
 **Type:** Work / Task completion

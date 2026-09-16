@@ -1,7 +1,7 @@
 ---
 id: integration-wmqn3
 title: Goodreads adapter, Settings card and daily shelf sync — the user's public Goodreads user id (no key exists, no cookie ever, ADR-0075) drives a sync of the currently-reading / read / to-read shelf feeds into book statuses, ratings and finished dates, importing unknown currently-reading books through Open Library by ISBN
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-09-16
