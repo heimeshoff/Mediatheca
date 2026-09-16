@@ -853,7 +853,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                         Html.div [
                             prop.className "flex gap-1 border-b border-base-content/10 mb-8"
                             prop.children [
-                                for (tab, label) in [ (Overview, "Overview"); (Journal, "Journal") ] do
+                                for (tab, label) in [ (Overview, "Overview"); (Journal, "Notes") ] do
                                     Html.button [
                                         prop.className (
                                             "px-5 py-3 text-sm font-semibold transition-all cursor-pointer " +
@@ -1041,7 +1041,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                         | Journal ->
                                             // Notion-style block editor — self-contained
                                             // (loads and debounce-saves its own document)
-                                            JournalEditor.view model.Slug
+                                            NotesEditor.view Game model.Slug
                                     ]
                                 ]
                                 // Right Column: Social & Activity — persistent across

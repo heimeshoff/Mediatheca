@@ -845,23 +845,14 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                             ]
                                     ]
                                 ]
-                                // ── Right column: friends + content blocks ──
+                                // ── Right column: friends + notes ──
                                 Html.div [
                                     prop.className "lg:col-span-4 space-y-6"
                                     prop.children [
                                         friendsCard book dispatch
                                         Html.div [
                                             prop.children [
-                                                ContentBlockEditor.view
-                                                    book.ContentBlocks
-                                                    (fun req -> dispatch (Add_content_block req))
-                                                    (fun bid req -> dispatch (Update_content_block (bid, req)))
-                                                    (fun bid -> dispatch (Remove_content_block bid))
-                                                    (fun bid blockType -> dispatch (Change_content_block_type (bid, blockType)))
-                                                    (fun blockIds -> dispatch (Reorder_content_blocks blockIds))
-                                                    (Some (fun data filename insertBefore -> dispatch (Upload_screenshot (data, filename, insertBefore))))
-                                                    (Some (fun leftId rightId -> dispatch (Group_content_blocks (leftId, rightId))))
-                                                    (Some (fun blockId -> dispatch (Ungroup_content_block blockId)))
+                                                NotesEditor.view Book model.Slug
                                             ]
                                         ]
                                     ]

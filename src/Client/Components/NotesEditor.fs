@@ -1,6 +1,8 @@
-module Mediatheca.Client.Components.JournalEditor
+module Mediatheca.Client.Components.NotesEditor
 
-// Notion-style block editor for game journals.
+// Notion-style block editor for Notes (ADR-0080) -- the one editor shared by
+// all four media types (movies, series, games, books), replacing the old
+// per-kind content-block editor and the game-only journal editor it grew from.
 //
 // The document is a flat list of JournalBlockDto forming a tree via ParentId
 // (see Shared.fs). This mirrors Notion's editor model:
@@ -13,8 +15,11 @@ module Mediatheca.Client.Components.JournalEditor
 //     (columnList → column containers, like Notion's column_list/column)
 //   - toggle blocks collapse/expand nested child blocks
 //
-// The editor is self-contained: it loads, edits and debounce-saves the whole
-// document through its own API proxy (plain storage, not event-sourced).
+// `view` is self-contained: it loads, edits and debounce-saves the whole
+// document through `getNotes`/`saveNotes`, keyed on the owning
+// `(MediaType, slug)` pair (ADR-0080 §3 -- never a bare slug). `viewDemo`
+// mounts the same editor over a fixed in-memory document with no API calls
+// at all, for the StyleGuide specimen.
 
 open System
 open System.Collections.Generic
@@ -31,6 +36,13 @@ let private api: IMediathecaApi =
     |> Remoting.buildProxy<IMediathecaApi>
 
 type private Side = Above | Below | LeftSide | RightSide
+
+/// Where the document comes from and where saves go. `Demo` never touches
+/// the network -- the StyleGuide specimen renders and "saves" entirely in
+/// local React state.
+type private Source =
+    | Live of mediaType: MediaType * slug: string
+    | Demo of initialBlocks: JournalBlockDto list
 
 type private SaveState =
     | SaveIdle
@@ -357,7 +369,7 @@ let private isUrl (text: string) =
 // ── Component ───────────────────────────────────────────────────────────────
 
 [<ReactComponent>]
-let view (slug: string) =
+let private editor (source: Source) =
     let blocks, setBlocks = React.useState<JournalBlockDto list>([])
     let loaded, setLoaded = React.useState(false)
     let saveState, setSaveState = React.useState(SaveIdle)
@@ -382,11 +394,16 @@ let view (slug: string) =
     let doSave () =
         dirtyRef.current <- false
         let toSave = blocksRef.current
-        async {
-            match! api.saveGameJournal slug toSave with
-            | Ok () -> setSaveState SaveDone
-            | Error e -> setSaveState (SaveFailed e)
-        } |> Async.StartImmediate
+        match source with
+        | Live (mediaType, slug) ->
+            async {
+                match! api.saveNotes mediaType slug toSave with
+                | Ok () -> setSaveState SaveDone
+                | Error e -> setSaveState (SaveFailed e)
+            } |> Async.StartImmediate
+        | Demo _ ->
+            // Nothing to persist -- the specimen only ever edits local state.
+            setSaveState SaveDone
 
     let scheduleSave () =
         dirtyRef.current <- true
@@ -409,25 +426,36 @@ let view (slug: string) =
         focusRequestRef.current <- Some (id, caret)
         setFocusedId (Some id)
 
-    // Load on mount / slug change; flush pending edits on unmount
+    // Load on mount / source change; flush pending edits on unmount
+    let sourceKey =
+        match source with
+        | Live (mediaType, slug) -> $"live:{mediaType}:{slug}"
+        | Demo _ -> "demo"
+
     React.useEffect((fun () ->
         setLoaded false
         setBlocks []
         blocksRef.current <- []
         setFocusedId None
         setSaveState SaveIdle
-        async {
-            let! bs = api.getGameJournal slug
-            blocksRef.current <- bs
-            setBlocks bs
+        match source with
+        | Live (mediaType, slug) ->
+            async {
+                let! bs = api.getNotes mediaType slug
+                blocksRef.current <- bs
+                setBlocks bs
+                setLoaded true
+            } |> Async.StartImmediate
+        | Demo initialBlocks ->
+            blocksRef.current <- initialBlocks
+            setBlocks initialBlocks
             setLoaded true
-        } |> Async.StartImmediate
         React.createDisposable (fun () ->
             match saveTimerRef.current with
             | Some t -> emitJsExpr t "clearTimeout($0)"
             | None -> ()
             if dirtyRef.current then doSave ())
-    ), [| box slug |])
+    ), [| box sourceKey |])
 
     // After every render: honour pending focus requests, re-fit textarea heights
     React.useEffect(fun () ->
@@ -455,17 +483,22 @@ let view (slug: string) =
         reader.readAsArrayBuffer (file)
 
     let uploadImageInto (blockId: string) (file: Browser.Types.File) =
-        let fileType: string = emitJsExpr file "$0.type"
-        if fileType.StartsWith("image/") then
-            readFileAsBytes file (fun bytes name ->
-                async {
-                    match! api.uploadContentImage bytes name with
-                    | Ok imageRef ->
-                        mutate false (Doc.updateBlock blockId (fun b -> { b with ImageRef = Some imageRef }))
-                    | Error e ->
-                        mutate true (Doc.removeBlockAndChildren blockId)
-                        setSaveState (SaveFailed e)
-                } |> Async.StartImmediate)
+        match source with
+        | Demo _ ->
+            // No live API call from the StyleGuide specimen -- fake the ref.
+            mutate false (Doc.updateBlock blockId (fun b -> { b with ImageRef = Some "demo/sample-image.png" }))
+        | Live _ ->
+            let fileType: string = emitJsExpr file "$0.type"
+            if fileType.StartsWith("image/") then
+                readFileAsBytes file (fun bytes name ->
+                    async {
+                        match! api.uploadContentImage bytes name with
+                        | Ok imageRef ->
+                            mutate false (Doc.updateBlock blockId (fun b -> { b with ImageRef = Some imageRef }))
+                        | Error e ->
+                            mutate true (Doc.removeBlockAndChildren blockId)
+                            setSaveState (SaveFailed e)
+                    } |> Async.StartImmediate)
 
     let openImagePicker (blockId: string) =
         pendingImageRef.current <- Some blockId
@@ -886,7 +919,7 @@ let view (slug: string) =
                         e.dataTransfer.setData("text/plain", block.Id) |> ignore
                         // drag the whole block visually, not just the grip
                         emitJsExpr (e, e.clientX, e.clientY)
-                            "(function(ev,x,y){var b=ev.currentTarget.closest('.journal-block'); if(b){var r=b.getBoundingClientRect(); ev.dataTransfer.setDragImage(b, x-r.left, y-r.top);}})($0,$1,$2)" |> ignore
+                            "(function(ev,x,y){var b=ev.currentTarget.closest('.notes-block'); if(b){var r=b.getBoundingClientRect(); ev.dataTransfer.setDragImage(b, x-r.left, y-r.top);}})($0,$1,$2)" |> ignore
                         emitJsExpr (fun () -> setDraggedId (Some block.Id)) "setTimeout($0, 0)")
                     prop.onDragEnd (fun _ ->
                         setDraggedId None
@@ -1187,7 +1220,7 @@ let view (slug: string) =
         Html.div ([
             prop.key block.Id
             prop.className (
-                "journal-block group relative py-0.5" +
+                "notes-block group relative py-0.5" +
                 (if isDragged then " opacity-40" else ""))
         ] @ dropHandlers block.Id true @ [
             prop.children [
@@ -1277,7 +1310,7 @@ let view (slug: string) =
             if not loaded then
                 Html.div [
                     prop.className "text-sm text-base-content/30 italic py-8"
-                    prop.text "Loading journal…"
+                    prop.text "Loading notes…"
                 ]
             else
                 Html.div [
@@ -1316,3 +1349,14 @@ let view (slug: string) =
             ]
         ]
     ]
+
+// ── Public entry points ──────────────────────────────────────────────────────
+
+/// Mounted on Movie/Series/Game/Book detail pages, each passing its own
+/// `MediaType`. The `(MediaType, slug)` pair is the owner of the document
+/// (ADR-0080 §3) -- never pass a bare slug.
+let view (mediaType: MediaType) (slug: string) = editor (Live (mediaType, slug))
+
+/// StyleGuide specimen only: renders the same editor over a fixed sample
+/// document with no `getNotes`/`saveNotes` calls at all.
+let viewDemo (initialBlocks: JournalBlockDto list) = editor (Demo initialBlocks)

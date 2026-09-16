@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 18:40 -- Task verified and completed: curation-knqfj - Notes editor on every detail page — `JournalEditor` becomes `NotesEditor` taking `(MediaType, slug)` over `getNotes`/`saveNotes`, mounted where `ContentBlockEditor` sits on Movie/Series/Book detail and on the Game detail tab (label "Notes"); `ContentBlockEditor` and its StyleGuide specimens go, one NotesEditor specimen replaces them (ADR-0080, step 2 of 3)
+
+**Type:** Work / Task completion
+**Task:** curation-knqfj - Notes editor on every detail page — `JournalEditor` becomes `NotesEditor` taking `(MediaType, slug)` over `getNotes`/`saveNotes`, mounted where `ContentBlockEditor` sits on Movie/Series/Book detail and on the Game detail tab (label "Notes"); `ContentBlockEditor` and its StyleGuide specimens go, one NotesEditor specimen replaces them (ADR-0080, step 2 of 3)
+**Summary:** Notes editor on every detail page — JournalEditor becomes NotesEditor keyed on (MediaType, slug) over getNotes/saveNotes, mounted as a plain panel on Movie/Series/Book detail and on the Game detail tab (relabelled Notes); ContentBlockEditor and its two StyleGuide specimens deleted, one NotesEditor.viewDemo specimen over a fixed sample document replaces them (ADR-0080, step 2 of 3)
+**Duration:** 38m
+**Verification:** PASS (iteration 1)
+**Files changed:** 16
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 18:37 -- Task verified and completed: curation-w9fkq - Backfill legacy `catalog_entries` rows with an exact-match-resolved `media_type` via a corrective `Entry_media_types_inferred` event (ambiguous/orphan slugs reported by name, never guessed), self-heal `catalog_entries`' UNIQUE to `(catalog_slug, media_type, movie_slug)` at projection Init, and restore `Add_entry` to strict `(MediaType, slug)` pair identity (ADR-0079 §5 resolved)
 
 **Type:** Work / Task completion

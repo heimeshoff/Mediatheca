@@ -57,16 +57,6 @@ type Msg =
     | Remove_watch_session of sessionId: string
     | Add_new_friend_to_session of sessionId: string * name: string
     | New_friend_for_session_result of Result<unit, string>
-    | Add_content_block of AddContentBlockRequest
-    | Update_content_block of blockId: string * UpdateContentBlockRequest
-    | Remove_content_block of blockId: string
-    | Change_content_block_type of blockId: string * blockType: string
-    | Reorder_content_blocks of blockIds: string list
-    | Upload_screenshot of data: byte array * filename: string * insertBefore: string option
-    | Screenshot_uploaded of Result<string, string> * insertBefore: string option
-    | Group_content_blocks of leftId: string * rightId: string
-    | Ungroup_content_block of blockId: string
-    | Content_block_result of Result<unit, string>
     | Add_friend_and_recommend of name: string
     | Friend_and_recommend_result of Result<unit, string>
     | Add_friend_and_watch_with of name: string

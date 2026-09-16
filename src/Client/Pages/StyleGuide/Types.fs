@@ -9,8 +9,7 @@ type Section =
     | Animations
     | Components
     | VelvetLobbyPatterns
-    | ContentBlocks
-    | ContentZone
+    | Notes
     | EntryList
 
 type Model = {

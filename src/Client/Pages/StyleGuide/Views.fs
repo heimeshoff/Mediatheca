@@ -1866,77 +1866,44 @@ let private velvetLobbyPatternsSection () =
         ]
     ]
 
-// ── Section: Content Blocks ──
+// ── Section: Notes ──
 
-[<ReactComponent>]
-let private contentBlocksDemo () =
-    let blocks, setBlocks = React.useState<ContentBlockDto list>([
-        { BlockId = "demo-1"; BlockType = "text"; Content = "This is a text note. Hover to see the drag handle on the left."; ImageRef = None; Url = None; Caption = None; Position = 0; RowGroup = None; RowPosition = None }
-        { BlockId = "demo-2"; BlockType = "quote"; Content = "The only way to do great work is to love what you do."; ImageRef = None; Url = None; Caption = None; Position = 1; RowGroup = None; RowPosition = None }
-        { BlockId = "demo-3"; BlockType = "callout"; Content = "Click the drag handle to open the context menu. Use \"Turn into\" to change block types."; ImageRef = None; Url = None; Caption = None; Position = 2; RowGroup = None; RowPosition = None }
-        { BlockId = "demo-4"; BlockType = "code"; Content = "let hello = printfn \"Hello from Fable!\""; ImageRef = None; Url = None; Caption = None; Position = 3; RowGroup = None; RowPosition = None }
-        { BlockId = "demo-5"; BlockType = "text"; Content = "Check out [Fable Documentation](https://fable.io/docs/) for more info on the compiler."; ImageRef = None; Url = None; Caption = None; Position = 4; RowGroup = None; RowPosition = None }
-    ])
-    let nextId, setNextId = React.useState(6)
+// ADR-0080: one Notion-style block editor, `NotesEditor`, shared by all four
+// media types (movies, series, games, books) -- replacing the two per-kind
+// editors it grew out of. The specimen below is `NotesEditor.viewDemo`,
+// which renders over this fixed sample document and never calls
+// `getNotes`/`saveNotes` -- editing, the slash menu, drag-and-drop and
+// columns all work locally, in-memory, with no live API call from the
+// StyleGuide.
 
-    let onAdd (req: AddContentBlockRequest) =
-        let newBlock : ContentBlockDto = {
-            BlockId = $"demo-{nextId}"
-            BlockType = req.BlockType
-            Content = req.Content
-            ImageRef = req.ImageRef
-            Url = req.Url
-            Caption = req.Caption
-            Position = blocks.Length
-            RowGroup = None
-            RowPosition = None
-        }
-        setBlocks (blocks @ [newBlock])
-        setNextId (nextId + 1)
+let private sampleNotesDoc : JournalBlockDto list = [
+    { Id = "sample-1"; ParentId = None; BlockType = JournalBlockTypes.heading1; Content = "Notes"; Checked = false; Collapsed = false; Language = None; Url = None; ImageRef = None; Caption = None; Position = 0; Width = 1.0 }
+    { Id = "sample-2"; ParentId = None; BlockType = JournalBlockTypes.text; Content = "This is the same Notion-style block editor now shared by Movie, Series, Game and Book detail pages -- one model, one storage path (ADR-0080)."; Checked = false; Collapsed = false; Language = None; Url = None; ImageRef = None; Caption = None; Position = 1; Width = 1.0 }
+    { Id = "sample-3"; ParentId = None; BlockType = JournalBlockTypes.bullet; Content = "Type '/' to open the slash menu and pick a block type"; Checked = false; Collapsed = false; Language = None; Url = None; ImageRef = None; Caption = None; Position = 2; Width = 1.0 }
+    { Id = "sample-4"; ParentId = None; BlockType = JournalBlockTypes.bullet; Content = "Hover a block to reveal the drag handle, then drag to reorder or form two-column layouts"; Checked = false; Collapsed = false; Language = None; Url = None; ImageRef = None; Caption = None; Position = 3; Width = 1.0 }
+    { Id = "sample-5"; ParentId = None; BlockType = JournalBlockTypes.todo; Content = "Try checking this one off"; Checked = false; Collapsed = false; Language = None; Url = None; ImageRef = None; Caption = None; Position = 4; Width = 1.0 }
+    { Id = "sample-6"; ParentId = None; BlockType = JournalBlockTypes.quote; Content = "One editor, one model, one storage path for all four media types."; Checked = false; Collapsed = false; Language = None; Url = None; ImageRef = None; Caption = None; Position = 5; Width = 1.0 }
+]
 
-    let onUpdate (blockId: string) (req: UpdateContentBlockRequest) =
-        setBlocks (blocks |> List.map (fun b ->
-            if b.BlockId = blockId then
-                { b with Content = req.Content; Url = req.Url; ImageRef = req.ImageRef; Caption = req.Caption }
-            else b))
-
-    let onRemove (blockId: string) =
-        setBlocks (blocks |> List.filter (fun b -> b.BlockId <> blockId))
-
-    let onChangeType (blockId: string) (newType: string) =
-        setBlocks (blocks |> List.map (fun b ->
-            if b.BlockId = blockId then { b with BlockType = newType }
-            else b))
-
-    let onReorder (blockIds: string list) =
-        setBlocks (
-            blockIds
-            |> List.mapi (fun i bid ->
-                blocks |> List.tryFind (fun b -> b.BlockId = bid)
-                |> Option.map (fun b -> { b with Position = i }))
-            |> List.choose id)
-
-    ContentBlockEditor.view blocks onAdd onUpdate onRemove onChangeType onReorder None None None
-
-let private contentBlocksSection () =
+let private notesSection () =
     Html.div [
         prop.className "flex flex-col gap-6"
         prop.children [
-            sectionTitle "Content Blocks"
+            sectionTitle "Notes"
 
-            decision "The content block system lets users attach rich notes to movies. All blocks are text blocks that can contain inline links via markdown-style [text](url) syntax. Blocks are event-sourced and ordered by position. Smart paste: select text and paste a URL to create an inline link."
+            decision "The Notes editor (ADR-0080) is a Notion-style block editor shared by every media type. Each detail page's document is keyed by its own (MediaType, slug) pair -- never a bare slug -- and debounce-saves the whole document as one snapshot 800ms after the last edit."
 
             subheading "Live Demo"
 
             Html.p [
                 prop.className DesignSystem.secondaryText
-                prop.text "Try adding, editing, and removing blocks below. Hover over a block to see the drag handle on the left. Click the handle to open the context menu (edit, delete, change type). Drag to reorder."
+                prop.text "Try typing, pressing '/' for the slash menu, dragging the handle to reorder blocks, or dragging onto a block's left/right half to form a two-column layout. This specimen edits a fixed in-memory document -- no network call, nothing is persisted."
             ]
 
             Html.div [
                 prop.className "max-w-2xl mt-4"
                 prop.children [
-                    contentBlocksDemo ()
+                    NotesEditor.viewDemo sampleNotesDoc
                 ]
             ]
 
@@ -1946,11 +1913,17 @@ let private contentBlocksSection () =
                 prop.className "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl"
                 prop.children [
                     for (typeName, label, desc) in [
-                        "text", "Text Block", "Free-form text notes with optional inline links via [text](url) markdown syntax. Default block type."
-                        "quote", "Quote Block", "Styled with a left border and italic text. Use for citations, memorable quotes, or highlighted passages."
-                        "callout", "Callout Block", "Info-styled block with an icon and tinted background. Use for tips, warnings, or important notes."
-                        "code", "Code Block", "Monospace font with a subtle background. Use for code snippets, technical references, or formatted data."
-                        "image", "Image Block", "Image attachments with optional caption. Uses ImageRef for storage reference. (Planned -- not yet in editor.)"
+                        "text", "Text", "Plain paragraph text. The default block type; '/' converts it into any other type."
+                        "h1 / h2 / h3 / h4", "Heading", "Section headings, four levels."
+                        "bullet / numbered", "List", "Bulleted or numbered list items."
+                        "todo", "To-do", "A checkbox line item."
+                        "toggle", "Toggle", "Collapsible block whose children hide/show."
+                        "quote", "Quote", "Left-border styled block for citations or highlighted passages."
+                        "callout", "Callout", "Icon + tinted background, for tips or important notes."
+                        "code", "Code", "Monospace block for snippets."
+                        "link", "Link", "A bare URL pasted into an empty block becomes a link block."
+                        "image", "Image", "Drag-and-drop or paste an image to attach it."
+                        "columnList / column", "Columns", "Formed by dragging a block onto another's left/right edge; dissolve back to a flat list when down to one column."
                     ] do
                         Html.div [
                             prop.className (DesignSystem.velvetCard + " p-5 rounded-xl border border-base-content/5")
@@ -1979,7 +1952,7 @@ let private contentBlocksSection () =
                 prop.children [
                     Html.code [
                         prop.className "text-xs font-mono text-base-content/60 bg-base-300/30 p-3 rounded block"
-                        prop.text "ContentBlockEditor.view blocks onAdd onUpdate onRemove onChangeType onReorder"
+                        prop.text "NotesEditor.view (mediaType: MediaType) (slug: string)"
                     ]
                     Html.div [
                         prop.className "p-4 rounded-lg bg-base-200/30 border border-base-content/5"
@@ -1989,12 +1962,8 @@ let private contentBlocksSection () =
                                 prop.className "mt-2 space-y-1"
                                 prop.children [
                                     for (name, desc) in [
-                                        "blocks", "ContentBlockDto list, sorted by Position"
-                                        "onAdd", "AddContentBlockRequest -> unit"
-                                        "onUpdate", "string -> UpdateContentBlockRequest -> unit"
-                                        "onRemove", "string -> unit"
-                                        "onChangeType", "string -> string -> unit (blockId, newType)"
-                                        "onReorder", "string list -> unit (ordered blockIds)"
+                                        "mediaType", "MediaType -- Movie | Series | Game | Book; owns the document together with slug"
+                                        "slug", "string -- the media item's slug"
                                     ] do
                                         Html.li [
                                             prop.className "text-sm text-base-content/70"
@@ -2019,190 +1988,12 @@ let private contentBlocksSection () =
                         prop.className "p-4 rounded-lg bg-base-200/30 border border-base-content/5"
                         prop.children [
                             for (keys, desc) in [
-                                "Enter", "Save the current block"
-                                "Escape", "Cancel editing"
-                                "Select text + Paste URL", "Create an inline [text](url) link in the content"
-                                "Hover block", "Reveal drag handle on the left"
-                                "Click drag handle", "Open context menu (Edit, Delete, Turn into...)"
-                                "Drag handle", "Drag to reorder blocks"
-                            ] do
-                                Html.div [
-                                    prop.className "flex items-center gap-3 py-1"
-                                    prop.children [
-                                        Html.kbd [
-                                            prop.className "px-2 py-0.5 text-xs font-mono bg-base-300/50 rounded border border-base-content/10 text-base-content/70 min-w-[4rem] text-center"
-                                            prop.text keys
-                                        ]
-                                        Html.span [
-                                            prop.className "text-sm text-base-content/70"
-                                            prop.text desc
-                                        ]
-                                    ]
-                                ]
-                        ]
-                    ]
-                ]
-            ]
-
-            subheading "Decisions"
-
-            decisionBox
-                "Inline Editing"
-                "Edit-in-place with Enter/Escape keyboard shortcuts. Blocks transform into input fields on edit, keeping the user in context. No modal dialogs for simple text edits."
-                "Separate edit modal (too heavy for quick notes). Markdown editor (overkill for short text notes)."
-
-            decisionBox
-                "Smart Paste"
-                "Pasting a URL when text is selected wraps it as a markdown link [text](url) inline. This mirrors how rich text editors work and keeps links as part of the text flow rather than separate block types."
-                "Separate link block type (adds complexity, breaks text flow). Always creating plain text from paste (loses structured links)."
-
-            decisionBox
-                "No-Card Styling"
-                "Content blocks render as plain text on the background -- no cards, no glass effects. Blocks are secondary content that should feel like natural text, not UI elements. New blocks appear via a subtle \"new block\" placeholder."
-                "Glass cards (too visually heavy, makes notes feel like separate components). Fully styled cards (compete with primary movie metadata)."
-        ]
-    ]
-
-// ── Section: Content Zone ──
-
-// Functional updaters (setState(fun prev -> ...)) ensure each callback sees
-// the latest state, even when ContentBlockEditor fires multiple callbacks
-// (e.g. onReorder then onUngroup) in the same React event.
-
-[<ReactComponent>]
-let private contentZoneDemo () =
-    let pairGroupId = "demo-row-group-1"
-    let blocks, setBlocks = React.useState<ContentBlockDto list>([
-        { BlockId = "zone-1"; BlockType = "text"; Content = "This standalone text block can be dragged to reorder, or dropped onto another block's left/right half to form a two-column row."; ImageRef = None; Url = None; Caption = None; Position = 0; RowGroup = None; RowPosition = None }
-        { BlockId = "zone-2"; BlockType = "text"; Content = "Left column -- this block is already paired in a RowPair. Drag within the pair to swap sides, or drag to a gap to extract."; ImageRef = None; Url = None; Caption = None; Position = 1; RowGroup = Some pairGroupId; RowPosition = Some 0 }
-        { BlockId = "zone-3"; BlockType = "text"; Content = "Right column -- the other half of the pre-existing RowPair."; ImageRef = None; Url = None; Caption = None; Position = 2; RowGroup = Some pairGroupId; RowPosition = Some 1 }
-        { BlockId = "zone-4"; BlockType = "quote"; Content = "Two-column layouts let you place related content side by side -- like a quote next to commentary."; ImageRef = None; Url = None; Caption = None; Position = 3; RowGroup = None; RowPosition = None }
-        { BlockId = "zone-5"; BlockType = "callout"; Content = "Try dragging this callout to the left or right half of the quote above to create a new pair!"; ImageRef = None; Url = None; Caption = None; Position = 4; RowGroup = None; RowPosition = None }
-    ])
-    let nextId, setNextId = React.useState(6)
-
-    let onAdd (req: AddContentBlockRequest) =
-        let newBlock : ContentBlockDto = {
-            BlockId = $"zone-{nextId}"
-            BlockType = req.BlockType
-            Content = req.Content
-            ImageRef = req.ImageRef
-            Url = req.Url
-            Caption = req.Caption
-            Position = blocks.Length
-            RowGroup = None
-            RowPosition = None
-        }
-        setBlocks (blocks @ [newBlock])
-        setNextId (nextId + 1)
-
-    let onUpdate (blockId: string) (req: UpdateContentBlockRequest) =
-        setBlocks (blocks |> List.map (fun b ->
-            if b.BlockId = blockId then
-                { b with Content = req.Content; Url = req.Url; ImageRef = req.ImageRef; Caption = req.Caption }
-            else b))
-
-    let onRemove (blockId: string) =
-        setBlocks (blocks |> List.filter (fun b -> b.BlockId <> blockId))
-
-    let onChangeType (blockId: string) (newType: string) =
-        setBlocks (blocks |> List.map (fun b ->
-            if b.BlockId = blockId then { b with BlockType = newType }
-            else b))
-
-    let onReorder (blockIds: string list) =
-        setBlocks (
-            blockIds
-            |> List.mapi (fun i bid ->
-                blocks |> List.tryFind (fun b -> b.BlockId = bid)
-                |> Option.map (fun b -> { b with Position = i }))
-            |> List.choose id)
-
-    let onGroup (leftId: string) (rightId: string) =
-        let groupId = System.Guid.NewGuid().ToString()
-        setBlocks (blocks |> List.map (fun b ->
-            if b.BlockId = leftId then { b with RowGroup = Some groupId; RowPosition = Some 0 }
-            elif b.BlockId = rightId then { b with RowGroup = Some groupId; RowPosition = Some 1 }
-            else b))
-
-    let onUngroup (blockId: string) =
-        let block = blocks |> List.tryFind (fun b -> b.BlockId = blockId)
-        match block |> Option.bind (fun b -> b.RowGroup) with
-        | Some rg ->
-            setBlocks (blocks |> List.map (fun b ->
-                if b.RowGroup = Some rg then { b with RowGroup = None; RowPosition = None }
-                else b))
-        | None -> ()
-
-    ContentBlockEditor.view
-        blocks
-        onAdd
-        onUpdate
-        onRemove
-        onChangeType
-        onReorder
-        None
-        (Some onGroup)
-        (Some onUngroup)
-
-let private contentZoneSection () =
-    Html.div [
-        prop.className "flex flex-col gap-6"
-        prop.children [
-            sectionTitle "Content Zone"
-
-            decision "The Content Zone is a Notion-like drag-and-drop layout system for content blocks. Beyond simple reordering, blocks can be grouped into two-column RowPairs by dragging onto the left or right half of another block. RowPair members can be swapped or extracted back to full-width by dragging to a gap indicator."
-
-            subheading "Live Demo"
-
-            Html.p [
-                prop.className DesignSystem.secondaryText
-                prop.text "This is a fully interactive demo with pre-existing paired and standalone blocks. Try these interactions:"
-            ]
-
-            Html.ul [
-                prop.className "mt-2 space-y-1 list-disc list-inside max-w-2xl"
-                prop.children [
-                    Html.li [
-                        prop.className "text-sm text-base-content/70"
-                        prop.text "Drag blocks between positions via the green full-width indicator lines"
-                    ]
-                    Html.li [
-                        prop.className "text-sm text-base-content/70"
-                        prop.text "Drag a block to the left or right half of another to create a two-column row"
-                    ]
-                    Html.li [
-                        prop.className "text-sm text-base-content/70"
-                        prop.text "Drag a RowPair member to a gap to extract it as full-width"
-                    ]
-                    Html.li [
-                        prop.className "text-sm text-base-content/70"
-                        prop.text "Drag within a RowPair to swap left/right positions"
-                    ]
-                ]
-            ]
-
-            Html.div [
-                prop.className "max-w-2xl mt-4"
-                prop.children [
-                    contentZoneDemo ()
-                ]
-            ]
-
-            subheading "Interaction Patterns"
-
-            Html.div [
-                prop.className "flex flex-col gap-3 max-w-3xl"
-                prop.children [
-                    Html.div [
-                        prop.className "p-4 rounded-lg bg-base-200/30 border border-base-content/5"
-                        prop.children [
-                            for (keys, desc) in [
-                                "Drag to gap", "Reorder: move a block to a new position (green full-width line)"
-                                "Drag to left half", "Group: create a RowPair with the dragged block on the left"
-                                "Drag to right half", "Group: create a RowPair with the dragged block on the right"
-                                "Drag pair member to gap", "Ungroup: extract block from pair, both become full-width"
-                                "Drag within pair", "Swap: exchange left/right positions in the RowPair"
+                                "Enter", "Split the block; empty list items convert back to text"
+                                "Backspace at start", "Merge into the previous text-like block, or turn the block back into text"
+                                "/", "Open the slash menu to change block type"
+                                "Markdown prefixes (# , - , 1. , [] , > , ```)", "Autoformat the current block as you type"
+                                "Drag handle", "Reorder blocks, or drop onto a block's left/right edge to form columns"
+                                "Toggle blocks", "Collapse/expand their nested children"
                             ] do
                                 Html.div [
                                     prop.className "flex items-center gap-3 py-1"
@@ -2222,61 +2013,19 @@ let private contentZoneSection () =
                 ]
             ]
 
-            subheading "API"
-
-            Html.div [
-                prop.className "flex flex-col gap-3 max-w-3xl"
-                prop.children [
-                    Html.code [
-                        prop.className "text-xs font-mono text-base-content/60 bg-base-300/30 p-3 rounded block"
-                        prop.text "ContentBlockEditor.view blocks onAdd onUpdate onRemove onChangeType onReorder onUploadScreenshot onGroupBlocks onUngroupBlock"
-                    ]
-                    Html.div [
-                        prop.className "p-4 rounded-lg bg-base-200/30 border border-base-content/5"
-                        prop.children [
-                            Html.p [ prop.className DesignSystem.mutedText; prop.text "Parameters:" ]
-                            Html.ul [
-                                prop.className "mt-2 space-y-1"
-                                prop.children [
-                                    for (name, desc) in [
-                                        "blocks", "ContentBlockDto list -- sorted by Position"
-                                        "onAdd", "AddContentBlockRequest -> unit"
-                                        "onUpdate", "string -> UpdateContentBlockRequest -> unit"
-                                        "onRemove", "string -> unit"
-                                        "onChangeType", "string -> string -> unit (blockId, newType)"
-                                        "onReorder", "string list -> unit (ordered blockIds)"
-                                        "onUploadScreenshot", "(byte[] -> string -> string option -> unit) option"
-                                        "onGroupBlocks", "(string -> string -> unit) option -- (leftId, rightId)"
-                                        "onUngroupBlock", "(string -> unit) option -- blockId"
-                                    ] do
-                                        Html.li [
-                                            prop.className "text-sm text-base-content/70"
-                                            prop.children [
-                                                Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text name ]
-                                                Html.span [ prop.text $" -- {desc}" ]
-                                            ]
-                                        ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
-
             subheading "Decisions"
 
             decisionBox
-                "Gap-Based Reordering"
-                "Green full-width indicator lines appear between blocks during drag, clearly showing where the block will land. This provides unambiguous drop targets and works naturally with both single blocks and RowPairs."
-                "Swap-on-hover (confusing with adjacent blocks). Drag handle only (no visual feedback for drop position). Sortable.js (external dependency, harder to integrate with RowPair grouping)."
+                "One editor, one model, one storage path"
+                "The game journal's tree/16-type/columns/toggle model generalized to all four media types (ADR-0080), replacing the separately event-sourced ContentBlocks (movies/series/books) and the plain-SQLite GameJournal. One editor to maintain, one mental model for users across every detail page."
+                "Keeping two editors and two models side by side (ADR-0043's re-derivability standard already flagged the mutable GameJournal table as a violation). Migrating ContentBlocks' flat model up to the tree instead of the reverse (loses toggle/columns/16 types users already rely on in the journal)."
 
             decisionBox
-                "Left/Right Drop Zones for Grouping"
-                "Dragging onto the left or right half of a block creates a two-column RowPair. The drop zone (left vs right) determines which side the dragged block occupies. This mirrors Notion's column creation and is discoverable through visual feedback."
-                "Explicit 'group' button (extra UI, less fluid). Context menu grouping (requires selecting two blocks separately, slower workflow)."
+                "Owner in the stream id, not a bare slug"
+                "The document's owner is the (MediaType, slug) pair, carried in the stream id (Notes-{token}-{slug}) rather than a bare slug prop. This is the same typing discipline ADR-0079 established for catalog entries -- never reintroduce an untyped slug."
+                "A bare slug prop (worked for GameJournal because games were the only owner; breaks the moment a second media type needs the same stream)."
         ]
     ]
-
 // ── Section: Entry List ──
 
 type private MockEntry = {
@@ -2472,8 +2221,7 @@ let private sectionNav (activeSection: Section) (dispatch: Msg -> unit) =
         Animations, "Animations"
         Components, "Components"
         VelvetLobbyPatterns, "Velvet Lobby Patterns"
-        ContentBlocks, "Content Blocks"
-        ContentZone, "Content Zone"
+        Notes, "Notes"
         EntryList, "Entry List"
     ]
     Html.nav [
@@ -2500,8 +2248,7 @@ let private sectionContent (section: Section) =
     | Animations -> animationsSection ()
     | Components -> componentsSection ()
     | VelvetLobbyPatterns -> velvetLobbyPatternsSection ()
-    | ContentBlocks -> contentBlocksSection ()
-    | ContentZone -> contentZoneSection ()
+    | Notes -> notesSection ()
     | EntryList -> entryListSection ()
 
 // ── Page View ──

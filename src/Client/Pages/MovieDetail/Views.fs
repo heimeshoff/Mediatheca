@@ -972,16 +972,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                         // Notes
                                         Html.section [
                                             prop.children [
-                                                ContentBlockEditor.view
-                                                    movie.ContentBlocks
-                                                    (fun req -> dispatch (Add_content_block req))
-                                                    (fun bid req -> dispatch (Update_content_block (bid, req)))
-                                                    (fun bid -> dispatch (Remove_content_block bid))
-                                                    (fun bid blockType -> dispatch (Change_content_block_type (bid, blockType)))
-                                                    (fun blockIds -> dispatch (Reorder_content_blocks blockIds))
-                                                    (Some (fun data filename insertBefore -> dispatch (Upload_screenshot (data, filename, insertBefore))))
-                                                    (Some (fun leftId rightId -> dispatch (Group_content_blocks (leftId, rightId))))
-                                                    (Some (fun blockId -> dispatch (Ungroup_content_block blockId)))
+                                                NotesEditor.view Movie model.Slug
                                             ]
                                         ]
                                         // Cast
