@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 23:35 -- Modeling / Refined: curation-kezpv - Retire the one-off Notes migration tooling after the harbour cutover (Gate 1, Gate 2, Health-tab media-type backfill)
+
+**Type:** Modeling / Refine
+**BC:** curation
+**Status after:** todo
+**Summary:** The real-world precondition is met and recorded: a read-only inspection of a temp copy of harbour's live store (2026-09-16 23:33 CEST) shows Gate 1 ran at 22:36 CEST (14 `Notes_saved` events, 0 `ContentBlocks-*` streams), Gate 2 between 22:38 and 22:57 CEST (`content_blocks`/`game_journal_blocks` gone, six ADR-0034 pre-purge backups), and the backfill at 22:58 CEST (3 `Entry_media_types_inferred` events, 0 untyped `catalog_entries`). The "builder records the date before promotion" criterion became a Notes fact. Settled the `resolveMediaType` question: the two backfill call sites are its only callers, so it and its `MediaTypeResolution` DU plus three `CatalogProjectionTests` cases are deleted (grep criterion widened accordingly). Named the exact `AdministrationTests.fs` backfill helpers/cases to delete and the Health-tab event guard to keep, the AdminSurgery `Msg`/`PendingAction`/flag members to remove, and added ADR-0080 / ADR-0079 retirement amendments via `ADRS_WRITTEN`. curation-tb0nn's dismissal (23:31) is reflected — no guard ships, no dependency. Orchestrator not consulted: shape fixed by ADR-0080/0079, open items were factual checks.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 23:31 -- Modeling / Dismissed: curation-tb0nn
 
 **Type:** Modeling / Dismiss
