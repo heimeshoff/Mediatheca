@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 18:44 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 1h15m
+**Completed:** 4 (first-try PASS: 2, re-dispatched: 2, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** journal-k52j1: 1 (iteration-2 PASS after the conductor applied the two non-bullet README edits on main, no worker re-dispatch), books-f3sb2: 1, curation-w9fkq: 2 (+1 ADR-0072 resolve-conflict dispatch after a real merge-back conflict with books-f3sb2 on CatalogProjectionTests.fs; rung-6 two-dot re-verify was the iteration-2 PASS), curation-knqfj: 1
+**Commits:** 7 (2 batch-start, 4 integration, 1 session-end)
+**Vision-conformance:** none — batch aligns with vision (vision.md carries no "What success looks like" / "Non-goals" sections; judged against Design Principles and the Books arc's "Later: reading activity in the Journal, books in catalogs" — both shipped this session; the Notes editor consolidation serves the Replayable principle per ADR-0043/0080; the media_type backfill repairs ADR-0079's deferred §5)
+**Batch mix:** 75% product-facing / 25% harness / 0% bookkeeping (4 tasks) — the 25% is journal-k52j1, a README-only chore with zero source files, which the classifier cannot place as bookkeeping
+**Carry-over:** none — working tree clean (5 stranded RESULT sidecars swept; `.agentheim/salvage/curation-w9fkq-merge-conflict.patch` kept, gitignored; all four worktrees torn down — the books-f3sb2 teardown at 18:01 ran before its node_modules junction was unlinked and emptied the main tree's node_modules, restored via npm ci at 18:15; full suite on main after the batch: build OK, Expecto 956/956, Vitest 108/108)
+
+---
+
 ## 2026-09-16 18:40 -- Task verified and completed: curation-knqfj - Notes editor on every detail page — `JournalEditor` becomes `NotesEditor` taking `(MediaType, slug)` over `getNotes`/`saveNotes`, mounted where `ContentBlockEditor` sits on Movie/Series/Book detail and on the Game detail tab (label "Notes"); `ContentBlockEditor` and its StyleGuide specimens go, one NotesEditor specimen replaces them (ADR-0080, step 2 of 3)
 
 **Type:** Work / Task completion
