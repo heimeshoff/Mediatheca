@@ -26,6 +26,7 @@ let private apiBootstrap (conn: SqliteConnection) =
     CastStore.initialize conn
     JellyfinStore.initialize conn
     ContentBlockProjection.handler.Init conn
+    NotesProjection.handler.Init conn
     FriendProjection.handler.Init conn
     MovieProjection.handler.Init conn
     SeriesProjection.handler.Init conn

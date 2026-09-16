@@ -11,6 +11,7 @@ let private createInMemoryConnection () =
     CastStore.initialize conn
     JellyfinStore.initialize conn
     ContentBlockProjection.handler.Init conn
+    NotesProjection.handler.Init conn
     conn
 
 [<Tests>]

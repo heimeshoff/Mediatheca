@@ -30,6 +30,7 @@ let private createMovieConnection () =
     CastStore.initialize conn
     JellyfinStore.initialize conn
     ContentBlockProjection.handler.Init conn
+    NotesProjection.handler.Init conn
     FriendProjection.handler.Init conn
     MovieProjection.handler.Init conn
     conn
@@ -136,6 +137,7 @@ let private createGameConnection () =
     conn.Open()
     EventStore.initialize conn
     ContentBlockProjection.handler.Init conn
+    NotesProjection.handler.Init conn
     GameProjection.handler.Init conn
     conn
 
@@ -336,6 +338,7 @@ let private apiBootstrap (conn: SqliteConnection) =
     CastStore.initialize conn
     JellyfinStore.initialize conn
     ContentBlockProjection.handler.Init conn
+    NotesProjection.handler.Init conn
     FriendProjection.handler.Init conn
     MovieProjection.handler.Init conn
     SeriesProjection.handler.Init conn

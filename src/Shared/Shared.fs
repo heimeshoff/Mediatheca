@@ -215,10 +215,10 @@ type JournalBlockDto = {
 }
 
 /// games-t69rb: the "does this journal have anything to show" rule, shared
-/// between the server (computing `GameDetail.HasJournalContent` from
-/// `game_journal_blocks`, ADR-0043's re-derivability test — no new event,
-/// no projection column) and the client (unit-tested directly here, ADR-0064,
-/// rather than duplicated). A block counts as content if it carries
+/// between the server (computing `HasNotesContent` on each detail DTO,
+/// curation-h98ve/ADR-0080, from `notes_blocks` — ADR-0043's re-derivability
+/// test, no new event, no projection column) and the client (unit-tested
+/// directly here, ADR-0064, rather than duplicated). A block counts as content if it carries
 /// non-whitespace `Content`, or an `ImageRef`/`Url` (image and link blocks
 /// carry no text) — structural-only blocks (`columnList`/`column`/`toggle`
 /// wrappers with nothing typed into them yet) don't count.
@@ -648,6 +648,11 @@ type MovieDetail = {
     WantToWatchWith: FriendRef list
     WatchSessions: WatchSessionDto list
     ContentBlocks: ContentBlockDto list
+    /// curation-h98ve (ADR-0080): server-computed via `JournalBlock.hasContent`
+    /// over `notes_blocks`, re-derived fresh on every read (ADR-0043) —
+    /// the Notes counterpart games-t69rb originally shipped only on
+    /// `GameDetail`.
+    HasNotesContent: bool
 }
 
 // TV Series
@@ -767,6 +772,8 @@ type SeriesDetail = {
     /// (integration-mqsd3) -- mirrors `MovieDetail.JellyfinId`. Drives
     /// "Remove local copy" visibility on the series detail page.
     JellyfinId: string option
+    /// curation-h98ve (ADR-0080): see `MovieDetail.HasNotesContent`.
+    HasNotesContent: bool
 }
 
 type ReturningSoonItem = {
@@ -982,6 +989,8 @@ type BookDetail = {
     Language: string option
     ProgressHistory: ReadingProgressDto list
     ContentBlocks: ContentBlockDto list
+    /// curation-h98ve (ADR-0080): see `MovieDetail.HasNotesContent`.
+    HasNotesContent: bool
 }
 
 type AddBookRequest = {
@@ -1332,10 +1341,13 @@ type GameDetail = {
     WantToPlayWith: FriendRef list
     PlayedWith: FriendRef list
     ContentBlocks: ContentBlockDto list
-    /// games-t69rb: server-computed via `JournalBlock.hasContent` over
-    /// `game_journal_blocks` — lets the client pick Journal-first vs.
-    /// Overview-first without a second round-trip to `getGameJournal`.
-    HasJournalContent: bool
+    /// games-t69rb, renamed by curation-h98ve (ADR-0080): server-computed
+    /// via `JournalBlock.hasContent` over `notes_blocks` — lets the client
+    /// pick Notes-first vs. Overview-first without a second round-trip to
+    /// `getNotes`. Until curation-j4qqt migrates existing games' journals,
+    /// this is also true when only the legacy `game_journal_blocks` table
+    /// has content (see `GameProjection.getBySlug`'s comment).
+    HasNotesContent: bool
 }
 
 type AddGameRequest = {
@@ -1940,6 +1952,11 @@ type IMediathecaApi = {
     groupContentBlocksInRow: string -> string -> string -> string -> Async<Result<unit, string>>
     ungroupContentBlock: string -> string -> Async<Result<unit, string>>
     uploadContentImage: byte array -> string -> Async<Result<string, string>>
+    // Notes (curation-h98ve, ADR-0080): one event-sourced document per
+    // (MediaType, slug), replacing ContentBlocks and GameJournal (server
+    // core only here — the client editor switch is curation-knqfj).
+    getNotes: MediaType -> string -> Async<JournalBlockDto list>
+    saveNotes: MediaType -> string -> JournalBlockDto list -> Async<Result<unit, string>>
     // Catalogs
     createCatalog: CreateCatalogRequest -> Async<Result<string, string>>
     updateCatalog: string -> UpdateCatalogRequest -> Async<Result<unit, string>>

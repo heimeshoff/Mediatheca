@@ -35,6 +35,7 @@ let private bootstrap (conn: SqliteConnection) =
     EventStore.initialize conn
     SettingsStore.initialize conn
     ContentBlockProjection.handler.Init conn
+    NotesProjection.handler.Init conn
     BookProjection.handler.Init conn
     MetadataCache.initialize conn
     Administration.initializeJobRuns conn

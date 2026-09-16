@@ -29,6 +29,7 @@ module Administration =
         "Friends", "Friend-"
         "Catalogs", "Catalog-"
         "ContentBlocks", "ContentBlocks-"
+        "Notes", "Notes-"
     ]
 
     let private prefixForBoundedContext (bc: string option) : string option =
@@ -68,6 +69,7 @@ module Administration =
         "Friend-", fun eventType data -> Friends.Serialization.deserialize eventType data |> Option.map Friends.Serialization.serialize
         "Catalog-", fun eventType data -> Catalogs.Serialization.deserialize eventType data |> Option.map Catalogs.Serialization.serialize
         "ContentBlocks-", fun eventType data -> ContentBlocks.Serialization.deserialize eventType data |> Option.map ContentBlocks.Serialization.serialize
+        "Notes-", fun eventType data -> Notes.Serialization.deserialize eventType data |> Option.map Notes.Serialization.serialize
     ]
 
     /// Round-trip validate + canonicalize `rawData` as an instance of
@@ -142,6 +144,7 @@ module Administration =
         "Friends", Friends.Serialization.handledEventTypes
         "Catalogs", Catalogs.Serialization.handledEventTypes
         "ContentBlocks", ContentBlocks.Serialization.handledEventTypes
+        "Notes", Notes.Serialization.handledEventTypes
     ]
 
     /// True if `eventType` is a known match-arm string for `bcName`'s
@@ -420,6 +423,9 @@ module Administration =
         "book_list", Projected "BookProjection"
         "book_detail", Projected "BookProjection"
         "book_progress", Projected "BookProjection"
+        // curation-h98ve (ADR-0080, amends ADR-0044): Notes' document-stream
+        // snapshot projection — flat block rows, owner (media_type, slug).
+        "notes_blocks", Projected "NotesProjection"
 
         // Cache — re-derivable from Jellyfin's own state via a full
         // clear-then-repopulate sync (Api.fs's Jellyfin import handlers),
@@ -904,6 +910,7 @@ module Administration =
         "friend_list", "image_ref"
         "content_blocks", "image_ref"
         "game_journal_blocks", "image_ref"
+        "notes_blocks", "image_ref"
         "cast_members", "image_ref"
     ]
 

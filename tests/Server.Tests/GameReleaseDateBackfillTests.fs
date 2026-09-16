@@ -42,6 +42,7 @@ let private createConnection () =
     EventStore.initialize conn
     SettingsStore.initialize conn
     ContentBlockProjection.handler.Init conn
+    NotesProjection.handler.Init conn
     GameProjection.handler.Init conn
     GameJournal.initialize conn
     MetadataCache.initialize conn

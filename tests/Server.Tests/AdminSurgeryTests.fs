@@ -28,6 +28,7 @@ let private bootstrapAdmin (conn: SqliteConnection) =
     JellyfinStore.initialize conn
     GameJournal.initialize conn
     ContentBlockProjection.handler.Init conn
+    NotesProjection.handler.Init conn
     FriendProjection.handler.Init conn
     MovieProjection.handler.Init conn
     SeriesProjection.handler.Init conn

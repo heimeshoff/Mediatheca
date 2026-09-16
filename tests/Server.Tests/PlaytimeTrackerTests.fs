@@ -13,6 +13,7 @@ let private createInMemoryConnection () =
     EventStore.initialize conn
     // GameProjection.getBySlug joins with content_blocks, so initialize that table too
     ContentBlockProjection.handler.Init conn
+    NotesProjection.handler.Init conn
     GameProjection.handler.Init conn
     GameJournal.initialize conn
     PlaySessionProjection.handler.Init conn

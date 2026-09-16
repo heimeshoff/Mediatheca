@@ -2479,6 +2479,28 @@ module Api =
                     return Error $"Failed to upload image: {ex.Message}"
             }
 
+            // Notes (curation-h98ve, ADR-0080): event-sourced document per
+            // (MediaType, slug); no bespoke write path, same executeCommand
+            // idiom every other command uses.
+            getNotes = fun mediaType slug -> async {
+                use conn = factory ()
+                return NotesProjection.getForOwner conn mediaType slug
+            }
+
+            saveNotes = fun mediaType slug blocks -> async {
+                use conn = factory ()
+                let sid = Notes.streamId mediaType slug
+                return
+                    executeCommand
+                        conn sid
+                        Notes.Serialization.fromStoredEvent
+                        Notes.reconstitute
+                        Notes.decide
+                        Notes.Serialization.toEventData
+                        (Notes.Save_notes blocks)
+                        projectionHandlers
+            }
+
             // Catalogs
             createCatalog = fun request -> async {
                 use conn = factory ()

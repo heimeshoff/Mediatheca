@@ -25,6 +25,7 @@ let private bootstrapAdmin (conn: SqliteConnection) =
     // lazily by Composition.fs at startup.
     GameJournal.initialize conn
     ContentBlockProjection.handler.Init conn
+    NotesProjection.handler.Init conn
     FriendProjection.handler.Init conn
     MovieProjection.handler.Init conn
     SeriesProjection.handler.Init conn
@@ -626,8 +627,8 @@ let administrationTests =
 
             // books-y9kxy adds book_list.cover_ref/book_detail.cover_ref (two
             // more ref-bearing columns) to the fifteen this registry already
-            // named.
-            Expect.equal (List.length Administration.imageRefColumns) 17 "Registry should list all seventeen ref-bearing columns"
+            // named; curation-h98ve (ADR-0080) adds notes_blocks.image_ref.
+            Expect.equal (List.length Administration.imageRefColumns) 18 "Registry should list all eighteen ref-bearing columns"
 
             for (table, column) in Administration.imageRefColumns do
                 use cmd = conn.CreateCommand()

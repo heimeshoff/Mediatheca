@@ -30,6 +30,7 @@ let private newConn () =
     CastStore.initialize conn
     JellyfinStore.initialize conn
     ContentBlockProjection.handler.Init conn
+    NotesProjection.handler.Init conn
     conn
 
 let private mkEpisode (num: int) : Series.EpisodeImportData = {

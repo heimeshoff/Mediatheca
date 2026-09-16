@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 14:28 -- Task verified and completed: curation-h98ve - Notes server core — an event-sourced block document per (MediaType, slug) — `Notes_saved` snapshot stream, `notes_blocks` projection, `getNotes`/`saveNotes` on IMediathecaApi, `HasNotesContent` on all four detail DTOs replacing `GameDetail.HasJournalContent`, registered in every Administration registry; ContentBlocks and GameJournal left untouched (ADR-0080, step 1 of 3)
+
+**Type:** Work / Task completion
+**Task:** curation-h98ve - Notes server core — an event-sourced block document per (MediaType, slug) — `Notes_saved` snapshot stream, `notes_blocks` projection, `getNotes`/`saveNotes` on IMediathecaApi, `HasNotesContent` on all four detail DTOs replacing `GameDetail.HasJournalContent`, registered in every Administration registry; ContentBlocks and GameJournal left untouched (ADR-0080, step 1 of 3)
+**Summary:** Notes server core (ADR-0080 step 1) — Notes.fs Notes_saved snapshot stream keyed by (MediaType, slug), notes_blocks projection, getNotes/saveNotes on IMediathecaApi, HasNotesContent on all four detail DTOs replacing GameDetail.HasJournalContent, registered in every Administration registry; ContentBlocks and GameJournal untouched
+**Duration:** 34m
+**Verification:** PASS (iteration 1)
+**Files changed:** 49
+**Tests added:** 19
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 14:08 -- Task verified and completed: intelligence-h4qk2 - Prune the dead activity-heatmap payload — DashboardAllTab.ActivityDays/MonthlyBreakdown, their two Shared types and the seven daily/monthly feeder queries go end to end (mirroring intelligence-p4t7k); the All tab stopped rendering them in intelligence-dq8rk and no client reads them
 
 **Type:** Work / Task completion

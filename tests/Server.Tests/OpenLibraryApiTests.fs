@@ -35,6 +35,7 @@ let private fakeCoverBytes = Array.create 2048 (byte 0xFF)
 let private bootstrap (conn: SqliteConnection) =
     EventStore.initialize conn
     ContentBlockProjection.handler.Init conn
+    NotesProjection.handler.Init conn
     BookProjection.handler.Init conn
     MetadataCache.initialize conn
 

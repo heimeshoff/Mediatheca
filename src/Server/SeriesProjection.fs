@@ -1042,7 +1042,10 @@ module SeriesProjection =
               ContentBlocks = ContentBlockProjection.getByMovie conn slug
               NextEpisodeAirDate = getNextEpisodeAirDate conn slug
               NextSeasonAirDate = getNextSeasonAirDate conn slug
-              JellyfinId = JellyfinStore.getSeriesJellyfinId conn slug }
+              JellyfinId = JellyfinStore.getSeriesJellyfinId conn slug
+              // curation-h98ve (ADR-0080): re-derived fresh from notes_blocks
+              // on every read, never cached (ADR-0043).
+              HasNotesContent = NotesProjection.getForOwner conn Mediatheca.Shared.MediaType.Series slug |> Mediatheca.Shared.JournalBlock.hasContent }
         )
 
     /// series-q8jwc: `EpisodeCount`/`NextUp` composed via the

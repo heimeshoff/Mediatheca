@@ -23,6 +23,7 @@ let private bootstrapEverything (conn: SqliteConnection) =
     GameJournal.initialize conn
     SettingsStore.initialize conn
     ContentBlockProjection.handler.Init conn
+    NotesProjection.handler.Init conn
     FriendProjection.handler.Init conn
     MovieProjection.handler.Init conn
     SeriesProjection.handler.Init conn
@@ -57,6 +58,7 @@ let private allProjectionHandlers = [
     GameProjection.handler
     BookProjection.handler
     PlaySessionProjection.handler
+    NotesProjection.handler
 ]
 
 [<Tests>]
@@ -113,6 +115,9 @@ let tests =
                 "GameProjection", [ "game_list"; "game_detail" ]
                 "PlaySessionProjection", [ "game_play_session" ]
                 "BookProjection", [ "book_list"; "book_detail"; "book_progress" ]
+                // curation-h98ve (ADR-0080): Notes' document-stream snapshot
+                // projection.
+                "NotesProjection", [ "notes_blocks" ]
             ]
             let derivedFromRegistry =
                 Administration.tableRegistry
@@ -128,7 +133,7 @@ let tests =
                 let actual = derivedFromRegistry |> Map.tryFind name |> Option.defaultValue Set.empty
                 Expect.equal actual (Set.ofList tables) (sprintf "%s's derived table set" name)
             Expect.equal (Map.count derivedFromRegistry) (List.length expected)
-                "no extra projections should appear in the derivation beyond the seven expected"
+                "no extra projections should appear in the derivation beyond the eight expected"
 
         testCase "getUnrebuildableTableStats reports Cache and Imperative row counts, and omits every Projected table" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapEverything

@@ -1,7 +1,7 @@
 ---
 id: curation-h98ve
 title: Notes server core — an event-sourced block document per (MediaType, slug) — `Notes_saved` snapshot stream, `notes_blocks` projection, `getNotes`/`saveNotes` on IMediathecaApi, `HasNotesContent` on all four detail DTOs replacing `GameDetail.HasJournalContent`, registered in every Administration registry; ContentBlocks and GameJournal left untouched (ADR-0080, step 1 of 3)
-status: doing
+status: done
 type: feature
 context: curation
 created: 2026-09-16
@@ -113,3 +113,111 @@ serving live traffic until j4qqt removes them.
 - Do not document Notes as an aggregate with a "protects:" clause — see the README delta.
 - Specialist round (orchestrator, 2026-09-16): tactical-modeler designed the stream and `decide`;
   architect confirmed the separate `Notes-` namespace from `ContentBlocks-` and the ADR-0079 owner key.
+
+## Outcome
+
+Implemented Notes' server core per ADR-0080 step 1: `src/Server/Notes.fs` (the
+`Notes_saved` snapshot stream — `decide`'s no-op-save/duplicate-id/5000-block-cap
+rules, the frozen `storageToken`/`streamId`/`parseStreamId`) and
+`src/Server/NotesProjection.fs` (`notes_blocks`, delete-then-reinsert per
+snapshot). `IMediathecaApi` gained `getNotes`/`saveNotes` (`src/Shared/Shared.fs`,
+`src/Server/Api.fs`), wired through the existing `executeCommand`/
+`executeCommandCore` path — no bespoke write path. All four detail DTOs
+(`MovieDetail`, `SeriesDetail`, `GameDetail`, `BookDetail`) gained
+`HasNotesContent: bool`, computed fresh from `notes_blocks` on every read
+(never cached, ADR-0043) in `MovieProjection.fs`/`SeriesProjection.fs`/
+`BookProjection.fs`/`GameProjection.fs`. `GameDetail.HasJournalContent` is
+deleted; `GameProjection.getBySlug`'s `HasNotesContent` is `notes_blocks`
+content OR legacy `game_journal_blocks` content (one `||`, commented as
+deleted by curation-j4qqt) so the games-t69rb Journal-first tab default stays
+correct until the migration lands. The one required client edit beyond the
+Vitest rename is `src/Client/Pages/GameDetail/State.fs`'s
+`g.HasJournalContent` -> `g.HasNotesContent` (the field it reads no longer
+exists otherwise) — `ContentBlockEditor.fs`/`JournalEditor.fs` are untouched.
+`Administration.fs` gained the six registry entries ADR-0080 §12 names:
+`boundedContextPrefixes`'s `"Notes", "Notes-"`, the `eventCodecs` compensating
+codec, `handledEventTypesByBoundedContext`'s `"Notes"` entry,
+`tableRegistry`'s `"notes_blocks", Projected "NotesProjection"`, and
+`imageRefColumns`'s `"notes_blocks", "image_ref"`; `Composition.fs`'s
+`projectionHandlers` gained `NotesProjection.handler`.
+
+**Removal cascade:** verified (grep across `Api.fs`) that none of
+`removeMovie`/`removeSeries`/`removeGame`/`removeBook` today cascade into
+`ContentBlocks` streams on removal — those streams are left orphaned
+(rebuild-safe, per ADR-0080's own framing). Notes mirrors that: media removal
+is untouched here, Notes streams orphan the same way ContentBlocks streams
+already do. `GameJournal.deleteForGame`'s physical row+image deletion is a
+different, legacy-only behavior this task doesn't touch or extend to Notes.
+
+**Test-fixture ripple (unavoidable, mechanical):** every `MovieDetail`/
+`SeriesDetail`/`GameDetail`/`BookDetail`-shaped `getBySlug` call now also
+reads `notes_blocks` (mirroring how it already reads `content_blocks`), so
+every existing test fixture that already called
+`ContentBlockProjection.handler.Init` alongside one of the four media
+projections needed the matching `NotesProjection.handler.Init` line too (33
+files) — otherwise those fixtures would fail at runtime with "no such table:
+notes_blocks". Confirmed via grep that every fixture calling one of the four
+`getBySlug` functions already had a `ContentBlockProjection.handler.Init`
+neighbor, and that the sed-based bulk edit touched exactly (and only) those
+lines — a stray full-directory `sed -i` initially rewrote every test file's
+line endings (LF, no content change); this was caught via `git diff` (empty
+for the unintended files) and reverted with `git checkout --` before
+building, so only the 33 legitimately-affected files plus the 3 new test
+files remain in the diff.
+
+**New tests** (19 Expecto, all green — `dotnet run --project
+tests/Server.Tests/Server.Tests.fsproj`, 927/927 passing):
+`tests/Server.Tests/NotesTests.fs` (pure `decide`/`evolve`/`streamId`
+coverage — no-op save, reorder-only save still appends, duplicate-id and
+5000-block-cap refusals, `storageToken`/`parseStreamId` round-trip),
+`tests/Server.Tests/NotesProjectionTests.fs` (projection replay — several
+`Notes_saved` snapshots yield only the latest's rows, per-owner scoping,
+field round-trip), `tests/Server.Tests/HasNotesContentTests.fs` (the
+DTO-level field for each of the four media types, plus the game
+legacy-journal-OR case). `TableClassificationTests.fs` and
+`AdministrationTests.fs` were updated for the new registry entries (the
+generic registry-completeness guards — `handledEventTypesByBoundedContext`
+has an entry for every `boundedContextPrefixes` name, and the
+schema-vs-registry set-equality check — cover Notes automatically once
+`NotesProjection.handler.Init`/`tableRegistry`/`imageRefColumns` were added,
+no bespoke per-BC test needed beyond updating the two hardcoded expectation
+lists — Projected-table set and the ref-column count 17 -> 18).
+
+`npm run build` (Fable/Vite), `npm test` (Expecto, 927/927), and `npm run
+test:client` (Vitest, 103/103) are all green.
+
+**README delta not carried in the structured block:** the "Document streams
+(not aggregates)" heading ADR-0080 calls for cannot be expressed by the
+delta grammar (no section-creation op). Please add, as its own `##` heading
+placed after "## Aggregates" and before "## Key events":
+
+```
+## Document streams (not aggregates)
+
+- **Notes** — an event-sourced document stream, not an aggregate: there is
+  no cross-block invariant to protect, only "the user typed; store what
+  they typed." Built with the same decide/evolve/reconstitute/streamId/
+  Serialization machinery as an aggregate purely because that machinery is
+  the cheapest path to free expected-position concurrency, no-op handling,
+  and projection catch-up — not because the concept deserves aggregate
+  ceremony (ADR-0080).
+```
+
+Also by hand: "Key events" and "Key commands" are prose paragraphs, not
+bullet lists, so the delta grammar's append/replace ops don't apply — please
+append ", plus `Notes_saved` (ADR-0080)." to the Key events paragraph and
+", plus `Save_notes`." to the Key commands paragraph. And the "Open
+questions" bullet "Should ContentBlocks become a more general 'annotations
+on any aggregate' mechanism..." is now answered (yes, ADR-0080) — please
+replace it with something like "~~Should ContentBlocks become a more general
+'annotations on any aggregate' mechanism?~~ Answered by ADR-0080: yes,
+generalized as Notes. ContentBlocks itself is retired by curation-j4qqt."
+(not expressed as a delta op since it has no bold lead-in for the anchor
+rule).
+
+**Follow-ups (curation-knqfj, curation-j4qqt) are unaffected:** ContentBlocks
+and GameJournal keep serving live traffic unchanged, confirmed diff-free
+(`git diff --stat` empty for `src/Server/ContentBlocks.fs`,
+`src/Server/ContentBlockProjection.fs`, `src/Server/GameJournal.fs`,
+`src/Client/Components/ContentBlockEditor.fs`,
+`src/Client/Components/JournalEditor.fs`).

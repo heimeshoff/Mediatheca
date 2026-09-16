@@ -1,6 +1,6 @@
 /// games-t69rb: MVU coverage for the game-detail page's default-tab rule —
 /// `State.update`'s `Game_loaded` case must land on Journal only on the
-/// page's first load for a game (when `HasJournalContent` says so), and must
+/// page's first load for a game (when `HasNotesContent` says so), and must
 /// never override a tab the builder already picked by hand on the refreshes
 /// that follow every command. `Game_loaded` never touches the `api`
 /// parameter, so a `Unchecked.defaultof<IMediathecaApi>` stand-in is safe
@@ -64,7 +64,7 @@ let private gameDetail (hasJournalContent: bool) : GameDetail =
       WantToPlayWith = []
       PlayedWith = []
       ContentBlocks = []
-      HasJournalContent = hasJournalContent }
+      HasNotesContent = hasJournalContent }
 
 let private fakeApi : IMediathecaApi = Unchecked.defaultof<IMediathecaApi>
 

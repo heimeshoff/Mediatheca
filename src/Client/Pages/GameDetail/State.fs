@@ -75,7 +75,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         let isFirstLoad = model.Game.IsNone
         let nextTab =
             match isFirstLoad, game with
-            | true, Some g -> if g.HasJournalContent then Journal else Overview
+            | true, Some g -> if g.HasNotesContent then Journal else Overview
             | _ -> model.ActiveTab
         let cmds =
             match game with

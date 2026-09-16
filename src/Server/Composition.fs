@@ -324,6 +324,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         GameProjection.handler
         BookProjection.handler
         PlaySessionProjection.handler
+        NotesProjection.handler
     ]
 
     // Catch up all projections from their saved checkpoints. Projections are

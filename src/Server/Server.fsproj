@@ -44,6 +44,8 @@
     <Compile Include="ContentBlocks.fs" />
     <Compile Include="ContentBlockProjection.fs" />
     <Compile Include="GameJournal.fs" />
+    <Compile Include="Notes.fs" />
+    <Compile Include="NotesProjection.fs" />
     <Compile Include="Catalogs.fs" />
     <Compile Include="CatalogProjection.fs" />
     <Compile Include="MovieProjection.fs" />
