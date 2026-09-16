@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 17:04 -- Modeling / Promoted: journal-k52j1 - Reading day and Book finished join the Journal's ubiquitous language — a README-only change, because no live activity surface exists to attach code to (the All-tab heatmap/monthly payload was pruned, and `DashboardCrossMediaStats` / `getRecentActivity` are confirmed-dead payload with no client consumer)
+
+**Type:** Modeling / Promote
+**BC:** journal
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-16 17:04 -- Modeling / Refined: journal-k52j1 - Reading day and Book finished join the Journal's ubiquitous language (README-only)
 
 **Type:** Modeling / Refine

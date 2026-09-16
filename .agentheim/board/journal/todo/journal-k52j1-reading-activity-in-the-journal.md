@@ -1,7 +1,7 @@
 ---
 id: journal-k52j1
 title: Reading day and Book finished join the Journal's ubiquitous language — a README-only change, because no live activity surface exists to attach code to (the All-tab heatmap/monthly payload was pruned, and `DashboardCrossMediaStats` / `getRecentActivity` are confirmed-dead payload with no client consumer)
-status: backlog
+status: todo
 type: chore
 context: journal
 created: 2026-09-16
