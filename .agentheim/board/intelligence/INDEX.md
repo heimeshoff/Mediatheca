@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
-- **Todo:** 0
+- **Backlog:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 15
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **intelligence-h4qk2** — Prune the dead activity-heatmap payload — DashboardAllTab.ActivityDays/MonthlyBreakdown, their two Shared types and the seven daily/monthly feeder queries go end to end (mirroring intelligence-p4t7k); the All tab stopped rendering them in intelligence-dq8rk and no client reads them (refactor) — `todo/intelligence-h4qk2-dashboardalltab-s-activitydays-monthlybreakdown-payload-has.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -46,7 +47,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **intelligence-h4qk2** — DashboardAllTab's ActivityDays/MonthlyBreakdown payload has no client consumer — either build the heatmap or stop computing it (chore) — `backlog/intelligence-h4qk2-dashboardalltab-s-activitydays-monthlybreakdown-payload-has.md`
 <!-- backlog-list:end -->
 
 

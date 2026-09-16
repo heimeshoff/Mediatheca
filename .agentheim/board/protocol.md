@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 12:32 -- Modeling / Promoted: intelligence-h4qk2 - Prune the dead activity-heatmap payload — DashboardAllTab.ActivityDays/MonthlyBreakdown, their two Shared types and the seven daily/monthly feeder queries go end to end (mirroring intelligence-p4t7k); the All tab stopped rendering them in intelligence-dq8rk and no client reads them
+
+**Type:** Modeling / Promote
+**BC:** intelligence
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-16 12:32 -- Modeling / Refined: intelligence-h4qk2 - Prune the dead activity-heatmap payload (DashboardAllTab.ActivityDays/MonthlyBreakdown) end to end
 
 **Type:** Modeling / Refine
