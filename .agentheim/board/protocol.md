@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 20:55 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 57m
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** curation-j4qqt: 1
+**Commits:** 3 (1 batch-start, 1 integration, 1 session-end)
+**Vision-conformance:** none — batch aligns with vision (vision.md carries no "What success looks like" / "Non-goals" sections; judged against the Design Principles: retiring ContentBlocks and the plain-storage GameJournal into the event-sourced Notes document serves the Replayable principle per ADR-0080, and both gates are builder-triggered with report-don't-guess previews, consistent with the "Not autonomous" stance)
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task)
+**Carry-over:** none — working tree clean (1 stranded RESULT sidecar swept; worktree torn down with its node_modules junction unlinked first, main node_modules intact at 210 entries; on main after the batch: npm run build OK, Vitest 108/108; Expecto not re-run on main because a dev server was listening on port 5000 — the verifier's run in the byte-identical worktree was 919/919). Builder follow-ups: the two [human-eye] criteria — both gates on the Admin Surgery tab, then Gate 1 → Gate 2 → Rebuild-all → Health tab on harbour after deploy. New backlog item curation-h4k2p (Notes image cleanup on media removal).
+
+---
+
 ## 2026-09-16 20:52 -- Task verified and completed: curation-j4qqt - Migrate and purge — two builder-triggered Administration gates: "Migrate to Notes" turns every content-block owner and game journal into one `Notes_saved` event (owners resolved by exact slug match, ambiguous/orphan ones reported, never guessed); "Purge legacy stores" bulk-deletes the `ContentBlocks-*` streams under ADR-0034 guardrails and drops both legacy tables; ContentBlocks, GameJournal, its boot migration and all content-block RPC members are deleted (ADR-0080, step 3 of 3)
 
 **Type:** Work / Task completion
