@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 14:36 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 44m
+**Completed:** 3 (first-try PASS: 3, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** intelligence-h4qk2: 1, curation-h98ve: 1, curation-cyxbc: 1
+**Commits:** 4
+**Vision-conformance:** none — batch aligns with vision (vision.md carries no "What success looks like" / "Non-goals" sections; judged against Design Principles and Out of Scope (v1) — the heatmap prune serves the intent-driven All tab, Notes event-sources the user's own writing per ADR-0043, typed entries fix games in catalogs)
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (3 tasks)
+**Carry-over:** none — working tree clean (3 stranded RESULT sidecars swept; `.agentheim/state/whats-next.md` rewritten at session start with the Audible-fix churn advisory, gitignored)
+
+---
+
 ## 2026-09-16 14:32 -- Task verified and completed: curation-cyxbc - Typed catalog entries — an entry references `(MediaType, slug)` (ADR-0079): `Entry_added` carries the media type, legacy entries stay untyped and fall back to today's read-time inference, the projection resolves all four media types (fixing games, which render as bare slugs today), `getCatalogsForBook`, type-filtered lookups and removal cascade, and the Shared vocabulary loses its `Movie*` names
 
 **Type:** Work / Task completion
