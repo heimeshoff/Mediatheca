@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 3
-- **Todo:** 0
+- **Backlog:** 2
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 2
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **curation-knqfj** — Notes editor on every detail page — `JournalEditor` becomes `NotesEditor` taking `(MediaType, slug)` over `getNotes`/`saveNotes`, mounted where `ContentBlockEditor` sits on Movie/Series/Book detail and on the Game detail tab (label "Notes"); `ContentBlockEditor` and its StyleGuide specimens go, one NotesEditor specimen replaces them (ADR-0080, step 2 of 3) (feature) — `todo/curation-knqfj-notes-editor-on-every-detail-page.md`
 <!-- no tasks in todo -->
 <!-- todo-list:end -->
 
@@ -36,7 +37,6 @@ research touching this BC, and concept synthesis pages.
 <!-- backlog-list:start -->
 - **curation-w9fkq** — Backfill `media_type` on legacy catalog entries, widen `catalog_entries`' UNIQUE to `(catalog_slug, media_type, movie_slug)`, and relax `Add_entry` back to strict `(MediaType, slug)` pair identity (feature) — `backlog/curation-w9fkq-backfill-media-type-on-legacy-catalog-entries-widen-catalog.md`
 - **curation-j4qqt** — Migrate and purge — two builder-triggered Administration gates: "Migrate to Notes" turns every content-block owner and game journal into one `Notes_saved` event (owners resolved by exact slug match, ambiguous/orphan ones reported, never guessed); "Purge legacy stores" bulk-deletes the `ContentBlocks-*` streams under ADR-0034 guardrails and drops both legacy tables; ContentBlocks, GameJournal, its boot migration and all content-block RPC members are deleted (ADR-0080, step 3 of 3) (feature) — `backlog/curation-j4qqt-migrate-content-blocks-and-game-journals-to-notes-and-purge.md`
-- **curation-knqfj** — Notes editor on every detail page — `JournalEditor` becomes `NotesEditor` taking `(MediaType, slug)` over `getNotes`/`saveNotes`, mounted where `ContentBlockEditor` sits on Movie/Series/Book detail and on the Game detail tab (label "Notes"); `ContentBlockEditor` and its StyleGuide specimens go, one NotesEditor specimen replaces them (ADR-0080, step 2 of 3) (feature) — `backlog/curation-knqfj-notes-editor-on-every-detail-page.md`
 <!-- no tasks in backlog -->
 <!-- backlog-list:end -->
 

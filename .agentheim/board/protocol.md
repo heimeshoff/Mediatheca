@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 16:55 -- Modeling / Promoted: curation-knqfj - Notes editor on every detail page — `JournalEditor` becomes `NotesEditor` taking `(MediaType, slug)` over `getNotes`/`saveNotes`, mounted where `ContentBlockEditor` sits on Movie/Series/Book detail and on the Game detail tab (label "Notes"); `ContentBlockEditor` and its StyleGuide specimens go, one NotesEditor specimen replaces them (ADR-0080, step 2 of 3)
+
+**Type:** Modeling / Promote
+**BC:** curation
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-16 14:36 -- Work session ended
 
 **Type:** Work / Session end
