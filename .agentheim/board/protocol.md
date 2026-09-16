@@ -5,6 +5,16 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 00:14 -- Modeling / Refined: curation-h4k2p - Clear the Notes document and delete its content/ images on media removal
+
+**Type:** Modeling / Refine
+**BC:** curation
+**Status after:** backlog
+**Summary:** Corrected the scope — all four media types have a removal handler (removeMovie/removeSeries/removeGame/removeBook), not only Series. Orchestrator (tactical-modeler) settled the Notes-document disposition: clear it through an ordinary `Notes_saved []` event via `Save_notes []` (replay-safe, history kept per ADR-0080/0043), never an imperative `notes_blocks` delete and no new event type; read the `content/` refs from the projection first, append, then delete files last (cache tier, ADR-0045/0025). One shared private helper in Api.fs called from all four handlers. Acceptance criteria rewritten as machine-checkable, API-level Expecto test with a real temp image dir specified, old GameJournal code/test located in git history for the worker.
+**ADRs written:** none — applies ADR-0080 §5/§6, ADR-0043, ADR-0045, ADR-0025
+
+---
+
 ## 2026-09-17 00:10 -- Modeling / Promoted: intelligence-p7k3x - Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload
 
 **Type:** Modeling / Promote
