@@ -5,6 +5,26 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 12:53 -- Modeling / Refined: curation-cyxbc - Typed catalog entries (was: Books in catalogs)
+
+**Type:** Modeling / Refine
+**BC:** curation
+**Status after:** todo
+**Summary:** Code-fact check found the catalog entry key is an untyped slug resolved by join order, that games are already broken in catalog detail (`getEntries` never joins `game_list`: raw slug, year 0, no cover, `/movies/` link), that `getCatalogsForGame` is literally the movie lookup, that book removal has no catalog cascade, and that every media type slugs as `slugify(title)-year` so cross-type collisions are refused and the slug-only removal cascade would cross-delete. Builder chose **typed entries** over keeping the untyped slug or renaming DTO fields only ("I am all about specific ubiquitous language in this bounded context") and folded the games fix in. Orchestrator → tactical-modeler settled the shape: `MediaType option` on `Entry_added`/`EntryState` (None only on legacy replays, key omitted when None), a conservative duplicate rule (legacy on either side → slug alone rejects, because the projection's UNIQUE stays), `media_type TEXT NULL` via the idempotent ALTER TABLE guard, read-time join-order inference kept only as the NULL fallback, type filters on `getCatalogsFor*` / the series-children lookup / `getEntriesByMediaSlug`, `RoutePrefix` replaced by `MediaType` + a Shared `MediaType.routePrefix` helper, Shared DTOs renamed (`MediaSlug`/`Title`/`Year`/`PosterRef`), stored JSON key and column kept. Task rewritten with machine-checkable criteria (Expecto serialization + duplicate rule, projection query tests per media type incl. the NULL fallback and a slug-collision case, typed cascade). depends_on gains the done styleguide task; `blocks: [books-f3sb2]`. Follow-ups noted, not captured: widening UNIQUE + strict pair identity after a media_type backfill (ADR-0079 §5); `EventFormatting.crossLinkFields` mislinking non-movie catalog entries (pre-existing).
+**Split into:** books-f3sb2 (book detail page catalog pill row + picker with `CatalogManager` extracted into `Components/` for all four pages, and `removeBook` cascading catalog entries; depends_on curation-cyxbc)
+**ADRs written:** 0079 (catalog entries typed by MediaType; legacy entries untyped, resolved at read time; stored shapes kept)
+
+---
+
+## 2026-09-16 12:53 -- Modeling / Captured: books-f3sb2 - Book detail page joins catalogs — the catalog pill row + "Add to Catalog" picker on `/books/{slug}` via `getCatalogsForBook` (sending `MediaType.Book`), with the thrice-copied `CatalogManager` modal extracted into `Components/` and consumed by all four detail pages, and `removeBook` cascading the book's catalog entries like the other media types
+
+**Type:** Modeling / Capture
+**BC:** books
+**Filed to:** backlog
+**Summary:** Split out of curation-cyxbc during its 2026-09-16 refinement: the book detail page's catalog pill row + picker (extracting the thrice-copied CatalogManager modal into Components/ with BookDetail as its fourth consumer) and removeBook cascading the book's catalog entries through the type-filtered lookup curation-cyxbc introduces (ADR-0079). depends_on curation-cyxbc.
+
+---
+
 ## 2026-09-16 12:47 -- Modeling / Promoted: books-n8fpz - Collapse the three per-type content-block method families (Books, Series, Games) into the one generic IMediathecaApi family — they are byte-identical copies over the single ContentBlocks aggregate; BookDetail and SeriesDetail call the generic methods for all seven operations, and the never-called Games family goes
 
 **Type:** Modeling / Promote
