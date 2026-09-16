@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 13:05 -- Modeling / Dismissed: books-n8fpz
+
+**Type:** Modeling / Dismiss
+**Dismissed:**
+- books-n8fpz - Collapse the three per-type content-block method families (Books, Series, Games) into the one generic IMediathecaApi family — they are byte-identical copies over the single ContentBlocks aggregate; BookDetail and SeriesDetail call the generic methods for all seven operations, and the never-called Games family goes (books)
+
+---
+
 ## 2026-09-16 12:54 -- Modeling / Promoted: curation-cyxbc - Typed catalog entries — an entry references `(MediaType, slug)` (ADR-0079): `Entry_added` carries the media type, legacy entries stay untyped and fall back to today's read-time inference, the projection resolves all four media types (fixing games, which render as bare slugs today), `getCatalogsForBook`, type-filtered lookups and removal cascade, and the Shared vocabulary loses its `Movie*` names
 
 **Type:** Modeling / Promote
