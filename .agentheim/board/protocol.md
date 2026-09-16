@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 17:04 -- Modeling / Refined: journal-k52j1 - Reading day and Book finished join the Journal's ubiquitous language (README-only)
+
+**Type:** Modeling / Refine
+**BC:** journal
+**Status after:** todo
+**Summary:** Premise corrected: besides the heatmap/monthly payload pruned by intelligence-h4qk2, `DashboardCrossMediaStats` and `getRecentActivity`/`RecentActivityItem` turned out to have zero client consumers, so no live activity surface exists to wire reading into. Task reduced to a README-only chore (Reading day + Book finished in the ubiquitous language, Books in the subscribed-events list, Purpose/Aggregates/Relationships extended, two open questions recorded). Dropped: recent-activity entries, monthly breakdown Reading series, cross-media stats fields, Recently Read rail (covered by intelligence-dnv2y). Dependencies cleared (all done; no client change, so no styleguide gate). Follow-up candidate noted, not captured: prune the dead cross-media stats / recent-activity payload in intelligence/.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 16:55 -- Modeling / Promoted: books-f3sb2 - Book detail page joins catalogs — the catalog pill row + "Add to Catalog" picker on `/books/{slug}` via `getCatalogsForBook` (sending `MediaType.Book`), with the thrice-copied `CatalogManager` modal extracted into `Components/` and consumed by all four detail pages, and `removeBook` cascading the book's catalog entries like the other media types
 
 **Type:** Modeling / Promote
