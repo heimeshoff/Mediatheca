@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 04:13 -- Batch started: [integration-dhctm, books-f33e2]
+
+**Type:** Work / Batch start
+**Tasks:** integration-dhctm - Audible adapter and Settings card — an imported audible-cli auth file (never a login or device registration, ADR-0074) with refresh-token → access-token minting, a "Test connection" that names the customer and marketplace, unauthenticated catalog search and product detail with Audnexus as metadata fallback, and `addBookFromAudible`, books-f33e2 - Book detail page at /books/{slug} mirroring the movie detail page — cover hero with title/authors/year/format, a reading-progress bar with source badge and a manual "update progress" control (page or percent), the Games-shaped status control, personal rating, description/narrators/series/length from the cache, external links, recommended-by friends, progress history, content blocks, event history and remove
+**Parallel:** yes (2 workers — integration-dhctm and books-f33e2 are the whole ready set; the orchestrator's pre-scan found no shared source regions between them. Merge order if both pass: dhctm first (Shared/Api tail-append), then f33e2.)
+
+---
+
 ## 2026-09-16 04:13 -- Task verified and completed: integration-c8d4x - Open Library adapter — keyword search, ISBN and work lookup, cover download, an adapter-owned 1 req/s throttle with an identifying User-Agent — plus the `searchOpenLibraryBooks` / `addBookFromOpenLibrary` API that turns a search hit into a Book with its metadata cache slice filled
 
 **Type:** Work / Task completion

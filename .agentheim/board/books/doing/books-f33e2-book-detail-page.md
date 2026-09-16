@@ -1,7 +1,7 @@
 ---
 id: books-f33e2
 title: Book detail page at /books/{slug} mirroring the movie detail page — cover hero with title/authors/year/format, a reading-progress bar with source badge and a manual "update progress" control (page or percent), the Games-shaped status control, personal rating, description/narrators/series/length from the cache, external links, recommended-by friends, progress history, content blocks, event history and remove
-status: todo
+status: doing
 type: feature
 context: books
 created: 2026-09-16

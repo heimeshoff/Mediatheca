@@ -1,7 +1,7 @@
 ---
 id: integration-dhctm
 title: Audible adapter and Settings card — an imported audible-cli auth file (never a login or device registration, ADR-0074) with refresh-token → access-token minting, a "Test connection" that names the customer and marketplace, unauthenticated catalog search and product detail with Audnexus as metadata fallback, and `addBookFromAudible`
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-09-16
