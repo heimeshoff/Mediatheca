@@ -1,7 +1,7 @@
 ---
 id: books-f3sb2
 title: Book detail page joins catalogs — the catalog pill row + "Add to Catalog" picker on `/books/{slug}` via `getCatalogsForBook` (sending `MediaType.Book`), with the thrice-copied `CatalogManager` modal extracted into `Components/` and consumed by all four detail pages, and `removeBook` cascading the book's catalog entries like the other media types
-status: backlog
+status: todo
 type: feature
 context: books
 created: 2026-09-16

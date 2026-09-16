@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 16:55 -- Modeling / Promoted: books-f3sb2 - Book detail page joins catalogs — the catalog pill row + "Add to Catalog" picker on `/books/{slug}` via `getCatalogsForBook` (sending `MediaType.Book`), with the thrice-copied `CatalogManager` modal extracted into `Components/` and consumed by all four detail pages, and `removeBook` cascading the book's catalog entries like the other media types
+
+**Type:** Modeling / Promote
+**BC:** books
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-16 16:55 -- Modeling / Promoted: curation-knqfj - Notes editor on every detail page — `JournalEditor` becomes `NotesEditor` taking `(MediaType, slug)` over `getNotes`/`saveNotes`, mounted where `ContentBlockEditor` sits on Movie/Series/Book detail and on the Game detail tab (label "Notes"); `ContentBlockEditor` and its StyleGuide specimens go, one NotesEditor specimen replaces them (ADR-0080, step 2 of 3)
 
 **Type:** Modeling / Promote
