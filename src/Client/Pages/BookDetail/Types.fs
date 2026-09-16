@@ -24,6 +24,9 @@ type Model = {
     Slug: string
     Book: BookDetail option
     AllFriends: FriendListItem list
+    AllCatalogs: CatalogListItem list
+    BookCatalogs: CatalogRef list
+    ShowCatalogPicker: bool
     IsLoading: bool
     IsRatingOpen: bool
     IsStatusOpen: bool
@@ -43,6 +46,14 @@ type Msg =
     | Load_book of string
     | Book_loaded of BookDetail option
     | Friends_loaded of FriendListItem list
+    | Catalogs_loaded of CatalogListItem list
+    | Book_catalogs_loaded of CatalogRef list
+    | Open_catalog_picker
+    | Close_catalog_picker
+    | Add_to_catalog of catalogSlug: string
+    | Remove_from_catalog of catalogSlug: string * entryId: string
+    | Create_catalog_and_add of name: string
+    | Catalog_result of Result<unit, string>
     | Command_result of Result<unit, string>
     | Toggle_rating_dropdown
     | Set_personal_rating of int

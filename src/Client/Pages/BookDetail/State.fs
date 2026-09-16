@@ -24,6 +24,9 @@ let init (slug: string) : Model * Cmd<Msg> =
     { Slug = slug
       Book = None
       AllFriends = []
+      AllCatalogs = []
+      BookCatalogs = []
+      ShowCatalogPicker = false
       IsLoading = true
       IsRatingOpen = false
       IsStatusOpen = false
@@ -44,6 +47,8 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         Cmd.batch [
             Cmd.OfAsync.perform api.getBook slug Book_loaded
             Cmd.OfAsync.perform api.getFriends () Friends_loaded
+            Cmd.OfAsync.perform api.getCatalogs () Catalogs_loaded
+            Cmd.OfAsync.perform api.getCatalogsForBook slug Book_catalogs_loaded
         ]
 
     | Book_loaded book ->
@@ -51,6 +56,70 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Friends_loaded friends ->
         { model with AllFriends = friends }, Cmd.none
+
+    | Catalogs_loaded catalogs ->
+        { model with AllCatalogs = catalogs }, Cmd.none
+
+    | Book_catalogs_loaded catalogs ->
+        { model with BookCatalogs = catalogs }, Cmd.none
+
+    | Open_catalog_picker ->
+        { model with ShowCatalogPicker = true }, Cmd.none
+
+    | Close_catalog_picker ->
+        { model with ShowCatalogPicker = false }, Cmd.none
+
+    | Add_to_catalog catalogSlug ->
+        let request: AddCatalogEntryRequest = {
+            MediaSlug = model.Slug
+            MediaType = MediaType.Book
+            Note = None
+        }
+        model,
+        Cmd.OfAsync.either
+            (fun () -> async {
+                match! api.addCatalogEntry catalogSlug request with
+                | Ok _ -> return Ok ()
+                | Error e -> return Error e
+            }) () Catalog_result (fun ex -> Catalog_result (Error ex.Message))
+
+    | Remove_from_catalog (catalogSlug, entryId) ->
+        model,
+        Cmd.OfAsync.either
+            (fun () -> api.removeCatalogEntry catalogSlug entryId)
+            () Catalog_result (fun ex -> Catalog_result (Error ex.Message))
+
+    | Create_catalog_and_add name ->
+        let request: CreateCatalogRequest = {
+            Name = name
+            Description = ""
+            IsSorted = false
+        }
+        model,
+        Cmd.OfAsync.either
+            (fun () -> async {
+                match! api.createCatalog request with
+                | Ok slug ->
+                    let entryReq: AddCatalogEntryRequest = {
+                        MediaSlug = model.Slug
+                        MediaType = MediaType.Book
+                        Note = None
+                    }
+                    match! api.addCatalogEntry slug entryReq with
+                    | Ok _ -> return Ok ()
+                    | Error e -> return Error e
+                | Error e -> return Error e
+            }) () Catalog_result (fun ex -> Catalog_result (Error ex.Message))
+
+    | Catalog_result (Ok ()) ->
+        model,
+        Cmd.batch [
+            Cmd.OfAsync.perform api.getCatalogs () Catalogs_loaded
+            Cmd.OfAsync.perform api.getCatalogsForBook model.Slug Book_catalogs_loaded
+        ]
+
+    | Catalog_result (Error err) ->
+        { model with Error = Some err }, Cmd.none
 
     | Command_result (Ok ()) ->
         model, Cmd.OfAsync.perform api.getBook model.Slug Book_loaded

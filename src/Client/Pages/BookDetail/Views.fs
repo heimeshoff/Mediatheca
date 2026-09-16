@@ -771,6 +771,42 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                 Html.div [
                                     prop.className "lg:col-span-8 space-y-6"
                                     prop.children [
+                                        // Catalogs
+                                        Html.div [
+                                            prop.className "flex flex-wrap items-center gap-2"
+                                            prop.children [
+                                                // Add to catalog button
+                                                Html.button [
+                                                    prop.className "w-9 h-9 rounded-full bg-base-100/50 border border-base-content/15 hover:bg-base-100/70 text-base-content/50 hover:text-base-content flex items-center justify-center transition-colors cursor-pointer"
+                                                    prop.onClick (fun _ -> dispatch Open_catalog_picker)
+                                                    prop.children [
+                                                        Html.span [ prop.className "[&>svg]:w-5 [&>svg]:h-5"; prop.children [ Icons.catalog () ] ]
+                                                    ]
+                                                ]
+                                                // Selected catalog pills
+                                                for cat in model.BookCatalogs do
+                                                    Html.span [
+                                                        prop.className "inline-flex items-center gap-1.5 bg-transparent border border-base-content/20 text-base-content/70 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors hover:border-base-content/40 group/pill"
+                                                        prop.children [
+                                                            Html.a [
+                                                                prop.className "cursor-pointer hover:text-primary transition-colors"
+                                                                prop.href (Feliz.Router.Router.format ("catalogs", cat.Slug))
+                                                                prop.onClick (fun e ->
+                                                                    e.preventDefault()
+                                                                    Feliz.Router.Router.navigate ("catalogs", cat.Slug))
+                                                                prop.text cat.Name
+                                                            ]
+                                                            Html.button [
+                                                                prop.className "text-base-content/30 hover:text-error transition-colors cursor-pointer opacity-0 group-hover/pill:opacity-100"
+                                                                prop.onClick (fun e ->
+                                                                    e.stopPropagation()
+                                                                    dispatch (Remove_from_catalog (cat.Slug, cat.EntryId)))
+                                                                prop.text "×"
+                                                            ]
+                                                        ]
+                                                    ]
+                                            ]
+                                        ]
                                         progressCard book model dispatch
                                         personalRatingCard book.PersonalRating model.IsRatingOpen dispatch
                                         detailsCard book
@@ -848,5 +884,15 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                     formatPicker book.Format dispatch
                 if model.ShowEventHistory then
                     EventHistoryModal.view $"Book-{model.Slug}" (fun () -> dispatch Close_event_history)
+                // Catalog picker modal
+                if model.ShowCatalogPicker then
+                    CatalogManager.CatalogManager
+                        model.AllCatalogs
+                        model.BookCatalogs
+                        "Book"
+                        (fun slug -> dispatch (Add_to_catalog slug))
+                        (fun slug entryId -> dispatch (Remove_from_catalog (slug, entryId)))
+                        (fun name -> dispatch (Create_catalog_and_add name))
+                        (fun () -> dispatch Close_catalog_picker)
             ]
         ]

@@ -49,7 +49,7 @@ Single user (library owner). External progress sources (Audible, Goodreads) act 
 - **Upstream of:** Journal (publishes `Reading_progress_observed`, `Book_status_changed`), Intelligence (dashboard Books tab / All-tab reading rail).
 - **Downstream of:** Friends (friend slugs on recommendations).
 - **Downstream of:** Integration via anticorruption — the Open Library adapter (search, ISBN lookup, covers), the Audible adapter (catalog search, library import, listening-progress sync) and the Goodreads adapter (public shelf feed sync) translate into `Add_book_to_library`, `Link_external_id`, `Observe_reading_progress`, `Change_status`, `Set_personal_rating` commands and `book_metadata_cache` writes. See ADR-0074 (Audible credentials), ADR-0075 (Goodreads feeds + Open Library as the metadata source).
-- **Consumed by:** Curation (catalogs will reference books by slug — `curation-cyxbc`, backlog).
+- **Consumed by:** Curation — catalogs reference books by `(MediaType.Book, slug)` (ADR-0079); the book detail page's catalog pill row/picker and `removeBook`'s catalog-entry removal cascade shipped in `books-f3sb2`.
 
 ## Frontend gate
 

@@ -1,7 +1,7 @@
 ---
 id: books-f3sb2
 title: Book detail page joins catalogs — the catalog pill row + "Add to Catalog" picker on `/books/{slug}` via `getCatalogsForBook` (sending `MediaType.Book`), with the thrice-copied `CatalogManager` modal extracted into `Components/` and consumed by all four detail pages, and `removeBook` cascading the book's catalog entries like the other media types
-status: doing
+status: done
 type: feature
 context: books
 created: 2026-09-16
@@ -83,3 +83,17 @@ same block `removeMovie` / `removeSeries` / `removeGame` carry.
   copies already drift only in one string, and a fourth would make a later fix a four-file edit.
 - `getEntriesByMediaSlug` is type-filtered by `curation-cyxbc`; without it a same-slugged
   movie's entry would be deleted with the book (ADR-0079 §4).
+
+## Outcome
+
+The book detail page (`/books/{slug}`) now carries the same catalog pill row every other media detail page has: a round "add" button opening a picker, one pill per catalog the book belongs to (linking to `/catalogs/{slug}`, with a hover-× to remove), placed at the top of the left column exactly where `MovieDetail` places it. `BookDetail.Types`/`State`/`Views` gained the `AllCatalogs`/`BookCatalogs`/`ShowCatalogPicker` model fields and the `Catalogs_loaded`/`Book_catalogs_loaded`/`Open_catalog_picker`/`Close_catalog_picker`/`Add_to_catalog`/`Remove_from_catalog`/`Create_catalog_and_add`/`Catalog_result` messages, mirroring `GameDetail`'s shape. `Load_book` now also fires `api.getCatalogs ()` and `api.getCatalogsForBook slug`; `Add_to_catalog`/`Create_catalog_and_add` send `{ MediaSlug = slug; MediaType = Book; Note = None }` (ADR-0079); `Catalog_result (Ok ())` reloads both lists.
+
+**Extraction.** The three near-identical private `CatalogManager` React components in `Pages/MovieDetail/Views.fs`, `Pages/SeriesDetail/Views.fs` and `Pages/GameDetail/Views.fs` (differing only in the "already in all catalogs" noun) are gone; `src/Client/Components/CatalogManager.fs` is the single shared component, taking `mediaNoun: string` as its one point of variation, compiled before all four detail pages in `Client.fsproj`. All four pages (including `SeriesDetail`'s season/episode-targeted picker, which now derives `mediaNoun` from its `CatalogTarget`) call `CatalogManager.CatalogManager` — `grep -n "let private CatalogManager" src/Client/Pages` is empty. Paper overlay (ADR-0016) is unchanged: the component still renders through `ModalPanel.viewCustom`.
+
+**Server.** `Api.fs`'s `removeBook` now cascades `CatalogProjection.getEntriesByMediaSlug conn Book slug` → `Catalogs.Remove_entry` per hit, the same block `removeMovie`/`removeSeries`/`removeGame` already carry, before the existing poster-image cleanup.
+
+**Tests.** `src/Client/Pages/BookDetail/State.test.fs` (5 Vitest cases, `Fable.Mocha`) drives `BookDetail.State.update` with a `createObj [...] |> unbox` api stand-in (the `Dashboard/ExpandCard.test.fs` idiom — `Unchecked.defaultof<IMediathecaApi>` is `null` in Fable and the record-copy-update shorthand also throws immediately, since Fable records compile to classes that read every field off the source at construction time) and a small `runCmd` helper that executes a `Cmd<Msg>`'s effects and waits out the 1ms JS timer `Cmd.OfAsync.perform` schedules even in tests: `Load_book` fires all four loads including both catalog ones, `Add_to_catalog`/`Create_catalog_and_add` send the typed request with the book's own slug, `Catalog_result (Ok ())` reloads both catalog lists, and the picker's open/close toggle is covered synchronously (it never touches the api). `tests/Server.Tests/CatalogProjectionTests.fs` gained two Expecto cases: the full add/getCatalogsForBook/getCatalog/removeCatalogEntry round-trip, and `removeBook` removing every catalog entry referencing the book (across two catalogs) while leaving a same-slugged movie's entry, in its own catalog, in place.
+
+Verified: `npm run build`, `npm test` (938/938 Expecto), `npm run test:client` (16 files / 108 tests) all green.
+
+Not independently verified: the "pill row and picker are indistinguishable in rhythm from the movie page's" [human-eye] criterion, and the "in the running app" walkthrough (picker adds/creates, × removes, catalog detail page lists the book) — no dev server was exercised against a live database for this task (workers do not touch the live DB); the markup is copied verbatim from `MovieDetail`'s pill row and the shared `CatalogManager` component is byte-for-byte the same JSX shape the other three pages already ship, so this is a low-risk gap, same posture `books-f33e2` recorded for its own [human-eye] criterion.

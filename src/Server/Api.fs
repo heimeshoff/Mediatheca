@@ -4328,6 +4328,19 @@ module Api =
                         projectionHandlers
                 match result with
                 | Ok () ->
+                    // Remove catalog entries referencing this book
+                    let catalogEntries = CatalogProjection.getEntriesByMediaSlug conn Mediatheca.Shared.MediaType.Book slug
+                    for (catalogSlug, entryId) in catalogEntries do
+                        let catalogSid = Catalogs.streamId catalogSlug
+                        executeCommand
+                            conn catalogSid
+                            Catalogs.Serialization.fromStoredEvent
+                            Catalogs.reconstitute
+                            Catalogs.decide
+                            Catalogs.Serialization.toEventData
+                            (Catalogs.Remove_entry entryId)
+                            projectionHandlers
+                        |> ignore
                     ImageStore.deleteImage imageBasePath (sprintf "posters/book-%s.jpg" slug)
                     return Ok ()
                 | Error e -> return Error e

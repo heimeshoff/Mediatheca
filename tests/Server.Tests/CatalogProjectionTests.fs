@@ -312,4 +312,80 @@ let catalogProjectionTests =
             let seriesCatalogs = api.getCatalogsForSeries "series-2015" |> Async.RunSynchronously
             let seriesCatalogSlugs = seriesCatalogs |> List.map (fun c -> c.Slug) |> Set.ofList
             Expect.equal seriesCatalogSlugs (Set.ofList [ catD; catE ]) "getCatalogsForSeries should still resolve both the season and the episode child entries"
+
+        // books-f3sb2: the API round-trip a book's detail page drives -- add,
+        // see it via both getCatalogsForBook and getCatalog's typed DTO, then
+        // remove the entry and see both empty out again.
+        testCase "adding a book to a catalog is visible via getCatalogsForBook and getCatalog, and removeCatalogEntry clears it from both" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrap
+            let api = createApi db.Factory
+            let conn = db.Connection
+
+            appendBookEvent conn "moby-dick-1851" (Books.Book_added_to_library (sampleBook "Moby-Dick" (Some 1851) (Some "book-covers/moby-dick-1851.jpg")))
+
+            let catalogSlug =
+                match api.createCatalog { Name = "Want to Read"; Description = ""; IsSorted = false } |> Async.RunSynchronously with
+                | Ok slug -> slug
+                | Error e -> failtestf "Expected catalog creation to succeed; got %s" e
+
+            let entryId =
+                match api.addCatalogEntry catalogSlug { MediaSlug = "moby-dick-1851"; MediaType = MediaType.Book; Note = None } |> Async.RunSynchronously with
+                | Ok entryId -> entryId
+                | Error e -> failtestf "Expected addCatalogEntry to succeed; got %s" e
+
+            let afterAdd = api.getCatalogsForBook "moby-dick-1851" |> Async.RunSynchronously
+            Expect.equal (afterAdd |> List.map (fun c -> c.Slug)) [ catalogSlug ] "getCatalogsForBook lists the catalog the book was added to"
+
+            match api.getCatalog catalogSlug |> Async.RunSynchronously with
+            | Some detail ->
+                Expect.equal (List.length detail.Entries) 1 "the catalog carries exactly the one book entry"
+                let entry = detail.Entries.[0]
+                Expect.equal entry.Title "Moby-Dick" "the entry's title resolves from book_list"
+                Expect.equal entry.PosterRef (Some "book-covers/moby-dick-1851.jpg") "the entry's cover resolves from book_list"
+                Expect.equal entry.MediaType MediaType.Book "the entry is typed as a Book (ADR-0079)"
+            | None -> failtestf "Expected getCatalog %s to resolve" catalogSlug
+
+            match api.removeCatalogEntry catalogSlug entryId |> Async.RunSynchronously with
+            | Ok () -> ()
+            | Error e -> failtestf "Expected removeCatalogEntry to succeed; got %s" e
+
+            let afterRemove = api.getCatalogsForBook "moby-dick-1851" |> Async.RunSynchronously
+            Expect.equal afterRemove [] "getCatalogsForBook is empty once the entry is removed"
+
+        // books-f3sb2: the removal cascade `removeMovie`/`removeSeries`/`removeGame`
+        // already carry (curation-cyxbc) -- `removeBook` gains the same cascade,
+        // and the type filter must keep a same-slugged movie's entry untouched
+        // (mirrors the "removing a movie leaves a same-slugged book's entry in
+        // place" test above, reversed).
+        testCase "removing a book removes every catalog entry referencing it and leaves a same-slugged movie's entry in place" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrap
+            let api = createApi db.Factory
+            let conn = db.Connection
+
+            appendBookEvent conn "shared-1922" (Books.Book_added_to_library (sampleBook "Shared Book" (Some 1922) None))
+            appendMovieEvent conn "shared-1922" (Movies.Movie_added_to_library (sampleMovie "Shared Movie" 1922 None))
+
+            let mkCatalog (name: string) =
+                match api.createCatalog { Name = name; Description = ""; IsSorted = false } |> Async.RunSynchronously with
+                | Ok slug -> slug
+                | Error e -> failtestf "Expected catalog creation to succeed; got %s" e
+
+            let bookCatalogOne = mkCatalog "Shared Book Catalog One"
+            let bookCatalogTwo = mkCatalog "Shared Book Catalog Two"
+            let movieCatalog = mkCatalog "Shared Movie Catalog"
+
+            api.addCatalogEntry bookCatalogOne { MediaSlug = "shared-1922"; MediaType = MediaType.Book; Note = None } |> Async.RunSynchronously |> ignore
+            api.addCatalogEntry bookCatalogTwo { MediaSlug = "shared-1922"; MediaType = MediaType.Book; Note = None } |> Async.RunSynchronously |> ignore
+            api.addCatalogEntry movieCatalog { MediaSlug = "shared-1922"; MediaType = MediaType.Movie; Note = None } |> Async.RunSynchronously |> ignore
+
+            match api.removeBook "shared-1922" |> Async.RunSynchronously with
+            | Ok () -> ()
+            | Error e -> failtestf "Expected removeBook to succeed; got %s" e
+
+            Expect.equal (List.length (CatalogProjection.getEntries conn bookCatalogOne)) 0 "the book's entry in the first catalog should be removed"
+            Expect.equal (List.length (CatalogProjection.getEntries conn bookCatalogTwo)) 0 "the book's entry in the second catalog should be removed"
+
+            let movieCatalogEntries = CatalogProjection.getEntries conn movieCatalog
+            Expect.equal (List.length movieCatalogEntries) 1 "the movie's entry, in its own catalog, should remain"
+            Expect.equal movieCatalogEntries.[0].MediaType MediaType.Movie "the remaining entry should be the movie's"
     ]

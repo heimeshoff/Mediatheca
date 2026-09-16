@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 18:00 -- Task verified and completed: books-f3sb2 - Book detail page joins catalogs — the catalog pill row + "Add to Catalog" picker on `/books/{slug}` via `getCatalogsForBook` (sending `MediaType.Book`), with the thrice-copied `CatalogManager` modal extracted into `Components/` and consumed by all four detail pages, and `removeBook` cascading the book's catalog entries like the other media types
+
+**Type:** Work / Task completion
+**Task:** books-f3sb2 - Book detail page joins catalogs — the catalog pill row + "Add to Catalog" picker on `/books/{slug}` via `getCatalogsForBook` (sending `MediaType.Book`), with the thrice-copied `CatalogManager` modal extracted into `Components/` and consumed by all four detail pages, and `removeBook` cascading the book's catalog entries like the other media types
+**Summary:** Book detail page joins catalogs — pill row + "Add to Catalog" picker via getCatalogsForBook / typed AddCatalogEntryRequest { MediaType = Book }, removeBook cascades the book's catalog entries like the other three media types, and the thrice-copied CatalogManager modal is one shared Components/CatalogManager.fs consumed by all four detail pages
+**Duration:** 31m
+**Verification:** PASS (iteration 1)
+**Files changed:** 11
+**Tests added:** 7
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 17:44 -- Task verified and completed: journal-k52j1 - Reading day and Book finished join the Journal's ubiquitous language — a README-only change, because no live activity surface exists to attach code to (the All-tab heatmap/monthly payload was pruned, and `DashboardCrossMediaStats` / `getRecentActivity` are confirmed-dead payload with no client consumer)
 
 **Type:** Work / Task completion
