@@ -126,18 +126,6 @@ let bookProjectionTests =
             | Some detail -> Expect.equal detail.FinishedAt (Some expectedDate) "finished_at should default to the event's own local date when effectiveOn is None"
             | None -> failtest "Expected the book to be found"
 
-        testCase "getDailyReadingActivity counts distinct days" <| fun _ ->
-            use conn = createConnection ()
-            let slug = "project-hail-mary-2021"
-            appendBookEvent conn slug (Books.Book_added_to_library sampleBookData)
-            appendBookEvent conn slug (Books.Reading_progress_observed (observation 20 Audible "2026-01-01"))
-            appendBookEvent conn slug (Books.Reading_progress_observed (observation 40 Audible "2026-01-02"))
-            appendBookEvent conn slug (Books.Reading_progress_observed (observation 30 Goodreads "2026-01-02"))
-
-            let activity = BookProjection.getDailyReadingActivity conn |> Map.ofList
-            Expect.equal (activity |> Map.tryFind "2026-01-01") (Some 1) "One distinct book observed on 2026-01-01"
-            Expect.equal (activity |> Map.tryFind "2026-01-02") (Some 1) "One distinct book (two sources) observed on 2026-01-02"
-
         testCase "Removing an observation deletes its row and recomputes the denormalized progress" <| fun _ ->
             use conn = createConnection ()
             let slug = "project-hail-mary-2021"

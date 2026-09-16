@@ -415,28 +415,10 @@ type DashboardCrossMediaStats = {
     WeekGameMinutes: int
 }
 
-type DashboardActivityDay = {
-    Date: string
-    MovieSessions: int
-    EpisodesWatched: int
-    GameSessions: int
-    /// intelligence-dnv2y: distinct books with a reading-progress observation
-    /// that day (`BookProjection.getDailyReadingActivity`'s own `COUNT(DISTINCT
-    /// book_slug)` — two observations of one book on the same day count once).
-    Reading: int
-}
-
-type DashboardMonthlyBreakdown = {
-    Month: string
-    MovieMinutes: int
-    SeriesMinutes: int
-    GameMinutes: int
-}
-
 // `DashboardAllTab` itself is declared further down (just after `ReadingPosition`),
 // once `DashboardBookItem` exists for its `CurrentlyReading` field — see the
 // comment there (intelligence-dnv2y). Every other type it depends on
-// (`DashboardSeriesNextUp` .. `DashboardMonthlyBreakdown`) is already declared
+// (`DashboardSeriesNextUp` .. `DashboardCrossMediaStats`) is already declared
 // above this point.
 
 type DashboardMovieStats = {
@@ -921,8 +903,6 @@ type DashboardAllTab = {
     PlaySessions: DashboardPlaySession list
     JellyfinServerUrl: string option
     CrossMediaStats: DashboardCrossMediaStats
-    ActivityDays: DashboardActivityDay list
-    MonthlyBreakdown: DashboardMonthlyBreakdown list
     /// intelligence-dnv2y: In Focus books (latest `progress_observed_on` desc,
     /// then `added_at` desc), plus any book `finished_at` within the last 7
     /// days marked `Finished = true` (the intelligence-b1nz5 linger) —

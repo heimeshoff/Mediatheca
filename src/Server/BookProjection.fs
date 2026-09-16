@@ -557,13 +557,6 @@ module BookProjection =
         |> Db.setParams [ "limit", SqlType.Int32 (RowLimit.toSql limit) ]
         |> Db.query readListItemRow
 
-    /// Per-`observed_on` distinct-day count of `book_progress` rows — the
-    /// Journal/heatmap source (`journal-k52j1`, not built by this task).
-    let getDailyReadingActivity (conn: SqliteConnection) : (string * int) list =
-        conn
-        |> Db.newCommand "SELECT observed_on, COUNT(DISTINCT book_slug) as cnt FROM book_progress GROUP BY observed_on ORDER BY observed_on"
-        |> Db.query (fun (rd: IDataReader) -> rd.ReadString "observed_on", rd.ReadInt32 "cnt")
-
     // ── intelligence-dnv2y: Dashboard queries ──
 
     /// `BookListItem` -> the dashboard's shared `DashboardBookItem` card shape.

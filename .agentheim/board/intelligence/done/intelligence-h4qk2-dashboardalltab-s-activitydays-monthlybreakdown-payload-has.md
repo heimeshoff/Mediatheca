@@ -1,7 +1,7 @@
 ---
 id: intelligence-h4qk2
 title: Prune the dead activity-heatmap payload — DashboardAllTab.ActivityDays/MonthlyBreakdown, their two Shared types and the seven daily/monthly feeder queries go end to end (mirroring intelligence-p4t7k); the All tab stopped rendering them in intelligence-dq8rk and no client reads them
-status: doing
+status: done
 type: refactor
 context: intelligence
 created: 2026-09-16
@@ -146,3 +146,21 @@ a live view. `DashboardCrossMediaStats` and every other `DashboardAllTab` field 
   ("Scope note on the heatmap tooltip line") is where the gap was found.
 - `book_progress`, `watch_sessions`, `series_episode_progress` and `game_play_session` are untouched.
   The deleted queries are trivially re-derivable from `git show ca464a1:src/Server/<file>.fs`.
+
+## Outcome
+
+Removed the dead 365-day activity-heatmap and 12-month monthly-breakdown payload end to end, mirroring `intelligence-p4t7k`'s New Games prune:
+
+- `src/Shared/Shared.fs`: deleted `DashboardActivityDay` and `DashboardMonthlyBreakdown`, dropped `ActivityDays`/`MonthlyBreakdown` from `DashboardAllTab`, and re-pointed the placement comment above `DashboardMovieStats` at `DashboardCrossMediaStats` (the new last type declared above that point).
+- `src/Server/Api.fs`: deleted the "Activity heatmap data" and "Monthly breakdown" computation blocks from `getDashboardAllTab` and the two record-field assignments.
+- Deleted all seven feeder queries: `MovieProjection.getDailyMovieActivity` / `getMonthlyMovieMinutes`, `SeriesProjection.getDailyEpisodeActivity` / `getMonthlySeriesMinutes`, `GameProjection.getDailyGameActivity` / `getMonthlyGameMinutes`, `BookProjection.getDailyReadingActivity` (with its `journal-k52j1` doc comment). The differently-named per-tab charts (`getMonthlyActivity`, `getMonthlyEpisodeActivity`, `getMonthlyPlayTime`, `getMonthlyPlayTimePerGame`) are untouched and the Movies/Series/Games tabs still compile against them.
+- Removed the two tests that existed only to exercise the dead payload: `tests/Server.Tests/BookProjectionTests.fs`'s `"getDailyReadingActivity counts distinct days"` and `tests/Server.Tests/DashboardBooksTests.fs`'s `"DashboardActivityDay.Reading counts distinct books per day, not observation rows"` plus its header-comment bullet. `DashboardBooksTests.fs` keeps its other four cases.
+- No file under `src/Client/` was touched. `npm run build` is clean (194 modules, no type errors) — the proof no client consumer existed. `npm test` (Expecto): 906/906 passing. `npm run test:client` (Vitest): 103/103 passing. The acceptance-criteria grep (`ActivityDays|MonthlyBreakdown|DashboardActivityDay|DashboardMonthlyBreakdown|getDailyMovieActivity|getDailyEpisodeActivity|getDailyGameActivity|getDailyReadingActivity|getMonthlyMovieMinutes|getMonthlySeriesMinutes|getMonthlyGameMinutes` over `src/ tests/ --include=*.fs`) returns nothing.
+
+Two README edits from the task's "What" §6 are reported for the conductor to apply rather than edited directly (post-ghcaj, workers never touch READMEs):
+
+1. **Intelligence README** — four `replace` ops carried in this RESULT's `README_DELTA` block cover the **Activity day**, **Heatmap**, **Monthly breakdown** bullets (each now marked reserved language, no live surface since `intelligence-dq8rk`, payload pruned by this task; the Monday-first/task-036 clause dropped from Activity day) and the **Reading rail / Books tab** bullet (its `DashboardActivityDay`-gains-`Reading` sentence replaced with one noting the payload was pruned by this task).
+2. **Retired paragraph** — this is prose, not a bullet the `README_DELTA` grammar can target (no leading `- `), so it cannot travel as an `append`/`replace` op. The conductor should hand-add this task to the existing Retired paragraph in `.agentheim/knowledge/contexts/intelligence/README.md`, right after the New Games sentences ("...the dashboard no longer computes or ships New Games data at all."), the following new sentence: "`intelligence-h4qk2` similarly pruned the dead 365-day activity-heatmap payload (`DashboardActivityDay`/`DashboardMonthlyBreakdown`, `ActivityDays`/`MonthlyBreakdown` on `DashboardAllTab`, and the seven daily/monthly feeder queries) end to end — no client ever read it either."
+3. **Journal README Purpose line** (a different BC's README — out of scope for this worker's README_DELTA entirely) — in `.agentheim/knowledge/contexts/journal/README.md`'s `## Purpose`, the sentence "Powers the heatmap, \"Recently Watched/Played\", and the cross-media stats blocks on the dashboard." should become something like: "Powers \"Recently Watched/Played\" and the cross-media stats blocks on the dashboard today; the heatmap is a planned Journal surface (vision: \"Later\"), not yet live — see `intelligence-h4qk2`." The Journal README's **Activity day** and **Monthly breakdown** ubiquitous-language bullets are left as-is (concepts, not code).
+
+No domain decision was made beyond the prune-vs-rebuild call already recorded in the task's own Notes during refinement — no ADR filed. No new backlog items: `journal-k52j1` already exists, already corrected, and already `depends_on` this task.

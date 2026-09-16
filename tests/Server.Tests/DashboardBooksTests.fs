@@ -9,7 +9,6 @@ module Mediatheca.Tests.DashboardBooksTests
 //     `getRecentlyAddedUnfinished` (Books tab; strict rails)
 //   - `Api.getDashboardCardItems AllCurrentlyReading` parity with the
 //     collapsed `getDashboardAllTab` payload
-//   - `DashboardActivityDay.Reading`'s distinct-book-per-day count
 
 open System
 open System.Net.Http
@@ -144,20 +143,4 @@ let tests =
             | BookReadingItems items ->
                 Expect.equal items allTab.CurrentlyReading "the expanded card's uncapped query matches the collapsed All-tab payload exactly"
             | other -> failtestf "Expected BookReadingItems, got %A" other
-
-        testCase "DashboardActivityDay.Reading counts distinct books per day, not observation rows" <| fun _ ->
-            use db = TestDb.withTempDbFactory apiBootstrap
-            let api = createApi db.Factory
-            let day = isoDaysAgo 2
-            addBook db.Connection "reading-day-2020" "Reading Day Book" "B0READINGD1"
-            appendBookEvent db.Connection "reading-day-2020" (Books.Reading_progress_observed
-                { Percent = 20; Position = None; Source = Audible; ObservedOn = day; Finished = false })
-            appendBookEvent db.Connection "reading-day-2020" (Books.Reading_progress_observed
-                { Percent = 35; Position = None; Source = ProgressSource.Manual; ObservedOn = day; Finished = false })
-
-            let allTab = api.getDashboardAllTab () |> Async.RunSynchronously
-            let dayEntry = allTab.ActivityDays |> List.tryFind (fun d -> d.Date = day)
-            match dayEntry with
-            | Some entry -> Expect.equal entry.Reading 1 "two observations of one book on the same day count as one"
-            | None -> failtest "Expected an activity day entry for the seeded observation day"
     ]

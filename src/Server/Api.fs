@@ -2772,54 +2772,6 @@ module Api =
                 let weekEpisodeCount = SeriesProjection.getEpisodesWatchedThisWeek conn
                 let weekGameMinutes = GameProjection.getGameMinutesThisWeek conn
 
-                // Activity heatmap data (365 days)
-                let dailyMovies = MovieProjection.getDailyMovieActivity conn
-                let dailyEpisodes = SeriesProjection.getDailyEpisodeActivity conn
-                let dailyGames = GameProjection.getDailyGameActivity conn
-                let dailyReading = BookProjection.getDailyReadingActivity conn
-
-                // Merge daily activity into unified list
-                let allDates =
-                    [ for (d, _) in dailyMovies -> d
-                      for (d, _) in dailyEpisodes -> d
-                      for (d, _) in dailyGames -> d
-                      for (d, _) in dailyReading -> d ]
-                    |> List.distinct
-                    |> List.sort
-                let movieMap = dailyMovies |> Map.ofList
-                let episodeMap = dailyEpisodes |> Map.ofList
-                let gameMap = dailyGames |> Map.ofList
-                let readingMap = dailyReading |> Map.ofList
-                let activityDays =
-                    allDates
-                    |> List.map (fun d ->
-                        { Mediatheca.Shared.DashboardActivityDay.Date = d
-                          MovieSessions = movieMap |> Map.tryFind d |> Option.defaultValue 0
-                          EpisodesWatched = episodeMap |> Map.tryFind d |> Option.defaultValue 0
-                          GameSessions = gameMap |> Map.tryFind d |> Option.defaultValue 0
-                          Reading = readingMap |> Map.tryFind d |> Option.defaultValue 0 })
-
-                // Monthly breakdown (12 months)
-                let monthlyMovies = MovieProjection.getMonthlyMovieMinutes conn
-                let monthlySeries = SeriesProjection.getMonthlySeriesMinutes conn
-                let monthlyGames = GameProjection.getMonthlyGameMinutes conn
-                let allMonths =
-                    [ for (m, _) in monthlyMovies -> m
-                      for (m, _) in monthlySeries -> m
-                      for (m, _) in monthlyGames -> m ]
-                    |> List.distinct
-                    |> List.sort
-                let monthlyMovieMap = monthlyMovies |> Map.ofList
-                let monthlySeriesMap = monthlySeries |> Map.ofList
-                let monthlyGameMap = monthlyGames |> Map.ofList
-                let monthlyBreakdown =
-                    allMonths
-                    |> List.map (fun m ->
-                        { Mediatheca.Shared.DashboardMonthlyBreakdown.Month = m
-                          MovieMinutes = monthlyMovieMap |> Map.tryFind m |> Option.defaultValue 0
-                          SeriesMinutes = monthlySeriesMap |> Map.tryFind m |> Option.defaultValue 0
-                          GameMinutes = monthlyGameMap |> Map.tryFind m |> Option.defaultValue 0 })
-
                 return {
                     Mediatheca.Shared.DashboardAllTab.SeriesNextUp = seriesNextUp
                     MoviesToWatch = moviesToWatch
@@ -2845,8 +2797,6 @@ module Api =
                         WeekEpisodeCount = weekEpisodeCount
                         WeekGameMinutes = weekGameMinutes
                     }
-                    ActivityDays = activityDays
-                    MonthlyBreakdown = monthlyBreakdown
                     CurrentlyReading = currentlyReading
                 }
             }

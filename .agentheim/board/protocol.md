@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 14:08 -- Task verified and completed: intelligence-h4qk2 - Prune the dead activity-heatmap payload — DashboardAllTab.ActivityDays/MonthlyBreakdown, their two Shared types and the seven daily/monthly feeder queries go end to end (mirroring intelligence-p4t7k); the All tab stopped rendering them in intelligence-dq8rk and no client reads them
+
+**Type:** Work / Task completion
+**Task:** intelligence-h4qk2 - Prune the dead activity-heatmap payload — DashboardAllTab.ActivityDays/MonthlyBreakdown, their two Shared types and the seven daily/monthly feeder queries go end to end (mirroring intelligence-p4t7k); the All tab stopped rendering them in intelligence-dq8rk and no client reads them
+**Summary:** Pruned the dead 365-day activity-heatmap / 12-month monthly-breakdown payload end to end — the two Shared types, the two DashboardAllTab fields, the two computation blocks in Api.getDashboardAllTab, all seven feeder queries and the two tests that existed only to exercise them
+**Duration:** 13m
+**Verification:** PASS (iteration 1)
+**Files changed:** 8
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 13:54 -- Batch started: [intelligence-h4qk2, curation-cyxbc, curation-h98ve]
 
 **Type:** Work / Batch start

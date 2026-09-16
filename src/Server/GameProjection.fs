@@ -1327,27 +1327,3 @@ module GameProjection =
         |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
         |> Option.defaultValue 0
 
-    // Cross-media: Daily game activity for last 365 days
-    let getDailyGameActivity (conn: SqliteConnection) : (string * int) list =
-        conn
-        |> Db.newCommand """
-            SELECT date, COUNT(DISTINCT game_slug) as count
-            FROM game_play_session
-            WHERE date >= date('now', '-365 days')
-            GROUP BY date
-        """
-        |> Db.query (fun (rd: IDataReader) ->
-            rd.ReadString "date", rd.ReadInt32 "count")
-
-    // Cross-media: Monthly game minutes for last 12 months
-    let getMonthlyGameMinutes (conn: SqliteConnection) : (string * int) list =
-        conn
-        |> Db.newCommand """
-            SELECT strftime('%Y-%m', date) as month, SUM(minutes_played) as total_minutes
-            FROM game_play_session
-            WHERE date >= date('now', '-12 months')
-            GROUP BY month
-            ORDER BY month
-        """
-        |> Db.query (fun (rd: IDataReader) ->
-            rd.ReadString "month", rd.ReadInt32 "total_minutes")

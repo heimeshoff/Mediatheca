@@ -886,29 +886,3 @@ module MovieProjection =
         |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
         |> Option.defaultValue 0
 
-    // Cross-media: Daily movie activity for last 365 days
-    let getDailyMovieActivity (conn: SqliteConnection) : (string * int) list =
-        conn
-        |> Db.newCommand """
-            SELECT date, COUNT(*) as count
-            FROM watch_sessions
-            WHERE date >= date('now', '-365 days')
-            GROUP BY date
-        """
-        |> Db.query (fun (rd: IDataReader) ->
-            rd.ReadString "date", rd.ReadInt32 "count")
-
-    // Cross-media: Monthly movie minutes for last 12 months
-    let getMonthlyMovieMinutes (conn: SqliteConnection) : (string * int) list =
-        conn
-        |> Db.newCommand """
-            SELECT strftime('%Y-%m', ws.date) as month,
-                   COALESCE(SUM(md.runtime), 0) as minutes
-            FROM watch_sessions ws
-            JOIN movie_detail md ON ws.movie_slug = md.slug
-            WHERE ws.date >= date('now', '-12 months')
-            GROUP BY month
-            ORDER BY month
-        """
-        |> Db.query (fun (rd: IDataReader) ->
-            rd.ReadString "month", rd.ReadInt32 "minutes")

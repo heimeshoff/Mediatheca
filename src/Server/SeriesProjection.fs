@@ -1785,18 +1785,6 @@ module SeriesProjection =
         |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
         |> Option.defaultValue 0
 
-    // Cross-media: Daily episode activity for last 365 days
-    let getDailyEpisodeActivity (conn: SqliteConnection) : (string * int) list =
-        conn
-        |> Db.newCommand """
-            SELECT watched_date as date, COUNT(*) as count
-            FROM series_episode_progress
-            WHERE watched_date >= date('now', '-365 days') AND watched_date IS NOT NULL
-            GROUP BY watched_date
-        """
-        |> Db.query (fun (rd: IDataReader) ->
-            rd.ReadString "date", rd.ReadInt32 "count")
-
     /// Dashboard: returning/in-production series with a known future air date
     /// (episode air_date preferred, falls back to season air_date). Ordered
     /// ascending by next air date. Limited to `limit` results.
@@ -1841,21 +1829,3 @@ module SeriesProjection =
             | None, None -> None)
         |> List.sortBy (fun (item: Mediatheca.Shared.ReturningSoonItem) -> item.NextAirDate)
         |> RowLimit.truncate limit
-
-    // Cross-media: Monthly series minutes for last 12 months
-    let getMonthlySeriesMinutes (conn: SqliteConnection) : (string * int) list =
-        conn
-        |> Db.newCommand """
-            SELECT strftime('%Y-%m', sep.watched_date) as month,
-                   COALESCE(SUM(e.runtime), 0) as minutes
-            FROM series_episode_progress sep
-            JOIN series_episode_cache e ON e.series_slug = sep.series_slug
-                AND e.season_number = sep.season_number
-                AND e.episode_number = sep.episode_number
-            WHERE sep.watched_date >= date('now', '-12 months')
-              AND sep.watched_date IS NOT NULL
-            GROUP BY month
-            ORDER BY month
-        """
-        |> Db.query (fun (rd: IDataReader) ->
-            rd.ReadString "month", rd.ReadInt32 "minutes")

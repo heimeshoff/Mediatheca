@@ -1,7 +1,7 @@
 # Journal
 
 ## Purpose
-The **cross-media diary**. Aggregates *when* and *with whom* media was experienced — watch sessions (Movies), episode-watched events (Series), and play-time changes (Games) — into a unified activity timeline. Powers the heatmap, "Recently Watched/Played", and the cross-media stats blocks on the dashboard.
+The **cross-media diary**. Aggregates *when* and *with whom* media was experienced — watch sessions (Movies), episode-watched events (Series), and play-time changes (Games) — into a unified activity timeline. Powers "Recently Watched/Played" and the cross-media stats blocks on the dashboard today; the heatmap is a planned Journal surface (vision: "Later"), not yet live — see `intelligence-h4qk2`.
 
 ## Classification
 **core** — The "diary" half of the product name (Mediatheca = library + diary). Without it the dashboard's intent-driven feel collapses to a catalog.
