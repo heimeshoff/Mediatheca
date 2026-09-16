@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 23:40 -- Batch started: [curation-kezpv]
+
+**Type:** Work / Batch start
+**Tasks:** curation-kezpv - Retire the one-off Notes migration tooling after the harbour cutover — delete Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores" (five `IAdminApi` members, DTOs, AdminSurgery sections, `ContentBlockConversion.fs` and tests) and the Health-tab catalog media-type backfill action, once both have run on the live store
+**Parallel:** no (1 worker — curation-kezpv is the only ready task across every BC)
+
+---
+
 ## 2026-09-16 23:35 -- Modeling / Promoted: curation-kezpv - Retire the one-off Notes migration tooling after the harbour cutover — delete Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores" (five `IAdminApi` members, DTOs, AdminSurgery sections, `ContentBlockConversion.fs` and tests) and the Health-tab catalog media-type backfill action, once both have run on the live store
 
 **Type:** Modeling / Promote

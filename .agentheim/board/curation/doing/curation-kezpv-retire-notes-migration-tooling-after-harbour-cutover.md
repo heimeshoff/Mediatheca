@@ -1,7 +1,7 @@
 ---
 id: curation-kezpv
 title: Retire the one-off Notes migration tooling after the harbour cutover — delete Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores" (five `IAdminApi` members, DTOs, AdminSurgery sections, `ContentBlockConversion.fs` and tests) and the Health-tab catalog media-type backfill action, once both have run on the live store
-status: todo
+status: doing
 type: chore
 context: curation
 created: 2026-09-16

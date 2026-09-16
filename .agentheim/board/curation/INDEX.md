@@ -11,19 +11,19 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 1
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 6
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **curation-kezpv** — Retire the one-off Notes migration tooling after the harbour cutover — delete Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores" (five `IAdminApi` members, DTOs, AdminSurgery sections, `ContentBlockConversion.fs` and tests) and the Health-tab catalog media-type backfill action, once both have run on the live store (chore) — `todo/curation-kezpv-retire-notes-migration-tooling-after-harbour-cutover.md`
 <!-- no tasks in todo -->
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **curation-kezpv** — Retire the one-off Notes migration tooling after the harbour cutover — delete Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores" (five `IAdminApi` members, DTOs, AdminSurgery sections, `ContentBlockConversion.fs` and tests) and the Health-tab catalog media-type backfill action, once both have run on the live store (chore) — `doing/curation-kezpv-retire-notes-migration-tooling-after-harbour-cutover.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
