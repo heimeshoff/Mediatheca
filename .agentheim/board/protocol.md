@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 05:37 -- Task verified and completed: intelligence-dnv2y - Dashboard Books tab and All-tab "Reading" rail — the All tab's "Books coming soon" placeholder becomes a Currently Reading card (In Focus books with progress bars and source badges, finished books lingering 7 days marked "Finished"), plus a Books tab with Currently Reading, Recently Finished, Recently Added and a reading-stats block, and reading days on the activity heatmap
+
+**Type:** Work / Task completion
+**Task:** intelligence-dnv2y - Dashboard Books tab and All-tab "Reading" rail — the All tab's "Books coming soon" placeholder becomes a Currently Reading card (In Focus books with progress bars and source badges, finished books lingering 7 days marked "Finished"), plus a Books tab with Currently Reading, Recently Finished, Recently Added and a reading-stats block, and reading days on the activity heatmap
+**Summary:** Dashboard Books presence: the All tab's "Books coming soon" placeholder becomes a Reading card (In Focus books with progress bars and source glyphs, 7-day finished linger via date-string comparison per ADR-0077, expand-in-place keyed on slug) and a new Books tab with Currently Reading / Recently Finished / Recently Added rails plus a stats tile row (Total, In Focus, Finished this year / all time, Pages read, Hours listened), backed by DashboardBookItem / DashboardBooksTab / DashboardBookStats DTOs, new BookProjection queries, four DashboardCardQuery cases and DashboardActivityDay.Reading. The heatmap tooltip line was not built because no client heatmap exists (backlog item filed).
+**Duration:** 34m
+**Verification:** PASS (iteration 1)
+**Files changed:** 10
+**Tests added:** 7
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 05:32 -- Batch started: [integration-jjvg2, integration-y2ak4]
 
 **Type:** Work / Batch start

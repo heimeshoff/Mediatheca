@@ -563,3 +563,129 @@ module BookProjection =
         conn
         |> Db.newCommand "SELECT observed_on, COUNT(DISTINCT book_slug) as cnt FROM book_progress GROUP BY observed_on ORDER BY observed_on"
         |> Db.query (fun (rd: IDataReader) -> rd.ReadString "observed_on", rd.ReadInt32 "cnt")
+
+    // ── intelligence-dnv2y: Dashboard queries ──
+
+    /// `BookListItem` -> the dashboard's shared `DashboardBookItem` card shape.
+    /// `finished` is the caller's to set — a strict rail (Currently Reading,
+    /// Recently Added) is never finished by construction; `getRecentlyFinished`
+    /// results always are.
+    let toDashboardBookItem (finished: bool) (item: Mediatheca.Shared.BookListItem) : Mediatheca.Shared.DashboardBookItem =
+        { Mediatheca.Shared.DashboardBookItem.Slug = item.Slug
+          Title = item.Title
+          Authors = item.Authors
+          CoverRef = item.CoverRef
+          ProgressPercent = item.ProgressPercent
+          ProgressSource = item.ProgressSource
+          Finished = finished
+          FinishedOn = item.FinishedAt }
+
+    /// The All-tab "Reading" card's own query (mirrors
+    /// `MovieProjection.getAllTabMoviesToWatch`, intelligence-b1nz5): In Focus
+    /// books ordered by latest `progress_observed_on` desc (then `added_at`
+    /// desc), plus any book `finished_at` within the last 7 days (a date-string
+    /// comparison, ADR-0077 §3), marked `Finished = true`. The Books tab's own
+    /// Currently Reading card stays strict — see `getCurrentlyReading` above.
+    let getAllTabCurrentlyReading (conn: SqliteConnection) : Mediatheca.Shared.DashboardBookItem list =
+        conn
+        |> Db.newCommand """
+            SELECT slug, title, authors, cover_ref, progress_percent, progress_source, status, finished_at
+            FROM book_list
+            WHERE status = 'InFocus'
+               OR (status = 'Finished' AND finished_at IS NOT NULL AND finished_at >= date('now', '-7 days'))
+            ORDER BY
+                CASE WHEN status = 'InFocus' THEN 0 ELSE 1 END,
+                CASE WHEN status = 'InFocus' THEN progress_observed_on END DESC,
+                CASE WHEN status = 'InFocus' THEN added_at END DESC,
+                CASE WHEN status = 'Finished' THEN finished_at END DESC
+        """
+        |> Db.query (fun (rd: IDataReader) ->
+            let status = parseBookStatus (rd.ReadString "status")
+            { Mediatheca.Shared.DashboardBookItem.Slug = rd.ReadString "slug"
+              Title = rd.ReadString "title"
+              Authors = parseJsonStringList (rd.ReadString "authors")
+              CoverRef = readOptString rd "cover_ref"
+              ProgressPercent = rd.ReadInt32 "progress_percent"
+              ProgressSource = readOptString rd "progress_source" |> Option.map parseProgressSource
+              Finished = (status = BookStatus.Finished)
+              FinishedOn = readOptString rd "finished_at" })
+
+    /// The Books tab's own "Recently Added" rail — newest first, excluding
+    /// already-finished books (those belong to the tab's "Recently Finished"
+    /// rail instead, `getRecentlyFinished` above).
+    let getRecentlyAddedUnfinished (conn: SqliteConnection) (limit: int option) : BookListItem list =
+        conn
+        |> Db.newCommand """
+            SELECT slug, title, authors, year, cover_ref, subjects, format, status,
+                   progress_percent, progress_source, progress_observed_on, personal_rating, finished_at
+            FROM book_list
+            WHERE status <> 'Finished'
+            ORDER BY added_at DESC
+            LIMIT @limit
+        """
+        |> Db.setParams [ "limit", SqlType.Int32 (RowLimit.toSql limit) ]
+        |> Db.query readListItemRow
+
+    /// The Books tab's stat-tile row. `PagesReadThisYear` joins each
+    /// finished-this-year book to the exact `book_progress` row that produced
+    /// its denormalized latest observation (the `(book_slug, observed_on,
+    /// source)` primary key `book_list`'s own `progress_observed_on` /
+    /// `progress_source` were computed from, `recomputeProgress` above) and
+    /// sums any `Page` position found; `HoursListenedThisYear` sums
+    /// `runtime_minutes x percent` (in hours) over the same cohort restricted
+    /// to an Audible-sourced latest observation with a known cache-tier
+    /// runtime. Both are `None`, not `Some 0`, when nothing contributes.
+    let getReadingStats (conn: SqliteConnection) : Mediatheca.Shared.DashboardBookStats =
+        let count (whereClause: string) =
+            conn
+            |> Db.newCommand (sprintf "SELECT COUNT(*) as cnt FROM book_list WHERE %s" whereClause)
+            |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "cnt")
+            |> Option.defaultValue 0
+        let total = count "1 = 1"
+        let inFocus = count "status = 'InFocus'"
+        let finishedThisYear = count "status = 'Finished' AND strftime('%Y', finished_at) = strftime('%Y', 'now')"
+        let finishedAllTime = count "status = 'Finished'"
+        let pagesReadThisYear =
+            conn
+            |> Db.newCommand """
+                SELECT bp.position_json
+                FROM book_list bl
+                JOIN book_progress bp
+                    ON bp.book_slug = bl.slug
+                   AND bp.observed_on = bl.progress_observed_on
+                   AND bp.source = bl.progress_source
+                WHERE bl.status = 'Finished' AND strftime('%Y', bl.finished_at) = strftime('%Y', 'now')
+            """
+            |> Db.query (fun (rd: IDataReader) ->
+                if rd.IsDBNull(rd.GetOrdinal("position_json")) then None
+                else
+                    decodeReadingPositionJson (rd.ReadString "position_json")
+                    |> Option.bind (function Page (page, _) -> Some page | _ -> None))
+            |> List.choose id
+            |> function
+                | [] -> None
+                | pages -> Some (List.sum pages)
+        let hoursListenedThisYear =
+            conn
+            |> Db.newCommand """
+                SELECT bl.progress_percent as percent, mc.runtime_minutes as runtime_minutes
+                FROM book_list bl
+                JOIN book_metadata_cache mc ON mc.book_slug = bl.slug
+                WHERE bl.status = 'Finished'
+                  AND strftime('%Y', bl.finished_at) = strftime('%Y', 'now')
+                  AND bl.progress_source = 'Audible'
+                  AND mc.runtime_minutes IS NOT NULL
+            """
+            |> Db.query (fun (rd: IDataReader) ->
+                let percent = rd.ReadInt32 "percent"
+                let runtime = rd.ReadInt32 "runtime_minutes"
+                float runtime * (float percent / 100.0) / 60.0)
+            |> function
+                | [] -> None
+                | hours -> Some (List.sum hours)
+        { Mediatheca.Shared.DashboardBookStats.Total = total
+          InFocus = inFocus
+          FinishedThisYear = finishedThisYear
+          FinishedAllTime = finishedAllTime
+          PagesReadThisYear = pagesReadThisYear
+          HoursListenedThisYear = hoursListenedThisYear }

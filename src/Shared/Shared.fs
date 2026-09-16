@@ -420,6 +420,10 @@ type DashboardActivityDay = {
     MovieSessions: int
     EpisodesWatched: int
     GameSessions: int
+    /// intelligence-dnv2y: distinct books with a reading-progress observation
+    /// that day (`BookProjection.getDailyReadingActivity`'s own `COUNT(DISTINCT
+    /// book_slug)` — two observations of one book on the same day count once).
+    Reading: int
 }
 
 type DashboardMonthlyBreakdown = {
@@ -429,17 +433,11 @@ type DashboardMonthlyBreakdown = {
     GameMinutes: int
 }
 
-type DashboardAllTab = {
-    SeriesNextUp: DashboardSeriesNextUp list
-    MoviesToWatch: DashboardMovieToWatch list
-    GamesInFocus: DashboardGameInFocus list
-    GamesRecentlyPlayed: DashboardGameRecentlyPlayed list
-    PlaySessions: DashboardPlaySession list
-    JellyfinServerUrl: string option
-    CrossMediaStats: DashboardCrossMediaStats
-    ActivityDays: DashboardActivityDay list
-    MonthlyBreakdown: DashboardMonthlyBreakdown list
-}
+// `DashboardAllTab` itself is declared further down (just after `ReadingPosition`),
+// once `DashboardBookItem` exists for its `CurrentlyReading` field — see the
+// comment there (intelligence-dnv2y). Every other type it depends on
+// (`DashboardSeriesNextUp` .. `DashboardMonthlyBreakdown`) is already declared
+// above this point.
 
 type DashboardMovieStats = {
     TotalMovies: int
@@ -894,6 +892,44 @@ type ProgressSource =
 type ReadingPosition =
     | Page of page: int * total: int option
     | Minutes of minutes: int * total: int option
+
+/// intelligence-dnv2y: the dashboard's shared reading-item shape — one card
+/// renderer serves the All tab's "Reading" rail and all three of the Books
+/// tab's rails (Currently Reading / Recently Finished / Recently Added).
+/// `Finished`/`FinishedOn` only carry meaning for a lingering item (ADR-0077's
+/// `finished_at` date string) — `false`/`None` otherwise.
+type DashboardBookItem = {
+    Slug: string
+    Title: string
+    Authors: string list
+    CoverRef: string option
+    ProgressPercent: int
+    ProgressSource: ProgressSource option
+    Finished: bool
+    FinishedOn: string option
+}
+
+/// Declared here, rather than beside its sibling Dashboard-tab types further
+/// up the file, because `CurrentlyReading` needs `DashboardBookItem` (which
+/// needs `ProgressSource`, declared just above) — see the placeholder comment
+/// left at this type's original location.
+type DashboardAllTab = {
+    SeriesNextUp: DashboardSeriesNextUp list
+    MoviesToWatch: DashboardMovieToWatch list
+    GamesInFocus: DashboardGameInFocus list
+    GamesRecentlyPlayed: DashboardGameRecentlyPlayed list
+    PlaySessions: DashboardPlaySession list
+    JellyfinServerUrl: string option
+    CrossMediaStats: DashboardCrossMediaStats
+    ActivityDays: DashboardActivityDay list
+    MonthlyBreakdown: DashboardMonthlyBreakdown list
+    /// intelligence-dnv2y: In Focus books (latest `progress_observed_on` desc,
+    /// then `added_at` desc), plus any book `finished_at` within the last 7
+    /// days marked `Finished = true` (the intelligence-b1nz5 linger) —
+    /// `BookProjection.getAllTabCurrentlyReading`. The Books tab's own
+    /// Currently Reading card stays strict (no linger) via a separate query.
+    CurrentlyReading: DashboardBookItem list
+}
 
 /// ADR-0076 §4: an external catalog identity the user (or an import acting
 /// for them) asserts this library entry IS — one value per kind, enforced by
@@ -1409,6 +1445,36 @@ type DashboardGamesTab = {
     Upcoming: GameListItem list
 }
 
+/// intelligence-dnv2y: the Books tab's stat-tile row. `PagesReadThisYear` /
+/// `HoursListenedThisYear` are best-effort (`None` when nothing contributing
+/// is known yet) — the client hides a tile whose value is `None` rather than
+/// rendering a misleading zero.
+type DashboardBookStats = {
+    Total: int
+    InFocus: int
+    FinishedThisYear: int
+    FinishedAllTime: int
+    /// Sum of the `Page` position of each finished-this-year book's latest
+    /// observation, when known (`BookProjection.getReadingStats`).
+    PagesReadThisYear: int option
+    /// Sum of `runtime_minutes x percent` (converted to hours) over
+    /// finished-this-year books whose latest observation is Audible-sourced
+    /// and whose cache-tier runtime is known.
+    HoursListenedThisYear: float option
+}
+
+type DashboardBooksTab = {
+    /// Strict — In Focus only, no 7-day linger (the All tab's own
+    /// `CurrentlyReading` field on `DashboardAllTab` carries the linger).
+    CurrentlyReading: DashboardBookItem list
+    /// Last 90 days, newest first.
+    RecentlyFinished: DashboardBookItem list
+    /// Newest first, excluding already-finished books (`RecentlyFinished`
+    /// above is that rail).
+    RecentlyAdded: DashboardBookItem list
+    Stats: DashboardBookStats
+}
+
 // Steam Integration
 
 type SteamAchievement = {
@@ -1450,6 +1516,16 @@ type DashboardCardQuery =
     | GamesRecentlyAddedQuery
     | GamesUpcomingQuery
     | SteamRecentAchievementsQuery
+    /// intelligence-dnv2y: the All-tab "Reading" card's own query — In Focus
+    /// books plus the 7-day finished linger (mirrors `AllMoviesToWatchQuery`'s
+    /// split from its tab's strict query). Named without the `...Query` suffix
+    /// per the task's own spelling, unlike its siblings above.
+    | AllCurrentlyReading
+    /// intelligence-dnv2y: the Books tab's own three rails — each strict, no
+    /// linger (the All tab's linger lives only in `AllCurrentlyReading`).
+    | BooksCurrentlyReading
+    | BooksRecentlyFinished
+    | BooksRecentlyAdded
 
 /// The unlimited result of a `DashboardCardQuery`, in the same item shape the
 /// collapsed card already renders, so the expanded card reuses its item view.
@@ -1467,6 +1543,10 @@ type DashboardCardItems =
     | RecentlyPlayedGameItems of DashboardGameRecentlyPlayed list
     | GameItems of GameListItem list
     | AchievementItems of SteamAchievement list
+    /// intelligence-dnv2y: shared by all four Reading queries above — one
+    /// item shape, so one expanded-card renderer serves the All tab's
+    /// Reading card and every Books-tab rail.
+    | BookReadingItems of DashboardBookItem list
 
 type SteamOwnedGame = {
     AppId: int
@@ -1849,6 +1929,7 @@ type IMediathecaApi = {
     getDashboardMoviesTab: unit -> Async<DashboardMoviesTab>
     getDashboardSeriesTab: unit -> Async<DashboardSeriesTab>
     getDashboardGamesTab: unit -> Async<DashboardGamesTab>
+    getDashboardBooksTab: unit -> Async<DashboardBooksTab>
     /// A dashboard card's query with its row limit lifted (card expansion).
     getDashboardCardItems: DashboardCardQuery -> Async<DashboardCardItems>
     // Settings

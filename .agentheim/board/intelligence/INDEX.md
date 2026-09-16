@@ -10,10 +10,10 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 14
+- **Doing:** 0
+- **Done:** 15
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **intelligence-dnv2y** — Dashboard Books tab and All-tab "Reading" rail — the All tab's "Books coming soon" placeholder becomes a Currently Reading card (In Focus books with progress bars and source badges, finished books lingering 7 days marked "Finished"), plus a Books tab with Currently Reading, Recently Finished, Recently Added and a reading-stats block, and reading days on the activity heatmap (feature) — `doing/intelligence-dnv2y-dashboard-books-tab-and-reading-rail.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **intelligence-dnv2y** — Dashboard Books tab and All-tab "Reading" rail — the All tab's "Books coming soon" placeholder becomes a Currently Reading card (In Focus books with progress bars and source badges, finished books lingering 7 days marked "Finished"), plus a Books tab with Currently Reading, Recently Finished, Recently Added and a reading-stats block, and reading days on the activity heatmap (feature) — `done/intelligence-dnv2y-dashboard-books-tab-and-reading-rail.md`
 - **intelligence-b1nz5** — All-tab dashboard — a watched movie stays on "Movies to Watch" and a retired game stays on "Games" for 7 days, marked finished, the same way a finished series already lingers on "Next episode" (feature) — `done/intelligence-b1nz5-finished-movies-retired-games-linger-on-dashboard.md`
 - **intelligence-cs2dm** — Collapsing a dashboard card remounts every collapsed card (fade-in-up replays, and the grown surface's DOM node is repurposed into a sibling card) — give `growingTabArea`'s two render branches stable keys so the collapsed subtree really stays mounted across expand/collapse (ADR-0073 §3/§4) (bug) — `done/intelligence-cs2dm-collapse-remounts-cards-keyed-branch-swap.md`
 - **intelligence-m09d4** — Dashboard card expand/collapse grows in place — the card surface and its already-rendered items travel to their expanded positions in ~0.5s via the design-system FLIP primitive, later-fetched items join below without disturbing them, and the 50ms scroll guess in State.fs is retired (ADR-0073) (feature) — `done/intelligence-m09d4-dashboard-expand-flip-grow-animation.md`
@@ -46,6 +46,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **intelligence-h4qk2** — DashboardAllTab's ActivityDays/MonthlyBreakdown payload has no client consumer — either build the heatmap or stop computing it (chore) — `backlog/intelligence-h4qk2-dashboardalltab-s-activitydays-monthlybreakdown-payload-has.md`
 <!-- backlog-list:end -->
 
 

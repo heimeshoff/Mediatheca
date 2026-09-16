@@ -7,6 +7,7 @@ type DashboardTab =
     | MoviesTab
     | SeriesTab
     | GamesTab
+    | BooksTab
 
 type AchievementsState =
     | AchievementsNotLoaded
@@ -36,6 +37,15 @@ type DashboardCard =
     | GamesRecentlyAdded
     | GamesUpcoming
     | GamesRecentAchievements
+    /// intelligence-dnv2y: the All-tab "Reading" card — In Focus books plus
+    /// the 7-day finished linger (mirrors `AllMoviesToWatch`'s split from its
+    /// tab's own strict card).
+    | AllReading
+    /// intelligence-dnv2y: the Books tab's three rails, each strict (no
+    /// linger — the All tab's `AllReading` card above carries that).
+    | BooksReading
+    | BooksFinished
+    | BooksAdded
 
 module DashboardCard =
     /// The query an expanded card re-runs with its row limit lifted.
@@ -61,6 +71,10 @@ module DashboardCard =
         | GamesRecentlyAdded -> GamesRecentlyAddedQuery
         | GamesUpcoming -> GamesUpcomingQuery
         | GamesRecentAchievements -> SteamRecentAchievementsQuery
+        | AllReading -> AllCurrentlyReading
+        | BooksReading -> BooksCurrentlyReading
+        | BooksFinished -> BooksRecentlyFinished
+        | BooksAdded -> BooksRecentlyAdded
 
 /// The unlimited items of the expanded card. While the fetch is in flight
 /// (and after a failed one) the view keeps showing the tab's own limited
@@ -81,6 +95,7 @@ type Model = {
     MoviesTabData: DashboardMoviesTab option
     SeriesTabData: DashboardSeriesTab option
     GamesTabData: DashboardGamesTab option
+    BooksTabData: DashboardBooksTab option
     Achievements: AchievementsState
     IsLoading: bool
     IsSyncing: bool
@@ -94,6 +109,7 @@ type Msg =
     | MoviesTabLoaded of DashboardMoviesTab
     | SeriesTabLoaded of DashboardSeriesTab
     | GamesTabLoaded of DashboardGamesTab
+    | BooksTabLoaded of DashboardBooksTab
     | TabLoadError of string
     | AchievementsLoaded of Result<SteamAchievement list, string>
     | TriggerPlaytimeSync

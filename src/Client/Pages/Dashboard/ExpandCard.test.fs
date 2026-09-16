@@ -18,6 +18,17 @@ let private fakeApi : IMediathecaApi =
     ]
     |> unbox
 
+let private book (slug: string) (percent: int) : DashboardBookItem = {
+    Slug = slug
+    Title = slug
+    Authors = []
+    CoverRef = None
+    ProgressPercent = percent
+    ProgressSource = Some ProgressSource.Audible
+    Finished = false
+    FinishedOn = None
+}
+
 let private loaded () =
     let model, _ = init ()
     { model with IsLoading = false }
@@ -107,6 +118,38 @@ let expandCardTests =
             Expect.equal (DashboardCard.query AllMoviesToWatch) AllMoviesToWatchQuery "All tab lingers on recently-watched movies"
             Expect.equal (DashboardCard.query MoviesToWatch) MoviesToWatchQuery "Movies tab stays strictly unwatched-only"
             Expect.notEqual (DashboardCard.query AllMoviesToWatch) (DashboardCard.query MoviesToWatch) "the two cards no longer share a query"
+
+        // intelligence-dnv2y: the All tab's "Reading" card lingers on the
+        // 7-day finished window; the Books tab's own three rails each stay
+        // strict, mirroring the Movies split above — every card gets its own
+        // query so a book slug can never resolve to the wrong query's shape.
+        testCase "the All tab's Reading card and the Books tab's three rails each have their own distinct query" <| fun () ->
+            Expect.equal (DashboardCard.query AllReading) AllCurrentlyReading "All tab lingers on the 7-day finished window"
+            Expect.equal (DashboardCard.query BooksReading) BooksCurrentlyReading "Books tab's Currently Reading stays strict"
+            Expect.equal (DashboardCard.query BooksFinished) BooksRecentlyFinished "Books tab's Recently Finished rail"
+            Expect.equal (DashboardCard.query BooksAdded) BooksRecentlyAdded "Books tab's Recently Added rail"
+            let queries = [ AllCurrentlyReading; BooksCurrentlyReading; BooksRecentlyFinished; BooksRecentlyAdded ]
+            Expect.equal (queries |> List.distinct |> List.length) (List.length queries) "no two Reading cards share a query"
+
+        // design-system-btmdx / ADR-0073 §1: a surviving item only ever
+        // translates (no fade) across expand/collapse — that guarantee comes
+        // from the collapsed and expanded faces of the SAME card deriving an
+        // identical `data-flip-key` for the same item, which in turn depends
+        // on `ExpandCard`/`ExpandedItemsLoaded` preserving the same `Card`
+        // identity end to end. Exercised here for the Reading card's own
+        // item shape (`BookReadingItems`), the same way the Movies-shaped
+        // cases above exercise `MovieItems`/`PersonItems`.
+        testCase "expanding the Reading card keeps the same card identity through to the loaded reply, so every item's FLIP key stays keyed on its own slug" <| fun () ->
+            let expanded, _ = update fakeApi (ExpandCard AllReading) (loaded ())
+            Expect.equal expanded.Expanded (Some { Card = AllReading; Items = ExpandedLoading }) "the Reading card is expanded while its unlimited items are fetched"
+
+            let items = BookReadingItems [ book "dune-1965" 40; book "project-hail-mary-2021" 100 ]
+            let updated, _ = update fakeApi (ExpandedItemsLoaded (AllReading, Ok items)) expanded
+            match updated.Expanded with
+            | Some { Card = AllReading; Items = ExpandedReady (BookReadingItems loadedItems) } ->
+                Expect.equal (loadedItems |> List.map (fun b -> b.Slug)) [ "dune-1965"; "project-hail-mary-2021" ]
+                    "each item keeps its own slug — the identity `cardItemKey`/`Motion.flipKey` key off of"
+            | other -> failtestf "Expected the Reading card's own BookReadingItems reply, got %A" other
     ]
 
 Mocha.runTests expandCardTests |> ignore

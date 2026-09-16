@@ -48,6 +48,7 @@ let private tabBar (activeTab: DashboardTab) (dispatch: Msg -> unit) =
             tab "Movies" MoviesTab
             tab "TV Series" SeriesTab
             tab "Games" GamesTab
+            tab "Books" BooksTab
         ]
     ]
 
@@ -807,6 +808,115 @@ let private gameInFocusPosterCard (card: DashboardCard) (item: DashboardGameInFo
         ]
     ])
 
+// ── Books: Reading — Poster Cards (All tab + every Books-tab rail) ──
+
+/// intelligence-dnv2y: a small source glyph riding the progress overlay — a
+/// single letter, kept minimal per the task's "small source glyph" ask
+/// rather than growing the icon set for one card.
+let private progressSourceGlyph (source: ProgressSource option) =
+    match source with
+    | Some ProgressSource.Audible -> "A"
+    | Some ProgressSource.Goodreads -> "G"
+    | Some ProgressSource.Manual -> "M"
+    | None -> "?"
+
+let private progressSourceTitle (source: ProgressSource option) =
+    match source with
+    | Some ProgressSource.Audible -> "Audible"
+    | Some ProgressSource.Goodreads -> "Goodreads"
+    | Some ProgressSource.Manual -> "Manual"
+    | None -> "No progress yet"
+
+/// One card renderer for the All tab's "Reading" card and all three of the
+/// Books tab's rails (Currently Reading / Recently Finished / Recently
+/// Added) — they all read the same `DashboardBookItem` shape
+/// (`intelligence-dnv2y`). A lingering/already-finished item gets the same
+/// green "Finished" pill `movieToWatchPosterCard`/`gameInFocusPosterCard`
+/// use (intelligence-b1nz5) instead of the progress overlay.
+let private bookReadingPosterCard (card: DashboardCard) (item: DashboardBookItem) =
+    Html.a (Motion.flipKey (cardItemKey card item.Slug) @ [
+        prop.href (Router.format ("books", item.Slug))
+        prop.onClick (fun e ->
+            e.preventDefault()
+            Router.navigate ("books", item.Slug)
+        )
+        prop.className "cursor-pointer group"
+        prop.children [
+            Html.div [
+                prop.className (DesignSystem.posterCard + " relative w-full")
+                prop.children [
+                    Html.div [
+                        prop.className (DesignSystem.posterImageContainer + " poster-shadow")
+                        prop.children [
+                            match item.CoverRef with
+                            | Some ref ->
+                                Html.img [
+                                    prop.src $"/images/{ref}"
+                                    prop.alt item.Title
+                                    prop.className DesignSystem.posterImage
+                                ]
+                            | None ->
+                                Html.div [
+                                    prop.className "flex flex-col items-center justify-center w-full h-full text-base-content/20 px-3 gap-2"
+                                    prop.children [
+                                        Icons.book ()
+                                        Html.p [
+                                            prop.className "text-xs text-base-content/40 font-medium text-center line-clamp-2"
+                                            prop.text item.Title
+                                        ]
+                                    ]
+                                ]
+
+                            if item.Finished then
+                                finishedBadge "Finished"
+                            else
+                                // Thin gold progress bar along the bottom edge
+                                // (DesignSystem.progressContinuous), the
+                                // percent in font-mono, and a small source
+                                // glyph, riding a scrim for legibility over
+                                // the artwork.
+                                Html.div [
+                                    prop.className "absolute inset-x-0 bottom-0 z-10 px-1.5 pb-1.5 pt-5 bg-gradient-to-t from-black/85 to-transparent"
+                                    prop.children [
+                                        Html.div [
+                                            prop.className "flex items-center justify-between mb-1"
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className "font-mono text-[10px] font-semibold text-white"
+                                                    prop.text (string item.ProgressPercent + "%")
+                                                ]
+                                                Html.span [
+                                                    prop.className "flex items-center justify-center w-3.5 h-3.5 rounded-full bg-white/20 text-white text-[8px] font-bold leading-none"
+                                                    prop.title (progressSourceTitle item.ProgressSource)
+                                                    prop.text (progressSourceGlyph item.ProgressSource)
+                                                ]
+                                            ]
+                                        ]
+                                        DesignSystem.progressContinuous (float item.ProgressPercent / 100.0)
+                                    ]
+                                ]
+
+                            Html.div [ prop.className DesignSystem.posterShine ]
+                        ]
+                    ]
+                ]
+            ]
+            Html.div [
+                prop.className "mt-2 px-0.5"
+                prop.children [
+                    Html.p [
+                        prop.className "text-sm font-semibold truncate group-hover:text-primary transition-colors"
+                        prop.text item.Title
+                    ]
+                    Html.p [
+                        prop.className "text-xs text-base-content/50 truncate"
+                        prop.text (String.concat ", " item.Authors)
+                    ]
+                ]
+            ]
+        ]
+    ])
+
 // ── Steam Achievements Card ──
 
 let private achievementItem (card: DashboardCard) (achievement: SteamAchievement) =
@@ -891,16 +1001,6 @@ let private achievementsBody (card: DashboardCard) (state: AchievementsState) : 
                 ]
     ]
 
-// ── Books placeholder (right column, matches Games column chrome) ──
-
-let private booksColumnPlaceholder =
-    sectionOpen Icons.catalog "Books" [
-        Html.p [
-            prop.className "text-base-content/40 text-sm font-medium text-center py-6"
-            prop.text "Books coming soon."
-        ]
-    ]
-
 // ── All Tab — 3a layout: TV row, Movies row, Games/Books split ──
 
 let private allTabView (data: DashboardAllTab) (expanded: ExpandedCard option) (dispatch: Msg -> unit) =
@@ -951,7 +1051,27 @@ let private allTabView (data: DashboardAllTab) (expanded: ExpandedCard option) (
             Unpack = (function GamesInFocusItems items -> Some items | _ -> None)
             RenderItem = gameInFocusPosterCard AllGamesInFocus
         }
-    [ nextEpisode; moviesToWatch; games ],
+    // 4. Reading — In Focus books plus the 7-day finished linger
+    // (intelligence-dnv2y). Same auto-fill poster grid shape as Games, so the
+    // two columns read as siblings.
+    let reading =
+        expandable dispatch {
+            Card = AllReading
+            Chrome = Open
+            Icon = Icons.book
+            Title = "Reading"
+            Collapsed = [
+                Html.div [
+                    prop.className (expandedLayoutClass PosterGrid)
+                    prop.children [ for item in data.CurrentlyReading do bookReadingPosterCard AllReading item ]
+                ]
+            ]
+            ExpandedLayout = PosterGrid
+            Items = data.CurrentlyReading
+            Unpack = (function BookReadingItems items -> Some items | _ -> None)
+            RenderItem = bookReadingPosterCard AllReading
+        }
+    [ nextEpisode; moviesToWatch; games; reading ],
     [
         if not (List.isEmpty data.SeriesNextUp) then
             nextEpisode.CollapsedView
@@ -959,7 +1079,7 @@ let private allTabView (data: DashboardAllTab) (expanded: ExpandedCard option) (
         if not (List.isEmpty data.MoviesToWatch) then
             moviesToWatch.CollapsedView
 
-        // Games (left) / Books (right) two-column split — stays single-column
+        // Games (left) / Reading (right) two-column split — stays single-column
         // until xl (raised from lg) so both columns get comfortable room rather
         // than squeezing two-up at mid widths.
         Html.div [
@@ -967,7 +1087,8 @@ let private allTabView (data: DashboardAllTab) (expanded: ExpandedCard option) (
             prop.children [
                 if not (List.isEmpty data.GamesInFocus) then
                     games.CollapsedView
-                booksColumnPlaceholder
+                if not (List.isEmpty data.CurrentlyReading) then
+                    reading.CollapsedView
             ]
         ]
     ])
@@ -2875,6 +2996,63 @@ let private gamesTabView (data: DashboardGamesTab) (achievementsState: Achieveme
         ]
     ])
 
+// ── Books Tab ──
+
+/// intelligence-dnv2y: Total / In Focus / Finished this year / Finished (all
+/// time) / Pages read / Hours listened — a tile whose value is `None` is
+/// hidden rather than rendered as a misleading zero.
+let private bookStatsRow (stats: DashboardBookStats) =
+    Html.div [
+        prop.className "flex gap-3 flex-wrap mb-4"
+        prop.children [
+            statBadge "Books" (string stats.Total)
+            statBadge "In Focus" (string stats.InFocus)
+            statBadge "Finished This Year" (string stats.FinishedThisYear)
+            statBadge "Finished" (string stats.FinishedAllTime)
+            match stats.PagesReadThisYear with
+            | Some pages -> statBadge "Pages Read" (string pages)
+            | None -> ()
+            match stats.HoursListenedThisYear with
+            | Some hours -> statBadge "Hours Listened" (sprintf "%.0f" hours)
+            | None -> ()
+        ]
+    ]
+
+let private booksTabView (data: DashboardBooksTab) (expanded: ExpandedCard option) (dispatch: Msg -> unit) =
+  growingTabArea expanded dispatch (fun dispatch ->
+    // Currently Reading | Recently Finished | Recently Added — poster
+    // scrollers, the same shape the other tabs' "Recently X" rails use.
+    let posterRail (card: DashboardCard) (icon: unit -> ReactElement) (title: string) (items: DashboardBookItem list) (emptyMessage: string) =
+        expandable dispatch {
+            Card = card
+            Chrome = CardOverflow
+            Icon = icon
+            Title = title
+            Collapsed = [
+                if List.isEmpty items then
+                    emptyNote emptyMessage
+                else
+                    posterScroller [ for item in items do bookReadingPosterCard card item ]
+            ]
+            ExpandedLayout = WrappingRow
+            Items = items
+            Unpack = (function BookReadingItems items -> Some items | _ -> None)
+            RenderItem = bookReadingPosterCard card
+        }
+    let currentlyReading =
+        posterRail BooksReading Icons.book "Currently Reading" data.CurrentlyReading "Nothing In Focus right now"
+    let recentlyFinished =
+        posterRail BooksFinished Icons.trophy "Recently Finished" data.RecentlyFinished "Nothing finished in the last 90 days"
+    let recentlyAdded =
+        posterRail BooksAdded Icons.book "Recently Added" data.RecentlyAdded "No books added yet"
+    [ currentlyReading; recentlyFinished; recentlyAdded ],
+    [
+        bookStatsRow data.Stats
+        currentlyReading.CollapsedView
+        recentlyFinished.CollapsedView
+        recentlyAdded.CollapsedView
+    ])
+
 // ── Loading spinner ──
 
 let private loadingView =
@@ -2919,6 +3097,10 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         | GamesTab ->
                             match model.GamesTabData with
                             | Some data -> gamesTabView data model.Achievements model.Expanded dispatch
+                            | None -> loadingView
+                        | BooksTab ->
+                            match model.BooksTabData with
+                            | Some data -> booksTabView data model.Expanded dispatch
                             | None -> loadingView
                 ]
             ]

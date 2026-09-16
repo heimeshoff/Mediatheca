@@ -26,6 +26,11 @@ let private fetchTabData (api: IMediathecaApi) (tab: DashboardTab) : Cmd<Msg> =
             api.getDashboardGamesTab ()
             GamesTabLoaded
             (fun ex -> TabLoadError ex.Message)
+    | BooksTab ->
+        Cmd.OfAsync.either
+            api.getDashboardBooksTab ()
+            BooksTabLoaded
+            (fun ex -> TabLoadError ex.Message)
 
 let private fetchAchievements (api: IMediathecaApi) : Cmd<Msg> =
     Cmd.OfAsync.either
@@ -52,6 +57,7 @@ let init () : Model * Cmd<Msg> =
       MoviesTabData = None
       SeriesTabData = None
       GamesTabData = None
+      BooksTabData = None
       Achievements = AchievementsNotLoaded
       IsLoading = true
       IsSyncing = false
@@ -79,6 +85,9 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             | AchievementsNotLoaded -> fetchAchievements api
             | _ -> Cmd.none
         { model with GamesTabData = Some data; IsLoading = false; Achievements = if model.Achievements = AchievementsNotLoaded then AchievementsLoading else model.Achievements }, achievementsCmd
+
+    | BooksTabLoaded data ->
+        { model with BooksTabData = Some data; IsLoading = false }, Cmd.none
 
     | TabLoadError _ ->
         { model with IsLoading = false }, Cmd.none

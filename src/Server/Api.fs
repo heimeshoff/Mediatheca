@@ -2584,6 +2584,7 @@ module Api =
                 let gamesInFocus = GameProjection.getGamesInFocus conn
                 let gamesRecentlyPlayed = GameProjection.getGamesRecentlyPlayed conn (Some 6)
                 let playSessions = PlaytimeTracker.getDashboardPlaySessions conn 14
+                let currentlyReading = BookProjection.getAllTabCurrentlyReading conn
                 let jellyfinServerUrl = SettingsStore.getSetting conn "jellyfin_server_url"
 
                 // Cross-media stats
@@ -2606,24 +2607,28 @@ module Api =
                 let dailyMovies = MovieProjection.getDailyMovieActivity conn
                 let dailyEpisodes = SeriesProjection.getDailyEpisodeActivity conn
                 let dailyGames = GameProjection.getDailyGameActivity conn
+                let dailyReading = BookProjection.getDailyReadingActivity conn
 
                 // Merge daily activity into unified list
                 let allDates =
                     [ for (d, _) in dailyMovies -> d
                       for (d, _) in dailyEpisodes -> d
-                      for (d, _) in dailyGames -> d ]
+                      for (d, _) in dailyGames -> d
+                      for (d, _) in dailyReading -> d ]
                     |> List.distinct
                     |> List.sort
                 let movieMap = dailyMovies |> Map.ofList
                 let episodeMap = dailyEpisodes |> Map.ofList
                 let gameMap = dailyGames |> Map.ofList
+                let readingMap = dailyReading |> Map.ofList
                 let activityDays =
                     allDates
                     |> List.map (fun d ->
                         { Mediatheca.Shared.DashboardActivityDay.Date = d
                           MovieSessions = movieMap |> Map.tryFind d |> Option.defaultValue 0
                           EpisodesWatched = episodeMap |> Map.tryFind d |> Option.defaultValue 0
-                          GameSessions = gameMap |> Map.tryFind d |> Option.defaultValue 0 })
+                          GameSessions = gameMap |> Map.tryFind d |> Option.defaultValue 0
+                          Reading = readingMap |> Map.tryFind d |> Option.defaultValue 0 })
 
                 // Monthly breakdown (12 months)
                 let monthlyMovies = MovieProjection.getMonthlyMovieMinutes conn
@@ -2673,6 +2678,7 @@ module Api =
                     }
                     ActivityDays = activityDays
                     MonthlyBreakdown = monthlyBreakdown
+                    CurrentlyReading = currentlyReading
                 }
             }
 
@@ -2855,6 +2861,26 @@ module Api =
                 }
             }
 
+            getDashboardBooksTab = fun () -> async {
+                use conn = factory ()
+                let currentlyReading =
+                    BookProjection.getCurrentlyReading conn
+                    |> List.map (BookProjection.toDashboardBookItem false)
+                let recentlyFinished =
+                    BookProjection.getRecentlyFinished conn 90
+                    |> List.map (BookProjection.toDashboardBookItem true)
+                let recentlyAdded =
+                    BookProjection.getRecentlyAddedUnfinished conn (Some 10)
+                    |> List.map (BookProjection.toDashboardBookItem false)
+                let stats = BookProjection.getReadingStats conn
+                return {
+                    Mediatheca.Shared.DashboardBooksTab.CurrentlyReading = currentlyReading
+                    RecentlyFinished = recentlyFinished
+                    RecentlyAdded = recentlyAdded
+                    Stats = stats
+                }
+            }
+
             // Dashboard card expansion: the card's query with its row limit
             // lifted. Each tab query above passes `Some n`; this passes `None`.
             getDashboardCardItems = fun query -> async {
@@ -2899,6 +2925,14 @@ module Api =
                     match! Steam.getRecentAchievements httpClient (getSteamConfig ()) with
                     | Ok achievements -> return AchievementItems achievements
                     | Error message -> return failwith message
+                | AllCurrentlyReading ->
+                    return BookReadingItems (BookProjection.getAllTabCurrentlyReading conn)
+                | BooksCurrentlyReading ->
+                    return BookReadingItems (BookProjection.getCurrentlyReading conn |> List.map (BookProjection.toDashboardBookItem false))
+                | BooksRecentlyFinished ->
+                    return BookReadingItems (BookProjection.getRecentlyFinished conn 90 |> List.map (BookProjection.toDashboardBookItem true))
+                | BooksRecentlyAdded ->
+                    return BookReadingItems (BookProjection.getRecentlyAddedUnfinished conn None |> List.map (BookProjection.toDashboardBookItem false))
             }
 
             addFriend = fun name -> async {

@@ -340,6 +340,7 @@ let private apiBootstrap (conn: SqliteConnection) =
     MovieProjection.handler.Init conn
     SeriesProjection.handler.Init conn
     GameProjection.handler.Init conn
+    BookProjection.handler.Init conn
     GameJournal.initialize conn
     PlaySessionProjection.handler.Init conn
     MetadataCache.initialize conn
@@ -360,7 +361,7 @@ let private createApi (factory: unit -> SqliteConnection) : IMediathecaApi =
         (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         "test-fixtures-do-not-exist/images"
-        [ ContentBlockProjection.handler; MovieProjection.handler; SeriesProjection.handler; GameProjection.handler; PlaySessionProjection.handler ]
+        [ ContentBlockProjection.handler; MovieProjection.handler; SeriesProjection.handler; GameProjection.handler; BookProjection.handler; PlaySessionProjection.handler ]
 
 let cardItemsParityTests =
     testList "getDashboardCardItems matches the collapsed All-tab payload for the lingering rails (intelligence-b1nz5)" [
