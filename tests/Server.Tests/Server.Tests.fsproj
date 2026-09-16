@@ -10,7 +10,6 @@
     <Compile Include="DataDirTests.fs" />
     <Compile Include="MoviesTests.fs" />
     <Compile Include="FriendsTests.fs" />
-    <Compile Include="ContentBlockConversionTests.fs" />
     <Compile Include="NotesTests.fs" />
     <Compile Include="NotesProjectionTests.fs" />
     <Compile Include="HasNotesContentTests.fs" />
@@ -27,7 +26,6 @@
     <Compile Include="JobConnectionConcurrencyTests.fs" />
     <Compile Include="RequestConnectionConcurrencyTests.fs" />
     <Compile Include="AdminSurgeryTests.fs" />
-    <Compile Include="NotesMigrationTests.fs" />
     <Compile Include="AdminWipeImportTests.fs" />
     <Compile Include="ProjectionRebuildTests.fs" />
     <Compile Include="ProjectionDriftTests.fs" />

@@ -25,14 +25,8 @@ let init () : Model * Cmd<Msg> =
       IsCommitting = false
       CommitError = None
       LastResult = None
-      BackupStats = None
-      NotesMigrationPreview = None
-      NotesMigrationLoading = false
-      NotesMigrationReport = None
-      NotesMigrationConfirmedThisSession = false
-      PurgeLegacyNotesPreview = None
-      PurgeLegacyNotesLoading = false },
-    Cmd.batch [ Cmd.ofMsg Load_backup_stats; Cmd.ofMsg Load_notes_migration_preview ]
+      BackupStats = None },
+    Cmd.ofMsg Load_backup_stats
 
 let update (api: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
@@ -133,9 +127,6 @@ let update (api: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         | Some (PendingRename(oldType, newType, _)) ->
             { model with IsCommitting = true; PendingAction = None; CommitError = None },
             Cmd.OfAsync.perform (api.renameEventType oldType) newType Mutation_completed
-        | Some (PendingPurgeLegacyNotes preview) ->
-            { model with IsCommitting = true; PendingAction = None; CommitError = None },
-            Cmd.OfAsync.perform api.purgeLegacyNotes preview.StreamIds Mutation_completed
 
     | Mutation_completed result ->
         let model =
@@ -148,8 +139,7 @@ let update (api: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 DeleteGlobalPositionInput = ""
                 RenamePreview = None
                 RenameOldTypeInput = ""
-                RenameNewTypeInput = ""
-                PurgeLegacyNotesPreview = None }
+                RenameNewTypeInput = "" }
         model, Cmd.ofMsg Load_backup_stats
 
     | Load_backup_stats ->
@@ -157,37 +147,3 @@ let update (api: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Backup_stats_loaded stats ->
         { model with BackupStats = Some stats }, Cmd.none
-
-    // curation-j4qqt (ADR-0080 §10-11) — Gate 1: "Migrate to Notes"
-
-    | Load_notes_migration_preview ->
-        { model with NotesMigrationLoading = true },
-        Cmd.OfAsync.perform api.previewNotesMigration () Notes_migration_preview_loaded
-
-    | Notes_migration_preview_loaded preview ->
-        { model with NotesMigrationLoading = false; NotesMigrationPreview = Some preview }, Cmd.none
-
-    | Run_notes_migration_clicked ->
-        { model with NotesMigrationLoading = true },
-        Cmd.OfAsync.perform api.runNotesMigration () Notes_migration_completed
-
-    | Notes_migration_completed report ->
-        { model with
-            NotesMigrationLoading = false
-            NotesMigrationReport = Some report
-            NotesMigrationConfirmedThisSession = true },
-        Cmd.ofMsg Load_notes_migration_preview
-
-    // curation-j4qqt (ADR-0080 §10-11) — Gate 2: "Purge legacy stores"
-
-    | Load_purge_legacy_notes_preview ->
-        { model with PurgeLegacyNotesLoading = true },
-        Cmd.OfAsync.perform api.previewPurgeLegacyNotes () Purge_legacy_notes_preview_loaded
-
-    | Purge_legacy_notes_preview_loaded preview ->
-        { model with PurgeLegacyNotesLoading = false; PurgeLegacyNotesPreview = Some preview }, Cmd.none
-
-    | Purge_legacy_notes_clicked ->
-        match model.PurgeLegacyNotesPreview with
-        | None -> model, Cmd.none
-        | Some preview -> { model with PendingAction = Some (PendingPurgeLegacyNotes preview) }, Cmd.none

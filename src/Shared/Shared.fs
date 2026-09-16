@@ -2398,89 +2398,6 @@ type WipeImportPreview = {
     NewestTimestamp: string option
 }
 
-// Catalog entry media-type backfill (curation-w9fkq, ADR-0079 §5 resolved):
-// a one-off, no-preview Administration action that appends a corrective
-// `Catalogs.Entry_media_types_inferred` event per catalog for legacy
-// (untyped) entries an exact-match probe against
-// movie_list/series_list/game_list/book_list resolves to exactly one media
-// type. Report-don't-guess (ADR-0080 §10): ambiguous (matched more than one
-// list) and orphan (matched none) entries are named, never converted.
-
-/// One legacy catalog entry named by catalog + entry slug — either
-/// successfully resolved (with the `MediaType` it was stamped with), or
-/// reported unresolved for the operator to fix by hand via the existing
-/// ADR-0032 compensating-event composer.
-type CatalogBackfillEntryRef = {
-    CatalogSlug: string
-    EntrySlug: string
-}
-
-type CatalogBackfillResolvedEntry = {
-    CatalogSlug: string
-    EntrySlug: string
-    MediaType: MediaType
-}
-
-/// Result of one run of `IAdminApi.backfillCatalogEntryMediaTypes`. Safely
-/// re-runnable — idempotency is decided against each catalog's
-/// reconstituted aggregate, never the derived projection, so a rerun after
-/// the operator fixes an ambiguous/orphan slug at the source only reports
-/// zero for entries already resolved.
-type CatalogMediaTypeBackfillReport = {
-    Resolved: CatalogBackfillResolvedEntry list
-    Ambiguous: CatalogBackfillEntryRef list
-    Orphan: CatalogBackfillEntryRef list
-}
-
-// Notes migration / legacy purge (curation-j4qqt, ADR-0080 §10-11): two
-// separate operator-triggered Administration gates, sharing one owner-
-// resolution report between preview and confirm. Gate 1 ("Migrate to
-// Notes") is additive and idempotent per owner; Gate 2 ("Purge legacy
-// stores") is destructive, single-confirm, ADR-0034-guarded. Ambiguous/
-// orphan owners are named, never guessed, per ADR-0080's report-don't-guess
-// discipline (the same shape `CatalogBackfillEntryRef`/
-// `CatalogBackfillResolvedEntry` already established above).
-
-/// A legacy content-block/game-journal owner slug that could not be
-/// resolved to exactly one media type (ambiguous: matched more than one
-/// home projection; orphan: matched none).
-type NotesMigrationOwnerRef = {
-    Slug: string
-}
-
-type NotesMigrationResolvedOwner = {
-    Slug: string
-    MediaType: MediaType
-}
-
-/// Gate 1's preview: every distinct legacy owner, resolved/ambiguous/orphan.
-type NotesMigrationPreview = {
-    Resolved: NotesMigrationResolvedOwner list
-    Ambiguous: NotesMigrationOwnerRef list
-    Orphan: NotesMigrationOwnerRef list
-}
-
-/// Gate 1's confirm result — same resolved/ambiguous/orphan shape as the
-/// preview, plus `Converted`: the number of NEW `Notes_saved` events this
-/// run actually appended (an owner already carrying a `Notes-*` stream is
-/// skipped, so a second confirm reports `Converted = 0`).
-type NotesMigrationReport = {
-    Resolved: NotesMigrationResolvedOwner list
-    Ambiguous: NotesMigrationOwnerRef list
-    Orphan: NotesMigrationOwnerRef list
-    Converted: int
-}
-
-/// Gate 2's preview: the default target set (every `ContentBlocks-*` stream
-/// of a Gate-1-resolved owner), the streams excluded from that default
-/// (ambiguous/orphan owners' streams), and the exact event-row count the
-/// default set would delete.
-type PurgeLegacyNotesPreview = {
-    StreamIds: string list
-    ExcludedStreamIds: string list
-    EventCount: int
-}
-
 type IAdminApi = {
     // Event Store Browser
     getEventPage: EventPageQuery -> Async<EventPage>
@@ -2559,28 +2476,4 @@ type IAdminApi = {
     /// stream count, oldest/newest timestamp of what's currently in the
     /// store, i.e. what would be discarded by a Wipe & Import.
     getWipeImportPreview: unit -> Async<WipeImportPreview>
-    // Catalog entry media-type backfill (curation-w9fkq, ADR-0079 §5 resolved)
-    /// No preview/confirm — additive, non-destructive, safely re-runnable.
-    /// Appends one corrective `Entry_media_types_inferred` per catalog with
-    /// resolvable legacy entries, catches every projection up, and reports
-    /// every resolved / ambiguous / orphan entry by catalog + entry slug.
-    backfillCatalogEntryMediaTypes: unit -> Async<CatalogMediaTypeBackfillReport>
-    // Notes migration / legacy purge (curation-j4qqt, ADR-0080 §10-11)
-    /// Gate 1 preview — resolved/ambiguous/orphan owners, named, never guessed.
-    previewNotesMigration: unit -> Async<NotesMigrationPreview>
-    /// Gate 1 confirm — converts every resolved owner into one `Notes_saved`
-    /// via `Notes.decide`, skipping owners that already have a `Notes-*`
-    /// stream. Additive, idempotent, safely re-runnable.
-    runNotesMigration: unit -> Async<NotesMigrationReport>
-    /// Gate 2 preview — the default `ContentBlocks-*` stream-id set (every
-    /// stream of a Gate-1-resolved owner) plus the excluded ambiguous/orphan
-    /// streams and the exact row count the default set would delete.
-    previewPurgeLegacyNotes: unit -> Async<PurgeLegacyNotesPreview>
-    /// Gate 2 confirm — ADR-0034 protocol (VACUUM INTO backup first): bulk-
-    /// deletes the given `ContentBlocks-*` stream ids' event rows, drops
-    /// `content_blocks`/`game_journal_blocks`, and clears the
-    /// `game_journal_migrated` setting, all in one transaction. Explicit
-    /// stream-id list (never a bare prefix) so the caller can exclude
-    /// specific streams by construction.
-    purgeLegacyNotes: string list -> Async<SurgeryResult>
 }

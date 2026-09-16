@@ -265,119 +265,6 @@ let private renamePanel (model: Model) (dispatch: Msg -> unit) =
             ]
     ]
 
-// ── Notes migration (curation-j4qqt, ADR-0080 §10-11) ──
-// Two separate gates, each preview -> confirm, sharing one owner-resolution
-// report. Gate 1 is additive/idempotent; Gate 2 is destructive and reuses
-// this tab's shared PendingAction/confirm-dialog/Mutation_completed
-// plumbing (it returns the same SurgeryResult edit/delete/rename do).
-
-let private ownerRefRow (label: string) (slug: string) =
-    Html.div [
-        prop.key (label + "/" + slug)
-        prop.className "flex items-center justify-between gap-3 py-1 border-b border-base-content/5 last:border-b-0"
-        prop.children [
-            Html.span [ prop.className DesignSystem.dataText; prop.text slug ]
-            Html.span [ prop.className DesignSystem.mutedText; prop.text label ]
-        ]
-    ]
-
-let private notesMigrationPanel (model: Model) (dispatch: Msg -> unit) =
-    sectionCard "Gate 1 — Migrate to Notes" [
-        Html.p [
-            prop.className DesignSystem.mutedText
-            prop.text "Converts every legacy content-block/game-journal owner into one Notes_saved event (ADR-0080). Exact-match owner resolution only — ambiguous or orphaned slugs are reported below, never guessed. Additive and safe to re-run; an owner already migrated is skipped."
-        ]
-        match model.NotesMigrationPreview with
-        | None ->
-            Daisy.button.button [
-                button.outline; button.sm
-                prop.disabled model.NotesMigrationLoading
-                prop.onClick (fun _ -> dispatch Load_notes_migration_preview)
-                prop.text "Load preview"
-            ]
-        | Some preview ->
-            Html.div [
-                prop.className "flex flex-col gap-3"
-                prop.children [
-                    Html.span [
-                        prop.className DesignSystem.bodyText
-                        prop.text (sprintf "%d resolved, %d ambiguous, %d orphaned" (List.length preview.Resolved) (List.length preview.Ambiguous) (List.length preview.Orphan))
-                    ]
-                    if not (List.isEmpty preview.Ambiguous) then
-                        Html.div [
-                            prop.children [
-                                yield Html.span [ prop.className DesignSystem.eyebrow; prop.text "Ambiguous — matched more than one media type" ]
-                                yield! preview.Ambiguous |> List.map (fun r -> ownerRefRow "ambiguous" r.Slug)
-                            ]
-                        ]
-                    if not (List.isEmpty preview.Orphan) then
-                        Html.div [
-                            prop.children [
-                                yield Html.span [ prop.className DesignSystem.eyebrow; prop.text "Orphaned — matched no media type" ]
-                                yield! preview.Orphan |> List.map (fun r -> ownerRefRow "orphan" r.Slug)
-                            ]
-                        ]
-                    Daisy.button.button [
-                        button.primary; button.sm
-                        prop.disabled (model.NotesMigrationLoading || List.isEmpty preview.Resolved)
-                        prop.onClick (fun _ -> dispatch Run_notes_migration_clicked)
-                        prop.text (if model.NotesMigrationLoading then "Running…" else "Confirm migration")
-                    ]
-                ]
-            ]
-        match model.NotesMigrationReport with
-        | None -> Html.none
-        | Some report ->
-            Html.p [
-                prop.className DesignSystem.mutedText
-                prop.text (sprintf "Last run: %d converted, %d resolved, %d ambiguous, %d orphaned" report.Converted (List.length report.Resolved) (List.length report.Ambiguous) (List.length report.Orphan))
-            ]
-    ]
-
-let private purgeLegacyNotesPanel (model: Model) (dispatch: Msg -> unit) =
-    sectionCard "Gate 2 — Purge legacy stores" [
-        Html.p [
-            prop.className DesignSystem.mutedText
-            prop.text "Bulk-deletes every ContentBlocks-* stream belonging to a Gate-1-resolved owner, then drops the content_blocks and game_journal_blocks tables (ADR-0034 protocol — VACUUM INTO backup first). Destructive, single confirm, no undo except the backup."
-        ]
-        if not model.NotesMigrationConfirmedThisSession then
-            Html.p [
-                prop.className "text-sm text-warning"
-                prop.text "Run Gate 1 — Migrate to Notes at least once this session before purging."
-            ]
-        match model.PurgeLegacyNotesPreview with
-        | None ->
-            Daisy.button.button [
-                button.outline; button.sm
-                prop.disabled (model.PurgeLegacyNotesLoading || not model.NotesMigrationConfirmedThisSession)
-                prop.onClick (fun _ -> dispatch Load_purge_legacy_notes_preview)
-                prop.text "Load preview"
-            ]
-        | Some preview ->
-            Html.div [
-                prop.className "flex flex-col gap-3"
-                prop.children [
-                    Html.span [
-                        prop.className DesignSystem.bodyText
-                        prop.text (sprintf "%d stream%s, %d event%s to delete" (List.length preview.StreamIds) (if List.length preview.StreamIds = 1 then "" else "s") preview.EventCount (if preview.EventCount = 1 then "" else "s"))
-                    ]
-                    if not (List.isEmpty preview.ExcludedStreamIds) then
-                        Html.div [
-                            prop.children [
-                                yield Html.span [ prop.className DesignSystem.eyebrow; prop.text "Excluded — ambiguous/orphan owners' streams" ]
-                                yield! preview.ExcludedStreamIds |> List.map (fun s -> ownerRefRow "excluded" s)
-                            ]
-                        ]
-                    Daisy.button.button [
-                        button.error; button.sm
-                        prop.disabled (model.PurgeLegacyNotesLoading || not model.NotesMigrationConfirmedThisSession)
-                        prop.onClick (fun _ -> dispatch Purge_legacy_notes_clicked)
-                        prop.text "Confirm purge"
-                    ]
-                ]
-            ]
-    ]
-
 // ── Backup stats (keep-all retention) ──
 
 let private backupStatsPanel (model: Model) =
@@ -463,24 +350,6 @@ let private confirmDialog (model: Model) (dispatch: Msg -> unit) =
                 Daisy.button.button [ button.ghost; prop.onClick (fun _ -> dispatch Cancel_pending); prop.text "Cancel" ]
                 Daisy.button.button [ button.error; prop.disabled model.IsCommitting; prop.onClick (fun _ -> dispatch Confirm_pending); prop.text "Confirm rename" ]
             ]
-    | Some (PendingPurgeLegacyNotes preview) ->
-        ModalPanel.viewWithFooter
-            "Confirm purge"
-            (fun () -> dispatch Cancel_pending)
-            [
-                Html.p [
-                    prop.className DesignSystem.bodyText
-                    prop.text (sprintf "Delete %d event%s across %d ContentBlocks-* stream%s, then drop content_blocks and game_journal_blocks. A backup is taken first." preview.EventCount (if preview.EventCount = 1 then "" else "s") (List.length preview.StreamIds) (if List.length preview.StreamIds = 1 then "" else "s"))
-                ]
-                Html.p [
-                    prop.className "text-sm text-warning mt-2"
-                    prop.text "This is a hard delete — there is no trash or undo (the backup file is the only way back). Every projection is flagged dirty until the next Rebuild all."
-                ]
-            ]
-            [
-                Daisy.button.button [ button.ghost; prop.onClick (fun _ -> dispatch Cancel_pending); prop.text "Cancel" ]
-                Daisy.button.button [ button.error; prop.disabled model.IsCommitting; prop.onClick (fun _ -> dispatch Confirm_pending); prop.text "Confirm purge" ]
-            ]
 
 let view (model: Model) (dispatch: Msg -> unit) =
     Html.div [
@@ -494,8 +363,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
             editPanel model dispatch
             deletePanel model dispatch
             renamePanel model dispatch
-            notesMigrationPanel model dispatch
-            purgeLegacyNotesPanel model dispatch
             backupStatsPanel model
             confirmDialog model dispatch
         ]

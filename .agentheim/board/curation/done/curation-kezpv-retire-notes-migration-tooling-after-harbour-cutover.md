@@ -1,7 +1,7 @@
 ---
 id: curation-kezpv
 title: Retire the one-off Notes migration tooling after the harbour cutover — delete Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores" (five `IAdminApi` members, DTOs, AdminSurgery sections, `ContentBlockConversion.fs` and tests) and the Health-tab catalog media-type backfill action, once both have run on the live store
-status: doing
+status: done
 type: chore
 context: curation
 created: 2026-09-16
@@ -144,3 +144,50 @@ Sweep every remaining reference (comments and doc-strings included) to any delet
   ADR-0080/ADR-0079 and curation-j4qqt/w9fkq's own file lists; the open items were factual
   (callers of `resolveMediaType`, the harbour precondition, tb0nn's fate) and were checked
   directly against the code and the live store.
+
+## Outcome
+
+Deleted both one-off migration/backfill tools now that they've run on harbour's live store
+(verified 2026-09-16, see the task's Notes):
+
+- **Gate 1 / Gate 2 (ADR-0080 §10-§11, curation-j4qqt)**: removed `IAdminApi.previewNotesMigration`,
+  `runNotesMigration`, `previewPurgeLegacyNotes`, `purgeLegacyNotes` and their five DTOs from
+  `src/Shared/Shared.fs`; removed the matching `Administration.fs` implementations
+  (`previewNotesMigrationCore`, `runNotesMigrationCore`, `readLegacyContentBlocks`,
+  `readGameJournalBlocks`, owner-slug reads, `previewPurgeLegacyNotesCore`, `purgeLegacyNotesCore`)
+  and their `IAdminApi` wiring; deleted `src/Server/ContentBlockConversion.fs` and its
+  `Server.fsproj` entry; deleted `tests/Server.Tests/ContentBlockConversionTests.fs` and
+  `tests/Server.Tests/NotesMigrationTests.fs` and their `Server.Tests.fsproj` entries; removed the
+  `PendingPurgeLegacyNotes` case, the Gate 1/Gate 2 model fields
+  (`NotesMigrationConfirmedThisSession` etc.), the seven `*_notes_migration_*` /
+  `*_purge_legacy_notes_*` `Msg` cases and their `update` arms, and both gate cards from
+  `src/Client/Pages/AdminSurgery/{Types,State,Views}.fs` — edit/delete/rename and backup stats are
+  untouched.
+- **Health-tab backfill (ADR-0079 §5, curation-w9fkq)**: removed
+  `IAdminApi.backfillCatalogEntryMediaTypes`, `CatalogMediaTypeBackfillReport` and its entry DTOs
+  from `src/Shared/Shared.fs`; removed the `Administration.fs` implementation and `IAdminApi`
+  wiring; removed the button/report card from `src/Client/Pages/AdminHealth/{Types,State,Views}.fs`;
+  deleted `CatalogProjection.resolveMediaType`, its `MediaTypeResolution` DU, and the now-unused
+  `existsInTable` helper from `src/Server/CatalogProjection.fs` (the backfill's two call sites were
+  its only callers); deleted the backfill test-fixture helper block and the four
+  `backfillCatalogEntryMediaTypes` Expecto cases (including the drift-regression case, which
+  exercised the deleted action directly) plus the three `resolveMediaType` cases in
+  `tests/Server.Tests/CatalogProjectionTests.fs`, from `tests/Server.Tests/AdministrationTests.fs`.
+- **Kept, verified unchanged and green**: `Catalogs.Entry_media_types_inferred`'s `evolve` arm,
+  `CatalogProjection` handler arm, Serialization encode/decode, and
+  `EventFormatting.formatCatalogEvent` arm; the `getHealthStats Entry_media_types_inferred …`
+  regression guard in `AdministrationTests.fs`; `EventStore.deleteEventsByStreamIds` /
+  `previewBulkDeleteByStreamIds` and their `EventSurgeryTests.fs` cases; every ADR-0080 §12
+  registry entry (`Notes`/`notes_blocks` stay).
+- Two ADR amendments reported (see `ADRS` block): a `## Amendment 2026-09-16 (curation-kezpv,
+  retirement)` section appended to ADR-0080 (Gate 1/Gate 2 retirement) and to ADR-0079 (backfill
+  retirement).
+- Verified: `dotnet build` green, `npm run build` green, `npm test` — 912 Expecto tests passed (was
+  922 before this task's 10 test deletions), `npm run test:client` — 108 Vitest tests passed. All
+  five acceptance-criteria grep commands return nothing; `ContentBlockConversion.fs`,
+  `ContentBlockConversionTests.fs` and `NotesMigrationTests.fs` no longer exist and are gone from
+  both `.fsproj` files.
+
+Key files: `src/Shared/Shared.fs`, `src/Server/Administration.fs`, `src/Server/CatalogProjection.fs`,
+`src/Client/Pages/AdminSurgery/{Types,State,Views}.fs`, `src/Client/Pages/AdminHealth/{Types,State,Views}.fs`,
+`tests/Server.Tests/AdministrationTests.fs`, `tests/Server.Tests/CatalogProjectionTests.fs`.

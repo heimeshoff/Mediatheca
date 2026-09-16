@@ -41,7 +41,6 @@
     <Compile Include="SettingsStore.fs" />
     <Compile Include="JellyfinStore.fs" />
     <Compile Include="MetadataCache.fs" />
-    <Compile Include="ContentBlockConversion.fs" />
     <Compile Include="Notes.fs" />
     <Compile Include="NotesProjection.fs" />
     <Compile Include="Catalogs.fs" />

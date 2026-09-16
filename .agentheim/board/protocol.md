@@ -5,6 +5,21 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 00:00 -- Task verified and completed: curation-kezpv - Retire the one-off Notes migration tooling after the harbour cutover — delete Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores" (five `IAdminApi` members, DTOs, AdminSurgery sections, `ContentBlockConversion.fs` and tests) and the Health-tab catalog media-type backfill action, once both have run on the live store
+
+**Type:** Work / Task completion
+**Task:** curation-kezpv - Retire the one-off Notes migration tooling after the harbour cutover — delete Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores" (five `IAdminApi` members, DTOs, AdminSurgery sections, `ContentBlockConversion.fs` and tests) and the Health-tab catalog media-type backfill action, once both have run on the live store
+**Summary:** Retired the one-off Notes migration tooling (Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores") and the Health-tab catalog media-type backfill now that all three ran on harbour's live store on 2026-09-16 — five IAdminApi members, their DTOs, server implementations, ContentBlockConversion.fs, CatalogProjection.resolveMediaType / MediaTypeResolution, the AdminSurgery gate cards and AdminHealth backfill card, and their dedicated tests are deleted; Entry_media_types_inferred's permanent event handling and the bulk-delete surgery primitives stay.
+**Duration:** 18m00s
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 16
+**Tests added:** 0
+**ADRs written:** ADR-0080 amendment, ADR-0079 amendment
+**README delta:** README.md §Ubiquitous language anchors "Catalog entry" and "Inferred media type": merged — the worker's `expected` text omitted the leading `- ` so the precondition mismatched and both new bullets were appended below the old ones; conductor removed the two stale bullets by hand, observed current text now equals the worker's `body` for both.
+
+---
+
 ## 2026-09-16 23:40 -- Batch started: [curation-kezpv]
 
 **Type:** Work / Batch start

@@ -6,7 +6,7 @@ status: accepted
 date: 2026-09-16
 supersedes: []
 superseded_by: []
-related_tasks: [curation-cyxbc, books-f3sb2, curation-w9fkq]
+related_tasks: [curation-cyxbc, books-f3sb2, curation-w9fkq, curation-kezpv]
 related_research: []
 ---
 
@@ -121,3 +121,22 @@ knowing *which* kind of media an entry points at is worth an event-shape change.
 Ceremony is lighter than ADR-0080's Gate 1 / Gate 2: nothing is destroyed (no legacy table dropped, no event rewritten or deleted), so a single operator-triggered, no-preview `IAdminApi` action appends one corrective `Catalogs.Entry_media_types_inferred` event per catalog, batched (mirroring `Entries_reordered`'s bulk-event shape on this aggregate), bypassing `decide` (ADR-0032's compensating-event path — there is no user intent to express, only a repaired fact), idempotent against each catalog's reconstituted aggregate state rather than the derived projection.
 
 `catalog_entries`' widened `UNIQUE(catalog_slug, media_type, movie_slug)` ships in the same deploy and **self-heals at projection `Init`** (every app start) by recreating the table when the live schema still shows the narrow constraint, preserving all rows regardless of whether the backfill has run yet. This is safe unconditionally of ordering — SQLite treats `NULL` as pairwise-distinct in a UNIQUE index, so still-untyped rows carry no duplicate-protection gap either way, and `decide`'s retained legacy-untyped `Add_entry` branch is the guard that actually protects them, not the index. It is also necessary: `CREATE TABLE IF NOT EXISTS` is a no-op on an existing table, so without self-healing the relaxed `decide` would be live from the first boot while the narrow index persisted until a manual Rebuild-all, reopening the clobber divergence the first amendment closed. `decide`'s `Add_entry` arm is restored to §3's original pair-identity wording via `Seq.tryPick` (not `Seq.tryHead`, which inspects an arbitrary same-slug entry once several can coexist) over all same-slug entries.
+
+## Amendment 2026-09-16 (curation-kezpv, retirement)
+
+§5's one-off catalog media-type backfill (`IAdminApi.backfillCatalogEntryMediaTypes`, resolved by
+the curation-w9fkq amendment above) ran on harbour's live store on 2026-09-16 at 20:58:31Z: 3
+`Entry_media_types_inferred` events appended, 0 `catalog_entries` rows left with a NULL/empty
+`media_type`. With the backfill run and no untyped entries left to resolve, this task
+(curation-kezpv) deleted the action end to end: `IAdminApi.backfillCatalogEntryMediaTypes`, the
+`CatalogMediaTypeBackfillReport` / `CatalogBackfillEntryRef` / `CatalogBackfillResolvedEntry` DTOs,
+the `Administration.fs` implementation, the Health-tab button + report card, and
+`CatalogProjection.resolveMediaType` / `MediaTypeResolution` (the exact-match resolver) along with
+its now-orphaned `existsInTable` helper — the backfill's two call sites were `resolveMediaType`'s
+only callers; the `Entry_media_types_inferred` event's `evolve` arm never called it, it consumes
+already-resolved values from the event payload. The `Catalogs.Entry_media_types_inferred` event
+type itself is **permanent**: its `evolve` arm, `CatalogProjection` handler arm, Serialization
+encode/decode, and `EventFormatting.formatCatalogEvent` arm all stay, and the existing regression
+guard (`getHealthStats Entry_media_types_inferred appears in neither the unhandled nor the
+unformattable list`) is unchanged — three such events already sit in harbour's log and the
+projection must keep replaying them correctly forever.

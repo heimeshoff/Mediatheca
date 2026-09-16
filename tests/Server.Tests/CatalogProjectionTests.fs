@@ -351,39 +351,6 @@ let catalogProjectionTests =
             let bookEntry = entries |> List.find (fun e -> e.MediaType = MediaType.Book)
             Expect.equal bookEntry.Title "Same Cat Book" "The book entry should resolve as a book, not a guessed movie"
 
-        // ── Media-type backfill resolver (curation-w9fkq) ──
-
-        testCase "resolveMediaType: exactly one exact match resolves, zero matches reports Orphan, and the same slug in two lists reports Ambiguous" <| fun _ ->
-            use db = TestDb.withTempDbFactory bootstrap
-            let conn = db.Connection
-
-            appendMovieEvent conn "solo-movie-2020" (Movies.Movie_added_to_library (sampleMovie "Solo Movie" 2020 None))
-            appendMovieEvent conn "collision-2021" (Movies.Movie_added_to_library { sampleMovie "Collision Movie" 2021 None with TmdbId = 2 })
-            appendBookEvent conn "collision-2021" (Books.Book_added_to_library (sampleBook "Collision Book" (Some 2021) None))
-
-            Expect.equal (CatalogProjection.resolveMediaType conn "solo-movie-2020") (CatalogProjection.Resolved MediaType.Movie) "Exactly one match should resolve"
-            Expect.equal (CatalogProjection.resolveMediaType conn "nowhere-2099") CatalogProjection.Orphan "Zero matches should report Orphan"
-            Expect.equal (CatalogProjection.resolveMediaType conn "collision-2021") CatalogProjection.Ambiguous "A slug present in both movie_list and book_list should report Ambiguous"
-
-        testCase "resolveMediaType genuinely consults game_list and book_list — the read-time join-order inference would have called both Movie" <| fun _ ->
-            use db = TestDb.withTempDbFactory bootstrap
-            let conn = db.Connection
-
-            appendGameEvent conn "solo-game-2020" (Games.Game_added_to_library (sampleGame "Solo Game" 2020 None))
-            appendBookEvent conn "solo-book-2020" (Books.Book_added_to_library (sampleBook "Solo Book" (Some 2020) None))
-
-            Expect.equal (CatalogProjection.resolveMediaType conn "solo-game-2020") (CatalogProjection.Resolved MediaType.Game) "A legacy game slug should resolve to Game, not a guessed Movie"
-            Expect.equal (CatalogProjection.resolveMediaType conn "solo-book-2020") (CatalogProjection.Resolved MediaType.Book) "A legacy book slug should resolve to Book, not a guessed Movie"
-
-        testCase "resolveMediaType resolves a series-shaped slug:suffix entry via base_slug against series_list" <| fun _ ->
-            use db = TestDb.withTempDbFactory bootstrap
-            let conn = db.Connection
-            let seasons: Series.SeasonImportData list =
-                [ { SeasonNumber = 1; Name = "Season 1"; Overview = ""; PosterRef = None; AirDate = None; Episodes = [] } ]
-            appendSeriesEvent conn "solo-series-2015" (Series.Series_added_to_library (sampleSeries "Solo Series" 2015 None seasons))
-
-            Expect.equal (CatalogProjection.resolveMediaType conn "solo-series-2015:s01") (CatalogProjection.Resolved MediaType.Series) "A series-shaped slug:suffix entry should resolve via base_slug"
-
         // ── catalog_entries schema self-heal (curation-w9fkq) ──
 
         testCase "catalog_entries self-heals: a fresh DB gets the widened UNIQUE from Init" <| fun _ ->

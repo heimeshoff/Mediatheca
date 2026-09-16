@@ -7,7 +7,7 @@ date: 2026-09-16
 supersedes: []
 superseded_by: []
 amends: [0044]
-related_tasks: [curation-h98ve, curation-knqfj, curation-j4qqt]
+related_tasks: [curation-h98ve, curation-knqfj, curation-j4qqt, curation-kezpv]
 related_research: []
 ---
 
@@ -443,3 +443,20 @@ event.
   wiring), `src/Client/Components/JournalEditor.fs` (`Doc.normalize`, the debounce),
   `src/Shared/Shared.fs` (`JournalBlockDto`, `JournalBlockTypes`, `JournalBlock.hasContent`).
 - `curation-h98ve`, `curation-knqfj`, `curation-j4qqt` — the tasks this ADR was written against.
+
+## Amendment 2026-09-16 (curation-kezpv, retirement)
+
+Gate 1 ("Migrate to Notes") and Gate 2 ("Purge legacy stores"), §10-§11's two operator-triggered
+Administration actions, ran on harbour's live store on 2026-09-16: Gate 1 at 20:36:18Z (14
+`Notes_saved` events on 14 `Notes-*` streams, zero `ContentBlocks-*` streams left unconverted),
+Gate 2 between 22:38 and 22:57 CEST (`content_blocks` and `game_journal_blocks` dropped, six
+ADR-0034 pre-purge backups taken). With both gates run, this task (curation-kezpv) deleted both
+end to end: `IAdminApi.previewNotesMigration` / `runNotesMigration` / `previewPurgeLegacyNotes` /
+`purgeLegacyNotes` and their DTOs (`NotesMigrationOwnerRef`, `NotesMigrationResolvedOwner`,
+`NotesMigrationPreview`, `NotesMigrationReport`, `PurgeLegacyNotesPreview`), their
+`Administration.fs` implementations (owner resolution, legacy-table reads,
+`ContentBlockConversion.fs` in full), and the `AdminSurgery` page's Gate 1 / Gate 2 cards, `Msg`
+cases and `PendingPurgeLegacyNotes` pending-action case. §11's general-purpose
+`EventStore.deleteEventsByStreamIds` / `previewBulkDeleteByStreamIds` primitives are NOT retired —
+they're reusable surgery infrastructure, not migration-specific — and §12's `Notes`/`notes_blocks`
+registry entries stay permanently; nothing about the registries changes here.
