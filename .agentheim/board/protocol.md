@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 05:56 -- Task verified and completed: integration-y2ak4 - Goodreads reading progress from the public user-status feed — parse "is on page N of M of Title" / "is N% done with Title" / "finished reading" items from `user_status/list/{id}?format=rss`, join them to currently-reading books by normalized title, and emit `Observe_reading_progress` (source Goodreads) as part of the shelf sync, idempotent across runs
+
+**Type:** Work / Task completion
+**Task:** integration-y2ak4 - Goodreads reading progress from the public user-status feed — parse "is on page N of M of Title" / "is N% done with Title" / "finished reading" items from `user_status/list/{id}?format=rss`, join them to currently-reading books by normalized title, and emit `Observe_reading_progress` (source Goodreads) as part of the shelf sync, idempotent across runs
+**Summary:** Goodreads reading progress from the public user-status feed: Goodreads.getStatusUpdates and the pure parseProgress recognize page-N-of-M / N%-done / finished / started items (HTML-entity-decoded, case/whitespace tolerant), and GoodreadsSync's new progress step joins them by normalized title (currently-reading shelf items resolved this run, then every library book; any ambiguity is Unmatched, never a guess), floors page/total to a percent, processes oldest-first, emits Observe_reading_progress (source Goodreads) and persists goodreads_last_status_id/at for idempotent re-runs, inside the same "Goodreads shelf sync" job with new Progress counts on its result.
+**Duration:** 24m
+**Verification:** PASS (iteration 1)
+**Files changed:** 7
+**Tests added:** 18
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 05:37 -- Task verified and completed: intelligence-dnv2y - Dashboard Books tab and All-tab "Reading" rail — the All tab's "Books coming soon" placeholder becomes a Currently Reading card (In Focus books with progress bars and source badges, finished books lingering 7 days marked "Finished"), plus a Books tab with Currently Reading, Recently Finished, Recently Added and a reading-stats block, and reading days on the activity heatmap
 
 **Type:** Work / Task completion

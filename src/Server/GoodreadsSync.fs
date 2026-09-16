@@ -386,6 +386,203 @@ module GoodreadsSync =
                         return failwith msg
         }
 
+    // ── Progress step (user_status feed) -- integration-y2ak4, ADR-0075 §4.
+    // Runs after all three shelf feeds fold successfully, in the same job
+    // run. Persists `goodreads_last_status_id`/`goodreads_last_status_at` so
+    // a re-run with no new status items appends zero events. ──────────────
+
+    let private lastStatusIdKey = "goodreads_last_status_id"
+    let private lastStatusAtKey = "goodreads_last_status_at"
+    let private maxFirstRunPages = 3
+    let private firstRunLookbackDays = 90.0
+
+    /// Tier (a) -- the currently-reading shelf items fetched by THIS run,
+    /// already resolved to slugs by the shelf step above -- and tiers
+    /// (b)/(c) collapsed into one -- every library book, by title (ADR-0075
+    /// §4's own text folds "goodreads_book_id is set" and "by title" into a
+    /// single title-keyed fallback, since every book the shelf step ever
+    /// linked is already found via tier (a) on every subsequent run that
+    /// still carries it on the currently-reading shelf).
+    let private buildTitleTiers (conn: SqliteConnection) (currentlyReadingSlugs: (string * string) list) : (string * string) list * (string * string) list =
+        let tierA = currentlyReadingSlugs |> List.map (fun (title, slug) -> Goodreads.normalizeTitle title, slug)
+        let tierBC = BookProjection.getAll conn |> List.map (fun b -> Goodreads.normalizeTitle b.Title, b.Slug)
+        tierA, tierBC
+
+    /// Exact normalized-title match first, then an unambiguous prefix match
+    /// (status titles are sometimes truncated) -- tier (a) before tier
+    /// (b)/(c) at each stage. More than one distinct slug at any stage is
+    /// ambiguous -- `None`, never a guess.
+    let private matchProgressTitle (tierA: (string * string) list) (tierBC: (string * string) list) (rawTitle: string) : string option =
+        let norm = Goodreads.normalizeTitle rawTitle
+        let exact (tier: (string * string) list) =
+            match tier |> List.filter (fun (t, _) -> t = norm) |> List.map snd |> List.distinct with
+            | [ slug ] -> Some slug
+            | _ -> None
+        let prefix (tier: (string * string) list) =
+            match
+                tier
+                |> List.filter (fun (t, _) -> t <> "" && norm <> "" && (t.StartsWith(norm: string) || norm.StartsWith(t: string)))
+                |> List.map snd
+                |> List.distinct
+            with
+            | [ slug ] -> Some slug
+            | _ -> None
+        exact tierA
+        |> Option.orElseWith (fun () -> exact tierBC)
+        |> Option.orElseWith (fun () -> prefix tierA)
+        |> Option.orElseWith (fun () -> prefix tierBC)
+
+    /// Fetches status pages starting at 1 until: an empty page (end of
+    /// feed), a page whose oldest item is at or before `markerAt` (nothing
+    /// left to process), the first-run cap (3 pages or a 90-day-old item,
+    /// only when there is no marker yet), or a fetch error -- in which case
+    /// items already fetched are still returned alongside the error (this
+    /// task's own acceptance criterion: a page failure after page 1 still
+    /// processes page 1's items and reports the error).
+    let private fetchNewStatusItems
+        (httpClient: HttpClient)
+        (userId: string)
+        (markerAt: System.DateTimeOffset option)
+        : Async<Goodreads.GoodreadsStatusItem list * string option> =
+        async {
+            let hasMarker = Option.isSome markerAt
+            let cutoff = System.DateTimeOffset.UtcNow.AddDays(-firstRunLookbackDays)
+            let mutable items : Goodreads.GoodreadsStatusItem list = []
+            let mutable page = 1
+            let mutable stop = false
+            let mutable errorMsg = None
+            while not stop do
+                let! fetchResult = Goodreads.getStatusUpdates httpClient userId page
+                match fetchResult with
+                | Error err ->
+                    errorMsg <- Some (Goodreads.describeError err)
+                    stop <- true
+                | Ok pageItems ->
+                    items <- items @ pageItems
+                    if List.isEmpty pageItems then
+                        stop <- true
+                    else
+                        let oldestOnPage = pageItems |> List.map (fun i -> i.PublishedAt) |> List.min
+                        let reachedMarker =
+                            match markerAt with
+                            | Some m -> oldestOnPage <= m
+                            | None -> false
+                        let reachedFirstRunCap = not hasMarker && (page >= maxFirstRunPages || oldestOnPage < cutoff)
+                        if reachedMarker || reachedFirstRunCap then
+                            stop <- true
+                        else
+                            page <- page + 1
+            return items, errorMsg
+        }
+
+    /// Strictly newer than the persisted marker -- a later item at the exact
+    /// same `PublishedAt` as the marker (rare, same-second statuses) still
+    /// counts as new as long as it isn't the marker's own status id.
+    let private isNewerThanMarker (markerId: string option) (markerAt: System.DateTimeOffset option) (item: Goodreads.GoodreadsStatusItem) : bool =
+        match markerAt with
+        | None -> true
+        | Some m ->
+            if item.PublishedAt > m then true
+            elif item.PublishedAt = m then markerId |> Option.map (fun id -> id <> item.StatusId) |> Option.defaultValue true
+            else false
+
+    let private runProgressStep
+        (conn: SqliteConnection)
+        (jobLock: SemaphoreSlim)
+        (httpClient: HttpClient)
+        (userId: string)
+        (currentlyReadingSlugs: (string * string) list)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        : Async<GoodreadsProgressSyncSummary * string option> =
+        async {
+            let markerId = withLock jobLock (fun () -> SettingsStore.getSetting conn lastStatusIdKey)
+            let markerAt =
+                withLock jobLock (fun () -> SettingsStore.getSetting conn lastStatusAtKey)
+                |> Option.bind (fun s ->
+                    match System.DateTimeOffset.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None) with
+                    | true, dto -> Some dto
+                    | false, _ -> None)
+
+            let! fetchedItems, fetchError = fetchNewStatusItems httpClient userId markerAt
+
+            let tierA, tierBC = withLock jobLock (fun () -> buildTitleTiers conn currentlyReadingSlugs)
+
+            // Items are processed oldest-first (this task's own instructions)
+            // so the aggregate's per-source no-op/promotion rules see them
+            // in the order they actually happened.
+            let newItems =
+                fetchedItems
+                |> List.filter (isNewerThanMarker markerId markerAt)
+                |> List.sortBy (fun i -> i.PublishedAt)
+
+            let mutable progressObserved = 0
+            let mutable unmatched = 0
+            let mutable started = 0
+            let mutable ignored = 0
+
+            for item in newItems do
+                match Goodreads.parseProgress item.Text with
+                | None -> ignored <- ignored + 1
+                | Some (Goodreads.Started _) ->
+                    // Informational only -- never calls Observe_reading_progress.
+                    started <- started + 1
+                | Some (Goodreads.PageProgress (page, total, title)) ->
+                    let percent = if total > 0 then (page * 100) / total else 0 // floor, never round
+                    match matchProgressTitle tierA tierBC title with
+                    | None -> unmatched <- unmatched + 1
+                    | Some slug ->
+                        let data: Books.ReadingProgressObservedData = {
+                            Percent = percent
+                            Position = Some (Page (page, Some total))
+                            Source = ProgressSource.Goodreads
+                            ObservedOn = item.PublishedAt.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+                            Finished = false
+                        }
+                        withLock jobLock (fun () -> executeBookCommand conn slug (Books.Observe_reading_progress data) projectionHandlers |> ignore)
+                        progressObserved <- progressObserved + 1
+                | Some (Goodreads.PercentProgress (percent, title)) ->
+                    match matchProgressTitle tierA tierBC title with
+                    | None -> unmatched <- unmatched + 1
+                    | Some slug ->
+                        let data: Books.ReadingProgressObservedData = {
+                            Percent = percent
+                            Position = None
+                            Source = ProgressSource.Goodreads
+                            ObservedOn = item.PublishedAt.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+                            Finished = false
+                        }
+                        withLock jobLock (fun () -> executeBookCommand conn slug (Books.Observe_reading_progress data) projectionHandlers |> ignore)
+                        progressObserved <- progressObserved + 1
+                | Some (Goodreads.Finished title) ->
+                    match matchProgressTitle tierA tierBC title with
+                    | None -> unmatched <- unmatched + 1
+                    | Some slug ->
+                        let data: Books.ReadingProgressObservedData = {
+                            Percent = 100
+                            Position = None
+                            Source = ProgressSource.Goodreads
+                            ObservedOn = item.PublishedAt.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+                            Finished = true
+                        }
+                        withLock jobLock (fun () -> executeBookCommand conn slug (Books.Observe_reading_progress data) projectionHandlers |> ignore)
+                        progressObserved <- progressObserved + 1
+
+            // The marker advances to the newest item FETCHED this run
+            // (matched, unmatched, started or ignored alike) so a re-run
+            // never re-walks pages already seen, even when nothing on them
+            // was a progress update this sync cares about.
+            match fetchedItems |> List.sortByDescending (fun i -> i.PublishedAt) |> List.tryHead with
+            | Some newest ->
+                withLock jobLock (fun () ->
+                    SettingsStore.setSetting conn lastStatusIdKey newest.StatusId
+                    SettingsStore.setSetting conn lastStatusAtKey (newest.PublishedAt.ToString("o", System.Globalization.CultureInfo.InvariantCulture)))
+            | None -> ()
+
+            let summary : GoodreadsProgressSyncSummary =
+                { ProgressObserved = progressObserved; Unmatched = unmatched; Started = started; Ignored = ignored }
+            return summary, fetchError
+        }
+
     // ── Result persistence (a plain one-line human summary -- the counts
     // the body already formats, same convention every other job's
     // `JobRunOutcome.Summary` uses) ──
@@ -397,8 +594,12 @@ module GoodreadsSync =
                 sprintf "%s: %d fetched, %d created, %d linked, %d status changes, %d skipped"
                     s.Shelf s.Fetched s.Created s.Linked s.StatusChanged s.Skipped)
             |> String.concat "; "
-        if List.isEmpty r.Errors then shelfText
-        else sprintf "%s (%d item error(s))" shelfText (List.length r.Errors)
+        let progressText =
+            sprintf "progress: %d observed, %d unmatched, %d started, %d ignored"
+                r.Progress.ProgressObserved r.Progress.Unmatched r.Progress.Started r.Progress.Ignored
+        let combined = sprintf "%s; %s" shelfText progressText
+        if List.isEmpty r.Errors then combined
+        else sprintf "%s (%d item error(s))" combined (List.length r.Errors)
 
     // ── The sync itself ──────────────────────────────────────────────────
 
@@ -426,6 +627,7 @@ module GoodreadsSync =
                 let mutable shelfSummaries = []
                 let mutable allErrors = []
                 let mutable failure = None
+                let mutable currentlyReadingResolved : (string * string) list = []
                 for shelf in allShelves do
                     if Option.isNone failure then
                         let! fetchResult = Goodreads.getShelf httpClient userId shelf
@@ -444,6 +646,14 @@ module GoodreadsSync =
                                     if result.Linked then linked <- linked + 1
                                     if result.StatusChanged then statusChanged <- statusChanged + 1
                                     if result.Skipped then skipped <- skipped + 1
+                                    // Captured for the progress step's title
+                                    // join (tier (a), ADR-0075 §4) -- resolved
+                                    // AFTER processing, so a freshly-created
+                                    // or freshly-linked item's slug is found.
+                                    if shelf = "currently-reading" then
+                                        match withLock jobLock (fun () -> resolveExistingSlug conn item) with
+                                        | Some slug -> currentlyReadingResolved <- currentlyReadingResolved @ [ (item.Title, slug) ]
+                                        | None -> ()
                                 with ex ->
                                     allErrors <- allErrors @ [ sprintf "%s (%s): %s" item.Title shelf ex.Message ]
                             shelfSummaries <-
@@ -460,7 +670,13 @@ module GoodreadsSync =
                     withLock jobLock (fun () -> SettingsStore.setSetting conn "goodreads_last_error" err)
                     return Error err
                 | None ->
-                    let result = { Shelves = shelfSummaries; Errors = allErrors }
+                    let! progressSummary, progressError =
+                        runProgressStep conn jobLock httpClient userId currentlyReadingResolved projectionHandlers
+                    let allErrorsWithProgress =
+                        match progressError with
+                        | Some e -> allErrors @ [ sprintf "Goodreads progress feed: %s" e ]
+                        | None -> allErrors
+                    let result = { Shelves = shelfSummaries; Progress = progressSummary; Errors = allErrorsWithProgress }
                     withLock jobLock (fun () ->
                         SettingsStore.setSetting conn "goodreads_last_sync" (System.DateTime.UtcNow.ToString("o"))
                         SettingsStore.setSetting conn "goodreads_last_sync_result" (formatResult result)

@@ -55,7 +55,7 @@ let goodreadsCardTests =
 
         testCase "a successful sync stops the spinner and leaves the notice for the follow-up Load_goodreads_settings to refresh" <| fun () ->
             let model, _ = init ()
-            let successResult : GoodreadsSyncResult = { Shelves = []; Errors = [] }
+            let successResult : GoodreadsSyncResult = { Shelves = []; Progress = { ProgressObserved = 0; Unmatched = 0; Started = 0; Ignored = 0 }; Errors = [] }
             let updated, _ = update fakeApi fakeAdminApi (Goodreads_sync_completed (Ok successResult)) { model with IsSyncingGoodreads = true; GoodreadsLastError = Some "stale notice" }
             Expect.isFalse updated.IsSyncingGoodreads "the spinner stops"
             Expect.equal updated.GoodreadsLastError (Some "stale notice") "the reducer itself never clears the notice out of band -- Load_goodreads_settings (dispatched alongside this) is the single source of truth"

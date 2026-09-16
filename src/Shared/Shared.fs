@@ -1114,11 +1114,26 @@ type GoodreadsShelfSyncSummary = {
     Skipped: int
 }
 
+/// The user-status-feed progress step's contribution to a
+/// `runGoodreadsShelfSync` run (integration-y2ak4, ADR-0075 §4) — parsed
+/// status items joined to library books and folded into
+/// `Observe_reading_progress` commands. `Unmatched` (no library book found),
+/// `Started` (an "is starting"/"started reading" item — informational only,
+/// never emits a command) and `Ignored` (text that matched none of the four
+/// recognized shapes) are each counted separately from `ProgressObserved`.
+type GoodreadsProgressSyncSummary = {
+    ProgressObserved: int
+    Unmatched: int
+    Started: int
+    Ignored: int
+}
+
 /// `IMediathecaApi.runGoodreadsShelfSync` — persisted as JSON under
 /// `goodreads_last_sync_result` (ADR-0010: per-item failures never abort the
 /// run, so `Errors` can be non-empty alongside real shelf progress).
 type GoodreadsSyncResult = {
     Shelves: GoodreadsShelfSyncSummary list
+    Progress: GoodreadsProgressSyncSummary
     Errors: string list
 }
 

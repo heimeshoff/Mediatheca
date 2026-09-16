@@ -51,6 +51,28 @@ module Goodreads =
         | FeedUnavailable of string
         | ParseFailed of string
 
+    /// One item off the user-status feed (`user_status/list/{id}?format=rss`,
+    /// integration-y2ak4, ADR-0075 §4) -- the item carries no book id, only
+    /// free text (`Text`, the item's `<title>`) that `parseProgress` reads.
+    /// `StatusId` is pulled from the numeric suffix of `user_status/show/{id}`
+    /// in `<link>` (falling back to `<guid>`) -- the idempotency marker's key.
+    type GoodreadsStatusItem = {
+        StatusId: string
+        Text: string
+        PublishedAt: System.DateTimeOffset
+        Link: string option
+    }
+
+    /// The result of parsing one status item's text (`parseProgress`) --
+    /// this task's own vocabulary for the four recognized shapes. `Started`
+    /// never reaches `Observe_reading_progress` (there is no percent to
+    /// report); it is purely informational in the sync's counts.
+    type ProgressUpdate =
+        | PageProgress of page: int * total: int * title: string
+        | PercentProgress of percent: int * title: string
+        | Finished of title: string
+        | Started of title: string
+
     type private GoodreadsFeed = {
         ChannelTitle: string
         Items: GoodreadsShelfItem list
@@ -211,6 +233,157 @@ module Goodreads =
             let! result = fetchFeed httpClient userId shelf
             return result |> Result.map (fun f -> f.ChannelTitle)
         }
+
+    // ── Progress feed (user_status) -- integration-y2ak4, ADR-0075 §4 ──────
+
+    /// RFC-822-shaped dates ("Tue, 02 Sep 2026 12:00:00 -0800") -- same
+    /// day-of-week-is-untrustworthy problem `GoodreadsSync.parseReadAtDate`
+    /// works around for `user_read_at`; duplicated here (rather than shared)
+    /// because this module has no dependency on `GoodreadsSync.fs`, which is
+    /// compiled after it.
+    let private parseRfc822 (s: string) : System.DateTimeOffset option =
+        let withoutDayName =
+            match s.IndexOf(',') with
+            | -1 -> s
+            | idx -> s.Substring(idx + 1).Trim()
+        match System.DateTimeOffset.TryParse(withoutDayName, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None) with
+        | true, dto -> Some dto
+        | false, _ ->
+            match System.DateTimeOffset.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None) with
+            | true, dto -> Some dto
+            | false, _ -> None
+
+    let private statusIdPattern = System.Text.RegularExpressions.Regex(@"user_status/show/(\d+)")
+
+    let private extractStatusId (link: string option) (guid: string option) : string =
+        let tryExtract (s: string option) =
+            s
+            |> Option.bind (fun v ->
+                let m = statusIdPattern.Match(v)
+                if m.Success then Some m.Groups.[1].Value else None)
+        match tryExtract link with
+        | Some id -> id
+        | None ->
+            match tryExtract guid with
+            | Some id -> id
+            | None -> link |> Option.orElse guid |> Option.defaultValue ""
+
+    let private parseStatusItem (item: XElement) : GoodreadsStatusItem option =
+        let text = elementText item "title"
+        let link = elementText item "link"
+        let guid = elementText item "guid"
+        let pubDate = elementText item "pubDate" |> Option.bind parseRfc822
+        match text, pubDate with
+        | Some t, Some dto -> Some { StatusId = extractStatusId link guid; Text = t; PublishedAt = dto; Link = link }
+        | _ -> None
+
+    let private parseStatusFeed (xml: string) : Result<GoodreadsStatusItem list, GoodreadsError> =
+        try
+            let doc = XDocument.Parse(xml)
+            match doc.Root with
+            | null -> Error (ParseFailed "empty document")
+            | root ->
+                match root.Element(XName.Get "channel") with
+                | null -> Error (ParseFailed "no <channel> element")
+                | channel ->
+                    match elementText channel "title" with
+                    | None -> Error ProfilePrivateOrUnknown
+                    | Some _ ->
+                        let items =
+                            channel.Elements(XName.Get "item")
+                            |> Seq.choose parseStatusItem
+                            |> Seq.toList
+                        Ok items
+        with ex ->
+            Error (ParseFailed ex.Message)
+
+    /// `GET https://www.goodreads.com/user_status/list/{userId}?format=rss&page={page}`
+    /// -- the user's status updates, paginated. Shares the same throttle gate
+    /// and User-Agent as the shelf feed (both are plain unauthenticated GETs
+    /// against goodreads.com, ADR-0070's reasoning).
+    let getStatusUpdates (httpClient: HttpClient) (userId: string) (page: int) : Async<Result<GoodreadsStatusItem list, GoodreadsError>> =
+        throttleCall (fun () ->
+            async {
+                try
+                    let url =
+                        sprintf "https://www.goodreads.com/user_status/list/%s?format=rss&page=%d"
+                            userId page
+                    use request = new HttpRequestMessage(HttpMethod.Get, url)
+                    request.Headers.Add("User-Agent", userAgent)
+                    request.Headers.Add("Accept", "application/rss+xml, application/xml")
+                    let! response = httpClient.SendAsync(request) |> Async.AwaitTask
+                    if response.StatusCode = System.Net.HttpStatusCode.Forbidden
+                       || response.StatusCode = System.Net.HttpStatusCode.NotFound then
+                        return Error ProfilePrivateOrUnknown
+                    elif not response.IsSuccessStatusCode then
+                        return Error (FeedUnavailable (sprintf "HTTP %d" (int response.StatusCode)))
+                    else
+                        let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+                        return parseStatusFeed body
+                with ex ->
+                    return Error (FeedUnavailable ex.Message)
+            })
+
+    let private whitespacePattern = System.Text.RegularExpressions.Regex(@"\s+")
+    let private normalizeWhitespace (s: string) = whitespacePattern.Replace(s, " ").Trim()
+
+    let private regexOpts = System.Text.RegularExpressions.RegexOptions.IgnoreCase
+    let private pagePattern = System.Text.RegularExpressions.Regex(@"\bis on page\s+(\d+)\s+of\s+(\d+)\s+of\s+(.+)$", regexOpts)
+    let private percentPattern = System.Text.RegularExpressions.Regex(@"\bis\s+(\d+)\s*%\s+done\s+with\s+(.+)$", regexOpts)
+    let private finishedPattern = System.Text.RegularExpressions.Regex(@"\b(?:finished reading|is finished with)\s+(.+)$", regexOpts)
+    let private startedPattern = System.Text.RegularExpressions.Regex(@"\b(?:is starting|started reading)\s+(.+)$", regexOpts)
+
+    /// A pure function over one status item's text (`GoodreadsStatusItem.Text`)
+    /// -- case-insensitive, whitespace-normalized, HTML-entity-decoded
+    /// (`&amp;`, `&#39;`, ...). Anything not matching one of the four known
+    /// shapes -- quotes, shelvings, reviews -- is `None`, never an error
+    /// (this task's own instructions).
+    let parseProgress (text: string) : ProgressUpdate option =
+        if isNull text then None
+        else
+            let decoded = System.Net.WebUtility.HtmlDecode(text)
+            let t = normalizeWhitespace decoded
+            let pageMatch = pagePattern.Match(t)
+            if pageMatch.Success then
+                Some (PageProgress (int pageMatch.Groups.[1].Value, int pageMatch.Groups.[2].Value, pageMatch.Groups.[3].Value.Trim()))
+            else
+                let percentMatch = percentPattern.Match(t)
+                if percentMatch.Success then
+                    Some (PercentProgress (int percentMatch.Groups.[1].Value, percentMatch.Groups.[2].Value.Trim()))
+                else
+                    let finishedMatch = finishedPattern.Match(t)
+                    if finishedMatch.Success then
+                        Some (Finished (finishedMatch.Groups.[1].Value.Trim()))
+                    else
+                        let startedMatch = startedPattern.Match(t)
+                        if startedMatch.Success then
+                            Some (Started (startedMatch.Groups.[1].Value.Trim()))
+                        else
+                            None
+
+    let private trailingParentheticalPattern = System.Text.RegularExpressions.Regex(@"\s*\([^)]*\)\s*$")
+
+    /// Title normalization for the status-feed join (this task's own
+    /// instructions): strip surrounding quotes/asterisks, a trailing author
+    /// parenthetical (e.g. "(Dune #1)"), and a subtitle after a colon; then
+    /// lower-case and collapse whitespace. Used to compare a status item's
+    /// free-text title against shelf-item and library-book titles.
+    let normalizeTitle (title: string) : string =
+        if isNull title then ""
+        else
+            let trimQuotes (s: string) =
+                let s = s.Trim()
+                let quoteChars = [| '"'; '\''; '*' |]
+                if s.Length >= 2 && Array.contains s.[0] quoteChars && s.[s.Length - 1] = s.[0] then
+                    s.Substring(1, s.Length - 2)
+                else s
+            let withoutQuotes = trimQuotes title
+            let withoutParenthetical = trailingParentheticalPattern.Replace(withoutQuotes, "")
+            let withoutSubtitle =
+                match withoutParenthetical.IndexOf(':') with
+                | -1 -> withoutParenthetical
+                | idx -> withoutParenthetical.Substring(0, idx)
+            normalizeWhitespace (withoutSubtitle.ToLowerInvariant())
 
     /// Fixed, user-facing text for each error case -- `goodreads_last_error`
     /// stores exactly this for `ProfilePrivateOrUnknown` (this task's own

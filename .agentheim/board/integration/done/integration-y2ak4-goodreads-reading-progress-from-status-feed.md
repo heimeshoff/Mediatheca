@@ -1,7 +1,7 @@
 ---
 id: integration-y2ak4
 title: Goodreads reading progress from the public user-status feed — parse "is on page N of M of Title" / "is N% done with Title" / "finished reading" items from `user_status/list/{id}?format=rss`, join them to currently-reading books by normalized title, and emit `Observe_reading_progress` (source Goodreads) as part of the shelf sync, idempotent across runs
-status: doing
+status: done
 type: feature
 context: integration
 created: 2026-09-16
@@ -100,3 +100,44 @@ cookie-free and carries items like "X is on page 137 of 248 of *Title*" and "X i
   only. Do not attempt full i18n.
 - Goodreads percent for audiobooks tracked there is also fine — the source badge says Goodreads,
   the position is a bare percent.
+
+## Outcome
+
+Added the user-status-feed progress step to the Goodreads sync (extends integration-wmqn3), per
+ADR-0075 §4:
+
+- `src/Server/Goodreads.fs` — `GoodreadsStatusItem`, `ProgressUpdate` (`PageProgress`/
+  `PercentProgress`/`Finished`/`Started`), `getStatusUpdates` (paginated `user_status/list/{id}
+  ?format=rss&page={n}`, sharing the existing throttle/User-Agent/parse-error handling),
+  `parseProgress` (pure, HTML-entity-decoding via `System.Net.WebUtility.HtmlDecode`, four regex
+  shapes, case-insensitive and whitespace-normalized), and `normalizeTitle` (quote/asterisk/
+  parenthetical/subtitle stripping + lower-case + whitespace collapse) for the title join.
+- `src/Server/GoodreadsSync.fs` — a new progress step (`runProgressStep` and its helpers
+  `buildTitleTiers`, `matchProgressTitle`, `fetchNewStatusItems`, `isNewerThanMarker`) wired into
+  `runSync` right after the three shelf feeds fold successfully (a shelf-feed failure still aborts
+  the whole run before reaching it, unchanged). The shelf loop now also captures each
+  currently-reading item's resolved slug (post-link/-create) for the join's tier (a). Items are
+  filtered to those newer than the persisted `goodreads_last_status_id`/`goodreads_last_status_at`
+  marker, sorted oldest-first, and folded through `Books.Observe_reading_progress` (the aggregate
+  itself owns promotion/finish, per ADR-0076/0077 — no separate `Change_status` call is needed for
+  progress). `formatResult` now also renders the progress counts in the job's one-line summary.
+- `src/Shared/Shared.fs` — `GoodreadsProgressSyncSummary { ProgressObserved; Unmatched; Started;
+  Ignored }` and a new `Progress` field on `GoodreadsSyncResult` (the only breaking shape change;
+  `Composition.fs`/`Api.fs` needed no changes since they only reference the type name).
+- `src/Client/Pages/Settings/GoodreadsCard.test.fs` — updated the one `GoodreadsSyncResult` record
+  literal for the new field.
+- Tests: `tests/Server.Tests/GoodreadsProgressTests.fs` (new, 12 table-driven `parseProgress`
+  cases: all four shapes, a title containing " of ", a title with a colon, HTML entities, case/
+  whitespace tolerance, and two `None` cases for shelvings/reviews) and 6 new cases appended to
+  `tests/Server.Tests/GoodreadsSyncTests.fs`'s new `goodreadsProgressSyncTests` list: the
+  currently-reading-shelf join plus an ambiguous-title `Unmatched` case in the same feed; oldest-
+  first processing with promote-then-finish, idempotent re-run, and a genuinely-new 4th item on the
+  next run; a `Started` item issuing zero commands; `PageProgress (299, 300, _)` flooring to 99;
+  a clean two-page first-run walk recording the marker; and a page-2 fetch failure that still
+  processes page 1 and reports the error. All 889 server tests (`npm test`), 95 client tests
+  (`npm run test:client`) and the production Fable build (`npm run build`) are green.
+
+No ADR was written — this task implements ADR-0075 §4's already-recorded decision; the title-join
+tier collapse (b)+(c) into one "every library book by title" pool (rather than a separate
+goodreads_book_id-only tier) is an implementation detail documented in the README delta, not a new
+doctrine call.
