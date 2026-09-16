@@ -309,14 +309,29 @@ let audnexusTests =
 let getCustomerSummaryTests =
     testList "Audible.getCustomerSummary (the \"Test connection\" probe)" [
 
-        testCase "sends a Bearer Authorization header and client-id: 0, and reports the library's total count" <| fun _ ->
+        testCase "sends a Bearer Authorization header and NO client-id header, and reports the library's total count" <| fun _ ->
             let handler = new RecordingHandler(fun _ -> jsonResponse HttpStatusCode.OK """{"total_results": 42}""")
             use http = new HttpClient(handler)
             let result = getCustomerSummary http "api.audible.de" "my-access-token" |> Async.RunSynchronously
             Expect.equal result (Ok "42 titles") "Reports the total from the response"
             let request = handler.Requests.[0]
             Expect.equal (request.Headers.GetValues("Authorization") |> Seq.head) "Bearer my-access-token" "Bearer token"
-            Expect.equal (request.Headers.GetValues("client-id") |> Seq.head) "0" "client-id: 0"
+            // Audible rejects a quickstart-minted bearer token paired with
+            // `client-id: 0` as HTTP 400 ("does not correspond to the
+            // specified Client-ID"); the same request succeeds without it.
+            Expect.isFalse (request.Headers.Contains "client-id") "No client-id header -- Audible 400s a bearer token paired with client-id: 0"
+
+        testCase "a 400 surfaces Audible's own message instead of a bare status code" <| fun _ ->
+            let handler = new RecordingHandler(fun _ -> jsonResponse HttpStatusCode.BadRequest """{"message": "The specified authorization token does not correspond to the specified Client-ID in the request headers."}""")
+            use http = new HttpClient(handler)
+            let result = getCustomerSummary http "api.audible.de" "my-access-token" |> Async.RunSynchronously
+            Expect.equal result (Error (OtherFailure "HTTP 400: The specified authorization token does not correspond to the specified Client-ID in the request headers.")) "The response body's message is part of the failure text"
+
+        testCase "a 500 with no JSON message stays a bare status code" <| fun _ ->
+            let handler = new RecordingHandler(fun _ -> new HttpResponseMessage(HttpStatusCode.InternalServerError))
+            use http = new HttpClient(handler)
+            let result = getCustomerSummary http "api.audible.de" "my-access-token" |> Async.RunSynchronously
+            Expect.equal result (Error (OtherFailure "HTTP 500")) "No message to add"
 
         testCase "a 401 maps to Unauthorized (the withAccessToken retry trigger)" <| fun _ ->
             let handler = new RecordingHandler(fun _ -> new HttpResponseMessage(HttpStatusCode.Unauthorized))

@@ -199,22 +199,37 @@ module Audible =
                             return Error (authFileRejectedPrefix + "the API rejected the minted access token twice in a row; paste a fresh auth file")
         }
 
-    // ── Authenticated fetch (bearer + client-id, ADR-0074's "What" section) ──
+    // ── Authenticated fetch (bearer only, ADR-0074's "What" section) ──
+    //
+    // Bearer WITHOUT a `client-id` header. The adapter originally sent
+    // `client-id: 0` alongside the bearer token (mkb79's bearer mode), but
+    // Audible answers that with HTTP 400 "The specified authorization token
+    // does not correspond to the specified Client-ID in the request headers"
+    // for a token minted from an `audible-cli quickstart` device -- verified
+    // 2026-09-16 against api.audible.de: the identical request succeeds the
+    // moment the header is dropped, and fails with it on every host/token
+    // combination tried. So no client-id at all.
+
+    /// Audible's error bodies are `{"message": "..."}`; surface that text so
+    /// a 400 explains itself instead of reading as a bare status code.
+    let private describeFailure (status: int) (body: string) : string =
+        match Decode.fromString (Decode.field "message" Decode.string) body with
+        | Ok message when not (String.IsNullOrWhiteSpace message) -> sprintf "HTTP %d: %s" status message
+        | _ -> sprintf "HTTP %d" status
 
     let private sendAuthenticated (httpClient: HttpClient) (url: string) (token: string) : Async<Result<string, FetchError>> =
         async {
             try
                 use request = new HttpRequestMessage(HttpMethod.Get, url)
                 request.Headers.Add("Authorization", sprintf "Bearer %s" token)
-                request.Headers.Add("client-id", "0")
                 let! response = httpClient.SendAsync(request) |> Async.AwaitTask
                 let status = int response.StatusCode
+                let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
                 if status = 401 || status = 403 then
                     return Error Unauthorized
                 elif not response.IsSuccessStatusCode then
-                    return Error (OtherFailure (sprintf "HTTP %d" status))
+                    return Error (OtherFailure (describeFailure status body))
                 else
-                    let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
                     return Ok body
             with ex ->
                 return Error (OtherFailure ex.Message)
@@ -428,9 +443,12 @@ module Audible =
               Authors = get.Optional.Field "authors" (Decode.list decodeName) |> Option.defaultValue []
               Narrators = get.Optional.Field "narrators" (Decode.list decodeName) |> Option.defaultValue []
               RuntimeMinutes = get.Optional.Field "runtime_length_min" Decode.int
-              PercentComplete =
-                get.Optional.Field "percent_complete" Decode.float
-                |> Option.orElse (get.Optional.Field "percent_complete" Decode.int |> Option.map float)
+              // `Decode.float` accepts both `0.0` (what Audible actually
+              // sends) and a bare `42`. An earlier `Option.orElse` fallback
+              // to `Decode.int` ran eagerly inside the getter and failed the
+              // whole item on `0.0` -- the very first title of a real
+              // library -- so no fallback here.
+              PercentComplete = get.Optional.Field "percent_complete" Decode.float
               IsFinished = get.Optional.Field "is_finished" Decode.bool |> Option.defaultValue false
               PurchaseDate = get.Optional.Field "purchase_date" Decode.string
               CoverUrl = get.Optional.Field "product_images" (Decode.field "500" Decode.string)

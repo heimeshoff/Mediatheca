@@ -78,6 +78,16 @@ let audibleAuthFileTests =
                     rejected
             Expect.equal stillRejected.AudibleLastError (Some "audible auth file rejected: expired") "A generic failure does not overwrite the standing notice"
 
+        testCase "the installer choice defaults to pipx and Audible_installer_changed swaps the shown install command" <| fun () ->
+            let model, _ = init ()
+            Expect.equal model.AudibleInstaller Pipx "pipx is the default installer"
+            Expect.equal (audibleInstallCommand model.AudibleInstaller) "pipx install audible-cli" "pipx command"
+            let switched, _ = update fakeApi fakeAdminApi (Audible_installer_changed Uv) model
+            Expect.equal switched.AudibleInstaller Uv "uv selected"
+            Expect.equal (audibleInstallCommand switched.AudibleInstaller) "uv tool install audible-cli" "uv command"
+            let back, _ = update fakeApi fakeAdminApi (Audible_installer_changed Pipx) switched
+            Expect.equal back.AudibleInstaller Pipx "switching back to pipx works"
+
         testCase "Audible_cleared resets Configured, CustomerName and the standing notice" <| fun () ->
             let model, _ = init ()
             let status : AudibleStatus = { Configured = true; CustomerName = Some "Marco H"; Marketplace = "de"; LastError = None }

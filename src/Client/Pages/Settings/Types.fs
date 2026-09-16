@@ -2,6 +2,13 @@ module Mediatheca.Client.Pages.Settings.Types
 
 open Mediatheca.Shared
 
+/// Which Python tool installer the Audible card's setup instructions show
+/// for `audible-cli`. Purely a display choice on the client -- it swaps the
+/// install command in the how-to paragraph and is never persisted.
+type AudibleInstaller =
+    | Pipx
+    | Uv
+
 type Model = {
     TmdbApiKey: string
     TmdbKeyInput: string
@@ -104,6 +111,8 @@ type Model = {
     AudibleMarketplace: string
     AudibleLastError: string option
     AudibleAuthFileInput: string
+    /// Which installer the setup how-to shows (pipx or uv); display only.
+    AudibleInstaller: AudibleInstaller
     IsSavingAudible: bool
     IsTestingAudible: bool
     IsClearingAudible: bool
@@ -274,6 +283,7 @@ type Msg =
     | Audible_status_loaded of AudibleStatus
     | Audible_auth_file_input_changed of string
     | Audible_marketplace_changed of string
+    | Audible_installer_changed of AudibleInstaller
     | Save_audible_auth_file
     | Audible_save_result of Result<AudibleStatus, string>
     | Test_audible_connection

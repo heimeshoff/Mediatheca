@@ -1625,16 +1625,29 @@ let private qbittorrentDetail (model: Model) (dispatch: Msg -> unit) =
 let private audibleDetail (model: Model) (dispatch: Msg -> unit) =
     Html.div [
         prop.children [
+            // Installer choice: pipx or uv. Swaps only the install command
+            // below; everything after it is the same for both.
+            Html.div [
+                prop.className "mb-3 flex flex-wrap items-center gap-2"
+                prop.children [
+                    Html.span [ prop.className (DesignSystem.mutedText + " text-sm"); prop.text "Install with" ]
+                    DesignSystem.filterPill "pipx" (model.AudibleInstaller = Pipx) (fun () -> dispatch (Audible_installer_changed Pipx))
+                    DesignSystem.filterPill "uv" (model.AudibleInstaller = Uv) (fun () -> dispatch (Audible_installer_changed Uv))
+                ]
+            ]
+
             Html.p [
                 prop.className "text-base-content/70 mb-4 text-sm"
                 prop.children [
                     Html.text "Run "
-                    Html.code [ prop.className "text-xs"; prop.text "pipx install audible-cli" ]
+                    Html.code [ prop.className "text-xs"; prop.text (State.audibleInstallCommand model.AudibleInstaller) ]
                     Html.text ", then "
                     Html.code [ prop.className "text-xs"; prop.text "audible quickstart" ]
-                    Html.text " on your own machine, and paste the resulting "
+                    Html.text " on your own machine, and paste the resulting auth file below: "
                     Html.code [ prop.className "text-xs"; prop.text "~/.audible/<profile>.json" ]
-                    Html.text " below. Mediatheca never logs in or registers a device itself."
+                    Html.text " on Linux/macOS, "
+                    Html.code [ prop.className "text-xs"; prop.text "%LOCALAPPDATA%\\audible\\<profile>.json" ]
+                    Html.text " on Windows. Mediatheca never logs in or registers a device itself."
                 ]
             ]
 
@@ -1694,7 +1707,7 @@ let private audibleDetail (model: Model) (dispatch: Msg -> unit) =
                     Daisy.textarea [
                         prop.className "w-full font-mono text-xs"
                         prop.rows 4
-                        prop.placeholder (if model.AudibleConfigured then "auth file stored — paste a new one to replace" else "paste the contents of ~/.audible/<profile>.json here")
+                        prop.placeholder (if model.AudibleConfigured then "auth file stored — paste a new one to replace" else "paste the contents of <profile>.json here (~/.audible/ or %LOCALAPPDATA%\\audible\\)")
                         prop.value model.AudibleAuthFileInput
                         prop.onChange (Audible_auth_file_input_changed >> dispatch)
                     ]

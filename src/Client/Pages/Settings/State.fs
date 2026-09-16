@@ -12,6 +12,14 @@ let private jsFetch (url: string) : JS.Promise<obj> = jsNative
 [<Emit("new TextDecoder().decode($0)")>]
 let private decodeBytes (value: obj) : string = jsNative
 
+/// The `audible-cli` install command the Audible card's how-to shows for the
+/// chosen Python tool installer. `pipx` and `uv tool` both put an isolated
+/// `audible` executable on PATH; the rest of the instructions are identical.
+let audibleInstallCommand (installer: AudibleInstaller) : string =
+    match installer with
+    | Pipx -> "pipx install audible-cli"
+    | Uv -> "uv tool install audible-cli"
+
 /// integration-v0xmv: `Steam.mapFamilyFetchError`'s rejected-token errors are
 /// prefixed "family token rejected" (ADR-0070; distinct from ADR-0065's Web
 /// API key rejection wording per its rule 3). Used to distinguish "paste a
@@ -263,6 +271,7 @@ let init () : Model * Cmd<Msg> =
       AudibleMarketplace = "de"
       AudibleLastError = None
       AudibleAuthFileInput = ""
+      AudibleInstaller = Pipx
       IsSavingAudible = false
       IsTestingAudible = false
       IsClearingAudible = false
@@ -756,6 +765,9 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
 
     | Audible_auth_file_input_changed value ->
         { model with AudibleAuthFileInput = value; AudibleSaveResult = None }, Cmd.none
+
+    | Audible_installer_changed installer ->
+        { model with AudibleInstaller = installer }, Cmd.none
 
     | Audible_marketplace_changed value ->
         { model with AudibleMarketplace = value },

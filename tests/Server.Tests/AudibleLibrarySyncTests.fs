@@ -61,7 +61,11 @@ let private libraryItemJson (asin: string) (title: string) (percentComplete: flo
           sprintf "\"publisher_summary\": \"Description of %s\"" title ]
     let optionalPercent =
         percentComplete
-        |> Option.map (fun p -> sprintf "\"percent_complete\": %s" (p.ToString(Globalization.CultureInfo.InvariantCulture)))
+        // Always with a decimal point ("0.0", "42.0") -- the wire shape
+        // Audible really sends. A plain ToString gave "0"/"42", which an
+        // int decoder accepts too, and hid the eager `Decode.int` fallback
+        // that failed every real library on its first `0.0`.
+        |> Option.map (fun p -> sprintf "\"percent_complete\": %s" (p.ToString("0.0###", Globalization.CultureInfo.InvariantCulture)))
         |> Option.toList
     let optionalRuntime =
         runtimeMinutes
