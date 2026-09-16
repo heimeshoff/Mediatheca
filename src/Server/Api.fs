@@ -22,6 +22,27 @@ module Api =
         | Qbittorrent.AuthFailed -> "qBittorrent authentication failed"
         | Qbittorrent.OtherFailure msg -> msg
 
+    /// integration-wmqn3 (ADR-0075): `goodreads_import_shelves` is stored as
+    /// a JSON string list -- `currently-reading` is always implicitly
+    /// included (the Settings card disables un-checking it), defaulting to
+    /// `["currently-reading"]` when nothing has been saved yet.
+    let private decodeGoodreadsImportShelves (raw: string option) : string list =
+        match raw with
+        | None -> [ "currently-reading" ]
+        | Some json ->
+            match Thoth.Json.Net.Decode.fromString (Thoth.Json.Net.Decode.list Thoth.Json.Net.Decode.string) json with
+            | Ok shelves ->
+                if List.contains "currently-reading" shelves then shelves
+                else "currently-reading" :: shelves
+            | Error _ -> [ "currently-reading" ]
+
+    let private encodeGoodreadsImportShelves (shelves: string list) : string =
+        shelves
+        |> List.distinct
+        |> List.map Thoth.Json.Net.Encode.string
+        |> Thoth.Json.Net.Encode.list
+        |> Thoth.Json.Net.Encode.toString 0
+
     /// games-v4nqe: read-modify-write helper shared by every converted Steam
     /// emission site below. Reads the current `game_metadata_cache` identity
     /// card, overrides only the fields the caller actually passes `Some` for
@@ -1838,6 +1859,16 @@ module Api =
         (getQbittorrentConfig: unit -> Qbittorrent.QbittorrentConfig)
         (getOpenLibraryConfig: unit -> OpenLibrary.OpenLibraryConfig)
         (getAudibleConfig: unit -> Audible.AudibleConfig)
+        (getGoodreadsConfig: unit -> Goodreads.GoodreadsConfig)
+        // integration-wmqn3 (ADR-0026): built in Composition.fs, closing over
+        // the SAME `ScheduledJobs.JobRunRecorder`/job connection/lock the
+        // "Goodreads shelf sync" `JobSpec` and the Jobs tab's generic
+        // "Run now" share -- so the Settings card's own "Sync now" click is
+        // ALSO recorded as a `job_runs` row (trigger = "manual") and guarded
+        // against overlapping the nightly fire, rather than a bespoke
+        // un-recorded trigger (`triggerPlaytimeSync`'s older shape, predating
+        // ADR-0026).
+        (runGoodreadsShelfSyncNow: unit -> Async<Result<GoodreadsSyncResult, string>>)
         (mountRoots: LocalCopyRemoval.MountRoots)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
@@ -5672,4 +5703,55 @@ module Api =
                 use conn = factory ()
                 return! addBookFromAudibleImpl conn httpClient getAudibleConfig imageBasePath projectionHandlers request
             }
+
+            // Goodreads (integration-wmqn3, ADR-0075) -- the user's PUBLIC
+            // Goodreads user id (no developer key exists any more, no cookie
+            // ever) drives the shelf sync. `getGoodreadsConfig` re-reads
+            // settings on every call, the same shape `getAudibleConfig`
+            // above uses.
+            getGoodreadsSettings = fun () -> async {
+                use conn = factory ()
+                let config = getGoodreadsConfig ()
+                return {
+                    UserId = config.UserId
+                    ImportShelves = config.ImportShelves
+                    LastSync = SettingsStore.getSetting conn "goodreads_last_sync"
+                    LastResult = SettingsStore.getSetting conn "goodreads_last_sync_result"
+                    LastError = SettingsStore.getSetting conn "goodreads_last_error"
+                }
+            }
+
+            setGoodreadsUserId = fun input -> async {
+                use conn = factory ()
+                match Goodreads.parseUserId input with
+                | Error e -> return Error e
+                | Ok userId ->
+                    SettingsStore.setSetting conn "goodreads_user_id" userId
+                    return Ok userId
+            }
+
+            setGoodreadsImportShelves = fun shelves -> async {
+                use conn = factory ()
+                SettingsStore.setSetting conn "goodreads_import_shelves" (encodeGoodreadsImportShelves shelves)
+                return ()
+            }
+
+            testGoodreadsConnection = fun () -> async {
+                let config = getGoodreadsConfig ()
+                match config.UserId with
+                | None -> return Error "Goodreads is not configured -- enter your user id in Settings"
+                | Some userId ->
+                    let! itemsResult = Goodreads.getShelf httpClient userId "currently-reading"
+                    match itemsResult with
+                    | Error err -> return Error (Goodreads.describeError err)
+                    | Ok items ->
+                        let! nameResult = Goodreads.getProfileName httpClient userId "currently-reading"
+                        let name =
+                            match nameResult with
+                            | Ok n -> n
+                            | Error _ -> "Goodreads"
+                        return Ok (sprintf "%s: %d currently reading" name (List.length items))
+            }
+
+            runGoodreadsShelfSync = fun () -> runGoodreadsShelfSyncNow ()
         }

@@ -268,6 +268,19 @@ let init () : Model * Cmd<Msg> =
       IsClearingAudible = false
       AudibleSaveResult = None
       AudibleTestResult = None
+      GoodreadsUserId = None
+      GoodreadsUserIdInput = ""
+      GoodreadsReadShelfOptedIn = false
+      GoodreadsToReadShelfOptedIn = false
+      GoodreadsLastSync = None
+      GoodreadsLastResult = None
+      GoodreadsLastError = None
+      IsSavingGoodreads = false
+      IsTestingGoodreads = false
+      IsSyncingGoodreads = false
+      GoodreadsSaveResult = None
+      GoodreadsTestResult = None
+      GoodreadsSyncResult = None
       PlaytimeSyncStatus = None
       JellyfinLastSyncTime = None
       JellyfinSyncStatus = None
@@ -287,7 +300,7 @@ let init () : Model * Cmd<Msg> =
       JobsSectionLoaded = false
       SurgerySectionOpen = false
       SurgerySectionLoaded = false },
-    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_qbittorrent_settings; Cmd.ofMsg Load_audible_status; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync; Cmd.ofMsg Load_steam_api_key_last_error; Cmd.ofMsg Load_steam_family_last_result ]
+    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_qbittorrent_settings; Cmd.ofMsg Load_audible_status; Cmd.ofMsg Load_goodreads_settings; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync; Cmd.ofMsg Load_steam_api_key_last_error; Cmd.ofMsg Load_steam_family_last_result ]
 
 let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
@@ -794,6 +807,83 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
             AudibleSaveResult = None
             AudibleTestResult = None },
         Cmd.none
+
+    // Goodreads Integration (integration-wmqn3, ADR-0075)
+    | Load_goodreads_settings ->
+        model, Cmd.OfAsync.perform api.getGoodreadsSettings () Goodreads_settings_loaded
+
+    | Goodreads_settings_loaded settings ->
+        { model with
+            GoodreadsUserId = settings.UserId
+            GoodreadsReadShelfOptedIn = settings.ImportShelves |> List.contains "read"
+            GoodreadsToReadShelfOptedIn = settings.ImportShelves |> List.contains "to-read"
+            GoodreadsLastSync = settings.LastSync
+            GoodreadsLastResult = settings.LastResult
+            GoodreadsLastError = settings.LastError },
+        Cmd.none
+
+    | Goodreads_user_id_input_changed value ->
+        { model with GoodreadsUserIdInput = value; GoodreadsSaveResult = None }, Cmd.none
+
+    | Save_goodreads_user_id ->
+        { model with IsSavingGoodreads = true; GoodreadsSaveResult = None },
+        Cmd.OfAsync.either api.setGoodreadsUserId model.GoodreadsUserIdInput
+            Goodreads_save_result
+            (fun ex -> Goodreads_save_result (Error ex.Message))
+
+    | Goodreads_save_result result ->
+        let model =
+            match result with
+            | Ok userId -> { model with GoodreadsUserId = Some userId; GoodreadsUserIdInput = "" }
+            | Error _ -> model
+        { model with IsSavingGoodreads = false; GoodreadsSaveResult = Some result },
+        (match result with Ok _ -> Cmd.ofMsg Load_goodreads_settings | Error _ -> Cmd.none)
+
+    // `currently-reading` is always on and disabled -- these two checkboxes
+    // are the only shelves the Settings card can toggle (ADR-0075 §3).
+    | Toggle_goodreads_read_shelf ->
+        let optedIn = not model.GoodreadsReadShelfOptedIn
+        let shelves =
+            [ "currently-reading" ]
+            @ (if optedIn then [ "read" ] else [])
+            @ (if model.GoodreadsToReadShelfOptedIn then [ "to-read" ] else [])
+        { model with GoodreadsReadShelfOptedIn = optedIn },
+        Cmd.OfAsync.perform api.setGoodreadsImportShelves shelves (fun () -> Load_goodreads_settings)
+
+    | Toggle_goodreads_to_read_shelf ->
+        let optedIn = not model.GoodreadsToReadShelfOptedIn
+        let shelves =
+            [ "currently-reading" ]
+            @ (if model.GoodreadsReadShelfOptedIn then [ "read" ] else [])
+            @ (if optedIn then [ "to-read" ] else [])
+        { model with GoodreadsToReadShelfOptedIn = optedIn },
+        Cmd.OfAsync.perform api.setGoodreadsImportShelves shelves (fun () -> Load_goodreads_settings)
+
+    | Test_goodreads_connection ->
+        { model with IsTestingGoodreads = true; GoodreadsTestResult = None },
+        Cmd.OfAsync.either api.testGoodreadsConnection ()
+            Goodreads_test_result
+            (fun ex -> Goodreads_test_result (Error ex.Message))
+
+    | Goodreads_test_result result ->
+        { model with IsTestingGoodreads = false; GoodreadsTestResult = Some result }, Cmd.none
+
+    | Sync_goodreads_now ->
+        { model with IsSyncingGoodreads = true; GoodreadsSyncResult = None },
+        Cmd.OfAsync.either api.runGoodreadsShelfSync ()
+            Goodreads_sync_completed
+            (fun ex -> Goodreads_sync_completed (Error ex.Message))
+
+    | Goodreads_sync_completed result ->
+        let goodreadsLastError =
+            match result with
+            | Error e -> Some e
+            | Ok _ -> None
+        { model with
+            IsSyncingGoodreads = false
+            GoodreadsSyncResult = Some result
+            GoodreadsLastError = (match result with Ok _ -> model.GoodreadsLastError | Error _ -> goodreadsLastError) },
+        Cmd.ofMsg Load_goodreads_settings
 
     // Sync Status
     | Load_playtime_sync_status ->

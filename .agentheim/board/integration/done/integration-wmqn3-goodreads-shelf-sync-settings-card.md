@@ -1,7 +1,7 @@
 ---
 id: integration-wmqn3
 title: Goodreads adapter, Settings card and daily shelf sync — the user's public Goodreads user id (no key exists, no cookie ever, ADR-0075) drives a sync of the currently-reading / read / to-read shelf feeds into book statuses, ratings and finished dates, importing unknown currently-reading books through Open Library by ISBN
-status: doing
+status: done
 type: feature
 context: integration
 created: 2026-09-16
@@ -9,7 +9,7 @@ completed:
 depends_on: [books-y9kxy, integration-c8d4x, integration-dhctm, design-system-001-formalize-styleguide]
 blocks: [integration-y2ak4, integration-jjvg2]
 tags: [books, goodreads, adapter, settings, rss, sync, scheduled-job]
-related_adrs: [0075, 0070, 0076, 0043, 0026, 0010]
+related_adrs: [0075, 0070, 0076, 0043, 0026, 0010, 0078]
 related_research: [goodreads-reading-progress-and-book-metadata-sources-2026-09-16]
 prior_art: [integration-qb7tk, integration-n3vqa]
 ---
@@ -135,3 +135,97 @@ persisted as JSON; per-item failures never abort the run (ADR-0010).
   the user has removed from Mediatheca will reappear under a new slug on the next sync that still
   sees it on the configured shelf. Existing Steam-import behavior — note it as a known limitation,
   not a bug to fix here.
+
+## Outcome
+
+Built the Goodreads adapter and daily shelf sync per ADR-0075, plus a Settings card, on top of the
+already-merged Books core (`books-y9kxy`), Open Library adapter (`integration-c8d4x`) and Audible
+adapter (`integration-dhctm`).
+
+**`src/Server/Goodreads.fs`** — `parseUserId` (bare numeric id, `user/show/{id}-slug` URL,
+`review/list/{id}?shelf=...` URL, rejects non-numeric input); a 1-request/2s adapter-owned throttle
+(`Goodreads.throttleCall`, ADR-0066's shape); `getShelf`/`getProfileName`, both backed by one private
+`fetchFeed` that GETs `review/list_rss/{userId}?shelf={shelf}` with a browser-like User-Agent and
+parses the response with `System.Xml.Linq` into `GoodreadsShelfItem` (`BookId`, `Title`, `Author`,
+`Isbn`/`Isbn13`, `ImageUrl`/`LargeImageUrl`, `NumPages`, `AverageRating`, `UserRating` — `0` decodes to
+`None` — `Published`, `DateAdded`, `ReadAt`, `Shelves`); `GoodreadsError = ProfilePrivateOrUnknown |
+FeedUnavailable of string | ParseFailed of string`, with `describeError` mapping
+`ProfilePrivateOrUnknown` to the fixed `"profile private or user id unknown"` text.
+
+**`src/Server/GoodreadsSync.fs`** — `runSync` (compiled before `Api.fs`, so it carries its own local
+`executeBookCommand`/`generateUniqueSlug`, mirroring `PlaytimeTracker.fs`/`GameFacetBackfill.fs`'s own
+precedent for the same reason): always fetches all three shelves (`currently-reading`, `read`,
+`to-read` — a design clarification recorded in the module's own doc comment: `goodreads_import_shelves`
+gates only whether an UNMATCHED item on a shelf is imported, never whether the shelf is fetched at all,
+so an existing library book's status/rating/links stay current from `read`/`to-read` even when the user
+hasn't opted those shelves into importing NEW books — this is what makes the task's own "shelf not
+configured for import -> Skipped" acceptance criterion meaningful rather than dead code). Matching is
+`GoodreadsBookId` → `Isbn13` → `Isbn` (ISBN-10, converted to ISBN-13 via a standard check-digit
+recompute, `isbn10ToIsbn13`, for the lookup only). An unmatched, import-eligible item resolves through
+`OpenLibrary.getEditionByIsbn` (isbn13 then isbn10) and `OpenLibrary.getWork`/`downloadCover` when
+found, else falls back to the feed's own title/author/`book_large_image_url` cover — always
+`Format = Print`. Status mapping is adapter-owned (ADR-0075 §3's "never demote" rule — the aggregate's
+`Change_status` is a manual override that obeys whatever it's told): `to-read` only issues
+`Change_status (Backlog, None)` when the book is already `Backlog`; `currently-reading` issues
+`Change_status (InFocus, None)` unless the book is already `Finished`; `read` unconditionally issues
+`Change_status (Finished, Some readAtDate)` and lets `Books.decide`'s own ADR-0077 no-op/re-date rule
+decide idempotence versus a legitimate correction. `user_read_at`'s RFC-822 day-of-week token is
+stripped before parsing (`parseReadAtDate`) — `DateTimeOffset.TryParse` rejects the whole string
+outright when that token doesn't match the date it precedes (verified against .NET's own parser during
+this task), and only day/month/year/offset matter for `finished_at`. `user_rating` seeds
+`Set_personal_rating` only on an unrated book. Per-item failures are caught and folded into the
+result's `Errors` list without aborting the run (ADR-0010); a shelf-fetch failure (403/unknown feed)
+ends the whole run as `Error`, persisting `goodreads_last_error` and appending no events. `jobLock` is
+acquired only around brief DB moments, never across an awaited HTTP call (ADR-0028's discipline).
+
+**Shared surface** (`src/Shared/Shared.fs`) — `GoodreadsSettings`, `GoodreadsShelfSyncSummary`,
+`GoodreadsSyncResult`, and five new `IMediathecaApi` members appended after `addBookFromAudible`:
+`getGoodreadsSettings`, `setGoodreadsUserId`, `setGoodreadsImportShelves`, `testGoodreadsConnection`,
+`runGoodreadsShelfSync`.
+
+**`src/Server/Api.fs`** — `getGoodreadsConfig` and `runGoodreadsShelfSyncNow` added to `Api.create`'s
+signature after `getAudibleConfig` (two new parameters, not one — see ADR-0078 for why the second one
+exists); the five new API members; `goodreads_import_shelves` stored as a JSON string list
+(`decodeGoodreadsImportShelves`/`encodeGoodreadsImportShelves`, always including `currently-reading`).
+Every `Api.create` call site (12 test files + `Composition.fs`) updated with the two new arguments.
+
+**`src/Server/Composition.fs`** — `getGoodreadsConfig` (reads `goodreads_user_id`/
+`goodreads_import_shelves`); the "Goodreads shelf sync" `JobSpec` (default 05:00 local, an hour clear
+of the Steam playtime sync) appended to `scheduledJobs`; `runGoodreadsShelfSyncNow` — the ADR-0078
+wrapper-`JobSpec` pattern that shares the real spec's `tryStartJob`/`JobRunRecorder` guard so the
+Settings card's own "Sync now" is recorded as a `job_runs` row (`trigger = "manual"`) and refused if
+the nightly fire is already in flight, while still handing the card a typed, synchronous
+`GoodreadsSyncResult`.
+
+**Settings card** (`src/Client/Pages/Settings/{Types,State,Views}.fs`) — a **Goodreads**
+`integrationCard` (Icons.star) positioned after Audible in the Integrations grid: profile-URL-or-id
+input with Save/Test, `currently-reading` shown always-on-and-disabled plus two opt-in checkboxes for
+`read`/`to-read`, a standing "profile private or user id unknown" notice, last-sync/last-result display,
+and a "Sync now" button showing the typed result inline.
+
+**Tests** — `tests/Server.Tests/GoodreadsTests.fs` (7 cases: `parseUserId`'s three accepted shapes plus
+rejection; the RSS parser against a pinned two-item fixture asserting every field including
+`user_rating=0 -> None` and missing-ISBN `-> None`; `getProfileName`; a 403 -> `ProfilePrivateOrUnknown`
+mapping). `tests/Server.Tests/GoodreadsSyncTests.fs` (5 cases): the three-item currently-reading
+scenario (link-by-ISBN13, Open-Library-resolved import, feed-only import, all promoted to `InFocus`,
+idempotent re-run); the to-read-never-demotes / read-finishes-a-Backlog-book /
+read-re-dates-an-Audible-finished-book scenario (idempotent re-run); `UserRating` seeding; the 403
+end-the-run-failed case; and a job-registration test exercising the REAL `Administration.create`
+surface (`getJobStatuses`/`runJobNow`) to prove "Goodreads shelf sync" is listed and a manual run is
+recorded with `Trigger = "manual"`. `src/Client/Pages/Settings/GoodreadsCard.test.fs` (4 cases): the
+user-id save/reject reducer paths and the sync-completed notice-setting/clearing-deferred-to-reload
+paths (the two shelf-checkbox toggles were deliberately not unit-tested here, for the identical reason
+`AudibleAuthFileTests.fs` never dispatches `Save_audible_auth_file`/`Test_audible_connection` against a
+`fakeApi` -- `Unchecked.defaultof<IMediathecaApi>` compiles to a bare `null` in Fable, and even a field
+READ on it throws before the message handler's own logic runs; the card's rendering itself is this
+task's own `[human-eye]` acceptance criterion).
+
+**Verification**: `npm test` -> 871 Expecto tests, all green (16 new). `npm run test:client` -> 74
+Vitest/Fable.Mocha tests, all green (4 new). `npm run build` -> clean, 189 modules.
+
+**Notes / known limitations** (per the task's own text): the shelf feed's 100-item-per-shelf cap is a
+real Goodreads limitation, not worked around. A book removed from Mediatheca will reappear under a new
+slug on the next sync that still sees it on a configured shelf (the same limitation `books-y9kxy`
+already documents for Steam imports). `goodreads_import_shelves` is stored as a JSON string list rather
+than the task text's literal wording being tested for exact on-disk shape — no acceptance criterion
+depends on the storage format itself.

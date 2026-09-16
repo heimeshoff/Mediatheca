@@ -1749,6 +1749,170 @@ let private audibleDetail (model: Model) (dispatch: Msg -> unit) =
         ]
     ]
 
+/// Goodreads (integration-wmqn3, ADR-0075): the user's PUBLIC Goodreads
+/// user id -- no developer key exists any more, no session cookie ever.
+/// `currently-reading` is always on and disabled; `read`/`to-read` are
+/// opt-in checkboxes (default off, to keep a 900-book "read" shelf from
+/// flooding the library). Same Save/Test/Sync-now shape `qbittorrentDetail`/
+/// `audibleDetail` above use.
+let private goodreadsDetail (model: Model) (dispatch: Msg -> unit) =
+    Html.div [
+        prop.children [
+            Html.p [
+                prop.className "text-base-content/70 mb-4 text-sm"
+                prop.children [
+                    Html.text "Paste your Goodreads profile URL or numeric user id below. Your Goodreads profile must be public for the shelf feeds to work."
+                ]
+            ]
+
+            match model.GoodreadsUserId with
+            | Some userId ->
+                Html.div [
+                    prop.className "mb-3 flex items-center gap-2 text-sm text-base-content/60"
+                    prop.children [
+                        Html.span [ prop.text "User id:" ]
+                        Html.span [ prop.className "font-mono"; prop.text userId ]
+                    ]
+                ]
+            | None -> Html.none
+
+            // Standing "profile private or user id unknown" notice.
+            match model.GoodreadsLastError with
+            | Some lastError ->
+                Daisy.alert [
+                    alert.warning
+                    prop.className "mb-4"
+                    prop.children [
+                        Html.span [ prop.className "text-sm"; prop.text lastError ]
+                    ]
+                ]
+            | None -> Html.none
+
+            Html.div [
+                prop.className "form-control mb-3"
+                prop.children [
+                    Daisy.label [
+                        prop.className "label"
+                        prop.children [ Html.span [ prop.className "label-text"; prop.text "Profile URL or user id" ] ]
+                    ]
+                    Daisy.input [
+                        prop.className "w-full"
+                        prop.placeholder "goodreads.com/user/show/12345678-name"
+                        prop.value model.GoodreadsUserIdInput
+                        prop.onChange (Goodreads_user_id_input_changed >> dispatch)
+                    ]
+                ]
+            ]
+
+            Html.div [
+                prop.className "flex flex-col gap-1 mb-4"
+                prop.children [
+                    Html.label [
+                        prop.className "flex items-center gap-2 text-sm cursor-not-allowed select-none opacity-60"
+                        prop.children [
+                            Daisy.checkbox [ checkbox.xs; prop.isChecked true; prop.disabled true ]
+                            Html.span [ prop.text "currently-reading (always imported)" ]
+                        ]
+                    ]
+                    Html.label [
+                        prop.className "flex items-center gap-2 text-sm cursor-pointer select-none"
+                        prop.children [
+                            Daisy.checkbox [
+                                checkbox.xs
+                                prop.isChecked model.GoodreadsReadShelfOptedIn
+                                prop.onChange (fun (_: bool) -> dispatch Toggle_goodreads_read_shelf)
+                            ]
+                            Html.span [ prop.text "read" ]
+                        ]
+                    ]
+                    Html.label [
+                        prop.className "flex items-center gap-2 text-sm cursor-pointer select-none"
+                        prop.children [
+                            Daisy.checkbox [
+                                checkbox.xs
+                                prop.isChecked model.GoodreadsToReadShelfOptedIn
+                                prop.onChange (fun (_: bool) -> dispatch Toggle_goodreads_to_read_shelf)
+                            ]
+                            Html.span [ prop.text "to-read" ]
+                        ]
+                    ]
+                ]
+            ]
+
+            feedbackAlert model.GoodreadsTestResult
+            feedbackAlert model.GoodreadsSaveResult
+
+            match model.GoodreadsSyncResult with
+            | Some (Ok result) ->
+                Daisy.alert [
+                    alert.success
+                    prop.className "mb-4"
+                    prop.children [ Html.span [ prop.className "text-sm"; prop.text (sprintf "Synced: %d shelves, %d error(s)" (List.length result.Shelves) (List.length result.Errors)) ] ]
+                ]
+            | Some (Error e) ->
+                Daisy.alert [
+                    alert.error
+                    prop.className "mb-4"
+                    prop.children [ Html.span [ prop.className "text-sm"; prop.text e ] ]
+                ]
+            | None -> Html.none
+
+            match model.GoodreadsLastSync, model.GoodreadsLastResult with
+            | Some lastSync, Some lastResult ->
+                Html.div [
+                    prop.className "mb-4 text-sm text-base-content/60"
+                    prop.children [
+                        Html.div [ prop.text (sprintf "Last sync: %s" lastSync) ]
+                        Html.div [ prop.className "font-mono text-xs"; prop.text lastResult ]
+                    ]
+                ]
+            | _ -> Html.none
+
+            Html.div [
+                prop.className "flex gap-2 mb-4"
+                prop.children [
+                    Daisy.button.button [
+                        button.outline
+                        button.sm
+                        if Option.isNone model.GoodreadsUserId || model.IsTestingGoodreads then button.disabled
+                        prop.onClick (fun _ -> dispatch Test_goodreads_connection)
+                        prop.disabled (Option.isNone model.GoodreadsUserId || model.IsTestingGoodreads)
+                        prop.children [
+                            if model.IsTestingGoodreads then
+                                Daisy.loading [ loading.spinner; loading.sm ]
+                            Html.text "Test connection"
+                        ]
+                    ]
+                    Daisy.button.button [
+                        button.primary
+                        button.sm
+                        if model.GoodreadsUserIdInput = "" || model.IsSavingGoodreads then button.disabled
+                        prop.onClick (fun _ -> dispatch Save_goodreads_user_id)
+                        prop.disabled (model.GoodreadsUserIdInput = "" || model.IsSavingGoodreads)
+                        prop.children [
+                            if model.IsSavingGoodreads then
+                                Daisy.loading [ loading.spinner; loading.sm ]
+                            Html.text "Save"
+                        ]
+                    ]
+                    if Option.isSome model.GoodreadsUserId then
+                        Daisy.button.button [
+                            button.ghost
+                            button.sm
+                            if model.IsSyncingGoodreads then button.disabled
+                            prop.onClick (fun _ -> dispatch Sync_goodreads_now)
+                            prop.disabled model.IsSyncingGoodreads
+                            prop.children [
+                                if model.IsSyncingGoodreads then
+                                    Daisy.loading [ loading.spinner; loading.sm ]
+                                Html.text "Sync now"
+                            ]
+                        ]
+                ]
+            ]
+        ]
+    ]
+
 // ── Main View ──
 
 let view (model: Model) (dispatch: Msg -> unit) =
@@ -1835,6 +1999,15 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         "Audiobook catalog search and listening progress"
                         (statusBadge model.AudibleConfigured (if model.AudibleConfigured then "Connected" else "Not configured"))
                         (audibleDetail model dispatch)
+
+                    // integration-wmqn3 (ADR-0075): positioned after Audible
+                    // per this task's own instructions.
+                    integrationCard
+                        Icons.star
+                        "Goodreads"
+                        "Reading shelf, ratings and finished dates"
+                        (statusBadge (Option.isSome model.GoodreadsUserId) (if Option.isSome model.GoodreadsUserId then "Connected" else "Not configured"))
+                        (goodreadsDetail model dispatch)
                 ]
             ]
 

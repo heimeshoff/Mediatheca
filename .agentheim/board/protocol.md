@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 05:32 -- Task verified and completed: integration-wmqn3 - Goodreads adapter, Settings card and daily shelf sync — the user's public Goodreads user id (no key exists, no cookie ever, ADR-0075) drives a sync of the currently-reading / read / to-read shelf feeds into book statuses, ratings and finished dates, importing unknown currently-reading books through Open Library by ISBN
+
+**Type:** Work / Task completion
+**Task:** integration-wmqn3 - Goodreads adapter, Settings card and daily shelf sync — the user's public Goodreads user id (no key exists, no cookie ever, ADR-0075) drives a sync of the currently-reading / read / to-read shelf feeds into book statuses, ratings and finished dates, importing unknown currently-reading books through Open Library by ISBN
+**Summary:** Goodreads adapter (Goodreads.fs: parseUserId, throttled public review/list_rss shelf-feed fetch/parse with ProfilePrivateOrUnknown / FeedUnavailable / ParseFailed) plus the daily shelf sync (GoodreadsSync.fs: match by Goodreads id / ISBN-13 / ISBN-10, import unmatched currently-reading items via Open Library or the feed's own data, adapter-owned never-demote status mapping with ADR-0077 backdating of read dates, one-time rating seeding, idempotent replay), a Goodreads Settings card (user id or profile URL, Test, shelf opt-ins, Sync now, standing notice) and a "Goodreads shelf sync" scheduled job whose manual trigger shares the ADR-0026 job-run recorder (ADR-0078).
+**Duration:** 42m
+**Verification:** PASS (iteration 1)
+**Files changed:** 27
+**Tests added:** 16
+**ADRs written:** 0078-goodreads-manual-sync-shares-job-run-recorder-via-wrapper-jobspec.md
+
+---
+
 ## 2026-09-16 05:24 -- Task verified and completed: books-g7g1j - Search modal Books tab — Open Library (default on) and Audible (default on, no credential needed) as selectable sources with source badges on a merged cover grid, the existing duplicate-prompt flow for import, library books in the Library tab, and navigation to the new book detail route
 
 **Type:** Work / Task completion

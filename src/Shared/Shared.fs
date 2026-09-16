@@ -1056,6 +1056,36 @@ type AddBookFromAudibleRequest = {
     SkipDuplicateCheck: bool
 }
 
+/// integration-wmqn3 (ADR-0075): what Settings -> Goodreads shows/edits. The
+/// setting is the user's PUBLIC Goodreads user id -- never a developer key
+/// (none exists any more) and never a session cookie. `ImportShelves`
+/// defaults to `["currently-reading"]`; `read`/`to-read` are opt-in.
+type GoodreadsSettings = {
+    UserId: string option
+    ImportShelves: string list
+    LastSync: string option
+    LastResult: string option
+    LastError: string option
+}
+
+/// One shelf's contribution to a `runGoodreadsShelfSync` run.
+type GoodreadsShelfSyncSummary = {
+    Shelf: string
+    Fetched: int
+    Created: int
+    Linked: int
+    StatusChanged: int
+    Skipped: int
+}
+
+/// `IMediathecaApi.runGoodreadsShelfSync` — persisted as JSON under
+/// `goodreads_last_sync_result` (ADR-0010: per-item failures never abort the
+/// run, so `Errors` can be non-empty alongside real shelf progress).
+type GoodreadsSyncResult = {
+    Shelves: GoodreadsShelfSyncSummary list
+    Errors: string list
+}
+
 // Games
 
 type GameStatus =
@@ -2018,6 +2048,16 @@ type IMediathecaApi = {
     setAudibleMarketplace: string -> Async<unit>
     searchAudibleBooks: string -> Async<AudibleSearchResult list>
     addBookFromAudible: AddBookFromAudibleRequest -> Async<Result<AddBookOutcome, string>>
+    // Goodreads (integration-wmqn3, ADR-0075) -- the user's PUBLIC Goodreads
+    // user id (no developer key exists any more, no cookie ever) drives a
+    // daily shelf sync; Open Library resolves unknown currently-reading
+    // imports by ISBN. Goodreads has no search endpoint, so there is no
+    // searchGoodreadsBooks/addBookFromGoodreads pair here.
+    getGoodreadsSettings: unit -> Async<GoodreadsSettings>
+    setGoodreadsUserId: string -> Async<Result<string, string>>
+    setGoodreadsImportShelves: string list -> Async<unit>
+    testGoodreadsConnection: unit -> Async<Result<string, string>>
+    runGoodreadsShelfSync: unit -> Async<Result<GoodreadsSyncResult, string>>
 }
 
 // Administration console — a separate Remoting contract (ADR-0004 allows multiple

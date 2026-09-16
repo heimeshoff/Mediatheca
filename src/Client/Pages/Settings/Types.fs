@@ -109,6 +109,25 @@ type Model = {
     IsClearingAudible: bool
     AudibleSaveResult: Result<string, string> option
     AudibleTestResult: Result<string, string> option
+    // Goodreads Integration (integration-wmqn3, ADR-0075): the user's PUBLIC
+    // Goodreads user id (no developer key exists any more, no cookie ever).
+    // `GoodreadsUserIdInput` is the profile-URL-or-bare-id text box;
+    // `GoodreadsReadShelfOptedIn`/`GoodreadsToReadShelfOptedIn` back the two
+    // opt-in shelf checkboxes (`currently-reading` is always on, no state
+    // needed for it).
+    GoodreadsUserId: string option
+    GoodreadsUserIdInput: string
+    GoodreadsReadShelfOptedIn: bool
+    GoodreadsToReadShelfOptedIn: bool
+    GoodreadsLastSync: string option
+    GoodreadsLastResult: string option
+    GoodreadsLastError: string option
+    IsSavingGoodreads: bool
+    IsTestingGoodreads: bool
+    IsSyncingGoodreads: bool
+    GoodreadsSaveResult: Result<string, string> option
+    GoodreadsTestResult: Result<string, string> option
+    GoodreadsSyncResult: Result<GoodreadsSyncResult, string> option
     // Sync Status
     PlaytimeSyncStatus: PlaytimeSyncStatus option
     JellyfinLastSyncTime: string option
@@ -246,6 +265,18 @@ type Msg =
     | Audible_test_result of Result<string, string>
     | Clear_audible_auth_file
     | Audible_cleared
+    // Goodreads Integration (integration-wmqn3, ADR-0075)
+    | Load_goodreads_settings
+    | Goodreads_settings_loaded of GoodreadsSettings
+    | Goodreads_user_id_input_changed of string
+    | Save_goodreads_user_id
+    | Goodreads_save_result of Result<string, string>
+    | Toggle_goodreads_read_shelf
+    | Toggle_goodreads_to_read_shelf
+    | Test_goodreads_connection
+    | Goodreads_test_result of Result<string, string>
+    | Sync_goodreads_now
+    | Goodreads_sync_completed of Result<GoodreadsSyncResult, string>
     // Sync Status
     | Load_playtime_sync_status
     | Playtime_sync_status_loaded of PlaytimeSyncStatus

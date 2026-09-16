@@ -239,6 +239,23 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     let getOpenLibraryConfig () : OpenLibrary.OpenLibraryConfig =
         { UserAgent = "Mediatheca/1.0 (+https://github.com/heimeshoff/mediatheca)" }
 
+    /// Dynamic Goodreads config provider (integration-wmqn3, ADR-0075): the
+    /// user's PUBLIC Goodreads user id (never a key -- none exists any more
+    /// -- and never a cookie) plus which shelves (beyond the always-on
+    /// `currently-reading`) import new, unmatched books.
+    let getGoodreadsConfig () : Goodreads.GoodreadsConfig =
+        use conn = connectionFactory ()
+        { UserId = SettingsStore.getSetting conn "goodreads_user_id"
+          ImportShelves =
+            SettingsStore.getSetting conn "goodreads_import_shelves"
+            |> fun raw ->
+                match raw with
+                | None -> [ "currently-reading" ]
+                | Some json ->
+                    match Thoth.Json.Net.Decode.fromString (Thoth.Json.Net.Decode.list Thoth.Json.Net.Decode.string) json with
+                    | Ok shelves -> if List.contains "currently-reading" shelves then shelves else "currently-reading" :: shelves
+                    | Error _ -> [ "currently-reading" ] }
+
     /// Dynamic Audible config provider (integration-dhctm, ADR-0074): reads
     /// the imported auth file (if any), the marketplace default, and the
     /// last-minted access token/expiry from `SettingsStore` — the same
@@ -418,6 +435,14 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
         |> Option.defaultValue 7
 
+    // integration-wmqn3 (ADR-0075): defaults to 05:00 local, an hour clear
+    // of the Steam playtime sync (04:00) so the two jobs' network I/O
+    // windows don't pile up.
+    let goodreadsSyncHour =
+        SettingsStore.getSetting conn "goodreads_sync_hour"
+        |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
+        |> Option.defaultValue 5
+
     // administration-tj8n2 (ADR-0028): scheduled jobs get their OWN connection,
     // dedicated and never shared with request threads or `conn` — separate
     // from the request-serving `conn` above. Both jobs (and the job-runs
@@ -491,6 +516,23 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
                 eprintfn "[GameReleaseDateBackfill] %s" summary
                 return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = summary } : ScheduledJobs.JobRunOutcome)
             } }
+        // integration-wmqn3 (ADR-0075/ADR-0010): unconfigured (no user id
+        // saved yet) is a `Skipped` disposition, never an `error` -- the
+        // same "config gap, not a failure" convention `PlaytimeTracker`'s
+        // `Error` case maps to.
+        { Name = "Goodreads shelf sync"
+          Hour = goodreadsSyncHour
+          Run = fun () ->
+            async {
+                match! GoodreadsSync.runSync jobConn jobDbLock httpClient getGoodreadsConfig getOpenLibraryConfig imageBasePath projectionHandlers with
+                | Ok result ->
+                    let summary = GoodreadsSync.formatResult result
+                    eprintfn "[GoodreadsSync] Sync complete: %s" summary
+                    return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = summary } : ScheduledJobs.JobRunOutcome)
+                | Error err ->
+                    eprintfn "[GoodreadsSync] Sync skipped: %s" err
+                    return ({ Disposition = ScheduledJobs.JobDisposition.Skipped; Summary = err } : ScheduledJobs.JobRunOutcome)
+            } }
     ]
 
     // job_runs table + startup crash reconciliation (ADR-0026) — table
@@ -501,13 +543,51 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     Administration.initializeJobRuns conn
     let jobRunRecorder = Administration.makeJobRunRecorder jobConn jobDbLock
 
+    // integration-wmqn3 (ADR-0026): the Settings card's own "Sync now" click
+    // runs through the SAME `tryStartJob`/`jobRunRecorder` guard as the
+    // nightly fire and the Jobs tab's generic "Run now" -- a manual trigger
+    // is recorded as a `job_runs` row (trigger = "manual") and refused
+    // (`Error "...already running"`, no new row) if the nightly fire is
+    // already in flight. A wrapper `JobSpec` (same Name, so it shares the
+    // real spec's guard slot) captures the run's typed result in `resultCell`
+    // because `tryStartJob`'s `Async<unit>` body has nowhere else to return
+    // it — the same reasoning `runJobNow`'s callers only ever see a
+    // fire-and-forget `Started`/`Rejected` outcome, whereas this caller
+    // (a synchronous Settings "Sync now" click awaiting its own result)
+    // needs the typed `GoodreadsSyncResult` back.
+    let runGoodreadsShelfSyncNow () : Async<Result<GoodreadsSyncResult, string>> =
+        async {
+            let spec = scheduledJobs |> List.find (fun s -> s.Name = "Goodreads shelf sync")
+            let resultCell : Result<GoodreadsSyncResult, string> option ref = ref None
+            let wrappedSpec : ScheduledJobs.JobSpec = {
+                spec with
+                    Run = fun () ->
+                        async {
+                            match! GoodreadsSync.runSync jobConn jobDbLock httpClient getGoodreadsConfig getOpenLibraryConfig imageBasePath projectionHandlers with
+                            | Ok result ->
+                                resultCell.Value <- Some (Ok result)
+                                return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = GoodreadsSync.formatResult result } : ScheduledJobs.JobRunOutcome)
+                            | Error err ->
+                                resultCell.Value <- Some (Error err)
+                                return ({ Disposition = ScheduledJobs.JobDisposition.Skipped; Summary = err } : ScheduledJobs.JobRunOutcome)
+                        }
+            }
+            match ScheduledJobs.tryStartJob jobRunRecorder wrappedSpec "manual" with
+            | Error () -> return Error "Goodreads shelf sync is already running"
+            | Ok (_, body) ->
+                do! body
+                match resultCell.Value with
+                | Some r -> return r
+                | None -> return Error "Goodreads shelf sync did not report a result"
+        }
+
     // Per-instance projection guards (ADR-0035): built exactly once here and
     // passed to every consumer below, so "one guard per process" is a
     // property of this wiring rather than of Administration.fs.
     let adminGuards = Administration.makeGuards ()
 
     // Create API
-    let api = Api.create connectionFactory httpClient qbittorrentHttpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig getQbittorrentConfig getOpenLibraryConfig getAudibleConfig mountRoots imageBasePath projectionHandlers
+    let api = Api.create connectionFactory httpClient qbittorrentHttpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig getQbittorrentConfig getOpenLibraryConfig getAudibleConfig getGoodreadsConfig runGoodreadsShelfSyncNow mountRoots imageBasePath projectionHandlers
     let adminApi = Administration.create connectionFactory dbPath imageBasePath projectionHandlers scheduledJobs jobRunRecorder adminGuards
 
     let remotingHandler =

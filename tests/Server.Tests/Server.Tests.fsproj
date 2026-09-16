@@ -70,6 +70,8 @@
     <Compile Include="OpenLibraryApiTests.fs" />
     <Compile Include="AudibleTests.fs" />
     <Compile Include="AudibleApiTests.fs" />
+    <Compile Include="GoodreadsTests.fs" />
+    <Compile Include="GoodreadsSyncTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
