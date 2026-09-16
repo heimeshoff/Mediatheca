@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 12:54 -- Modeling / Promoted: curation-cyxbc - Typed catalog entries — an entry references `(MediaType, slug)` (ADR-0079): `Entry_added` carries the media type, legacy entries stay untyped and fall back to today's read-time inference, the projection resolves all four media types (fixing games, which render as bare slugs today), `getCatalogsForBook`, type-filtered lookups and removal cascade, and the Shared vocabulary loses its `Movie*` names
+
+**Type:** Modeling / Promote
+**BC:** curation
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-16 12:53 -- Modeling / Refined: curation-cyxbc - Typed catalog entries (was: Books in catalogs)
 
 **Type:** Modeling / Refine
