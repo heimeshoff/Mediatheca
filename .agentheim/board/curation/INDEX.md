@@ -11,19 +11,19 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 7
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **curation-h4k2p** — Clear the Notes document (via an ordinary `Notes_saved []` event, never an imperative row delete) and delete its `content/`-prefixed uploaded images when a movie, series, game, or book is removed — a shared helper called from all four `removeX` handlers, restoring the parity the deleted `GameJournal.deleteForGame` gave games (chore) — `todo/curation-h4k2p-clean-up-notes-owned-uploaded-content-images-on-media-remova.md`
 <!-- no tasks in todo -->
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **curation-h4k2p** — Clear the Notes document (via an ordinary `Notes_saved []` event, never an imperative row delete) and delete its `content/`-prefixed uploaded images when a movie, series, game, or book is removed — a shared helper called from all four `removeX` handlers, restoring the parity the deleted `GameJournal.deleteForGame` gave games (chore) — `doing/curation-h4k2p-clean-up-notes-owned-uploaded-content-images-on-media-remova.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

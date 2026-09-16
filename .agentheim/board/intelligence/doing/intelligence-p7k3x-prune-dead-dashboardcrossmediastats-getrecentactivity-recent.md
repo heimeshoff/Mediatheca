@@ -1,7 +1,7 @@
 ---
 id: intelligence-p7k3x
 title: Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload
-status: todo
+status: doing
 type: chore
 context: intelligence
 created: 2026-09-16

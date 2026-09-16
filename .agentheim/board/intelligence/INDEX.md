@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 16
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **intelligence-p7k3x** — Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload (chore) — `todo/intelligence-p7k3x-prune-dead-dashboardcrossmediastats-getrecentactivity-recent.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **intelligence-p7k3x** — Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload (chore) — `doing/intelligence-p7k3x-prune-dead-dashboardcrossmediastats-getrecentactivity-recent.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

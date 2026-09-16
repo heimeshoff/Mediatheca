@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 00:19 -- Batch started: [curation-h4k2p, intelligence-p7k3x]
+
+**Type:** Work / Batch start
+**Tasks:** curation-h4k2p - Clear the Notes document (via an ordinary `Notes_saved []` event, never an imperative row delete) and delete its `content/`-prefixed uploaded images when a movie, series, game, or book is removed — a shared helper called from all four `removeX` handlers, restoring the parity the deleted `GameJournal.deleteForGame` gave games, intelligence-p7k3x - Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload
+**Parallel:** yes (2 workers, full ready set — both tasks touch src/Server/Api.fs, so merge-ordered curation-h4k2p then intelligence-p7k3x; no planning advisory present)
+
+---
+
 ## 2026-09-17 00:15 -- Modeling / Promoted: curation-h4k2p - Clear the Notes document (via an ordinary `Notes_saved []` event, never an imperative row delete) and delete its `content/`-prefixed uploaded images when a movie, series, game, or book is removed — a shared helper called from all four `removeX` handlers, restoring the parity the deleted `GameJournal.deleteForGame` gave games
 
 **Type:** Modeling / Promote
