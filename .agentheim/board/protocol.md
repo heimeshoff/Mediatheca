@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 02:16 -- Batch started: [books-y9kxy]
+
+**Type:** Work / Batch start
+**Tasks:** books-y9kxy - Book aggregate, projection, metadata cache slice and API — the server core of the new Books BC (identity card, external ids, format, Games-shaped status, event-sourced reading-progress observations, personal rating, recommended-by), registered in every Administration registry, with MediaType.Book threaded through Shared
+**Parallel:** no (1 worker — books-y9kxy is the only ready task; the other eight Books tasks all depend on it, directly or transitively)
+
+---
+
 ## 2026-09-16 02:15 -- Modeling / Refined: Books integration task set (9 todo tasks) — orchestrator pass before work
 
 **Type:** Modeling / Refine

@@ -1,7 +1,7 @@
 ---
 id: books-y9kxy
 title: Book aggregate, projection, metadata cache slice and API — the server core of the new Books BC (identity card, external ids, format, Games-shaped status, event-sourced reading-progress observations, personal rating, recommended-by), registered in every Administration registry, with MediaType.Book threaded through Shared
-status: todo
+status: doing
 type: feature
 context: books
 created: 2026-09-16
