@@ -95,6 +95,20 @@ type Model = {
     IsSavingQbittorrent: bool
     QbittorrentTestResult: Result<string, string> option
     QbittorrentSaveResult: Result<string, string> option
+    // Audible Integration (integration-dhctm, ADR-0074): an imported
+    // audible-cli auth file, never a login. `AudibleAuthFileInput` is the
+    // paste textarea's own buffer -- never re-populated from a stored file
+    // (ADR-0074 point 6, the file is a secret): a save clears it back to "".
+    AudibleConfigured: bool
+    AudibleCustomerName: string option
+    AudibleMarketplace: string
+    AudibleLastError: string option
+    AudibleAuthFileInput: string
+    IsSavingAudible: bool
+    IsTestingAudible: bool
+    IsClearingAudible: bool
+    AudibleSaveResult: Result<string, string> option
+    AudibleTestResult: Result<string, string> option
     // Sync Status
     PlaytimeSyncStatus: PlaytimeSyncStatus option
     JellyfinLastSyncTime: string option
@@ -221,6 +235,17 @@ type Msg =
     | Qbittorrent_test_result of Result<string, string>
     | Save_qbittorrent_settings
     | Qbittorrent_save_result of Result<unit, string>
+    // Audible Integration (integration-dhctm, ADR-0074)
+    | Load_audible_status
+    | Audible_status_loaded of AudibleStatus
+    | Audible_auth_file_input_changed of string
+    | Audible_marketplace_changed of string
+    | Save_audible_auth_file
+    | Audible_save_result of Result<AudibleStatus, string>
+    | Test_audible_connection
+    | Audible_test_result of Result<string, string>
+    | Clear_audible_auth_file
+    | Audible_cleared
     // Sync Status
     | Load_playtime_sync_status
     | Playtime_sync_status_loaded of PlaytimeSyncStatus

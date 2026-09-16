@@ -1,7 +1,7 @@
 ---
 id: integration-dhctm
 title: Audible adapter and Settings card — an imported audible-cli auth file (never a login or device registration, ADR-0074) with refresh-token → access-token minting, a "Test connection" that names the customer and marketplace, unauthenticated catalog search and product detail with Audnexus as metadata fallback, and `addBookFromAudible`
-status: doing
+status: done
 type: feature
 context: integration
 created: 2026-09-16
@@ -148,3 +148,93 @@ sync are `integration-jjvg2`.
   specified. **`integration-wmqn3` (Goodreads) now `depends_on` this task** because its own spec
   positions its card "after Audible" in the Integrations grid — land your card cleanly so that
   positioning is unambiguous for the next worker.
+
+## Outcome
+
+Built `src/Server/Audible.fs` — the `Audible` module (auth-file validation,
+locale→host mapping, `refreshAccessToken`, the cached/proactive-refresh/
+retry-once `withAccessToken` orchestration mirroring `Jellyfin.withReauthRetry`,
+unauthenticated `searchCatalog`/`getProduct`) plus a sibling `Audnexus` module
+(a 700ms-gated `getBook` fallback for description/narrators/series). No code
+path registers a device or performs a login — verified both by construction
+and by `grep -rn "auth/register|from_login|device_registration"
+src/Server/Audible.fs` returning empty, exactly as the task's own acceptance
+criterion specifies (a reflection-based "no such member" test was deliberately
+not written, per the task's explicit instruction that the grep is the
+verification).
+
+Wired `Audible.AudibleConfig` through `Composition.getAudibleConfig` (reads
+`audible_auth_file`/`audible_marketplace`/`audible_access_token`/
+`audible_access_token_expires` from `SettingsStore` on every call, the same
+shape `getJellyfinConfig` uses) and threaded a new `getAudibleConfig`
+parameter through `Api.create` — appended after `getOpenLibraryConfig`,
+per the task's own scheduling note, to avoid a manual-merge conflict with
+`integration-c8d4x`. Added `Api.fs`'s `addBookFromAudibleImpl` (product →
+Audnexus fallback → `AddBookRequest` → `addBookToLibraryImpl` → cache slice
+upsert, mirroring `addBookFromOpenLibraryImpl`'s shape) and the full
+`IMediathecaApi` tail: `getAudibleStatus` (never the auth file or a token —
+the DTO structurally has no such field), `setAudibleAuthFile` (validates,
+stores, clears any stale error/token), `clearAudibleAuthFile`,
+`testAudibleConnection` (mints a token via `withAudibleAccessToken` and
+probes `/1.0/library`, persisting/clearing `audible_last_error` on the fixed
+`"audible auth file rejected: "` prefix), `getAudibleMarketplace`/
+`setAudibleMarketplace`, and `searchAudibleBooks`/`addBookFromAudible`.
+
+Added `AudibleStatus`, `AudibleSearchResult`, `AddBookFromAudibleRequest` to
+`src/Shared/Shared.fs` and the eight new `IMediathecaApi` members at the
+tail, after Open Library's.
+
+Client: `Pages/Settings/{Types,State,Views}.fs` gained the Audible model
+fields/messages/reducer cases and an `audibleDetail` card — a marketplace
+select (shown until an auth file is configured), a paste textarea that never
+re-displays a stored file (placeholder "auth file stored — paste a new one
+to replace"), Save/Test connection/Clear buttons, a status badge, and the
+standing rejection notice in the same warning style as Steam's Web-API-key/
+Family-token notices — registered in the Integrations grid immediately after
+qBittorrent (per the task's note, so `integration-wmqn3`'s Goodreads card can
+land unambiguously "after Audible").
+
+Every `Api.create` test call site (11 files) and `OpenLibraryApiTests.fs`'s
+own `createApi` wrapper got the new `getAudibleConfig` argument.
+
+Tests: `tests/Server.Tests/AudibleTests.fs` (19 cases) — `validateAuthFile`
+(accepts a full fixture, rejects a missing `refresh_token` naming the field,
+rejects non-JSON), `marketplaceHost`/`amazonTokenHost`, `refreshAccessToken`
+(asserts the five mkb79 form fields against a recording handler targeting
+`https://api.amazon.de/auth/token` for `locale_code = "de"`, and the fixed
+rejection prefix on a 401), `withAccessToken` (zero-refresh-calls cache
+reuse, one refresh on an expired cache, exactly-one-refresh retry-once on a
+401 then a fixed-prefix error on the second 401, non-auth failures pass
+through untouched), `searchCatalog` (decodes asin/title/authors/narrators/
+runtime/500px cover, unauthenticated — no `Authorization` header sent),
+`getProduct` (full decode + HTML-stripped description + `None` on 404),
+`Audnexus.getBook`, and `getCustomerSummary` (Bearer + `client-id: 0`
+headers, total-count reporting, 401 → `Unauthorized`).
+`tests/Server.Tests/AudibleApiTests.fs` (6 cases) — `addBookFromAudible`
+end-to-end (Format/AudibleAsin/cover-on-disk/cache-slice-via-Audnexus-
+fallback, then `Duplicate_found` on a second call), a 404 ASIN's clear
+error, `getAudibleStatus`'s secrecy (structural + string-search assertion
+that no secret substring ever appears in the encoded response), and
+`testAudibleConnection`'s two persistence paths (a stubbed 401 persists the
+prefixed `audible_last_error`; a stubbed success persists
+`audible_access_token`/`audible_access_token_expires` and clears a stale
+notice). `src/Client/Pages/Settings/AudibleAuthFile.test.fs` (6 Vitest/
+Fable.Mocha cases) covers the reducer's three named states plus the standing
+notice's clear/no-clobber behavior and `Audible_cleared`'s reset.
+
+Verified: `npm test` → 859/859 Expecto tests passing (31 new: 19 + 6 + 6).
+`npm run test:client` → 68/68 Vitest tests passing (11 files, including the
+new one). `npm run build` → clean, 189 modules. No new ADR: ADR-0074
+(pre-loaded, already accepted) settles the no-login/no-registration decision
+this task implements; nothing here rose to a fresh "why this, not the
+obvious alternative" call, mirroring `integration-qb7tk`'s own no-new-ADR
+outcome.
+
+Key files: `src/Server/Audible.fs`, `src/Server/Api.fs`,
+`src/Server/Composition.fs`, `src/Server/Server.fsproj`,
+`src/Shared/Shared.fs`, `src/Client/Pages/Settings/{Types,State,Views}.fs`,
+`src/Client/Client.fsproj`,
+`src/Client/Pages/Settings/AudibleAuthFile.test.fs`,
+`tests/Server.Tests/{AudibleTests,AudibleApiTests}.fs`,
+`tests/Server.Tests/Server.Tests.fsproj`, and the 11 test files whose
+`Api.create` call site gained the new `getAudibleConfig` argument.

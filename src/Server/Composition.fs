@@ -239,6 +239,40 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     let getOpenLibraryConfig () : OpenLibrary.OpenLibraryConfig =
         { UserAgent = "Mediatheca/1.0 (+https://github.com/heimeshoff/mediatheca)" }
 
+    /// Dynamic Audible config provider (integration-dhctm, ADR-0074): reads
+    /// the imported auth file (if any), the marketplace default, and the
+    /// last-minted access token/expiry from `SettingsStore` — the same
+    /// re-read-every-call shape `getJellyfinConfig` uses for its own cached
+    /// token. `Audible.validateAuthFile` re-validates the stored JSON on
+    /// every read rather than trusting it was valid when saved; a decode
+    /// failure here (should never happen — `setAudibleAuthFile` only stores
+    /// a file that already validated) degrades to "not configured" rather
+    /// than throwing.
+    let getAudibleConfig () : Audible.AudibleConfig =
+        use conn = connectionFactory ()
+        let authFile =
+            SettingsStore.getSetting conn "audible_auth_file"
+            |> Option.bind (fun json ->
+                match Audible.validateAuthFile json with
+                | Ok authFile -> Some authFile
+                | Error _ -> None)
+        let marketplace =
+            authFile
+            |> Option.map (fun a -> a.LocaleCode)
+            |> Option.orElse (SettingsStore.getSetting conn "audible_marketplace")
+            |> Option.defaultValue "de"
+        let cachedToken = SettingsStore.getSetting conn "audible_access_token"
+        let cachedExpiresAt =
+            SettingsStore.getSetting conn "audible_access_token_expires"
+            |> Option.bind (fun s ->
+                match DateTime.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind) with
+                | true, d -> Some d
+                | _ -> None)
+        { AuthFile = authFile
+          Marketplace = marketplace
+          CachedAccessToken = cachedToken
+          CachedAccessTokenExpiresAt = cachedExpiresAt }
+
     // Dynamic Steam config provider (reads from DB, falls back to env var)
     let getSteamConfig () : Steam.SteamConfig =
         use conn = connectionFactory ()
@@ -473,7 +507,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     let adminGuards = Administration.makeGuards ()
 
     // Create API
-    let api = Api.create connectionFactory httpClient qbittorrentHttpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig getQbittorrentConfig getOpenLibraryConfig mountRoots imageBasePath projectionHandlers
+    let api = Api.create connectionFactory httpClient qbittorrentHttpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig getQbittorrentConfig getOpenLibraryConfig getAudibleConfig mountRoots imageBasePath projectionHandlers
     let adminApi = Administration.create connectionFactory dbPath imageBasePath projectionHandlers scheduledJobs jobRunRecorder adminGuards
 
     let remotingHandler =

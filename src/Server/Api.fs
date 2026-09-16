@@ -1717,6 +1717,116 @@ module Api =
                         return Error $"Failed to refresh book from Open Library: {ex.Message}"
         }
 
+    /// integration-dhctm (ADR-0074): persists a freshly-minted access token
+    /// (`Audible.withAccessToken`'s `persist` callback) — the same two
+    /// `SettingsStore` writes every call site that mints a token needs.
+    let private persistAudibleAccessToken (conn: SqliteConnection) (token: Audible.AudibleAccessToken) : unit =
+        SettingsStore.setSetting conn "audible_access_token" token.AccessToken
+        SettingsStore.setSetting conn "audible_access_token_expires" (token.ExpiresAt.ToString("o"))
+
+    /// Wires `Audible.withAccessToken` to a stored `Audible.AudibleConfig`
+    /// and the given `fetch`. `Error "Audible is not configured..."` when no
+    /// auth file has been saved yet -- never attempted, since there is no
+    /// refresh token to mint from (ADR-0074 point 1: no code path here can
+    /// register a device or log in to obtain one).
+    let private withAudibleAccessToken
+        (httpClient: HttpClient)
+        (conn: SqliteConnection)
+        (config: Audible.AudibleConfig)
+        (fetch: string -> Async<Result<'a, Audible.FetchError>>)
+        : Async<Result<'a, string>> =
+        match config.AuthFile with
+        | None -> async { return Error "Audible is not configured — paste an auth file in Settings" }
+        | Some authFile ->
+            let cached =
+                match config.CachedAccessToken, config.CachedAccessTokenExpiresAt with
+                | Some token, Some expiresAt -> Some (token, expiresAt)
+                | _ -> None
+            Audible.withAccessToken
+                cached
+                (fun () -> Audible.refreshAccessToken httpClient authFile)
+                (persistAudibleAccessToken conn)
+                fetch
+
+    /// integration-dhctm (ADR-0074): fetches the Audible product (falling
+    /// back to Audnexus when the product lacks a description) and turns it
+    /// into an `AddBookRequest`, then reuses `addBookToLibraryImpl`. On
+    /// `Book_added`, writes the cache slice (`MetadataCache.upsertBookMetadata`,
+    /// `source = "audible"`) — never the identity card (ADR-0043's
+    /// identity-card clause). The cover is fetched via
+    /// `addBookToLibraryImpl`'s own generic `CoverUrl` path (`coverDownloader
+    /// = None`) -- Audible's catalog CDN needs no adapter-owned throttle or
+    /// User-Agent the way Open Library's covers host does.
+    let private addBookFromAudibleImpl
+        (conn: SqliteConnection)
+        (httpClient: HttpClient)
+        (getAudibleConfig: unit -> Audible.AudibleConfig)
+        (imageBasePath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (request: AddBookFromAudibleRequest)
+        : Async<Result<AddBookOutcome, string>> = async {
+            try
+                let config = getAudibleConfig ()
+                let locale = config.Marketplace
+                let host = Audible.marketplaceHost locale
+                let! productOpt = Audible.getProduct httpClient host request.Asin
+                match productOpt with
+                | None -> return Error (sprintf "Audible product %s not found" request.Asin)
+                | Some product ->
+                    let! audnexusOpt =
+                        if Option.isNone product.Description then Audnexus.getBook httpClient request.Asin locale
+                        else async { return None }
+
+                    let description = product.Description |> Option.orElse (audnexusOpt |> Option.bind (fun a -> a.Description))
+                    let narrators =
+                        if not (List.isEmpty product.Narrators) then product.Narrators
+                        else audnexusOpt |> Option.map (fun a -> a.Narrators) |> Option.defaultValue []
+                    let seriesName = product.SeriesName |> Option.orElse (audnexusOpt |> Option.bind (fun a -> a.SeriesName))
+                    let seriesPosition = product.SeriesPosition |> Option.orElse (audnexusOpt |> Option.bind (fun a -> a.SeriesPosition))
+
+                    let year =
+                        product.ReleaseDate
+                        |> Option.bind (fun d ->
+                            if d.Length >= 4 then
+                                match System.Int32.TryParse(d.Substring(0, 4)) with
+                                | true, y -> Some y
+                                | _ -> None
+                            else None)
+
+                    let addRequest : AddBookRequest = {
+                        Title = product.Title
+                        Authors = product.Authors
+                        Year = year
+                        CoverUrl = product.CoverUrl
+                        Subjects = product.Categories
+                        Format = BookFormat.Audiobook
+                        ExternalIds = [ AudibleAsin request.Asin ]
+                        SkipDuplicateCheck = request.SkipDuplicateCheck
+                    }
+
+                    let! result = addBookToLibraryImpl conn httpClient imageBasePath projectionHandlers addRequest None
+                    match result with
+                    | Ok (AddBookOutcome.Book_added slug) ->
+                        let metadata : MetadataCache.BookMetadata = {
+                            Description = description
+                            PageCount = None
+                            RuntimeMinutes = product.RuntimeMinutes
+                            Narrators = narrators
+                            SeriesName = seriesName
+                            SeriesPosition = seriesPosition
+                            Publisher = product.Publisher
+                            PublishedDate = product.ReleaseDate
+                            AverageRating = product.Rating
+                            Language = product.Language
+                            Source = Some "audible"
+                        }
+                        MetadataCache.upsertBookMetadata conn slug metadata
+                        return Ok (AddBookOutcome.Book_added slug)
+                    | other -> return other
+            with ex ->
+                return Error $"Failed to add book from Audible: {ex.Message}"
+        }
+
     let create
         (factory: unit -> SqliteConnection)
         (httpClient: HttpClient)
@@ -1727,6 +1837,7 @@ module Api =
         (getJellyfinConfig: unit -> Jellyfin.JellyfinConfig)
         (getQbittorrentConfig: unit -> Qbittorrent.QbittorrentConfig)
         (getOpenLibraryConfig: unit -> OpenLibrary.OpenLibraryConfig)
+        (getAudibleConfig: unit -> Audible.AudibleConfig)
         (mountRoots: LocalCopyRemoval.MountRoots)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
@@ -5461,5 +5572,104 @@ module Api =
             refreshBookFromOpenLibrary = fun slug -> async {
                 use conn = factory ()
                 return! refreshBookFromOpenLibraryImpl conn httpClient getOpenLibraryConfig slug
+            }
+
+            // Audible (integration-dhctm, ADR-0074) — an imported audible-cli
+            // auth file, never a login or device registration. Appended at
+            // the tail after Open Library, per this task's own Notes
+            // (avoids a manual-merge conflict at squash time with c8d4x).
+            getAudibleStatus = fun () -> async {
+                use conn = factory ()
+                let authFile =
+                    SettingsStore.getSetting conn "audible_auth_file"
+                    |> Option.bind (fun json -> match Audible.validateAuthFile json with Ok a -> Some a | Error _ -> None)
+                let marketplace =
+                    authFile
+                    |> Option.map (fun a -> a.LocaleCode)
+                    |> Option.orElse (SettingsStore.getSetting conn "audible_marketplace")
+                    |> Option.defaultValue "de"
+                return {
+                    Configured = authFile |> Option.isSome
+                    CustomerName = authFile |> Option.map (fun a -> a.CustomerName)
+                    Marketplace = marketplace
+                    LastError = SettingsStore.getSetting conn "audible_last_error"
+                }
+            }
+
+            setAudibleAuthFile = fun json -> async {
+                use conn = factory ()
+                match Audible.validateAuthFile json with
+                | Error e -> return Error (sprintf "Invalid auth file: %s" e)
+                | Ok authFile ->
+                    SettingsStore.setSetting conn "audible_auth_file" json
+                    // A freshly-pasted file replaces whatever was there --
+                    // any standing rejection notice and cached token belong
+                    // to the OLD file and must not survive it (the
+                    // `steam_api_key_last_error` clear-on-save convention,
+                    // ADR-0065).
+                    SettingsStore.deleteSetting conn "audible_last_error"
+                    SettingsStore.deleteSetting conn "audible_access_token"
+                    SettingsStore.deleteSetting conn "audible_access_token_expires"
+                    return Ok {
+                        Configured = true
+                        CustomerName = Some authFile.CustomerName
+                        Marketplace = authFile.LocaleCode
+                        LastError = None
+                    }
+            }
+
+            clearAudibleAuthFile = fun () -> async {
+                use conn = factory ()
+                SettingsStore.deleteSetting conn "audible_auth_file"
+                SettingsStore.deleteSetting conn "audible_access_token"
+                SettingsStore.deleteSetting conn "audible_access_token_expires"
+                SettingsStore.deleteSetting conn "audible_last_error"
+                return ()
+            }
+
+            testAudibleConnection = fun () -> async {
+                use conn = factory ()
+                try
+                    let config = getAudibleConfig ()
+                    match config.AuthFile with
+                    | None -> return Error "Audible is not configured — paste an auth file in Settings"
+                    | Some authFile ->
+                        let host = Audible.marketplaceHost authFile.LocaleCode
+                        let! outcome =
+                            withAudibleAccessToken httpClient conn config (fun token -> Audible.getCustomerSummary httpClient host token)
+                        match outcome with
+                        | Ok summary ->
+                            SettingsStore.deleteSetting conn "audible_last_error"
+                            return Ok (sprintf "Connected as %s (%s) — %s" authFile.CustomerName authFile.LocaleCode summary)
+                        | Error msg ->
+                            if msg.StartsWith(Audible.authFileRejectedPrefix) then
+                                SettingsStore.setSetting conn "audible_last_error" msg
+                            return Error msg
+                with ex ->
+                    return Error $"Audible connection test failed: {ex.Message}"
+            }
+
+            getAudibleMarketplace = fun () -> async {
+                use conn = factory ()
+                return SettingsStore.getSetting conn "audible_marketplace" |> Option.defaultValue "de"
+            }
+
+            setAudibleMarketplace = fun marketplace -> async {
+                use conn = factory ()
+                SettingsStore.setSetting conn "audible_marketplace" marketplace
+                return ()
+            }
+
+            searchAudibleBooks = fun query -> async {
+                try
+                    let config = getAudibleConfig ()
+                    let host = Audible.marketplaceHost config.Marketplace
+                    return! Audible.searchCatalog httpClient host query
+                with _ -> return []
+            }
+
+            addBookFromAudible = fun request -> async {
+                use conn = factory ()
+                return! addBookFromAudibleImpl conn httpClient getAudibleConfig imageBasePath projectionHandlers request
             }
         }

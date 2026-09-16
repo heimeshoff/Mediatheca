@@ -68,6 +68,7 @@ let private createDashboardApi (factory: unit -> SqliteConnection) : IMediatheca
         (fun () -> ({ ServerUrl = ""; Username = ""; Password = ""; UserId = ""; AccessToken = "" } : Jellyfin.JellyfinConfig))
         (fun () -> ({ Url = ""; Username = ""; Password = "" } : Qbittorrent.QbittorrentConfig))
         (fun () -> ({ UserAgent = "Mediatheca/1.0 (+https://github.com/heimeshoff/mediatheca)" } : OpenLibrary.OpenLibraryConfig))
+        (fun () -> ({ AuthFile = None; Marketplace = "de"; CachedAccessToken = None; CachedAccessTokenExpiresAt = None } : Audible.AudibleConfig))
         LocalCopyRemoval.defaultMountRoots
         noImagesDir
         [ ContentBlockProjection.handler; GameProjection.handler; PlaySessionProjection.handler ]

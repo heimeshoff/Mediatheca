@@ -68,6 +68,8 @@
     <Compile Include="DashboardLingerTests.fs" />
     <Compile Include="OpenLibraryTests.fs" />
     <Compile Include="OpenLibraryApiTests.fs" />
+    <Compile Include="AudibleTests.fs" />
+    <Compile Include="AudibleApiTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

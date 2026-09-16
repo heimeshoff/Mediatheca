@@ -1616,6 +1616,139 @@ let private qbittorrentDetail (model: Model) (dispatch: Msg -> unit) =
         ]
     ]
 
+/// Audible (integration-dhctm, ADR-0074): an imported `audible-cli` auth
+/// file, never a login or device registration. The textarea never
+/// re-displays a stored file (ADR-0074 point 6 -- it's a secret); once
+/// configured, its placeholder says so and the user pastes a NEW file to
+/// replace it. Save/Test/Clear are three distinct buttons/results, the same
+/// shape `qbittorrentDetail` above uses.
+let private audibleDetail (model: Model) (dispatch: Msg -> unit) =
+    Html.div [
+        prop.children [
+            Html.p [
+                prop.className "text-base-content/70 mb-4 text-sm"
+                prop.children [
+                    Html.text "Run "
+                    Html.code [ prop.className "text-xs"; prop.text "pipx install audible-cli" ]
+                    Html.text ", then "
+                    Html.code [ prop.className "text-xs"; prop.text "audible quickstart" ]
+                    Html.text " on your own machine, and paste the resulting "
+                    Html.code [ prop.className "text-xs"; prop.text "~/.audible/<profile>.json" ]
+                    Html.text " below. Mediatheca never logs in or registers a device itself."
+                ]
+            ]
+
+            match model.AudibleCustomerName with
+            | Some name ->
+                Html.div [
+                    prop.className "mb-3 flex items-center gap-2 text-sm text-base-content/60"
+                    prop.children [
+                        Html.span [ prop.text "Connected as:" ]
+                        Html.span [ prop.className "font-mono"; prop.text (sprintf "%s (%s)" name model.AudibleMarketplace) ]
+                    ]
+                ]
+            | None -> Html.none
+
+            // Standing "auth file rejected" notice (ADR-0074 point 4) --
+            // same warning style as Steam's Web API key / Family token
+            // rejection notices, distinct wording so the remedy is
+            // unambiguous.
+            match model.AudibleLastError with
+            | Some lastError ->
+                Daisy.alert [
+                    alert.warning
+                    prop.className "mb-4"
+                    prop.children [
+                        Html.span [ prop.className "text-sm"; prop.text lastError ]
+                    ]
+                ]
+            | None -> Html.none
+
+            if not model.AudibleConfigured then
+                Html.div [
+                    prop.className "form-control mb-3"
+                    prop.children [
+                        Daisy.label [
+                            prop.className "label"
+                            prop.children [ Html.span [ prop.className "label-text"; prop.text "Marketplace (used for search until an auth file is pasted)" ] ]
+                        ]
+                        Daisy.select [
+                            prop.className "w-full"
+                            prop.value model.AudibleMarketplace
+                            prop.onChange (Audible_marketplace_changed >> dispatch)
+                            prop.children [
+                                for code in [ "de"; "us"; "uk"; "fr"; "ca"; "au"; "it"; "es"; "jp"; "in" ] ->
+                                    Html.option [ prop.value code; prop.text code ]
+                            ]
+                        ]
+                    ]
+                ]
+
+            Html.div [
+                prop.className "form-control mb-4"
+                prop.children [
+                    Daisy.label [
+                        prop.className "label"
+                        prop.children [ Html.span [ prop.className "label-text"; prop.text "Auth file (JSON)" ] ]
+                    ]
+                    Daisy.textarea [
+                        prop.className "w-full font-mono text-xs"
+                        prop.rows 4
+                        prop.placeholder (if model.AudibleConfigured then "auth file stored — paste a new one to replace" else "paste the contents of ~/.audible/<profile>.json here")
+                        prop.value model.AudibleAuthFileInput
+                        prop.onChange (Audible_auth_file_input_changed >> dispatch)
+                    ]
+                ]
+            ]
+
+            feedbackAlert model.AudibleTestResult
+            feedbackAlert model.AudibleSaveResult
+
+            Html.div [
+                prop.className "flex gap-2 mb-4"
+                prop.children [
+                    Daisy.button.button [
+                        button.outline
+                        button.sm
+                        if not model.AudibleConfigured || model.IsTestingAudible then button.disabled
+                        prop.onClick (fun _ -> dispatch Test_audible_connection)
+                        prop.disabled (not model.AudibleConfigured || model.IsTestingAudible)
+                        prop.children [
+                            if model.IsTestingAudible then
+                                Daisy.loading [ loading.spinner; loading.sm ]
+                            Html.text "Test connection"
+                        ]
+                    ]
+                    Daisy.button.button [
+                        button.primary
+                        button.sm
+                        if model.AudibleAuthFileInput = "" || model.IsSavingAudible then button.disabled
+                        prop.onClick (fun _ -> dispatch Save_audible_auth_file)
+                        prop.disabled (model.AudibleAuthFileInput = "" || model.IsSavingAudible)
+                        prop.children [
+                            if model.IsSavingAudible then
+                                Daisy.loading [ loading.spinner; loading.sm ]
+                            Html.text "Save"
+                        ]
+                    ]
+                    if model.AudibleConfigured then
+                        Daisy.button.button [
+                            button.ghost
+                            button.sm
+                            if model.IsClearingAudible then button.disabled
+                            prop.onClick (fun _ -> dispatch Clear_audible_auth_file)
+                            prop.disabled model.IsClearingAudible
+                            prop.children [
+                                if model.IsClearingAudible then
+                                    Daisy.loading [ loading.spinner; loading.sm ]
+                                Html.text "Clear"
+                            ]
+                        ]
+                ]
+            ]
+        ]
+    ]
+
 // ── Main View ──
 
 let view (model: Model) (dispatch: Msg -> unit) =
@@ -1692,6 +1825,16 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         "Torrent client for \"Remove local copy\""
                         (statusBadge (model.QbittorrentUrl <> "" && model.QbittorrentUsername <> "") (if model.QbittorrentUrl <> "" && model.QbittorrentUsername <> "" then "Connected" else "Not configured"))
                         (qbittorrentDetail model dispatch)
+
+                    // integration-dhctm (ADR-0074): appended after qBittorrent
+                    // deliberately -- integration-wmqn3 (Goodreads) positions
+                    // its own card "after Audible" in this grid.
+                    integrationCard
+                        Icons.book
+                        "Audible"
+                        "Audiobook catalog search and listening progress"
+                        (statusBadge model.AudibleConfigured (if model.AudibleConfigured then "Connected" else "Not configured"))
+                        (audibleDetail model dispatch)
                 ]
             ]
 

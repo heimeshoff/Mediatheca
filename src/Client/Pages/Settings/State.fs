@@ -258,6 +258,16 @@ let init () : Model * Cmd<Msg> =
       IsSavingQbittorrent = false
       QbittorrentTestResult = None
       QbittorrentSaveResult = None
+      AudibleConfigured = false
+      AudibleCustomerName = None
+      AudibleMarketplace = "de"
+      AudibleLastError = None
+      AudibleAuthFileInput = ""
+      IsSavingAudible = false
+      IsTestingAudible = false
+      IsClearingAudible = false
+      AudibleSaveResult = None
+      AudibleTestResult = None
       PlaytimeSyncStatus = None
       JellyfinLastSyncTime = None
       JellyfinSyncStatus = None
@@ -277,7 +287,7 @@ let init () : Model * Cmd<Msg> =
       JobsSectionLoaded = false
       SurgerySectionOpen = false
       SurgerySectionLoaded = false },
-    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_qbittorrent_settings; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync; Cmd.ofMsg Load_steam_api_key_last_error; Cmd.ofMsg Load_steam_family_last_result ]
+    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_qbittorrent_settings; Cmd.ofMsg Load_audible_status; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync; Cmd.ofMsg Load_steam_api_key_last_error; Cmd.ofMsg Load_steam_family_last_result ]
 
 let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
@@ -711,6 +721,79 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
             | Ok () -> Cmd.ofMsg Load_qbittorrent_settings
             | Error _ -> Cmd.none
         { model with IsSavingQbittorrent = false; QbittorrentSaveResult = Some saveResult }, cmd
+
+    // Audible Integration (integration-dhctm, ADR-0074)
+    | Load_audible_status ->
+        model, Cmd.OfAsync.perform api.getAudibleStatus () Audible_status_loaded
+
+    | Audible_status_loaded status ->
+        { model with
+            AudibleConfigured = status.Configured
+            AudibleCustomerName = status.CustomerName
+            AudibleMarketplace = status.Marketplace
+            AudibleLastError = status.LastError },
+        Cmd.none
+
+    | Audible_auth_file_input_changed value ->
+        { model with AudibleAuthFileInput = value; AudibleSaveResult = None }, Cmd.none
+
+    | Audible_marketplace_changed value ->
+        { model with AudibleMarketplace = value },
+        Cmd.OfAsync.either api.setAudibleMarketplace value
+            (fun () -> Load_audible_status)
+            (fun _ -> Load_audible_status)
+
+    | Save_audible_auth_file ->
+        { model with IsSavingAudible = true; AudibleSaveResult = None },
+        Cmd.OfAsync.either api.setAudibleAuthFile model.AudibleAuthFileInput
+            Audible_save_result
+            (fun ex -> Audible_save_result (Error ex.Message))
+
+    | Audible_save_result result ->
+        let model =
+            match result with
+            | Ok status ->
+                { model with
+                    AudibleConfigured = status.Configured
+                    AudibleCustomerName = status.CustomerName
+                    AudibleMarketplace = status.Marketplace
+                    AudibleLastError = status.LastError
+                    AudibleAuthFileInput = "" }
+            | Error _ -> model
+        let saveResult =
+            match result with
+            | Ok status -> Ok (sprintf "Connected as %s (%s)" (status.CustomerName |> Option.defaultValue "?") status.Marketplace)
+            | Error e -> Error e
+        { model with IsSavingAudible = false; AudibleSaveResult = Some saveResult }, Cmd.none
+
+    | Test_audible_connection ->
+        { model with IsTestingAudible = true; AudibleTestResult = None },
+        Cmd.OfAsync.either api.testAudibleConnection ()
+            Audible_test_result
+            (fun ex -> Audible_test_result (Error ex.Message))
+
+    | Audible_test_result result ->
+        let audibleLastError =
+            match result with
+            | Ok _ -> None
+            | Error msg when msg.StartsWith("audible auth file rejected: ") -> Some msg
+            | Error _ -> model.AudibleLastError
+        { model with IsTestingAudible = false; AudibleTestResult = Some result; AudibleLastError = audibleLastError }, Cmd.none
+
+    | Clear_audible_auth_file ->
+        { model with IsClearingAudible = true },
+        Cmd.OfAsync.perform api.clearAudibleAuthFile () (fun () -> Audible_cleared)
+
+    | Audible_cleared ->
+        { model with
+            IsClearingAudible = false
+            AudibleConfigured = false
+            AudibleCustomerName = None
+            AudibleLastError = None
+            AudibleAuthFileInput = ""
+            AudibleSaveResult = None
+            AudibleTestResult = None },
+        Cmd.none
 
     // Sync Status
     | Load_playtime_sync_status ->

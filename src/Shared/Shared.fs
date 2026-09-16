@@ -1025,6 +1025,37 @@ type AddBookFromOpenLibraryRequest = {
     SkipDuplicateCheck: bool
 }
 
+/// integration-dhctm (ADR-0074): what Settings → Audible shows. Never the
+/// auth file or any token (point 6, secret handling) — this DTO structurally
+/// has no field for either.
+type AudibleStatus = {
+    Configured: bool
+    CustomerName: string option
+    Marketplace: string
+    LastError: string option
+}
+
+/// `IMediathecaApi.searchAudibleBooks` — one hit from Audible's
+/// unauthenticated `/1.0/catalog/products` (ADR-0074 point 5); `CoverUrl`
+/// pre-built at 500px for the search modal's grid.
+type AudibleSearchResult = {
+    Asin: string
+    Title: string
+    Authors: string list
+    Narrators: string list
+    RuntimeMinutes: int option
+    ReleaseYear: int option
+    CoverUrl: string option
+    SeriesName: string option
+}
+
+/// `IMediathecaApi.addBookFromAudible` — turns a catalog search hit into a
+/// Book (ADR-0074).
+type AddBookFromAudibleRequest = {
+    Asin: string
+    SkipDuplicateCheck: bool
+}
+
 // Games
 
 type GameStatus =
@@ -1975,6 +2006,18 @@ type IMediathecaApi = {
     searchOpenLibraryBooks: string -> Async<OpenLibrarySearchResult list>
     addBookFromOpenLibrary: AddBookFromOpenLibraryRequest -> Async<Result<AddBookOutcome, string>>
     refreshBookFromOpenLibrary: string -> Async<Result<unit, string>>
+    // Audible (integration-dhctm, ADR-0074) — an imported audible-cli auth
+    // file, never a login or device registration. Catalog search/detail run
+    // unauthenticated; the library/progress sync (integration-jjvg2) is the
+    // only thing gated on the auth file.
+    getAudibleStatus: unit -> Async<AudibleStatus>
+    setAudibleAuthFile: string -> Async<Result<AudibleStatus, string>>
+    clearAudibleAuthFile: unit -> Async<unit>
+    testAudibleConnection: unit -> Async<Result<string, string>>
+    getAudibleMarketplace: unit -> Async<string>
+    setAudibleMarketplace: string -> Async<unit>
+    searchAudibleBooks: string -> Async<AudibleSearchResult list>
+    addBookFromAudible: AddBookFromAudibleRequest -> Async<Result<AddBookOutcome, string>>
 }
 
 // Administration console — a separate Remoting contract (ADR-0004 allows multiple

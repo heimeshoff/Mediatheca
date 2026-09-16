@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 04:45 -- Task verified and completed: integration-dhctm - Audible adapter and Settings card — an imported audible-cli auth file (never a login or device registration, ADR-0074) with refresh-token → access-token minting, a "Test connection" that names the customer and marketplace, unauthenticated catalog search and product detail with Audnexus as metadata fallback, and `addBookFromAudible`
+
+**Type:** Work / Task completion
+**Task:** integration-dhctm - Audible adapter and Settings card — an imported audible-cli auth file (never a login or device registration, ADR-0074) with refresh-token → access-token minting, a "Test connection" that names the customer and marketplace, unauthenticated catalog search and product detail with Audnexus as metadata fallback, and `addBookFromAudible`
+**Summary:** Audible adapter (Audible.fs + Audnexus module) on ADR-0074's imported-auth-file contract — validateAuthFile, locale→host mapping, refreshAccessToken via POST /auth/token, withAccessToken cache/proactive-refresh/retry-once with the fixed "audible auth file rejected: " notice, and no code path that logs in or registers a device — plus unauthenticated catalog search and product detail with Audnexus fallback, the full IMediathecaApi surface (getAudibleStatus never leaks the file, set/clear auth file, test connection, marketplace, searchAudibleBooks, addBookFromAudible) and an Audible Settings card after qBittorrent.
+**Duration:** 31m
+**Verification:** PASS (iteration 1)
+**Files changed:** 25
+**Tests added:** 31
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 04:13 -- Batch started: [integration-dhctm, books-f33e2]
 
 **Type:** Work / Batch start
