@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 17:09 -- Modeling / Promoted: curation-w9fkq - Backfill legacy `catalog_entries` rows with an exact-match-resolved `media_type` via a corrective `Entry_media_types_inferred` event (ambiguous/orphan slugs reported by name, never guessed), self-heal `catalog_entries`' UNIQUE to `(catalog_slug, media_type, movie_slug)` at projection Init, and restore `Add_entry` to strict `(MediaType, slug)` pair identity (ADR-0079 §5 resolved)
+
+**Type:** Modeling / Promote
+**BC:** curation
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-16 17:09 -- Modeling / Refined: curation-w9fkq - Backfill legacy catalog_entries media_type via corrective event, self-heal the widened UNIQUE at Init, restore Add_entry pair identity
 
 **Type:** Modeling / Refine

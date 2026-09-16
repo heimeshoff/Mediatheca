@@ -1,7 +1,7 @@
 ---
 id: curation-w9fkq
 title: Backfill legacy `catalog_entries` rows with an exact-match-resolved `media_type` via a corrective `Entry_media_types_inferred` event (ambiguous/orphan slugs reported by name, never guessed), self-heal `catalog_entries`' UNIQUE to `(catalog_slug, media_type, movie_slug)` at projection Init, and restore `Add_entry` to strict `(MediaType, slug)` pair identity (ADR-0079 §5 resolved)
-status: backlog
+status: todo
 type: feature
 context: curation
 created: 2026-09-16
