@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 00:15 -- Modeling / Promoted: curation-h4k2p - Clear the Notes document (via an ordinary `Notes_saved []` event, never an imperative row delete) and delete its `content/`-prefixed uploaded images when a movie, series, game, or book is removed — a shared helper called from all four `removeX` handlers, restoring the parity the deleted `GameJournal.deleteForGame` gave games
+
+**Type:** Modeling / Promote
+**BC:** curation
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-17 00:14 -- Modeling / Refined: curation-h4k2p - Clear the Notes document and delete its content/ images on media removal
 
 **Type:** Modeling / Refine

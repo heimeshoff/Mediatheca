@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
-- **Todo:** 0
+- **Backlog:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 7
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **curation-h4k2p** — Clear the Notes document (via an ordinary `Notes_saved []` event, never an imperative row delete) and delete its `content/`-prefixed uploaded images when a movie, series, game, or book is removed — a shared helper called from all four `removeX` handlers, restoring the parity the deleted `GameJournal.deleteForGame` gave games (chore) — `todo/curation-h4k2p-clean-up-notes-owned-uploaded-content-images-on-media-remova.md`
 <!-- no tasks in todo -->
 <!-- todo-list:end -->
 
@@ -39,7 +40,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **curation-h4k2p** — Clean up Notes-owned uploaded content images on media removal (parity with the deleted GameJournal.deleteForGame cleanup) (chore) — `backlog/curation-h4k2p-clean-up-notes-owned-uploaded-content-images-on-media-remova.md`
 <!-- no tasks in backlog -->
 <!-- backlog-list:end -->
 

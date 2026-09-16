@@ -1,7 +1,7 @@
 ---
 id: curation-h4k2p
 title: Clear the Notes document (via an ordinary `Notes_saved []` event, never an imperative row delete) and delete its `content/`-prefixed uploaded images when a movie, series, game, or book is removed — a shared helper called from all four `removeX` handlers, restoring the parity the deleted `GameJournal.deleteForGame` gave games
-status: backlog
+status: todo
 type: chore
 context: curation
 created: 2026-09-16
