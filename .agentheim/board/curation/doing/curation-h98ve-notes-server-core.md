@@ -1,7 +1,7 @@
 ---
 id: curation-h98ve
 title: Notes server core — an event-sourced block document per (MediaType, slug) — `Notes_saved` snapshot stream, `notes_blocks` projection, `getNotes`/`saveNotes` on IMediathecaApi, `HasNotesContent` on all four detail DTOs replacing `GameDetail.HasJournalContent`, registered in every Administration registry; ContentBlocks and GameJournal left untouched (ADR-0080, step 1 of 3)
-status: todo
+status: doing
 type: feature
 context: curation
 created: 2026-09-16

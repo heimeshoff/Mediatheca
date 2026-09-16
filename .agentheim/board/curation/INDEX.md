@@ -11,20 +11,20 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 2
-- **Todo:** 2
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 2
 - **Done:** 0
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **curation-h98ve** — Notes server core — an event-sourced block document per (MediaType, slug) — `Notes_saved` snapshot stream, `notes_blocks` projection, `getNotes`/`saveNotes` on IMediathecaApi, `HasNotesContent` on all four detail DTOs replacing `GameDetail.HasJournalContent`, registered in every Administration registry; ContentBlocks and GameJournal left untouched (ADR-0080, step 1 of 3) (feature) — `todo/curation-h98ve-notes-server-core.md`
-- **curation-cyxbc** — Typed catalog entries — an entry references `(MediaType, slug)` (ADR-0079): `Entry_added` carries the media type, legacy entries stay untyped and fall back to today's read-time inference, the projection resolves all four media types (fixing games, which render as bare slugs today), `getCatalogsForBook`, type-filtered lookups and removal cascade, and the Shared vocabulary loses its `Movie*` names (feature) — `todo/curation-cyxbc-books-in-catalogs.md`
 <!-- no tasks in todo -->
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **curation-h98ve** — Notes server core — an event-sourced block document per (MediaType, slug) — `Notes_saved` snapshot stream, `notes_blocks` projection, `getNotes`/`saveNotes` on IMediathecaApi, `HasNotesContent` on all four detail DTOs replacing `GameDetail.HasJournalContent`, registered in every Administration registry; ContentBlocks and GameJournal left untouched (ADR-0080, step 1 of 3) (feature) — `doing/curation-h98ve-notes-server-core.md`
+- **curation-cyxbc** — Typed catalog entries — an entry references `(MediaType, slug)` (ADR-0079): `Entry_added` carries the media type, legacy entries stay untyped and fall back to today's read-time inference, the projection resolves all four media types (fixing games, which render as bare slugs today), `getCatalogsForBook`, type-filtered lookups and removal cascade, and the Shared vocabulary loses its `Movie*` names (feature) — `doing/curation-cyxbc-books-in-catalogs.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

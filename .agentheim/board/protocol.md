@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 13:54 -- Batch started: [intelligence-h4qk2, curation-cyxbc, curation-h98ve]
+
+**Type:** Work / Batch start
+**Tasks:** intelligence-h4qk2 - Prune the dead activity-heatmap payload — DashboardAllTab.ActivityDays/MonthlyBreakdown, their two Shared types and the seven daily/monthly feeder queries go end to end (mirroring intelligence-p4t7k); the All tab stopped rendering them in intelligence-dq8rk and no client reads them, curation-cyxbc - Typed catalog entries — an entry references `(MediaType, slug)` (ADR-0079): `Entry_added` carries the media type, legacy entries stay untyped and fall back to today's read-time inference, the projection resolves all four media types (fixing games, which render as bare slugs today), `getCatalogsForBook`, type-filtered lookups and removal cascade, and the Shared vocabulary loses its `Movie*` names, curation-h98ve - Notes server core — an event-sourced block document per (MediaType, slug) — `Notes_saved` snapshot stream, `notes_blocks` projection, `getNotes`/`saveNotes` on IMediathecaApi, `HasNotesContent` on all four detail DTOs replacing `GameDetail.HasJournalContent`, registered in every Administration registry; ContentBlocks and GameJournal left untouched (ADR-0080, step 1 of 3)
+**Parallel:** yes (3 workers — the whole ready set; all three touch src/Shared/Shared.fs and src/Server/Api.fs, so squash-merges are ordered sequentially: intelligence-h4qk2 (smallest, pure prune) first, then curation-cyxbc, then curation-h98ve)
+
+---
+
 ## 2026-09-16 13:22 -- Modeling / Captured: curation-j4qqt - Migrate and purge — two builder-triggered Administration gates: "Migrate to Notes" turns every content-block owner and game journal into one `Notes_saved` event (owners resolved by exact slug match, ambiguous/orphan ones reported, never guessed); "Purge legacy stores" bulk-deletes the `ContentBlocks-*` streams under ADR-0034 guardrails and drops both legacy tables; ContentBlocks, GameJournal, its boot migration and all content-block RPC members are deleted (ADR-0080, step 3 of 3)
 
 **Type:** Modeling / Capture
