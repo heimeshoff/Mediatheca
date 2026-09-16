@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 03:30 -- Batch started: [integration-c8d4x]
+
+**Type:** Work / Batch start
+**Tasks:** integration-c8d4x - Open Library adapter — keyword search, ISBN and work lookup, cover download, an adapter-owned 1 req/s throttle with an identifying User-Agent — plus the `searchOpenLibraryBooks` / `addBookFromOpenLibrary` API that turns a search hit into a Book with its metadata cache slice filled
+**Parallel:** no (1 worker — integration-c8d4x is the only ready task now that books-y9kxy is done; integration-dhctm and books-f33e2 both depend on c8d4x's Shared/Api/Composition tail-append landing first, per the orchestrator's ordering)
+
+---
+
 ## 2026-09-16 03:29 -- Task verified and completed: books-y9kxy - Book aggregate, projection, metadata cache slice and API — the server core of the new Books BC (identity card, external ids, format, Games-shaped status, event-sourced reading-progress observations, personal rating, recommended-by), registered in every Administration registry, with MediaType.Book threaded through Shared
 
 **Type:** Work / Task completion

@@ -1,7 +1,7 @@
 ---
 id: integration-c8d4x
 title: Open Library adapter — keyword search, ISBN and work lookup, cover download, an adapter-owned 1 req/s throttle with an identifying User-Agent — plus the `searchOpenLibraryBooks` / `addBookFromOpenLibrary` API that turns a search hit into a Book with its metadata cache slice filled
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-09-16
