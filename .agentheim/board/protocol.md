@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 22:48 -- Modeling / Captured: curation-n2nkm - "`Notes_saved` is unformattable — `EventFormatting.formatEvent` dispatches by stream prefix and has no `Notes-` arm, so every Notes stream shows in the Health tab's Unformattable list and renders nothing in the event browser; add `formatNotesEvent` (block count + first text excerpt) and the guard test"
+
+**Type:** Modeling / Capture
+**BC:** curation
+**Filed to:** todo
+**Summary:** Seen on harbour after the live Notes migration: Notes_saved is listed as unformattable because EventFormatting.formatEvent has no Notes- prefix arm. Add formatNotesEvent plus the unformattable guard test, same shape as the Entry_media_types_inferred fix.
+
+---
+
 ## 2026-09-16 22:30 -- Modeling / Captured: curation-kezpv - Retire the one-off Notes migration tooling after the harbour cutover — delete Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores" (five `IAdminApi` members, DTOs, AdminSurgery sections, `ContentBlockConversion.fs` and tests) and the Health-tab catalog media-type backfill action, once both have run on the live store
 
 **Type:** Modeling / Capture
