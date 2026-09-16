@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 00:04 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 24m (batch started 23:41, integrated 00:00)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** curation-kezpv: 1
+**Commits:** 3 (1 batch-start, 1 integration, 1 session-end)
+**Vision-conformance:** none — batch aligns with vision (vision.md carries no "What success looks like" / "Non-goals" sections; judged against the Design Principles: retiring one-off operator tooling whose job is done keeps the Administration surface honest and touches no event, so Replayable holds — the Entry_media_types_inferred event and the Notes stream stay permanent)
+**Batch mix:** 0% product-facing / 100% harness / 0% bookkeeping (1 task) — the heuristic files a type: chore that touches src/ as harness; in substance this was a product-code deletion (Surgery/Health tab tooling), reported as the lib classifies it
+**Carry-over:** none — working tree clean (1 stranded RESULT sidecar swept; worktree torn down with its node_modules junction unlinked first, main node_modules intact at 210 entries; on main after the batch: npm run build OK, Vitest 108/108; Expecto not re-run on main because the builder's dotnet watch server (Server.exe, port 5000, restarted 00:00:27) holds Shared.dll — the verifier's run in the source-identical worktree was 912/912. Session-start churn: 1 recognized machine-shape commit (curation-tb0nn dismissal), 0 human commits. README delta for curation-kezpv came back merged twice (worker's expected text lacked the leading bullet dash); the stale bullets were removed by hand before the commit. Builder follow-ups: the [human-eye] criterion — Surgery tab without Gate 1/Gate 2 cards and Health tab without the backfill action, on harbour after deploy; and the verifier's note that the Entry_media_types_inferred projection arm lost its only end-to-end replay case with the drift-regression test the task ordered deleted — worth a small backlog item if wanted)
+
+---
+
 ## 2026-09-17 00:00 -- Task verified and completed: curation-kezpv - Retire the one-off Notes migration tooling after the harbour cutover — delete Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores" (five `IAdminApi` members, DTOs, AdminSurgery sections, `ContentBlockConversion.fs` and tests) and the Health-tab catalog media-type backfill action, once both have run on the live store
 
 **Type:** Work / Task completion
