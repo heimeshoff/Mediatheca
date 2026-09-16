@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 00:10 -- Modeling / Refined: intelligence-p7k3x - Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload
+
+**Type:** Modeling / Refine
+**BC:** intelligence
+**Status after:** todo
+**Summary:** Re-verified by grep that the three symbols have no consumer under src/Client or tests/. Pinned line references to commit 933bf7b (the capture's had drifted). Extended scope to the h4qk2 end-to-end shape: 12 of the 14 CrossMediaStats feeder queries and EventStore.getRecentEvents are single-caller and go too; getCurrentlyWatchingCount (Series tab) and getGamesCompletedPerYear stay. Corrected the capture's 'no test coverage' claim — one Expecto case asserts on getGamesBeatenThisYear; its two lines are trimmed and the case renamed. Added README-delta instructions (Stats bullet + Retired paragraph). No orchestrator round — grep-verified deletion with a shipped precedent.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-09-17 00:04 -- Work session ended
 
 **Type:** Work / Session end
