@@ -1,7 +1,7 @@
 ---
 id: curation-kezpv
 title: Retire the one-off Notes migration tooling after the harbour cutover — delete Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores" (five `IAdminApi` members, DTOs, AdminSurgery sections, `ContentBlockConversion.fs` and tests) and the Health-tab catalog media-type backfill action, once both have run on the live store
-status: backlog
+status: todo
 type: chore
 context: curation
 created: 2026-09-16
@@ -121,9 +121,9 @@ Sweep every remaining reference (comments and doc-strings included) to any delet
   - The container was redeployed at 23:27 CEST with the build that includes curation-n2nkm
     (image created 2026-09-16T21:26:33Z), so the Surgery/Health tabs on harbour currently show
     the erroring gates and the no-op backfill until this task deploys.
-  - Not verified here: that the builder did a Rebuild-all and eyeballed the Health tab clean
-    afterwards. Not a blocker for the deletion — the projection reads the same events either
-    way — but worth one look on harbour after this task deploys.
+  - Rebuild-all done and Health tab clean afterwards: confirmed by the builder on 2026-09-16
+    (relayed from the parallel modeling session that dismissed curation-tb0nn). Precondition
+    fully closed.
 - curation-tb0nn (the post-purge preview guard) was **dismissed 2026-09-16 23:31**; it is not a
   dependency and nothing of it ships. The 500s from the gate previews on harbour are cosmetic
   until this retirement deploys — the purge they would guard has already happened.

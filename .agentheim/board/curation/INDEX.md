@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 2
-- **Todo:** 0
+- **Backlog:** 1
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 6
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **curation-kezpv** — Retire the one-off Notes migration tooling after the harbour cutover — delete Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores" (five `IAdminApi` members, DTOs, AdminSurgery sections, `ContentBlockConversion.fs` and tests) and the Health-tab catalog media-type backfill action, once both have run on the live store (chore) — `todo/curation-kezpv-retire-notes-migration-tooling-after-harbour-cutover.md`
 <!-- no tasks in todo -->
 <!-- todo-list:end -->
 
@@ -38,7 +39,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **curation-kezpv** — Retire the one-off Notes migration tooling after the harbour cutover — delete Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores" (five `IAdminApi` members, DTOs, AdminSurgery sections, `ContentBlockConversion.fs` and tests) and the Health-tab catalog media-type backfill action, once both have run on the live store (chore) — `backlog/curation-kezpv-retire-notes-migration-tooling-after-harbour-cutover.md`
 - **curation-h4k2p** — Clean up Notes-owned uploaded content images on media removal (parity with the deleted GameJournal.deleteForGame cleanup) (chore) — `backlog/curation-h4k2p-clean-up-notes-owned-uploaded-content-images-on-media-remova.md`
 <!-- no tasks in backlog -->
 <!-- backlog-list:end -->
