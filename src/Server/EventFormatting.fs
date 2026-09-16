@@ -444,6 +444,49 @@ module EventFormatting =
             Some { Timestamp = ts; Label = "Media types inferred"; Details = [ $"{count} entries corrected" ] }
         | _ -> None
 
+    let formatNotesEvent (storedEvent: EventStore.StoredEvent) : EventHistoryEntry option =
+        let ts = storedEvent.Timestamp.ToString("yyyy-MM-dd HH:mm")
+        let data = storedEvent.Data
+        match storedEvent.EventType with
+        | "Notes_saved" ->
+            // curation-n2nkm: each save carries the full current block list
+            // (ADR-0080 decision 3). Decision 3 says the owner isn't
+            // duplicated INTO THE PAYLOAD — it says nothing about the
+            // rendered details here, so the owner is recovered via
+            // Notes.parseStreamId (MediaType + slug live in the stream id)
+            // and surfaced alongside the block count and a content excerpt.
+            let blocks =
+                match Decode.fromString
+                          (Decode.field "blocks"
+                              (Decode.list
+                                  (Decode.object (fun get ->
+                                      get.Required.Field "blockType" Decode.string,
+                                      get.Required.Field "content" Decode.string))))
+                          data with
+                | Ok items -> items
+                | Error _ -> []
+            let count = List.length blocks
+            // "First non-empty text content" reading: the first block (in
+            // document order) whose Content is non-whitespace, regardless
+            // of blockType — the simplest rule that matches the task's
+            // prose without needing a text/non-text blockType allowlist
+            // (an image/columnList/column wrapper simply never has
+            // non-whitespace Content, so it's naturally skipped).
+            let excerpt =
+                blocks
+                |> List.tryPick (fun (_, content) ->
+                    if not (String.IsNullOrWhiteSpace content) then Some (content.Trim()) else None)
+                |> function
+                    | Some content when content.Length > 60 -> content.Substring(0, 60) + "…"
+                    | Some content -> content
+                    | None -> "(empty document)"
+            let owner =
+                match Notes.parseStreamId storedEvent.StreamId with
+                | Some (mediaType, slug) -> $"{Notes.storageToken mediaType} · {slug}"
+                | None -> "?"
+            Some { Timestamp = ts; Label = "Notes saved"; Details = [ owner; $"{count} blocks"; excerpt ] }
+        | _ -> None
+
     /// Known payload reference fields that name another stream, for the
     /// stream drill-in's cross-linking (administration-v4y9g). Field name ->
     /// (stream_id prefix, human-readable kind). A field can appear across many
@@ -477,6 +520,7 @@ module EventFormatting =
         elif streamId.StartsWith("Book-") then formatBookEvent storedEvent
         elif streamId.StartsWith("Friend-") then formatFriendEvent storedEvent
         elif streamId.StartsWith("Catalog-") then formatCatalogEvent storedEvent
+        elif streamId.StartsWith("Notes-") then formatNotesEvent storedEvent
         else None
 
     /// Read events from one or more stream IDs, merge chronologically, and format

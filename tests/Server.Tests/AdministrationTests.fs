@@ -557,6 +557,81 @@ let administrationTests =
             Expect.isEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "Entry_media_types_inferred")) "Entry_media_types_inferred is in Catalogs.Serialization.handledEventTypes, so it must not appear in the unhandled list"
             Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Entry_media_types_inferred")) "Entry_media_types_inferred now has a formatter case in EventFormatting.formatCatalogEvent, so it must not appear in the unformattable list"
 
+        testCase "getHealthStats Notes_saved appears in neither the unhandled nor the unformattable list (curation-n2nkm: seen unformattable on harbour after the live Notes migration; EventFormatting.formatEvent had no Notes- prefix arm)" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
+            // Notes.Serialization.handledEventTypes already listed
+            // "Notes_saved" from curation-h98ve, but EventFormatting had no
+            // Notes- dispatch arm at all — this is the administration-qk3f7-
+            // style regression guard closing that gap.
+            let block : JournalBlockDto = {
+                Id = "block-1"; ParentId = None; BlockType = JournalBlockTypes.text
+                Content = "some notes"; Checked = false; Collapsed = false
+                Language = None; Url = None; ImageRef = None; Caption = None
+                Position = 0; Width = 1.0
+            }
+            EventStore.appendToStream conn (Notes.streamId MediaType.Movie "some-movie") -1L
+                [ Notes.Serialization.toEventData (Notes.Notes_saved [ block ]) ] |> ignore
+            let api = createApi db.Factory
+
+            let stats = api.getHealthStats () |> Async.RunSynchronously
+
+            Expect.isEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "Notes_saved")) "Notes_saved is in Notes.Serialization.handledEventTypes, so it must not appear in the unhandled list"
+            Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Notes_saved")) "Notes_saved now has a formatter case via EventFormatting.formatNotesEvent, so it must not appear in the unformattable list"
+
+        testCase "EventFormatting.formatEvent on a Notes-game-<slug> stream's Notes_saved returns label, owner, block count, and a text excerpt (curation-n2nkm)" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
+            let headingBlock : JournalBlockDto = {
+                Id = "block-1"; ParentId = None; BlockType = JournalBlockTypes.heading1
+                Content = ""; Checked = false; Collapsed = false
+                Language = None; Url = None; ImageRef = None; Caption = None
+                Position = 0; Width = 1.0
+            }
+            let textBlock : JournalBlockDto = {
+                Id = "block-2"; ParentId = None; BlockType = JournalBlockTypes.text
+                Content = "Started the campaign against the alien invasion forces this evening"
+                Checked = false; Collapsed = false
+                Language = None; Url = None; ImageRef = None; Caption = None
+                Position = 1; Width = 1.0
+            }
+            let streamId = Notes.streamId MediaType.Game "starcom-unknown-space-2022"
+            EventStore.appendToStream conn streamId -1L
+                [ Notes.Serialization.toEventData (Notes.Notes_saved [ headingBlock; textBlock ]) ] |> ignore
+
+            let stored = EventStore.readStream conn streamId |> List.exactlyOne
+            let formatted = EventFormatting.formatEvent stored
+
+            match formatted with
+            | None -> failtest "formatEvent returned None for a Notes_saved event"
+            | Some entry ->
+                Expect.equal entry.Label "Notes saved" "label"
+                Expect.contains entry.Details "game · starcom-unknown-space-2022" "details should carry the owner media type and slug"
+                Expect.contains entry.Details "2 blocks" "details should carry the block count"
+                let excerptDetail = entry.Details |> List.tryFind (fun d -> d.StartsWith("Started the campaign"))
+                Expect.isSome excerptDetail "details should carry the first non-empty text block's content, truncated to ~60 chars"
+                Expect.isLessThanOrEqual excerptDetail.Value.Length 61 "excerpt should be truncated to ~60 chars (+ ellipsis)"
+
+        testCase "EventFormatting.formatEvent on a Notes_saved event whose blocks are all empty yields the \"(empty document)\" wording (curation-n2nkm)" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
+            let emptyBlock : JournalBlockDto = {
+                Id = "block-1"; ParentId = None; BlockType = JournalBlockTypes.text
+                Content = "   "; Checked = false; Collapsed = false
+                Language = None; Url = None; ImageRef = None; Caption = None
+                Position = 0; Width = 1.0
+            }
+            let streamId = Notes.streamId MediaType.Movie "some-empty-movie"
+            EventStore.appendToStream conn streamId -1L
+                [ Notes.Serialization.toEventData (Notes.Notes_saved [ emptyBlock ]) ] |> ignore
+
+            let stored = EventStore.readStream conn streamId |> List.exactlyOne
+            let formatted = EventFormatting.formatEvent stored
+
+            match formatted with
+            | None -> failtest "formatEvent returned None for a Notes_saved event"
+            | Some entry -> Expect.contains entry.Details "(empty document)" "an all-empty document should render as \"(empty document)\""
+
         testCase "getHealthStats unhandled list flags an event type whose stream prefix matches no known bounded context" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapAdmin
             let conn = db.Connection

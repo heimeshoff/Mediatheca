@@ -5,6 +5,31 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 23:17 -- Task verified and completed: curation-n2nkm - "`Notes_saved` is unformattable — `EventFormatting.formatEvent` dispatches by stream prefix and has no `Notes-` arm, so every Notes stream shows in the Health tab's Unformattable list and renders nothing in the event browser; add `formatNotesEvent` (block count + first text excerpt) and the guard test"
+
+**Type:** Work / Task completion
+**Task:** curation-n2nkm - "`Notes_saved` is unformattable — `EventFormatting.formatEvent` dispatches by stream prefix and has no `Notes-` arm, so every Notes stream shows in the Health tab's Unformattable list and renders nothing in the event browser; add `formatNotesEvent` (block count + first text excerpt) and the guard test"
+**Summary:** `EventFormatting.formatNotesEvent` now renders a `Notes_saved` event's owner (media type + slug, via `Notes.parseStreamId`), block count, and a truncated first-non-empty-text excerpt (or "(empty document)"), and both the Health-tab guard and two new `formatEvent`-level Expecto cases cover it.
+**Duration:** 15m50s
+**Verification:** PASS (iteration 2)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 2
+**Tests added:** 3
+**ADRs written:** none
+
+---
+
+## 2026-09-16 23:07 -- Verification failed: curation-n2nkm - `Notes_saved` is unformattable — add `formatNotesEvent` (block count + first text excerpt) and the guard test
+
+**Type:** Work / Verification failure
+**Task:** curation-n2nkm - `Notes_saved` is unformattable — add `formatNotesEvent` (block count + first text excerpt) and the guard test
+**Iteration:** 1 of 3
+**Reasons:** formatter emits only the block count — owner (media type + slug via Notes.parseStreamId), first text excerpt and "(empty document)" wording all missing; no formatEvent-level Expecto cases added (only the Health-tab guard); worker's ADR-0080 justification misreads "not in the payload" as "not in the rendered details"
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-09-16 23:01 -- Batch started: [curation-n2nkm]
 
 **Type:** Work / Batch start
