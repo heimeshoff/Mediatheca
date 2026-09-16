@@ -13,6 +13,7 @@ type Model = {
     MovieDetailModel: Pages.MovieDetail.Types.Model
     SeriesDetailModel: Pages.SeriesDetail.Types.Model
     GameDetailModel: Pages.GameDetail.Types.Model
+    BookDetailModel: Pages.BookDetail.Types.Model
     FriendListModel: Pages.Friends.Types.Model
     FriendDetailModel: Pages.FriendDetail.Types.Model
     CatalogListModel: Pages.Catalogs.Types.Model
@@ -39,6 +40,7 @@ type Msg =
     | Movie_detail_msg of Pages.MovieDetail.Types.Msg
     | Series_detail_msg of Pages.SeriesDetail.Types.Msg
     | Game_detail_msg of Pages.GameDetail.Types.Msg
+    | Book_detail_msg of Pages.BookDetail.Types.Msg
     | Friend_list_msg of Pages.Friends.Types.Msg
     | Friend_detail_msg of Pages.FriendDetail.Types.Msg
     | Catalog_list_msg of Pages.Catalogs.Types.Msg

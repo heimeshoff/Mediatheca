@@ -35,6 +35,8 @@ let private pageContent (model: Model) (dispatch: Msg -> unit) =
         Pages.SeriesDetail.Views.view model.SeriesDetailModel (Series_detail_msg >> dispatch) (fun () -> dispatch Go_back)
     | Game_detail _ ->
         Pages.GameDetail.Views.view model.GameDetailModel (Game_detail_msg >> dispatch) (fun () -> dispatch Go_back)
+    | Book_detail _ ->
+        Pages.BookDetail.Views.view model.BookDetailModel (Book_detail_msg >> dispatch) (fun () -> dispatch Go_back)
     | Friend_list ->
         Pages.Friends.Views.view model.FriendListModel (Friend_list_msg >> dispatch)
     | Friend_detail _ ->

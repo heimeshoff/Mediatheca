@@ -32,6 +32,7 @@ let init (api: IMediathecaApi) (adminApi: IAdminApi) () : Model * Cmd<Msg> =
     let movieDetailModel, movieDetailCmd = Pages.MovieDetail.State.init ""
     let seriesDetailModel, seriesDetailCmd = Pages.SeriesDetail.State.init ""
     let gameDetailModel, gameDetailCmd = Pages.GameDetail.State.init ""
+    let bookDetailModel, bookDetailCmd = Pages.BookDetail.State.init ""
     let friendListModel, friendListCmd = Pages.Friends.State.init ()
     let friendDetailModel, friendDetailCmd = Pages.FriendDetail.State.init ""
     let catalogListModel, catalogListCmd = Pages.Catalogs.State.init ()
@@ -49,6 +50,7 @@ let init (api: IMediathecaApi) (adminApi: IAdminApi) () : Model * Cmd<Msg> =
         MovieDetailModel = movieDetailModel
         SeriesDetailModel = seriesDetailModel
         GameDetailModel = gameDetailModel
+        BookDetailModel = bookDetailModel
         FriendListModel = friendListModel
         FriendDetailModel = friendDetailModel
         CatalogListModel = catalogListModel
@@ -541,6 +543,10 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
             let childModel, childCmd = Pages.GameDetail.State.init slug
             { model with GameDetailModel = childModel },
             Cmd.map Game_detail_msg childCmd
+        | Book_detail slug ->
+            let childModel, childCmd = Pages.BookDetail.State.init slug
+            { model with BookDetailModel = childModel },
+            Cmd.map Book_detail_msg childCmd
         | Friend_list ->
             let childModel, childCmd = Pages.Friends.State.init ()
             { model with FriendListModel = childModel },
@@ -627,6 +633,12 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
             | Game_detail _ ->
                 { model with PendingDashboardTab = Some Pages.Dashboard.Types.GamesTab; SuppressNextHistoryPush = true },
                 Cmd.ofEffect (fun _ -> Route.navigateTo Dashboard)
+            | Book_detail _ ->
+                // No Books dashboard tab exists yet (books-g7g1j) — land on
+                // the Dashboard without pre-selecting a tab, same as any
+                // other page with no dedicated tab of its own.
+                { model with SuppressNextHistoryPush = true },
+                Cmd.ofEffect (fun _ -> Route.navigateTo Dashboard)
             | Friend_detail _ ->
                 { model with SuppressNextHistoryPush = true },
                 Cmd.ofEffect (fun _ -> Route.navigateTo Friend_list)
@@ -675,6 +687,10 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
     | Game_detail_msg childMsg ->
         let childModel, childCmd = Pages.GameDetail.State.update api childMsg model.GameDetailModel
         { model with GameDetailModel = childModel }, Cmd.map Game_detail_msg childCmd
+
+    | Book_detail_msg childMsg ->
+        let childModel, childCmd = Pages.BookDetail.State.update api childMsg model.BookDetailModel
+        { model with BookDetailModel = childModel }, Cmd.map Book_detail_msg childCmd
 
     | Friend_list_msg childMsg ->
         let childModel, childCmd = Pages.Friends.State.update api childMsg model.FriendListModel

@@ -42,6 +42,11 @@
     <Compile Include="Pages\GameDetail\Types.fs" />
     <Compile Include="Pages\GameDetail\State.fs" />
     <Compile Include="Pages\GameDetail\Views.fs" />
+    <Compile Include="Pages\BookDetail\Progress.fs" />
+    <Compile Include="Pages\BookDetail\Format.fs" />
+    <Compile Include="Pages\BookDetail\Types.fs" />
+    <Compile Include="Pages\BookDetail\State.fs" />
+    <Compile Include="Pages\BookDetail\Views.fs" />
     <Compile Include="Pages\Friends\Types.fs" />
     <Compile Include="Pages\Friends\State.fs" />
     <Compile Include="Pages\Friends\Views.fs" />
@@ -96,6 +101,8 @@
     <Compile Include="Pages\SeriesDetail\NextUp.test.fs" />
     <Compile Include="Pages\GameDetail\JournalHasContent.test.fs" />
     <Compile Include="Pages\GameDetail\DefaultTab.test.fs" />
+    <Compile Include="Pages\BookDetail\Progress.test.fs" />
+    <Compile Include="Pages\BookDetail\Format.test.fs" />
     <Compile Include="Pages\Settings\FamilyTokenRejected.test.fs" />
     <Compile Include="Pages\Settings\AudibleAuthFile.test.fs" />
     <Compile Include="Pages\Dashboard\ExpandCard.test.fs" />

@@ -7,6 +7,7 @@ type Page =
     | Movie_detail of slug: string
     | Series_detail of slug: string
     | Game_detail of slug: string
+    | Book_detail of slug: string
     | Friend_list
     | Friend_detail of slug: string
     | Catalog_list
@@ -37,6 +38,7 @@ module Route =
         | [ "series"; slug ] -> Series_detail slug
         | [ "games" ] -> Dashboard
         | [ "games"; slug ] -> Game_detail slug
+        | [ "books"; slug ] -> Book_detail slug
         | [ "friends" ] -> Friend_list
         | [ "friends"; slug ] -> Friend_detail slug
         | [ "catalogs" ] -> Catalog_list
@@ -66,6 +68,7 @@ module Route =
         | Movie_detail slug -> Router.format ("movies", slug)
         | Series_detail slug -> Router.format ("series", slug)
         | Game_detail slug -> Router.format ("games", slug)
+        | Book_detail slug -> Router.format ("books", slug)
         | Friend_list -> Router.format "friends"
         | Friend_detail slug -> Router.format ("friends", slug)
         | Catalog_list -> Router.format "catalogs"
@@ -81,6 +84,7 @@ module Route =
         | Movie_detail slug -> Router.navigate ("movies", slug)
         | Series_detail slug -> Router.navigate ("series", slug)
         | Game_detail slug -> Router.navigate ("games", slug)
+        | Book_detail slug -> Router.navigate ("books", slug)
         | Friend_list -> Router.navigate "friends"
         | Friend_detail slug -> Router.navigate ("friends", slug)
         | Catalog_list -> Router.navigate "catalogs"
@@ -111,7 +115,7 @@ module Route =
     /// `isSeriesSection` / `isGamesSection`.
     let isDashboardSection (page: Page) =
         match page with
-        | Dashboard | Movie_detail _ | Series_detail _ | Game_detail _ -> true
+        | Dashboard | Movie_detail _ | Series_detail _ | Game_detail _ | Book_detail _ -> true
         | _ -> false
 
     let isCatalogsSection (page: Page) =

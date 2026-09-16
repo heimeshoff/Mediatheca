@@ -2,6 +2,10 @@
 /// shape — bare `/movies`, `/series`, `/games` (old bookmarks) now resolve to
 /// the Dashboard rather than a dedicated list page or `Not_found`, while the
 /// parameterized detail routes are untouched.
+///
+/// books-f33e2 adds `["books"; slug]` coverage — this task owns the
+/// `Router.fs` edit that introduces `Book_detail` (`books-g7g1j` confirms
+/// rather than duplicates it, per the refinement note in both tasks).
 module Mediatheca.Client.RouteTests
 
 open Fable.Mocha
@@ -28,11 +32,15 @@ let routeTests =
         testCase "[\"games\"; slug] still resolves to the Game_detail page" <| fun () ->
             Expect.equal (Route.parseUrl [ "games"; "outer-wilds" ]) (Game_detail "outer-wilds") "the parameterized detail route is untouched"
 
-        testCase "Route.isDashboardSection covers Dashboard and the three detail pages" <| fun () ->
+        testCase "[\"books\"; slug] resolves to the Book_detail page (books-f33e2)" <| fun () ->
+            Expect.equal (Route.parseUrl [ "books"; "project-hail-mary" ]) (Book_detail "project-hail-mary") "the new Books detail route"
+
+        testCase "Route.isDashboardSection covers Dashboard and the four detail pages" <| fun () ->
             Expect.isTrue (Route.isDashboardSection Dashboard) "Dashboard itself"
             Expect.isTrue (Route.isDashboardSection (Movie_detail "x")) "a movie detail page is reached from, and returns to, the Dashboard"
             Expect.isTrue (Route.isDashboardSection (Series_detail "x")) "a series detail page is reached from, and returns to, the Dashboard"
             Expect.isTrue (Route.isDashboardSection (Game_detail "x")) "a game detail page is reached from, and returns to, the Dashboard"
+            Expect.isTrue (Route.isDashboardSection (Book_detail "x")) "a book detail page is reached from, and returns to, the Dashboard (books-f33e2)"
             Expect.isFalse (Route.isDashboardSection Catalog_list) "an unrelated page is not part of the Dashboard section"
     ]
 

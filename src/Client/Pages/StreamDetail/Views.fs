@@ -16,6 +16,7 @@ let private pageForDetailLink (segment: string, slug: string) : Page option =
     | "movies" -> Some (Movie_detail slug)
     | "series" -> Some (Series_detail slug)
     | "games" -> Some (Game_detail slug)
+    | "books" -> Some (Book_detail slug)
     | "friends" -> Some (Friend_detail slug)
     | "catalogs" -> Some (Catalog_detail slug)
     | _ -> None

@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 04:58 -- Task verified and completed: books-f33e2 - Book detail page at /books/{slug} mirroring the movie detail page — cover hero with title/authors/year/format, a reading-progress bar with source badge and a manual "update progress" control (page or percent), the Games-shaped status control, personal rating, description/narrators/series/length from the cache, external links, recommended-by friends, progress history, content blocks, event history and remove
+
+**Type:** Work / Task completion
+**Task:** books-f33e2 - Book detail page at /books/{slug} mirroring the movie detail page — cover hero with title/authors/year/format, a reading-progress bar with source badge and a manual "update progress" control (page or percent), the Games-shaped status control, personal rating, description/narrators/series/length from the cache, external links, recommended-by friends, progress history, content blocks, event history and remove
+**Summary:** Book detail page at /books/{slug} mirroring MovieDetail: cover hero with format badge, length line and series line, the Games-shaped status control, a reading-progress card with a paper-overlay Update-progress popover (percent or page/total via the pure Progress.buildProgressRequest seam) and a removable history list, personal rating, details/links cards, recommended-by friends, content blocks, event history and remove — wired through Router.fs's new Book_detail page and the root MVU delegation, with a Playwright spec proving 100 % finishes and removal re-derives.
+**Duration:** 44m
+**Verification:** PASS (iteration 1)
+**Files changed:** 15
+**Tests added:** 15
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 04:45 -- Batch started: [integration-wmqn3]
 
 **Type:** Work / Batch start

@@ -1,7 +1,7 @@
 ---
 id: books-f33e2
 title: Book detail page at /books/{slug} mirroring the movie detail page — cover hero with title/authors/year/format, a reading-progress bar with source badge and a manual "update progress" control (page or percent), the Games-shaped status control, personal rating, description/narrators/series/length from the cache, external links, recommended-by friends, progress history, content blocks, event history and remove
-status: doing
+status: done
 type: feature
 context: books
 created: 2026-09-16
@@ -104,3 +104,79 @@ Layout mirrors `Pages/MovieDetail/Views.fs` (hero + two-column content grid, `de
 - ADR-0016 paper overlay for the popover; ADR-0015: review against the live StyleGuide page.
 - `intelligence-dnv2y` (dashboard) navigates here; `books-g7g1j` (search) navigates here and now
   `depends_on` this task (Router.fs ownership, see What section).
+
+## Outcome
+
+Built `src/Client/Pages/BookDetail/{Progress,Format,Types,State,Views}.fs`, mirroring `Pages/MovieDetail`'s
+structure (hero + two-column content grid, `panelCard`, `personalRatingCard`, `FriendManager`,
+`EventHistoryModal`, `ContentBlockEditor`) pruned to what the task's What section asked for, plus
+GameDetail's dropdown-based status-control shape (`HeroStatus`) adapted to `BookStatus`'s four cases.
+
+**Hero**: portrait cover (`CoverRef`, placeholder `Icons.book`), title, authors, year, a format badge,
+the length line ("9 h 12 min · narrated by X" / "384 pages", `Format.lengthLine`), a series line
+("Book N of *Series*", `Format.seriesLine`), and the status control. `Format.fs` and `Progress.fs` are
+pure, Feliz-free modules (the `SeriesDetail.NextUp` split) unit-tested in `Format.test.fs`/`Progress.test.fs`.
+
+**Progress card** (left column, first): `DesignSystem.progressContinuous`, the percent/source/observed-date
+line, a "History" list (newest first, each row behind a per-row confirm before
+`api.removeBookProgressObservation`), and an "Update progress" button opening a `ModalPanel`-backed
+popover (paper overlay, ADR-0016) with Percent/Page tabs, an inline validation message from
+`Progress.buildProgressRequest`, and a native date input defaulting to today.
+
+**Status control**: `bookStatusBadge`/`bookStatusLabel` are Books' own — `DesignSystem.statusBadge` was
+*not* reused directly because its label is hardcoded per `LifecycleStatus` case ("Retired"), and the
+task's acceptance criteria require the control to literally read "Finished" (a book is finished, not
+retired). The CSS color vocabulary (`status-badge-retired` etc.) is still reused for Finished's "done"
+hue, keeping the visual family consistent with Games/Movies while getting Books' own words right — this
+is documented inline in `Views.fs` rather than as a separate ADR (a page-level label choice, not a
+cross-cutting decision).
+
+**Personal rating / Details / Links cards**: `personalRatingCard` (rating dropdown, `api.setBookPersonalRating`);
+description/publisher/published-date/language/subjects/average-rating; Audible (built from `AudibleAsin`
+against the `audible.de` host — `getAudibleStatus` does not exist yet in this worktree's `Shared.fs`, per
+the dispatch's fallback instruction; the sibling `integration-dhctm`/a follow-up task is expected to
+thread the marketplace-aware host in later), Goodreads, and Open Library links, shown only for the ids
+the book carries.
+
+**Right column**: `friendsCard` (recommended-by only, `api.recommendBookBy`/`removeBookRecommendation`,
+the movie `FriendManager` modal pattern reused) and `ContentBlockEditor.view`. Content-block add/update/
+remove/get use the book-specific `addBookContentBlock`/`updateBookContentBlock`/`removeBookContentBlock`
+family `books-y9kxy` added; change-type/reorder/group/ungroup have no book-specific counterpart in
+`Shared.fs`, so they reuse the generic bare-slug-keyed `IMediathecaApi` methods against the same slug —
+correct today because the underlying `ContentBlocks` stream is shared bare-slug-keyed across media types
+(a known, already-recorded limitation), noted in `State.fs` and filed as a backlog item below in case
+that limitation is ever resolved out from under this reliance.
+
+**Journal editor**: confirmed and left out — `JournalEditor.view` hardcodes `api.saveGameJournal`/
+`api.getGameJournal` at its two call sites with no generic storage/load-save seam; reusing it for Books
+would need a parallel `book_journal_blocks` table and module, out of scope here (matches the task's own
+Notes finding).
+
+**Router.fs** (owned by this task): added `Book_detail of slug`, `["books"; slug] -> Book_detail slug`,
+`toUrl`/`navigateTo`, and `isDashboardSection`. Root `Types.fs`/`State.fs`/`Views.fs` gained the
+`BookDetailModel`/`Book_detail_msg` delegation, an `init`/`Url_changed`/`Go_back` wiring identical in
+shape to `Game_detail`'s (no Books dashboard tab exists yet, so `Go_back`'s empty-stack fallback lands on
+the Dashboard without pre-selecting a tab). `StreamDetail/Views.fs`'s `pageForDetailLink` also gained a
+`"books" -> Book_detail` case — a one-line, directly-enabled follow-through of the same Router.fs change
+(without it, a book event stream row in the admin projection panel would render no drill-in link at all).
+
+**Tests**: `Progress.test.fs` (6 cases) proves `buildProgressRequest` shapes `(page, total)` and a bare
+percent correctly and rejects percent > 100 / page > total / negative / non-numeric input.
+`Format.test.fs` (7 cases) proves `lengthLine`'s audiobook/print/ebook branches (including the exact
+"9 h 12 min · narrated by X" string from the acceptance criteria) and `seriesLine`'s position+name rule.
+`Route.test.fs` gained the `["books"; slug] -> Book_detail` case and an `isDashboardSection` assertion —
+this task owns that edit per the refinement note; `books-g7g1j` confirms rather than duplicates it.
+`tests/e2e/book-detail-progress.spec.ts` seeds a book via a direct `addBook` call, drives the popover
+twice (a backdated 60% observation, then a 100% observation today), asserts the status control reads
+"Finished" and the bar reads "100%", then removes the newest (100%) history row and asserts the bar
+re-derives to the remaining 60% observation while status stays Finished (ADR-0076: removal never
+un-finishes a book) — covering both the "100% finishes" and "removing an observation re-renders from the
+remainder" acceptance criteria in one hermetic run.
+
+Verified: `npm run build` (Fable typecheck + production bundle), `npm run test:client` (12 files / 76
+tests), `npm test` (834 Expecto tests), and `npx playwright test tests/e2e/book-detail-progress.spec.ts`
+all green.
+
+Not independently verified: the "side by side with a movie page, the book page reads as the same family"
+[human-eye] criterion — the page reuses `panelCard`/`velvetCard`/`paper-overlay`/`rating-dropdown` and the
+hero rhythm verbatim from `MovieDetail`/`GameDetail`, but a human visual pass is outside a worker's tools.
