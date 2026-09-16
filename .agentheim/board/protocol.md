@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 12:47 -- Modeling / Refined: books-n8fpz - Collapse the three per-type content-block method families (Books, Series, Games) into the one generic IMediathecaApi family
+
+**Type:** Modeling / Refine
+**BC:** books
+**Status after:** backlog
+**Summary:** Code-fact check plus one builder decision. The capture's premise (Books' family is uniquely incomplete, so its fallback to the generic methods is fragile) does not hold: Series has the identical 3-of-7 split, the Games family has no caller at all (GameDetail uses the Game Journal), the three `get*ContentBlocks` variants have no client caller (detail DTOs embed the blocks), and every per-type `Api.fs` body is a byte-identical copy of the generic one with `sessionId = None`. Events, aggregate, stream id and projection are already single. Builder's stated goal — one set of events with one behavior regardless of owning entity — is already true at the event level; the duplication is only the RPC surface. Builder chose **remove all three families** over completing the Book family, a Books-only removal, or an owner-kind key. Task rewritten from a two-way judgment call (`chore`) into a prescribed behavior-preserving `refactor`: twelve `IMediathecaApi` members and their `Api.fs` bodies go, BookDetail and SeriesDetail call the generic family for all seven operations, one Expecto test proves the generic path serves a book and a series slug end to end, no diff on ContentBlocks.fs/ContentBlockProjection.fs/ContentBlocksTests.fs, one books README bullet. Latent cross-media slug collision recorded as out of scope (owner identity, Curation, needs a live-data migration). prior_art set to books-y9kxy, books-f33e2. No orchestrator round — the facts were fully settled by reading the code.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 12:32 -- Modeling / Promoted: intelligence-h4qk2 - Prune the dead activity-heatmap payload — DashboardAllTab.ActivityDays/MonthlyBreakdown, their two Shared types and the seven daily/monthly feeder queries go end to end (mirroring intelligence-p4t7k); the All tab stopped rendering them in intelligence-dq8rk and no client reads them
 
 **Type:** Modeling / Promote
