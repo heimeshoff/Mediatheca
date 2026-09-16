@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
-- **Todo:** 0
+- **Backlog:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 16
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **intelligence-p7k3x** — Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload (chore) — `todo/intelligence-p7k3x-prune-dead-dashboardcrossmediastats-getrecentactivity-recent.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -47,7 +48,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **intelligence-p7k3x** — Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload (chore) — `backlog/intelligence-p7k3x-prune-dead-dashboardcrossmediastats-getrecentactivity-recent.md`
 <!-- backlog-list:end -->
 
 

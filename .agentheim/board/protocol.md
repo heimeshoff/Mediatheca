@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 00:10 -- Modeling / Promoted: intelligence-p7k3x - Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload
+
+**Type:** Modeling / Promote
+**BC:** intelligence
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-17 00:10 -- Modeling / Refined: intelligence-p7k3x - Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload
 
 **Type:** Modeling / Refine
