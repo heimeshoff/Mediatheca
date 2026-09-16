@@ -1,6 +1,7 @@
 ﻿## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0080** — Notes: one document-snapshot event per debounced save, owned by (MediaType, slug), replacing ContentBlocks and GameJournal; migrate then purge via two Administration gates (amends 0044) — 2026-09-16 — `../../decisions/0080-notes-single-block-document-per-media-item-snapshot-events.md`
 <!-- no ADRs scoped to this BC -->
 <!-- adr-local:end -->
 

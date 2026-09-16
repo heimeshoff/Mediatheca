@@ -5,6 +5,33 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 13:22 -- Modeling / Captured: curation-j4qqt - Migrate and purge — two builder-triggered Administration gates: "Migrate to Notes" turns every content-block owner and game journal into one `Notes_saved` event (owners resolved by exact slug match, ambiguous/orphan ones reported, never guessed); "Purge legacy stores" bulk-deletes the `ContentBlocks-*` streams under ADR-0034 guardrails and drops both legacy tables; ContentBlocks, GameJournal, its boot migration and all content-block RPC members are deleted (ADR-0080, step 3 of 3)
+
+**Type:** Modeling / Capture
+**BC:** curation
+**Filed to:** backlog
+**Summary:** Step 3 of 3 of ADR-0080: two builder-triggered Administration gates — Migrate to Notes (one `Notes_saved` per resolved legacy owner, ambiguous/orphan slugs reported never guessed, games sourced from game_journal_blocks directly) and Purge legacy stores (bulk stream delete under ADR-0034 guardrails, both legacy tables dropped) — then ContentBlocks, GameJournal, the Composition.fs boot migration and every content-block RPC member are deleted. Builder chose purge over keeping the events as history. Parked in backlog until both parents are done.
+
+---
+
+## 2026-09-16 13:22 -- Modeling / Captured: curation-knqfj - Notes editor on every detail page — `JournalEditor` becomes `NotesEditor` taking `(MediaType, slug)` over `getNotes`/`saveNotes`, mounted where `ContentBlockEditor` sits on Movie/Series/Book detail and on the Game detail tab (label "Notes"); `ContentBlockEditor` and its StyleGuide specimens go, one NotesEditor specimen replaces them (ADR-0080, step 2 of 3)
+
+**Type:** Modeling / Capture
+**BC:** curation
+**Filed to:** backlog
+**Summary:** Step 2 of 3 of ADR-0080: JournalEditor becomes NotesEditor over `(MediaType, slug)`, mounted on Movie/Series/Book detail where ContentBlockEditor sits and on the Game detail tab (label "Notes"); ContentBlockEditor and its StyleGuide specimens retire, one NotesEditor specimen replaces them. Fully refined; parked in backlog only because the promote gate needs curation-h98ve in done/.
+
+---
+
+## 2026-09-16 13:22 -- Modeling / Captured: curation-h98ve - Notes server core — an event-sourced block document per (MediaType, slug) — `Notes_saved` snapshot stream, `notes_blocks` projection, `getNotes`/`saveNotes` on IMediathecaApi, `HasNotesContent` on all four detail DTOs replacing `GameDetail.HasJournalContent`, registered in every Administration registry; ContentBlocks and GameJournal left untouched (ADR-0080, step 1 of 3)
+
+**Type:** Modeling / Capture
+**BC:** curation
+**Filed to:** todo
+**Summary:** Step 1 of 3 of ADR-0080's Notes unification: the event-sourced Notes document stream (one `Notes_saved` snapshot per debounced save, owner `(MediaType, slug)`), `notes_blocks` projection, `getNotes`/`saveNotes`, `HasNotesContent` on all four detail DTOs, full Administration registry wiring. Strictly additive — ContentBlocks and GameJournal untouched until curation-j4qqt. Refined via the orchestrator (tactical-modeler + architect) and filed straight to todo.
+
+---
+
 ## 2026-09-16 13:05 -- Modeling / Dismissed: books-n8fpz
 
 **Type:** Modeling / Dismiss
