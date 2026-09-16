@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 1
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **journal-k52j1** — Reading day and Book finished join the Journal's ubiquitous language — a README-only change, because no live activity surface exists to attach code to (the All-tab heatmap/monthly payload was pruned, and `DashboardCrossMediaStats` / `getRecentActivity` are confirmed-dead payload with no client consumer) (chore) — `todo/journal-k52j1-reading-activity-in-the-journal.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **journal-k52j1** — Reading day and Book finished join the Journal's ubiquitous language — a README-only change, because no live activity surface exists to attach code to (the All-tab heatmap/monthly payload was pruned, and `DashboardCrossMediaStats` / `getRecentActivity` are confirmed-dead payload with no client consumer) (chore) — `doing/journal-k52j1-reading-activity-in-the-journal.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

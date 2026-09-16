@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 17:29 -- Batch started: [books-f3sb2, curation-w9fkq, journal-k52j1]
+
+**Type:** Work / Batch start
+**Tasks:** books-f3sb2 - Book detail page joins catalogs — the catalog pill row + "Add to Catalog" picker on `/books/{slug}` via `getCatalogsForBook` (sending `MediaType.Book`), with the thrice-copied `CatalogManager` modal extracted into `Components/` and consumed by all four detail pages, and `removeBook` cascading the book's catalog entries like the other media types, curation-w9fkq - Backfill legacy `catalog_entries` rows with an exact-match-resolved `media_type` via a corrective `Entry_media_types_inferred` event (ambiguous/orphan slugs reported by name, never guessed), self-heal `catalog_entries`' UNIQUE to `(catalog_slug, media_type, movie_slug)` at projection Init, and restore `Add_entry` to strict `(MediaType, slug)` pair identity (ADR-0079 §5 resolved), journal-k52j1 - Reading day and Book finished join the Journal's ubiquitous language — a README-only change, because no live activity surface exists to attach code to (the All-tab heatmap/monthly payload was pruned, and `DashboardCrossMediaStats` / `getRecentActivity` are confirmed-dead payload with no client consumer)
+**Parallel:** yes (3 workers — 4 ready; curation-knqfj held to next wave: cap 3, and it overlaps books-f3sb2 on all four detail-page Views.fs and Client.fsproj, so it merges after f3sb2)
+
+---
+
 ## 2026-09-16 17:09 -- Modeling / Promoted: curation-w9fkq - Backfill legacy `catalog_entries` rows with an exact-match-resolved `media_type` via a corrective `Entry_media_types_inferred` event (ambiguous/orphan slugs reported by name, never guessed), self-heal `catalog_entries`' UNIQUE to `(catalog_slug, media_type, movie_slug)` at projection Init, and restore `Add_entry` to strict `(MediaType, slug)` pair identity (ADR-0079 §5 resolved)
 
 **Type:** Modeling / Promote
