@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 23:31 -- Modeling / Dismissed: curation-tb0nn
+
+**Type:** Modeling / Dismiss
+**Dismissed:**
+- curation-tb0nn - Guard Gate 1 / Gate 2 previews after the legacy purge — once `content_blocks`/`game_journal_blocks` are dropped both previews return HTTP 500 ("no such table"); with a `tableExists` check they report "legacy stores already purged" with zero owners/streams and Gate 2's confirm stays disabled (curation)
+
+---
+
 ## 2026-09-16 23:20 -- Work session ended
 
 **Type:** Work / Session end
