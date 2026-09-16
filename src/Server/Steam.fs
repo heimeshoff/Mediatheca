@@ -1156,7 +1156,7 @@ module Steam =
         | 1 -> Mediatheca.Shared.Unsupported
         | 2 -> Mediatheca.Shared.Playable
         | 3 -> Mediatheca.Shared.Verified
-        | _ -> Mediatheca.Shared.Unknown
+        | _ -> Mediatheca.Shared.DeckCompatibility.Unknown
 
     /// Fetches `appId`'s Steam Deck compatibility verdict from its store app
     /// page (the `ajaxgetdeckappcompatibilityreport` endpoint this task

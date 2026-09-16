@@ -25,9 +25,15 @@ module Slug =
     let gameSlug (name: string) (year: int) =
         sprintf "%s-%d" (slugify name) year
 
+    /// books-y9kxy: same shape as movieSlug/gameSlug — `Year` on a book is
+    /// optional (ADR-0076), so callers pass 0 when unknown, matching the
+    /// existing "unknown year" convention `addGame`'s callers already use.
+    let bookSlug (name: string) (year: int) =
+        sprintf "%s-%d" (slugify name) year
+
 // Search
 
-type MediaType = Movie | Series | Game
+type MediaType = Movie | Series | Game | Book
 
 type LibrarySearchResult = {
     Slug: string
@@ -837,6 +843,157 @@ type UpdateEpisodeWatchedDateRequest = {
     SeasonNumber: int
     EpisodeNumber: int
     Date: string
+}
+
+// Books (books-y9kxy, ADR-0076/ADR-0077)
+//
+// Declared BEFORE the Games section: several case names here are shared
+// verbatim with Games' own vocabulary (Backlog/InFocus/Abandoned with
+// GameStatus, Manual with PlaySessionSource, Unknown with DeckCompatibility,
+// Duplicate_found with AddGameOutcome — this task's own instructions call
+// for reusing these names). F# resolves a bare, unqualified union case name
+// to whichever same-named case was declared LAST among open types when no
+// expected-type context disambiguates it (e.g. `Backlog` inside a record
+// literal) — so this section must be declared textually before Games'
+// section, letting GameStatus/PlaySessionSource/DeckCompatibility/
+// AddGameOutcome keep being every pre-existing bare reference's resolution
+// target, unchanged. Every one of THIS module's own bare-collision-prone
+// usages (in Books.fs/BookProjection.fs/Api.fs) is written fully qualified
+// (`BookStatus.Backlog`, `BookFormat.Unknown`, `ProgressSource.Manual`,
+// `AddBookOutcome.Duplicate_found`) for exactly this reason.
+
+/// ADR-0076 §6: a single value recording how the user is reading a book
+/// right now — event-carried, changeable. A book owned on Audible and in
+/// print simultaneously is one Book with both an ASIN and an ISBN linked;
+/// this field records how the user is reading it now.
+type BookFormat =
+    | Audiobook
+    | Print
+    | Ebook
+    | Unknown
+
+/// ADR-0076 §5: mirrors GameStatus's shape (a sustained state, not a flag) —
+/// promotion/finishing are progress-driven (`Books.decide`), `Change_status`
+/// is the manual override for everything else (Abandoned, back to Backlog, a
+/// re-read from Finished to InFocus).
+type BookStatus =
+    | Backlog
+    | InFocus
+    | Finished
+    | Abandoned
+
+/// ADR-0076 §1: who reported a reading-progress observation.
+type ProgressSource =
+    | Audible
+    | Goodreads
+    | Manual
+
+/// ADR-0076 §1: the user's position in a book at the moment of an
+/// observation — a page (of an optional known total) or elapsed minutes (of
+/// an optional known total, for an audiobook).
+type ReadingPosition =
+    | Page of page: int * total: int option
+    | Minutes of minutes: int * total: int option
+
+/// ADR-0076 §4: an external catalog identity the user (or an import acting
+/// for them) asserts this library entry IS — one value per kind, enforced by
+/// `Books.decide`'s per-kind-uniqueness invariant, not by this type.
+type BookExternalId =
+    | Isbn13 of string
+    | OpenLibraryWork of string
+    | OpenLibraryEdition of string
+    | AudibleAsin of string
+    | GoodreadsBookId of string
+
+/// One row of a book's reading-progress history (`book_progress`,
+/// ADR-0076 §2) — the detail page's progress-history list.
+type ReadingProgressDto = {
+    ObservedOn: string
+    Source: ProgressSource
+    Percent: int
+    Position: ReadingPosition option
+}
+
+type BookListItem = {
+    Slug: string
+    Title: string
+    Authors: string list
+    Year: int option
+    CoverRef: string option
+    Subjects: string list
+    Format: BookFormat
+    Status: BookStatus
+    ProgressPercent: int
+    ProgressSource: ProgressSource option
+    ProgressObservedOn: string option
+    PersonalRating: int option
+    FinishedAt: string option
+}
+
+type BookDetail = {
+    Slug: string
+    Title: string
+    Authors: string list
+    Year: int option
+    CoverRef: string option
+    Subjects: string list
+    Format: BookFormat
+    Status: BookStatus
+    ProgressPercent: int
+    ProgressSource: ProgressSource option
+    ProgressObservedOn: string option
+    PersonalRating: int option
+    FinishedAt: string option
+    AddedAt: string option
+    Isbn13: string option
+    OpenLibraryWorkKey: string option
+    OpenLibraryEditionKey: string option
+    AudibleAsin: string option
+    GoodreadsBookId: string option
+    RecommendedBy: FriendRef list
+    // ADR-0043/ADR-0045 cache-tier fields (book_metadata_cache), joined at
+    // query time — None/empty when never fetched, the honest-degradation
+    // stance every other cache read in this codebase takes.
+    Description: string option
+    PageCount: int option
+    RuntimeMinutes: int option
+    Narrators: string list
+    SeriesName: string option
+    SeriesPosition: int option
+    Publisher: string option
+    PublishedDate: string option
+    AverageRating: float option
+    Language: string option
+    ProgressHistory: ReadingProgressDto list
+    ContentBlocks: ContentBlockDto list
+}
+
+type AddBookRequest = {
+    Title: string
+    Authors: string list
+    Year: int option
+    CoverUrl: string option
+    Subjects: string list
+    Format: BookFormat
+    ExternalIds: BookExternalId list
+    SkipDuplicateCheck: bool
+}
+
+/// The shape of `AddGameOutcome` (`Duplicate_found` shared verbatim) — note
+/// `AddGameOutcome`'s own success case is actually named `Created`, not
+/// `Book_added`; this task's own case names are kept as specified.
+type AddBookOutcome =
+    | Book_added of slug: string
+    | Duplicate_found of existingSlug: string * existingTitle: string
+
+/// `setBookProgress` (Api.fs) — Manual source, today's date unless given;
+/// percent is computed from Page/TotalPages when Percent is absent.
+type SetReadingProgressRequest = {
+    Slug: string
+    Percent: int option
+    Page: int option
+    TotalPages: int option
+    ObservedOn: string option
 }
 
 // Games
@@ -1766,6 +1923,25 @@ type IMediathecaApi = {
     previewTmdbMovie: int -> Async<TmdbPreviewData option>
     previewTmdbSeries: int -> Async<TmdbPreviewData option>
     previewRawgGame: int -> Async<RawgPreviewData option>
+    // Books (books-y9kxy, ADR-0076/ADR-0077)
+    getBooks: unit -> Async<BookListItem list>
+    getBook: string -> Async<BookDetail option>
+    addBook: AddBookRequest -> Async<Result<AddBookOutcome, string>>
+    removeBook: string -> Async<Result<unit, string>>
+    setBookStatus: string -> BookStatus -> string option -> Async<Result<unit, string>>
+    setBookFormat: string -> BookFormat -> Async<Result<unit, string>>
+    setBookPersonalRating: string -> int option -> Async<Result<unit, string>>
+    setBookProgress: SetReadingProgressRequest -> Async<Result<unit, string>>
+    removeBookProgressObservation: string -> string -> ProgressSource -> Async<Result<unit, string>>
+    linkBookExternalId: string -> BookExternalId -> Async<Result<unit, string>>
+    recommendBookBy: string -> string -> Async<Result<unit, string>>
+    removeBookRecommendation: string -> string -> Async<Result<unit, string>>
+    // Book Content Blocks (a fourth parallel family — no owner-kind key
+    // exists on ContentBlocks; mirrors the Series/Games precedent exactly)
+    getBookContentBlocks: string -> Async<ContentBlockDto list>
+    addBookContentBlock: string -> AddContentBlockRequest -> Async<Result<string, string>>
+    updateBookContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
+    removeBookContentBlock: string -> string -> Async<Result<unit, string>>
 }
 
 // Administration console — a separate Remoting contract (ADR-0004 allows multiple

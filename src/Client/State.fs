@@ -20,11 +20,12 @@ let private loadSearchLibraryCmd (api: IMediathecaApi) : Cmd<Msg> =
         let! movies = api.getMovies ()
         let! series = api.getSeries ()
         let! games = api.getGames ()
-        return movies, series, games
+        let! books = api.getBooks ()
+        return movies, series, games, books
     }
     Cmd.OfAsync.perform
         (fun () -> loadAll) ()
-        (fun (movies, series, games) -> Search_modal_msg (SearchModal.Library_loaded (movies, series, games)))
+        (fun (movies, series, games, books) -> Search_modal_msg (SearchModal.Library_loaded (movies, series, games, books)))
 
 let init (api: IMediathecaApi) (adminApi: IAdminApi) () : Model * Cmd<Msg> =
     let dashboardModel, dashboardCmd = Pages.Dashboard.State.init ()
@@ -96,8 +97,8 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
     | None -> model, Cmd.none
     | Some searchModel ->
         match childMsg with
-        | SearchModal.Library_loaded (movies, series, games) ->
-            { model with SearchModal = Some (searchModel |> SearchModal.applyLibraryLoaded movies series games) },
+        | SearchModal.Library_loaded (movies, series, games, books) ->
+            { model with SearchModal = Some (searchModel |> SearchModal.applyLibraryLoaded movies series games books) },
             Cmd.none
 
         | SearchModal.Close ->
@@ -259,6 +260,8 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                         (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
                 | MediaType.Game ->
                     Cmd.none // Games use Import_rawg instead
+                | MediaType.Book ->
+                    Cmd.none // Books have no TMDB import path (books-g7g1j owns its own search tab)
             { model with SearchModal = Some { searchModel with IsImporting = true; Error = None } }, importCmd
 
         | SearchModal.Import_rawg rawgResult ->
@@ -321,6 +324,7 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                     | MediaType.Movie -> ("movies", slug)
                     | MediaType.Series -> ("series", slug)
                     | MediaType.Game -> ("games", slug)
+                    | MediaType.Book -> ("books", slug)
                 { model with SearchModal = None },
                 Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate (fst navSegments, snd navSegments))
             | Error err ->
@@ -373,6 +377,7 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                 | MediaType.Movie -> ("movies", slug)
                 | MediaType.Series -> ("series", slug)
                 | MediaType.Game -> ("games", slug)
+                | MediaType.Book -> ("books", slug)
             { model with SearchModal = None },
             Cmd.ofEffect (fun _ -> Feliz.Router.Router.navigate (fst navSegments, snd navSegments))
 

@@ -25,6 +25,7 @@ module Administration =
         "Movies", "Movie-"
         "Series", "Series-"
         "Games", "Game-"
+        "Books", "Book-"
         "Friends", "Friend-"
         "Catalogs", "Catalog-"
         "ContentBlocks", "ContentBlocks-"
@@ -63,6 +64,7 @@ module Administration =
         "Movie-", fun eventType data -> Movies.Serialization.deserialize eventType data |> Option.map Movies.Serialization.serialize
         "Series-", fun eventType data -> Series.Serialization.deserialize eventType data |> Option.map Series.Serialization.serialize
         "Game-", fun eventType data -> Games.Serialization.deserialize eventType data |> Option.map Games.Serialization.serialize
+        "Book-", fun eventType data -> Books.Serialization.deserialize eventType data |> Option.map Books.Serialization.serialize
         "Friend-", fun eventType data -> Friends.Serialization.deserialize eventType data |> Option.map Friends.Serialization.serialize
         "Catalog-", fun eventType data -> Catalogs.Serialization.deserialize eventType data |> Option.map Catalogs.Serialization.serialize
         "ContentBlocks-", fun eventType data -> ContentBlocks.Serialization.deserialize eventType data |> Option.map ContentBlocks.Serialization.serialize
@@ -126,11 +128,17 @@ module Administration =
     /// (administration-gxd6e). Same admin-console-only-knowledge shape as
     /// `boundedContextPrefixes` above — kept as a separate registry since a
     /// BC's set of handled event types is a different fact than its stream
-    /// prefix.
-    let private handledEventTypesByBoundedContext = [
+    /// prefix. Not `private` (matching `boundedContextPrefixes` above) so
+    /// `TableClassificationTests`-style registry-completeness tests can
+    /// assert every name in `boundedContextPrefixes` has an entry here —
+    /// the books-y9kxy iteration-2 drift (a new BC's prefix registered but
+    /// its handled-types entry forgotten) is exactly the gap that guard
+    /// closes.
+    let handledEventTypesByBoundedContext = [
         "Movies", Movies.Serialization.handledEventTypes
         "Series", Series.Serialization.handledEventTypes
         "Games", Games.Serialization.handledEventTypes
+        "Books", Books.Serialization.handledEventTypes
         "Friends", Friends.Serialization.handledEventTypes
         "Catalogs", Catalogs.Serialization.handledEventTypes
         "ContentBlocks", ContentBlocks.Serialization.handledEventTypes
@@ -408,6 +416,10 @@ module Administration =
         // (game, gaming day); the table is now checkpoint-tracked and
         // rebuildable, no longer PlaytimeTracker's imperative write.
         "game_play_session", Projected "PlaySessionProjection"
+        // books-y9kxy (ADR-0076/ADR-0077): the Book aggregate's read model.
+        "book_list", Projected "BookProjection"
+        "book_detail", Projected "BookProjection"
+        "book_progress", Projected "BookProjection"
 
         // Cache — re-derivable from Jellyfin's own state via a full
         // clear-then-repopulate sync (Api.fs's Jellyfin import handlers),
@@ -424,6 +436,11 @@ module Administration =
         // over a real refresh path for it.
         "game_metadata_cache", Cache "MetadataCache"
         "movie_metadata_cache", Cache "(none yet)"
+        // books-y9kxy (ADR-0076 §3 / ADR-0045): length/description/series
+        // metadata, refreshed by Integration's Open Library/Audible/
+        // Audnexus adapters (later tasks — this task ships the empty,
+        // classified table only).
+        "book_metadata_cache", Cache "Open Library / Audible / Audnexus adapters"
 
         // Cache — the Series season/episode tree (series-m7fdk, ADR-0043/
         // ADR-0045): renamed via ALTER TABLE from the former projection
@@ -882,6 +899,8 @@ module Administration =
         "game_list", "cover_ref"
         "game_detail", "cover_ref"
         "game_detail", "backdrop_ref"
+        "book_list", "cover_ref"
+        "book_detail", "cover_ref"
         "friend_list", "image_ref"
         "content_blocks", "image_ref"
         "game_journal_blocks", "image_ref"

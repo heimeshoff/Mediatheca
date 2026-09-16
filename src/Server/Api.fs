@@ -3725,6 +3725,314 @@ module Api =
                     return []
             }
 
+            // Books (books-y9kxy, ADR-0076/ADR-0077)
+            getBooks = fun () -> async {
+                use conn = factory ()
+                return BookProjection.getAll conn
+            }
+
+            getBook = fun slug -> async {
+                use conn = factory ()
+                return BookProjection.getBySlug conn slug
+            }
+
+            addBook = fun request -> async {
+                use conn = factory ()
+                try
+                    let year = request.Year |> Option.defaultValue 0
+                    let baseSlug = Slug.bookSlug request.Title year
+
+                    // Duplicate check (books-y9kxy): any external id already
+                    // linked -> Duplicate_found; else case-insensitive title +
+                    // first author -> Duplicate_found. SkipDuplicateCheck
+                    // bypasses both.
+                    let existing =
+                        if request.SkipDuplicateCheck then None
+                        else
+                            let byExternalId =
+                                request.ExternalIds
+                                |> List.tryPick (fun eid -> BookProjection.findByExternalId conn eid)
+                            match byExternalId with
+                            | Some existingSlug ->
+                                match BookProjection.getBySlug conn existingSlug with
+                                | Some b -> Some (existingSlug, b.Title)
+                                | None -> Some (existingSlug, request.Title)
+                            | None ->
+                                let firstAuthor = request.Authors |> List.tryHead |> Option.map (fun a -> a.ToLowerInvariant())
+                                BookProjection.findByTitle conn request.Title
+                                |> List.tryFind (fun (candidateSlug, _) ->
+                                    match BookProjection.getBySlug conn candidateSlug with
+                                    | Some b -> (b.Authors |> List.tryHead |> Option.map (fun a -> a.ToLowerInvariant())) = firstAuthor
+                                    | None -> false)
+
+                    match existing with
+                    | Some (existingSlug, existingTitle) ->
+                        return Ok (AddBookOutcome.Duplicate_found (existingSlug, existingTitle))
+                    | None ->
+                        let slug = generateUniqueSlug conn Books.streamId baseSlug
+                        let sid = Books.streamId slug
+
+                        let! coverRef = async {
+                            match request.CoverUrl with
+                            | None -> return None
+                            | Some url ->
+                                try
+                                    let! response = httpClient.GetAsync(url: string) |> Async.AwaitTask
+                                    response.EnsureSuccessStatusCode() |> ignore
+                                    let! bytes = response.Content.ReadAsByteArrayAsync() |> Async.AwaitTask
+                                    let relativePath = sprintf "posters/book-%s.jpg" slug
+                                    ImageStore.saveImage imageBasePath relativePath bytes
+                                    return Some relativePath
+                                with _ -> return None
+                        }
+
+                        let bookData: Books.BookAddedData = {
+                            Title = request.Title
+                            Authors = request.Authors
+                            Year = request.Year
+                            CoverRef = coverRef
+                            Subjects = request.Subjects
+                            Format = request.Format
+                            ExternalIds = request.ExternalIds
+                        }
+
+                        let result =
+                            executeCommand
+                                conn sid
+                                Books.Serialization.fromStoredEvent
+                                Books.reconstitute
+                                Books.decide
+                                Books.Serialization.toEventData
+                                (Books.Add_book_to_library bookData)
+                                projectionHandlers
+
+                        match result with
+                        | Error e -> return Error e
+                        | Ok () -> return Ok (AddBookOutcome.Book_added slug)
+                with ex ->
+                    return Error $"Failed to add book: {ex.Message}"
+            }
+
+            removeBook = fun slug -> async {
+                use conn = factory ()
+                let sid = Books.streamId slug
+                let result =
+                    executeCommand
+                        conn sid
+                        Books.Serialization.fromStoredEvent
+                        Books.reconstitute
+                        Books.decide
+                        Books.Serialization.toEventData
+                        Books.Remove_book_from_library
+                        projectionHandlers
+                match result with
+                | Ok () ->
+                    ImageStore.deleteImage imageBasePath (sprintf "posters/book-%s.jpg" slug)
+                    return Ok ()
+                | Error e -> return Error e
+            }
+
+            setBookStatus = fun slug status effectiveOn -> async {
+                use conn = factory ()
+                let sid = Books.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Books.Serialization.fromStoredEvent
+                        Books.reconstitute
+                        Books.decide
+                        Books.Serialization.toEventData
+                        (Books.Change_status (status, effectiveOn))
+                        projectionHandlers
+            }
+
+            setBookFormat = fun slug format -> async {
+                use conn = factory ()
+                let sid = Books.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Books.Serialization.fromStoredEvent
+                        Books.reconstitute
+                        Books.decide
+                        Books.Serialization.toEventData
+                        (Books.Set_format format)
+                        projectionHandlers
+            }
+
+            setBookPersonalRating = fun slug rating -> async {
+                use conn = factory ()
+                let sid = Books.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Books.Serialization.fromStoredEvent
+                        Books.reconstitute
+                        Books.decide
+                        Books.Serialization.toEventData
+                        (Books.Set_personal_rating rating)
+                        projectionHandlers
+            }
+
+            // Manual source, today's date unless given; percent is computed
+            // from Page/TotalPages when Percent is absent (books-y9kxy).
+            // Derived-percent rounding for adapter sources is the adapters'
+            // own concern (integration-jjvg2/integration-y2ak4 floor theirs);
+            // this manual path floors too, via integer division.
+            setBookProgress = fun request -> async {
+                use conn = factory ()
+                let position =
+                    match request.Page with
+                    | Some page -> Some (Page (page, request.TotalPages))
+                    | None -> None
+                let computedPercent =
+                    match request.Percent with
+                    | Some p -> Some p
+                    | None ->
+                        match request.Page, request.TotalPages with
+                        | Some page, Some total when total > 0 -> Some (page * 100 / total)
+                        | _ -> None
+                match computedPercent with
+                | None -> return Error "setBookProgress requires Percent, or Page and TotalPages"
+                | Some percent ->
+                    let observedOn = request.ObservedOn |> Option.defaultValue (System.DateTime.UtcNow.ToString("yyyy-MM-dd"))
+                    let data: Books.ReadingProgressObservedData = {
+                        Percent = percent
+                        Position = position
+                        Source = ProgressSource.Manual
+                        ObservedOn = observedOn
+                        Finished = false
+                    }
+                    let sid = Books.streamId request.Slug
+                    return
+                        executeCommand
+                            conn sid
+                            Books.Serialization.fromStoredEvent
+                            Books.reconstitute
+                            Books.decide
+                            Books.Serialization.toEventData
+                            (Books.Observe_reading_progress data)
+                            projectionHandlers
+            }
+
+            removeBookProgressObservation = fun slug observedOn source -> async {
+                use conn = factory ()
+                let sid = Books.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Books.Serialization.fromStoredEvent
+                        Books.reconstitute
+                        Books.decide
+                        Books.Serialization.toEventData
+                        (Books.Remove_reading_progress_observation (observedOn, source))
+                        projectionHandlers
+            }
+
+            linkBookExternalId = fun slug externalId -> async {
+                use conn = factory ()
+                let sid = Books.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Books.Serialization.fromStoredEvent
+                        Books.reconstitute
+                        Books.decide
+                        Books.Serialization.toEventData
+                        (Books.Link_external_id externalId)
+                        projectionHandlers
+            }
+
+            recommendBookBy = fun slug friendSlug -> async {
+                use conn = factory ()
+                let sid = Books.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Books.Serialization.fromStoredEvent
+                        Books.reconstitute
+                        Books.decide
+                        Books.Serialization.toEventData
+                        (Books.Recommend_by friendSlug)
+                        projectionHandlers
+            }
+
+            removeBookRecommendation = fun slug friendSlug -> async {
+                use conn = factory ()
+                let sid = Books.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Books.Serialization.fromStoredEvent
+                        Books.reconstitute
+                        Books.decide
+                        Books.Serialization.toEventData
+                        (Books.Remove_recommendation friendSlug)
+                        projectionHandlers
+            }
+
+            // Book Content Blocks — a fourth parallel family mirroring
+            // Series/Games exactly. ContentBlocks.streamId is bare-slug
+            // (no owner-kind key exists to extend, books-y9kxy).
+            getBookContentBlocks = fun slug -> async {
+                use conn = factory ()
+                return ContentBlockProjection.getForMovieDetail conn slug
+            }
+
+            addBookContentBlock = fun slug request -> async {
+                use conn = factory ()
+                let sid = ContentBlocks.streamId slug
+                let blockId = System.Guid.NewGuid().ToString("N")
+                let blockData: ContentBlocks.ContentBlockData = {
+                    BlockId = blockId
+                    BlockType = request.BlockType
+                    Content = request.Content
+                    ImageRef = request.ImageRef
+                    Url = request.Url
+                    Caption = request.Caption
+                }
+                let result =
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Add_content_block (blockData, None))
+                        projectionHandlers
+                match result with
+                | Ok () -> return Ok blockId
+                | Error e -> return Error e
+            }
+
+            updateBookContentBlock = fun slug blockId request -> async {
+                use conn = factory ()
+                let sid = ContentBlocks.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Update_content_block (blockId, request.Content, request.ImageRef, request.Url, request.Caption))
+                        projectionHandlers
+            }
+
+            removeBookContentBlock = fun slug blockId -> async {
+                use conn = factory ()
+                let sid = ContentBlocks.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        ContentBlocks.Serialization.fromStoredEvent
+                        ContentBlocks.reconstitute
+                        ContentBlocks.decide
+                        ContentBlocks.Serialization.toEventData
+                        (ContentBlocks.Remove_content_block blockId)
+                        projectionHandlers
+            }
+
             // Games Settings
             getRawgApiKey = fun () -> async {
                 use conn = factory ()
@@ -4940,6 +5248,9 @@ module Api =
                         let slug = streamPrefix.Substring(6)
                         Some (ContentBlocks.streamId slug)
                     elif streamPrefix.StartsWith("Game-") then
+                        let slug = streamPrefix.Substring(5)
+                        Some (ContentBlocks.streamId slug)
+                    elif streamPrefix.StartsWith("Book-") then
                         let slug = streamPrefix.Substring(5)
                         Some (ContentBlocks.streamId slug)
                     else

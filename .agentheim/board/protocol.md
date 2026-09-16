@@ -5,6 +5,41 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 03:29 -- Task verified and completed: books-y9kxy - Book aggregate, projection, metadata cache slice and API — the server core of the new Books BC (identity card, external ids, format, Games-shaped status, event-sourced reading-progress observations, personal rating, recommended-by), registered in every Administration registry, with MediaType.Book threaded through Shared
+
+**Type:** Work / Task completion
+**Task:** books-y9kxy - Book aggregate, projection, metadata cache slice and API — the server core of the new Books BC (identity card, external ids, format, Games-shaped status, event-sourced reading-progress observations, personal rating, recommended-by), registered in every Administration registry, with MediaType.Book threaded through Shared
+**Summary:** Built the Book aggregate (Books.fs), BookProjection (book_list/book_detail/book_progress), the book_metadata_cache slice, every Administration registry entry (incl. handledEventTypesByBoundedContext with a registry-completeness guard), and the full Remoting API for books plus a fourth content-blocks method family, threading MediaType.Book through Shared and the client's search/navigation with zero incomplete-match warnings. Verifier iterations 1–2 added the finished_at-default test, the status event in the drift-zero rebuild, the README Status bullet correction, and the Health-tab unknown-event registration.
+**Duration:** 1h14m
+**Verification:** PASS (iteration 3)
+**Files changed:** 21
+**Tests added:** 36
+**ADRs written:** none
+
+---
+
+## 2026-09-16 03:15 -- Verification failed: books-y9kxy - Book aggregate, projection, metadata cache slice and API — the server core of the new Books BC
+
+**Type:** Work / Verification failure
+**Task:** books-y9kxy - Book aggregate, projection, metadata cache slice and API — the server core of the new Books BC
+**Iteration:** 2 of 3
+**Reasons:** Administration.handledEventTypesByBoundedContext has no Books entry, so the Health tab's unknown-event report would list every Book event type as unhandled (criterion 4); the iteration-1 findings are closed
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
+## 2026-09-16 03:02 -- Verification failed: books-y9kxy - Book aggregate, projection, metadata cache slice and API — the server core of the new Books BC
+
+**Type:** Work / Verification failure
+**Task:** books-y9kxy - Book aggregate, projection, metadata cache slice and API — the server core of the new Books BC
+**Iteration:** 1 of 3
+**Reasons:** no test for the projection's finished_at default when effectiveOn is None, the drift-zero rebuild test omits the Book_status_changed event the criterion names, README "Status" bullet still says any non-InFocus status promotes (aggregate excludes Finished)
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-09-16 02:16 -- Batch started: [books-y9kxy]
 
 **Type:** Work / Batch start

@@ -12,8 +12,8 @@ Catalog of this bounded context's tasks by status.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 2
-- **Doing:** 1
-- **Done:** 0
+- **Doing:** 0
+- **Done:** 1
 <!-- task-counts:end -->
 
 ### Todo
@@ -24,11 +24,11 @@ Catalog of this bounded context's tasks by status.
 
 ### Doing
 <!-- doing-list:start -->
-- **books-y9kxy** — Book aggregate, projection, metadata cache slice and API — the server core of the new Books BC (identity card, external ids, format, Games-shaped status, event-sourced reading-progress observations, personal rating, recommended-by), registered in every Administration registry, with MediaType.Book threaded through Shared (feature) — `doing/books-y9kxy-book-aggregate-projection-and-api.md`
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **books-y9kxy** — Book aggregate, projection, metadata cache slice and API — the server core of the new Books BC (identity card, external ids, format, Games-shaped status, event-sourced reading-progress observations, personal rating, recommended-by), registered in every Administration registry, with MediaType.Book threaded through Shared (feature) — `done/books-y9kxy-book-aggregate-projection-and-api.md`
 <!-- done-list:end -->
 
 ### Backlog

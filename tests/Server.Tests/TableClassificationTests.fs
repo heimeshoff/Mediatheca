@@ -27,6 +27,7 @@ let private bootstrapEverything (conn: SqliteConnection) =
     MovieProjection.handler.Init conn
     SeriesProjection.handler.Init conn
     GameProjection.handler.Init conn
+    BookProjection.handler.Init conn
     PlaySessionProjection.handler.Init conn
     CatalogProjection.handler.Init conn
     Administration.initializeJobRuns conn
@@ -54,6 +55,7 @@ let private allProjectionHandlers = [
     CatalogProjection.handler
     SeriesProjection.handler
     GameProjection.handler
+    BookProjection.handler
     PlaySessionProjection.handler
 ]
 
@@ -110,6 +112,7 @@ let tests =
                 "SeriesProjection", [ "series_list"; "series_detail"; "series_rewatch_sessions"; "series_episode_progress" ]
                 "GameProjection", [ "game_list"; "game_detail" ]
                 "PlaySessionProjection", [ "game_play_session" ]
+                "BookProjection", [ "book_list"; "book_detail"; "book_progress" ]
             ]
             let derivedFromRegistry =
                 Administration.tableRegistry

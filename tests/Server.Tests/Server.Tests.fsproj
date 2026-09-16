@@ -35,6 +35,9 @@
     <Compile Include="SeriesRefreshCacheTests.fs" />
     <Compile Include="SeriesProjectionReadsTests.fs" />
     <Compile Include="GamesTests.fs" />
+    <Compile Include="BooksTests.fs" />
+    <Compile Include="BookProjectionTests.fs" />
+    <Compile Include="BooksApiTests.fs" />
     <Compile Include="FacetDerivationTests.fs" />
     <Compile Include="ReleaseDateParsingTests.fs" />
     <Compile Include="PlayFacetsOverrideTests.fs" />

@@ -23,7 +23,7 @@ let private readFileAsBytes (file: Browser.Types.File) (onDone: byte array * str
         onDone (uint8Array, file.name)
     reader.readAsArrayBuffer(file)
 
-let private routeForMedia (mediaType: MediaType) = match mediaType with | Movie -> "movies" | Series -> "series" | Game -> "games"
+let private routeForMedia (mediaType: MediaType) = match mediaType with | Movie -> "movies" | Series -> "series" | Game -> "games" | Book -> "books"
 
 let private mediaListRow (onRemove: (string * string) -> unit) (item: EntryList.EntryItem) =
     Html.div [

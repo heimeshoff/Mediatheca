@@ -218,6 +218,22 @@ module MetadataCache =
                 episode_runtime INTEGER,
                 fetched_at      TEXT
             );
+
+            CREATE TABLE IF NOT EXISTS book_metadata_cache (
+                book_slug       TEXT PRIMARY KEY,
+                description     TEXT,
+                page_count      INTEGER,
+                runtime_minutes INTEGER,
+                narrators       TEXT,
+                series_name     TEXT,
+                series_position INTEGER,
+                publisher       TEXT,
+                published_date  TEXT,
+                average_rating  REAL,
+                language        TEXT,
+                source          TEXT,
+                fetched_at      TEXT
+            );
             """
         |> Db.exec
 
@@ -848,3 +864,110 @@ module MetadataCache =
             """
         |> Db.query (fun (rd: IDataReader) ->
             rd.ReadString "game_slug", rd.ReadInt32 "steam_app_id")
+
+    /// books-y9kxy (ADR-0076 §3 / ADR-0045): the description/length/series
+    /// metadata cache slice — `page_count`, `runtime_minutes`, `description`,
+    /// `narrators`, `series_name`/`series_position`, `publisher`,
+    /// `published_date`, `average_rating`, `language`. Written by
+    /// Integration's Open Library/Audible/Audnexus adapters (later tasks),
+    /// read at query time by `BookProjection.getBySlug`'s join — a
+    /// `ProjectionHandler` never touches this table.
+    type BookMetadata = {
+        Description: string option
+        PageCount: int option
+        RuntimeMinutes: int option
+        Narrators: string list
+        SeriesName: string option
+        SeriesPosition: int option
+        Publisher: string option
+        PublishedDate: string option
+        AverageRating: float option
+        Language: string option
+        Source: string option
+    }
+
+    let private emptyBookMetadata : BookMetadata = {
+        Description = None
+        PageCount = None
+        RuntimeMinutes = None
+        Narrators = []
+        SeriesName = None
+        SeriesPosition = None
+        Publisher = None
+        PublishedDate = None
+        AverageRating = None
+        Language = None
+        Source = None
+    }
+
+    /// `INSERT ... ON CONFLICT DO UPDATE` naming every column this slice
+    /// owns — the whole table, since `book_metadata_cache` has no other
+    /// writer/slice to preserve (unlike `game_metadata_cache`'s several
+    /// independently-scheduled slices). Stamps `fetched_at` on every genuine
+    /// write, the same "seed vs. real fetch" distinction every other cache
+    /// upsert in this module uses (there is no seed step for books — this is
+    /// always a genuine fetch).
+    let upsertBookMetadata (conn: SqliteConnection) (slug: string) (metadata: BookMetadata) : unit =
+        let narratorsJson = metadata.Narrators |> List.map Encode.string |> Encode.list |> Encode.toString 0
+        conn
+        |> Db.newCommand
+            """
+            INSERT INTO book_metadata_cache
+                (book_slug, description, page_count, runtime_minutes, narrators, series_name, series_position,
+                 publisher, published_date, average_rating, language, source, fetched_at)
+            VALUES
+                (@book_slug, @description, @page_count, @runtime_minutes, @narrators, @series_name, @series_position,
+                 @publisher, @published_date, @average_rating, @language, @source, @fetched_at)
+            ON CONFLICT(book_slug) DO UPDATE SET
+                description = excluded.description,
+                page_count = excluded.page_count,
+                runtime_minutes = excluded.runtime_minutes,
+                narrators = excluded.narrators,
+                series_name = excluded.series_name,
+                series_position = excluded.series_position,
+                publisher = excluded.publisher,
+                published_date = excluded.published_date,
+                average_rating = excluded.average_rating,
+                language = excluded.language,
+                source = excluded.source,
+                fetched_at = excluded.fetched_at
+            """
+        |> Db.setParams [
+            "book_slug", SqlType.String slug
+            "description", (match metadata.Description with Some d -> SqlType.String d | None -> SqlType.Null)
+            "page_count", (match metadata.PageCount with Some p -> SqlType.Int32 p | None -> SqlType.Null)
+            "runtime_minutes", (match metadata.RuntimeMinutes with Some r -> SqlType.Int32 r | None -> SqlType.Null)
+            "narrators", SqlType.String narratorsJson
+            "series_name", (match metadata.SeriesName with Some s -> SqlType.String s | None -> SqlType.Null)
+            "series_position", (match metadata.SeriesPosition with Some p -> SqlType.Int32 p | None -> SqlType.Null)
+            "publisher", (match metadata.Publisher with Some p -> SqlType.String p | None -> SqlType.Null)
+            "published_date", (match metadata.PublishedDate with Some d -> SqlType.String d | None -> SqlType.Null)
+            "average_rating", (match metadata.AverageRating with Some r -> SqlType.Double r | None -> SqlType.Null)
+            "language", (match metadata.Language with Some l -> SqlType.String l | None -> SqlType.Null)
+            "source", (match metadata.Source with Some s -> SqlType.String s | None -> SqlType.Null)
+            "fetched_at", SqlType.String (System.DateTime.UtcNow.ToString("o"))
+        ]
+        |> Db.exec
+
+    /// Honest-degradation read (ADR-0048) — an empty `BookMetadata` when no
+    /// cache row exists yet, never a fabricated value.
+    let tryGetBookMetadata (conn: SqliteConnection) (slug: string) : BookMetadata =
+        conn
+        |> Db.newCommand
+            "SELECT description, page_count, runtime_minutes, narrators, series_name, series_position, publisher, published_date, average_rating, language, source FROM book_metadata_cache WHERE book_slug = @slug"
+        |> Db.setParams [ "slug", SqlType.String slug ]
+        |> Db.querySingle (fun (rd: IDataReader) ->
+            { Description = if rd.IsDBNull(rd.GetOrdinal("description")) then None else Some (rd.ReadString "description")
+              PageCount = if rd.IsDBNull(rd.GetOrdinal("page_count")) then None else Some (rd.ReadInt32 "page_count")
+              RuntimeMinutes = if rd.IsDBNull(rd.GetOrdinal("runtime_minutes")) then None else Some (rd.ReadInt32 "runtime_minutes")
+              Narrators =
+                if rd.IsDBNull(rd.GetOrdinal("narrators")) then []
+                else Decode.fromString (Decode.list Decode.string) (rd.ReadString "narrators") |> Result.defaultValue []
+              SeriesName = if rd.IsDBNull(rd.GetOrdinal("series_name")) then None else Some (rd.ReadString "series_name")
+              SeriesPosition = if rd.IsDBNull(rd.GetOrdinal("series_position")) then None else Some (rd.ReadInt32 "series_position")
+              Publisher = if rd.IsDBNull(rd.GetOrdinal("publisher")) then None else Some (rd.ReadString "publisher")
+              PublishedDate = if rd.IsDBNull(rd.GetOrdinal("published_date")) then None else Some (rd.ReadString "published_date")
+              AverageRating = if rd.IsDBNull(rd.GetOrdinal("average_rating")) then None else Some (rd.ReadDouble "average_rating")
+              Language = if rd.IsDBNull(rd.GetOrdinal("language")) then None else Some (rd.ReadString "language")
+              Source = if rd.IsDBNull(rd.GetOrdinal("source")) then None else Some (rd.ReadString "source") })
+        |> Option.defaultValue emptyBookMetadata

@@ -22,6 +22,7 @@
     <Compile Include="Friends.fs" />
     <Compile Include="Series.fs" />
     <Compile Include="Games.fs" />
+    <Compile Include="Books.fs" />
     <Compile Include="FacetDerivation.fs" />
     <Compile Include="ReleaseDateParsing.fs" />
     <Compile Include="Tmdb.fs" />
@@ -46,6 +47,7 @@
     <Compile Include="FriendProjection.fs" />
     <Compile Include="SeriesProjection.fs" />
     <Compile Include="GameProjection.fs" />
+    <Compile Include="BookProjection.fs" />
     <Compile Include="PlaySessionProjection.fs" />
     <Compile Include="PlaytimeTracker.fs" />
     <Compile Include="GameFacetBackfill.fs" />

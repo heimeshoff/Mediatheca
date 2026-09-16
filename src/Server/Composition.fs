@@ -265,6 +265,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         CatalogProjection.handler
         SeriesProjection.handler
         GameProjection.handler
+        BookProjection.handler
         PlaySessionProjection.handler
     ]
 

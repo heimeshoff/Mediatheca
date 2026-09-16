@@ -31,6 +31,9 @@ type Model = {
     LibraryMovies: MovieListItem list
     LibrarySeries: SeriesListItem list
     LibraryGames: GameListItem list
+    /// books-y9kxy: no dedicated Books search tab yet (books-g7g1j) — books
+    /// are searchable from the Library tab only, via `filterLibrary`.
+    LibraryBooks: BookListItem list
     TmdbResults: TmdbSearchResult list
     RawgResults: RawgSearchResult list
     SteamResults: SteamSearchResult list
@@ -54,7 +57,7 @@ type Model = {
 }
 
 type Msg =
-    | Library_loaded of MovieListItem list * SeriesListItem list * GameListItem list
+    | Library_loaded of MovieListItem list * SeriesListItem list * GameListItem list * BookListItem list
     | Query_changed of string
     | Tab_changed of SearchTab
     | Debounce_tmdb_expired of version: int
@@ -95,6 +98,7 @@ let init () : Model = {
     LibraryMovies = []
     LibrarySeries = []
     LibraryGames = []
+    LibraryBooks = []
     TmdbResults = []
     RawgResults = []
     SteamResults = []
@@ -117,10 +121,10 @@ let init () : Model = {
 /// The `Library_loaded` reducer step, pulled out as a plain function so the
 /// seeded-from-fetch path is directly testable (`SearchModal.test.fs`)
 /// without standing up the root `State.fs`/API plumbing around it.
-let applyLibraryLoaded (movies: MovieListItem list) (series: SeriesListItem list) (games: GameListItem list) (model: Model) : Model =
-    { model with LibraryMovies = movies; LibrarySeries = series; LibraryGames = games }
+let applyLibraryLoaded (movies: MovieListItem list) (series: SeriesListItem list) (games: GameListItem list) (books: BookListItem list) (model: Model) : Model =
+    { model with LibraryMovies = movies; LibrarySeries = series; LibraryGames = games; LibraryBooks = books }
 
-let filterLibrary (query: string) (movies: MovieListItem list) (series: SeriesListItem list) (games: GameListItem list) : LibrarySearchResult list =
+let filterLibrary (query: string) (movies: MovieListItem list) (series: SeriesListItem list) (games: GameListItem list) (books: BookListItem list) : LibrarySearchResult list =
     if query = "" then []
     else
         let searchQuery, yearFilter = FuzzyMatch.extractYear query
@@ -140,6 +144,14 @@ let filterLibrary (query: string) (movies: MovieListItem list) (series: SeriesLi
                            Year = s.Year
                            PosterRef = s.PosterRef
                            MediaType = MediaType.Series }))
+        let bookItems =
+            books
+            |> List.map (fun b ->
+                (b.Title, { LibrarySearchResult.Slug = b.Slug
+                            Name = b.Title
+                            Year = b.Year |> Option.defaultValue 0
+                            PosterRef = b.CoverRef
+                            MediaType = MediaType.Book }))
         let gameItems =
             games
             |> List.map (fun g ->
@@ -148,7 +160,7 @@ let filterLibrary (query: string) (movies: MovieListItem list) (series: SeriesLi
                            Year = g.Year
                            PosterRef = g.CoverRef
                            MediaType = MediaType.Game }))
-        let allItems = movieItems @ seriesItems @ gameItems
+        let allItems = movieItems @ seriesItems @ gameItems @ bookItems
         let results = FuzzyMatch.fuzzyMatch 20 searchQuery allItems
         match yearFilter with
         | Some year ->
@@ -540,7 +552,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
     let hoverTimerRef = React.useRef(None : int option)
     let activeTab = model.ActiveTab
 
-    let localResults = filterLibrary model.Query model.LibraryMovies model.LibrarySeries model.LibraryGames
+    let localResults = filterLibrary model.Query model.LibraryMovies model.LibrarySeries model.LibraryGames model.LibraryBooks
 
     // Build lookup of library items by (lowercased name, year) to exclude from external results
     let libraryMovieKeys =
@@ -561,6 +573,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
         | MediaType.Movie -> libraryMovieKeys |> Set.contains key
         | MediaType.Series -> librarySeriesKeys |> Set.contains key
         | MediaType.Game -> false
+        | MediaType.Book -> false // TmdbSearchResult never carries Book — books-g7g1j owns its own search tab
     let isGameInLibrary (r: RawgSearchResult) =
         let key = r.Name.ToLowerInvariant(), r.Year |> Option.defaultValue 0
         libraryGameKeys |> Set.contains key
@@ -760,6 +773,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 | MediaType.Movie -> Icons.movie ()
                                 | MediaType.Series -> Icons.tv ()
                                 | MediaType.Game -> Icons.gamepad ()
+                                | MediaType.Book -> Icons.book ()
                             let mediaBadge =
                                 Some (
                                     Daisy.badge [
@@ -769,12 +783,14 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                             | MediaType.Movie -> "bg-blue-500/80 text-white border-0"
                                             | MediaType.Series -> "bg-purple-500/80 text-white border-0"
                                             | MediaType.Game -> "bg-green-500/80 text-white border-0"
+                                            | MediaType.Book -> "bg-amber-500/80 text-white border-0"
                                         )
                                         prop.text (
                                             match result.MediaType with
                                             | MediaType.Movie -> "Movie"
                                             | MediaType.Series -> "Series"
                                             | MediaType.Game -> "Game"
+                                            | MediaType.Book -> "Book"
                                         )
                                     ]
                                 )
@@ -783,6 +799,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 | MediaType.Movie -> $"lib:movie:{result.Slug}"
                                 | MediaType.Series -> $"lib:series:{result.Slug}"
                                 | MediaType.Game -> $"lib:game:{result.Slug}"
+                                | MediaType.Book -> $"lib:book:{result.Slug}"
                             renderPosterCard
                                 imgSrc
                                 fallbackIcon

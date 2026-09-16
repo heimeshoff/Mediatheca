@@ -350,6 +350,51 @@ module EventFormatting =
             Some { Timestamp = ts; Label = "Play facets overridden"; Details = details }
         | _ -> None
 
+    let formatBookEvent (storedEvent: EventStore.StoredEvent) : EventHistoryEntry option =
+        let ts = storedEvent.Timestamp.ToString("yyyy-MM-dd HH:mm")
+        let data = storedEvent.Data
+        match storedEvent.EventType with
+        | "Book_added_to_library" ->
+            let title = tryField "title" data |> Option.defaultValue "?"
+            Some { Timestamp = ts; Label = "Added to library"; Details = [ title ] }
+        | "Book_removed_from_library" ->
+            Some { Timestamp = ts; Label = "Removed from library"; Details = [] }
+        | "Book_cover_replaced" ->
+            Some { Timestamp = ts; Label = "Cover replaced"; Details = [] }
+        | "Book_external_id_linked" ->
+            let kind = tryField "kind" data |> Option.defaultValue "?"
+            let value = tryField "value" data |> Option.defaultValue "?"
+            Some { Timestamp = ts; Label = "External id linked"; Details = [ $"{kind}: {value}" ] }
+        | "Book_format_set" ->
+            let format = tryField "format" data |> Option.defaultValue "?"
+            Some { Timestamp = ts; Label = "Format set"; Details = [ format ] }
+        | "Book_status_changed" ->
+            let status = tryField "status" data |> Option.defaultValue "?"
+            let effectiveOn = tryField "effectiveOn" data
+            let details = [ $"New status: {status}" ] @ (effectiveOn |> Option.map (fun d -> $"Effective on: {d}") |> Option.toList)
+            Some { Timestamp = ts; Label = "Status changed"; Details = details }
+        | "Reading_progress_observed" ->
+            let percent = tryFieldInt "percent" data |> Option.defaultValue 0
+            let source = tryField "source" data |> Option.defaultValue "?"
+            let observedOn = tryField "observedOn" data |> Option.defaultValue "?"
+            Some { Timestamp = ts; Label = "Reading progress observed"; Details = [ $"{observedOn}: {percent}%% ({source})" ] }
+        | "Reading_progress_observation_removed" ->
+            let observedOn = tryField "observedOn" data |> Option.defaultValue "?"
+            let source = tryField "source" data |> Option.defaultValue "?"
+            Some { Timestamp = ts; Label = "Reading progress observation removed"; Details = [ $"{observedOn} ({source})" ] }
+        | "Book_personal_rating_set" ->
+            let rating = tryFieldOptionalInt "rating" data
+            match rating with
+            | Some r -> Some { Timestamp = ts; Label = "Personal rating set"; Details = [ $"Rating: {r}" ] }
+            | None -> Some { Timestamp = ts; Label = "Personal rating cleared"; Details = [] }
+        | "Book_recommended_by" ->
+            let friend = tryField "friendSlug" data |> Option.defaultValue "?"
+            Some { Timestamp = ts; Label = "Recommendation added"; Details = [ $"By: {friend}" ] }
+        | "Book_recommendation_removed" ->
+            let friend = tryField "friendSlug" data |> Option.defaultValue "?"
+            Some { Timestamp = ts; Label = "Recommendation removed"; Details = [ $"From: {friend}" ] }
+        | _ -> None
+
     let formatFriendEvent (storedEvent: EventStore.StoredEvent) : EventHistoryEntry option =
         let ts = storedEvent.Timestamp.ToString("yyyy-MM-dd HH:mm")
         let data = storedEvent.Data
@@ -440,6 +485,7 @@ module EventFormatting =
         if streamId.StartsWith("Movie-") then formatMovieEvent storedEvent
         elif streamId.StartsWith("Series-") then formatSeriesEvent storedEvent
         elif streamId.StartsWith("Game-") then formatGameEvent storedEvent
+        elif streamId.StartsWith("Book-") then formatBookEvent storedEvent
         elif streamId.StartsWith("Friend-") then formatFriendEvent storedEvent
         elif streamId.StartsWith("Catalog-") then formatCatalogEvent storedEvent
         elif streamId.StartsWith("ContentBlocks-") then formatContentBlockEvent storedEvent

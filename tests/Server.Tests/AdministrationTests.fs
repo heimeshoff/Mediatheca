@@ -29,6 +29,7 @@ let private bootstrapAdmin (conn: SqliteConnection) =
     MovieProjection.handler.Init conn
     SeriesProjection.handler.Init conn
     GameProjection.handler.Init conn
+    BookProjection.handler.Init conn
     PlaySessionProjection.handler.Init conn
     CatalogProjection.handler.Init conn
     // games-a7dqx: GameProjection.getBySlug/getAll etc. now LEFT JOIN
@@ -529,6 +530,49 @@ let administrationTests =
             Expect.isEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "Series_refreshed")) "Series_refreshed is handled by Series' deserializer for both the historical and narrowed payload shapes"
             Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Series_refreshed")) "Series_refreshed has a formatter case for both the historical and narrowed payload shapes"
 
+        testCase "getHealthStats one of every BookEvent appears in neither the unhandled nor the unformattable list (books-y9kxy iteration 3: Books registered in handledEventTypesByBoundedContext)" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
+            let streamId = Books.streamId "the-fellowship-of-the-ring"
+            let addedData: Books.BookAddedData = {
+                Title = "The Fellowship of the Ring"; Authors = [ "J.R.R. Tolkien" ]; Year = Some 1954
+                CoverRef = None; Subjects = []; Format = BookFormat.Print; ExternalIds = []
+            }
+            let progressData: Books.ReadingProgressObservedData = {
+                Percent = 42; Position = Some (Page (137, Some 423)); Source = ProgressSource.Manual
+                ObservedOn = "2026-01-05"; Finished = false
+            }
+            EventStore.appendToStream conn streamId -1L [
+                Books.Serialization.toEventData (Books.Book_added_to_library addedData)
+                Books.Serialization.toEventData Books.Book_removed_from_library
+                Books.Serialization.toEventData (Books.Book_cover_replaced "book-cover.jpg")
+                Books.Serialization.toEventData (Books.Book_external_id_linked (Isbn13 "9780618260274"))
+                Books.Serialization.toEventData (Books.Book_format_set BookFormat.Ebook)
+                Books.Serialization.toEventData (Books.Book_status_changed (BookStatus.InFocus, None))
+                Books.Serialization.toEventData (Books.Reading_progress_observed progressData)
+                Books.Serialization.toEventData (Books.Reading_progress_observation_removed ("2026-01-05", ProgressSource.Manual))
+                Books.Serialization.toEventData (Books.Book_personal_rating_set (Some 4))
+                Books.Serialization.toEventData (Books.Book_recommended_by "alice")
+                Books.Serialization.toEventData (Books.Book_recommendation_removed "alice")
+            ] |> ignore
+            let api = createApi db.Factory
+
+            let stats = api.getHealthStats () |> Async.RunSynchronously
+
+            for eventType in Books.Serialization.handledEventTypes do
+                Expect.isEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = eventType)) (sprintf "%s is handled by Books' deserializer, so it must not appear in the unhandled list" eventType)
+                Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = eventType)) (sprintf "%s must have a formatter case in EventFormatting.formatBookEvent, so it must not appear in the unformattable list" eventType)
+
+        testCase "handledEventTypesByBoundedContext has an entry for every bounded context named in boundedContextPrefixes (registry-completeness guard)" <| fun _ ->
+            // Closes the books-y9kxy iteration-2 drift by construction: a BC
+            // registered in boundedContextPrefixes (so its streams resolve to
+            // an owning BC) but forgotten in handledEventTypesByBoundedContext
+            // would otherwise have every one of its event types silently
+            // reported as unhandled on the Health tab, with no test failing.
+            let prefixNames = Administration.boundedContextPrefixes |> List.map fst |> Set.ofList
+            let handledNames = Administration.handledEventTypesByBoundedContext |> List.map fst |> Set.ofList
+            Expect.equal handledNames prefixNames "Every bounded context named in boundedContextPrefixes must have a matching handledEventTypesByBoundedContext entry, or its event types will silently be reported as unhandled"
+
         testCase "getProjectionStats lists all registered projections with checkpoint, lag, and row counts" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapAdmin
             let conn = db.Connection
@@ -580,7 +624,10 @@ let administrationTests =
             use db = TestDb.withTempDbFactory bootstrapAdmin
             let conn = db.Connection
 
-            Expect.equal (List.length Administration.imageRefColumns) 15 "Registry should list all fifteen ref-bearing columns"
+            // books-y9kxy adds book_list.cover_ref/book_detail.cover_ref (two
+            // more ref-bearing columns) to the fifteen this registry already
+            // named.
+            Expect.equal (List.length Administration.imageRefColumns) 17 "Registry should list all seventeen ref-bearing columns"
 
             for (table, column) in Administration.imageRefColumns do
                 use cmd = conn.CreateCommand()
