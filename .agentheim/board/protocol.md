@@ -5,6 +5,25 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 18:16 -- Batch started: [curation-knqfj]
+
+**Type:** Work / Batch start
+**Tasks:** curation-knqfj - Notes editor on every detail page — `JournalEditor` becomes `NotesEditor` taking `(MediaType, slug)` over `getNotes`/`saveNotes`, mounted where `ContentBlockEditor` sits on Movie/Series/Book detail and on the Game detail tab (label "Notes"); `ContentBlockEditor` and its StyleGuide specimens go, one NotesEditor specimen replaces them (ADR-0080, step 2 of 3)
+**Parallel:** yes (1 worker — second wave; curation-knqfj was held from wave 1 because it overlapped books-f3sb2 on all four detail-page Views.fs and Client.fsproj — books-f3sb2 is now integrated (d81eaab), so knqfj branches from a main that already carries the CatalogManager extraction; dispatched while curation-w9fkq's iteration-2 re-dispatch runs in its own worktree)
+
+---
+
+## 2026-09-16 18:14 -- Verification failed: curation-w9fkq - Backfill legacy catalog_entries media_type via corrective event, self-heal the widened UNIQUE at Init, restore Add_entry pair identity
+
+**Type:** Work / Verification failure
+**Task:** curation-w9fkq - Backfill legacy catalog_entries media_type via corrective event, self-heal the widened UNIQUE at Init, restore Add_entry pair identity
+**Iteration:** 1 of 3
+**Reasons:** the acceptance criterion's `checkProjectionDrift` zero-discrepancy conjunct (after backfill + rebuild) has no test; `Entry_media_types_inferred` is in `handledEventTypes` but has no `EventFormatting.formatCatalogEvent` arm (would surface in UnformattableEventTypes and render nothing in the stream drill-in); `npm run test:client` unverifiable at verification time because the conductor emptied the main tree's node_modules by removing a sibling worktree before unlinking its junction (restored via npm ci)
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-09-16 18:00 -- Task verified and completed: books-f3sb2 - Book detail page joins catalogs — the catalog pill row + "Add to Catalog" picker on `/books/{slug}` via `getCatalogsForBook` (sending `MediaType.Book`), with the thrice-copied `CatalogManager` modal extracted into `Components/` and consumed by all four detail pages, and `removeBook` cascading the book's catalog entries like the other media types
 
 **Type:** Work / Task completion
