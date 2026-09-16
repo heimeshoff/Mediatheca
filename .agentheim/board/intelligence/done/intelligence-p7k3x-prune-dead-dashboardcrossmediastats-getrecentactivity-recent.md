@@ -1,7 +1,7 @@
 ---
 id: intelligence-p7k3x
 title: Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload
-status: doing
+status: done
 type: chore
 context: intelligence
 created: 2026-09-16
@@ -67,3 +67,19 @@ Follow the same end-to-end removal shape `intelligence-h4qk2` used: type, API me
 - **No orchestrator round** — a grep-verified dead-code deletion with a shipped precedent (`intelligence-h4qk2`) needs no specialist; the refinement's value was re-running the greps and finding the single-caller feeders and the one test assertion the capture missed.
 - Capture's line references (`Shared.fs:413/315/924/1986`, `Api.fs:2716-2764/2807`) had already drifted by the time of refinement because `curation-kezpv` deleted code above them; that's why *What* pins to commit `933bf7b` and says "relocate by symbol".
 - `getRecentActivity`'s 40-arm event-type → description table is the only place those English labels exist. Nothing consumes them; if an activity feed is ever built (journal-k52j1 shipped reading activity without one), it will want per-BC descriptions from the event DUs, not a string match in `Api.fs`.
+
+## Outcome
+
+Removed the dead `DashboardCrossMediaStats` / `getRecentActivity` / `RecentActivityItem` payload end to end, following the `intelligence-h4qk2` shape (type -> API member -> server implementation -> feeder queries -> payload embedding, nothing left half-wired):
+
+- **`src/Shared/Shared.fs`** — deleted the `RecentActivityItem` record, the `DashboardCrossMediaStats` record, the `CrossMediaStats` field on `DashboardAllTab`, and `getRecentActivity` from `IMediathecaApi`. Re-pointed the placement comment above the (now-gone) cross-media stats section to end at `DashboardPlaySession`, the last surviving All-tab dependency.
+- **`src/Server/Api.fs`** — deleted the `getRecentActivity` member (the whole 40-arm event-type -> English description match included) and, in `getDashboardAllTab`, the 14-binding "Cross-media stats" block plus the `CrossMediaStats = { ... }` field in the returned record.
+- **Feeder queries deleted** (single-caller, only `CrossMediaStats` ever called them): `MovieProjection.getTotalWatchTimeMinutes`/`getMoviesWatchedThisYear`/`getMoviesWatchedThisMonth`/`getMoviesWatchedThisWeek`; `SeriesProjection.getTotalSeriesWatchTimeMinutes`/`getEpisodesWatchedThisYear`/`getEpisodesWatchedThisMonth`/`getEpisodesWatchedThisWeek`; `GameProjection.getTotalGamePlayTimeMinutes`/`getGamesBeatenThisYear`/`getGamesPlayedThisMonth`/`getGameMinutesThisWeek`/`getActiveGamesCount`. Kept `SeriesProjection.getCurrentlyWatchingCount` (still called from `getDashboardSeriesTab`) and `GameProjection.getGamesCompletedPerYear` (still called from the Games tab) untouched.
+- **`src/Server/EventStore.fs`** — deleted `getRecentEvents`, its only caller (`getRecentActivity`) having just been removed. `getTotalEventCount` and the store-head query are untouched.
+- **`tests/Server.Tests/GameFacetProjectionTests.fs`** — trimmed the `"getGamesCompletedPerYear/getGamesBeatenThisYear have no stale column to fall back to at all — honest degradation"` case down to its `getGamesCompletedPerYear` half (still live) and renamed it to drop the deleted function from the title. No other test file referenced any deleted symbol.
+
+Verification: `grep -rn "DashboardCrossMediaStats\|getRecentActivity\|RecentActivityItem\|CrossMediaStats\|getRecentEvents" src/ tests/ --include=*.fs` and the feeder-name grep both return nothing (excluding `fable_modules/`). `npm run build` compiles clean (Fable). `npm test` — Expecto 912/912 (same count as before, per the acceptance criterion). `npm run test:client` — Vitest 108/108, unchanged.
+
+**README delta:** reported a `replace` op on the **Stats** ubiquitous-language bullet dropping its cross-media clause (see `README_DELTA` block above).
+
+**Retired paragraph addition (conductor hand-application — delta grammar can't target prose):** append this sentence to the existing **Retired** paragraph in `.agentheim/knowledge/contexts/intelligence/README.md` (same paragraph that already ends with the `intelligence-h4qk2` sentence, immediately before the `- **Card grow**` bullet that follows it): "`intelligence-p7k3x` similarly pruned `DashboardCrossMediaStats` (14 feeders) and `getRecentActivity`/`RecentActivityItem` (plus `EventStore.getRecentEvents`) end to end — no client ever read them either."

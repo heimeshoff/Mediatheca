@@ -346,12 +346,6 @@ module EventStore =
             |> Db.setParams [ "prefix", SqlType.String (prefix + "%"); "event_type", SqlType.String eventType ]
             |> Db.querySingle readEvent
 
-    let getRecentEvents (conn: SqliteConnection) (count: int) : StoredEvent list =
-        conn
-        |> Db.newCommand "SELECT global_position, stream_id, stream_position, event_type, data, metadata, timestamp FROM events ORDER BY global_position DESC LIMIT @count"
-        |> Db.setParams [ "count", SqlType.Int32 count ]
-        |> Db.query readEvent
-
     let getTotalEventCount (conn: SqliteConnection) : int =
         conn
         |> Db.newCommand "SELECT COUNT(*) as cnt FROM events"

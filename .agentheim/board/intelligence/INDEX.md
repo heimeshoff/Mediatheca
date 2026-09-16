@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 16
+- **Doing:** 0
+- **Done:** 17
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **intelligence-p7k3x** — Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload (chore) — `doing/intelligence-p7k3x-prune-dead-dashboardcrossmediastats-getrecentactivity-recent.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **intelligence-p7k3x** — Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload (chore) — `done/intelligence-p7k3x-prune-dead-dashboardcrossmediastats-getrecentactivity-recent.md`
 - **intelligence-h4qk2** — Prune the dead activity-heatmap payload — DashboardAllTab.ActivityDays/MonthlyBreakdown, their two Shared types and the seven daily/monthly feeder queries go end to end (mirroring intelligence-p4t7k); the All tab stopped rendering them in intelligence-dq8rk and no client reads them (refactor) — `done/intelligence-h4qk2-dashboardalltab-s-activitydays-monthlybreakdown-payload-has.md`
 - **intelligence-dnv2y** — Dashboard Books tab and All-tab "Reading" rail — the All tab's "Books coming soon" placeholder becomes a Currently Reading card (In Focus books with progress bars and source badges, finished books lingering 7 days marked "Finished"), plus a Books tab with Currently Reading, Recently Finished, Recently Added and a reading-stats block, and reading days on the activity heatmap (feature) — `done/intelligence-dnv2y-dashboard-books-tab-and-reading-rail.md`
 - **intelligence-b1nz5** — All-tab dashboard — a watched movie stays on "Movies to Watch" and a retired game stays on "Games" for 7 days, marked finished, the same way a finished series already lingers on "Next episode" (feature) — `done/intelligence-b1nz5-finished-movies-retired-games-linger-on-dashboard.md`

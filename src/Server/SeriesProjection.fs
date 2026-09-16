@@ -1755,38 +1755,6 @@ module SeriesProjection =
                       EpisodeCount = epCount } : Mediatheca.Shared.DashboardSeriesWatchedWith)
             friendRef)
 
-    // Cross-media: Total series watch time in minutes
-    let getTotalSeriesWatchTimeMinutes (conn: SqliteConnection) : int =
-        conn
-        |> Db.newCommand """
-            SELECT COALESCE(SUM(e.runtime), 0) as total
-            FROM (SELECT DISTINCT series_slug, season_number, episode_number FROM series_episode_progress) p
-            JOIN series_episode_cache e ON e.series_slug = p.series_slug AND e.season_number = p.season_number AND e.episode_number = p.episode_number
-        """
-        |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
-        |> Option.defaultValue 0
-
-    // Cross-media: Episodes watched this year
-    let getEpisodesWatchedThisYear (conn: SqliteConnection) : int =
-        conn
-        |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_episode_progress WHERE watched_date >= strftime('%Y-01-01', 'now') AND watched_date IS NOT NULL"
-        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
-        |> Option.defaultValue 0
-
-    // Cross-media: Episodes watched this month
-    let getEpisodesWatchedThisMonth (conn: SqliteConnection) : int =
-        conn
-        |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_episode_progress WHERE watched_date >= strftime('%Y-%m-01', 'now') AND watched_date IS NOT NULL"
-        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
-        |> Option.defaultValue 0
-
-    // Cross-media: Episodes watched this week (last 7 days)
-    let getEpisodesWatchedThisWeek (conn: SqliteConnection) : int =
-        conn
-        |> Db.newCommand "SELECT COUNT(*) as cnt FROM series_episode_progress WHERE watched_date >= date('now', '-7 days') AND watched_date IS NOT NULL"
-        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
-        |> Option.defaultValue 0
-
     /// Dashboard: returning/in-production series with a known future air date
     /// (episode air_date preferred, falls back to season air_date). Ordered
     /// ascending by next air date. Limited to `limit` results.

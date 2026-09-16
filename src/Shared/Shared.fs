@@ -276,13 +276,6 @@ type DashboardStats = {
     TotalPlayTimeMinutes: int
 }
 
-type RecentActivityItem = {
-    Timestamp: string
-    StreamId: string
-    EventType: string
-    Description: string
-}
-
 // Dashboard Tabs
 
 type DashboardSeriesNextUp = {
@@ -374,27 +367,10 @@ type DashboardPlaySession = {
     MinutesPlayed: int
 }
 
-type DashboardCrossMediaStats = {
-    TotalMovieMinutes: int
-    TotalSeriesMinutes: int
-    TotalGameMinutes: int
-    MoviesWatchedThisYear: int
-    EpisodesWatchedThisYear: int
-    GamesBeatenThisYear: int
-    MoviesWatchedThisMonth: int
-    EpisodesWatchedThisMonth: int
-    GamesPlayedThisMonth: int
-    ActiveSeriesCount: int
-    ActiveGamesCount: int
-    WeekMovieCount: int
-    WeekEpisodeCount: int
-    WeekGameMinutes: int
-}
-
 // `DashboardAllTab` itself is declared further down (just after `ReadingPosition`),
 // once `DashboardBookItem` exists for its `CurrentlyReading` field — see the
 // comment there (intelligence-dnv2y). Every other type it depends on
-// (`DashboardSeriesNextUp` .. `DashboardCrossMediaStats`) is already declared
+// (`DashboardSeriesNextUp` .. `DashboardPlaySession`) is already declared
 // above this point.
 
 type DashboardMovieStats = {
@@ -883,7 +859,6 @@ type DashboardAllTab = {
     GamesRecentlyPlayed: DashboardGameRecentlyPlayed list
     PlaySessions: DashboardPlaySession list
     JellyfinServerUrl: string option
-    CrossMediaStats: DashboardCrossMediaStats
     /// intelligence-dnv2y: In Focus books (latest `progress_observed_on` desc,
     /// then `added_at` desc), plus any book `finished_at` within the last 7
     /// days marked `Finished = true` (the intelligence-b1nz5 linger) —
@@ -1932,7 +1907,6 @@ type IMediathecaApi = {
     // Dashboard
     getDashboardStats: unit -> Async<DashboardStats>
     getRecentSeries: int -> Async<RecentSeriesItem list>
-    getRecentActivity: int -> Async<RecentActivityItem list>
     getDashboardAllTab: unit -> Async<DashboardAllTab>
     getDashboardMoviesTab: unit -> Async<DashboardMoviesTab>
     getDashboardSeriesTab: unit -> Async<DashboardSeriesTab>

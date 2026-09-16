@@ -2595,61 +2595,6 @@ module Api =
                 return SeriesProjection.getRecentSeries conn count
             }
 
-            getRecentActivity = fun count -> async {
-                use conn = factory ()
-                let events = EventStore.getRecentEvents conn count
-                return events |> List.map (fun e ->
-                    let description =
-                        match e.EventType with
-                        | "Movie_added_to_library" -> "Movie added to library"
-                        | "Movie_removed_from_library" -> "Movie removed from library"
-                        | "Watch_session_recorded" -> "Watch session recorded"
-                        | "Watch_session_removed" -> "Watch session removed"
-                        | "Friend_added" -> "Friend added"
-                        | "Friend_removed" -> "Friend removed"
-                        | "Catalog_created" -> "Catalog created"
-                        | "Catalog_removed" -> "Catalog removed"
-                        | "Entry_added" -> "Entry added to catalog"
-                        | "Content_block_added" -> "Content block added"
-                        | "Series_added_to_library" -> "Series added to library"
-                        | "Series_removed_from_library" -> "Series removed from library"
-                        | "Episode_watched" -> "Episode watched"
-                        | "Episode_unwatched" -> "Episode marked unwatched"
-                        | "Season_marked_watched" -> "Season marked as watched"
-                        | "Episodes_watched_up_to" -> "Episodes watched up to"
-                        | "Season_marked_unwatched" -> "Season marked unwatched"
-                        | "Episode_watched_date_changed" -> "Episode watched date changed"
-                        | "Rewatch_session_created" -> "Rewatch session created"
-                        | "Rewatch_session_removed" -> "Rewatch session removed"
-                        | "Series_personal_rating_set" -> "Series personal rating updated"
-                        | "Series_recommended_by" -> "Series recommendation added"
-                        | "Series_recommendation_removed" -> "Series recommendation removed"
-                        | "Series_want_to_watch_with" -> "Want to watch series with friend"
-                        | "Series_removed_want_to_watch_with" -> "Removed want to watch series with friend"
-                        | "Game_added_to_library" -> "Game added to library"
-                        | "Game_removed_from_library" -> "Game removed from library"
-                        | "Game_status_changed" -> "Game status changed"
-                        | "Game_personal_rating_set" -> "Game personal rating updated"
-                        | "Game_played_with" -> "Played game with friend"
-                        | "Game_played_with_removed" -> "Removed played game with friend"
-                        | "Game_recommended_by" -> "Game recommendation added"
-                        | "Game_recommendation_removed" -> "Game recommendation removed"
-                        | "Want_to_play_with" -> "Want to play game with friend"
-                        | "Removed_want_to_play_with" -> "Removed want to play game with friend"
-                        | "Game_marked_as_owned" -> "Game marked as owned"
-                        | "Game_ownership_removed" -> "Game ownership removed"
-                        | "Game_family_owner_added" -> "Game family owner added"
-                        | "Game_family_owner_removed" -> "Game family owner removed"
-                        | "Game_steam_app_id_set" -> "Game linked to Steam"
-                        | "Game_play_time_set" -> "Game play time updated"
-                        | other -> other.Replace("_", " ")
-                    { Mediatheca.Shared.RecentActivityItem.Timestamp = e.Timestamp.ToString("o")
-                      StreamId = e.StreamId
-                      EventType = e.EventType
-                      Description = description }
-                )
-            }
-
             // Dashboard Tabs
             getDashboardAllTab = fun () -> async {
                 use conn = factory ()
@@ -2661,22 +2606,6 @@ module Api =
                 let currentlyReading = BookProjection.getAllTabCurrentlyReading conn
                 let jellyfinServerUrl = SettingsStore.getSetting conn "jellyfin_server_url"
 
-                // Cross-media stats
-                let totalMovieMinutes = MovieProjection.getTotalWatchTimeMinutes conn
-                let totalSeriesMinutes = SeriesProjection.getTotalSeriesWatchTimeMinutes conn
-                let totalGameMinutes = GameProjection.getTotalGamePlayTimeMinutes conn
-                let moviesWatchedThisYear = MovieProjection.getMoviesWatchedThisYear conn
-                let episodesWatchedThisYear = SeriesProjection.getEpisodesWatchedThisYear conn
-                let gamesBeatenThisYear = GameProjection.getGamesBeatenThisYear conn
-                let moviesWatchedThisMonth = MovieProjection.getMoviesWatchedThisMonth conn
-                let episodesWatchedThisMonth = SeriesProjection.getEpisodesWatchedThisMonth conn
-                let gamesPlayedThisMonth = GameProjection.getGamesPlayedThisMonth conn
-                let activeSeriesCount = SeriesProjection.getCurrentlyWatchingCount conn
-                let activeGamesCount = GameProjection.getActiveGamesCount conn
-                let weekMovieCount = MovieProjection.getMoviesWatchedThisWeek conn
-                let weekEpisodeCount = SeriesProjection.getEpisodesWatchedThisWeek conn
-                let weekGameMinutes = GameProjection.getGameMinutesThisWeek conn
-
                 return {
                     Mediatheca.Shared.DashboardAllTab.SeriesNextUp = seriesNextUp
                     MoviesToWatch = moviesToWatch
@@ -2686,22 +2615,6 @@ module Api =
                     JellyfinServerUrl =
                         jellyfinServerUrl
                         |> Option.bind (fun s -> if System.String.IsNullOrWhiteSpace(s) then None else Some s)
-                    CrossMediaStats = {
-                        Mediatheca.Shared.DashboardCrossMediaStats.TotalMovieMinutes = totalMovieMinutes
-                        TotalSeriesMinutes = totalSeriesMinutes
-                        TotalGameMinutes = totalGameMinutes
-                        MoviesWatchedThisYear = moviesWatchedThisYear
-                        EpisodesWatchedThisYear = episodesWatchedThisYear
-                        GamesBeatenThisYear = gamesBeatenThisYear
-                        MoviesWatchedThisMonth = moviesWatchedThisMonth
-                        EpisodesWatchedThisMonth = episodesWatchedThisMonth
-                        GamesPlayedThisMonth = gamesPlayedThisMonth
-                        ActiveSeriesCount = activeSeriesCount
-                        ActiveGamesCount = activeGamesCount
-                        WeekMovieCount = weekMovieCount
-                        WeekEpisodeCount = weekEpisodeCount
-                        WeekGameMinutes = weekGameMinutes
-                    }
                     CurrentlyReading = currentlyReading
                 }
             }

@@ -860,31 +860,3 @@ module MovieProjection =
             |> List.sortByDescending snd
             |> List.truncate 20
 
-    // Cross-media: Total watch time in minutes (all movies)
-    let getTotalWatchTimeMinutes (conn: SqliteConnection) : int =
-        conn
-        |> Db.newCommand "SELECT COALESCE(SUM(md.runtime), 0) as total FROM watch_sessions ws JOIN movie_detail md ON ws.movie_slug = md.slug"
-        |> Db.querySingle (fun rd -> rd.ReadInt32 "total")
-        |> Option.defaultValue 0
-
-    // Cross-media: Movies watched this year
-    let getMoviesWatchedThisYear (conn: SqliteConnection) : int =
-        conn
-        |> Db.newCommand "SELECT COUNT(DISTINCT movie_slug) as cnt FROM watch_sessions WHERE date >= strftime('%Y-01-01', 'now')"
-        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
-        |> Option.defaultValue 0
-
-    // Cross-media: Movies watched this month
-    let getMoviesWatchedThisMonth (conn: SqliteConnection) : int =
-        conn
-        |> Db.newCommand "SELECT COUNT(DISTINCT movie_slug) as cnt FROM watch_sessions WHERE date >= strftime('%Y-%m-01', 'now')"
-        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
-        |> Option.defaultValue 0
-
-    // Cross-media: Movies watched this week (last 7 days)
-    let getMoviesWatchedThisWeek (conn: SqliteConnection) : int =
-        conn
-        |> Db.newCommand "SELECT COUNT(DISTINCT movie_slug) as cnt FROM watch_sessions WHERE date >= date('now', '-7 days')"
-        |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
-        |> Option.defaultValue 0
-

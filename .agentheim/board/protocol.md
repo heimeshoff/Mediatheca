@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 00:34 -- Task verified and completed: intelligence-p7k3x - Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload
+
+**Type:** Work / Task completion
+**Task:** intelligence-p7k3x - Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload
+**Summary:** Pruned the dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload end to end — Shared types, the Api.fs member and getDashboardAllTab embedding, 12 single-caller feeder queries across Movie/Series/GameProjection, EventStore.getRecentEvents, and trimmed the one Expecto case that touched getGamesBeatenThisYear — while keeping SeriesProjection.getCurrentlyWatchingCount and GameProjection.getGamesCompletedPerYear, which still have live callers.
+**Duration:** 13m20s
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 7
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-09-17 00:19 -- Batch started: [curation-h4k2p, intelligence-p7k3x]
 
 **Type:** Work / Batch start

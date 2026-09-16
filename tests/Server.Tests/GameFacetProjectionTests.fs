@@ -269,7 +269,7 @@ let safeReadCompositionTests =
             let afterRebuild = GameProjection.getBySlug conn "portal-2-2011"
             Expect.equal (afterRebuild |> Option.map (fun d -> d.Genres)) (Some [ "Puzzle"; "Co-op" ]) "Drop + Init + replay reproduces genres — event-carried, never lost"
 
-        testCase "getGamesCompletedPerYear/getGamesBeatenThisYear have no stale column to fall back to at all — honest degradation" <| fun _ ->
+        testCase "getGamesCompletedPerYear has no stale column to fall back to at all — honest degradation" <| fun _ ->
             let conn = createConnection ()
             appendGameAdded conn "portal-2-2011" sampleGameData
             // Mark Retired — no game_play_session row at all.
@@ -279,9 +279,6 @@ let safeReadCompositionTests =
 
             let completedPerYear = GameProjection.getGamesCompletedPerYear conn
             Expect.isEmpty completedPerYear "No game_play_session row exists — nothing to fall back to, correctly excluded"
-
-            let beatenThisYear = GameProjection.getGamesBeatenThisYear conn
-            Expect.equal beatenThisYear 0 "Same honest-degradation stance for the cross-media 'beaten this year' count"
     ]
 
 [<Tests>]
