@@ -5,6 +5,36 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 06:27 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 4h07m (first "Batch started" 02:16 → 06:23)
+**Completed:** 9 (first-try PASS: 6, re-dispatched: 3, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** books-y9kxy: 3, integration-c8d4x: 2, integration-dhctm: 1, books-f33e2: 1, integration-wmqn3: 1, books-g7g1j: 1, intelligence-dnv2y: 1, integration-y2ak4: 1, integration-jjvg2: 2
+**Commits:** 19 (6 batch starts, 9 task integrations, 1 README reconcile, 1 merge-back arity reconcile, this entry) — plus the modeling/research commits earlier this session (2 research, 1 BC creation, 11 captures, 1 refine)
+**Vision-conformance:** none — batch aligns with vision. All nine tasks serve the "Books — Audible + Goodreads" workstream modeling pulled into v1 this session (vision.md updated in the same session: Books left "Out of Scope (v1)", gained an In Focus section, a dashboard tab and a Remaining-v1-Work entry). vision.md still has no "What success looks like"/"Non-goals" headings — `extractVisionSections` returns two empty lists, so the judgement was made against the Books section, "Unified Dashboard" and "Design Principles" (Replayable: every progress observation is an event, ADR-0076; Intent-driven: In Focus books on the All tab).
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (9 tasks)
+**Carry-over:** none — working tree clean, no registered worktrees remain; 13 stranded RESULT sidecars (one per iteration) swept from `.worktrees/.results/` and the empty `.worktrees/` removed.
+
+**Result source (all nine tasks, ADR-0080 §6):** sidecar · layout both+sentinel · sidecar present, every iteration — `selectResultSource` picked the sidecar first-try each time; two transcript copies were truncated by the harness (wmqn3's to its last line, f33e2's from the top) and the sidecar rescued both, no repairs.
+
+**Session-start churn note:** 0 recognized machine-shape commits flagged for governed surfaces; the 15 commits between the 2026-09-14 16:13 boundary and this session's first batch were this session's own modeling/research bookkeeping (2 research report commits, 1 `model(books): create` BC-creation commit touching vision.md/context-map.md deliberately, 11 captures, 1 refine) — known cause, no re-alignment task; `whats-next.md` not written.
+
+**Verification history:** books-y9kxy PASS iteration 3 (iter 1: missing finished_at-default test, drift-zero stream lacked the status event, README Status bullet stale; iter 2: Books missing from `handledEventTypesByBoundedContext` so the Health tab would list every Book event as unhandled — fixed with a registry-completeness guard). integration-c8d4x PASS iteration 2 (iter 1: the import's cover download bypassed `OpenLibrary.downloadCover` — no User-Agent, no covers throttle, dead code — and the OLID `edition_key` was fed to the ISBN endpoint). integration-jjvg2 PASS iteration 2 (iter 1: both sync paths cleared `audible_last_error` on an empty library response against ADR-0068, and the import stamped `ObservedOn` in UTC). dhctm, f33e2, g7g1j, wmqn3, dnv2y, y2ak4 PASS iteration 1. **Integrated main, full suite:** the first run after the last squash FAILED to build the test project — `DashboardBooksTests.fs` (new in intelligence-dnv2y, forked before wmqn3/jjvg2 added three `Api.create` parameters) still called the old arity; git had auto-merged every sequential squash without a textual conflict, so no ladder rung fired and each worktree was green in isolation. Reconciled on main by the conductor (three stub arguments, the same every other test call site carries, its own scoped commit), then re-run: build clean, Expecto 906/906, Vitest 102/102 (15 files).
+
+**Builder checks pending ([human-eye] criteria):** the Audible and Goodreads Settings cards read as one of the existing integration cards; the search modal's Books tab feels identical in rhythm to the Games tab with matching source badges; the book detail page reads as the movie page's family with the progress bar as its one extra card; the All-tab Reading card sits beside Games with the same poster cap, progress bars legible at rail size, the Finished pill matching Watched/Retired. Also worth a glance after deploy: paste the `audible-cli` auth file and the Goodreads user id in Settings, then "Import library" / "Sync now" — the first real feeds may surface parser gaps the pinned fixtures could not (German-locale Goodreads status text, an Audible marketplace other than `de`).
+
+**Backlog items filed by workers:** books-n8fpz (Books' content-block method family is missing four operations — BookDetail falls back to the generic bare-slug methods), intelligence-h4qk2 (DashboardAllTab's ActivityDays/MonthlyBreakdown payload has no client consumer — build the heatmap or prune it). Plus the two modeling captured: journal-k52j1, curation-cyxbc.
+
+**Harness notes:** the plugin cache `0.9.6/lib/` is complete; every verb ran from it. Conductor helpers lived in the scratchpad as `.mjs` files written with the Write tool (a Bash heredoc collapses backslashes — three bites, now in memory): `wt.mjs` (worktree + node_modules junction + sidecar clear; `cmd /c rmdir` on the junction before `git worktree remove`, main copy verified intact each time), `assemble.mjs` (full worker prompt into one file, handed by path), `result.mjs` (source ladder → blocks on disk), `assemble-verifier.mjs` (diff against the branch's merge-base, not `main..HEAD` — the latter picked up the reverse of a sibling's merge once main moved on), `integrate.mjs` (squash → README delta with a leading-dash normaliser → ADRs + finalize → outcome → complete → backlog capture → index-add → one scoped commit). One README delta on books-y9kxy disposed `merged` because the worker's `expected` omitted the bullet dash; reconciled by hand in its own scoped commit, and the normaliser prevented a repeat.
+
+---
+
 ## 2026-09-16 06:23 -- Task verified and completed: integration-jjvg2 - Audible library import and daily listening-progress sync — "Import Audible library" creates a Book per library title (matched by ASIN) and a scheduled "Audible progress sync" job reads `/1.0/library` `percent_complete`/`is_finished` into `Observe_reading_progress` commands, with the run recorded as a job run and a rejected auth file surfaced as a standing notice
 
 **Type:** Work / Task completion
