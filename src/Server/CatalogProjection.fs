@@ -24,6 +24,46 @@ module CatalogProjection =
         | "Book" -> Some MediaType.Book
         | _ -> None
 
+    /// The narrow constraint every `catalog_entries` table pre-curation-w9fkq
+    /// carries — kept as a named literal so the DDL text below and the
+    /// self-heal detection below never drift apart.
+    let private narrowUnique = "UNIQUE(catalog_slug, movie_slug)"
+    let private widenedUnique = "UNIQUE(catalog_slug, media_type, movie_slug)"
+
+    let private newCatalogEntriesDdl =
+        sprintf """
+            CREATE TABLE IF NOT EXISTS catalog_entries (
+                entry_id     TEXT PRIMARY KEY,
+                catalog_slug TEXT NOT NULL,
+                movie_slug   TEXT NOT NULL,
+                note         TEXT,
+                position     INTEGER NOT NULL DEFAULT 0,
+                media_type   TEXT,
+                %s
+            );
+            CREATE INDEX IF NOT EXISTS idx_catalog_entries_catalog ON catalog_entries(catalog_slug);
+        """ widenedUnique
+
+    let private catalogEntriesColumnNames (conn: SqliteConnection) : Set<string> =
+        use cmd = conn.CreateCommand()
+        cmd.CommandText <- "PRAGMA table_info(catalog_entries)"
+        use reader = cmd.ExecuteReader()
+        [ while reader.Read() do
+            yield reader.GetString(reader.GetOrdinal("name")) ]
+        |> Set.ofList
+
+    /// True when the LIVE `catalog_entries` table (if any) still carries the
+    /// narrow, pre-curation-w9fkq `UNIQUE(catalog_slug, movie_slug)`
+    /// constraint — read straight from `sqlite_master`'s stored DDL text
+    /// rather than re-deriving it, the same idiom `checkProjectionDrift`'s
+    /// schema comparisons use elsewhere in this codebase.
+    let private catalogEntriesNeedsWidening (conn: SqliteConnection) : bool =
+        conn
+        |> Db.newCommand "SELECT sql FROM sqlite_master WHERE type='table' AND name='catalog_entries'"
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "sql")
+        |> Option.map (fun sql -> sql.Contains(narrowUnique) && not (sql.Contains(widenedUnique)))
+        |> Option.defaultValue false
+
     let private createTables (conn: SqliteConnection) : unit =
         conn
         |> Db.newCommand """
@@ -33,28 +73,57 @@ module CatalogProjection =
                 description  TEXT NOT NULL DEFAULT '',
                 is_sorted    INTEGER NOT NULL DEFAULT 0
             );
-
-            CREATE TABLE IF NOT EXISTS catalog_entries (
-                entry_id     TEXT PRIMARY KEY,
-                catalog_slug TEXT NOT NULL,
-                movie_slug   TEXT NOT NULL,
-                note         TEXT,
-                position     INTEGER NOT NULL DEFAULT 0,
-                UNIQUE(catalog_slug, movie_slug)
-            );
-            CREATE INDEX IF NOT EXISTS idx_catalog_entries_catalog ON catalog_entries(catalog_slug);
         """
         |> Db.exec
 
-        // curation-cyxbc (ADR-0079): typed entries — nullable so legacy rows
-        // (recorded before entries were typed) stay NULL and keep resolving
-        // via the read-time join-order inference. UNIQUE(catalog_slug,
-        // movie_slug) is deliberately left unchanged (ADR-0079 §5) — SQLite
-        // treats NULLs as distinct in a UNIQUE index, so widening it now
-        // would drop duplicate protection for every legacy row.
-        try
-            conn |> Db.newCommand "ALTER TABLE catalog_entries ADD COLUMN media_type TEXT" |> Db.exec
-        with _ -> ()
+        conn |> Db.newCommand newCatalogEntriesDdl |> Db.exec
+
+        // curation-w9fkq (ADR-0079 §5 resolved): self-heals `catalog_entries`'
+        // UNIQUE to `(catalog_slug, media_type, movie_slug)` at every app
+        // start — `CREATE TABLE IF NOT EXISTS` above is a no-op on a live
+        // table that predates the widened constraint, so a manual
+        // Rebuild-all would otherwise be the only way to pick it up, leaving
+        // a window where the relaxed `Catalogs.decide` is live but the
+        // narrow index still stands (reopening cyxbc's clobber divergence).
+        // Detected from `sqlite_master`'s stored DDL text; every row —
+        // typed and still-`NULL` `media_type` alike — survives a rename +
+        // recreate + copy inside one transaction. The retired
+        // `ALTER TABLE … ADD COLUMN media_type` guard (curation-cyxbc) is
+        // folded into `newCatalogEntriesDdl` above for the fresh-DB case; a
+        // table old enough to lack the column entirely (pre-cyxbc) is
+        // handled here too via `catalogEntriesColumnNames`.
+        if catalogEntriesNeedsWidening conn then
+            let hasMediaTypeColumn = catalogEntriesColumnNames conn |> Set.contains "media_type"
+            let mediaTypeSelect = if hasMediaTypeColumn then "media_type" else "NULL"
+            use tx = conn.BeginTransaction()
+            try
+                conn
+                |> Db.newCommand "ALTER TABLE catalog_entries RENAME TO catalog_entries_pre_w9fkq"
+                |> Db.exec
+                conn
+                |> Db.newCommand (sprintf """
+                    CREATE TABLE catalog_entries (
+                        entry_id     TEXT PRIMARY KEY,
+                        catalog_slug TEXT NOT NULL,
+                        movie_slug   TEXT NOT NULL,
+                        note         TEXT,
+                        position     INTEGER NOT NULL DEFAULT 0,
+                        media_type   TEXT,
+                        %s
+                    );
+
+                    INSERT INTO catalog_entries (entry_id, catalog_slug, movie_slug, note, position, media_type)
+                    SELECT entry_id, catalog_slug, movie_slug, note, position, %s FROM catalog_entries_pre_w9fkq;
+
+                    DROP TABLE catalog_entries_pre_w9fkq;
+
+                    CREATE INDEX IF NOT EXISTS idx_catalog_entries_catalog ON catalog_entries(catalog_slug);
+                """ widenedUnique mediaTypeSelect)
+                |> Db.exec
+                tx.Commit()
+            with _ ->
+                tx.Rollback()
+                reraise ()
 
     let private dropTables (conn: SqliteConnection) : unit =
         conn
@@ -145,6 +214,20 @@ module CatalogProjection =
                         |> Db.setParams [
                             "entry_id", SqlType.String eid
                             "position", SqlType.Int32 i
+                        ]
+                        |> Db.exec)
+
+                | Catalogs.Entry_media_types_inferred inferred ->
+                    // curation-w9fkq: same last-write-wins tolerance as
+                    // evolve — an unknown entry_id (already removed) simply
+                    // updates zero rows.
+                    inferred
+                    |> List.iter (fun item ->
+                        conn
+                        |> Db.newCommand "UPDATE catalog_entries SET media_type = @media_type WHERE entry_id = @entry_id"
+                        |> Db.setParams [
+                            "entry_id", SqlType.String item.EntryId
+                            "media_type", SqlType.String (encodeMediaType item.MediaType)
                         ]
                         |> Db.exec)
 
@@ -354,3 +437,44 @@ module CatalogProjection =
               IsSorted = rd.ReadInt32 "is_sorted" > 0
               Entries = entries }
         )
+
+    // ── Media-type backfill resolver (curation-w9fkq, ADR-0079 §5 resolved) ──
+
+    /// Outcome of resolving a legacy (untyped) catalog entry's slug against
+    /// all four `*_list` tables. Never a guess: `Ambiguous`/`Orphan` are
+    /// reported by the caller, never converted (ADR-0080 §10's
+    /// report-don't-guess discipline).
+    type MediaTypeResolution =
+        | Resolved of MediaType
+        | Ambiguous
+        | Orphan
+
+    let private existsInTable (conn: SqliteConnection) (table: string) (column: string) (value: string) : bool =
+        conn
+        |> Db.newCommand (sprintf "SELECT 1 FROM %s WHERE %s = @value" table column)
+        |> Db.setParams [ "value", SqlType.String value ]
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "1")
+        |> Option.isSome
+
+    /// Exact-match probe against `movie_list`, `series_list` (on
+    /// `base_slug`), `game_list` and `book_list` — the part before `:` for a
+    /// series-shaped `slug:suffix` entry, exactly as `getEntries` above
+    /// parses it. Unlike the read-time join-order inference (`getEntries`'
+    /// `ELSE COALESCE(ml.name, sl.name, …)`, which only ever resolves Movie
+    /// or Series and defaults everything else to Movie), this genuinely
+    /// consults `game_list`/`book_list` too. Exactly one match resolves;
+    /// zero is `Orphan`; two or more is `Ambiguous`.
+    let resolveMediaType (conn: SqliteConnection) (mediaSlug: string) : MediaTypeResolution =
+        let baseSlug =
+            match mediaSlug.IndexOf(':') with
+            | -1 -> mediaSlug
+            | i -> mediaSlug.Substring(0, i)
+        let matches =
+            [ if existsInTable conn "movie_list" "slug" mediaSlug then yield MediaType.Movie
+              if existsInTable conn "series_list" "slug" baseSlug then yield MediaType.Series
+              if existsInTable conn "game_list" "slug" mediaSlug then yield MediaType.Game
+              if existsInTable conn "book_list" "slug" mediaSlug then yield MediaType.Book ]
+        match matches with
+        | [ one ] -> Resolved one
+        | [] -> Orphan
+        | _ -> Ambiguous

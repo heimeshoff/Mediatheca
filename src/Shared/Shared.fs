@@ -2466,6 +2466,40 @@ type WipeImportPreview = {
     NewestTimestamp: string option
 }
 
+// Catalog entry media-type backfill (curation-w9fkq, ADR-0079 §5 resolved):
+// a one-off, no-preview Administration action that appends a corrective
+// `Catalogs.Entry_media_types_inferred` event per catalog for legacy
+// (untyped) entries an exact-match probe against
+// movie_list/series_list/game_list/book_list resolves to exactly one media
+// type. Report-don't-guess (ADR-0080 §10): ambiguous (matched more than one
+// list) and orphan (matched none) entries are named, never converted.
+
+/// One legacy catalog entry named by catalog + entry slug — either
+/// successfully resolved (with the `MediaType` it was stamped with), or
+/// reported unresolved for the operator to fix by hand via the existing
+/// ADR-0032 compensating-event composer.
+type CatalogBackfillEntryRef = {
+    CatalogSlug: string
+    EntrySlug: string
+}
+
+type CatalogBackfillResolvedEntry = {
+    CatalogSlug: string
+    EntrySlug: string
+    MediaType: MediaType
+}
+
+/// Result of one run of `IAdminApi.backfillCatalogEntryMediaTypes`. Safely
+/// re-runnable — idempotency is decided against each catalog's
+/// reconstituted aggregate, never the derived projection, so a rerun after
+/// the operator fixes an ambiguous/orphan slug at the source only reports
+/// zero for entries already resolved.
+type CatalogMediaTypeBackfillReport = {
+    Resolved: CatalogBackfillResolvedEntry list
+    Ambiguous: CatalogBackfillEntryRef list
+    Orphan: CatalogBackfillEntryRef list
+}
+
 type IAdminApi = {
     // Event Store Browser
     getEventPage: EventPageQuery -> Async<EventPage>
@@ -2544,4 +2578,10 @@ type IAdminApi = {
     /// stream count, oldest/newest timestamp of what's currently in the
     /// store, i.e. what would be discarded by a Wipe & Import.
     getWipeImportPreview: unit -> Async<WipeImportPreview>
+    // Catalog entry media-type backfill (curation-w9fkq, ADR-0079 §5 resolved)
+    /// No preview/confirm — additive, non-destructive, safely re-runnable.
+    /// Appends one corrective `Entry_media_types_inferred` per catalog with
+    /// resolvable legacy entries, catches every projection up, and reports
+    /// every resolved / ambiguous / orphan entry by catalog + entry slug.
+    backfillCatalogEntryMediaTypes: unit -> Async<CatalogMediaTypeBackfillReport>
 }

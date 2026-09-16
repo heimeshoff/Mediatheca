@@ -6,6 +6,7 @@ module Mediatheca.Tests.CatalogProjectionTests
 // `getEntriesByMediaSlug`) that keep a removal cascade or a catalogs-for lookup
 // from crossing into another media type's same-slugged entry.
 
+open System.Data
 open System.Net.Http
 open Expecto
 open Microsoft.Data.Sqlite
@@ -124,6 +125,12 @@ let private sampleBook (title: string) (year: int option) (coverRef: string opti
     Format = BookFormat.Unknown
     ExternalIds = []
 }
+
+let private tableDdl (conn: SqliteConnection) (table: string) : string option =
+    conn
+    |> Db.newCommand "SELECT sql FROM sqlite_master WHERE type='table' AND name=@name"
+    |> Db.setParams [ "name", SqlType.String table ]
+    |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "sql")
 
 let private sampleSeries (name: string) (year: int) (posterRef: string option) (seasons: Series.SeasonImportData list) : Series.SeriesAddedData = {
     Name = name
@@ -312,6 +319,133 @@ let catalogProjectionTests =
             let seriesCatalogs = api.getCatalogsForSeries "series-2015" |> Async.RunSynchronously
             let seriesCatalogSlugs = seriesCatalogs |> List.map (fun c -> c.Slug) |> Set.ofList
             Expect.equal seriesCatalogSlugs (Set.ofList [ catD; catE ]) "getCatalogsForSeries should still resolve both the season and the episode child entries"
+
+        // curation-w9fkq (ADR-0079 §5 resolved): the widened UNIQUE now
+        // protects a typed pair, so a movie and a book sharing a slug can
+        // resolve to their own row within the SAME catalog, not just across
+        // two catalogs (see the cyxbc-era test above).
+        testCase "a movie and a book sharing a slug in the SAME catalog each resolve to their own row via getEntries" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrap
+            let api = createApi db.Factory
+            let conn = db.Connection
+
+            appendMovieEvent conn "same-cat-2022" (Movies.Movie_added_to_library (sampleMovie "Same Cat Movie" 2022 (Some "posters/same-cat-2022.jpg")))
+            appendBookEvent conn "same-cat-2022" (Books.Book_added_to_library (sampleBook "Same Cat Book" (Some 2022) (Some "book-covers/same-cat-2022.jpg")))
+
+            let catalogSlug =
+                match api.createCatalog { Name = "Mixed"; Description = ""; IsSorted = false } |> Async.RunSynchronously with
+                | Ok slug -> slug
+                | Error e -> failtestf "Expected catalog creation to succeed; got %s" e
+
+            match api.addCatalogEntry catalogSlug { MediaSlug = "same-cat-2022"; MediaType = MediaType.Movie; Note = None } |> Async.RunSynchronously with
+            | Ok _ -> ()
+            | Error e -> failtestf "Expected addCatalogEntry (movie) to succeed; got %s" e
+            match api.addCatalogEntry catalogSlug { MediaSlug = "same-cat-2022"; MediaType = MediaType.Book; Note = None } |> Async.RunSynchronously with
+            | Ok _ -> ()
+            | Error e -> failtestf "Expected addCatalogEntry (book) to succeed; got %s" e
+
+            let entries = CatalogProjection.getEntries conn catalogSlug
+            Expect.equal (List.length entries) 2 "Both same-slugged typed entries should coexist in one catalog"
+            let movieEntry = entries |> List.find (fun e -> e.MediaType = MediaType.Movie)
+            Expect.equal movieEntry.Title "Same Cat Movie" "The movie entry should resolve as a movie"
+            let bookEntry = entries |> List.find (fun e -> e.MediaType = MediaType.Book)
+            Expect.equal bookEntry.Title "Same Cat Book" "The book entry should resolve as a book, not a guessed movie"
+
+        // ── Media-type backfill resolver (curation-w9fkq) ──
+
+        testCase "resolveMediaType: exactly one exact match resolves, zero matches reports Orphan, and the same slug in two lists reports Ambiguous" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrap
+            let conn = db.Connection
+
+            appendMovieEvent conn "solo-movie-2020" (Movies.Movie_added_to_library (sampleMovie "Solo Movie" 2020 None))
+            appendMovieEvent conn "collision-2021" (Movies.Movie_added_to_library { sampleMovie "Collision Movie" 2021 None with TmdbId = 2 })
+            appendBookEvent conn "collision-2021" (Books.Book_added_to_library (sampleBook "Collision Book" (Some 2021) None))
+
+            Expect.equal (CatalogProjection.resolveMediaType conn "solo-movie-2020") (CatalogProjection.Resolved MediaType.Movie) "Exactly one match should resolve"
+            Expect.equal (CatalogProjection.resolveMediaType conn "nowhere-2099") CatalogProjection.Orphan "Zero matches should report Orphan"
+            Expect.equal (CatalogProjection.resolveMediaType conn "collision-2021") CatalogProjection.Ambiguous "A slug present in both movie_list and book_list should report Ambiguous"
+
+        testCase "resolveMediaType genuinely consults game_list and book_list — the read-time join-order inference would have called both Movie" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrap
+            let conn = db.Connection
+
+            appendGameEvent conn "solo-game-2020" (Games.Game_added_to_library (sampleGame "Solo Game" 2020 None))
+            appendBookEvent conn "solo-book-2020" (Books.Book_added_to_library (sampleBook "Solo Book" (Some 2020) None))
+
+            Expect.equal (CatalogProjection.resolveMediaType conn "solo-game-2020") (CatalogProjection.Resolved MediaType.Game) "A legacy game slug should resolve to Game, not a guessed Movie"
+            Expect.equal (CatalogProjection.resolveMediaType conn "solo-book-2020") (CatalogProjection.Resolved MediaType.Book) "A legacy book slug should resolve to Book, not a guessed Movie"
+
+        testCase "resolveMediaType resolves a series-shaped slug:suffix entry via base_slug against series_list" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrap
+            let conn = db.Connection
+            let seasons: Series.SeasonImportData list =
+                [ { SeasonNumber = 1; Name = "Season 1"; Overview = ""; PosterRef = None; AirDate = None; Episodes = [] } ]
+            appendSeriesEvent conn "solo-series-2015" (Series.Series_added_to_library (sampleSeries "Solo Series" 2015 None seasons))
+
+            Expect.equal (CatalogProjection.resolveMediaType conn "solo-series-2015:s01") (CatalogProjection.Resolved MediaType.Series) "A series-shaped slug:suffix entry should resolve via base_slug"
+
+        // ── catalog_entries schema self-heal (curation-w9fkq) ──
+
+        testCase "catalog_entries self-heals: a fresh DB gets the widened UNIQUE from Init" <| fun _ ->
+            use conn = new SqliteConnection("Data Source=:memory:")
+            conn.Open()
+            CatalogProjection.handler.Init conn
+            match tableDdl conn "catalog_entries" with
+            | Some sql -> Expect.stringContains sql "UNIQUE(catalog_slug, media_type, movie_slug)" "A fresh DB should get the widened UNIQUE from Init"
+            | None -> failtest "Expected catalog_entries table to exist"
+
+        testCase "catalog_entries self-heals: a DB seeded with the old narrow-constraint DDL and rows (some typed, some NULL) is recreated with the widened constraint, every row intact, and a second Init is a no-op" <| fun _ ->
+            use conn = new SqliteConnection("Data Source=:memory:")
+            conn.Open()
+            conn
+            |> Db.newCommand """
+                CREATE TABLE catalog_list (
+                    slug         TEXT PRIMARY KEY,
+                    name         TEXT NOT NULL,
+                    description  TEXT NOT NULL DEFAULT '',
+                    is_sorted    INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE catalog_entries (
+                    entry_id     TEXT PRIMARY KEY,
+                    catalog_slug TEXT NOT NULL,
+                    movie_slug   TEXT NOT NULL,
+                    note         TEXT,
+                    position     INTEGER NOT NULL DEFAULT 0,
+                    media_type   TEXT,
+                    UNIQUE(catalog_slug, movie_slug)
+                );
+                CREATE INDEX idx_catalog_entries_catalog ON catalog_entries(catalog_slug);
+            """
+            |> Db.exec
+            conn |> Db.newCommand "INSERT INTO catalog_list (slug, name) VALUES ('cat-a', 'Cat A')" |> Db.exec
+            conn
+            |> Db.newCommand """
+                INSERT INTO catalog_entries (entry_id, catalog_slug, movie_slug, note, position, media_type) VALUES
+                    ('e1', 'cat-a', 'typed-movie-2020', NULL, 0, 'Movie'),
+                    ('e2', 'cat-a', 'legacy-slug-2019', NULL, 1, NULL)
+            """
+            |> Db.exec
+
+            CatalogProjection.handler.Init conn
+
+            match tableDdl conn "catalog_entries" with
+            | Some sql -> Expect.stringContains sql "UNIQUE(catalog_slug, media_type, movie_slug)" "Should be widened after self-heal"
+            | None -> failtest "Expected catalog_entries table to exist"
+
+            let readRows () =
+                conn
+                |> Db.newCommand "SELECT entry_id, media_type FROM catalog_entries ORDER BY entry_id"
+                |> Db.query (fun (rd: IDataReader) ->
+                    rd.ReadString "entry_id",
+                    (if rd.IsDBNull(rd.GetOrdinal("media_type")) then None else Some (rd.ReadString "media_type")))
+            Expect.equal (readRows ()) [ ("e1", Some "Movie"); ("e2", None) ] "Every row, typed and still-NULL, should survive intact"
+
+            // A second Init is a no-op: DDL stays widened, row count unchanged.
+            CatalogProjection.handler.Init conn
+            match tableDdl conn "catalog_entries" with
+            | Some sql -> Expect.stringContains sql "UNIQUE(catalog_slug, media_type, movie_slug)" "A second Init should still show the widened constraint"
+            | None -> failtest "Expected catalog_entries table to exist"
+            Expect.equal (readRows ()) [ ("e1", Some "Movie"); ("e2", None) ] "A second Init should not touch existing rows"
 
         // books-f3sb2: the API round-trip a book's detail page drives -- add,
         // see it via both getCatalogsForBook and getCatalog's typed DTO, then

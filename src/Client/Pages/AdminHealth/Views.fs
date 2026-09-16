@@ -1,6 +1,7 @@
 module Mediatheca.Client.Pages.AdminHealth.Views
 
 open Feliz
+open Feliz.DaisyUI
 open Mediatheca.Client
 open Mediatheca.Shared
 open Mediatheca.Client.Pages.AdminHealth.Types
@@ -167,7 +168,70 @@ let private storageCard (storage: StorageStats) =
         ]
     ]
 
-let private loadedView (stats: HealthStats) =
+/// One resolved/ambiguous/orphan entry line — "catalog-slug / entry-slug",
+/// the same "named by catalog + entry slug" shape the backend report uses,
+/// so an operator can find and fix it via the Event Browser's stream
+/// drill-in (ADR-0032's compensating-event composer).
+let private backfillEntryRow (label: string) (catalogSlug: string) (entrySlug: string) =
+    Html.div [
+        prop.key (catalogSlug + "/" + entrySlug)
+        prop.className "flex items-center justify-between gap-3 py-1 border-b border-base-content/5 last:border-b-0"
+        prop.children [
+            Html.span [ prop.className DesignSystem.dataText; prop.text (sprintf "%s / %s" catalogSlug entrySlug) ]
+            Html.span [ prop.className DesignSystem.mutedText; prop.text label ]
+        ]
+    ]
+
+/// curation-w9fkq (ADR-0079 §5 resolved): a one-off, no-preview action —
+/// additive, non-destructive, safely re-runnable — that backfills a
+/// `MediaType` onto legacy catalog entries recorded before entries were
+/// typed, via exact-match resolution against movie_list/series_list/
+/// game_list/book_list. Ambiguous or orphaned slugs are reported by name,
+/// never guessed.
+let private catalogMediaTypeBackfillCard (model: Model) (dispatch: Msg -> unit) =
+    sectionCard "Catalog entry media types" [
+        Html.p [
+            prop.className DesignSystem.mutedText
+            prop.text "Backfills a media type onto legacy catalog entries recorded before entries were typed (ADR-0079). Exact-match only — ambiguous or orphaned slugs are reported below, never guessed. Additive and safe to re-run."
+        ]
+        Daisy.button.button [
+            button.outline
+            button.sm
+            prop.disabled model.CatalogBackfillRunning
+            prop.onClick (fun _ -> dispatch Run_catalog_media_type_backfill_clicked)
+            prop.text (if model.CatalogBackfillRunning then "Running…" else "Run backfill")
+        ]
+        match model.CatalogBackfillReport with
+        | None -> Html.none
+        | Some report ->
+            Html.div [
+                prop.className "flex flex-col gap-3 mt-1"
+                prop.children [
+                    Html.span [
+                        prop.className DesignSystem.bodyText
+                        prop.text (sprintf "%d resolved, %d ambiguous, %d orphaned" (List.length report.Resolved) (List.length report.Ambiguous) (List.length report.Orphan))
+                    ]
+                    if not (List.isEmpty report.Ambiguous) then
+                        Html.div [
+                            prop.children [
+                                yield Html.span [ prop.className DesignSystem.eyebrow; prop.text "Ambiguous — matched more than one media type" ]
+                                yield! report.Ambiguous |> List.map (fun e -> backfillEntryRow "ambiguous" e.CatalogSlug e.EntrySlug)
+                            ]
+                        ]
+                    else Html.none
+                    if not (List.isEmpty report.Orphan) then
+                        Html.div [
+                            prop.children [
+                                yield Html.span [ prop.className DesignSystem.eyebrow; prop.text "Orphaned — matched no media type" ]
+                                yield! report.Orphan |> List.map (fun e -> backfillEntryRow "orphan" e.CatalogSlug e.EntrySlug)
+                            ]
+                        ]
+                    else Html.none
+                ]
+            ]
+    ]
+
+let private loadedView (model: Model) (dispatch: Msg -> unit) (stats: HealthStats) =
     let maxBcCount = stats.BoundedContextCounts |> List.map (fun c -> c.Count) |> List.fold max 1
     let maxTypeCount = stats.TopEventTypes |> List.map (fun c -> c.Count) |> List.fold max 1
     Html.div [
@@ -221,12 +285,14 @@ let private loadedView (stats: HealthStats) =
                     ]
                 ]
             ]
+
+            catalogMediaTypeBackfillCard model dispatch
         ]
     ]
 
-let view (model: Model) (_dispatch: Msg -> unit) =
+let view (model: Model) (dispatch: Msg -> unit) =
     match model.Stats with
-    | Some stats -> loadedView stats
+    | Some stats -> loadedView model dispatch stats
     | None ->
         Html.div [
             prop.className (DesignSystem.velvetCard + " p-8 text-center " + DesignSystem.pagePadding)

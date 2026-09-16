@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 18:37 -- Task verified and completed: curation-w9fkq - Backfill legacy `catalog_entries` rows with an exact-match-resolved `media_type` via a corrective `Entry_media_types_inferred` event (ambiguous/orphan slugs reported by name, never guessed), self-heal `catalog_entries`' UNIQUE to `(catalog_slug, media_type, movie_slug)` at projection Init, and restore `Add_entry` to strict `(MediaType, slug)` pair identity (ADR-0079 §5 resolved)
+
+**Type:** Work / Task completion
+**Task:** curation-w9fkq - Backfill legacy `catalog_entries` rows with an exact-match-resolved `media_type` via a corrective `Entry_media_types_inferred` event (ambiguous/orphan slugs reported by name, never guessed), self-heal `catalog_entries`' UNIQUE to `(catalog_slug, media_type, movie_slug)` at projection Init, and restore `Add_entry` to strict `(MediaType, slug)` pair identity (ADR-0079 §5 resolved)
+**Summary:** Backfill legacy catalog_entries media_type via a corrective per-catalog Entry_media_types_inferred event (exact-match resolution against all four *_list tables, ambiguous/orphan slugs reported by name and left untyped, one no-preview IAdminApi action on the Health tab), self-heal catalog_entries' UNIQUE to (catalog_slug, media_type, movie_slug) at every projection Init, and restore Add_entry to strict (MediaType, slug) pair identity via Seq.tryPick (ADR-0079 §5 resolved)
+**Duration:** 1h08m
+**Verification:** PASS (iteration 2 — iteration 1 failed on a missing checkProjectionDrift test and a missing formatCatalogEvent arm, both added; a real merge-back conflict with books-f3sb2 on CatalogProjectionTests.fs was resolved via the ADR-0072 ladder and the iteration-2 verdict is the rung-6 two-dot re-verify against main)
+**Files changed:** 11
+**Tests added:** 18
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 18:16 -- Batch started: [curation-knqfj]
 
 **Type:** Work / Batch start

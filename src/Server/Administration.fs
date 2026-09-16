@@ -125,6 +125,73 @@ module Administration =
                     Projection.runProjection conn handler
                 Ok ()
 
+    /// curation-w9fkq (ADR-0079 §5 resolved): appends one corrective
+    /// `Entry_media_types_inferred` per catalog for that catalog's legacy
+    /// (untyped) entries `CatalogProjection.resolveMediaType` can resolve to
+    /// exactly one media type — the exact-match resolution, never the
+    /// read-time join-order guess (ADR-0080 §10's report-don't-guess
+    /// discipline). No preview/confirm ceremony (ADR-0032's compensating-
+    /// event path, bypassing `Catalogs.decide` — there is no user intent to
+    /// express, only a repaired fact): additive, non-destructive, safely
+    /// re-runnable. Idempotency is decided against each catalog's
+    /// RECONSTITUTED aggregate (`EntryState.MediaType = None`), never the
+    /// derived projection — so a projection rebuilt mid-way between two runs
+    /// gives the same answer either way. Projection catch-up runs once at
+    /// the end (only if anything was appended at all), mirroring
+    /// `runWipeAndImport`'s single-pass catch-up rather than
+    /// `appendCompensatingEventCore`'s per-append catch-up, since this can
+    /// append across many catalog streams in one action.
+    let private runCatalogMediaTypeBackfill
+        (conn: SqliteConnection)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        : CatalogMediaTypeBackfillReport =
+        let catalogStreamIds =
+            EventStore.getDistinctStreams conn
+            |> List.filter (fun s -> s.StartsWith("Catalog-"))
+        let resolved = ResizeArray<CatalogBackfillResolvedEntry>()
+        let ambiguous = ResizeArray<CatalogBackfillEntryRef>()
+        let orphan = ResizeArray<CatalogBackfillEntryRef>()
+        let mutable anyAppended = false
+        for streamId in catalogStreamIds do
+            let catalogSlug = streamId.Substring(8) // strip "Catalog-"
+            let events =
+                EventStore.readStream conn streamId
+                |> List.choose Catalogs.Serialization.fromStoredEvent
+            match Catalogs.reconstitute events with
+            | Catalogs.Active catalog ->
+                let toInfer = ResizeArray<Catalogs.InferredEntryMediaType>()
+                catalog.Entries
+                |> Map.values
+                |> Seq.filter (fun e -> Option.isNone e.MediaType)
+                |> Seq.iter (fun entry ->
+                    match CatalogProjection.resolveMediaType conn entry.MovieSlug with
+                    | CatalogProjection.Resolved mediaType ->
+                        resolved.Add { CatalogSlug = catalogSlug; EntrySlug = entry.MovieSlug; MediaType = mediaType }
+                        toInfer.Add { EntryId = entry.EntryId; MediaType = mediaType }
+                    | CatalogProjection.Ambiguous ->
+                        ambiguous.Add { CatalogSlug = catalogSlug; EntrySlug = entry.MovieSlug }
+                    | CatalogProjection.Orphan ->
+                        orphan.Add { CatalogSlug = catalogSlug; EntrySlug = entry.MovieSlug })
+                if toInfer.Count > 0 then
+                    let eventData = Catalogs.Serialization.toEventData (Catalogs.Entry_media_types_inferred (List.ofSeq toInfer))
+                    let expectedPosition = EventStore.getStreamPosition conn streamId
+                    match EventStore.appendToStream conn streamId expectedPosition [ eventData ] with
+                    | EventStore.Success _ -> anyAppended <- true
+                    | EventStore.ConcurrencyConflict _ ->
+                        // Single-admin-action, single-user app — nothing else
+                        // appends to a Catalog- stream concurrently with this
+                        // loop. Left unresolved for this run rather than
+                        // retried; a later re-run (this action is idempotent)
+                        // picks it up.
+                        ()
+            | Catalogs.Not_created | Catalogs.Removed -> ()
+        if anyAppended then
+            for handler in projectionHandlers do
+                Projection.runProjection conn handler
+        { Resolved = List.ofSeq resolved
+          Ambiguous = List.ofSeq ambiguous
+          Orphan = List.ofSeq orphan }
+
     /// Bounded-context name -> the hand-maintained `handledEventTypes` list
     /// mirroring that BC's `Serialization.deserialize` match arms
     /// (administration-gxd6e). Same admin-console-only-knowledge shape as
@@ -1816,5 +1883,10 @@ module Administration =
                     OldestTimestamp = summary.OldestTimestamp
                     NewestTimestamp = summary.NewestTimestamp
                 }
+            }
+
+            backfillCatalogEntryMediaTypes = fun () -> async {
+                use conn = factory ()
+                return runCatalogMediaTypeBackfill conn projectionHandlers
             }
         }

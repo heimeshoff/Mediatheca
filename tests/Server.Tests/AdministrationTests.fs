@@ -139,6 +139,55 @@ let private clearCastMemberImageRef (conn: SqliteConnection) (id: int64) : unit 
     cmd.Parameters.AddWithValue("@id", id) |> ignore
     cmd.ExecuteNonQuery() |> ignore
 
+// ── Catalog media-type backfill test helpers (curation-w9fkq) ──
+// Direct raw-row inserts into the four `*_list` tables — the resolver
+// (`CatalogProjection.resolveMediaType`) probes them with plain SQL, so
+// these fixtures don't need to go through each BC's own event+projection
+// pipeline (`insertMoviePosterRef` above is the same idiom for movies).
+
+let private insertSeriesRow (conn: SqliteConnection) (slug: string) (name: string) (year: int) : unit =
+    use cmd = conn.CreateCommand()
+    cmd.CommandText <- "INSERT INTO series_list (slug, name, year) VALUES (@slug, @name, @year)"
+    cmd.Parameters.AddWithValue("@slug", slug) |> ignore
+    cmd.Parameters.AddWithValue("@name", name) |> ignore
+    cmd.Parameters.AddWithValue("@year", year) |> ignore
+    cmd.ExecuteNonQuery() |> ignore
+
+let private insertGameRow (conn: SqliteConnection) (slug: string) (name: string) (year: int) : unit =
+    use cmd = conn.CreateCommand()
+    cmd.CommandText <- "INSERT INTO game_list (slug, name, year) VALUES (@slug, @name, @year)"
+    cmd.Parameters.AddWithValue("@slug", slug) |> ignore
+    cmd.Parameters.AddWithValue("@name", name) |> ignore
+    cmd.Parameters.AddWithValue("@year", year) |> ignore
+    cmd.ExecuteNonQuery() |> ignore
+
+let private insertBookRow (conn: SqliteConnection) (slug: string) (title: string) : unit =
+    use cmd = conn.CreateCommand()
+    cmd.CommandText <- "INSERT INTO book_list (slug, title) VALUES (@slug, @title)"
+    cmd.Parameters.AddWithValue("@slug", slug) |> ignore
+    cmd.Parameters.AddWithValue("@title", title) |> ignore
+    cmd.ExecuteNonQuery() |> ignore
+
+/// Appends `Catalog_created` directly to a fresh `Catalog-<slug>` stream —
+/// bypasses `IMediathecaApi.createCatalog` (an `IAdminApi`-only test file
+/// has no handle on `IMediathecaApi`).
+let private appendCatalogCreated (conn: SqliteConnection) (slug: string) (name: string) : unit =
+    let streamId = Catalogs.streamId slug
+    EventStore.appendToStream conn streamId -1L
+        [ Catalogs.Serialization.toEventData (Catalogs.Catalog_created { Name = name; Description = ""; IsSorted = false }) ]
+    |> ignore
+
+/// Appends a raw, legacy-shaped (`MediaType = None`) `Entry_added` — the
+/// shape every `Entry_added` had before ADR-0079, which is what the
+/// media-type backfill targets.
+let private appendLegacyCatalogEntry (conn: SqliteConnection) (catalogSlug: string) (entryId: string) (mediaSlug: string) (position: int) : unit =
+    let streamId = Catalogs.streamId catalogSlug
+    let expectedPosition = EventStore.getStreamPosition conn streamId
+    let data: Catalogs.EntryAddedData = { EntryId = entryId; MovieSlug = mediaSlug; Note = None; MediaType = None }
+    EventStore.appendToStream conn streamId expectedPosition
+        [ Catalogs.Serialization.toEventData (Catalogs.Entry_added (data, position)) ]
+    |> ignore
+
 [<Tests>]
 let administrationTests =
     testList "Administration" [
@@ -503,6 +552,24 @@ let administrationTests =
 
             Expect.isEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "Game_play_facets_overridden")) "Game_play_facets_overridden is handled by Games' deserializer, so it must not appear in the unhandled list"
             Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Game_play_facets_overridden")) "Game_play_facets_overridden has a formatter case, so it must not appear in the unformattable list"
+
+        testCase "getHealthStats Entry_media_types_inferred appears in neither the unhandled nor the unformattable list (curation-w9fkq: corrective backfill event ships with both a deserializer and a formatter arm)" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
+            // curation-w9fkq iteration 2: Catalogs.Serialization.handledEventTypes
+            // already listed "Entry_media_types_inferred" from iteration 1, but
+            // EventFormatting.formatCatalogEvent had no matching arm — this is
+            // the administration-qk3f7-style regression guard closing that gap.
+            let inferred : Catalogs.InferredEntryMediaType list =
+                [ { EntryId = "entry-1"; MediaType = MediaType.Movie } ]
+            EventStore.appendToStream conn (Catalogs.streamId "some-catalog") -1L
+                [ Catalogs.Serialization.toEventData (Catalogs.Entry_media_types_inferred inferred) ] |> ignore
+            let api = createApi db.Factory
+
+            let stats = api.getHealthStats () |> Async.RunSynchronously
+
+            Expect.isEmpty (stats.UnhandledEventTypes |> List.filter (fun r -> r.EventType = "Entry_media_types_inferred")) "Entry_media_types_inferred is in Catalogs.Serialization.handledEventTypes, so it must not appear in the unhandled list"
+            Expect.isEmpty (stats.UnformattableEventTypes |> List.filter (fun r -> r.EventType = "Entry_media_types_inferred")) "Entry_media_types_inferred now has a formatter case in EventFormatting.formatCatalogEvent, so it must not appear in the unformattable list"
 
         testCase "getHealthStats unhandled list flags an event type whose stream prefix matches no known bounded context" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapAdmin
@@ -1081,4 +1148,116 @@ let administrationTests =
                 Expect.equal organicRow.Metadata "{}" "Organic event carries the normal empty metadata"
                 Expect.equal composerRow.Metadata "{\"source\":\"admin-console\"}" "Composer event is marked with admin-console provenance"
                 Expect.notEqual composerRow.Metadata organicRow.Metadata "Metadata is the only permitted difference between an organic and a composer-appended event"
+
+        // ── Catalog entry media-type backfill (curation-w9fkq, ADR-0079 §5 resolved) ──
+
+        testCase "backfillCatalogEntryMediaTypes appends exactly one Entry_media_types_inferred per catalog with resolved entries, skips catalogs with none, and getEntries reflects the resolved media_type after catch-up" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
+            insertMoviePosterRef conn "resolvable-movie-2020" "posters/resolvable-movie-2020.jpg"
+            appendCatalogCreated conn "cat-a" "Catalog A"
+            appendLegacyCatalogEntry conn "cat-a" "entry-a1" "resolvable-movie-2020" 0
+
+            // Catalog B has one legacy entry that resolves to nothing at all
+            // (Orphan) — zero RESOLVED entries, so it must be skipped: no
+            // Entry_media_types_inferred appended to its stream.
+            appendCatalogCreated conn "cat-b" "Catalog B"
+            appendLegacyCatalogEntry conn "cat-b" "entry-b1" "nowhere-slug-2099" 0
+
+            let api = createApi db.Factory
+            let report = api.backfillCatalogEntryMediaTypes () |> Async.RunSynchronously
+
+            Expect.equal report.Resolved [ { CatalogSlug = "cat-a"; EntrySlug = "resolvable-movie-2020"; MediaType = MediaType.Movie } ] "Only catalog A's entry should resolve"
+            Expect.equal report.Orphan [ { CatalogSlug = "cat-b"; EntrySlug = "nowhere-slug-2099" } ] "Catalog B's unresolvable entry should be reported as Orphan, never converted"
+            Expect.isEmpty report.Ambiguous "No ambiguous entries in this fixture"
+
+            let catAEvents = EventStore.readStream conn (Catalogs.streamId "cat-a") |> List.filter (fun e -> e.EventType = "Entry_media_types_inferred")
+            Expect.equal (List.length catAEvents) 1 "Catalog A should get exactly one corrective event"
+            let catBEvents = EventStore.readStream conn (Catalogs.streamId "cat-b") |> List.filter (fun e -> e.EventType = "Entry_media_types_inferred")
+            Expect.isEmpty catBEvents "Catalog B should be skipped entirely — it has no resolved entries"
+
+            let catAEntries = CatalogProjection.getEntries conn "cat-a"
+            Expect.equal (List.length catAEntries) 1 "Catalog A's entry should still be there after catch-up"
+            Expect.equal catAEntries.[0].MediaType MediaType.Movie "getEntries should reflect the backfilled media_type after projection catch-up"
+
+        testCase "backfillCatalogEntryMediaTypes reports an ambiguous entry (same slug in two *_list tables) by catalog + entry slug, and never converts it" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
+            insertMoviePosterRef conn "collision-2021" "posters/collision-2021.jpg"
+            insertBookRow conn "collision-2021" "Collision Book"
+            appendCatalogCreated conn "cat-ambiguous" "Ambiguous Catalog"
+            appendLegacyCatalogEntry conn "cat-ambiguous" "entry-1" "collision-2021" 0
+            // Simulate the normal system, where catalog creation and entry
+            // adds already ran projection catch-up as part of the command
+            // flow — this fixture appends the raw events directly instead.
+            Projection.runProjection conn CatalogProjection.handler
+
+            let api = createApi db.Factory
+            let report = api.backfillCatalogEntryMediaTypes () |> Async.RunSynchronously
+
+            Expect.isEmpty report.Resolved "An ambiguous slug must never be converted"
+            Expect.equal report.Ambiguous [ { CatalogSlug = "cat-ambiguous"; EntrySlug = "collision-2021" } ] "Should name the ambiguous entry by catalog + entry slug"
+
+            let entries = CatalogProjection.getEntries conn "cat-ambiguous"
+            Expect.equal entries.[0].MediaType MediaType.Movie "An unconverted ambiguous entry still renders via the untouched read-time fallback"
+
+        testCase "backfillCatalogEntryMediaTypes rerun idempotency: decided from the reconstituted aggregate, unaffected by a projection rebuild in between" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
+            insertGameRow conn "resolvable-game-2019" "Resolvable Game" 2019
+            appendCatalogCreated conn "cat-idem" "Idempotency Catalog"
+            appendLegacyCatalogEntry conn "cat-idem" "entry-1" "resolvable-game-2019" 0
+
+            let api = createApi db.Factory
+            let firstReport = api.backfillCatalogEntryMediaTypes () |> Async.RunSynchronously
+            Expect.equal (List.length firstReport.Resolved) 1 "The first run should resolve the one entry"
+
+            // Drop and rebuild the projection entirely mid-way — the "still
+            // untyped" check must be decided from each catalog's
+            // RECONSTITUTED AGGREGATE, never the derived projection, so this
+            // has no bearing on the second run's answer.
+            Projection.rebuildProjectionWithProgress conn CatalogProjection.handler (fun _ -> ())
+
+            let secondReport = api.backfillCatalogEntryMediaTypes () |> Async.RunSynchronously
+            Expect.isEmpty secondReport.Resolved "A second invocation should resolve nothing new"
+
+            let catIdemEvents = EventStore.readStream conn (Catalogs.streamId "cat-idem") |> List.filter (fun e -> e.EventType = "Entry_media_types_inferred")
+            Expect.equal (List.length catIdemEvents) 1 "A second invocation should append zero further corrective events"
+
+        testCase "backfillCatalogEntryMediaTypes leaves the catalog projection with zero drift, including after a full rebuild" <| fun _ ->
+            // curation-w9fkq iteration 2: the corrective event's `evolve`
+            // arm AND its `handleEvent` arm (`UPDATE catalog_entries SET
+            // media_type`) are the only things reproducing the backfilled
+            // column on replay — this is exactly where drift could open, so
+            // check it against a shadow replay rather than only asserting
+            // `getEntries`' resolved values directly.
+            use db = TestDb.withTempDbFactory bootstrapAdmin
+            let conn = db.Connection
+            insertMoviePosterRef conn "resolvable-movie-2020" "posters/resolvable-movie-2020.jpg"
+            insertGameRow conn "resolvable-game-2019" "Resolvable Game" 2019
+            appendCatalogCreated conn "cat-drift" "Drift Catalog"
+            appendLegacyCatalogEntry conn "cat-drift" "entry-1" "resolvable-movie-2020" 0
+            appendLegacyCatalogEntry conn "cat-drift" "entry-2" "resolvable-game-2019" 1
+            Projection.runProjection conn CatalogProjection.handler
+
+            let api = createApi db.Factory
+            let report = api.backfillCatalogEntryMediaTypes () |> Async.RunSynchronously
+            Expect.equal (List.length report.Resolved) 2 "Both legacy entries should resolve"
+
+            use shadowConn = new SqliteConnection("Data Source=:memory:")
+            shadowConn.Open()
+            let drift = Administration.checkProjectionDrift conn shadowConn [ CatalogProjection.handler ] (fun _ -> ())
+            let discrepancies = drift |> List.collect (fun p -> p.Discrepancies)
+            Expect.isEmpty discrepancies "A shadow replay of CatalogProjection (including the corrective Entry_media_types_inferred event) should match the live tables exactly"
+
+            // ...and still zero after a live-side full rebuild — the
+            // self-healing `Init` (rename + recreate + copy of
+            // `catalog_entries`) is the other place this could diverge from
+            // a shadow built fresh.
+            Projection.rebuildProjectionWithProgress conn CatalogProjection.handler (fun _ -> ())
+            use shadowConn2 = new SqliteConnection("Data Source=:memory:")
+            shadowConn2.Open()
+            let drift2 = Administration.checkProjectionDrift conn shadowConn2 [ CatalogProjection.handler ] (fun _ -> ())
+            let discrepancies2 = drift2 |> List.collect (fun p -> p.Discrepancies)
+            Expect.isEmpty discrepancies2 "Drift should stay zero after a live-side rebuild of CatalogProjection too"
     ]

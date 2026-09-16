@@ -431,6 +431,17 @@ module EventFormatting =
             Some { Timestamp = ts; Label = "Entry removed"; Details = [ entryId ] }
         | "Entries_reordered" ->
             Some { Timestamp = ts; Label = "Entries reordered"; Details = [] }
+        | "Entry_media_types_inferred" ->
+            // curation-w9fkq: the corrective backfill event — a batch of
+            // `{ entryId; mediaType }` corrections appended directly by the
+            // Administration action, bypassing `decide` (ADR-0032). Only the
+            // count is shown here; which entries and to which type is the
+            // admin console's own backfill report, not the stream drill-in.
+            let count =
+                match Decode.fromString (Decode.field "items" (Decode.list (Decode.field "entryId" Decode.string))) data with
+                | Ok items -> List.length items
+                | Error _ -> 0
+            Some { Timestamp = ts; Label = "Media types inferred"; Details = [ $"{count} entries corrected" ] }
         | _ -> None
 
     let formatContentBlockEvent (storedEvent: EventStore.StoredEvent) : EventHistoryEntry option =

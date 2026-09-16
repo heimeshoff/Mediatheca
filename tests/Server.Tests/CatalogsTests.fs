@@ -153,22 +153,39 @@ let catalogTests =
                 | Error msg -> Expect.stringContains msg "already in this catalog" "Should say already in catalog"
                 | Ok _ -> failtest "Expected error"
 
-            // Amended during curation-cyxbc's implementation (see ADR-0079's
-            // amendment note): §3's typed-pair identity governs resolution,
-            // type-scoped lookups and the removal cascade, but is not yet the
-            // duplicate key here — the projection's UNIQUE(catalog_slug,
-            // movie_slug) stays slug-only (§5) until a `media_type` backfill
-            // lands, so accepting this add would emit an event the projection
-            // can't durably store (its `INSERT OR REPLACE` would silently
-            // clobber the earlier entry). Rejected for now; the follow-up that
-            // widens the UNIQUE constraint relaxes this back to strict pair
-            // identity.
-            testCase "Add_entry rejects a same-slug entry of a different media type while the projection key is slug-only (ADR-0079 §5)" <| fun _ ->
+            // curation-w9fkq (ADR-0079 §5 resolved): the widened
+            // UNIQUE(catalog_slug, media_type, movie_slug) now protects a
+            // typed pair, so this cyxbc-era rejection flips to acceptance —
+            // §3's original pair-identity wording is restored.
+            testCase "Add_entry accepts a same-slug entry of a different media type now that the widened UNIQUE protects the typed pair (ADR-0079 §5 resolved)" <| fun _ ->
                 let typedMovie: EntryAddedData = { sampleEntryData with MediaType = Some MediaType.Movie }
                 let typedBook: EntryAddedData = { sampleEntryData2 with MovieSlug = "inception-2010"; MediaType = Some MediaType.Book }
                 let result = givenWhenThen
                                 [ Catalog_created sampleCreateData; Entry_added (typedMovie, 0) ]
                                 (Add_entry typedBook)
+                match result with
+                | Ok events ->
+                    match events.[0] with
+                    | Entry_added (data, _) ->
+                        Expect.equal data.MediaType (Some MediaType.Book) "MediaType should match"
+                        Expect.equal data.MovieSlug "inception-2010" "MovieSlug should match"
+                    | _ -> failtest "Expected Entry_added"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            // The tryHead -> tryPick regression guard (curation-w9fkq): once a
+            // catalog holds TWO same-slug entries of different types,
+            // Seq.tryHead would inspect an arbitrary one of them and could
+            // silently accept a true duplicate; Seq.tryPick must check every
+            // same-slug entry.
+            testCase "a catalog already holding a typed Movie and a typed Book at the same slug still rejects a second same-type add at that slug" <| fun _ ->
+                let typedMovie: EntryAddedData = { sampleEntryData with MediaType = Some MediaType.Movie }
+                let typedBook: EntryAddedData = { EntryId = "entry-2"; MovieSlug = "inception-2010"; Note = None; MediaType = Some MediaType.Book }
+                let secondMovie: EntryAddedData = { EntryId = "entry-3"; MovieSlug = "inception-2010"; Note = None; MediaType = Some MediaType.Movie }
+                let result = givenWhenThen
+                                [ Catalog_created sampleCreateData
+                                  Entry_added (typedMovie, 0)
+                                  Entry_added (typedBook, 1) ]
+                                (Add_entry secondMovie)
                 match result with
                 | Error msg -> Expect.stringContains msg "already in this catalog" "Should say already in catalog"
                 | Ok _ -> failtest "Expected error"
@@ -319,6 +336,49 @@ let catalogTests =
                     Expect.equal catalog.Name "New Name" "Name should be updated"
                     Expect.equal catalog.Description "New Desc" "Description should be updated"
                 | _ -> failtest "Expected Active state"
+
+            // curation-w9fkq: the media-type backfill's corrective event.
+            testCase "evolve's Entry_media_types_inferred sets MediaType for every named entry and is a no-op for unknown entry ids" <| fun _ ->
+                let events = [
+                    Catalog_created sampleCreateData
+                    Entry_added (sampleEntryData, 0)
+                    Entry_added (sampleEntryData2, 1)
+                    Entry_media_types_inferred [
+                        { EntryId = "entry-1"; MediaType = MediaType.Movie }
+                        { EntryId = "entry-99"; MediaType = MediaType.Book }
+                    ]
+                ]
+                let state = reconstitute events
+                match state with
+                | Active catalog ->
+                    Expect.equal (Map.count catalog.Entries) 2 "Unknown entry id should not add an entry"
+                    let e1 = catalog.Entries |> Map.find "entry-1"
+                    Expect.equal e1.MediaType (Some MediaType.Movie) "entry-1 should be stamped Movie"
+                    let e2 = catalog.Entries |> Map.find "entry-2"
+                    Expect.equal e2.MediaType None "entry-2 should be untouched (not named in the batch)"
+                | _ -> failtest "Expected Active state"
+
+            testCase "evolve's Entry_media_types_inferred is last-write-wins, like Entry_updated" <| fun _ ->
+                let events = [
+                    Catalog_created sampleCreateData
+                    Entry_added ({ sampleEntryData with MediaType = Some MediaType.Movie }, 0)
+                    Entry_media_types_inferred [ { EntryId = "entry-1"; MediaType = MediaType.Book } ]
+                ]
+                let state = reconstitute events
+                match state with
+                | Active catalog ->
+                    let e1 = catalog.Entries |> Map.find "entry-1"
+                    Expect.equal e1.MediaType (Some MediaType.Book) "The later Entry_media_types_inferred should win"
+                | _ -> failtest "Expected Active state"
+
+            testCase "evolve's Entry_media_types_inferred is inert on Removed and Not_created states" <| fun _ ->
+                let removedState = reconstitute [ Catalog_created sampleCreateData; Catalog_removed ]
+                let afterOnRemoved = evolve removedState (Entry_media_types_inferred [ { EntryId = "entry-1"; MediaType = MediaType.Movie } ])
+                Expect.equal afterOnRemoved removedState "Should be inert on Removed"
+
+                let notCreatedState = Not_created
+                let afterOnNotCreated = evolve notCreatedState (Entry_media_types_inferred [ { EntryId = "entry-1"; MediaType = MediaType.Movie } ])
+                Expect.equal afterOnNotCreated notCreatedState "Should be inert on Not_created"
         ]
 
         testList "Serialization" [
@@ -399,5 +459,24 @@ let catalogTests =
                 let eventType, data = Serialization.serialize event
                 let deserialized = Serialization.deserialize eventType data
                 Expect.equal deserialized (Some event) "Should round-trip"
+
+            // curation-w9fkq: the media-type backfill's corrective event.
+            testCase "Entry_media_types_inferred round-trip" <| fun _ ->
+                let event = Entry_media_types_inferred [
+                    { EntryId = "entry-1"; MediaType = MediaType.Movie }
+                    { EntryId = "entry-2"; MediaType = MediaType.Book }
+                ]
+                let eventType, data = Serialization.serialize event
+                Expect.equal eventType "Entry_media_types_inferred" "Event type should match"
+                let deserialized = Serialization.deserialize eventType data
+                Expect.equal deserialized (Some event) "Should round-trip"
+
+            testCase "Entry_media_types_inferred is in handledEventTypes" <| fun _ ->
+                Expect.contains Serialization.handledEventTypes "Entry_media_types_inferred" "Should be a recognized event type"
+
+            testCase "Entry_media_types_inferred with an unrecognized mediaType string fails the whole decode" <| fun _ ->
+                let json = """{"items":[{"entryId":"entry-1","mediaType":"Podcast"}]}"""
+                let deserialized = Serialization.deserialize "Entry_media_types_inferred" json
+                Expect.equal deserialized None "An unrecognized media type should fail the decode, not silently drop the item"
         ]
     ]
