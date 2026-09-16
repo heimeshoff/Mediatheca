@@ -6,7 +6,7 @@ type: feature
 context: journal
 created: 2026-09-16
 completed:
-depends_on: [books-y9kxy, intelligence-dnv2y]
+depends_on: [books-y9kxy, intelligence-dnv2y, intelligence-h4qk2]
 blocks: []
 tags: [books, journal, activity, reading-progress]
 related_adrs: [0076, 0050]
@@ -17,8 +17,10 @@ prior_art: []
 ## Why
 
 The Journal is the diary half of Mediatheca: when and with whom media was experienced. Reading is
-the fourth verb. `intelligence-dnv2y` already puts reading days on the heatmap; this task makes
-reading a first-class activity in every other Journal surface (recent activity list, monthly
+the fourth verb. **Premise corrected 2026-09-16:** there is no live heatmap — `intelligence-dq8rk`
+removed the Activity section from the All tab and `intelligence-h4qk2` prunes the dead
+`ActivityDays`/`MonthlyBreakdown` payload (including `dnv2y`'s `Reading` field) end to end. This
+task makes reading a first-class activity in every Journal surface (recent activity list, monthly
 breakdown, cross-media stats) so "what did I do in August" includes the books.
 
 ## What
@@ -46,3 +48,9 @@ breakdown, cross-media stats) so "what did I do in August" includes the books.
 - ADR-0076 (observations as events, day-keyed), ADR-0050 (Games' source-tagged session precedent).
 - Captured alongside the Books integration set (2026-09-16); intentionally after the dashboard
   task so the heatmap contract lands first.
+- 2026-09-16 (h4qk2 refinement): the "heatmap contract" above never existed on the client — the
+  Activity section was removed by `intelligence-dq8rk` and the server-side payload is pruned by
+  `intelligence-h4qk2` (now a dependency). When this task is refined, a Journal activity view
+  (heatmap + monthly breakdown) needs its own `IMediathecaApi` method sized to that view, and its
+  own daily/monthly queries — never fields on `DashboardAllTab`. The deleted queries are in
+  `git show ca464a1:src/Server/{Movie,Series,Game,Book}Projection.fs` if a starting point helps.

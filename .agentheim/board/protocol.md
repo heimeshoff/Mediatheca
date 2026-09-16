@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 12:32 -- Modeling / Refined: intelligence-h4qk2 - Prune the dead activity-heatmap payload (DashboardAllTab.ActivityDays/MonthlyBreakdown) end to end
+
+**Type:** Modeling / Refine
+**BC:** intelligence
+**Status after:** todo
+**Summary:** Code-fact check plus one builder decision. The heatmap + monthly breakdown were real All-tab UI (archive tasks 027/036) that `intelligence-dq8rk` deliberately removed and `intelligence-wecjh` deleted the views for; `intelligence-p4t7k` pruned only the sibling `NewGames` payload, and `intelligence-dnv2y` then added a `Reading` field to the still-dead `ActivityDays` on a false premise. Builder chose **prune, not rebuild** (no Journal page exists, vision lists Journal reading activity as "Later", `journal-k52j1` is itself backlog). Task rewritten from a build-or-prune judgment call (`chore`) into a prescribed end-to-end prune (`refactor`) mirroring p4t7k: two Shared types, two `DashboardAllTab` fields, the `getDashboardAllTab` blocks, the seven feeder queries (`getDaily*Activity` x4, `getMonthly*Minutes` x3), the two tests that exist only for them, and README code-claims retired without deleting any ubiquitous-language term; no client edits, Fable compile is the proof. `journal-k52j1`'s false "dnv2y already puts reading days on the heatmap" premise corrected in its Why/Notes and it now `depends_on` intelligence-h4qk2 (reverse `blocks` edge set). prior_art widened to p4t7k, wecjh, dq8rk, dnv2y.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 06:27 -- Work session ended
 
 **Type:** Work / Session end
