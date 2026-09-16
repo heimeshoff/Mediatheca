@@ -55,6 +55,7 @@ let private createApi (factory: unit -> SqliteConnection) (imageBasePath: string
         (fun () -> ({ ApiKey = ""; SteamId = "" } : Steam.SteamConfig))
         (fun () -> ({ ServerUrl = ""; Username = ""; Password = ""; UserId = ""; AccessToken = "" } : Jellyfin.JellyfinConfig))
         (fun () -> ({ Url = ""; Username = ""; Password = "" } : Qbittorrent.QbittorrentConfig))
+        (fun () -> ({ UserAgent = "Mediatheca/1.0 (+https://github.com/heimeshoff/mediatheca)" } : OpenLibrary.OpenLibraryConfig))
         LocalCopyRemoval.defaultMountRoots
         imageBasePath
         [] // no projection handlers needed — addFriend only touches the event store

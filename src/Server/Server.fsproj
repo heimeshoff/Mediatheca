@@ -33,6 +33,7 @@
     <Compile Include="JellyfinImport.fs" />
     <Compile Include="Qbittorrent.fs" />
     <Compile Include="LocalCopyRemoval.fs" />
+    <Compile Include="OpenLibrary.fs" />
     <Compile Include="ImageStore.fs" />
     <Compile Include="CastStore.fs" />
     <Compile Include="SettingsStore.fs" />

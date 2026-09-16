@@ -386,6 +386,7 @@ let adminSurgeryTests =
                         (fun () -> ({ ApiKey = ""; SteamId = "" } : Steam.SteamConfig))
                         (fun () -> ({ ServerUrl = ""; Username = ""; Password = ""; UserId = ""; AccessToken = "" } : Jellyfin.JellyfinConfig))
                         (fun () -> ({ Url = ""; Username = ""; Password = "" } : Qbittorrent.QbittorrentConfig))
+                        (fun () -> ({ UserAgent = "Mediatheca/1.0 (+https://github.com/heimeshoff/mediatheca)" } : OpenLibrary.OpenLibraryConfig))
                         LocalCopyRemoval.defaultMountRoots
                         noImagesDir
                         []

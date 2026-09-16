@@ -354,6 +354,7 @@ let private createApi (factory: unit -> SqliteConnection) : IMediathecaApi =
         (fun () -> ({ ApiKey = ""; SteamId = "" } : Steam.SteamConfig))
         (fun () -> ({ ServerUrl = ""; Username = ""; Password = ""; UserId = ""; AccessToken = "" } : Jellyfin.JellyfinConfig))
         (fun () -> ({ Url = ""; Username = ""; Password = "" } : Qbittorrent.QbittorrentConfig))
+        (fun () -> ({ UserAgent = "Mediatheca/1.0 (+https://github.com/heimeshoff/mediatheca)" } : OpenLibrary.OpenLibraryConfig))
         LocalCopyRemoval.defaultMountRoots
         "test-fixtures-do-not-exist/images"
         [ ContentBlockProjection.handler; MovieProjection.handler; SeriesProjection.handler; GameProjection.handler; PlaySessionProjection.handler ]

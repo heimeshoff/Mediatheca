@@ -66,6 +66,8 @@
     <Compile Include="SteamFamilyIncrementalImportTests.fs" />
     <Compile Include="DashboardCardExpansionTests.fs" />
     <Compile Include="DashboardLingerTests.fs" />
+    <Compile Include="OpenLibraryTests.fs" />
+    <Compile Include="OpenLibraryApiTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

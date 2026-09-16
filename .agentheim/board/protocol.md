@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 04:13 -- Task verified and completed: integration-c8d4x - Open Library adapter — keyword search, ISBN and work lookup, cover download, an adapter-owned 1 req/s throttle with an identifying User-Agent — plus the `searchOpenLibraryBooks` / `addBookFromOpenLibrary` API that turns a search hit into a Book with its metadata cache slice filled
+
+**Type:** Work / Task completion
+**Task:** integration-c8d4x - Open Library adapter — keyword search, ISBN and work lookup, cover download, an adapter-owned 1 req/s throttle with an identifying User-Agent — plus the `searchOpenLibraryBooks` / `addBookFromOpenLibrary` API that turns a search hit into a Book with its metadata cache slice filled
+**Summary:** Open Library adapter (OpenLibrary.fs): keyword search, work / ISBN-edition / OLID-edition lookup with best-effort author resolution, cover download, two independent adapter-owned throttles (1s API, 3s covers) and an identifying User-Agent on every request including covers; searchOpenLibraryBooks, addBookFromOpenLibrary (shape-dispatched edition lookup, explicit Isbn13 field, cover routed through downloadCover) and refreshBookFromOpenLibrary (cache slice only) on IMediathecaApi, threaded through Composition and every Api.create test call site. Iteration 2 closed the verifier's two findings (cover download bypassing the adapter; OLID edition_key fed to the ISBN endpoint).
+**Duration:** 43m
+**Verification:** PASS (iteration 2)
+**Files changed:** 19
+**Tests added:** 12
+**ADRs written:** none
+
+---
+
+## 2026-09-16 03:57 -- Verification failed: integration-c8d4x - Open Library adapter — keyword search, ISBN and work lookup, cover download, an adapter-owned throttle with an identifying User-Agent
+
+**Type:** Work / Verification failure
+**Task:** integration-c8d4x - Open Library adapter — keyword search, ISBN and work lookup, cover download, an adapter-owned throttle with an identifying User-Agent
+**Iteration:** 1 of 3
+**Reasons:** the import's cover download bypasses OpenLibrary.downloadCover (no User-Agent, no covers throttle; downloadCover is dead code), and the edition lookup feeds the search result's OLID edition_key into /isbn/{isbn}.json so a real search hit would 404 and create a book titled by its work key
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-09-16 03:30 -- Batch started: [integration-c8d4x]
 
 **Type:** Work / Batch start

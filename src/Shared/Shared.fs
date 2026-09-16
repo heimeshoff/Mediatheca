@@ -996,6 +996,35 @@ type SetReadingProgressRequest = {
     ObservedOn: string option
 }
 
+/// integration-c8d4x (ADR-0075): one hit from `IMediathecaApi.searchOpenLibraryBooks`
+/// — Open Library's `search.json`, `CoverUrl` pre-built at size M for the
+/// search modal's grid.
+type OpenLibrarySearchResult = {
+    WorkKey: string
+    Title: string
+    Authors: string list
+    Year: int option
+    CoverId: int option
+    Isbn13: string option
+    EditionKey: string option
+    Subjects: string list
+    PageCount: int option
+    CoverUrl: string option
+}
+
+/// `IMediathecaApi.addBookFromOpenLibrary` — turns a search hit into a Book
+/// (integration-c8d4x). `EditionKey` is `search.json`'s `edition_key`, an
+/// OLID (`OL...M`), never an ISBN — resolved via `OpenLibrary.getEditionByOlid`.
+/// `Isbn13` is carried explicitly (from the search result's own `Isbn13`)
+/// so `Isbn13` linking never depends on parsing `EditionKey` (verifier
+/// iteration 1).
+type AddBookFromOpenLibraryRequest = {
+    WorkKey: string
+    EditionKey: string option
+    Isbn13: string option
+    SkipDuplicateCheck: bool
+}
+
 // Games
 
 type GameStatus =
@@ -1942,6 +1971,10 @@ type IMediathecaApi = {
     addBookContentBlock: string -> AddContentBlockRequest -> Async<Result<string, string>>
     updateBookContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
     removeBookContentBlock: string -> string -> Async<Result<unit, string>>
+    // Open Library (integration-c8d4x, ADR-0075) — book search/metadata source
+    searchOpenLibraryBooks: string -> Async<OpenLibrarySearchResult list>
+    addBookFromOpenLibrary: AddBookFromOpenLibraryRequest -> Async<Result<AddBookOutcome, string>>
+    refreshBookFromOpenLibrary: string -> Async<Result<unit, string>>
 }
 
 // Administration console — a separate Remoting contract (ADR-0004 allows multiple

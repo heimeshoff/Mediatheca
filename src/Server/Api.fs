@@ -1463,6 +1463,260 @@ module Api =
                 return Error (sprintf "Failed to add game from Steam: %s" ex.Message)
         }
 
+    /// Shared by `addBook` and `addBookFromOpenLibrary` (integration-c8d4x) —
+    /// extracted so the Open Library import path reuses the exact same
+    /// duplicate-check/slug/cover-download/command sequence rather than
+    /// re-deriving it, the `addMovieToLibraryImpl`/`addMovieToLibrary`
+    /// precedent above.
+    let private addBookToLibraryImpl
+        (conn: SqliteConnection)
+        (httpClient: HttpClient)
+        (imageBasePath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (request: AddBookRequest)
+        // integration-c8d4x, verifier iteration 2: when the caller already
+        // owns a source-specific, correctly-throttled/UA'd cover fetch
+        // (Open Library's `downloadCover`), it hands that in here keyed by
+        // the slug this function computes, instead of this function falling
+        // back to a bare, unthrottled `httpClient.GetAsync(request.CoverUrl)`.
+        // `None` (the manual-entry `addBook` path) preserves the original
+        // CoverUrl-fetch behaviour.
+        (coverDownloader: (string -> Async<string option>) option)
+        : Async<Result<AddBookOutcome, string>> = async {
+            try
+                let year = request.Year |> Option.defaultValue 0
+                let baseSlug = Slug.bookSlug request.Title year
+
+                // Duplicate check (books-y9kxy): any external id already
+                // linked -> Duplicate_found; else case-insensitive title +
+                // first author -> Duplicate_found. SkipDuplicateCheck
+                // bypasses both.
+                let existing =
+                    if request.SkipDuplicateCheck then None
+                    else
+                        let byExternalId =
+                            request.ExternalIds
+                            |> List.tryPick (fun eid -> BookProjection.findByExternalId conn eid)
+                        match byExternalId with
+                        | Some existingSlug ->
+                            match BookProjection.getBySlug conn existingSlug with
+                            | Some b -> Some (existingSlug, b.Title)
+                            | None -> Some (existingSlug, request.Title)
+                        | None ->
+                            let firstAuthor = request.Authors |> List.tryHead |> Option.map (fun a -> a.ToLowerInvariant())
+                            BookProjection.findByTitle conn request.Title
+                            |> List.tryFind (fun (candidateSlug, _) ->
+                                match BookProjection.getBySlug conn candidateSlug with
+                                | Some b -> (b.Authors |> List.tryHead |> Option.map (fun a -> a.ToLowerInvariant())) = firstAuthor
+                                | None -> false)
+
+                match existing with
+                | Some (existingSlug, existingTitle) ->
+                    return Ok (AddBookOutcome.Duplicate_found (existingSlug, existingTitle))
+                | None ->
+                    let slug = generateUniqueSlug conn Books.streamId baseSlug
+                    let sid = Books.streamId slug
+
+                    let! coverRef =
+                        match coverDownloader with
+                        | Some download -> download slug
+                        | None ->
+                            async {
+                                match request.CoverUrl with
+                                | None -> return None
+                                | Some url ->
+                                    try
+                                        let! response = httpClient.GetAsync(url: string) |> Async.AwaitTask
+                                        response.EnsureSuccessStatusCode() |> ignore
+                                        let! bytes = response.Content.ReadAsByteArrayAsync() |> Async.AwaitTask
+                                        let relativePath = sprintf "posters/book-%s.jpg" slug
+                                        ImageStore.saveImage imageBasePath relativePath bytes
+                                        return Some relativePath
+                                    with _ -> return None
+                            }
+
+                    let bookData: Books.BookAddedData = {
+                        Title = request.Title
+                        Authors = request.Authors
+                        Year = request.Year
+                        CoverRef = coverRef
+                        Subjects = request.Subjects
+                        Format = request.Format
+                        ExternalIds = request.ExternalIds
+                    }
+
+                    let result =
+                        executeCommandCore
+                            conn sid
+                            Books.Serialization.fromStoredEvent
+                            Books.reconstitute
+                            Books.decide
+                            Books.Serialization.toEventData
+                            (Books.Add_book_to_library bookData)
+                            projectionHandlers
+
+                    match result with
+                    | Error e -> return Error e
+                    | Ok () -> return Ok (AddBookOutcome.Book_added slug)
+            with ex ->
+                return Error $"Failed to add book: {ex.Message}"
+        }
+
+    /// `search.json`'s `edition_key` is an OLID (`OL33246498M`), never an
+    /// ISBN — verifier iteration 1 caught `addBookFromOpenLibraryImpl`
+    /// feeding it straight into `/isbn/{isbn}.json`, which 404s for any real
+    /// hit. Shape-dispatch on the value instead: OLIDs are `OL...M`
+    /// (`/books/{key}.json` — see `OpenLibrary.getEditionByOlid`); an
+    /// ISBN-shaped value (10 or 13 digits, ISBN-10's trailing check digit
+    /// may be `X`) still resolves via `/isbn/{isbn}.json` for any caller
+    /// that happens to pass one.
+    let private isOlidShaped (value: string) =
+        value.StartsWith("OL", System.StringComparison.Ordinal)
+        && value.EndsWith("M", System.StringComparison.Ordinal)
+
+    let private isIsbnShaped (value: string) =
+        (value.Length = 10 || value.Length = 13)
+        && value
+           |> Seq.mapi (fun i c -> i, c)
+           |> Seq.forall (fun (i, c) -> System.Char.IsDigit c || (c = 'X' && i = value.Length - 1))
+
+    /// integration-c8d4x (ADR-0075): fetches Open Library's work (and edition,
+    /// when given) and turns it into an `AddBookRequest`, then reuses
+    /// `addBookToLibraryImpl`. On `Book_added`, writes the cache slice
+    /// (`MetadataCache.upsertBookMetadata`, `source = "openlibrary"`) — never
+    /// the identity card (ADR-0043's identity-card clause).
+    let private addBookFromOpenLibraryImpl
+        (conn: SqliteConnection)
+        (httpClient: HttpClient)
+        (getOpenLibraryConfig: unit -> OpenLibrary.OpenLibraryConfig)
+        (imageBasePath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (request: AddBookFromOpenLibraryRequest)
+        : Async<Result<AddBookOutcome, string>> = async {
+            try
+                let config = getOpenLibraryConfig ()
+                let! work = OpenLibrary.getWork httpClient config request.WorkKey
+                let! editionOpt =
+                    match request.EditionKey with
+                    | Some key when isOlidShaped key -> OpenLibrary.getEditionByOlid httpClient config key
+                    | Some key when isIsbnShaped key -> OpenLibrary.getEditionByIsbn httpClient config key
+                    | Some _ | None -> async { return None }
+
+                let title = editionOpt |> Option.map (fun e -> e.Title) |> Option.defaultValue request.WorkKey
+                let authors = editionOpt |> Option.map (fun e -> e.Authors) |> Option.defaultValue []
+                let year =
+                    editionOpt
+                    |> Option.bind (fun e -> e.PublishDate)
+                    |> Option.bind (fun d ->
+                        if d.Length >= 4 then
+                            match System.Int32.TryParse(d.[d.Length - 4 ..]) with
+                            | true, y -> Some y
+                            | _ -> None
+                        else None)
+                let coverId = editionOpt |> Option.bind (fun e -> e.CoverId)
+                // Isbn13 is never parsed out of the edition key — it rides
+                // its own explicit field, populated from the search result's
+                // own `Isbn13` (verifier iteration 1).
+                let isbn13 = request.Isbn13
+                let externalIds =
+                    [ Some (OpenLibraryWork request.WorkKey)
+                      editionOpt |> Option.map (fun e -> OpenLibraryEdition e.EditionKey)
+                      isbn13 |> Option.map Isbn13
+                      editionOpt |> Option.bind (fun e -> e.GoodreadsIds |> List.tryHead) |> Option.map GoodreadsBookId ]
+                    |> List.choose id
+
+                // The cover download is routed through
+                // `OpenLibrary.downloadCover` (User-Agent + the covers gate)
+                // rather than `addBookToLibraryImpl`'s bare-CoverUrl fallback
+                // path (verifier iteration 1: that path issued an
+                // unthrottled, UA-less request and left `downloadCover` dead
+                // code). `addBookToLibraryImpl` invokes this with the slug it
+                // computes internally, once the duplicate check clears.
+                let coverDownloader : (string -> Async<string option>) option =
+                    coverId
+                    |> Option.map (fun id ->
+                        fun (slug: string) -> OpenLibrary.downloadCover httpClient config id slug imageBasePath)
+
+                let addRequest: AddBookRequest = {
+                    Title = title
+                    Authors = authors
+                    Year = year
+                    CoverUrl = None
+                    Subjects = work.Subjects |> List.truncate 8
+                    Format = BookFormat.Unknown
+                    ExternalIds = externalIds
+                    SkipDuplicateCheck = false
+                }
+
+                let! result = addBookToLibraryImpl conn httpClient imageBasePath projectionHandlers addRequest coverDownloader
+                match result with
+                | Ok (AddBookOutcome.Book_added slug) ->
+                    let metadata: MetadataCache.BookMetadata = {
+                        Description = work.Description
+                        PageCount = editionOpt |> Option.bind (fun e -> e.PageCount)
+                        RuntimeMinutes = None
+                        Narrators = []
+                        SeriesName = None
+                        SeriesPosition = None
+                        Publisher = editionOpt |> Option.bind (fun e -> e.Publishers |> List.tryHead)
+                        PublishedDate = editionOpt |> Option.bind (fun e -> e.PublishDate)
+                        AverageRating = None
+                        Language = None
+                        Source = Some "openlibrary"
+                    }
+                    MetadataCache.upsertBookMetadata conn slug metadata
+                    return Ok (AddBookOutcome.Book_added slug)
+                | other -> return other
+            with ex ->
+                return Error $"Failed to add book from Open Library: {ex.Message}"
+        }
+
+    /// integration-c8d4x (ADR-0043's identity-card clause): re-fetches the
+    /// work/edition for a book that has an Open Library key or ISBN and
+    /// rewrites the cache slice ONLY — never the identity card.
+    let private refreshBookFromOpenLibraryImpl
+        (conn: SqliteConnection)
+        (httpClient: HttpClient)
+        (getOpenLibraryConfig: unit -> OpenLibrary.OpenLibraryConfig)
+        (slug: string)
+        : Async<Result<unit, string>> = async {
+            match BookProjection.getBySlug conn slug with
+            | None -> return Error "Book not found"
+            | Some book ->
+                match book.OpenLibraryWorkKey, book.Isbn13 with
+                | None, None -> return Error "Book has no Open Library work key or ISBN to refresh from"
+                | workKeyOpt, isbnOpt ->
+                    try
+                        let config = getOpenLibraryConfig ()
+                        let! workOpt =
+                            match workKeyOpt with
+                            | Some workKey -> async { let! w = OpenLibrary.getWork httpClient config workKey in return Some w }
+                            | None -> async { return None }
+                        let! editionOpt =
+                            match isbnOpt with
+                            | Some isbn -> OpenLibrary.getEditionByIsbn httpClient config isbn
+                            | None -> async { return None }
+
+                        let current = MetadataCache.tryGetBookMetadata conn slug
+                        let metadata: MetadataCache.BookMetadata = {
+                            Description = workOpt |> Option.bind (fun w -> w.Description) |> Option.orElse current.Description
+                            PageCount = editionOpt |> Option.bind (fun e -> e.PageCount) |> Option.orElse current.PageCount
+                            RuntimeMinutes = current.RuntimeMinutes
+                            Narrators = current.Narrators
+                            SeriesName = current.SeriesName
+                            SeriesPosition = current.SeriesPosition
+                            Publisher = (editionOpt |> Option.bind (fun e -> e.Publishers |> List.tryHead)) |> Option.orElse current.Publisher
+                            PublishedDate = (editionOpt |> Option.bind (fun e -> e.PublishDate)) |> Option.orElse current.PublishedDate
+                            AverageRating = current.AverageRating
+                            Language = current.Language
+                            Source = Some "openlibrary"
+                        }
+                        MetadataCache.upsertBookMetadata conn slug metadata
+                        return Ok ()
+                    with ex ->
+                        return Error $"Failed to refresh book from Open Library: {ex.Message}"
+        }
+
     let create
         (factory: unit -> SqliteConnection)
         (httpClient: HttpClient)
@@ -1472,6 +1726,7 @@ module Api =
         (getSteamConfig: unit -> Steam.SteamConfig)
         (getJellyfinConfig: unit -> Jellyfin.JellyfinConfig)
         (getQbittorrentConfig: unit -> Qbittorrent.QbittorrentConfig)
+        (getOpenLibraryConfig: unit -> OpenLibrary.OpenLibraryConfig)
         (mountRoots: LocalCopyRemoval.MountRoots)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
@@ -3738,79 +3993,7 @@ module Api =
 
             addBook = fun request -> async {
                 use conn = factory ()
-                try
-                    let year = request.Year |> Option.defaultValue 0
-                    let baseSlug = Slug.bookSlug request.Title year
-
-                    // Duplicate check (books-y9kxy): any external id already
-                    // linked -> Duplicate_found; else case-insensitive title +
-                    // first author -> Duplicate_found. SkipDuplicateCheck
-                    // bypasses both.
-                    let existing =
-                        if request.SkipDuplicateCheck then None
-                        else
-                            let byExternalId =
-                                request.ExternalIds
-                                |> List.tryPick (fun eid -> BookProjection.findByExternalId conn eid)
-                            match byExternalId with
-                            | Some existingSlug ->
-                                match BookProjection.getBySlug conn existingSlug with
-                                | Some b -> Some (existingSlug, b.Title)
-                                | None -> Some (existingSlug, request.Title)
-                            | None ->
-                                let firstAuthor = request.Authors |> List.tryHead |> Option.map (fun a -> a.ToLowerInvariant())
-                                BookProjection.findByTitle conn request.Title
-                                |> List.tryFind (fun (candidateSlug, _) ->
-                                    match BookProjection.getBySlug conn candidateSlug with
-                                    | Some b -> (b.Authors |> List.tryHead |> Option.map (fun a -> a.ToLowerInvariant())) = firstAuthor
-                                    | None -> false)
-
-                    match existing with
-                    | Some (existingSlug, existingTitle) ->
-                        return Ok (AddBookOutcome.Duplicate_found (existingSlug, existingTitle))
-                    | None ->
-                        let slug = generateUniqueSlug conn Books.streamId baseSlug
-                        let sid = Books.streamId slug
-
-                        let! coverRef = async {
-                            match request.CoverUrl with
-                            | None -> return None
-                            | Some url ->
-                                try
-                                    let! response = httpClient.GetAsync(url: string) |> Async.AwaitTask
-                                    response.EnsureSuccessStatusCode() |> ignore
-                                    let! bytes = response.Content.ReadAsByteArrayAsync() |> Async.AwaitTask
-                                    let relativePath = sprintf "posters/book-%s.jpg" slug
-                                    ImageStore.saveImage imageBasePath relativePath bytes
-                                    return Some relativePath
-                                with _ -> return None
-                        }
-
-                        let bookData: Books.BookAddedData = {
-                            Title = request.Title
-                            Authors = request.Authors
-                            Year = request.Year
-                            CoverRef = coverRef
-                            Subjects = request.Subjects
-                            Format = request.Format
-                            ExternalIds = request.ExternalIds
-                        }
-
-                        let result =
-                            executeCommand
-                                conn sid
-                                Books.Serialization.fromStoredEvent
-                                Books.reconstitute
-                                Books.decide
-                                Books.Serialization.toEventData
-                                (Books.Add_book_to_library bookData)
-                                projectionHandlers
-
-                        match result with
-                        | Error e -> return Error e
-                        | Ok () -> return Ok (AddBookOutcome.Book_added slug)
-                with ex ->
-                    return Error $"Failed to add book: {ex.Message}"
+                return! addBookToLibraryImpl conn httpClient imageBasePath projectionHandlers request None
             }
 
             removeBook = fun slug -> async {
@@ -5258,5 +5441,25 @@ module Api =
                 let streamIds =
                     mainStreamId :: (contentBlocksStreamId |> Option.toList)
                 return EventFormatting.getStreamEvents conn streamIds
+            }
+
+            // Open Library (integration-c8d4x, ADR-0075) — appended at the
+            // tail deliberately: integration-dhctm depends on this task and
+            // appends its own Audible members after these, avoiding a
+            // manual-merge conflict at squash time (see this task's Notes).
+            searchOpenLibraryBooks = fun query -> async {
+                try
+                    return! OpenLibrary.searchBooks httpClient (getOpenLibraryConfig()) query
+                with _ -> return []
+            }
+
+            addBookFromOpenLibrary = fun request -> async {
+                use conn = factory ()
+                return! addBookFromOpenLibraryImpl conn httpClient getOpenLibraryConfig imageBasePath projectionHandlers request
+            }
+
+            refreshBookFromOpenLibrary = fun slug -> async {
+                use conn = factory ()
+                return! refreshBookFromOpenLibraryImpl conn httpClient getOpenLibraryConfig slug
             }
         }

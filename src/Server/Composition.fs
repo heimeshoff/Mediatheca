@@ -233,6 +233,12 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         { JellyfinRoot = envRoot "JELLYFIN_MEDIA_ROOT" LocalCopyRemoval.defaultMountRoots.JellyfinRoot
           QbittorrentRoot = envRoot "QBITTORRENT_DOWNLOAD_ROOT" LocalCopyRemoval.defaultMountRoots.QbittorrentRoot }
 
+    // Open Library needs no key or setting (ADR-0075) — a constant config,
+    // the same shape `mountRoots` above takes for a deployment fact that
+    // isn't a user setting either.
+    let getOpenLibraryConfig () : OpenLibrary.OpenLibraryConfig =
+        { UserAgent = "Mediatheca/1.0 (+https://github.com/heimeshoff/mediatheca)" }
+
     // Dynamic Steam config provider (reads from DB, falls back to env var)
     let getSteamConfig () : Steam.SteamConfig =
         use conn = connectionFactory ()
@@ -467,7 +473,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     let adminGuards = Administration.makeGuards ()
 
     // Create API
-    let api = Api.create connectionFactory httpClient qbittorrentHttpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig getQbittorrentConfig mountRoots imageBasePath projectionHandlers
+    let api = Api.create connectionFactory httpClient qbittorrentHttpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig getQbittorrentConfig getOpenLibraryConfig mountRoots imageBasePath projectionHandlers
     let adminApi = Administration.create connectionFactory dbPath imageBasePath projectionHandlers scheduledJobs jobRunRecorder adminGuards
 
     let remotingHandler =
