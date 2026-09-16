@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 02:15 -- Modeling / Refined: Books integration task set (9 todo tasks) — orchestrator pass before work
+
+**Type:** Modeling / Refine
+**BC:** books, integration, intelligence
+**Status after:** todo (all nine unchanged)
+**Summary:** Orchestrator (tactical-modeler + architect) refined books-y9kxy, integration-c8d4x, integration-dhctm, integration-jjvg2, integration-wmqn3, integration-y2ak4, books-g7g1j, books-f33e2, intelligence-dnv2y in place against the actual code. Found and fixed: a guaranteed Router.fs duplicate-DU-case collision (g7g1j now depends on f33e2, which owns the route); a wrong ContentBlocks "owner key" assumption (no such key exists — a fourth parallel IMediathecaApi method family, as Series/Games do); JournalEditor is game-specific (skipped for books); tail-append collisions in Shared/Api/Composition resolved by ordering (dhctm depends on c8d4x; wmqn3 depends on dhctm; jjvg2 depends on wmqn3); decide rules sharpened (percent outside 0–100 refused not clamped, per-source same-percent no-op, observation removal never reverts status, duplicate-kind external ids refused on add); derived percents floor, never round-half-up, in both syncs; Started status items never emit. Known limitations recorded (removed books resurface under a new slug on the next sync; ContentBlocks streams are bare-slug-keyed across media types).
+**ADRs written:** 0077 (Book status changes carry an effective-on date; amends 0076 §5) — written by modeling from the orchestrator's folded text so every worker sees it on disk.
+**Dispatch order:** y9kxy → c8d4x → dhctm ∥ f33e2 → wmqn3 ∥ g7g1j ∥ dnv2y → jjvg2 ∥ y2ak4.
+
+---
+
 ## 2026-09-16 01:55 -- Modeling / Captured: curation-cyxbc - Books in catalogs — a catalog entry can reference a book (RoutePrefix "books", cover as poster), with `getCatalogsForBook` / add-to-catalog on the book detail page and books in the catalog detail list, the same conformist treatment catalogs give movies, series and games
 
 **Type:** Modeling / Capture

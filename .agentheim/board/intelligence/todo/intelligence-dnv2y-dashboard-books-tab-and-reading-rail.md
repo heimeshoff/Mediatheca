@@ -9,7 +9,7 @@ completed:
 depends_on: [books-y9kxy, books-f33e2, design-system-001-formalize-styleguide]
 blocks: []
 tags: [books, dashboard, frontend, reading-progress, heatmap]
-related_adrs: [0076, 0073, 0016]
+related_adrs: [0076, 0077, 0073, 0016]
 related_research: []
 prior_art: [intelligence-b1nz5, intelligence-qh8mj, intelligence-m09d4]
 ---
@@ -73,8 +73,15 @@ replaces it, and gives books the same intent-driven treatment the vision gives m
 
 - Prior art to read first: `intelligence-b1nz5` (7-day linger + split query + pill), `intelligence-
   qh8mj` (adding a rail to a tab), `intelligence-m09d4` / ADR-0073 (expand-in-place, keys).
-- `Views.fs` lines ~896 (`booksColumnPlaceholder`) and ~972 (its slot) are the anchor; `tabBar`
-  ~line 47 for the tab; `view` dispatch ~2907.
-- ADR-0076 for what "In Focus" and "Finished" mean for books; ADR-0016 for any popover.
+- `Views.fs` lines ~896 (`booksColumnPlaceholder`) and ~965–972 (its call site inside the
+  `xl:grid-cols-2` slot) are the anchor (confirmed accurate during refinement, 2026-09-16); `tabBar`
+  ~line 47–50 is where a `tab "Books" BooksTab` entry appends (the function itself starts at line
+  35 — the tab-button list is what's meant); `view` dispatch ~line 2906–2907
+  (`match model.ActiveTab with`), with a `| BooksTab -> ...` arm appending after the existing
+  `GamesTab` arm (~2919–2922).
+- ADR-0076 for what "In Focus" and "Finished" mean for books; ADR-0077 (drafted by `books-y9kxy`) for
+  `finished_at` being a `yyyy-MM-dd` **date string**, not a timestamp — the 7-day-linger comparison
+  (`finished_at >= date('now','-7 days')`) and `RecentlyFinished`'s 90-day window must compare dates,
+  not parse a timestamp. ADR-0016 for any popover.
 - `intelligence-p4t7k`'s lesson: do not ship a payload no client reads — every new DTO field is
   rendered somewhere in this task.

@@ -6,8 +6,8 @@ type: feature
 context: integration
 created: 2026-09-16
 completed:
-depends_on: [books-y9kxy, integration-c8d4x, design-system-001-formalize-styleguide]
-blocks: [integration-y2ak4]
+depends_on: [books-y9kxy, integration-c8d4x, integration-dhctm, design-system-001-formalize-styleguide]
+blocks: [integration-y2ak4, integration-jjvg2]
 tags: [books, goodreads, adapter, settings, rss, sync, scheduled-job]
 related_adrs: [0075, 0070, 0076, 0043, 0026, 0010]
 related_research: [goodreads-reading-progress-and-book-metadata-sources-2026-09-16]
@@ -67,12 +67,20 @@ opted in):
    `LargeImageUrl` as the cover; `addBook` (duplicate check on) → `Duplicate_found` links the Goodreads
    id to the existing slug instead of creating. Then `upsertBookMetadata` with `page_count`
    (`NumPages`), `average_rating`, `source = "goodreads"` (+ description from Open Library when found).
-3. Status mapping via `Change_status`: `to-read → Backlog` only when the book is currently `Backlog`
-   or newly created (never demote an InFocus/Finished book); `currently-reading → InFocus` unless
-   already InFocus or Finished; `read → Finished` unless already Finished — with `finished_at` =
-   `ReadAt` date when present: the command carries `FinishedOn: string option` so the projection can
-   record the true date (extend `Change_status` in books-y9kxy's shape if needed: `Change_status of
-   BookStatus * effectiveOn: string option`).
+3. Status mapping via `Change_status (status, effectiveOn)` — `books-y9kxy` already defines this
+   signature (`BookStatus * effectiveOn: string option`, ADR-0077); this task is its first real
+   caller and does not need to extend anything. **The adapter, not the aggregate, enforces
+   "never demote"** — the aggregate's `Change_status` is a manual override that obeys whatever it's
+   told, so this sync must check current status itself before calling it: `to-read → Change_status
+   (Backlog, None)` only when the book is currently `Backlog` or newly created; `currently-reading →
+   Change_status (InFocus, None)` unless already `InFocus` or `Finished`; `read → Change_status
+   (Finished, Some readAtDate)` unless already `Finished` **with the same date** — ADR-0077's
+   narrowed no-op rule means calling this again with a *different* `ReadAt` (a corrected Goodreads
+   date, or a book Audible finished first at today's date) legitimately re-dates `finished_at`, so
+   don't guard this call with "unless already Finished" alone or a genuine correction will be
+   silently dropped. `readAtDate` is the feed's `ReadAt` (RFC-822, e.g.
+   `"Tue, 02 Sep 2026 00:00:00 -0800"`) parsed and reformatted to `yyyy-MM-dd` before the command is
+   issued — `decide` refuses anything else.
 4. `UserRating` seeds `Set_personal_rating` only when the book has no rating yet.
 5. Items on the feed but absent from the library after step 2 (shelf not configured for import) are
    counted as `Skipped`.
@@ -91,7 +99,10 @@ persisted as JSON; per-item failures never abort the run (ADR-0010).
       Library data with `Format = Print`, creates the third from feed data with the feed cover, and
       moves all three to `InFocus`; running the same sync again appends zero events.
 - [ ] `read` shelf item with `ReadAt = "Tue, 02 Sep 2026 …"` on a `Backlog` book → `Finished` with
-      `book_list.finished_at = 2026-09-02`; a `to-read` item never demotes an `InFocus` book (no event).
+      `book_list.finished_at = 2026-09-02`; a `to-read` item never demotes an `InFocus` book (no event);
+      running the sync again with the identical `ReadAt` appends zero events; a book already `Finished`
+      via an Audible import (`finished_at = today`) that this sync later finds on the `read` shelf with
+      a real `ReadAt` gets exactly one re-dating event, converging `finished_at` to the true date.
 - [ ] `UserRating = 4` sets the rating on an unrated book and does not touch a book already rated 5.
 - [ ] A 403 feed response ends the run failed with `goodreads_last_error` = "profile private or user
       id unknown" and no events appended; the Settings badge shows it after reload.
@@ -112,3 +123,15 @@ persisted as JSON; per-item failures never abort the run (ADR-0010).
   feed's id, that is a confirmed match; otherwise ISBN equality is the match.
 - Prior art: `integration-qb7tk` (card), `integration-n3vqa` (diff-before-enrich, per-item fault
   isolation, persisted last-result).
+- **Scheduling notes (added during refinement, 2026-09-16):** this task now `depends_on`
+  `integration-dhctm` because this task's own spec positions the Goodreads card "after Audible" in
+  the Settings Integrations grid — dispatching both in the same parallel batch would leave this
+  task's worker with no Audible card to anchor after. It also now `blocks` `integration-jjvg2`
+  (Audible's own scheduled-job task): both this task's "Goodreads shelf sync" job and `jjvg2`'s
+  "Audible progress sync" job append an entry to the same `Composition.fs` `scheduledJobs` list
+  literal (~line 395) — the two tasks don't otherwise interact; this ordering exists purely to avoid
+  a same-line-region merge conflict at squash time.
+- A removed book cannot be re-added under the same slug (see `books-y9kxy`'s Notes); a shelf title
+  the user has removed from Mediatheca will reappear under a new slug on the next sync that still
+  sees it on the configured shelf. Existing Steam-import behavior — note it as a known limitation,
+  not a bug to fix here.

@@ -6,7 +6,7 @@ type: feature
 context: integration
 created: 2026-09-16
 completed:
-depends_on: [integration-dhctm]
+depends_on: [integration-dhctm, integration-wmqn3]
 blocks: []
 tags: [books, audible, import, sync, scheduled-job, reading-progress]
 related_adrs: [0074, 0076, 0043, 0050, 0026, 0065]
@@ -28,8 +28,11 @@ the only Audible-sourced writer of that event.
 contributors,series,percent_complete,is_finished,listening_status,order_details&image_sizes=500`,
 paging until a page is short; `AudibleLibraryItem = { Asin; Title; Authors; Narrators; RuntimeMinutes;
 PercentComplete: float option; IsFinished: bool; PurchaseDate: string option; CoverUrl; SeriesName;
-SeriesPosition; ReleaseDate; Description }`. `percent_complete` is a float 0–100; round half-up to int.
-Items with `is_finished = true` and no percent are treated as 100.
+SeriesPosition; ReleaseDate; Description }`. `percent_complete` is a float 0–100; **floor to int, never
+round-half-up** — 99.6 % must floor to 99, not round to 100, so a title Audible hasn't itself marked
+finished can never auto-Finish via rounding (`Books.decide` refuses to clamp but happily accepts a
+source-supplied 100). Items with `is_finished = true` and no percent are treated as 100 (the source's
+own explicit signal, not a rounding artifact).
 
 **Import** (`Api.fs`, `IMediathecaApi.importAudibleLibrary: unit -> Async<Result<AudibleImportResult,
 string>>`, `AudibleImportResult = { Total; Created; AlreadyKnown; ProgressObserved; Errors: string list }`):
@@ -39,12 +42,20 @@ creation; **new** → `addBookFromAudible`-equivalent creation from the library 
 "diff, don't re-enrich" principle), then Audnexus only when description or narrators are empty.
 Then, for every item (known or new) with a percent, `Observe_reading_progress { Percent; Position =
 Some (Minutes (round (percent/100 × runtime), Some runtime)) when runtime known; Source = Audible;
-ObservedOn = today; Finished = is_finished }` — the aggregate decides whether anything is emitted
-(same percent → nothing, ADR-0076). Per-item failures are collected in `Errors`, never abort the
-run (ADR-0010's fault isolation). A newly created book whose percent is 0 and not finished stays
-`Backlog`; a percent > 0 promotes to `InFocus` via the aggregate rule — so a fresh import of a
-200-title library lands the in-progress titles In Focus and the rest in Backlog. Titles that are
-`is_finished` land `Finished` with `finished_at = today` (the true finish date is unknown; note it).
+ObservedOn = today; Finished = is_finished }` — the aggregate decides whether anything is emitted.
+The no-op comparison is **per-source** (this item's Audible percent vs. the book's *last Audible*
+observation, not its global current percent, per `books-y9kxy`'s ADR-0076/ADR-0077 rules): a 0 %
+observation on a book with no prior Audible observation emits nothing at all (0 equals the per-source
+default baseline) and the book stays `Backlog` — this is the definitive answer to this task's own
+first acceptance criterion below; do not leave it as an open question in the test. Per-item failures
+are collected in `Errors`, never abort the run (ADR-0010's fault isolation). A newly created book
+whose percent is 0 and not finished stays `Backlog`; a percent > 0 promotes to `InFocus` via the
+aggregate rule — so a fresh import of a 200-title library lands the in-progress titles In Focus and
+the rest in Backlog. Titles that are `is_finished` land `Finished`; since this sync always sends
+`ObservedOn = today`, the resulting `Book_status_changed (Finished, Some today)` dates `finished_at`
+to today (the true finish date is unknown — this is an accepted approximation, not a bug; a later
+Goodreads shelf sync for a book also tracked there can re-date it via `Change_status`'s backdating,
+see `integration-wmqn3`).
 
 **Scheduled job** (`ScheduledJobs.JobSpec`, registered in `Composition.fs` next to "Steam playtime
 sync"): name `"Audible progress sync"`, hour from `audible_sync_hour` (default 05). Body: if no auth
@@ -64,10 +75,10 @@ section lists the job automatically.
 
 - [ ] `AudibleLibrarySyncTests.fs` (stubbed handler, `TestDb`): an import over a 3-item fixture
       (one 0 %, one 42 %, one finished) creates 3 books — statuses Backlog / InFocus / Finished — and
-      3 `book_progress` rows only for the two with percent > 0 (the 0 % item emits an observation
-      only if the aggregate rule says so — assert exactly what `Books.decide` does for 0 % on a new
-      book, and document it); a second import with the same fixture creates nothing and appends
-      **zero** events (same-percent no-op).
+      2 `book_progress` rows, only for the two items with percent > 0 (a 0 % observation on a book
+      with no prior Audible observation is the per-source default baseline and emits nothing — see
+      `books-y9kxy`'s Notes); a second import with the same fixture creates nothing and appends
+      **zero** events (same-percent-per-source no-op).
 - [ ] Changing the fixture's 42 % to 55 % and running the **job** appends exactly one
       `Reading_progress_observed` (55, Audible, today) and no status change (already InFocus).
 - [ ] The job never creates a book: a library item with an unknown ASIN is counted in the result
@@ -97,3 +108,13 @@ section lists the job automatically.
   minutes.
 - Steam's `PlaytimeTracker.fs` is the closest existing sync body; `SteamFamilyIncrementalImportTests`
   the closest test shape.
+- **Scheduling note (added during refinement, 2026-09-16):** this task now `depends_on`
+  `integration-wmqn3` in addition to `integration-dhctm` — both this task's "Audible progress sync"
+  job and `wmqn3`'s "Goodreads shelf sync" job append a new entry to the same `Composition.fs`
+  `scheduledJobs` list literal (~line 395); dispatching both jobs' registration in the same parallel
+  batch risks a same-line-region merge conflict at squash time. This task and `wmqn3` don't otherwise
+  interact — this dependency exists purely to serialize the two `Composition.fs` list-append edits.
+- A removed book cannot be re-added under the same slug (see `books-y9kxy`'s Notes); a library title
+  the user has removed from Mediatheca will reappear under a new slug on the next import/sync that
+  still sees it in the Audible library. This is existing Steam-import behavior; note it as a known
+  limitation in your RESULT rather than treating it as a bug to fix here.

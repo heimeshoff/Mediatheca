@@ -7,7 +7,7 @@ context: integration
 created: 2026-09-16
 completed:
 depends_on: [books-y9kxy]
-blocks: [books-g7g1j, integration-wmqn3]
+blocks: [books-g7g1j, integration-wmqn3, integration-dhctm]
 tags: [books, open-library, adapter, search, metadata-cache, throttle]
 related_adrs: [0075, 0066, 0043, 0045, 0076]
 related_research: [goodreads-reading-progress-and-book-metadata-sources-2026-09-16]
@@ -96,3 +96,11 @@ Library's JSON.
   `{key}` references — resolve at most three, best-effort.
 - No settings card: Open Library needs no key. The Books Settings surface is integration-dhctm
   (Audible) and integration-wmqn3 (Goodreads).
+- **Scheduling note:** `integration-dhctm` now `depends_on` this task (added during refinement,
+  2026-09-16) — both tasks otherwise add new `IMediathecaApi` members to the same tail of the
+  interface (right after this task's new "Books" section) and matching fields to `Api.fs`'s `create`
+  record plus a new `getXConfig` function in `Composition.fs`'s adapter-config cluster (~line
+  188–237); dispatching them in the same parallel batch would produce a near-guaranteed manual-merge
+  conflict at squash time. This task should merge to `main` before `integration-dhctm` starts — no
+  action needed in this file beyond landing your own additions cleanly at the tail so the next
+  worker's diff applies without rebasing surprises.

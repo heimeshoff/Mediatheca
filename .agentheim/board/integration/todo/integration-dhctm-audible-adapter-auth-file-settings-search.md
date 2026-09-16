@@ -6,8 +6,8 @@ type: feature
 context: integration
 created: 2026-09-16
 completed:
-depends_on: [books-y9kxy, design-system-001-formalize-styleguide]
-blocks: [integration-jjvg2, books-g7g1j]
+depends_on: [books-y9kxy, integration-c8d4x, design-system-001-formalize-styleguide]
+blocks: [integration-jjvg2, integration-wmqn3, books-g7g1j]
 tags: [books, audible, adapter, settings, auth-file, audnexus, search]
 related_adrs: [0074, 0070, 0065, 0011, 0043, 0045, 0076]
 related_research: [audible-api-surface-and-listening-progress-2026-09-16]
@@ -102,8 +102,10 @@ sync are `integration-jjvg2`.
       expiry, and on a 401 from the API call refreshes once and retries once — a second 401 surfaces
       `AuthFileRejected` (exactly one refresh, asserted).
 - [ ] `grep -rn "auth/register\|from_login\|device_registration" src/Server/Audible.fs` is empty
-      (no registration path exists) — a test asserts the module has no member whose name contains
-      `register` or `login`.
+      (no registration path exists). This grep is the verification — do not attempt a reflection-based
+      unit test asserting "no member named register/login" (F# module functions compile to static
+      methods on a generated class and such a test would be fragile/over-engineered for what the grep
+      already proves); the CI/review step running the grep is sufficient. [human-eye or CI grep step]
 - [ ] `searchAudibleBooks "dune"` against a captured unauthenticated fixture decodes asin, title,
       authors, narrators, runtime, 500 px cover; works with no auth file stored.
 - [ ] `addBookFromAudible` creates a book with `Format = Audiobook`, `AudibleAsin` linked, cover at
@@ -136,3 +138,13 @@ sync are `integration-jjvg2`.
   auth file — a multi-KB JSON secret does not belong in an env var; Settings only.
 - Locale table: copy mkb79 `localization.py`'s `LOCALE_TEMPLATES` (country_code → domain,
   market_place_id) rather than guessing; the review gate confirmed `api.audible.de` live.
+- **Scheduling note (added during refinement, 2026-09-16):** this task now `depends_on`
+  `integration-c8d4x` — both tasks independently append new `IMediathecaApi` members near the same
+  tail of the interface, matching `Api.fs` `create`-record fields, and a new `getXConfig` function in
+  `Composition.fs`'s adapter-config cluster (~line 188–237); running them in the same parallel batch
+  risks a manual-merge conflict at squash time. Land your Settings-grid `integrationCard` block after
+  wherever `c8d4x` (Open Library — headless, no card) leaves the grid; since Open Library has no
+  Settings card, in practice this just means placing Audible's card after qBittorrent's as already
+  specified. **`integration-wmqn3` (Goodreads) now `depends_on` this task** because its own spec
+  positions its card "after Audible" in the Integrations grid — land your card cleanly so that
+  positioning is unambiguous for the next worker.

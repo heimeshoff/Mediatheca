@@ -10,6 +10,7 @@ Catalog of ADRs, research, and concept synthesis pages scoped to this bounded co
 ## ADRs scoped to this BC
 
 <!-- adr-local:start -->
+- **0077** — Book status changes carry `effectiveOn: string option` (amends ADR-0076 §5): a Finished status can be backdated to the day a source says it became true (Goodreads `user_read_at`, an observation's own day); `finished_at` is a `yyyy-MM-dd` date string; re-dating an already-Finished book is a legitimate event — 2026-09-16 — `../../decisions/0077-book-status-change-carries-effective-on-date.md`
 - **0076** — Books model: a reading-progress observation is an event (ADR-0043 engagement test), length/description are cache tier, the status lifecycle mirrors Games (`Backlog | InFocus | Finished | Abandoned`) with progress-driven promotion and 100 %-driven finish — 2026-09-16 — `../../decisions/0076-books-progress-observation-events-and-status-lifecycle.md`
 <!-- adr-local:end -->
 

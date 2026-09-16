@@ -7,9 +7,9 @@ context: books
 created: 2026-09-16
 completed:
 depends_on: [books-y9kxy, integration-c8d4x, design-system-001-formalize-styleguide]
-blocks: [intelligence-dnv2y]
+blocks: [intelligence-dnv2y, books-g7g1j]
 tags: [books, detail-page, frontend, reading-progress]
-related_adrs: [0076, 0016, 0015]
+related_adrs: [0076, 0077, 0016, 0015]
 related_research: []
 prior_art: []
 ---
@@ -25,8 +25,12 @@ fallback ADR-0075/0076 assume).
 
 `src/Client/Pages/BookDetail/{Types,State,Views}.fs` (after `Pages/GameDetail/Views.fs` in
 `Client.fsproj`), `Router.fs` (`Book_detail of slug`, `["books"; slug]`, `toUrl`,
-`isDashboardSection` — add if books-g7g1j hasn't), root `Types/State/Views.fs` wiring (`Cmd.map`,
-the per-page delegation pattern every other detail page follows).
+`isDashboardSection`), root `Types/State/Views.fs` wiring (`Cmd.map`, the per-page delegation
+pattern every other detail page follows). **This task owns the `Router.fs` edit** — `books-g7g1j`
+now `depends_on` this task specifically to avoid both tasks independently adding the identical new
+DU case and match arms (refined 2026-09-16; the two tasks originally specified the same ~10-line
+edit with no ordering between them, which would have produced a duplicate-union-case compile error
+at squash time if dispatched in the same batch).
 
 Layout mirrors `Pages/MovieDetail/Views.fs` (hero + two-column content grid, `detailCard`,
 `personalRatingCard`, `friendsCard`, `EventHistoryModal`, `ContentBlockEditor`):
@@ -52,8 +56,16 @@ Layout mirrors `Pages/MovieDetail/Views.fs` (hero + two-column content grid, `de
   (`https://openlibrary.org{workKey}`) — only the ids the book carries.
 - **Right column**: `friendsCard` with recommended-by (`api.recommendBookBy` /
   `removeBookRecommendation`, the movie `FriendManager` modal reused), content blocks
-  (`ContentBlockEditor.view` with the book owner key), the Journal editor **only if** `JournalEditor`
-  is media-agnostic (check GameJournal's coupling; if it is game-specific, leave it out and note it).
+  (`ContentBlockEditor.view` wired to the new `getBookContentBlocks`/`addBookContentBlock`/… family
+  `books-y9kxy` adds — there is no "book owner key" to pass; it's a distinct method family per BC,
+  mirroring how `ContentBlockEditor` is already wired for Series/Games). **Skip the Journal editor —
+  confirmed game-specific, not media-agnostic** (verified during refinement, 2026-09-16):
+  `JournalEditor.view` hardcodes `api.saveGameJournal`/`api.getGameJournal` at two call sites, backed
+  by `GameJournal.fs`'s own `game_journal_blocks` table; there is no generic journal storage and no
+  load/save-as-parameters seam to plug a book into. Reusing it would require a full parallel
+  `book_journal_blocks` table + `BookJournal.fs` module (out of scope for this task and `books-y9kxy`
+  as written) or a `JournalEditor` refactor (also out of scope). Leave it out; note this finding in
+  your RESULT rather than attempting a workaround.
 - **Action menu** (`ActionMenu`): Refresh metadata (`api.refreshBookFromOpenLibrary` when an OL key
   or ISBN exists), Change format, Event history (`EventHistoryModal.view $"Book-{slug}"`), Remove
   book (confirm → `api.removeBook` → navigate to Dashboard).
@@ -66,7 +78,8 @@ Layout mirrors `Pages/MovieDetail/Views.fs` (hero + two-column content grid, `de
       (page 120, total 300) into `{ Percent = None; Page = Some 120; TotalPages = Some 300 }` and a
       bare 45 into `{ Percent = Some 45; … }`; rejects percent > 100 and page > total with a message
       shown in the popover (model state, no `Cmd`).
-- [ ] `Route.test.fs` covers `["books"; slug]` (if not already from books-g7g1j).
+- [ ] `Route.test.fs` covers `["books"; slug]` — this task owns the `Router.fs` edit (see What
+      section); `books-g7g1j` confirms rather than duplicates it.
 - [ ] Loading a book whose cache has `RuntimeMinutes = 552` and `Narrators = ["X"]` renders
       "9 h 12 min · narrated by X" (a pure `lengthLine` function, unit-tested; print variant "384 pages").
 - [ ] Setting progress to 100 via the popover results in the page showing status Finished after the
@@ -85,6 +98,9 @@ Layout mirrors `Pages/MovieDetail/Views.fs` (hero + two-column content grid, `de
 - Copy `Pages/MovieDetail` file by file and prune — do not start from GameDetail (its tabs and play
   facets are noise here); take only GameDetail's status segmented control.
 - ADR-0076 for what the aggregate does with a manual 100 % (Finished), a lower percent (recorded,
-  status unchanged) and same-day overwrites (Manual wins a same-day tie in the projection).
+  status unchanged) and same-day overwrites (Manual wins a same-day tie in the projection). ADR-0077
+  (drafted by `books-y9kxy`) for `Change_status`'s `effectiveOn` — `book_list.finished_at` is a plain
+  `yyyy-MM-dd` date string, not a timestamp; render "finished {finished_at}" as a date, no time part.
 - ADR-0016 paper overlay for the popover; ADR-0015: review against the live StyleGuide page.
-- `intelligence-dnv2y` (dashboard) navigates here; `books-g7g1j` (search) navigates here.
+- `intelligence-dnv2y` (dashboard) navigates here; `books-g7g1j` (search) navigates here and now
+  `depends_on` this task (Router.fs ownership, see What section).

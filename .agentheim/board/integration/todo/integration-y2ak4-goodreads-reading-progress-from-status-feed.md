@@ -9,7 +9,7 @@ completed:
 depends_on: [integration-wmqn3]
 blocks: []
 tags: [books, goodreads, rss, reading-progress, sync]
-related_adrs: [0075, 0076, 0043]
+related_adrs: [0075, 0076, 0077, 0043]
 related_research: [goodreads-reading-progress-and-book-metadata-sources-2026-09-16]
 prior_art: []
 ---
@@ -44,15 +44,28 @@ cookie-free and carries items like "X is on page 137 of 248 of *Title*" and "X i
   is set, then (c) every library book by title. Exact normalized equality first; if none, a
   prefix match (status titles are sometimes truncated) that is unambiguous. No match → counted
   `Unmatched`, never an error.
-- **Emit**: `Observe_reading_progress { Percent = round(N/M × 100) | N; Position = Some (Page (N,
-  Some M)) | None; Source = Goodreads; ObservedOn = PublishedAt local date; Finished = (case
-  Finished) }`. Items are processed oldest-first so the aggregate's "same percent → no-op" and
+- **Emit**: per matched `ProgressUpdate` case —
+  - `PageProgress (n, m, _)` → `Percent = floor(n/m × 100)` (**floor, never round** — a
+    round-half-up on 299/300 would hit 100 and auto-Finish a book Goodreads hasn't itself marked
+    finished; `Books.decide` accepts a source's 100 at face value), `Position = Some (Page (n, Some m))`,
+    `Finished = false`.
+  - `PercentProgress (n, _)` → `Percent = n` (already an integer, no rounding needed), `Position = None`,
+    `Finished = false`.
+  - `Finished _` → `Percent = 100`, `Position = None`, `Finished = true` (the explicit signal, not a
+    rounding artifact — this is the one case allowed to actually reach 100).
+  - `Started _` → **do not emit** `Observe_reading_progress` at all (there is no percent to report);
+    log/count it as `Started` in the sync result and move on. (The parenthetical "percent 0, no event
+    unless the aggregate says so" in the pattern list above was ambiguous — this resolves it: a
+    `Started` item never calls `Observe_reading_progress`, it is purely informational.)
+  Every emitted command carries `Source = Goodreads`, `ObservedOn = PublishedAt` local date. Items are
+  processed oldest-first so the aggregate's **per-source** same-percent no-op (compared against this
+  book's latest *Goodreads* observation, not its global current percent — see `books-y9kxy`) and
   promotion rules see them in order.
 - **Idempotency**: persist `goodreads_last_status_id` / `goodreads_last_status_at`; only items newer
   than the persisted marker are processed; on the first run, walk back at most 3 pages (or until an
   item older than 90 days). Re-running with no new items appends zero events.
 - Wire into the "Goodreads shelf sync" job body (after the shelf step, in the same run) and into
-  its result (`ProgressObserved`, `Unmatched`, `Ignored` counts).
+  its result (`ProgressObserved`, `Unmatched`, `Started`, `Ignored` counts).
 
 ## Acceptance criteria
 
@@ -64,9 +77,12 @@ cookie-free and carries items like "X is on page 137 of 248 of *Title*" and "X i
       Some 300); Goodreads; 2026-09-15 }` on `Book-dune-1965`; an ambiguous prefix match emits nothing
       and counts `Unmatched`.
 - [ ] Order and idempotency: three items for one book (10 %, 40 %, finished) on three dates, processed
-      oldest-first, yield observations on the first two dates and a `Finished` status on the third;
-      re-running with the same feed appends zero events; a new 4th item (a different book) is the
-      only thing processed on the next run.
+      oldest-first, yield observations on the first two dates and a `Finished` status (Percent = 100,
+      Position = None) on the third; re-running with the same feed appends zero events; a new 4th item
+      (a different book) is the only thing processed on the next run.
+- [ ] A `Started` item never calls `Observe_reading_progress` (assert zero commands issued for it) and
+      is counted separately from `Unmatched`/`ProgressObserved` in the sync result.
+- [ ] A `PageProgress (299, 300, _)` item yields `Percent = 99` (floored), not 100.
 - [ ] First run on a fixture of two pages stops after page 2 and records the marker; a page request
       failure after page 1 still processes page 1's items and reports the error.
 - [ ] `npm test` green.
