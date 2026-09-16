@@ -1,7 +1,7 @@
 ---
 id: journal-k52j1
 title: Reading day and Book finished join the Journal's ubiquitous language — a README-only change, because no live activity surface exists to attach code to (the All-tab heatmap/monthly payload was pruned, and `DashboardCrossMediaStats` / `getRecentActivity` are confirmed-dead payload with no client consumer)
-status: doing
+status: done
 type: chore
 context: journal
 created: 2026-09-16
@@ -128,3 +128,45 @@ question rather than added asymmetrically ahead of the other three media types.
   (14 feeder queries computed on every All-tab load) and `getRecentActivity` / `RecentActivityItem`
   from `Shared.fs` / `Api.fs`, mirroring `intelligence-h4qk2` / `intelligence-p4t7k`. Belongs in
   `intelligence/`.
+
+## Verifier note (iteration 1)
+
+**REASONS:**
+- Acceptance criterion 3 is only one-third covered by the deliverable. It requires three greps to match — `reading-progress observations (Books)` (Purpose), `Movies / Series / Games / Books` (Aggregates), and `Downstream of:** Movies, Series, Games, Books` (Relationships). Only the third has a `README_DELTA` op (the `Relationships with other contexts` replace, which applies cleanly). The Purpose and Aggregates edits exist only as prose in the worker's `## Outcome`; no mechanized channel carries them, so after integration criterion 3 fails on re-grep.
+- `lib/readme-delta.mjs` anchors `replace` exclusively on col-0 `- **bold**` bullets. README line 4 (Purpose) and line 25 (Aggregates) are non-bullet paragraphs, unreachable by any legal op. The worker's branch also cannot edit `.agentheim/` directly. Every sanctioned worker output channel is closed.
+- Consequence if PASSed as-is: the Journal README integrates internally inconsistent — Ubiquitous language, Key events and Relationships name Books while Purpose and Aggregates do not.
+- Same grammar mismatch, second instance: `## What` step 1 requires the two bullets be inserted after **Play session**; `append` has no positional form, so both land after **Monthly breakdown**. Not itself a criterion violation.
+
+**SUGGESTED_FIX:** Do not re-dispatch — no worker output can satisfy criterion 3. Either (a) hand-apply the two non-bullet edits to Purpose and Aggregates on `main` at integration and record that they are conductor-applied rather than worker-deliverable, or (b) restate criterion 3 to cover only what the delta grammar can express and split the prose edits into their own builder-owned chore.
+
+**ITERATION_HINT:** task-under-specified
+
+**Conductor disposition:** option (a). The task's own Notes already assign README application to the conductor ("The README delta is reported in the RESULT block and applied by the conductor"), and the worker reported both prose edits verbatim in its Outcome for exactly that purpose — the same shape curation-cyxbc used for the curation README's Purpose paragraph last session. The delta ops and the two prose edits were applied on `main` and the result re-verified as iteration 2, with no worker re-dispatch (there is nothing further a worker could produce).
+
+## Outcome
+
+Journal's README gained the ubiquitous-language vocabulary for reading as a diary activity, closing the gap opened when Books became a core BC (ADR-0076) without ever being named in Journal's README.
+
+Applied via `README_DELTA` (bullet-list ops, all within grammar):
+- **Ubiquitous language** — appended **Reading day** (derived, not an upstream event — grouped from `book_progress` observations on `(book, day)`, survives as long as one observation for that book-day remains) and **Book finished** (the `Book_status_changed → Finished` transition, dated by its effective-on date per ADR-0077, which may be historical on a Goodreads backfill).
+- **Key events** — appended the Books subscription line (`Reading_progress_observed`, `Reading_progress_observation_removed`, `Book_status_changed` Finished-only) after the Games line.
+- **Relationships with other contexts** — replaced the `Downstream of:` bullet to add Books.
+- **Open questions** — appended two bullets: the missing live reading-activity API surface (naming the dead `DashboardCrossMediaStats` / `getRecentActivity` payload and the deleted `getDailyReadingActivity` shape as the template for a future one), and the missing `*_removed_from_library` subscriptions across all four media BCs (phantom-activity risk, deferred).
+
+**Non-bullet README edits (apply by hand)** — the README-delta grammar only supports appending/replacing list bullets; these two edits are to prose paragraphs, not bullets, so they can't be expressed as ops. Apply directly to `.agentheim/knowledge/contexts/journal/README.md` (CRLF on disk — preserve line endings):
+
+1. **Purpose** section, sentence fragment change:
+   - Old: `watch sessions (Movies), episode-watched events (Series), and play-time changes (Games) — into a unified activity timeline.`
+   - New: `watch sessions (Movies), episode-watched events (Series), play-time changes (Games), and reading-progress observations (Books) — into a unified activity timeline.`
+
+2. **Aggregates** section, first paragraph, sentence fragment change:
+   - Old: `its data is derived from events published by Movies / Series / Games.`
+   - New: `its data is derived from events published by Movies / Series / Games / Books.`
+
+**Premise verification performed** (per task instructions, before treating the refinement note's claims as fact):
+- `grep -rn "CrossMediaStats" src/Client` and the same for every `DashboardCrossMediaStats` field name, `getRecentActivity`, and `RecentActivityItem` under `src/Client` and `tests/`: zero matches anywhere. The only occurrences are the type/field declarations in `src/Shared/Shared.fs` (lines 315, 413, 433, 924, 1986) and the server-side computation in `src/Server/Api.fs` (lines 2716, 2764, 2807-2808). Confirmed dead payload with no consumer, as the refinement note states.
+- Read `src/Server/BookProjection.fs`'s `book_progress` table (lines 64-71): `book_slug`, `observed_on`, `source`, `percent`, `position_json`, PK `(book_slug, observed_on, source)`. The README delta's language (`(slug, ObservedOn, Source)` natural key, "grouping observations on `(book, day)`") matches this shape exactly.
+
+No source or test file was created or modified for this task — `git diff --stat -- src/ tests/` in this worktree is empty, per the task's own acceptance criterion.
+
+No ADR: no aggregate, consistency boundary, or pattern choice was introduced — this task only extends existing ubiquitous language per already-accepted ADRs (0076, 0077, 0050, 0043).

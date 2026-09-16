@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 17:44 -- Task verified and completed: journal-k52j1 - Reading day and Book finished join the Journal's ubiquitous language — a README-only change, because no live activity surface exists to attach code to (the All-tab heatmap/monthly payload was pruned, and `DashboardCrossMediaStats` / `getRecentActivity` are confirmed-dead payload with no client consumer)
+
+**Type:** Work / Task completion
+**Task:** journal-k52j1 - Reading day and Book finished join the Journal's ubiquitous language — a README-only change, because no live activity surface exists to attach code to (the All-tab heatmap/monthly payload was pruned, and `DashboardCrossMediaStats` / `getRecentActivity` are confirmed-dead payload with no client consumer)
+**Summary:** Reading day and Book finished join the Journal's ubiquitous language — README-only: two UL bullets, Books' three subscribed events in Key events, Books in Purpose/Aggregates/Downstream-of, two open questions recorded; no source or test file touched
+**Duration:** 17m
+**Verification:** PASS (iteration 2 — iteration 1 failed only on the bullet-only README_DELTA grammar; the conductor applied the two Purpose/Aggregates prose edits from the worker's Outcome on main per the task's Notes, no worker re-dispatch)
+**Files changed:** 0
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
+## 2026-09-16 17:41 -- Verification failed: journal-k52j1 - Reading day and Book finished join the Journal's ubiquitous language (README-only)
+
+**Type:** Work / Verification failure
+**Task:** journal-k52j1 - Reading day and Book finished join the Journal's ubiquitous language (README-only)
+**Iteration:** 1 of 3
+**Reasons:** acceptance criterion 3's Purpose and Aggregates prose edits are unreachable by the bullet-only README_DELTA grammar (reported in the worker's Outcome as conductor hand-edits, not carried by any op); bullets append after Monthly breakdown rather than after Play session (positional insert not expressible)
+**Iteration hint:** task-under-specified
+**Next:** conductor applied the delta ops plus the two prose edits on main (the task's Notes assign README application to the conductor; curation-cyxbc precedent), then re-verified as iteration 2 without a worker re-dispatch
+
+---
+
 ## 2026-09-16 17:29 -- Batch started: [books-f3sb2, curation-w9fkq, journal-k52j1]
 
 **Type:** Work / Batch start

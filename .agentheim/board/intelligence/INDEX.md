@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 16
@@ -47,6 +47,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **intelligence-p7k3x** — Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload (chore) — `backlog/intelligence-p7k3x-prune-dead-dashboardcrossmediastats-getrecentactivity-recent.md`
 <!-- backlog-list:end -->
 
 
