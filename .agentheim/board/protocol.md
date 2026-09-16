@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 12:47 -- Modeling / Promoted: books-n8fpz - Collapse the three per-type content-block method families (Books, Series, Games) into the one generic IMediathecaApi family — they are byte-identical copies over the single ContentBlocks aggregate; BookDetail and SeriesDetail call the generic methods for all seven operations, and the never-called Games family goes
+
+**Type:** Modeling / Promote
+**BC:** books
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-16 12:47 -- Modeling / Refined: books-n8fpz - Collapse the three per-type content-block method families (Books, Series, Games) into the one generic IMediathecaApi family
 
 **Type:** Modeling / Refine

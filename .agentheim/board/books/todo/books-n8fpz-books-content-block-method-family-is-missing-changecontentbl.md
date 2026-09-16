@@ -1,7 +1,7 @@
 ---
 id: books-n8fpz
 title: Collapse the three per-type content-block method families (Books, Series, Games) into the one generic IMediathecaApi family — they are byte-identical copies over the single ContentBlocks aggregate; BookDetail and SeriesDetail call the generic methods for all seven operations, and the never-called Games family goes
-status: backlog
+status: todo
 type: refactor
 context: books
 created: 2026-09-16

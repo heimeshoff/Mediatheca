@@ -10,14 +10,15 @@ Catalog of this bounded context's tasks by status.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
-- **Todo:** 0
+- **Backlog:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 3
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **books-n8fpz** — Collapse the three per-type content-block method families (Books, Series, Games) into the one generic IMediathecaApi family — they are byte-identical copies over the single ContentBlocks aggregate; BookDetail and SeriesDetail call the generic methods for all seven operations, and the never-called Games family goes (refactor) — `todo/books-n8fpz-books-content-block-method-family-is-missing-changecontentbl.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -33,7 +34,6 @@ Catalog of this bounded context's tasks by status.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **books-n8fpz** — Books' content-block method family is missing changeContentBlockType/reorderContentBlocks/groupContentBlocksInRow/ungroupContentBlock — BookDetail's ContentBlockEditor wiring falls back to the generic bare-slug-keyed IMediathecaApi methods for those four operations (chore) — `backlog/books-n8fpz-books-content-block-method-family-is-missing-changecontentbl.md`
 <!-- backlog-list:end -->
 
 ## Pointers
