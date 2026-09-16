@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 00:37 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 18m (batch started 00:19, last integration 00:34, suites on main green 00:37)
+**Completed:** 2 (first-try PASS: 2, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** curation-h4k2p: 1, intelligence-p7k3x: 1
+**Commits:** 4 (1 batch-start, 2 integration, 1 session-end)
+**Vision-conformance:** none — batch aligns with vision (vision.md carries no "What success looks like" / "Non-goals" sections; judged against the Design Principles: Replayable holds — curation-h4k2p clears a removed item's Notes through an ordinary Notes_saved [] event with the prior snapshots kept, and intelligence-p7k3x removed only read-side queries no surface rendered)
+**Batch mix:** 0% product-facing / 100% harness / 0% bookkeeping (2 tasks) — the heuristic files a type: chore touching src/ as harness; in substance both were product code (a server-side removal cascade and a dead-payload prune), reported as the lib classifies it
+**Carry-over:** none — working tree clean (2 stranded RESULT sidecars swept; both worktrees torn down with their node_modules junctions unlinked first, main node_modules intact at 210 entries; both squash-merges auto-merged cleanly on src/Server/Api.fs, the file both tasks touched. On main after the batch: npm run build OK, Vitest 108/108; Expecto 914/914 (912 + 2 new) run on the merged tree in a throwaway detached worktree, since the builder's dotnet watch server holds Server.dll on main — that server rebuilt and restarted itself at 00:35:11 after the last commit, confirming the merged server compiles. Session-start churn: 0 recognized machine-shape commits, 0 human commits. Both README deltas disposed applied; the intelligence Retired-paragraph sentence was hand-applied per the worker's Outcome)
+
+---
+
 ## 2026-09-17 00:34 -- Task verified and completed: curation-h4k2p - Clear the Notes document (via an ordinary `Notes_saved []` event, never an imperative row delete) and delete its `content/`-prefixed uploaded images when a movie, series, game, or book is removed — a shared helper called from all four `removeX` handlers, restoring the parity the deleted `GameJournal.deleteForGame` gave games
 
 **Type:** Work / Task completion
