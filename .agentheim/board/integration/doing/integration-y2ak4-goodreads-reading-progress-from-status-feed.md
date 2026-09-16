@@ -1,7 +1,7 @@
 ---
 id: integration-y2ak4
 title: Goodreads reading progress from the public user-status feed — parse "is on page N of M of Title" / "is N% done with Title" / "finished reading" items from `user_status/list/{id}?format=rss`, join them to currently-reading books by normalized title, and emit `Observe_reading_progress` (source Goodreads) as part of the shelf sync, idempotent across runs
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-09-16

@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 05:32 -- Batch started: [integration-jjvg2, integration-y2ak4]
+
+**Type:** Work / Batch start
+**Tasks:** integration-jjvg2 - Audible library import and daily listening-progress sync — "Import Audible library" creates a Book per library title (matched by ASIN) and a scheduled "Audible progress sync" job reads `/1.0/library` `percent_complete`/`is_finished` into `Observe_reading_progress` commands, with the run recorded as a job run and a rejected auth file surfaced as a standing notice, integration-y2ak4 - Goodreads reading progress from the public user-status feed — parse "is on page N of M of Title" / "is N% done with Title" / "finished reading" items from `user_status/list/{id}?format=rss`, join them to currently-reading books by normalized title, and emit `Observe_reading_progress` (source Goodreads) as part of the shelf sync, idempotent across runs
+**Parallel:** yes (2 workers — integration-jjvg2 and integration-y2ak4 both became ready when integration-wmqn3 integrated; they are the last two todo tasks. intelligence-dnv2y's verifier is still running in its own worktree. Merge order if both pass: y2ak4 (extends GoodreadsSync's job body) then jjvg2 (appends a second JobSpec + Api/Shared tail).)
+
+---
+
 ## 2026-09-16 05:32 -- Task verified and completed: integration-wmqn3 - Goodreads adapter, Settings card and daily shelf sync — the user's public Goodreads user id (no key exists, no cookie ever, ADR-0075) drives a sync of the currently-reading / read / to-read shelf feeds into book statuses, ratings and finished dates, importing unknown currently-reading books through Open Library by ISBN
 
 **Type:** Work / Task completion

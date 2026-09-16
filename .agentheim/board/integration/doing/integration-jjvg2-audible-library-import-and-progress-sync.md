@@ -1,7 +1,7 @@
 ---
 id: integration-jjvg2
 title: Audible library import and daily listening-progress sync — "Import Audible library" creates a Book per library title (matched by ASIN) and a scheduled "Audible progress sync" job reads `/1.0/library` `percent_complete`/`is_finished` into `Observe_reading_progress` commands, with the run recorded as a job run and a rejected auth file surfaced as a standing notice
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-09-16
