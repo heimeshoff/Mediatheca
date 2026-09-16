@@ -105,6 +105,7 @@
     <Compile Include="Pages\BookDetail\Format.test.fs" />
     <Compile Include="Pages\Settings\FamilyTokenRejected.test.fs" />
     <Compile Include="Pages\Settings\AudibleAuthFile.test.fs" />
+    <Compile Include="Pages\Settings\AudibleImportSync.test.fs" />
     <Compile Include="Pages\Settings\GoodreadsCard.test.fs" />
     <Compile Include="Pages\Dashboard\ExpandCard.test.fs" />
     <Compile Include="App.fs" />

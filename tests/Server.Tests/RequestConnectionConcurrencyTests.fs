@@ -59,6 +59,7 @@ let private createApi (factory: unit -> SqliteConnection) (imageBasePath: string
         (fun () -> ({ AuthFile = None; Marketplace = "de"; CachedAccessToken = None; CachedAccessTokenExpiresAt = None } : Audible.AudibleConfig))
         (fun () -> ({ UserId = None; ImportShelves = [ "currently-reading" ] } : Goodreads.GoodreadsConfig))
         (fun () -> async { return Error "not wired in tests" })
+        (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         imageBasePath
         [] // no projection handlers needed — addFriend only touches the event store

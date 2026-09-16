@@ -398,6 +398,87 @@ module Audible =
             with _ -> return None
         }
 
+    // ── Authenticated library fetch (integration-jjvg2, ADR-0074/ADR-0076) ──
+
+    /// One `/1.0/library` item, narrowed to the fields the import/progress
+    /// sync need (this task's own "What" section). `PercentComplete` is the
+    /// raw float Audible reports (0-100) -- floor-not-round happens at the
+    /// CALLER (`AudibleSync.percentOf`), never here, so this decoder stays a
+    /// faithful, lossless read of the wire shape.
+    type AudibleLibraryItem = {
+        Asin: string
+        Title: string
+        Authors: string list
+        Narrators: string list
+        RuntimeMinutes: int option
+        PercentComplete: float option
+        IsFinished: bool
+        PurchaseDate: string option
+        CoverUrl: string option
+        SeriesName: string option
+        SeriesPosition: int option
+        ReleaseDate: string option
+        Description: string option
+    }
+
+    let private decodeLibraryItem : Decoder<AudibleLibraryItem> =
+        Decode.object (fun get ->
+            { Asin = get.Required.Field "asin" Decode.string
+              Title = get.Required.Field "title" Decode.string
+              Authors = get.Optional.Field "authors" (Decode.list decodeName) |> Option.defaultValue []
+              Narrators = get.Optional.Field "narrators" (Decode.list decodeName) |> Option.defaultValue []
+              RuntimeMinutes = get.Optional.Field "runtime_length_min" Decode.int
+              PercentComplete =
+                get.Optional.Field "percent_complete" Decode.float
+                |> Option.orElse (get.Optional.Field "percent_complete" Decode.int |> Option.map float)
+              IsFinished = get.Optional.Field "is_finished" Decode.bool |> Option.defaultValue false
+              PurchaseDate = get.Optional.Field "purchase_date" Decode.string
+              CoverUrl = get.Optional.Field "product_images" (Decode.field "500" Decode.string)
+              SeriesName =
+                get.Optional.Field "series" (Decode.list (Decode.field "title" Decode.string))
+                |> Option.defaultValue []
+                |> List.tryHead
+              SeriesPosition =
+                get.Optional.Field "series" (Decode.list (Decode.field "sequence" Decode.string))
+                |> Option.defaultValue []
+                |> List.tryHead
+                |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
+              ReleaseDate = get.Optional.Field "release_date" Decode.string
+              Description = get.Optional.Field "publisher_summary" Decode.string |> Option.map stripHtml })
+
+    let private decodeLibraryResponse : Decoder<AudibleLibraryItem list> =
+        Decode.object (fun get -> get.Required.Field "items" (Decode.list decodeLibraryItem))
+
+    /// `num_results` capped at Audible's own documented max for `/1.0/library`.
+    let libraryPageSize = 1000
+
+    /// Authenticated `GET /1.0/library`, paged until a page returns fewer
+    /// than `libraryPageSize` items (this task's "What" section). ONE logical
+    /// fetch for `withAccessToken`'s retry-once orchestration: if any page
+    /// 401s, the WHOLE paged fetch reports `Unauthorized` so a retry (with a
+    /// freshly minted token) starts over from page 1.
+    let getLibrary (httpClient: HttpClient) (host: string) (token: string) : Async<Result<AudibleLibraryItem list, FetchError>> =
+        let rec loop (page: int) (acc: AudibleLibraryItem list) : Async<Result<AudibleLibraryItem list, FetchError>> =
+            async {
+                let url =
+                    sprintf
+                        "https://%s/1.0/library?num_results=%d&page=%d&response_groups=product_desc,product_attrs,media,contributors,series,percent_complete,is_finished,listening_status,order_details&image_sizes=500"
+                        host libraryPageSize page
+                let! result = sendAuthenticated httpClient url token
+                match result with
+                | Error e -> return Error e
+                | Ok body ->
+                    match Decode.fromString decodeLibraryResponse body with
+                    | Error e -> return Error (OtherFailure (sprintf "Failed to parse Audible library response: %s" e))
+                    | Ok items ->
+                        let combined = acc @ items
+                        if List.length items < libraryPageSize then
+                            return Ok combined
+                        else
+                            return! loop (page + 1) combined
+            }
+        loop 1 []
+
     // ── Runtime config (Composition.fs's `getAudibleConfig`, ADR-0074) ──────
 
     /// `AuthFile` is `None` until Settings saves one; `Marketplace` is the

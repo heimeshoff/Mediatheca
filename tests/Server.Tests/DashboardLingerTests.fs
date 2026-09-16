@@ -359,6 +359,7 @@ let private createApi (factory: unit -> SqliteConnection) : IMediathecaApi =
         (fun () -> ({ AuthFile = None; Marketplace = "de"; CachedAccessToken = None; CachedAccessTokenExpiresAt = None } : Audible.AudibleConfig))
         (fun () -> ({ UserId = None; ImportShelves = [ "currently-reading" ] } : Goodreads.GoodreadsConfig))
         (fun () -> async { return Error "not wired in tests" })
+        (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         "test-fixtures-do-not-exist/images"
         [ ContentBlockProjection.handler; MovieProjection.handler; SeriesProjection.handler; GameProjection.handler; BookProjection.handler; PlaySessionProjection.handler ]

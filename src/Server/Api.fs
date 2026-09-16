@@ -1848,6 +1848,168 @@ module Api =
                 return Error $"Failed to add book from Audible: {ex.Message}"
         }
 
+    /// integration-jjvg2: `executeCommandCore` only reports `Result<unit,
+    /// string>`, but the import needs to know whether the
+    /// `Observe_reading_progress` command it issues actually appended an
+    /// event (a same-percent-per-source observation is a legitimate no-op,
+    /// ADR-0076 §2, and must not inflate `ProgressObserved`). Same shape as
+    /// `GoodreadsSync.fs`'s/`AudibleSync.fs`'s own local copy.
+    let private executeBookCommandWithEvents
+        (conn: SqliteConnection)
+        (slug: string)
+        (command: Books.BookCommand)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        : Result<Books.BookEvent list, string> =
+        let streamId = Books.streamId slug
+        let storedEvents = EventStore.readStream conn streamId
+        let events = storedEvents |> List.choose Books.Serialization.fromStoredEvent
+        let state = Books.reconstitute events
+        let currentPosition = EventStore.getStreamPosition conn streamId
+        match Books.decide state command with
+        | Error e -> Error e
+        | Ok [] -> Ok []
+        | Ok newEvents ->
+            let eventDataList = newEvents |> List.map Books.Serialization.toEventData
+            match EventStore.appendToStream conn streamId currentPosition eventDataList with
+            | EventStore.ConcurrencyConflict _ -> Error "Concurrency conflict"
+            | EventStore.Success _ ->
+                for handler in projectionHandlers do
+                    Projection.runProjection conn handler
+                Ok newEvents
+
+    /// integration-jjvg2 (ADR-0074/ADR-0076): the one-time "Import library"
+    /// click. Known items (matched by ASIN via `BookProjection.findByExternalId`)
+    /// are never re-created; new items are created directly from the library
+    /// response's OWN fields (no per-title `getProduct` call -- ADR-0069's
+    /// "diff, don't re-enrich"), Audnexus only filling description/narrators
+    /// when the library item itself lacks them. Every item (known or new)
+    /// with a percent then funnels through `AudibleSync.observationFor` --
+    /// the SAME pure decision the daily sync uses, so import and sync are
+    /// one writer of `Reading_progress_observed`.
+    let private importAudibleLibraryImpl
+        (conn: SqliteConnection)
+        (httpClient: HttpClient)
+        (getAudibleConfig: unit -> Audible.AudibleConfig)
+        (imageBasePath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        : Async<Result<AudibleImportResult, string>> = async {
+            let config = getAudibleConfig ()
+            match config.AuthFile with
+            | None -> return Error "Audible is not configured — paste an auth file in Settings"
+            | Some authFile ->
+                let host = Audible.marketplaceHost authFile.LocaleCode
+                let cached =
+                    match config.CachedAccessToken, config.CachedAccessTokenExpiresAt with
+                    | Some t, Some e -> Some (t, e)
+                    | _ -> None
+                let! libraryResult =
+                    Audible.withAccessToken
+                        cached
+                        (fun () -> Audible.refreshAccessToken httpClient authFile)
+                        (persistAudibleAccessToken conn)
+                        (fun token -> Audible.getLibrary httpClient host token)
+                match libraryResult with
+                | Error msg ->
+                    if msg.StartsWith(Audible.authFileRejectedPrefix) then
+                        SettingsStore.setSetting conn "audible_last_error" msg
+                    return Error msg
+                | Ok items ->
+                    // Local calendar date, matching AudibleSync.runProgressSync
+                    // (the task's own Notes: "keep the plain local calendar
+                    // date of the sync run") -- an import and a same-day sync
+                    // must stamp the same ObservedOn, not one in UTC and one
+                    // in local time.
+                    let today = System.DateTime.Now.ToString("yyyy-MM-dd")
+                    let mutable created = 0
+                    let mutable alreadyKnown = 0
+                    let mutable progressObserved = 0
+                    let mutable errors : string list = []
+
+                    let observe (slug: string) (item: Audible.AudibleLibraryItem) =
+                        match AudibleSync.observationFor item today with
+                        | None -> ()
+                        | Some data ->
+                            match executeBookCommandWithEvents conn slug (Books.Observe_reading_progress data) projectionHandlers with
+                            | Ok events when not (List.isEmpty events) -> progressObserved <- progressObserved + 1
+                            | Ok _ -> ()
+                            | Error e -> errors <- errors @ [ sprintf "%s (%s): %s" item.Title item.Asin e ]
+
+                    for item in items do
+                        try
+                            match BookProjection.findByExternalId conn (AudibleAsin item.Asin) with
+                            | Some slug ->
+                                alreadyKnown <- alreadyKnown + 1
+                                observe slug item
+                            | None ->
+                                let year =
+                                    item.ReleaseDate
+                                    |> Option.bind (fun d ->
+                                        if d.Length >= 4 then
+                                            match System.Int32.TryParse(d.Substring(0, 4)) with
+                                            | true, y -> Some y
+                                            | _ -> None
+                                        else None)
+                                let addRequest : AddBookRequest = {
+                                    Title = item.Title
+                                    Authors = item.Authors
+                                    Year = year
+                                    CoverUrl = item.CoverUrl
+                                    Subjects = []
+                                    Format = BookFormat.Audiobook
+                                    ExternalIds = [ AudibleAsin item.Asin ]
+                                    SkipDuplicateCheck = true
+                                }
+                                let! addResult = addBookToLibraryImpl conn httpClient imageBasePath projectionHandlers addRequest None
+                                match addResult with
+                                | Ok (AddBookOutcome.Book_added slug) ->
+                                    created <- created + 1
+                                    let! audnexusOpt =
+                                        if Option.isNone item.Description || List.isEmpty item.Narrators then
+                                            Audnexus.getBook httpClient item.Asin authFile.LocaleCode
+                                        else async { return None }
+                                    let metadata : MetadataCache.BookMetadata = {
+                                        Description = item.Description |> Option.orElse (audnexusOpt |> Option.bind (fun a -> a.Description))
+                                        PageCount = None
+                                        RuntimeMinutes = item.RuntimeMinutes
+                                        Narrators =
+                                            if not (List.isEmpty item.Narrators) then item.Narrators
+                                            else audnexusOpt |> Option.map (fun a -> a.Narrators) |> Option.defaultValue []
+                                        SeriesName = item.SeriesName |> Option.orElse (audnexusOpt |> Option.bind (fun a -> a.SeriesName))
+                                        SeriesPosition = item.SeriesPosition |> Option.orElse (audnexusOpt |> Option.bind (fun a -> a.SeriesPosition))
+                                        Publisher = None
+                                        PublishedDate = item.ReleaseDate
+                                        AverageRating = None
+                                        Language = None
+                                        Source = Some "audible"
+                                    }
+                                    MetadataCache.upsertBookMetadata conn slug metadata
+                                    observe slug item
+                                | Ok (AddBookOutcome.Duplicate_found (existingSlug, _)) ->
+                                    alreadyKnown <- alreadyKnown + 1
+                                    observe existingSlug item
+                                | Error e -> errors <- errors @ [ sprintf "%s (%s): %s" item.Title item.Asin e ]
+                        with ex ->
+                            errors <- errors @ [ sprintf "%s (%s): %s" item.Title item.Asin ex.Message ]
+
+                    let result = {
+                        Total = List.length items
+                        Created = created
+                        AlreadyKnown = alreadyKnown
+                        ProgressObserved = progressObserved
+                        Errors = errors
+                    }
+                    SettingsStore.setSetting conn "audible_last_import_result" (AudibleSync.formatImportResult result)
+                    // integration-k4vqm's lesson (ADR-0068), bound by this
+                    // task's own Notes: an empty-but-200 library response is
+                    // inconclusive, not evidence the auth file is fine again
+                    // -- only a genuinely populated response clears a
+                    // standing `audible_last_error` notice (mirrors
+                    // Api.fs's Steam `Ok []` vs `Ok games` split above).
+                    if not (List.isEmpty items) then
+                        SettingsStore.deleteSetting conn "audible_last_error"
+                    return Ok result
+        }
+
     let create
         (factory: unit -> SqliteConnection)
         (httpClient: HttpClient)
@@ -1869,6 +2031,13 @@ module Api =
         // un-recorded trigger (`triggerPlaytimeSync`'s older shape, predating
         // ADR-0026).
         (runGoodreadsShelfSyncNow: unit -> Async<Result<GoodreadsSyncResult, string>>)
+        // integration-jjvg2 (ADR-0026): mirrors `runGoodreadsShelfSyncNow`
+        // immediately above -- built in Composition.fs, closing over the SAME
+        // `ScheduledJobs.JobRunRecorder`/job connection/lock the "Audible
+        // progress sync" `JobSpec` and the Jobs tab's generic "Run now"
+        // share, so the Settings card's own "Sync progress now" click is
+        // ALSO recorded as a `job_runs` row (trigger = "manual").
+        (runAudibleProgressSyncNow: unit -> Async<Result<AudibleProgressSyncResult, string>>)
         (mountRoots: LocalCopyRemoval.MountRoots)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
@@ -5788,4 +5957,23 @@ module Api =
             }
 
             runGoodreadsShelfSync = fun () -> runGoodreadsShelfSyncNow ()
+
+            // Audible library import + daily progress sync (integration-jjvg2,
+            // ADR-0074/ADR-0076/ADR-0026) -- appended at the tail, after
+            // Goodreads, per this task's own Notes.
+            importAudibleLibrary = fun () -> async {
+                use conn = factory ()
+                return! importAudibleLibraryImpl conn httpClient getAudibleConfig imageBasePath projectionHandlers
+            }
+
+            runAudibleProgressSync = fun () -> runAudibleProgressSyncNow ()
+
+            getAudibleSyncStatus = fun () -> async {
+                use conn = factory ()
+                return {
+                    LastImportResult = SettingsStore.getSetting conn "audible_last_import_result"
+                    LastSync = SettingsStore.getSetting conn "audible_last_sync"
+                    LastSyncResult = SettingsStore.getSetting conn "audible_last_sync_result"
+                }
+            }
         }

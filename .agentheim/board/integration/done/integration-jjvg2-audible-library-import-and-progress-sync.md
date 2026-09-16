@@ -1,7 +1,7 @@
 ---
 id: integration-jjvg2
 title: Audible library import and daily listening-progress sync — "Import Audible library" creates a Book per library title (matched by ASIN) and a scheduled "Audible progress sync" job reads `/1.0/library` `percent_complete`/`is_finished` into `Observe_reading_progress` commands, with the run recorded as a job run and a rejected auth file surfaced as a standing notice
-status: doing
+status: done
 type: feature
 context: integration
 created: 2026-09-16
@@ -118,3 +118,37 @@ section lists the job automatically.
   the user has removed from Mediatheca will reappear under a new slug on the next import/sync that
   still sees it in the Audible library. This is existing Steam-import behavior; note it as a known
   limitation in your RESULT rather than treating it as a bug to fix here.
+
+## Verifier note (iteration 1)
+
+VERDICT: FAIL (iteration 1 of 3). Runner green (build ok, Expecto 880/0, Vitest 100) — not the reason.
+
+REASONS:
+- ADR-0065 as amended by ADR-0068 (bound by this task's own Notes: "do not clear `audible_last_error` or report success on `[]`") is violated: both new code paths clear the standing notice unconditionally on ANY `Ok items`, including an empty library — `Api.fs:1997` (`SettingsStore.deleteSetting conn "audible_last_error"` after the import loop, reached when `items = []`) and `AudibleSync.fs:153` (same call in `runProgressSync`'s final `withLock` block). The guarded house pattern is `Api.fs:598-618`, where `Ok []` is NOT allowed to clear `steam_api_key_last_error` and only a populated `Ok games` does (`integration-k4vqm`, this task's prior art). A standing "audible auth file rejected: …" notice would be silently wiped by a later inconclusive empty-but-200 response. No test exercises an empty library response.
+- The import path derives its observation date in UTC while the sync path (and the Notes: "the plain local calendar date of the sync run") uses local: `Api.fs:1917` `DateTime.UtcNow.ToString("yyyy-MM-dd")` vs `AudibleSync.fs:129` `DateTime.Now.ToString("yyyy-MM-dd")`. On a UTC+1/+2 server an import between local midnight and 02:00 stamps yesterday's date (and the `Book_status_changed (Finished, Some today)` date, ADR-0077), so import-then-sync in that window is no longer the same-date no-op the criteria assume. `AudibleLibrarySyncTests.fs` asserts `ObservedOn` against `DateTime.Now` only on the sync path.
+
+SUGGESTED_FIX: Guard both notice-clears on a genuinely populated result — clear `audible_last_error` only when `items` is non-empty (mirroring `Api.fs:598-618`'s `Ok []` vs `Ok games` split), let an empty library report "0 items" plainly without touching the notice, and add a test for an empty-library response asserting a pre-set `audible_last_error` survives. Make `importAudibleLibraryImpl`'s `today` the local calendar date (`DateTime.Now.ToString("yyyy-MM-dd")`) so import and sync stamp the same day, and assert `ObservedOn` on the import path too.
+
+ITERATION_HINT: likely-fixable
+
+## Outcome
+
+Implemented the Audible library import and daily listening-progress sync (ADR-0074/ADR-0076/ADR-0026):
+
+- **`src/Server/Audible.fs`**: `AudibleLibraryItem` + `getLibrary` — authenticated, paged `GET /1.0/library` (`num_results=1000`, `page=n`), paging until a page returns fewer than 1000 items; one logical fetch for `withAccessToken`'s retry-once orchestration (a 401 on any page reports `Unauthorized` for the whole paged fetch).
+- **`src/Server/AudibleSync.fs`** (new, compiled before `Api.fs`/`ScheduledJobs.fs`, same shape as `GoodreadsSync.fs`): `percentOf` (floors the source's float percent — 99.6% never rounds to 100 — and treats `is_finished` with no percent as 100) and `observationFor` — the ONE pure decision that both the import and the scheduled job funnel through to build `Observe_reading_progress`. `runProgressSync` re-observes KNOWN books only (matched by `AudibleAsin`) and never creates one; an unmatched ASIN is counted `Unmatched`. A rejected auth file persists `audible_last_error` (prefix `audible auth file rejected: `) and returns an `Error` the caller must surface as a genuine failure.
+- **`src/Server/Api.fs`**: `importAudibleLibrary` (new private `executeBookCommandWithEvents` to detect no-op vs. real observations; creates a book per unmatched ASIN directly from the library item's own fields — no per-title `getProduct` call — Audnexus filling description/narrators only when thin) plus `runAudibleProgressSync`/`getAudibleSyncStatus` on `IMediathecaApi`; `Api.create` gained a `runAudibleProgressSyncNow` parameter (mirroring `runGoodreadsShelfSyncNow`), updated at every call site.
+- **`src/Server/Composition.fs`**: `audibleSyncHour` setting (default 05:00 local), the "Audible progress sync" `JobSpec` appended after "Goodreads shelf sync" in the shared `scheduledJobs` list, and `runAudibleProgressSyncNow` — the ADR-0026/ADR-0078 wrapper-JobSpec pattern, with one addition: a rejected auth file `failwith`s (after the typed result is captured in `resultCell`) so `tryStartJob` resolves the run to `error`, never `Skipped` — distinct from the plain "no auth file configured" `Skipped` case every other job uses.
+- **`src/Shared/Shared.fs`**: `AudibleImportResult`, `AudibleProgressSyncResult`, `AudibleSyncStatus` (kept separate from `AudibleStatus`, mirroring how `GoodreadsSettings` keeps its own LastSync/LastResult) and the three new `IMediathecaApi` members, all appended at the tail after Goodreads per the task's own merge-conflict-avoidance notes.
+- **Client** (`src/Client/Pages/Settings/{Types,State,Views}.fs`): an "Import library" / "Sync progress now" section in the Audible card (rendered once an auth file is configured), session-fresh success/error alerts, and the persisted last-import/last-sync summary from `getAudibleSyncStatus` — same Save/Test/Sync-now shape the Goodreads card established. `src/Client/Pages/Settings/AudibleImportSync.test.fs` (new) covers the reducer.
+- **Tests**: `tests/Server.Tests/AudibleLibrarySyncTests.fs` (new, iteration 1: 9 cases) covers the full acceptance-criteria list — the 3-item (0%/42%/finished) import creating 3 books with 2 progress observations and a fully idempotent re-run; the job re-observing a 42%→55% change as exactly one event with no extra status change; the job never creating a book (Unmatched counting); paging (1000 + 3 items, two requests, `page=1`/`page=2`); no-auth-file `Skipped` vs. a rejected-auth-file `error` job status (plus the job-registration "Run now" case); and `getAudibleSyncStatus` reading persisted, not in-memory, state. `Api.create`'s new parameter required updating 14 existing test call sites with a matching stub.
+
+**Iteration 2** fixed the two defects the verifier reported against iteration 1:
+
+- **Empty-library response no longer clears `audible_last_error`** (ADR-0068's lesson, bound by this task's own Notes): both `Api.fs`'s `importAudibleLibraryImpl` and `AudibleSync.runProgressSync` now guard their `SettingsStore.deleteSetting conn "audible_last_error"` call on `not (List.isEmpty items)`, mirroring `Api.fs:598-618`'s Steam `Ok []` vs `Ok games` split — an empty (200, zero-item) library response still reports "0 items" plainly (`Total`/`Observed`/`Unmatched` all correctly 0) but leaves a pre-set standing notice untouched. Two new Expecto cases assert this directly: one for the import path, one for the sync path, each seeding `audible_last_error` before the empty-response call and asserting it survives verbatim.
+- **`importAudibleLibraryImpl`'s `today` is now the local calendar date**: changed `System.DateTime.UtcNow.ToString("yyyy-MM-dd")` to `System.DateTime.Now.ToString("yyyy-MM-dd")` so the import path stamps `ObservedOn` (and any same-run `Book_status_changed Finished` date, ADR-0077) with the same date `AudibleSync.runProgressSync` already used — an import and a same-day sync are once again the same-date no-op the acceptance criteria assume. A new Expecto case imports a single-item fixture and asserts the resulting `Reading_progress_observed` event's `ObservedOn` against `DateTime.Now.ToString("yyyy-MM-dd")`.
+- 3 new tests total (2 in `importAudibleLibraryTests`, 1 in `audibleProgressSyncJobTests`); `npm test`: 883/883 Expecto tests passing (up from 880). `npm run test:client`: 100/100 Vitest tests passing (unchanged). `npm run build`: clean.
+
+**Known limitation (per the task's own Notes, not fixed here):** a book removed from Mediatheca that Audible still reports in the library will reappear under a NEW slug on the next import/sync — the same pre-existing behavior Steam import already has, inherited here via the shared `BookProjection.findByExternalId` lookup.
+
+No new ADR: this task applies the already-decided ADR-0026/ADR-0068/ADR-0074/ADR-0076/ADR-0078 patterns to a new adapter rather than making a new architectural decision; the notice-clearing guard and the local-date fix are both direct applications of already-accepted doctrine, recorded in the README delta and in code comments rather than a standalone ADR.

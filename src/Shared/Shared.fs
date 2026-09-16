@@ -1092,6 +1092,41 @@ type AddBookFromAudibleRequest = {
     SkipDuplicateCheck: bool
 }
 
+/// `IMediathecaApi.importAudibleLibrary` (integration-jjvg2, ADR-0074/
+/// ADR-0076): the one-time "Import library" click -- creates a Book per
+/// library title not yet matched by ASIN, then observes reading progress for
+/// every item (known or newly created) that carries one. Never creates a
+/// book again after this -- that is the daily sync's whole point of
+/// difference (`AudibleProgressSyncResult` below never creates one).
+type AudibleImportResult = {
+    Total: int
+    Created: int
+    AlreadyKnown: int
+    ProgressObserved: int
+    Errors: string list
+}
+
+/// `IMediathecaApi.runAudibleProgressSync` / the "Audible progress sync"
+/// scheduled job (ADR-0026/ADR-0074/ADR-0076): known books only -- NEVER
+/// creates one. `Unmatched` counts a library item whose ASIN isn't linked to
+/// any book yet (surfaced in the result, never silently dropped).
+type AudibleProgressSyncResult = {
+    Observed: int
+    Unmatched: int
+    Errors: string list
+}
+
+/// `IMediathecaApi.getAudibleSyncStatus` -- the persisted (SettingsStore, not
+/// in-memory) last-import/last-sync summary Settings shows after a reload.
+/// Kept separate from `AudibleStatus` (which is about the auth
+/// file/connection itself), mirroring how `GoodreadsSettings` keeps its own
+/// LastSync/LastResult fields.
+type AudibleSyncStatus = {
+    LastImportResult: string option
+    LastSync: string option
+    LastSyncResult: string option
+}
+
 /// integration-wmqn3 (ADR-0075): what Settings -> Goodreads shows/edits. The
 /// setting is the user's PUBLIC Goodreads user id -- never a developer key
 /// (none exists any more) and never a session cookie. `ImportShelves`
@@ -2154,6 +2189,13 @@ type IMediathecaApi = {
     setGoodreadsImportShelves: string list -> Async<unit>
     testGoodreadsConnection: unit -> Async<Result<string, string>>
     runGoodreadsShelfSync: unit -> Async<Result<GoodreadsSyncResult, string>>
+    // Audible library import + daily progress sync (integration-jjvg2,
+    // ADR-0074/ADR-0076/ADR-0026) -- appended at the tail, after Goodreads,
+    // per this task's own Notes (avoids a manual-merge conflict with wmqn3's
+    // own tail append).
+    importAudibleLibrary: unit -> Async<Result<AudibleImportResult, string>>
+    runAudibleProgressSync: unit -> Async<Result<AudibleProgressSyncResult, string>>
+    getAudibleSyncStatus: unit -> Async<AudibleSyncStatus>
 }
 
 // Administration console — a separate Remoting contract (ADR-0004 allows multiple

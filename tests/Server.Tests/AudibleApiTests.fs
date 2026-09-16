@@ -55,6 +55,7 @@ let private createApi (factory: unit -> SqliteConnection) (httpClient: HttpClien
         getAudibleConfig
         (fun () -> ({ UserId = None; ImportShelves = [ "currently-reading" ] } : Goodreads.GoodreadsConfig))
         (fun () -> async { return Error "not wired in tests" })
+        (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         imageBasePath
         allProjectionHandlers

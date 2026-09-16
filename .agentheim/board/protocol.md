@@ -5,6 +5,30 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 06:23 -- Task verified and completed: integration-jjvg2 - Audible library import and daily listening-progress sync — "Import Audible library" creates a Book per library title (matched by ASIN) and a scheduled "Audible progress sync" job reads `/1.0/library` `percent_complete`/`is_finished` into `Observe_reading_progress` commands, with the run recorded as a job run and a rejected auth file surfaced as a standing notice
+
+**Type:** Work / Task completion
+**Task:** integration-jjvg2 - Audible library import and daily listening-progress sync — "Import Audible library" creates a Book per library title (matched by ASIN) and a scheduled "Audible progress sync" job reads `/1.0/library` `percent_complete`/`is_finished` into `Observe_reading_progress` commands, with the run recorded as a job run and a rejected auth file surfaced as a standing notice
+**Summary:** Audible library import (importAudibleLibrary creates a Book per unmatched ASIN from the paged /1.0/library response's own fields, Audnexus filling description/narrators only when thin) and a daily "Audible progress sync" scheduled job (AudibleSync.runProgressSync, matched-by-ASIN books only, never creates one), both funnelling through the pure AudibleSync.percentOf / observationFor (floor, never round; is_finished with no percent → 100; local calendar date) into Observe_reading_progress; a rejected auth file resolves the job run to error with the fixed notice; an empty library response is inconclusive and never clears the standing notice (ADR-0068); Settings shows Import library / Sync progress now with persisted last-import/last-sync via getAudibleSyncStatus. Iteration 2 closed the verifier's two findings.
+**Duration:** 44m
+**Verification:** PASS (iteration 2)
+**Files changed:** 27
+**Tests added:** 17
+**ADRs written:** none
+
+---
+
+## 2026-09-16 06:09 -- Verification failed: integration-jjvg2 - Audible library import and daily listening-progress sync
+
+**Type:** Work / Verification failure
+**Task:** integration-jjvg2 - Audible library import and daily listening-progress sync
+**Iteration:** 1 of 3
+**Reasons:** both the import and the sync clear audible_last_error on an empty library response (ADR-0068: empty is inconclusive, never clears the standing notice), and the import stamps ObservedOn in UTC while the sync uses the local calendar date
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-09-16 05:56 -- Task verified and completed: integration-y2ak4 - Goodreads reading progress from the public user-status feed — parse "is on page N of M of Title" / "is N% done with Title" / "finished reading" items from `user_status/list/{id}?format=rss`, join them to currently-reading books by normalized title, and emit `Observe_reading_progress` (source Goodreads) as part of the shelf sync, idempotent across runs
 
 **Type:** Work / Task completion

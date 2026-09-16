@@ -443,6 +443,16 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
         |> Option.defaultValue 5
 
+    // integration-jjvg2 (ADR-0074/ADR-0076): defaults to 05:00 local, per
+    // this task's own "What" section -- deliberately the same default hour
+    // as the Goodreads shelf sync above (both are lightweight per-book HTTP
+    // calls, not the bulk Steam Store fetch the 04:00/06:00/07:00 spacing
+    // above exists to spread out).
+    let audibleSyncHour =
+        SettingsStore.getSetting conn "audible_sync_hour"
+        |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
+        |> Option.defaultValue 5
+
     // administration-tj8n2 (ADR-0028): scheduled jobs get their OWN connection,
     // dedicated and never shared with request threads or `conn` — separate
     // from the request-serving `conn` above. Both jobs (and the job-runs
@@ -457,6 +467,17 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     // connections to the same file, not one connection used by two threads.
     let jobConn = createConnection dbPath
     let jobDbLock = new SemaphoreSlim(1, 1)
+
+    /// integration-jjvg2: the SAME two `SettingsStore` writes `Api.fs`'s
+    /// `persistAudibleAccessToken` performs (`Audible.withAccessToken`'s
+    /// `persist` callback) -- duplicated here because that function is
+    /// PRIVATE to `Api.fs`'s module and this registry is built before
+    /// `Api.create` is even called (needed to construct
+    /// `runAudibleProgressSyncNow` below, which `Api.create` itself takes as
+    /// a parameter).
+    let persistAudibleAccessTokenForJob (conn: SqliteConnection) (token: Audible.AudibleAccessToken) : unit =
+        SettingsStore.setSetting conn "audible_access_token" token.AccessToken
+        SettingsStore.setSetting conn "audible_access_token_expires" (token.ExpiresAt.ToString("o"))
 
     let scheduledJobs : ScheduledJobs.JobSpec list = [
         { Name = "Steam playtime sync"
@@ -533,6 +554,30 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
                     eprintfn "[GoodreadsSync] Sync skipped: %s" err
                     return ({ Disposition = ScheduledJobs.JobDisposition.Skipped; Summary = err } : ScheduledJobs.JobRunOutcome)
             } }
+        // integration-jjvg2 (ADR-0074/ADR-0026): a rejected auth file is a
+        // genuine job FAILURE (`failwith`, caught by `tryStartJob`'s own
+        // try/with -> `Fail` -> `error` status), never a `Skipped`
+        // disposition -- distinct from "no auth file at all", which IS the
+        // usual "config gap, not a failure" `Skipped` case every other job
+        // uses. Appended AFTER "Goodreads shelf sync" per this task's own
+        // Notes (both this entry and wmqn3's touch this same list literal;
+        // this task depends_on wmqn3 purely to serialize the two edits).
+        { Name = "Audible progress sync"
+          Hour = audibleSyncHour
+          Run = fun () ->
+            async {
+                match! AudibleSync.runProgressSync jobConn jobDbLock httpClient getAudibleConfig (persistAudibleAccessTokenForJob jobConn) projectionHandlers with
+                | Ok result ->
+                    let summary = AudibleSync.formatResult result
+                    eprintfn "[AudibleSync] Sync complete: %s" summary
+                    return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = summary } : ScheduledJobs.JobRunOutcome)
+                | Error err when err.StartsWith(Audible.authFileRejectedPrefix) ->
+                    eprintfn "[AudibleSync] Sync failed: %s" err
+                    return failwith err
+                | Error err ->
+                    eprintfn "[AudibleSync] Sync skipped: %s" err
+                    return ({ Disposition = ScheduledJobs.JobDisposition.Skipped; Summary = err } : ScheduledJobs.JobRunOutcome)
+            } }
     ]
 
     // job_runs table + startup crash reconciliation (ADR-0026) — table
@@ -581,13 +626,50 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
                 | None -> return Error "Goodreads shelf sync did not report a result"
         }
 
+    // integration-jjvg2 (ADR-0026): mirrors `runGoodreadsShelfSyncNow`
+    // immediately above -- the Settings card's own "Sync progress now" click
+    // runs through the SAME `tryStartJob`/`jobRunRecorder` guard as the
+    // nightly fire, so it's recorded as a `job_runs` row (trigger = "manual")
+    // and refused if the nightly fire is already in flight. A rejected auth
+    // file still throws (`failwith`) inside the wrapped `Run`, resolving the
+    // row to `error` exactly like the plain scheduled entry -- but only
+    // AFTER `resultCell` is set, so the caller still sees the real message.
+    let runAudibleProgressSyncNow () : Async<Result<AudibleProgressSyncResult, string>> =
+        async {
+            let spec = scheduledJobs |> List.find (fun s -> s.Name = "Audible progress sync")
+            let resultCell : Result<AudibleProgressSyncResult, string> option ref = ref None
+            let wrappedSpec : ScheduledJobs.JobSpec = {
+                spec with
+                    Run = fun () ->
+                        async {
+                            match! AudibleSync.runProgressSync jobConn jobDbLock httpClient getAudibleConfig (persistAudibleAccessTokenForJob jobConn) projectionHandlers with
+                            | Ok result ->
+                                resultCell.Value <- Some (Ok result)
+                                return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = AudibleSync.formatResult result } : ScheduledJobs.JobRunOutcome)
+                            | Error err when err.StartsWith(Audible.authFileRejectedPrefix) ->
+                                resultCell.Value <- Some (Error err)
+                                return failwith err
+                            | Error err ->
+                                resultCell.Value <- Some (Error err)
+                                return ({ Disposition = ScheduledJobs.JobDisposition.Skipped; Summary = err } : ScheduledJobs.JobRunOutcome)
+                        }
+            }
+            match ScheduledJobs.tryStartJob jobRunRecorder wrappedSpec "manual" with
+            | Error () -> return Error "Audible progress sync is already running"
+            | Ok (_, body) ->
+                do! body
+                match resultCell.Value with
+                | Some r -> return r
+                | None -> return Error "Audible progress sync did not report a result"
+        }
+
     // Per-instance projection guards (ADR-0035): built exactly once here and
     // passed to every consumer below, so "one guard per process" is a
     // property of this wiring rather than of Administration.fs.
     let adminGuards = Administration.makeGuards ()
 
     // Create API
-    let api = Api.create connectionFactory httpClient qbittorrentHttpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig getQbittorrentConfig getOpenLibraryConfig getAudibleConfig getGoodreadsConfig runGoodreadsShelfSyncNow mountRoots imageBasePath projectionHandlers
+    let api = Api.create connectionFactory httpClient qbittorrentHttpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig getQbittorrentConfig getOpenLibraryConfig getAudibleConfig getGoodreadsConfig runGoodreadsShelfSyncNow runAudibleProgressSyncNow mountRoots imageBasePath projectionHandlers
     let adminApi = Administration.create connectionFactory dbPath imageBasePath projectionHandlers scheduledJobs jobRunRecorder adminGuards
 
     let remotingHandler =

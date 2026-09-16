@@ -1746,6 +1746,104 @@ let private audibleDetail (model: Model) (dispatch: Msg -> unit) =
                         ]
                 ]
             ]
+
+            // Library import + daily progress sync (integration-jjvg2,
+            // ADR-0074/ADR-0076/ADR-0026) -- only meaningful once an auth
+            // file is stored; the catalog-search half of Audible needs none.
+            if model.AudibleConfigured then
+                Html.div [
+                    prop.className "border-t border-base-content/10 pt-4"
+                    prop.children [
+                        match model.AudibleImportResult with
+                        | Some (Ok result) ->
+                            Daisy.alert [
+                                alert.success
+                                prop.className "mb-4"
+                                prop.children [
+                                    Html.span [
+                                        prop.className "text-sm"
+                                        prop.text (sprintf "Imported: %d total, %d created, %d already known, %d progress observed" result.Total result.Created result.AlreadyKnown result.ProgressObserved)
+                                    ]
+                                ]
+                            ]
+                        | Some (Error e) ->
+                            Daisy.alert [
+                                alert.error
+                                prop.className "mb-4"
+                                prop.children [ Html.span [ prop.className "text-sm"; prop.text e ] ]
+                            ]
+                        | None -> Html.none
+
+                        match model.AudibleProgressSyncResult with
+                        | Some (Ok result) ->
+                            Daisy.alert [
+                                alert.success
+                                prop.className "mb-4"
+                                prop.children [
+                                    Html.span [
+                                        prop.className "text-sm"
+                                        prop.text (sprintf "Synced: %d observed, %d unmatched" result.Observed result.Unmatched)
+                                    ]
+                                ]
+                            ]
+                        | Some (Error e) ->
+                            Daisy.alert [
+                                alert.error
+                                prop.className "mb-4"
+                                prop.children [ Html.span [ prop.className "text-sm"; prop.text e ] ]
+                            ]
+                        | None -> Html.none
+
+                        match model.AudibleLastImportResult with
+                        | Some lastImport ->
+                            Html.div [
+                                prop.className "mb-2 text-sm text-base-content/60"
+                                prop.children [ Html.div [ prop.className "font-mono text-xs"; prop.text (sprintf "Last import: %s" lastImport) ] ]
+                            ]
+                        | None -> Html.none
+
+                        match model.AudibleLastSync, model.AudibleLastSyncResult with
+                        | Some lastSync, Some lastResult ->
+                            Html.div [
+                                prop.className "mb-4 text-sm text-base-content/60"
+                                prop.children [
+                                    Html.div [ prop.text (sprintf "Last sync: %s" lastSync) ]
+                                    Html.div [ prop.className "font-mono text-xs"; prop.text lastResult ]
+                                ]
+                            ]
+                        | _ -> Html.none
+
+                        Html.div [
+                            prop.className "flex gap-2"
+                            prop.children [
+                                Daisy.button.button [
+                                    button.outline
+                                    button.sm
+                                    if model.IsImportingAudibleLibrary then button.disabled
+                                    prop.onClick (fun _ -> dispatch Import_audible_library)
+                                    prop.disabled model.IsImportingAudibleLibrary
+                                    prop.children [
+                                        if model.IsImportingAudibleLibrary then
+                                            Daisy.loading [ loading.spinner; loading.sm ]
+                                        Html.text "Import library"
+                                    ]
+                                ]
+                                Daisy.button.button [
+                                    button.ghost
+                                    button.sm
+                                    if model.IsSyncingAudibleProgress then button.disabled
+                                    prop.onClick (fun _ -> dispatch Sync_audible_progress_now)
+                                    prop.disabled model.IsSyncingAudibleProgress
+                                    prop.children [
+                                        if model.IsSyncingAudibleProgress then
+                                            Daisy.loading [ loading.spinner; loading.sm ]
+                                        Html.text "Sync progress now"
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
         ]
     ]
 

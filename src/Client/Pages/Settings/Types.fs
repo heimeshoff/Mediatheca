@@ -109,6 +109,21 @@ type Model = {
     IsClearingAudible: bool
     AudibleSaveResult: Result<string, string> option
     AudibleTestResult: Result<string, string> option
+    // Audible library import + daily progress sync (integration-jjvg2,
+    // ADR-0074/ADR-0076/ADR-0026). `AudibleLastImportResult`/
+    // `AudibleLastSync`/`AudibleLastSyncResult` are the persisted (not
+    // in-memory) summaries `getAudibleSyncStatus` reads back after a reload;
+    // `AudibleImportResult`/`AudibleProgressSyncResult` are this SESSION's
+    // fresh outcome for the success/error alert, the same
+    // session-vs-persisted split `GoodreadsSyncResult`/`GoodreadsLastResult`
+    // already establish.
+    IsImportingAudibleLibrary: bool
+    AudibleImportResult: Result<AudibleImportResult, string> option
+    IsSyncingAudibleProgress: bool
+    AudibleProgressSyncResult: Result<AudibleProgressSyncResult, string> option
+    AudibleLastImportResult: string option
+    AudibleLastSync: string option
+    AudibleLastSyncResult: string option
     // Goodreads Integration (integration-wmqn3, ADR-0075): the user's PUBLIC
     // Goodreads user id (no developer key exists any more, no cookie ever).
     // `GoodreadsUserIdInput` is the profile-URL-or-bare-id text box;
@@ -265,6 +280,14 @@ type Msg =
     | Audible_test_result of Result<string, string>
     | Clear_audible_auth_file
     | Audible_cleared
+    // Audible library import + daily progress sync (integration-jjvg2,
+    // ADR-0074/ADR-0076/ADR-0026)
+    | Load_audible_sync_status
+    | Audible_sync_status_loaded of AudibleSyncStatus
+    | Import_audible_library
+    | Audible_import_completed of Result<AudibleImportResult, string>
+    | Sync_audible_progress_now
+    | Audible_progress_sync_completed of Result<AudibleProgressSyncResult, string>
     // Goodreads Integration (integration-wmqn3, ADR-0075)
     | Load_goodreads_settings
     | Goodreads_settings_loaded of GoodreadsSettings

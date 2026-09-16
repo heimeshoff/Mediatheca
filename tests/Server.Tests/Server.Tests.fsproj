@@ -74,6 +74,7 @@
     <Compile Include="GoodreadsTests.fs" />
     <Compile Include="GoodreadsProgressTests.fs" />
     <Compile Include="GoodreadsSyncTests.fs" />
+    <Compile Include="AudibleLibrarySyncTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

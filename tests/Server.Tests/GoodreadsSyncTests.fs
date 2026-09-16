@@ -73,6 +73,7 @@ let private createSeedApi (factory: unit -> SqliteConnection) (imageBasePath: st
         (fun () -> ({ AuthFile = None; Marketplace = "de"; CachedAccessToken = None; CachedAccessTokenExpiresAt = None } : Audible.AudibleConfig))
         (fun () -> ({ UserId = None; ImportShelves = [ "currently-reading" ] } : Goodreads.GoodreadsConfig))
         (fun () -> async { return Error "not wired in this seeding api" })
+        (fun () -> async { return Error "not wired in this seeding api" })
         LocalCopyRemoval.defaultMountRoots
         imageBasePath
         allProjectionHandlers

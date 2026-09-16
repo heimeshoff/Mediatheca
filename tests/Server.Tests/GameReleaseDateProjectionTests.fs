@@ -71,6 +71,7 @@ let private createDashboardApi (factory: unit -> SqliteConnection) : IMediatheca
         (fun () -> ({ AuthFile = None; Marketplace = "de"; CachedAccessToken = None; CachedAccessTokenExpiresAt = None } : Audible.AudibleConfig))
         (fun () -> ({ UserId = None; ImportShelves = [ "currently-reading" ] } : Goodreads.GoodreadsConfig))
         (fun () -> async { return Error "not wired in tests" })
+        (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         noImagesDir
         [ ContentBlockProjection.handler; GameProjection.handler; PlaySessionProjection.handler ]

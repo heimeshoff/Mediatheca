@@ -268,6 +268,13 @@ let init () : Model * Cmd<Msg> =
       IsClearingAudible = false
       AudibleSaveResult = None
       AudibleTestResult = None
+      IsImportingAudibleLibrary = false
+      AudibleImportResult = None
+      IsSyncingAudibleProgress = false
+      AudibleProgressSyncResult = None
+      AudibleLastImportResult = None
+      AudibleLastSync = None
+      AudibleLastSyncResult = None
       GoodreadsUserId = None
       GoodreadsUserIdInput = ""
       GoodreadsReadShelfOptedIn = false
@@ -300,7 +307,7 @@ let init () : Model * Cmd<Msg> =
       JobsSectionLoaded = false
       SurgerySectionOpen = false
       SurgerySectionLoaded = false },
-    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_qbittorrent_settings; Cmd.ofMsg Load_audible_status; Cmd.ofMsg Load_goodreads_settings; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync; Cmd.ofMsg Load_steam_api_key_last_error; Cmd.ofMsg Load_steam_family_last_result ]
+    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_qbittorrent_settings; Cmd.ofMsg Load_audible_status; Cmd.ofMsg Load_audible_sync_status; Cmd.ofMsg Load_goodreads_settings; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync; Cmd.ofMsg Load_steam_api_key_last_error; Cmd.ofMsg Load_steam_family_last_result ]
 
 let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
@@ -807,6 +814,45 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
             AudibleSaveResult = None
             AudibleTestResult = None },
         Cmd.none
+
+    // Audible library import + daily progress sync (integration-jjvg2,
+    // ADR-0074/ADR-0076/ADR-0026)
+    | Load_audible_sync_status ->
+        model, Cmd.OfAsync.perform api.getAudibleSyncStatus () Audible_sync_status_loaded
+
+    | Audible_sync_status_loaded status ->
+        { model with
+            AudibleLastImportResult = status.LastImportResult
+            AudibleLastSync = status.LastSync
+            AudibleLastSyncResult = status.LastSyncResult },
+        Cmd.none
+
+    | Import_audible_library ->
+        { model with IsImportingAudibleLibrary = true; AudibleImportResult = None },
+        Cmd.OfAsync.either api.importAudibleLibrary ()
+            Audible_import_completed
+            (fun ex -> Audible_import_completed (Error ex.Message))
+
+    | Audible_import_completed result ->
+        { model with IsImportingAudibleLibrary = false; AudibleImportResult = Some result },
+        Cmd.ofMsg Load_audible_sync_status
+
+    | Sync_audible_progress_now ->
+        { model with IsSyncingAudibleProgress = true; AudibleProgressSyncResult = None },
+        Cmd.OfAsync.either api.runAudibleProgressSync ()
+            Audible_progress_sync_completed
+            (fun ex -> Audible_progress_sync_completed (Error ex.Message))
+
+    | Audible_progress_sync_completed result ->
+        let audibleLastError =
+            match result with
+            | Error e when e.StartsWith("audible auth file rejected: ") -> Some e
+            | _ -> model.AudibleLastError
+        { model with
+            IsSyncingAudibleProgress = false
+            AudibleProgressSyncResult = Some result
+            AudibleLastError = audibleLastError },
+        Cmd.ofMsg Load_audible_sync_status
 
     // Goodreads Integration (integration-wmqn3, ADR-0075)
     | Load_goodreads_settings ->
