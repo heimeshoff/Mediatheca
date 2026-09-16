@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 22:30 -- Modeling / Captured: curation-kezpv - Retire the one-off Notes migration tooling after the harbour cutover — delete Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores" (five `IAdminApi` members, DTOs, AdminSurgery sections, `ContentBlockConversion.fs` and tests) and the Health-tab catalog media-type backfill action, once both have run on the live store
+
+**Type:** Modeling / Capture
+**BC:** curation
+**Filed to:** backlog
+**Summary:** One-off migration tooling (Gate 1, Gate 2, Health-tab media-type backfill) has no retirement plan; delete it end to end once all three have run on harbour. Backlog until the builder confirms the live run.
+
+---
+
+## 2026-09-16 22:30 -- Modeling / Captured: curation-tb0nn - Guard Gate 1 / Gate 2 previews after the legacy purge — once `content_blocks`/`game_journal_blocks` are dropped both previews return HTTP 500 ("no such table"); with a `tableExists` check they report "legacy stores already purged" with zero owners/streams and Gate 2's confirm stays disabled
+
+**Type:** Modeling / Capture
+**BC:** curation
+**Filed to:** todo
+**Summary:** After Gate 2 drops the legacy tables both gate previews return HTTP 500 (no such table); guard the legacy reads with tableExists and report legacy stores already purged. Observed on the dev copy 2026-09-16.
+
+---
+
 ## 2026-09-16 20:55 -- Work session ended
 
 **Type:** Work / Session end
