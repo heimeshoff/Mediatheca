@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 17:09 -- Modeling / Refined: curation-w9fkq - Backfill legacy catalog_entries media_type via corrective event, self-heal the widened UNIQUE at Init, restore Add_entry pair identity
+
+**Type:** Modeling / Refine
+**BC:** curation
+**Status after:** todo
+**Summary:** ADR-0079 §5's open backfill shape resolved (tactical-modeler + architect via orchestrator): a corrective `Entry_media_types_inferred` event per catalog, appended through ADR-0032's compensating path by a single no-preview admin action; resolution is exact-match against all four `*_list` tables with ambiguous/orphan slugs reported by name, never the read-time join-order guess written back (that guess never consults game_list/book_list and a frozen wrong type would drop a row out of its type-scoped lookup and removal cascade). The widened UNIQUE self-heals at projection Init (CREATE TABLE IF NOT EXISTS would otherwise leave the narrow index live until a manual Rebuild-all while the relaxed decide is already live). Add_entry restored to pair identity with Seq.tryPick (tryHead is a latent bug once same-slug entries coexist). Acceptance criteria rewritten as Expecto cases plus one human-eye UI check; README delta drafted in Notes; styleguide gate added for the admin button.
+**Split into:** none
+**ADRs written:** ADR-0079 amendment (2026-09-16, curation-w9fkq)
+
+---
+
 ## 2026-09-16 17:04 -- Modeling / Promoted: journal-k52j1 - Reading day and Book finished join the Journal's ubiquitous language — a README-only change, because no live activity surface exists to attach code to (the All-tab heatmap/monthly payload was pruned, and `DashboardCrossMediaStats` / `getRecentActivity` are confirmed-dead payload with no client consumer)
 
 **Type:** Modeling / Promote
