@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 04:58 -- Batch started: [books-g7g1j, intelligence-dnv2y]
+
+**Type:** Work / Batch start
+**Tasks:** books-g7g1j - Search modal Books tab — Open Library (default on) and Audible (default on, no credential needed) as selectable sources with source badges on a merged cover grid, the existing duplicate-prompt flow for import, library books in the Library tab, and navigation to the new book detail route, intelligence-dnv2y - Dashboard Books tab and All-tab "Reading" rail — the All tab's "Books coming soon" placeholder becomes a Currently Reading card (In Focus books with progress bars and source badges, finished books lingering 7 days marked "Finished"), plus a Books tab with Currently Reading, Recently Finished, Recently Added and a reading-stats block, and reading days on the activity heatmap
+**Parallel:** yes (3 workers — books-g7g1j and intelligence-dnv2y became ready when books-f33e2 integrated and join the still-running integration-wmqn3; integration-jjvg2 and integration-y2ak4 stay blocked on wmqn3. Merge order if all pass: wmqn3 (Shared/Api tail), then dnv2y, then g7g1j.)
+
+---
+
 ## 2026-09-16 04:58 -- Task verified and completed: books-f33e2 - Book detail page at /books/{slug} mirroring the movie detail page — cover hero with title/authors/year/format, a reading-progress bar with source badge and a manual "update progress" control (page or percent), the Games-shaped status control, personal rating, description/narrators/series/length from the cache, external links, recommended-by friends, progress history, content blocks, event history and remove
 
 **Type:** Work / Task completion

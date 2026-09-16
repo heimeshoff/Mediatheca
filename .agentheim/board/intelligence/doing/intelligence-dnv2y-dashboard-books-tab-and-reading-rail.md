@@ -1,7 +1,7 @@
 ---
 id: intelligence-dnv2y
 title: Dashboard Books tab and All-tab "Reading" rail — the All tab's "Books coming soon" placeholder becomes a Currently Reading card (In Focus books with progress bars and source badges, finished books lingering 7 days marked "Finished"), plus a Books tab with Currently Reading, Recently Finished, Recently Added and a reading-stats block, and reading days on the activity heatmap
-status: todo
+status: doing
 type: feature
 context: intelligence
 created: 2026-09-16

@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 14
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **intelligence-dnv2y** — Dashboard Books tab and All-tab "Reading" rail — the All tab's "Books coming soon" placeholder becomes a Currently Reading card (In Focus books with progress bars and source badges, finished books lingering 7 days marked "Finished"), plus a Books tab with Currently Reading, Recently Finished, Recently Added and a reading-stats block, and reading days on the activity heatmap (feature) — `todo/intelligence-dnv2y-dashboard-books-tab-and-reading-rail.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **intelligence-dnv2y** — Dashboard Books tab and All-tab "Reading" rail — the All tab's "Books coming soon" placeholder becomes a Currently Reading card (In Focus books with progress bars and source badges, finished books lingering 7 days marked "Finished"), plus a Books tab with Currently Reading, Recently Finished, Recently Added and a reading-stats block, and reading days on the activity heatmap (feature) — `doing/intelligence-dnv2y-dashboard-books-tab-and-reading-rail.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

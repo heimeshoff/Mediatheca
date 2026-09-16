@@ -1,7 +1,7 @@
 ---
 id: books-g7g1j
 title: Search modal Books tab — Open Library (default on) and Audible (default on, no credential needed) as selectable sources with source badges on a merged cover grid, the existing duplicate-prompt flow for import, library books in the Library tab, and navigation to the new book detail route
-status: todo
+status: doing
 type: feature
 context: books
 created: 2026-09-16
