@@ -106,7 +106,6 @@ let projectionRebuildTests =
             let allHandlers = [
                 MovieProjection.handler
                 FriendProjection.handler
-                ContentBlockProjection.handler
                 CatalogProjection.handler
                 SeriesProjection.handler
                 GameProjection.handler

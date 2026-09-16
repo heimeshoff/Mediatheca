@@ -34,13 +34,12 @@ let private fakeCoverBytes = Array.create 2048 (byte 0xFF)
 let private bootstrap (conn: SqliteConnection) =
     EventStore.initialize conn
     SettingsStore.initialize conn
-    ContentBlockProjection.handler.Init conn
     NotesProjection.handler.Init conn
     BookProjection.handler.Init conn
     MetadataCache.initialize conn
     Administration.initializeJobRuns conn
 
-let private allProjectionHandlers = [ ContentBlockProjection.handler; BookProjection.handler ]
+let private allProjectionHandlers = [ BookProjection.handler ]
 
 let private withTempImageDir (f: string -> unit) =
     let dir = Path.Combine(Path.GetTempPath(), sprintf "mediatheca-audible-sync-test-images-%s" (Guid.NewGuid().ToString("N")))

@@ -697,6 +697,49 @@ module EventStore =
         cmd.Parameters.AddWithValue("@old", oldType) |> ignore
         cmd.ExecuteNonQuery()
 
+    /// Deletes every event row across the given set of exact stream ids, in
+    /// one `DELETE` statement (ADR-0080 §11, curation-j4qqt's Gate 2 — "Purge
+    /// legacy stores"). An explicit stream-id list, never a bare prefix, so a
+    /// caller can EXCLUDE specific streams (e.g. unresolved owners) from the
+    /// target set by construction, not by a UI checkbox layered on top of a
+    /// blunter primitive. Same gap-tolerant, no-renumbering contract as
+    /// `deleteEventRow` above. Returns total rows affected. `streamIds = []`
+    /// deletes nothing (an empty `IN ()` would otherwise be invalid SQL).
+    /// Callers MUST follow this with `rebuildFtsIndex` inside the same
+    /// transaction, same as `deleteEventRow`.
+    let deleteEventsByStreamIds (conn: SqliteConnection) (streamIds: string list) : int =
+        match streamIds with
+        | [] -> 0
+        | ids ->
+            use cmd = conn.CreateCommand()
+            let placeholders = ids |> List.mapi (fun i _ -> sprintf "@id%d" i) |> String.concat ", "
+            cmd.CommandText <- sprintf "DELETE FROM events WHERE stream_id IN (%s)" placeholders
+            ids |> List.iteri (fun i id -> cmd.Parameters.AddWithValue(sprintf "@id%d" i, id) |> ignore)
+            cmd.ExecuteNonQuery()
+
+    /// Preview for `deleteEventsByStreamIds`: the exact total row count
+    /// across the given streams, plus a bounded (20-row) sample — the same
+    /// Count+Sample shape `previewEventTypeRename`/`sampleEventsOfType`
+    /// already establish for a bulk operation's confirm dialog.
+    let previewBulkDeleteByStreamIds (conn: SqliteConnection) (streamIds: string list) : int * StoredEvent list =
+        match streamIds with
+        | [] -> 0, []
+        | ids ->
+            let placeholders = ids |> List.mapi (fun i _ -> sprintf "@id%d" i) |> String.concat ", "
+            let idParams = ids |> List.mapi (fun i id -> (sprintf "id%d" i), SqlType.String id)
+            let count =
+                conn
+                |> Db.newCommand (sprintf "SELECT COUNT(*) as cnt FROM events WHERE stream_id IN (%s)" placeholders)
+                |> Db.setParams idParams
+                |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt32 "cnt")
+                |> Option.defaultValue 0
+            let sample =
+                conn
+                |> Db.newCommand (sprintf "SELECT global_position, stream_id, stream_position, event_type, data, metadata, timestamp FROM events WHERE stream_id IN (%s) ORDER BY global_position LIMIT @limit" placeholders)
+                |> Db.setParams (("limit", SqlType.Int32 20) :: idParams)
+                |> Db.query readEvent
+            count, sample
+
     /// Re-syncs `events_fts` after an edit or delete — the exact `('rebuild')`
     /// idiom `createFtsIndex`'s own backfill path uses. MUST run AFTER the
     /// mutation, inside the SAME transaction (ADR-0034), so a full FTS

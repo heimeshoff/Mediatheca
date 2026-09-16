@@ -16,7 +16,6 @@ let private createConnection () =
     conn.Open()
     EventStore.initialize conn
     FriendProjection.handler.Init conn
-    ContentBlockProjection.handler.Init conn
     NotesProjection.handler.Init conn
     MetadataCache.initialize conn
     BookProjection.handler.Init conn

@@ -20,9 +20,7 @@ let private bootstrapEverything (conn: SqliteConnection) =
     CastStore.initialize conn
     JellyfinStore.initialize conn
     MetadataCache.initialize conn
-    GameJournal.initialize conn
     SettingsStore.initialize conn
-    ContentBlockProjection.handler.Init conn
     NotesProjection.handler.Init conn
     FriendProjection.handler.Init conn
     MovieProjection.handler.Init conn
@@ -52,7 +50,6 @@ let private isExcludedFromRegistry (name: string) : bool =
 let private allProjectionHandlers = [
     MovieProjection.handler
     FriendProjection.handler
-    ContentBlockProjection.handler
     CatalogProjection.handler
     SeriesProjection.handler
     GameProjection.handler
@@ -104,7 +101,6 @@ let tests =
             let expected = [
                 "MovieProjection", [ "movie_list"; "movie_detail"; "watch_sessions" ]
                 "FriendProjection", [ "friend_list" ]
-                "ContentBlockProjection", [ "content_blocks" ]
                 "CatalogProjection", [ "catalog_list"; "catalog_entries" ]
                 // series-m7fdk: series_season_cache/series_episode_cache (the
                 // renamed former series_seasons/series_episodes) moved to the
@@ -133,7 +129,7 @@ let tests =
                 let actual = derivedFromRegistry |> Map.tryFind name |> Option.defaultValue Set.empty
                 Expect.equal actual (Set.ofList tables) (sprintf "%s's derived table set" name)
             Expect.equal (Map.count derivedFromRegistry) (List.length expected)
-                "no extra projections should appear in the derivation beyond the eight expected"
+                "no extra projections should appear in the derivation beyond the ones expected"
 
         testCase "getUnrebuildableTableStats reports Cache and Imperative row counts, and omits every Projected table" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapEverything

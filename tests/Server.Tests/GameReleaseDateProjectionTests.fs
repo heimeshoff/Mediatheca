@@ -17,10 +17,8 @@ let private createConnection () =
     conn.Open()
     EventStore.initialize conn
     SettingsStore.initialize conn
-    ContentBlockProjection.handler.Init conn
     NotesProjection.handler.Init conn
     GameProjection.handler.Init conn
-    GameJournal.initialize conn
     PlaySessionProjection.handler.Init conn
     MetadataCache.initialize conn
     conn
@@ -50,10 +48,8 @@ let private appendGameAdded (conn: SqliteConnection) (slug: string) (data: Games
 let private bootstrapDashboardApi (conn: SqliteConnection) =
     EventStore.initialize conn
     SettingsStore.initialize conn
-    ContentBlockProjection.handler.Init conn
     NotesProjection.handler.Init conn
     GameProjection.handler.Init conn
-    GameJournal.initialize conn
     PlaySessionProjection.handler.Init conn
     MetadataCache.initialize conn
 
@@ -76,7 +72,7 @@ let private createDashboardApi (factory: unit -> SqliteConnection) : IMediatheca
         (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         noImagesDir
-        [ ContentBlockProjection.handler; GameProjection.handler; PlaySessionProjection.handler ]
+        [ GameProjection.handler; PlaySessionProjection.handler ]
 
 [<Tests>]
 let tests =

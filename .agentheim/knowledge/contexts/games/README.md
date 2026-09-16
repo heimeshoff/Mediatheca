@@ -175,11 +175,11 @@ Single user.
 - **Game detail page layout** (games-t69rb): the two-column grid is the page frame, not a
   per-tab concern — the right-hand card column (Links, play facets, friends/family owners,
   catalogs, …) is mounted unconditionally beside the content column; only the content
-  column's children swap between the Overview and Journal tabs (`Pages/GameDetail/Views.fs`).
-  **Journal-first default:** a game opens on the Journal tab if its journal document already
+  column's children swap between the Overview and Notes tabs (`Pages/GameDetail/Views.fs`).
+  **Notes-first default:** a game opens on the Notes tab if its notes document already
   has content, Overview otherwise — server-computed once per `getGameDetail` call as
-  `GameDetail.HasJournalContent` (`JournalBlock.hasContent` in `Shared.fs`, re-derived fresh
-  from `game_journal_blocks` every time, never cached — ADR-0043's re-derivability test; a
+  `GameDetail.HasNotesContent` (`JournalBlock.hasContent` in `Shared.fs`, re-derived fresh
+  from `notes_blocks` (Curation) every time, never cached — ADR-0043's re-derivability test; a
   block counts as content if it carries non-whitespace `Content` or an `ImageRef`/`Url`).
   The rule applies only on a page's first load for a game (`GameDetail/State.fs`'s
   `Game_loaded`, gated on `model.Game.IsNone`) — never on the refetches every command

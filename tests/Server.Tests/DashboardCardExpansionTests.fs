@@ -14,10 +14,8 @@ open Mediatheca.Shared
 let private bootstrap (conn: SqliteConnection) =
     EventStore.initialize conn
     SettingsStore.initialize conn
-    ContentBlockProjection.handler.Init conn
     NotesProjection.handler.Init conn
     GameProjection.handler.Init conn
-    GameJournal.initialize conn
     PlaySessionProjection.handler.Init conn
     MetadataCache.initialize conn
 
@@ -40,7 +38,7 @@ let private createApi (factory: unit -> SqliteConnection) : IMediathecaApi =
         (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         noImagesDir
-        [ ContentBlockProjection.handler; GameProjection.handler; PlaySessionProjection.handler ]
+        [ GameProjection.handler; PlaySessionProjection.handler ]
 
 let private sampleGameData (name: string) (year: int) : Games.GameAddedData = {
     Name = name

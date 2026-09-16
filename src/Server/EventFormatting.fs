@@ -444,28 +444,6 @@ module EventFormatting =
             Some { Timestamp = ts; Label = "Media types inferred"; Details = [ $"{count} entries corrected" ] }
         | _ -> None
 
-    let formatContentBlockEvent (storedEvent: EventStore.StoredEvent) : EventHistoryEntry option =
-        let ts = storedEvent.Timestamp.ToString("yyyy-MM-dd HH:mm")
-        let data = storedEvent.Data
-        match storedEvent.EventType with
-        | "Content_block_added" ->
-            let blockType = tryField "blockType" data |> Option.defaultValue "text"
-            Some { Timestamp = ts; Label = $"Content block added ({blockType})"; Details = [] }
-        | "Content_block_updated" ->
-            Some { Timestamp = ts; Label = "Content block updated"; Details = [] }
-        | "Content_block_removed" ->
-            Some { Timestamp = ts; Label = "Content block removed"; Details = [] }
-        | "Content_block_type_changed" ->
-            let blockType = tryField "blockType" data |> Option.defaultValue "?"
-            Some { Timestamp = ts; Label = "Content block type changed"; Details = [ $"New type: {blockType}" ] }
-        | "Content_blocks_reordered" ->
-            Some { Timestamp = ts; Label = "Content blocks reordered"; Details = [] }
-        | "Content_blocks_row_grouped" ->
-            Some { Timestamp = ts; Label = "Content blocks grouped into row"; Details = [] }
-        | "Content_block_row_ungrouped" ->
-            Some { Timestamp = ts; Label = "Content block ungrouped"; Details = [] }
-        | _ -> None
-
     /// Known payload reference fields that name another stream, for the
     /// stream drill-in's cross-linking (administration-v4y9g). Field name ->
     /// (stream_id prefix, human-readable kind). A field can appear across many
@@ -499,7 +477,6 @@ module EventFormatting =
         elif streamId.StartsWith("Book-") then formatBookEvent storedEvent
         elif streamId.StartsWith("Friend-") then formatFriendEvent storedEvent
         elif streamId.StartsWith("Catalog-") then formatCatalogEvent storedEvent
-        elif streamId.StartsWith("ContentBlocks-") then formatContentBlockEvent storedEvent
         else None
 
     /// Read events from one or more stream IDs, merge chronologically, and format

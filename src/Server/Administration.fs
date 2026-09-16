@@ -1,9 +1,11 @@
 namespace Mediatheca.Server
 
 open System
+open System.Data
 open System.IO
 open System.Threading
 open Microsoft.Data.Sqlite
+open Donald
 open Giraffe
 open Mediatheca.Shared
 
@@ -17,7 +19,7 @@ module Administration =
     /// Bounded-context name -> stream_id prefix, for the event explorer's BC
     /// filter (administration-g5dfy). Mirrors each BC's own `streamId` helper
     /// (Movies.streamId, Series.streamId, Games.streamId, Friends.streamId,
-    /// Catalogs.streamId, ContentBlocks.streamId) rather than referencing those
+    /// Catalogs.streamId, Notes.streamId) rather than referencing those
     /// modules directly, so EventStore.fs (and this lookup) stays decoupled from
     /// domain BCs — this is admin-console-only knowledge of the naming
     /// convention. Keep in sync if a BC's streamId prefix ever changes.
@@ -28,7 +30,6 @@ module Administration =
         "Books", "Book-"
         "Friends", "Friend-"
         "Catalogs", "Catalog-"
-        "ContentBlocks", "ContentBlocks-"
         "Notes", "Notes-"
     ]
 
@@ -68,7 +69,6 @@ module Administration =
         "Book-", fun eventType data -> Books.Serialization.deserialize eventType data |> Option.map Books.Serialization.serialize
         "Friend-", fun eventType data -> Friends.Serialization.deserialize eventType data |> Option.map Friends.Serialization.serialize
         "Catalog-", fun eventType data -> Catalogs.Serialization.deserialize eventType data |> Option.map Catalogs.Serialization.serialize
-        "ContentBlocks-", fun eventType data -> ContentBlocks.Serialization.deserialize eventType data |> Option.map ContentBlocks.Serialization.serialize
         "Notes-", fun eventType data -> Notes.Serialization.deserialize eventType data |> Option.map Notes.Serialization.serialize
     ]
 
@@ -192,6 +192,167 @@ module Administration =
           Ambiguous = List.ofSeq ambiguous
           Orphan = List.ofSeq orphan }
 
+    // ── Notes migration (curation-j4qqt, ADR-0080 §10) — Gate 1: "Migrate to
+    // Notes" ──
+    //
+    // Every distinct legacy content-block/game-journal owner, resolved to a
+    // MediaType by exact-slug match (`CatalogProjection.resolveMediaType`,
+    // reused verbatim from curation-w9fkq's backfill above — same "exact
+    // match, report don't guess" semantics ADR-0080 requires for a migration
+    // that commits a permanent event-log fact, unlike the live-read join-
+    // order fallback ADR-0079 keeps elsewhere). Confirm converts every
+    // resolved owner into one `Notes_saved` via `Notes.decide`, skipping any
+    // owner that already has a `Notes-*` stream (idempotent per owner) —
+    // reads go straight at the (soon-to-be-dropped) `content_blocks`/
+    // `game_journal_blocks` tables via raw SQL, never through the deleted
+    // `ContentBlocks`/`GameJournal`/`ContentBlockProjection` modules.
+
+    let private getContentBlockOwnerSlugs (conn: SqliteConnection) : string list =
+        conn
+        |> Db.newCommand "SELECT DISTINCT movie_slug FROM content_blocks WHERE session_id IS NULL"
+        |> Db.query (fun (rd: IDataReader) -> rd.ReadString "movie_slug")
+
+    let private getGameJournalOwnerSlugs (conn: SqliteConnection) : string list =
+        conn
+        |> Db.newCommand "SELECT DISTINCT game_slug FROM game_journal_blocks"
+        |> Db.query (fun (rd: IDataReader) -> rd.ReadString "game_slug")
+
+    /// Every distinct legacy owner slug across both legacy stores, resolved
+    /// to a `LegacyOwnerResolution` via the exact-match probe. Order is
+    /// stable (sorted) so preview and confirm report owners identically.
+    type private LegacyOwnerResolution =
+        | OwnerResolved of MediaType
+        | OwnerAmbiguous
+        | OwnerOrphan
+
+    let private resolveLegacyOwners (conn: SqliteConnection) : (string * LegacyOwnerResolution) list =
+        (getContentBlockOwnerSlugs conn @ getGameJournalOwnerSlugs conn)
+        |> List.distinct
+        |> List.sort
+        |> List.map (fun slug ->
+            match CatalogProjection.resolveMediaType conn slug with
+            | CatalogProjection.Resolved mt -> slug, OwnerResolved mt
+            | CatalogProjection.Ambiguous -> slug, OwnerAmbiguous
+            | CatalogProjection.Orphan -> slug, OwnerOrphan)
+
+    let private splitLegacyOwners (owners: (string * LegacyOwnerResolution) list) =
+        let resolved =
+            owners |> List.choose (function
+                | slug, OwnerResolved mt -> Some { NotesMigrationResolvedOwner.Slug = slug; MediaType = mt }
+                | _ -> None)
+        let ambiguous =
+            owners |> List.choose (function
+                | slug, OwnerAmbiguous -> Some { NotesMigrationOwnerRef.Slug = slug }
+                | _ -> None)
+        let orphan =
+            owners |> List.choose (function
+                | slug, OwnerOrphan -> Some { NotesMigrationOwnerRef.Slug = slug }
+                | _ -> None)
+        resolved, ambiguous, orphan
+
+    let private previewNotesMigrationCore (conn: SqliteConnection) : NotesMigrationPreview =
+        let resolved, ambiguous, orphan = resolveLegacyOwners conn |> splitLegacyOwners
+        { Resolved = resolved; Ambiguous = ambiguous; Orphan = orphan }
+
+    let private readOptString (rd: IDataReader) (col: string) : string option =
+        if rd.IsDBNull(rd.GetOrdinal(col)) then None else Some (rd.ReadString col)
+
+    /// Raw read of one owner's legacy content-block rows, in the shape
+    /// `ContentBlockConversion.convertOldBlocks` expects — the migration's
+    /// own private mirror of the deleted `ContentBlockProjection.getForMovieDetail`.
+    let private readLegacyContentBlocks (conn: SqliteConnection) (slug: string) : ContentBlockConversion.LegacyContentBlock list =
+        conn
+        |> Db.newCommand """
+            SELECT block_id, block_type, content, image_ref, url, caption, position, row_group, row_position
+            FROM content_blocks
+            WHERE movie_slug = @slug AND session_id IS NULL
+            ORDER BY position
+        """
+        |> Db.setParams [ "slug", SqlType.String slug ]
+        |> Db.query (fun (rd: IDataReader) ->
+            { ContentBlockConversion.BlockId = rd.ReadString "block_id"
+              BlockType = rd.ReadString "block_type"
+              Content = rd.ReadString "content"
+              ImageRef = readOptString rd "image_ref"
+              Url = readOptString rd "url"
+              Caption = readOptString rd "caption"
+              Position = rd.ReadInt32 "position"
+              RowGroup = readOptString rd "row_group"
+              RowPosition = if rd.IsDBNull(rd.GetOrdinal("row_position")) then None else Some (rd.ReadInt32 "row_position") })
+
+    /// Raw read of one game's `game_journal_blocks` rows — already in the
+    /// target `JournalBlockDto` shape, no conversion (ADR-0080 §10: a
+    /// Game-resolved owner's leftover `content_blocks` rows, if any, are the
+    /// already-superseded input the old boot migration already consumed
+    /// once, and are NOT converted a second time here).
+    let private readGameJournalBlocks (conn: SqliteConnection) (slug: string) : JournalBlockDto list =
+        let readOpt = readOptString
+        conn
+        |> Db.newCommand """
+            SELECT id, parent_id, block_type, content, checked, collapsed, language, url, image_ref, caption, position, width
+            FROM game_journal_blocks
+            WHERE game_slug = @slug
+            ORDER BY position
+        """
+        |> Db.setParams [ "slug", SqlType.String slug ]
+        |> Db.query (fun (rd: IDataReader) ->
+            { Id = rd.ReadString "id"
+              ParentId = readOpt rd "parent_id"
+              BlockType = rd.ReadString "block_type"
+              Content = rd.ReadString "content"
+              Checked = rd.ReadInt32 "checked" <> 0
+              Collapsed = rd.ReadInt32 "collapsed" <> 0
+              Language = readOpt rd "language"
+              Url = readOpt rd "url"
+              ImageRef = readOpt rd "image_ref"
+              Caption = readOpt rd "caption"
+              Position = rd.ReadInt32 "position"
+              Width = rd.ReadDouble "width" })
+
+    /// Gate 1 confirm: converts every resolved owner into one `Notes_saved`,
+    /// skipping any owner whose `Notes-*` stream already exists (idempotent
+    /// per owner, so re-running after the operator fixes an ambiguous slug
+    /// at the source only picks up that one owner).
+    let private runNotesMigrationCore
+        (conn: SqliteConnection)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        : NotesMigrationReport =
+        let owners = resolveLegacyOwners conn
+        let resolved, ambiguous, orphan = owners |> splitLegacyOwners
+        let mutable converted = 0
+        let mutable anyAppended = false
+        for owner in resolved do
+            let sid = Notes.streamId owner.MediaType owner.Slug
+            let alreadyMigrated = EventStore.getStreamPosition conn sid >= 0L
+            if not alreadyMigrated then
+                let blocks =
+                    match owner.MediaType with
+                    | Game -> readGameJournalBlocks conn owner.Slug
+                    | Movie | Series | Book ->
+                        readLegacyContentBlocks conn owner.Slug |> ContentBlockConversion.convertOldBlocks
+                match Notes.decide Notes.NotesState.empty (Notes.Save_notes blocks) with
+                | Ok [] -> ()
+                | Ok events ->
+                    let eventDatas = events |> List.map Notes.Serialization.toEventData
+                    match EventStore.appendToStream conn sid -1L eventDatas with
+                    | EventStore.Success _ ->
+                        converted <- converted + 1
+                        anyAppended <- true
+                    | EventStore.ConcurrencyConflict _ ->
+                        // Single-admin-action, single-user app — nothing else
+                        // appends to a fresh Notes-* stream concurrently with
+                        // this loop. Left unresolved for this run; a later
+                        // re-run (this action is idempotent) picks it up.
+                        ()
+                | Error _ -> ()
+        if anyAppended then
+            for handler in projectionHandlers do
+                Projection.runProjection conn handler
+        { Resolved = resolved
+          Ambiguous = ambiguous
+          Orphan = orphan
+          Converted = converted }
+
     /// Bounded-context name -> the hand-maintained `handledEventTypes` list
     /// mirroring that BC's `Serialization.deserialize` match arms
     /// (administration-gxd6e). Same admin-console-only-knowledge shape as
@@ -210,7 +371,6 @@ module Administration =
         "Books", Books.Serialization.handledEventTypes
         "Friends", Friends.Serialization.handledEventTypes
         "Catalogs", Catalogs.Serialization.handledEventTypes
-        "ContentBlocks", ContentBlocks.Serialization.handledEventTypes
         "Notes", Notes.Serialization.handledEventTypes
     ]
 
@@ -270,7 +430,7 @@ module Administration =
     /// on stream_id prefix to the matching per-BC projection's getBySlug, and
     /// flatten its typed detail DTO into loose display fields. Only the five
     /// BCs the task calls out (Movie/Series/Game/Friend/Catalog) get a row —
-    /// other stream kinds (e.g. ContentBlocks-) simply have no projection panel.
+    /// other stream kinds (e.g. Notes-) simply have no projection panel.
     let private projectionRowFor (conn: SqliteConnection) (streamId: string) : Mediatheca.Shared.ProjectionStateRow option =
         if streamId.StartsWith("Movie-") then
             let slug = streamId.Substring("Movie-".Length)
@@ -473,7 +633,6 @@ module Administration =
         "movie_detail", Projected "MovieProjection"
         "watch_sessions", Projected "MovieProjection"
         "friend_list", Projected "FriendProjection"
-        "content_blocks", Projected "ContentBlockProjection"
         "catalog_list", Projected "CatalogProjection"
         "catalog_entries", Projected "CatalogProjection"
         "series_list", Projected "SeriesProjection"
@@ -541,7 +700,6 @@ module Administration =
         "movie_cast", Imperative "CastStore"
         "series_cast", Imperative "CastStore"
         "movie_crew", Imperative "CastStore"
-        "game_journal_blocks", Imperative "GameJournal"
         "settings", Imperative "SettingsStore"
         "job_runs", Imperative "Administration (job runs recorder)"
         // The old Steam-sync snapshot table is deleted entirely by
@@ -586,10 +744,10 @@ module Administration =
         cmd.ExecuteScalar() :?> int64 |> int
 
     /// True if `tableName` exists in this connection's schema. Guards the
-    /// image-ref registry queries below: `cast_members` (CastStore.fs) and
-    /// `game_journal_blocks` (GameJournal.fs) are imperative tables, not
-    /// registered in `projectionTables`/`projectionHandlers`, and aren't
-    /// guaranteed present in minimal/test fixtures.
+    /// image-ref registry queries below: `cast_members` (CastStore.fs) is an
+    /// imperative table, not registered in
+    /// `projectionTables`/`projectionHandlers`, and isn't guaranteed present
+    /// in minimal/test fixtures.
     let private tableExists (conn: SqliteConnection) (tableName: string) : bool =
         use cmd = conn.CreateCommand()
         cmd.CommandText <- "SELECT name FROM sqlite_master WHERE type = 'table' AND name = @name"
@@ -753,9 +911,8 @@ module Administration =
     /// The not-dirty guard (ADR-0025): names of the six checkpoint-tracked
     /// projections that are either mid-rebuild or lagging behind the store
     /// head. Empty = clean, safe to trust the projection tables as the live
-    /// ref set. `cast_members`/`game_journal_blocks` are imperative writes
-    /// (CastStore.fs/GameJournal.fs) — never rebuilt, never lag — so they
-    /// need no gating here.
+    /// ref set. `cast_members` is an imperative write (CastStore.fs) — never
+    /// rebuilt, never lag — so it needs no gating here.
     let isAnyProjectionDirty (conn: SqliteConnection) (projectionHandlers: Projection.ProjectionHandler list) (guards: AdminGuards) : string list =
         let head = EventStore.getMaxGlobalPosition conn
         projectionHandlers
@@ -975,8 +1132,6 @@ module Administration =
         "book_list", "cover_ref"
         "book_detail", "cover_ref"
         "friend_list", "image_ref"
-        "content_blocks", "image_ref"
-        "game_journal_blocks", "image_ref"
         "notes_blocks", "image_ref"
         "cast_members", "image_ref"
     ]
@@ -985,7 +1140,7 @@ module Administration =
     /// `imageRefColumns` table, as one flat set — the "live" side of the
     /// orphan diff. Missing tables (guarded by `tableExists`) contribute no
     /// refs rather than erroring, since minimal/test fixtures may not have
-    /// initialized `cast_members`/`game_journal_blocks`.
+    /// initialized `cast_members`.
     ///
     /// Not private — `series-m7fdk`'s direct test seam (AdministrationTests.fs)
     /// asserts this returns a non-empty set for a fixture holding episode
@@ -1452,6 +1607,47 @@ module Administration =
                 tx.Rollback()
                 reraise ()
 
+    // ── Notes migration (curation-j4qqt, ADR-0080 §10-11) — Gate 2: "Purge
+    // legacy stores" ── Reuses this file's own `runSurgeryMutation` (ADR-0034
+    // protocol: VACUUM INTO backup first, then mutation + FTS rebuild +
+    // checkpoint rewind in one transaction) with `EventStore.deleteEventsByStreamIds`
+    // as the mutation, plus the two `DROP TABLE`s and the `game_journal_migrated`
+    // setting cleanup in the same closure — the registry/table removal lands
+    // atomically with the operator's confirm, per ADR-0080's sequencing note.
+
+    let private legacyContentBlockStreamId (slug: string) : string = sprintf "ContentBlocks-%s" slug
+
+    /// Gate 2 preview: the default target set is every `ContentBlocks-*`
+    /// stream (that actually exists in the log) belonging to a Gate-1-
+    /// resolved owner; ambiguous/orphan owners' streams are named separately
+    /// as excluded, never silently dropped from view.
+    let private previewPurgeLegacyNotesCore (conn: SqliteConnection) : PurgeLegacyNotesPreview =
+        let preview = previewNotesMigrationCore conn
+        let existingStreams = EventStore.getDistinctStreams conn |> Set.ofList
+        let streamIdsFor (slugs: string list) =
+            slugs |> List.map legacyContentBlockStreamId |> List.filter existingStreams.Contains
+        let defaultStreamIds = streamIdsFor (preview.Resolved |> List.map (fun r -> r.Slug))
+        let excludedStreamIds =
+            streamIdsFor ((preview.Ambiguous |> List.map (fun r -> r.Slug)) @ (preview.Orphan |> List.map (fun r -> r.Slug)))
+        let eventCount, _ = EventStore.previewBulkDeleteByStreamIds conn defaultStreamIds
+        { StreamIds = defaultStreamIds; ExcludedStreamIds = excludedStreamIds; EventCount = eventCount }
+
+    /// Gate 2 confirm: bulk-deletes the given stream ids' event rows, drops
+    /// both legacy tables, and clears the `game_journal_migrated` marker —
+    /// all inside `runSurgeryMutation`'s one backed-up transaction.
+    let private purgeLegacyNotesCore
+        (conn: SqliteConnection)
+        (dbPath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (streamIds: string list)
+        : SurgeryResult =
+        runSurgeryMutation conn dbPath projectionHandlers true (fun () ->
+            let affected = EventStore.deleteEventsByStreamIds conn streamIds
+            conn |> Db.newCommand "DROP TABLE IF EXISTS content_blocks" |> Db.exec
+            conn |> Db.newCommand "DROP TABLE IF EXISTS game_journal_blocks" |> Db.exec
+            SettingsStore.deleteSetting conn "game_journal_migrated"
+            affected)
+
     /// Directory walk over `backups/` for the Surgery tab's keep-all
     /// retention panel. Empty stats (not an error) if the directory doesn't
     /// exist yet — i.e. no surgery has ever run against this store.
@@ -1888,5 +2084,25 @@ module Administration =
             backfillCatalogEntryMediaTypes = fun () -> async {
                 use conn = factory ()
                 return runCatalogMediaTypeBackfill conn projectionHandlers
+            }
+
+            previewNotesMigration = fun () -> async {
+                use conn = factory ()
+                return previewNotesMigrationCore conn
+            }
+
+            runNotesMigration = fun () -> async {
+                use conn = factory ()
+                return runNotesMigrationCore conn projectionHandlers
+            }
+
+            previewPurgeLegacyNotes = fun () -> async {
+                use conn = factory ()
+                return previewPurgeLegacyNotesCore conn
+            }
+
+            purgeLegacyNotes = fun streamIds -> async {
+                use conn = factory ()
+                return purgeLegacyNotesCore conn dbPath projectionHandlers streamIds
             }
         }

@@ -1039,7 +1039,6 @@ module SeriesProjection =
               WantToWatchWith = resolveFriendRefs conn wantToWatchWithSlugs
               Seasons = seasons
               RewatchSessions = rewatchSessions
-              ContentBlocks = ContentBlockProjection.getByMovie conn slug
               NextEpisodeAirDate = getNextEpisodeAirDate conn slug
               NextSeasonAirDate = getNextSeasonAirDate conn slug
               JellyfinId = JellyfinStore.getSeriesJellyfinId conn slug

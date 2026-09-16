@@ -51,7 +51,6 @@ let private newConn () =
     MetadataCache.initialize conn
     CastStore.initialize conn
     JellyfinStore.initialize conn
-    ContentBlockProjection.handler.Init conn
     NotesProjection.handler.Init conn
     FriendProjection.handler.Init conn
     SeriesProjection.handler.Init conn

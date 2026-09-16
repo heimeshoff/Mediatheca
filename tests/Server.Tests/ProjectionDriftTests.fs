@@ -15,14 +15,13 @@ open Mediatheca.Shared
 /// over these functions, the same shape `ProjectionRebuildTests.fs`
 /// established for `rebuildProjectionWithProgress`.
 
-/// Registration order is load-bearing (Movie -> Friend -> ContentBlock ->
-/// Catalog -> Series -> Game, `Composition.fs`) — FriendProjection's
+/// Registration order is load-bearing (Movie -> Friend -> Catalog -> Series
+/// -> Game, `Composition.fs`) — FriendProjection's
 /// Friend_removed case scrubs movie_detail/watch_sessions and needs those
 /// tables to already exist.
 let private allProjectionHandlers = [
     MovieProjection.handler
     FriendProjection.handler
-    ContentBlockProjection.handler
     CatalogProjection.handler
     SeriesProjection.handler
     GameProjection.handler
@@ -176,7 +175,7 @@ let projectionDriftTests =
                 cmd.CommandText <- sprintf "SELECT COUNT(*) FROM %s" table
                 cmd.ExecuteScalar() :?> int64
 
-            let allTables = [ "movie_list"; "movie_detail"; "watch_sessions"; "friend_list"; "content_blocks"; "catalog_list"; "catalog_entries" ]
+            let allTables = [ "movie_list"; "movie_detail"; "watch_sessions"; "friend_list"; "catalog_list"; "catalog_entries" ]
             let preRowCounts = allTables |> List.map (fun t -> t, tableRowCount t)
             let preCheckpoints = allProjectionHandlers |> List.map (fun h -> h.Name, Projection.getCheckpoint conn h.Name)
 

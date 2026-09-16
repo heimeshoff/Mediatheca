@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 20:52 -- Task verified and completed: curation-j4qqt - Migrate and purge — two builder-triggered Administration gates: "Migrate to Notes" turns every content-block owner and game journal into one `Notes_saved` event (owners resolved by exact slug match, ambiguous/orphan ones reported, never guessed); "Purge legacy stores" bulk-deletes the `ContentBlocks-*` streams under ADR-0034 guardrails and drops both legacy tables; ContentBlocks, GameJournal, its boot migration and all content-block RPC members are deleted (ADR-0080, step 3 of 3)
+
+**Type:** Work / Task completion
+**Task:** curation-j4qqt - Migrate and purge — two builder-triggered Administration gates: "Migrate to Notes" turns every content-block owner and game journal into one `Notes_saved` event (owners resolved by exact slug match, ambiguous/orphan ones reported, never guessed); "Purge legacy stores" bulk-deletes the `ContentBlocks-*` streams under ADR-0034 guardrails and drops both legacy tables; ContentBlocks, GameJournal, its boot migration and all content-block RPC members are deleted (ADR-0080, step 3 of 3)
+**Summary:** Shipped both ADR-0080 gates — "Migrate to Notes" (exact-match owner resolution, report-don't-guess, one Notes_saved per resolved owner, idempotent) and "Purge legacy stores" (ADR-0034-guarded bulk delete of ContentBlocks-* streams plus DROP of both legacy tables) — on the Admin Surgery tab, then deleted ContentBlocks.fs/ContentBlockProjection.fs/GameJournal.fs and every content-block RPC member, registry entry, and DTO field.
+**Duration:** 52m
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 63
+**Tests added:** 7
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 19:57 -- Batch started: [curation-j4qqt]
 
 **Type:** Work / Batch start

@@ -45,13 +45,12 @@ let private fakeCoverBytes = Array.create 2048 (byte 0xFF)
 let private bootstrap (conn: SqliteConnection) =
     EventStore.initialize conn
     SettingsStore.initialize conn
-    ContentBlockProjection.handler.Init conn
     NotesProjection.handler.Init conn
     BookProjection.handler.Init conn
     MetadataCache.initialize conn
     Administration.initializeJobRuns conn
 
-let private allProjectionHandlers = [ ContentBlockProjection.handler; BookProjection.handler ]
+let private allProjectionHandlers = [ BookProjection.handler ]
 
 let private openLibraryConfig : OpenLibrary.OpenLibraryConfig =
     { UserAgent = "Mediatheca/1.0 (+https://github.com/heimeshoff/mediatheca)" }

@@ -25,14 +25,12 @@ let private apiBootstrap (conn: SqliteConnection) =
     SettingsStore.initialize conn
     CastStore.initialize conn
     JellyfinStore.initialize conn
-    ContentBlockProjection.handler.Init conn
     NotesProjection.handler.Init conn
     FriendProjection.handler.Init conn
     MovieProjection.handler.Init conn
     SeriesProjection.handler.Init conn
     GameProjection.handler.Init conn
     BookProjection.handler.Init conn
-    GameJournal.initialize conn
     PlaySessionProjection.handler.Init conn
     MetadataCache.initialize conn
 
@@ -53,7 +51,7 @@ let private createApi (factory: unit -> SqliteConnection) : IMediathecaApi =
         (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         "test-fixtures-do-not-exist/images"
-        [ ContentBlockProjection.handler; FriendProjection.handler; MovieProjection.handler
+        [ FriendProjection.handler; MovieProjection.handler
           SeriesProjection.handler; GameProjection.handler; BookProjection.handler; PlaySessionProjection.handler ]
 
 let private bookData (title: string) (asin: string) : Books.BookAddedData = {

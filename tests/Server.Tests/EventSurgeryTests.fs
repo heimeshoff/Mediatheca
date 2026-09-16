@@ -107,6 +107,43 @@ let eventSurgeryTests =
             Expect.equal remaining.[1].StreamPosition 2L "Last remaining row keeps its original stream_position — no renumbering"
             Expect.equal (EventStore.getStreamPosition conn "books-1") 2L "Stream position (MAX) should reflect the surviving rows, gap and all"
 
+        testCase "deleteEventsByStreamIds removes exactly the rows of the given stream ids and leaves every other stream untouched" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            EventStore.appendToStream conn "ContentBlocks-a" -1L [ makeEvent "Content_block_added" "{}"; makeEvent "Content_block_added" "{}" ] |> ignore
+            EventStore.appendToStream conn "ContentBlocks-b" -1L [ makeEvent "Content_block_added" "{}" ] |> ignore
+            EventStore.appendToStream conn "ContentBlocks-c" -1L [ makeEvent "Content_block_added" "{}"; makeEvent "Content_block_added" "{}"; makeEvent "Content_block_added" "{}" ] |> ignore
+
+            let affected = EventStore.deleteEventsByStreamIds conn [ "ContentBlocks-a"; "ContentBlocks-b" ]
+
+            Expect.equal affected 3 "Exactly the three rows across the two targeted streams should be deleted"
+            Expect.isEmpty (EventStore.readStream conn "ContentBlocks-a") "Targeted stream a should be empty"
+            Expect.isEmpty (EventStore.readStream conn "ContentBlocks-b") "Targeted stream b should be empty"
+            Expect.equal (List.length (EventStore.readStream conn "ContentBlocks-c")) 3 "Untargeted stream c should be untouched"
+
+            let countAfter, sampleAfter = EventStore.previewBulkDeleteByStreamIds conn [ "ContentBlocks-a"; "ContentBlocks-b" ]
+            Expect.equal countAfter 0 "previewBulkDeleteByStreamIds on the same ids should report zero after the delete"
+            Expect.isEmpty sampleAfter "The sample should also be empty after the delete"
+
+        testCase "previewBulkDeleteByStreamIds reports the exact count and a bounded sample before any delete" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            EventStore.appendToStream conn "ContentBlocks-a" -1L [ makeEvent "Content_block_added" "{}"; makeEvent "Content_block_added" "{}" ] |> ignore
+            EventStore.appendToStream conn "ContentBlocks-b" -1L [ makeEvent "Content_block_added" "{}" ] |> ignore
+            EventStore.appendToStream conn "ContentBlocks-other" -1L [ makeEvent "Content_block_added" "{}" ] |> ignore
+
+            let count, sample = EventStore.previewBulkDeleteByStreamIds conn [ "ContentBlocks-a"; "ContentBlocks-b" ]
+
+            Expect.equal count 3 "Preview count should cover exactly the two targeted streams' rows"
+            Expect.equal (List.length sample) 3 "Sample should include all rows when under the bound"
+            Expect.isTrue (sample |> List.forall (fun e -> e.StreamId = "ContentBlocks-a" || e.StreamId = "ContentBlocks-b")) "Sample should only include targeted streams' rows"
+            Expect.equal (List.length (EventStore.readStream conn "ContentBlocks-a")) 2 "Preview must not mutate anything"
+
+        testCase "deleteEventsByStreamIds with an empty list deletes nothing" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            EventStore.appendToStream conn "ContentBlocks-a" -1L [ makeEvent "Content_block_added" "{}" ] |> ignore
+            let affected = EventStore.deleteEventsByStreamIds conn []
+            Expect.equal affected 0 "An empty stream-id list should delete nothing"
+            Expect.equal (List.length (EventStore.readStream conn "ContentBlocks-a")) 1 "Existing stream should be untouched"
+
         testCase "renameEventTypeRows renames every occurrence and none remain at the old type" <| fun _ ->
             let conn = createInMemoryConnection ()
             EventStore.appendToStream conn "books-1" -1L [ makeEvent "BookAdded" "{}"; makeEvent "BookAdded" "{}" ] |> ignore

@@ -6,8 +6,9 @@ open Mediatheca.Shared
 /// Notes (ADR-0080): a document stream, not an aggregate — there is no
 /// cross-block invariant to protect, only "the user typed; store what they
 /// typed." Built with the codebase's aggregate machinery (decide/evolve/
-/// reconstitute/streamId/Serialization, matching ContentBlocks.fs's file
-/// shape) purely because that machinery is the cheapest path to free
+/// reconstitute/streamId/Serialization, matching the codebase's other
+/// aggregate-shaped modules' file shape) purely because that machinery is
+/// the cheapest path to free
 /// expected-position concurrency, no-op handling, and projection catch-up —
 /// not because the concept deserves aggregate ceremony. See the curation
 /// README's "Document streams (not aggregates)" heading, not "Aggregates".
@@ -159,7 +160,7 @@ module Notes =
             | _ -> None
 
         /// Hand-maintained mirror of the `deserialize` match-arm strings
-        /// above — see ContentBlocks.Serialization.handledEventTypes for
+        /// above — see e.g. Movies.Serialization.handledEventTypes for
         /// the pattern this follows.
         let handledEventTypes : string list = [
             "Notes_saved"

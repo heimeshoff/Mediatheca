@@ -2017,13 +2017,13 @@ let private notesSection () =
 
             decisionBox
                 "One editor, one model, one storage path"
-                "The game journal's tree/16-type/columns/toggle model generalized to all four media types (ADR-0080), replacing the separately event-sourced ContentBlocks (movies/series/books) and the plain-SQLite GameJournal. One editor to maintain, one mental model for users across every detail page."
-                "Keeping two editors and two models side by side (ADR-0043's re-derivability standard already flagged the mutable GameJournal table as a violation). Migrating ContentBlocks' flat model up to the tree instead of the reverse (loses toggle/columns/16 types users already rely on in the journal)."
+                "The game journal's tree/16-type/columns/toggle model generalized to all four media types (ADR-0080), replacing the separately event-sourced per-type block system (movies/series/books) and the old plain-SQLite journal table. One editor to maintain, one mental model for users across every detail page."
+                "Keeping two editors and two models side by side (ADR-0043's re-derivability standard already flagged the old mutable journal table as a violation). Migrating the old block system's flat model up to the tree instead of the reverse (loses toggle/columns/16 types users already rely on in the journal)."
 
             decisionBox
                 "Owner in the stream id, not a bare slug"
                 "The document's owner is the (MediaType, slug) pair, carried in the stream id (Notes-{token}-{slug}) rather than a bare slug prop. This is the same typing discipline ADR-0079 established for catalog entries -- never reintroduce an untyped slug."
-                "A bare slug prop (worked for GameJournal because games were the only owner; breaks the moment a second media type needs the same stream)."
+                "A bare slug prop (worked when games were the only owner; breaks the moment a second media type needs the same stream)."
         ]
     ]
 // ── Section: Entry List ──

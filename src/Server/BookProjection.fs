@@ -497,7 +497,6 @@ module BookProjection =
                 else Some (rd.ReadDouble "average_rating")
               Language = readOptString rd "language"
               ProgressHistory = getProgressHistory conn slug
-              ContentBlocks = ContentBlockProjection.getForMovieDetail conn slug
               // curation-h98ve (ADR-0080): re-derived fresh from notes_blocks
               // on every read, never cached (ADR-0043).
               HasNotesContent = NotesProjection.getForOwner conn MediaType.Book slug |> JournalBlock.hasContent }

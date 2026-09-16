@@ -318,7 +318,6 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     let projectionHandlers = [
         MovieProjection.handler
         FriendProjection.handler
-        ContentBlockProjection.handler
         CatalogProjection.handler
         SeriesProjection.handler
         GameProjection.handler
@@ -350,11 +349,6 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     // `genres` is deliberately excluded (ADR-0055) — see
     // GameProjection.dropDeprecatedColumns's doc comment.
     GameProjection.dropDeprecatedColumns conn
-
-    // Game journal (Notion-style blocks, plain storage) — table + one-time
-    // migration of the old event-sourced game content blocks
-    GameJournal.initialize conn
-    GameJournal.migrateFromContentBlocks conn dataDir
 
     // Backfill director/crew data for existing movies
     let backfillDirectors () =

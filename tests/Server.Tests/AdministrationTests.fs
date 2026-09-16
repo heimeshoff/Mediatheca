@@ -20,11 +20,6 @@ let private bootstrapAdmin (conn: SqliteConnection) =
     // exist for any Movie-/Series-/Game-/Friend-/Catalog- stream.
     CastStore.initialize conn
     JellyfinStore.initialize conn
-    // Image cache admin (administration-xx3mw) exercises game_journal_blocks,
-    // an imperative table (GameJournal.fs) that's otherwise only created
-    // lazily by Composition.fs at startup.
-    GameJournal.initialize conn
-    ContentBlockProjection.handler.Init conn
     NotesProjection.handler.Init conn
     FriendProjection.handler.Init conn
     MovieProjection.handler.Init conn
@@ -58,7 +53,6 @@ let private noImagesDir = "test-fixtures-do-not-exist/images"
 let private allProjectionHandlers = [
     MovieProjection.handler
     FriendProjection.handler
-    ContentBlockProjection.handler
     CatalogProjection.handler
     SeriesProjection.handler
     GameProjection.handler
@@ -100,14 +94,6 @@ let private insertMoviePosterRef (conn: SqliteConnection) (slug: string) (poster
     cmd.CommandText <- "INSERT INTO movie_list (slug, name, year, poster_ref) VALUES (@slug, @slug, 2000, @ref)"
     cmd.Parameters.AddWithValue("@slug", slug) |> ignore
     cmd.Parameters.AddWithValue("@ref", posterRef) |> ignore
-    cmd.ExecuteNonQuery() |> ignore
-
-let private insertContentBlock (conn: SqliteConnection) (blockId: string) (movieSlug: string) (imageRef: string) : unit =
-    use cmd = conn.CreateCommand()
-    cmd.CommandText <- "INSERT INTO content_blocks (block_id, movie_slug, block_type, image_ref) VALUES (@id, @slug, 'screenshot', @ref)"
-    cmd.Parameters.AddWithValue("@id", blockId) |> ignore
-    cmd.Parameters.AddWithValue("@slug", movieSlug) |> ignore
-    cmd.Parameters.AddWithValue("@ref", imageRef) |> ignore
     cmd.ExecuteNonQuery() |> ignore
 
 let private insertSeriesEpisode (conn: SqliteConnection) (seriesSlug: string) (season: int) (episode: int) (stillRef: string) : unit =
@@ -359,13 +345,13 @@ let administrationTests =
         testCase "getStreamDetail returns no projection row for a stream prefix with no projection dispatch" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapAdmin
             let conn = db.Connection
-            let streamId = "ContentBlocks-the-matrix-1999"
-            EventStore.appendToStream conn streamId -1L [ makeEvent "Content_block_added" """{"blockType":"text"}""" ] |> ignore
+            let streamId = "Unregistered-the-matrix-1999"
+            EventStore.appendToStream conn streamId -1L [ makeEvent "Some_unrelated_event" """{"foo":"bar"}""" ] |> ignore
             let api = createApi db.Factory
 
             let detail = api.getStreamDetail streamId |> Async.RunSynchronously
 
-            Expect.isEmpty detail.ProjectionRows "ContentBlocks streams have no projection panel dispatch"
+            Expect.isEmpty detail.ProjectionRows "unregistered-prefix streams have no projection panel dispatch"
 
         testCase "getHealthStats total event count matches a direct SQL count" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapAdmin
@@ -694,8 +680,10 @@ let administrationTests =
 
             // books-y9kxy adds book_list.cover_ref/book_detail.cover_ref (two
             // more ref-bearing columns) to the fifteen this registry already
-            // named; curation-h98ve (ADR-0080) adds notes_blocks.image_ref.
-            Expect.equal (List.length Administration.imageRefColumns) 18 "Registry should list all eighteen ref-bearing columns"
+            // named; curation-h98ve (ADR-0080) adds notes_blocks.image_ref;
+            // curation-j4qqt removes content_blocks.image_ref and
+            // game_journal_blocks.image_ref (both tables are dropped).
+            Expect.equal (List.length Administration.imageRefColumns) 16 "Registry should list all sixteen ref-bearing columns"
 
             for (table, column) in Administration.imageRefColumns do
                 use cmd = conn.CreateCommand()
@@ -759,33 +747,20 @@ let administrationTests =
                 let stats = api.getImageCacheStats () |> Async.RunSynchronously
                 Expect.equal stats.TotalFileCount 1 "Stats should compute normally despite the dirty projection")
 
-        testCase "a content_blocks.image_ref (movie journal) is never flagged orphan" <| fun _ ->
+        testCase "a notes_blocks.image_ref (curation-h98ve, ADR-0080) is never flagged orphan" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrapAdmin
             let conn = db.Connection
-            insertContentBlock conn "block-1" "dune" "content/movie-journal-1.jpg"
+            use insertCmd = conn.CreateCommand()
+            insertCmd.CommandText <- "INSERT INTO notes_blocks (id, media_type, slug, block_type, image_ref) VALUES (@id, 'movie', 'dune', 'image', @ref)"
+            insertCmd.Parameters.AddWithValue("@id", "block-1") |> ignore
+            insertCmd.Parameters.AddWithValue("@ref", "content/notes-1.jpg") |> ignore
+            insertCmd.ExecuteNonQuery() |> ignore
             withTempImagesDir (fun imagesDir ->
-                writeImageFile imagesDir "content/movie-journal-1.jpg" 10
+                writeImageFile imagesDir "content/notes-1.jpg" 10
                 let api = createImageApi db.Factory imagesDir
                 match api.listOrphanedImages () |> Async.RunSynchronously with
                 | OrphanScanReady (orphans, _) ->
-                    Expect.isEmpty (orphans |> List.filter (fun o -> o.RelativePath = "content/movie-journal-1.jpg")) "Referenced movie journal image should not be orphan"
-                | OrphanScanBlocked reason -> failwith reason)
-
-        testCase "a game_journal_blocks.image_ref (game journal) is never flagged orphan" <| fun _ ->
-            use db = TestDb.withTempDbFactory bootstrapAdmin
-            let conn = db.Connection
-            let block: JournalBlockDto = {
-                Id = "block-1"; ParentId = None; BlockType = JournalBlockTypes.image
-                Content = ""; Checked = false; Collapsed = false; Language = None; Url = None
-                ImageRef = Some "content/game-journal-1.jpg"; Caption = None; Position = 0; Width = 1.0
-            }
-            GameJournal.save conn "some-game" [ block ] |> ignore
-            withTempImagesDir (fun imagesDir ->
-                writeImageFile imagesDir "content/game-journal-1.jpg" 10
-                let api = createImageApi db.Factory imagesDir
-                match api.listOrphanedImages () |> Async.RunSynchronously with
-                | OrphanScanReady (orphans, _) ->
-                    Expect.isEmpty (orphans |> List.filter (fun o -> o.RelativePath = "content/game-journal-1.jpg")) "Referenced game journal image should not be orphan"
+                    Expect.isEmpty (orphans |> List.filter (fun o -> o.RelativePath = "content/notes-1.jpg")) "Referenced Notes image should not be orphan"
                 | OrphanScanBlocked reason -> failwith reason)
 
         testCase "a series_episode_cache.still_ref is never flagged orphan" <| fun _ ->

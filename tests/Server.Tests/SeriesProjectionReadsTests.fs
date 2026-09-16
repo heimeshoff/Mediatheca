@@ -26,10 +26,9 @@ let private newConn () =
     SeriesProjection.handler.Init conn
     // getBySlug/getDashboardSeriesNextUp reach across into CastStore's
     // series_cast table, JellyfinStore's jellyfin_episode table, and
-    // ContentBlockProjection's content_blocks table.
+    // NotesProjection's notes_blocks table.
     CastStore.initialize conn
     JellyfinStore.initialize conn
-    ContentBlockProjection.handler.Init conn
     NotesProjection.handler.Init conn
     conn
 

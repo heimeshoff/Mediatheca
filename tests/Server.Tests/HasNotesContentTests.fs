@@ -43,7 +43,6 @@ let hasNotesContentTests =
             EventStore.initialize conn
             CastStore.initialize conn
             JellyfinStore.initialize conn
-            ContentBlockProjection.handler.Init conn
             NotesProjection.handler.Init conn
             MovieProjection.handler.Init conn
 
@@ -72,7 +71,6 @@ let hasNotesContentTests =
             SeriesProjection.handler.Init conn
             CastStore.initialize conn
             JellyfinStore.initialize conn
-            ContentBlockProjection.handler.Init conn
             NotesProjection.handler.Init conn
 
             let slug = "the-wire-2002"
@@ -97,7 +95,6 @@ let hasNotesContentTests =
             conn.Open()
             EventStore.initialize conn
             FriendProjection.handler.Init conn
-            ContentBlockProjection.handler.Init conn
             NotesProjection.handler.Init conn
             MetadataCache.initialize conn
             BookProjection.handler.Init conn
@@ -122,10 +119,8 @@ let hasNotesContentTests =
             let conn = new SqliteConnection("Data Source=:memory:")
             conn.Open()
             EventStore.initialize conn
-            ContentBlockProjection.handler.Init conn
             NotesProjection.handler.Init conn
             GameProjection.handler.Init conn
-            GameJournal.initialize conn
             PlaySessionProjection.handler.Init conn
             MetadataCache.initialize conn
 
@@ -145,31 +140,4 @@ let hasNotesContentTests =
 
             let after = GameProjection.getBySlug conn slug
             Expect.equal (after |> Option.map (fun d -> d.HasNotesContent)) (Some true) "notes now carry content"
-
-        testCase "game: a game with ONLY legacy game_journal_blocks content still reports HasNotesContent = true (interim OR, deleted by curation-j4qqt)" <| fun _ ->
-            let conn = new SqliteConnection("Data Source=:memory:")
-            conn.Open()
-            EventStore.initialize conn
-            ContentBlockProjection.handler.Init conn
-            NotesProjection.handler.Init conn
-            GameProjection.handler.Init conn
-            GameJournal.initialize conn
-            PlaySessionProjection.handler.Init conn
-            MetadataCache.initialize conn
-
-            let slug = "hollow-knight-2017"
-            let gameData: Games.GameAddedData = {
-                Name = "Hollow Knight"; Year = 2017; Genres = []; Description = ""
-                ShortDescription = ""; WebsiteUrl = None; CoverRef = None; BackdropRef = None
-                RawgId = None; RawgRating = None
-            }
-            EventStore.appendToStream conn (Games.streamId slug) -1L [ Games.Serialization.toEventData (Games.Game_added_to_library gameData) ] |> ignore
-            Projection.runProjection conn GameProjection.handler
-
-            // Legacy plain-storage journal only — no Notes_saved event at all.
-            GameJournal.save conn slug [ textBlock "legacy1" "Beat the Radiance" ] |> ignore
-
-            let detail = GameProjection.getBySlug conn slug
-            Expect.equal (detail |> Option.map (fun d -> d.HasNotesContent)) (Some true)
-                "legacy game_journal_blocks content alone must still surface as HasNotesContent = true until curation-j4qqt migrates it"
     ]

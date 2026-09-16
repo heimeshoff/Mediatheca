@@ -146,43 +146,7 @@ type RecordWatchSessionRequest = {
     FriendSlugs: string list
 }
 
-// Content Blocks
-
-type ContentBlockType =
-    | TextBlock
-    | ImageBlock
-    | QuoteBlock
-    | CalloutBlock
-    | CodeBlock
-
-type ContentBlockDto = {
-    BlockId: string
-    BlockType: string
-    Content: string
-    ImageRef: string option
-    Url: string option
-    Caption: string option
-    Position: int
-    RowGroup: string option
-    RowPosition: int option
-}
-
-type AddContentBlockRequest = {
-    BlockType: string
-    Content: string
-    ImageRef: string option
-    Url: string option
-    Caption: string option
-}
-
-type UpdateContentBlockRequest = {
-    Content: string
-    ImageRef: string option
-    Url: string option
-    Caption: string option
-}
-
-// Game Journal (Notion-style block document; plain storage, not event-sourced)
+// Notes (Notion-style block document; ADR-0080)
 //
 // The document is a flat list of blocks forming a tree via ParentId:
 //   - root blocks (ParentId = None) stack vertically
@@ -629,7 +593,7 @@ type EventTailQuery = {
     Limit: int
 }
 
-// Movie DTOs (after WatchSession and ContentBlock since they reference those types)
+// Movie DTOs (after WatchSession since it references that type)
 
 type MovieListItem = {
     Slug: string
@@ -659,7 +623,6 @@ type MovieDetail = {
     RecommendedBy: FriendRef list
     WantToWatchWith: FriendRef list
     WatchSessions: WatchSessionDto list
-    ContentBlocks: ContentBlockDto list
     /// curation-h98ve (ADR-0080): server-computed via `JournalBlock.hasContent`
     /// over `notes_blocks`, re-derived fresh on every read (ADR-0043) —
     /// the Notes counterpart games-t69rb originally shipped only on
@@ -771,7 +734,6 @@ type SeriesDetail = {
     WantToWatchWith: FriendRef list
     Seasons: SeasonDto list
     RewatchSessions: RewatchSessionDto list
-    ContentBlocks: ContentBlockDto list
     /// Earliest known future air date (episode air_date) for this series.
     /// None if the series has no announced upcoming episode.
     NextEpisodeAirDate: string option
@@ -1000,7 +962,6 @@ type BookDetail = {
     AverageRating: float option
     Language: string option
     ProgressHistory: ReadingProgressDto list
-    ContentBlocks: ContentBlockDto list
     /// curation-h98ve (ADR-0080): see `MovieDetail.HasNotesContent`.
     HasNotesContent: bool
 }
@@ -1352,13 +1313,10 @@ type GameDetail = {
     RecommendedBy: FriendRef list
     WantToPlayWith: FriendRef list
     PlayedWith: FriendRef list
-    ContentBlocks: ContentBlockDto list
     /// games-t69rb, renamed by curation-h98ve (ADR-0080): server-computed
     /// via `JournalBlock.hasContent` over `notes_blocks` — lets the client
     /// pick Notes-first vs. Overview-first without a second round-trip to
-    /// `getNotes`. Until curation-j4qqt migrates existing games' journals,
-    /// this is also true when only the legacy `game_journal_blocks` table
-    /// has content (see `GameProjection.getBySlug`'s comment).
+    /// `getNotes`.
     HasNotesContent: bool
 }
 
@@ -1954,19 +1912,10 @@ type IMediathecaApi = {
     removeFriendFromWatchSession: string -> string -> string -> Async<Result<unit, string>>
     removeWatchSession: string -> string -> Async<Result<unit, string>>
     getWatchSessions: string -> Async<WatchSessionDto list>
-    // Content Blocks
-    addContentBlock: string -> string option -> AddContentBlockRequest -> Async<Result<string, string>>
-    updateContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
-    removeContentBlock: string -> string -> Async<Result<unit, string>>
-    changeContentBlockType: string -> string -> string -> Async<Result<unit, string>>
-    reorderContentBlocks: string -> string option -> string list -> Async<Result<unit, string>>
-    getContentBlocks: string -> string option -> Async<ContentBlockDto list>
-    groupContentBlocksInRow: string -> string -> string -> string -> Async<Result<unit, string>>
-    ungroupContentBlock: string -> string -> Async<Result<unit, string>>
     uploadContentImage: byte array -> string -> Async<Result<string, string>>
     // Notes (curation-h98ve, ADR-0080): one event-sourced document per
-    // (MediaType, slug), replacing ContentBlocks and GameJournal (server
-    // core only here — the client editor switch is curation-knqfj).
+    // (MediaType, slug) — see the curation README's "Document streams (not
+    // aggregates)" heading.
     getNotes: MediaType -> string -> Async<JournalBlockDto list>
     saveNotes: MediaType -> string -> JournalBlockDto list -> Async<Result<unit, string>>
     // Catalogs
@@ -2028,11 +1977,7 @@ type IMediathecaApi = {
     markEpisodesWatchedUpTo: string -> MarkEpisodesUpToRequest -> Async<Result<unit, string>>
     markSeasonUnwatched: string -> MarkSeasonUnwatchedRequest -> Async<Result<unit, string>>
     updateEpisodeWatchedDate: string -> UpdateEpisodeWatchedDateRequest -> Async<Result<unit, string>>
-    // Series Content Blocks + Catalogs
-    getSeriesContentBlocks: string -> Async<ContentBlockDto list>
-    addSeriesContentBlock: string -> AddContentBlockRequest -> Async<Result<string, string>>
-    updateSeriesContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
-    removeSeriesContentBlock: string -> string -> Async<Result<unit, string>>
+    // Series Catalogs
     getCatalogsForSeries: string -> Async<CatalogRef list>
     // Games
     searchRawgGames: string * int option -> Async<RawgSearchResult list>
@@ -2065,13 +2010,6 @@ type IMediathecaApi = {
     /// ADR-0053 — dispatches `Override_play_facets`. Supersedes the deleted
     /// `addGamePlayMode`/`removeGamePlayMode`/`getAllPlayModes` (games-v4nqe).
     overrideGamePlayFacets: string -> PlayFacetsOverride -> Async<Result<unit, string>>
-    getGameContentBlocks: string -> Async<ContentBlockDto list>
-    addGameContentBlock: string -> AddContentBlockRequest -> Async<Result<string, string>>
-    updateGameContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
-    removeGameContentBlock: string -> string -> Async<Result<unit, string>>
-    // Game Journal (Notion-style block document)
-    getGameJournal: string -> Async<JournalBlockDto list>
-    saveGameJournal: string -> JournalBlockDto list -> Async<Result<unit, string>>
     getCatalogsForGame: string -> Async<CatalogRef list>
     getGameImageCandidates: string -> Async<GameImageCandidate list>
     selectGameImage: string -> string -> string -> Async<Result<unit, string>>
@@ -2166,12 +2104,6 @@ type IMediathecaApi = {
     linkBookExternalId: string -> BookExternalId -> Async<Result<unit, string>>
     recommendBookBy: string -> string -> Async<Result<unit, string>>
     removeBookRecommendation: string -> string -> Async<Result<unit, string>>
-    // Book Content Blocks (a fourth parallel family — no owner-kind key
-    // exists on ContentBlocks; mirrors the Series/Games precedent exactly)
-    getBookContentBlocks: string -> Async<ContentBlockDto list>
-    addBookContentBlock: string -> AddContentBlockRequest -> Async<Result<string, string>>
-    updateBookContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
-    removeBookContentBlock: string -> string -> Async<Result<unit, string>>
     getCatalogsForBook: string -> Async<CatalogRef list>
     // Open Library (integration-c8d4x, ADR-0075) — book search/metadata source
     searchOpenLibraryBooks: string -> Async<OpenLibrarySearchResult list>
@@ -2500,6 +2432,55 @@ type CatalogMediaTypeBackfillReport = {
     Orphan: CatalogBackfillEntryRef list
 }
 
+// Notes migration / legacy purge (curation-j4qqt, ADR-0080 §10-11): two
+// separate operator-triggered Administration gates, sharing one owner-
+// resolution report between preview and confirm. Gate 1 ("Migrate to
+// Notes") is additive and idempotent per owner; Gate 2 ("Purge legacy
+// stores") is destructive, single-confirm, ADR-0034-guarded. Ambiguous/
+// orphan owners are named, never guessed, per ADR-0080's report-don't-guess
+// discipline (the same shape `CatalogBackfillEntryRef`/
+// `CatalogBackfillResolvedEntry` already established above).
+
+/// A legacy content-block/game-journal owner slug that could not be
+/// resolved to exactly one media type (ambiguous: matched more than one
+/// home projection; orphan: matched none).
+type NotesMigrationOwnerRef = {
+    Slug: string
+}
+
+type NotesMigrationResolvedOwner = {
+    Slug: string
+    MediaType: MediaType
+}
+
+/// Gate 1's preview: every distinct legacy owner, resolved/ambiguous/orphan.
+type NotesMigrationPreview = {
+    Resolved: NotesMigrationResolvedOwner list
+    Ambiguous: NotesMigrationOwnerRef list
+    Orphan: NotesMigrationOwnerRef list
+}
+
+/// Gate 1's confirm result — same resolved/ambiguous/orphan shape as the
+/// preview, plus `Converted`: the number of NEW `Notes_saved` events this
+/// run actually appended (an owner already carrying a `Notes-*` stream is
+/// skipped, so a second confirm reports `Converted = 0`).
+type NotesMigrationReport = {
+    Resolved: NotesMigrationResolvedOwner list
+    Ambiguous: NotesMigrationOwnerRef list
+    Orphan: NotesMigrationOwnerRef list
+    Converted: int
+}
+
+/// Gate 2's preview: the default target set (every `ContentBlocks-*` stream
+/// of a Gate-1-resolved owner), the streams excluded from that default
+/// (ambiguous/orphan owners' streams), and the exact event-row count the
+/// default set would delete.
+type PurgeLegacyNotesPreview = {
+    StreamIds: string list
+    ExcludedStreamIds: string list
+    EventCount: int
+}
+
 type IAdminApi = {
     // Event Store Browser
     getEventPage: EventPageQuery -> Async<EventPage>
@@ -2584,4 +2565,22 @@ type IAdminApi = {
     /// resolvable legacy entries, catches every projection up, and reports
     /// every resolved / ambiguous / orphan entry by catalog + entry slug.
     backfillCatalogEntryMediaTypes: unit -> Async<CatalogMediaTypeBackfillReport>
+    // Notes migration / legacy purge (curation-j4qqt, ADR-0080 §10-11)
+    /// Gate 1 preview — resolved/ambiguous/orphan owners, named, never guessed.
+    previewNotesMigration: unit -> Async<NotesMigrationPreview>
+    /// Gate 1 confirm — converts every resolved owner into one `Notes_saved`
+    /// via `Notes.decide`, skipping owners that already have a `Notes-*`
+    /// stream. Additive, idempotent, safely re-runnable.
+    runNotesMigration: unit -> Async<NotesMigrationReport>
+    /// Gate 2 preview — the default `ContentBlocks-*` stream-id set (every
+    /// stream of a Gate-1-resolved owner) plus the excluded ambiguous/orphan
+    /// streams and the exact row count the default set would delete.
+    previewPurgeLegacyNotes: unit -> Async<PurgeLegacyNotesPreview>
+    /// Gate 2 confirm — ADR-0034 protocol (VACUUM INTO backup first): bulk-
+    /// deletes the given `ContentBlocks-*` stream ids' event rows, drops
+    /// `content_blocks`/`game_journal_blocks`, and clears the
+    /// `game_journal_migrated` setting, all in one transaction. Explicit
+    /// stream-id list (never a bare prefix) so the caller can exclude
+    /// specific streams by construction.
+    purgeLegacyNotes: string list -> Async<SurgeryResult>
 }

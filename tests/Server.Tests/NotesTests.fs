@@ -6,7 +6,6 @@ open Mediatheca.Shared
 
 /// curation-h98ve (ADR-0080): pure decide/evolve coverage for Notes — a
 /// document stream, not an aggregate (see the module's own doc comment).
-/// Mirrors ContentBlocksTests.fs's given/when/then shape.
 
 let private mkBlock (id: string) (position: int) : JournalBlockDto = {
     Id = id
@@ -87,7 +86,7 @@ let notesTests =
                         (sprintf "round-trip for %A/%s" mediaType slug)
 
             testCase "parseStreamId returns None for a stream id from a different bounded context" <| fun _ ->
-                Expect.isNone (parseStreamId "ContentBlocks-some-slug") "not a Notes- stream"
+                Expect.isNone (parseStreamId "Movie-some-slug") "not a Notes- stream"
                 Expect.isNone (parseStreamId "Notes-unknowntoken-some-slug") "unrecognized storage token"
         ]
     ]

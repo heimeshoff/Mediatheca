@@ -2346,124 +2346,6 @@ module Api =
                 return MovieProjection.getWatchSessions conn slug
             }
 
-            // Content Blocks
-            addContentBlock = fun slug sessionId request -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                let blockId = System.Guid.NewGuid().ToString("N")
-                let blockData: ContentBlocks.ContentBlockData = {
-                    BlockId = blockId
-                    BlockType = request.BlockType
-                    Content = request.Content
-                    ImageRef = request.ImageRef
-                    Url = request.Url
-                    Caption = request.Caption
-                }
-                let result =
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Add_content_block (blockData, sessionId))
-                        projectionHandlers
-                match result with
-                | Ok () -> return Ok blockId
-                | Error e -> return Error e
-            }
-
-            updateContentBlock = fun slug blockId request -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Update_content_block (blockId, request.Content, request.ImageRef, request.Url, request.Caption))
-                        projectionHandlers
-            }
-
-            removeContentBlock = fun slug blockId -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Remove_content_block blockId)
-                        projectionHandlers
-            }
-
-            changeContentBlockType = fun slug blockId blockType -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Change_content_block_type (blockId, blockType))
-                        projectionHandlers
-            }
-
-            reorderContentBlocks = fun slug sessionId blockIds -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Reorder_content_blocks (blockIds, sessionId))
-                        projectionHandlers
-            }
-
-            getContentBlocks = fun slug sessionId -> async {
-                use conn = factory ()
-                match sessionId with
-                | Some sid -> return ContentBlockProjection.getBySession conn slug sid
-                | None -> return ContentBlockProjection.getForMovieDetail conn slug
-            }
-
-            groupContentBlocksInRow = fun slug leftId rightId rowGroup -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Group_content_blocks_in_row (leftId, rightId, rowGroup))
-                        projectionHandlers
-            }
-
-            ungroupContentBlock = fun slug blockId -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Ungroup_content_block blockId)
-                        projectionHandlers
-            }
-
             uploadContentImage = fun data filename -> async {
                 try
                     let ext = System.IO.Path.GetExtension(filename).ToLowerInvariant()
@@ -3676,66 +3558,7 @@ module Api =
                         projectionHandlers
             }
 
-            // Series Content Blocks + Catalogs
-            getSeriesContentBlocks = fun slug -> async {
-                use conn = factory ()
-                return ContentBlockProjection.getForMovieDetail conn slug
-            }
-
-            addSeriesContentBlock = fun slug request -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                let blockId = System.Guid.NewGuid().ToString("N")
-                let blockData: ContentBlocks.ContentBlockData = {
-                    BlockId = blockId
-                    BlockType = request.BlockType
-                    Content = request.Content
-                    ImageRef = request.ImageRef
-                    Url = request.Url
-                    Caption = request.Caption
-                }
-                let result =
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Add_content_block (blockData, None))
-                        projectionHandlers
-                match result with
-                | Ok () -> return Ok blockId
-                | Error e -> return Error e
-            }
-
-            updateSeriesContentBlock = fun slug blockId request -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Update_content_block (blockId, request.Content, request.ImageRef, request.Url, request.Caption))
-                        projectionHandlers
-            }
-
-            removeSeriesContentBlock = fun slug blockId -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Remove_content_block blockId)
-                        projectionHandlers
-            }
-
+            // Series Catalogs
             getCatalogsForSeries = fun slug -> async {
                 use conn = factory ()
                 return CatalogProjection.getCatalogsForSeriesWithChildren conn slug
@@ -3906,8 +3729,6 @@ module Api =
                     // Clean up images
                     ImageStore.deleteImage imageBasePath (sprintf "posters/game-%s.jpg" slug)
                     ImageStore.deleteImage imageBasePath (sprintf "backdrops/game-%s.jpg" slug)
-                    // Clean up the journal (block rows + uploaded content images)
-                    GameJournal.deleteForGame conn imageBasePath slug
                     return Ok ()
                 | Error e -> return Error e
             }
@@ -4103,77 +3924,6 @@ module Api =
                         Games.decide
                         Games.Serialization.toEventData
                         (Games.Remove_played_with friendSlug)
-                        projectionHandlers
-            }
-
-            // Game Journal (Notion-style block document, plain storage)
-            getGameJournal = fun slug -> async {
-                use conn = factory ()
-                return GameJournal.get conn slug
-            }
-
-            saveGameJournal = fun slug blocks -> async {
-                use conn = factory ()
-                return GameJournal.save conn slug blocks
-            }
-
-            // Game Content Blocks + Catalogs
-            getGameContentBlocks = fun slug -> async {
-                use conn = factory ()
-                return ContentBlockProjection.getForMovieDetail conn slug
-            }
-
-            addGameContentBlock = fun slug request -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                let blockId = System.Guid.NewGuid().ToString("N")
-                let blockData: ContentBlocks.ContentBlockData = {
-                    BlockId = blockId
-                    BlockType = request.BlockType
-                    Content = request.Content
-                    ImageRef = request.ImageRef
-                    Url = request.Url
-                    Caption = request.Caption
-                }
-                let result =
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Add_content_block (blockData, None))
-                        projectionHandlers
-                match result with
-                | Ok () -> return Ok blockId
-                | Error e -> return Error e
-            }
-
-            updateGameContentBlock = fun slug blockId request -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Update_content_block (blockId, request.Content, request.ImageRef, request.Url, request.Caption))
-                        projectionHandlers
-            }
-
-            removeGameContentBlock = fun slug blockId -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Remove_content_block blockId)
                         projectionHandlers
             }
 
@@ -4482,68 +4232,6 @@ module Api =
                         Books.decide
                         Books.Serialization.toEventData
                         (Books.Remove_recommendation friendSlug)
-                        projectionHandlers
-            }
-
-            // Book Content Blocks — a fourth parallel family mirroring
-            // Series/Games exactly. ContentBlocks.streamId is bare-slug
-            // (no owner-kind key exists to extend, books-y9kxy).
-            getBookContentBlocks = fun slug -> async {
-                use conn = factory ()
-                return ContentBlockProjection.getForMovieDetail conn slug
-            }
-
-            addBookContentBlock = fun slug request -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                let blockId = System.Guid.NewGuid().ToString("N")
-                let blockData: ContentBlocks.ContentBlockData = {
-                    BlockId = blockId
-                    BlockType = request.BlockType
-                    Content = request.Content
-                    ImageRef = request.ImageRef
-                    Url = request.Url
-                    Caption = request.Caption
-                }
-                let result =
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Add_content_block (blockData, None))
-                        projectionHandlers
-                match result with
-                | Ok () -> return Ok blockId
-                | Error e -> return Error e
-            }
-
-            updateBookContentBlock = fun slug blockId request -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Update_content_block (blockId, request.Content, request.ImageRef, request.Url, request.Caption))
-                        projectionHandlers
-            }
-
-            removeBookContentBlock = fun slug blockId -> async {
-                use conn = factory ()
-                let sid = ContentBlocks.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        ContentBlocks.Serialization.fromStoredEvent
-                        ContentBlocks.reconstitute
-                        ContentBlocks.decide
-                        ContentBlocks.Serialization.toEventData
-                        (ContentBlocks.Remove_content_block blockId)
                         projectionHandlers
             }
 
@@ -5759,24 +5447,7 @@ module Api =
 
             getStreamEvents = fun streamPrefix -> async {
                 use conn = factory ()
-                // Determine which streams to read based on the prefix
-                let mainStreamId = streamPrefix
-                let contentBlocksStreamId =
-                    // For Movie-X and Game-X, also read ContentBlocks-X
-                    if streamPrefix.StartsWith("Movie-") then
-                        let slug = streamPrefix.Substring(6)
-                        Some (ContentBlocks.streamId slug)
-                    elif streamPrefix.StartsWith("Game-") then
-                        let slug = streamPrefix.Substring(5)
-                        Some (ContentBlocks.streamId slug)
-                    elif streamPrefix.StartsWith("Book-") then
-                        let slug = streamPrefix.Substring(5)
-                        Some (ContentBlocks.streamId slug)
-                    else
-                        None
-                let streamIds =
-                    mainStreamId :: (contentBlocksStreamId |> Option.toList)
-                return EventFormatting.getStreamEvents conn streamIds
+                return EventFormatting.getStreamEvents conn [ streamPrefix ]
             }
 
             // Open Library (integration-c8d4x, ADR-0075) — appended at the

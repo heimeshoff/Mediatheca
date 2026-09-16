@@ -14,6 +14,8 @@ type PendingAction =
     | PendingEdit of target: SurgeryEventRow * newData: string * newMetadata: string
     | PendingDelete of preview: SurgeryDeletePreview
     | PendingRename of oldType: string * newType: string * preview: SurgeryRenamePreview
+    /// curation-j4qqt (ADR-0080 §10-11), Gate 2 — "Purge legacy stores".
+    | PendingPurgeLegacyNotes of preview: PurgeLegacyNotesPreview
 
 type Model = {
     // Edit
@@ -41,6 +43,20 @@ type Model = {
     LastResult: SurgeryResult option
     // Backups (keep-all retention panel)
     BackupStats: BackupStats option
+    // curation-j4qqt (ADR-0080 §10-11): Gate 1 — "Migrate to Notes" (preview
+    // -> confirm, additive/idempotent) and Gate 2 — "Purge legacy stores"
+    // (preview -> confirm, destructive, reuses the shared PendingAction/
+    // confirm-dialog/Mutation_completed plumbing above since it returns the
+    // same SurgeryResult edit/delete/rename do). Gate 2 refuses to run
+    // before Gate 1 has been confirmed at least once THIS SESSION
+    // (NotesMigrationConfirmedThisSession) — a human-eye guard, not a
+    // server-enforced one; the operator is expected to run Gate 1 first.
+    NotesMigrationPreview: NotesMigrationPreview option
+    NotesMigrationLoading: bool
+    NotesMigrationReport: NotesMigrationReport option
+    NotesMigrationConfirmedThisSession: bool
+    PurgeLegacyNotesPreview: PurgeLegacyNotesPreview option
+    PurgeLegacyNotesLoading: bool
 }
 
 type Msg =
@@ -64,3 +80,10 @@ type Msg =
     | Mutation_completed of SurgeryResult
     | Load_backup_stats
     | Backup_stats_loaded of BackupStats
+    | Load_notes_migration_preview
+    | Notes_migration_preview_loaded of NotesMigrationPreview
+    | Run_notes_migration_clicked
+    | Notes_migration_completed of NotesMigrationReport
+    | Load_purge_legacy_notes_preview
+    | Purge_legacy_notes_preview_loaded of PurgeLegacyNotesPreview
+    | Purge_legacy_notes_clicked

@@ -26,8 +26,6 @@ let private bootstrapAdmin (conn: SqliteConnection) =
     EventStore.initialize conn
     CastStore.initialize conn
     JellyfinStore.initialize conn
-    GameJournal.initialize conn
-    ContentBlockProjection.handler.Init conn
     NotesProjection.handler.Init conn
     FriendProjection.handler.Init conn
     MovieProjection.handler.Init conn
@@ -45,7 +43,6 @@ let private makeEvent eventType data : EventStore.EventData = {
 let private allProjectionHandlers = [
     MovieProjection.handler
     FriendProjection.handler
-    ContentBlockProjection.handler
     CatalogProjection.handler
     SeriesProjection.handler
     GameProjection.handler

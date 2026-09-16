@@ -819,15 +819,13 @@ module GameProjection =
               RecommendedBy = resolveFriendRefs conn recommendedBySlugs
               WantToPlayWith = resolveFriendRefs conn wantToPlayWithSlugs
               PlayedWith = resolveFriendRefs conn playedWithSlugs
-              ContentBlocks = ContentBlockProjection.getForMovieDetail conn slug
               // curation-h98ve (ADR-0080): re-derived fresh from notes_blocks
-              // on every read, never cached (ADR-0043). Until curation-j4qqt
-              // migrates existing games' journals into Notes, a game with
-              // only legacy game_journal_blocks content must still report
-              // true here — this OR is deleted the moment j4qqt lands.
+              // on every read, never cached (ADR-0043). curation-j4qqt
+              // migrated every existing game's journal into Notes and
+              // deleted the legacy game_journal_blocks table, so this reads
+              // notes_blocks only.
               HasNotesContent =
-                (NotesProjection.getForOwner conn MediaType.Game slug |> JournalBlock.hasContent)
-                || (GameJournal.get conn slug |> JournalBlock.hasContent) }
+                NotesProjection.getForOwner conn MediaType.Game slug |> JournalBlock.hasContent }
         )
 
     /// ADR-0053: composes the display-ready `PlayFacets` for one game by

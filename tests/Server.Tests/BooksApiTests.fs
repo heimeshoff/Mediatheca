@@ -15,13 +15,12 @@ let private noImagesDir = "test-fixtures-do-not-exist/images"
 
 let private bootstrap (conn: SqliteConnection) =
     EventStore.initialize conn
-    ContentBlockProjection.handler.Init conn
     NotesProjection.handler.Init conn
     BookProjection.handler.Init conn
     MetadataCache.initialize conn
 
 let private allProjectionHandlers =
-    [ ContentBlockProjection.handler; BookProjection.handler ]
+    [ BookProjection.handler ]
 
 let private createApi (factory: unit -> SqliteConnection) : IMediathecaApi =
     Api.create
