@@ -94,6 +94,28 @@ let private gamesSearchCmds (api: IMediathecaApi) (includeRawg: bool) (includeSt
                 (fun ex -> Search_modal_msg (SearchModal.Steam_search_failed ex.Message))
     ]
 
+/// books-g7g1j: fires whichever of Open Library/Audible are currently
+/// checked, in parallel, tagging each completion with `version` (the
+/// `SearchVersion` this search was fired under) so a stale response is
+/// dropped by `SearchModal.applyBooksSearchResults` — see that function's
+/// doc comment for why the Books tab needs this and RAWG/Steam don't. Built
+/// on the pure `SearchModal.booksSearchPlan` so the "which sources fire" and
+/// "how each source's Cmd is built" concerns stay independently testable.
+let private booksSearchCmds (api: IMediathecaApi) (includeOpenLibrary: bool) (includeAudible: bool) (version: int) (cleanQuery: string) : Cmd<Msg> =
+    SearchModal.booksSearchPlan includeOpenLibrary includeAudible
+    |> List.map (function
+        | SearchModal.OpenLibrary ->
+            Cmd.OfAsync.either
+                api.searchOpenLibraryBooks cleanQuery
+                (fun results -> Search_modal_msg (SearchModal.OpenLibrary_search_completed (version, results)))
+                (fun ex -> Search_modal_msg (SearchModal.OpenLibrary_search_failed ex.Message))
+        | SearchModal.Audible ->
+            Cmd.OfAsync.either
+                api.searchAudibleBooks cleanQuery
+                (fun results -> Search_modal_msg (SearchModal.Audible_search_completed (version, results)))
+                (fun ex -> Search_modal_msg (SearchModal.Audible_search_failed ex.Message)))
+    |> Cmd.batch
+
 let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) (model: Model) : Model * Cmd<Msg> =
     match model.SearchModal with
     | None -> model, Cmd.none
@@ -114,13 +136,16 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
             // its own search, regardless of the other source's state.
             let rawgNeedsSearch = searchModel.IncludeRawg && List.isEmpty searchModel.RawgResults && not searchModel.IsSearchingRawg
             let steamNeedsSearch = searchModel.IncludeSteam && List.isEmpty searchModel.SteamResults && not searchModel.IsSearchingSteam
+            let openLibraryNeedsSearch = searchModel.IncludeOpenLibrary && List.isEmpty searchModel.OpenLibraryResults && not searchModel.IsSearchingOpenLibrary
+            let audibleNeedsSearch = searchModel.IncludeAudible && List.isEmpty searchModel.AudibleResults && not searchModel.IsSearchingAudible
             let needsSearch =
                 searchModel.Query <> "" &&
                 (match tab with
                  | SearchModal.Library -> false
                  | SearchModal.Movies | SearchModal.Series ->
                      List.isEmpty searchModel.TmdbResults && not searchModel.IsSearchingTmdb
-                 | SearchModal.Games -> rawgNeedsSearch || steamNeedsSearch)
+                 | SearchModal.Games -> rawgNeedsSearch || steamNeedsSearch
+                 | SearchModal.Books -> openLibraryNeedsSearch || audibleNeedsSearch)
             if needsSearch then
                 let cleanQuery, yearOpt = FuzzyMatch.extractYear searchModel.Query
                 match tab with
@@ -143,6 +168,13 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                             IsSearchingSteam = steamNeedsSearch }
                     { model with SearchModal = Some withLoading },
                     gamesSearchCmds api rawgNeedsSearch steamNeedsSearch cleanQuery yearOpt
+                | SearchModal.Books ->
+                    let withLoading =
+                        { updatedSearch with
+                            IsSearchingOpenLibrary = openLibraryNeedsSearch
+                            IsSearchingAudible = audibleNeedsSearch }
+                    { model with SearchModal = Some withLoading },
+                    booksSearchCmds api openLibraryNeedsSearch audibleNeedsSearch searchModel.SearchVersion cleanQuery
                 | SearchModal.Library ->
                     { model with SearchModal = Some updatedSearch }, Cmd.none
             else
@@ -158,6 +190,8 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                     IsSearchingTmdb = q <> "" && (activeTab = SearchModal.Movies || activeTab = SearchModal.Series)
                     IsSearchingRawg = q <> "" && activeTab = SearchModal.Games && searchModel.IncludeRawg
                     IsSearchingSteam = q <> "" && activeTab = SearchModal.Games && searchModel.IncludeSteam
+                    IsSearchingOpenLibrary = q <> "" && activeTab = SearchModal.Books && searchModel.IncludeOpenLibrary
+                    IsSearchingAudible = q <> "" && activeTab = SearchModal.Books && searchModel.IncludeAudible
                     // Keep active tab results for progressive UX; clear inactive tab results (stale query)
                     TmdbResults =
                         if q = "" then []
@@ -170,6 +204,14 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                     SteamResults =
                         if q = "" then []
                         elif activeTab = SearchModal.Games then searchModel.SteamResults
+                        else []
+                    OpenLibraryResults =
+                        if q = "" then []
+                        elif activeTab = SearchModal.Books then searchModel.OpenLibraryResults
+                        else []
+                    AudibleResults =
+                        if q = "" then []
+                        elif activeTab = SearchModal.Books then searchModel.AudibleResults
                         else []
                     Error = None
             }
@@ -200,6 +242,8 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                         (fun ex -> Search_modal_msg (SearchModal.Tmdb_search_failed ex.Message))
                 | SearchModal.Games ->
                     model, gamesSearchCmds api searchModel.IncludeRawg searchModel.IncludeSteam cleanQuery yearOpt
+                | SearchModal.Books ->
+                    model, booksSearchCmds api searchModel.IncludeOpenLibrary searchModel.IncludeAudible version cleanQuery
                 | SearchModal.Library ->
                     model, Cmd.none
 
@@ -220,6 +264,18 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
 
         | SearchModal.Steam_search_failed err ->
             { model with SearchModal = Some { searchModel with IsSearchingSteam = false; Error = Some err } }, Cmd.none
+
+        | SearchModal.OpenLibrary_search_completed (version, results) ->
+            { model with SearchModal = Some (searchModel |> SearchModal.applyBooksSearchResults version (SearchModal.OpenLibraryResponse results)) }, Cmd.none
+
+        | SearchModal.OpenLibrary_search_failed err ->
+            { model with SearchModal = Some { searchModel with IsSearchingOpenLibrary = false; Error = Some err } }, Cmd.none
+
+        | SearchModal.Audible_search_completed (version, results) ->
+            { model with SearchModal = Some (searchModel |> SearchModal.applyBooksSearchResults version (SearchModal.AudibleResponse results)) }, Cmd.none
+
+        | SearchModal.Audible_search_failed err ->
+            { model with SearchModal = Some { searchModel with IsSearchingAudible = false; Error = Some err } }, Cmd.none
 
         | SearchModal.Toggle_include_rawg ->
             let newInclude = not searchModel.IncludeRawg
@@ -244,6 +300,32 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                     api.searchSteamGames (cleanQuery, yearOpt)
                     (fun results -> Search_modal_msg (SearchModal.Steam_search_completed results))
                     (fun ex -> Search_modal_msg (SearchModal.Steam_search_failed ex.Message))
+            else
+                { model with SearchModal = Some updated }, Cmd.none
+
+        | SearchModal.Toggle_include_openlibrary ->
+            let newInclude = not searchModel.IncludeOpenLibrary
+            let updated = { searchModel with IncludeOpenLibrary = newInclude }
+            if newInclude && searchModel.Query <> "" then
+                let cleanQuery, _yearOpt = FuzzyMatch.extractYear searchModel.Query
+                { model with SearchModal = Some { updated with IsSearchingOpenLibrary = true } },
+                Cmd.OfAsync.either
+                    api.searchOpenLibraryBooks cleanQuery
+                    (fun results -> Search_modal_msg (SearchModal.OpenLibrary_search_completed (searchModel.SearchVersion, results)))
+                    (fun ex -> Search_modal_msg (SearchModal.OpenLibrary_search_failed ex.Message))
+            else
+                { model with SearchModal = Some updated }, Cmd.none
+
+        | SearchModal.Toggle_include_audible ->
+            let newInclude = not searchModel.IncludeAudible
+            let updated = { searchModel with IncludeAudible = newInclude }
+            if newInclude && searchModel.Query <> "" then
+                let cleanQuery, _yearOpt = FuzzyMatch.extractYear searchModel.Query
+                { model with SearchModal = Some { updated with IsSearchingAudible = true } },
+                Cmd.OfAsync.either
+                    api.searchAudibleBooks cleanQuery
+                    (fun results -> Search_modal_msg (SearchModal.Audible_search_completed (searchModel.SearchVersion, results)))
+                    (fun ex -> Search_modal_msg (SearchModal.Audible_search_failed ex.Message))
             else
                 { model with SearchModal = Some updated }, Cmd.none
 
@@ -313,6 +395,43 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                     (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
             { model with SearchModal = Some { searchModel with IsImporting = true; Error = None; DuplicatePrompt = None } }, importCmd
 
+        | SearchModal.Import_openlibrary olResult ->
+            let request: AddBookFromOpenLibraryRequest = {
+                WorkKey = olResult.WorkKey
+                EditionKey = olResult.EditionKey
+                Isbn13 = olResult.Isbn13
+                SkipDuplicateCheck = false
+            }
+            let importCmd =
+                Cmd.OfAsync.either
+                    api.addBookFromOpenLibrary request
+                    (fun result ->
+                        match result with
+                        | Ok (Book_added slug) ->
+                            Search_modal_msg (SearchModal.Import_completed (Ok (slug, MediaType.Book)))
+                        | Ok (AddBookOutcome.Duplicate_found (existingSlug, existingTitle)) ->
+                            Search_modal_msg (SearchModal.Duplicate_prompt_show (existingSlug, existingTitle, SearchModal.FromOpenLibrary request))
+                        | Error e ->
+                            Search_modal_msg (SearchModal.Import_completed (Error e)))
+                    (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
+            { model with SearchModal = Some { searchModel with IsImporting = true; Error = None; DuplicatePrompt = None } }, importCmd
+
+        | SearchModal.Import_audible audibleResult ->
+            let request: AddBookFromAudibleRequest = { Asin = audibleResult.Asin; SkipDuplicateCheck = false }
+            let importCmd =
+                Cmd.OfAsync.either
+                    api.addBookFromAudible request
+                    (fun result ->
+                        match result with
+                        | Ok (Book_added slug) ->
+                            Search_modal_msg (SearchModal.Import_completed (Ok (slug, MediaType.Book)))
+                        | Ok (AddBookOutcome.Duplicate_found (existingSlug, existingTitle)) ->
+                            Search_modal_msg (SearchModal.Duplicate_prompt_show (existingSlug, existingTitle, SearchModal.FromAudible request))
+                        | Error e ->
+                            Search_modal_msg (SearchModal.Import_completed (Error e)))
+                    (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
+            { model with SearchModal = Some { searchModel with IsImporting = true; Error = None; DuplicatePrompt = None } }, importCmd
+
         | SearchModal.Import_completed result ->
             match result with
             | Ok (slug, mediaType) ->
@@ -342,10 +461,15 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
             match searchModel.DuplicatePrompt with
             | None -> model, Cmd.none
             | Some (_existingSlug, _existingName, pending) ->
+                // books-g7g1j: "add anyway" always resubmits the exact
+                // request that triggered `Duplicate_found`, with
+                // `SkipDuplicateCheck` forced true — `forceDuplicateImport`
+                // is the pure, per-case-tested version of what used to be
+                // an inlined `{ originalRequest with SkipDuplicateCheck =
+                // true }` per case.
                 let importCmd =
-                    match pending with
-                    | SearchModal.FromRawg originalRequest ->
-                        let forceRequest = { originalRequest with SkipDuplicateCheck = true }
+                    match SearchModal.forceDuplicateImport pending with
+                    | SearchModal.FromRawg forceRequest ->
                         Cmd.OfAsync.either
                             api.addGame forceRequest
                             (fun result ->
@@ -358,8 +482,7 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                                 | Error e ->
                                     Search_modal_msg (SearchModal.Import_completed (Error e)))
                             (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
-                    | SearchModal.FromSteam originalRequest ->
-                        let forceRequest = { originalRequest with SkipDuplicateCheck = true }
+                    | SearchModal.FromSteam forceRequest ->
                         Cmd.OfAsync.either
                             api.addGameFromSteam forceRequest
                             (fun result ->
@@ -367,6 +490,30 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                                 | Ok (Created slug) ->
                                     Search_modal_msg (SearchModal.Import_completed (Ok (slug, MediaType.Game)))
                                 | Ok (Duplicate_found _) ->
+                                    Search_modal_msg (SearchModal.Import_completed (Error "Unexpected duplicate response"))
+                                | Error e ->
+                                    Search_modal_msg (SearchModal.Import_completed (Error e)))
+                            (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
+                    | SearchModal.FromOpenLibrary forceRequest ->
+                        Cmd.OfAsync.either
+                            api.addBookFromOpenLibrary forceRequest
+                            (fun result ->
+                                match result with
+                                | Ok (Book_added slug) ->
+                                    Search_modal_msg (SearchModal.Import_completed (Ok (slug, MediaType.Book)))
+                                | Ok (AddBookOutcome.Duplicate_found _) ->
+                                    Search_modal_msg (SearchModal.Import_completed (Error "Unexpected duplicate response"))
+                                | Error e ->
+                                    Search_modal_msg (SearchModal.Import_completed (Error e)))
+                            (fun ex -> Search_modal_msg (SearchModal.Import_completed (Error ex.Message)))
+                    | SearchModal.FromAudible forceRequest ->
+                        Cmd.OfAsync.either
+                            api.addBookFromAudible forceRequest
+                            (fun result ->
+                                match result with
+                                | Ok (Book_added slug) ->
+                                    Search_modal_msg (SearchModal.Import_completed (Ok (slug, MediaType.Book)))
+                                | Ok (AddBookOutcome.Duplicate_found _) ->
                                     Search_modal_msg (SearchModal.Import_completed (Error "Unexpected duplicate response"))
                                 | Error e ->
                                     Search_modal_msg (SearchModal.Import_completed (Error e)))

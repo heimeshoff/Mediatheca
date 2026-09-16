@@ -6,7 +6,7 @@ open Fable.Core.JsInterop
 open Mediatheca.Shared
 open Mediatheca.Client
 
-type SearchTab = Library | Movies | Series | Games
+type SearchTab = Library | Movies | Series | Games | Books
 
 type HoverPreviewState =
     | NotHovering
@@ -22,29 +22,90 @@ type HoverPreviewState =
 /// — the client's "add as duplicate" retry needs to resubmit the exact
 /// request that triggered `Duplicate_found`, and RAWG/Steam imports build
 /// different request DTOs (`AddGameRequest` vs `AddGameFromSteamRequest`).
+/// books-g7g1j extends this with the two Books-tab import shapes
+/// (`AddBookFromOpenLibraryRequest` / `AddBookFromAudibleRequest`) rather
+/// than introducing a separate `PendingBookImport` type — the task's own
+/// notes call the rename to `PendingImport` cosmetic-only and optional, so
+/// the name is kept as-is to minimize the diff.
 type PendingGameImport =
     | FromRawg of AddGameRequest
     | FromSteam of AddGameFromSteamRequest
+    | FromOpenLibrary of AddBookFromOpenLibraryRequest
+    | FromAudible of AddBookFromAudibleRequest
+
+/// books-g7g1j: which library media type a pending duplicate-confirmation's
+/// "Open existing" button should navigate to — RAWG/Steam duplicates are
+/// always a Game, Open Library/Audible duplicates are always a Book.
+let pendingImportMediaType (pending: PendingGameImport) : MediaType =
+    match pending with
+    | FromRawg _ | FromSteam _ -> MediaType.Game
+    | FromOpenLibrary _ | FromAudible _ -> MediaType.Book
+
+/// books-g7g1j: "add anyway" always resubmits the exact request that
+/// triggered `Duplicate_found`, with `SkipDuplicateCheck` forced true —
+/// pulled out as a pure function (instead of four inlined
+/// `{ request with SkipDuplicateCheck = true }` copies in `State.fs`) so the
+/// per-case correctness is directly testable without stubbing
+/// `IMediathecaApi`.
+let forceDuplicateImport (pending: PendingGameImport) : PendingGameImport =
+    match pending with
+    | FromRawg r -> FromRawg { r with SkipDuplicateCheck = true }
+    | FromSteam r -> FromSteam { r with SkipDuplicateCheck = true }
+    | FromOpenLibrary r -> FromOpenLibrary { r with SkipDuplicateCheck = true }
+    | FromAudible r -> FromAudible { r with SkipDuplicateCheck = true }
+
+/// books-g7g1j: which Books-tab sources a completed search response merges
+/// into the Model — `applyBooksSearchResults` matches on this to know which
+/// field to update.
+type BookSearchResponse =
+    | OpenLibraryResponse of OpenLibrarySearchResult list
+    | AudibleResponse of AudibleSearchResult list
+
+/// books-g7g1j: which Books-tab sources need firing for the current toggle
+/// state — the pure decision core behind `booksSearchCmds` (`State.fs`).
+/// games-k3vps's equivalent (`gamesSearchCmds`) inlines this as two `if`s
+/// since nothing there needed it pulled out separately; this one is pulled
+/// out because the reducer test needs a plain assertion for "toggling a
+/// source off skips its command" without stubbing `IMediathecaApi`.
+type BookSource = OpenLibrary | Audible
+
+let booksSearchPlan (includeOpenLibrary: bool) (includeAudible: bool) : BookSource list =
+    [ if includeOpenLibrary then yield OpenLibrary
+      if includeAudible then yield Audible ]
 
 type Model = {
     Query: string
     LibraryMovies: MovieListItem list
     LibrarySeries: SeriesListItem list
     LibraryGames: GameListItem list
-    /// books-y9kxy: no dedicated Books search tab yet (books-g7g1j) — books
-    /// are searchable from the Library tab only, via `filterLibrary`.
+    /// books-y9kxy: library books, searchable from the Library tab via
+    /// `filterLibrary`. books-g7g1j adds the dedicated Books tab (below)
+    /// for finding NEW books via Open Library/Audible.
     LibraryBooks: BookListItem list
     TmdbResults: TmdbSearchResult list
     RawgResults: RawgSearchResult list
     SteamResults: SteamSearchResult list
+    /// books-g7g1j: the Books tab's two selectable sources — Open Library
+    /// (a keyword catalog search) and Audible (an unauthenticated catalog
+    /// search, ADR-0074 §5 — needs no credential).
+    OpenLibraryResults: OpenLibrarySearchResult list
+    AudibleResults: AudibleSearchResult list
     IsSearchingTmdb: bool
     IsSearchingRawg: bool
     IsSearchingSteam: bool
+    IsSearchingOpenLibrary: bool
+    IsSearchingAudible: bool
     /// games-k3vps: session-local search-source toggles for the Games tab —
     /// RAWG defaults on, Steam defaults off, reset on every modal open
     /// (`initWithGames`), never persisted.
     IncludeRawg: bool
     IncludeSteam: bool
+    /// books-g7g1j: session-local search-source toggles for the Books tab —
+    /// both default ON (Open Library needs no credential, and neither does
+    /// Audible's catalog search per ADR-0074 §5), reset on every modal open,
+    /// never persisted.
+    IncludeOpenLibrary: bool
+    IncludeAudible: bool
     IsImporting: bool
     Error: string option
     SearchVersion: int
@@ -67,12 +128,30 @@ type Msg =
     | Rawg_search_failed of string
     | Steam_search_completed of SteamSearchResult list
     | Steam_search_failed of string
+    /// books-g7g1j: `version` is the `SearchVersion` the search was FIRED
+    /// under (stamped at fire time in `State.fs`) — carried through so a
+    /// response arriving after the user has typed further (bumping
+    /// `SearchVersion` again) is dropped by `applyBooksSearchResults`
+    /// rather than stomping fresher results. RAWG/Steam don't need this
+    /// because they only ever fire under `Debounce_tmdb_expired`'s own
+    /// version check; the Books tab's toggle handlers fire outside that
+    /// single choke point too, so the guard is carried on the message
+    /// itself instead.
+    | OpenLibrary_search_completed of version: int * OpenLibrarySearchResult list
+    | OpenLibrary_search_failed of string
+    | Audible_search_completed of version: int * AudibleSearchResult list
+    | Audible_search_failed of string
     /// games-k3vps: toggling a search source. Session-local, no persistence.
     | Toggle_include_rawg
     | Toggle_include_steam
+    /// books-g7g1j: ditto, for the Books tab's two sources.
+    | Toggle_include_openlibrary
+    | Toggle_include_audible
     | Import of tmdbId: int * MediaType
     | Import_rawg of RawgSearchResult
     | Import_steam of SteamSearchResult
+    | Import_openlibrary of OpenLibrarySearchResult
+    | Import_audible of AudibleSearchResult
     | Import_completed of Result<string * MediaType, string>
     | Duplicate_prompt_show of existingSlug: string * existingName: string * request: PendingGameImport
     | Duplicate_prompt_cancel
@@ -102,11 +181,17 @@ let init () : Model = {
     TmdbResults = []
     RawgResults = []
     SteamResults = []
+    OpenLibraryResults = []
+    AudibleResults = []
     IsSearchingTmdb = false
     IsSearchingRawg = false
     IsSearchingSteam = false
+    IsSearchingOpenLibrary = false
+    IsSearchingAudible = false
     IncludeRawg = true
     IncludeSteam = false
+    IncludeOpenLibrary = true
+    IncludeAudible = true
     IsImporting = false
     Error = None
     SearchVersion = 0
@@ -173,6 +258,23 @@ let filterLibrary (query: string) (movies: MovieListItem list) (series: SeriesLi
             |> List.truncate 20
         | None ->
             results |> List.map snd
+
+/// books-g7g1j: the Books-tab reducer seam for a completed source search —
+/// pulled out as a plain function (mirrors `applyLibraryLoaded`) so the
+/// stale-drop behavior is directly testable. `version` is the value the
+/// corresponding `..._search_completed` message carries; a response for a
+/// version that's since been superseded by further typing is dropped
+/// (the model returned unchanged) rather than overwriting fresher results.
+/// Calling it once per source lets both sources' results build up in the
+/// Model independently — that's the "merge" the Books tab's search grid
+/// then renders from both fields at once.
+let applyBooksSearchResults (version: int) (response: BookSearchResponse) (model: Model) : Model =
+    if version <> model.SearchVersion then
+        model
+    else
+        match response with
+        | OpenLibraryResponse results -> { model with OpenLibraryResults = results; IsSearchingOpenLibrary = false }
+        | AudibleResponse results -> { model with AudibleResults = results; IsSearchingAudible = false }
 
 let private truncateText (maxLen: int) (text: string) =
     if text.Length <= maxLen then text
@@ -546,6 +648,28 @@ type private GameSearchEntry =
     | RawgEntry of RawgSearchResult
     | SteamEntry of SteamSearchResult
 
+/// books-g7g1j: same shape as `GameSearchEntry`, for the Books tab's merged
+/// Open Library / Audible grid.
+type private BookSearchEntry =
+    | OpenLibraryEntry of OpenLibrarySearchResult
+    | AudibleEntry of AudibleSearchResult
+
+/// books-g7g1j: the Audible poster card's second line — year, narrator(s)
+/// and runtime, since Audible search results have no dedicated preview
+/// popover to show that detail in instead (Open Library cards just show the
+/// year, like every other tab's cards).
+let private audibleSubtitle (r: AudibleSearchResult) =
+    let runtime =
+        r.RuntimeMinutes
+        |> Option.map (fun m ->
+            let h, mm = m / 60, m % 60
+            if h > 0 then $"{h}h {mm}m" else $"{mm}m")
+    [ r.ReleaseYear |> Option.map string
+      (if List.isEmpty r.Narrators then None else Some (r.Narrators |> List.truncate 2 |> String.concat ", "))
+      runtime ]
+    |> List.choose id
+    |> String.concat " · "
+
 [<ReactComponent>]
 let view (model: Model) (dispatch: Msg -> unit) =
     let selIdx, setSelIdx = React.useState(-1)
@@ -567,6 +691,10 @@ let view (model: Model) (dispatch: Msg -> unit) =
         model.LibraryGames
         |> List.map (fun g -> g.Name.ToLowerInvariant(), g.Year)
         |> Set.ofList
+    let libraryBookKeys =
+        model.LibraryBooks
+        |> List.map (fun b -> b.Title.ToLowerInvariant(), b.Year |> Option.defaultValue 0)
+        |> Set.ofList
     let isInLibrary (r: TmdbSearchResult) =
         let key = r.Title.ToLowerInvariant(), r.Year |> Option.defaultValue 0
         match r.MediaType with
@@ -580,11 +708,19 @@ let view (model: Model) (dispatch: Msg -> unit) =
     let isSteamGameInLibrary (r: SteamSearchResult) =
         let key = r.Name.ToLowerInvariant(), r.ReleaseYear |> Option.defaultValue 0
         libraryGameKeys |> Set.contains key
+    let isOpenLibraryBookInLibrary (r: OpenLibrarySearchResult) =
+        let key = r.Title.ToLowerInvariant(), r.Year |> Option.defaultValue 0
+        libraryBookKeys |> Set.contains key
+    let isAudibleBookInLibrary (r: AudibleSearchResult) =
+        let key = r.Title.ToLowerInvariant(), r.ReleaseYear |> Option.defaultValue 0
+        libraryBookKeys |> Set.contains key
 
     let movieResults = model.TmdbResults |> List.filter (fun r -> r.MediaType = MediaType.Movie && not (isInLibrary r))
     let seriesResults = model.TmdbResults |> List.filter (fun r -> r.MediaType = MediaType.Series && not (isInLibrary r))
     let gameResults = model.RawgResults |> List.filter (fun r -> not (isGameInLibrary r))
     let steamGameResults = model.SteamResults |> List.filter (fun r -> not (isSteamGameInLibrary r))
+    let openLibraryResults = model.OpenLibraryResults |> List.filter (fun r -> not (isOpenLibraryBookInLibrary r))
+    let audibleResults = model.AudibleResults |> List.filter (fun r -> not (isAudibleBookInLibrary r))
 
     // games-k3vps: unchecking a source hides its results immediately and a
     // late-arriving response for a since-unchecked source never renders —
@@ -596,15 +732,21 @@ let view (model: Model) (dispatch: Msg -> unit) =
         (if model.IncludeRawg then gameResults |> List.map RawgEntry else [])
         @ (if model.IncludeSteam then steamGameResults |> List.map SteamEntry else [])
 
+    // books-g7g1j: same principle, for the Books tab's two sources.
+    let mergedBookResults : BookSearchEntry list =
+        (if model.IncludeOpenLibrary then openLibraryResults |> List.map OpenLibraryEntry else [])
+        @ (if model.IncludeAudible then audibleResults |> List.map AudibleEntry else [])
+
     let tabResultCount (tab: SearchTab) =
         match tab with
         | Library -> List.length localResults
         | Movies -> List.length movieResults
         | Series -> List.length seriesResults
         | Games -> List.length mergedGameResults
+        | Books -> List.length mergedBookResults
 
     let cols = 4
-    let tabOrder = [| Library; Movies; Series; Games |]
+    let tabOrder = [| Library; Movies; Series; Games; Books |]
 
     // Reset selection when search query changes
     React.useEffect((fun () ->
@@ -705,11 +847,16 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     | Some (RawgEntry r) -> dispatch (Import_rawg r)
                     | Some (SteamEntry r) -> dispatch (Import_steam r)
                     | None -> ()
+                | Books ->
+                    match mergedBookResults |> List.tryItem selIdx with
+                    | Some (OpenLibraryEntry r) -> dispatch (Import_openlibrary r)
+                    | Some (AudibleEntry r) -> dispatch (Import_audible r)
+                    | None -> ()
         | "Escape" -> dispatch Close
         | _ -> ()
 
     let tabLabel (t: SearchTab) =
-        match t with Library -> "Library" | Movies -> "Movies" | Series -> "Series" | Games -> "Games"
+        match t with Library -> "Library" | Movies -> "Movies" | Series -> "Series" | Games -> "Games" | Books -> "Books"
 
     let tabIcon (t: SearchTab) =
         match t with
@@ -717,6 +864,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
         | Movies -> Icons.movie ()
         | Series -> Icons.tv ()
         | Games -> Icons.gamepad ()
+        | Books -> Icons.book ()
 
     let isTabLoading (t: SearchTab) =
         match t with
@@ -724,6 +872,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
         | Movies | Series -> model.IsSearchingTmdb
         | Games ->
             (model.IncludeRawg && model.IsSearchingRawg) || (model.IncludeSteam && model.IsSearchingSteam)
+        | Books ->
+            (model.IncludeOpenLibrary && model.IsSearchingOpenLibrary) || (model.IncludeAudible && model.IsSearchingAudible)
 
     let renderGrid (children: ReactElement list) =
         Html.div [
@@ -744,6 +894,13 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 let sources =
                                     [ if model.IncludeRawg && model.IsSearchingRawg then yield "RAWG"
                                       if model.IncludeSteam && model.IsSearchingSteam then yield "Steam" ]
+                                match sources with
+                                | [] -> "Searching..."
+                                | _ -> "Searching " + (sources |> String.concat " & ") + "..."
+                            | Books ->
+                                let sources =
+                                    [ if model.IncludeOpenLibrary && model.IsSearchingOpenLibrary then yield "Open Library"
+                                      if model.IncludeAudible && model.IsSearchingAudible then yield "Audible" ]
                                 match sources with
                                 | [] -> "Searching..."
                                 | _ -> "Searching " + (sources |> String.concat " & ") + "..."
@@ -892,6 +1049,49 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                     (fun () -> ())
                                     (fun () -> ())
                     ]
+            | Books ->
+                if List.isEmpty mergedBookResults then
+                    Html.p [
+                        prop.className "text-sm text-base-content/40 py-4 text-center"
+                        prop.text "No results"
+                    ]
+                else
+                    let sourceBadge (label: string) (colorClasses: string) =
+                        Daisy.badge [
+                            badge.xs
+                            prop.className (colorClasses + " border-0")
+                            prop.text label
+                        ]
+                    renderGrid [
+                        for (idx, entry) in mergedBookResults |> List.mapi (fun i r -> (i, r)) do
+                            let isSelected = selIdx = idx
+                            match entry with
+                            | OpenLibraryEntry result ->
+                                renderPosterCard
+                                    result.CoverUrl
+                                    (fun () -> Icons.book ())
+                                    result.Title
+                                    (result.Year |> Option.map string |> Option.defaultValue "")
+                                    (Some (sourceBadge "Open Library" "bg-emerald-600/80 text-white"))
+                                    isSelected
+                                    (fun () -> dispatch (Import_openlibrary result))
+                                    // books-g7g1j: no hover-preview endpoint exists for a
+                                    // Books search result yet — same no-op degrade as the
+                                    // Steam search card above (out of this task's scope).
+                                    (fun () -> ())
+                                    (fun () -> ())
+                            | AudibleEntry result ->
+                                renderPosterCard
+                                    result.CoverUrl
+                                    (fun () -> Icons.book ())
+                                    result.Title
+                                    (audibleSubtitle result)
+                                    (Some (sourceBadge "Audible" "bg-orange-600/80 text-white"))
+                                    isSelected
+                                    (fun () -> dispatch (Import_audible result))
+                                    (fun () -> ())
+                                    (fun () -> ())
+                    ]
 
     // Main modal
     Html.div [
@@ -925,7 +1125,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                     ]
                                     Daisy.input [
                                         prop.className "w-full mb-4 border-transparent focus:border-transparent focus:outline-0 focus:bg-base-200/60 transition-colors"
-                                        prop.placeholder "Search movies, series & games..."
+                                        prop.placeholder "Search movies, series, games & books..."
                                         prop.value model.Query
                                         prop.autoFocus true
                                         prop.onChange (Query_changed >> dispatch)
@@ -993,6 +1193,34 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                         ]
                                                     ]
                                                 ]
+                                            elif activeTab = Books then
+                                                Html.div [
+                                                    prop.className "flex items-center gap-4 px-1"
+                                                    prop.children [
+                                                        Html.label [
+                                                            prop.className "flex items-center gap-2 text-sm cursor-pointer select-none"
+                                                            prop.children [
+                                                                Daisy.checkbox [
+                                                                    checkbox.xs
+                                                                    prop.isChecked model.IncludeOpenLibrary
+                                                                    prop.onChange (fun (_: bool) -> dispatch Toggle_include_openlibrary)
+                                                                ]
+                                                                Html.span [ prop.text "Open Library" ]
+                                                            ]
+                                                        ]
+                                                        Html.label [
+                                                            prop.className "flex items-center gap-2 text-sm cursor-pointer select-none"
+                                                            prop.children [
+                                                                Daisy.checkbox [
+                                                                    checkbox.xs
+                                                                    prop.isChecked model.IncludeAudible
+                                                                    prop.onChange (fun (_: bool) -> dispatch Toggle_include_audible)
+                                                                ]
+                                                                Html.span [ prop.text "Audible" ]
+                                                            ]
+                                                        ]
+                                                    ]
+                                                ]
                                         ]
                                     ]
                                 ]
@@ -1010,7 +1238,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                         ]
                                     | None -> ()
                                     match model.DuplicatePrompt with
-                                    | Some (existingSlug, existingName, _request) ->
+                                    | Some (existingSlug, existingName, request) ->
                                         Html.div [
                                             prop.className "py-6"
                                             prop.children [
@@ -1027,7 +1255,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                     prop.children [
                                                         Html.button [
                                                             prop.className "btn btn-primary"
-                                                            prop.onClick (fun _ -> dispatch (Navigate_to (existingSlug, MediaType.Game)))
+                                                            prop.onClick (fun _ -> dispatch (Navigate_to (existingSlug, pendingImportMediaType request)))
                                                             prop.text "Open existing"
                                                         ]
                                                         Html.button [

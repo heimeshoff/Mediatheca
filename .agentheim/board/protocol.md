@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 05:24 -- Task verified and completed: books-g7g1j - Search modal Books tab — Open Library (default on) and Audible (default on, no credential needed) as selectable sources with source badges on a merged cover grid, the existing duplicate-prompt flow for import, library books in the Library tab, and navigation to the new book detail route
+
+**Type:** Work / Task completion
+**Task:** books-g7g1j - Search modal Books tab — Open Library (default on) and Audible (default on, no credential needed) as selectable sources with source badges on a merged cover grid, the existing duplicate-prompt flow for import, library books in the Library tab, and navigation to the new book detail route
+**Summary:** Search modal Books tab: Open Library and Audible source checkboxes (both on by default, the games-k3vps toggle shape), a merged cover grid with source badges (Audible cards show narrator + runtime), a version-guarded applyBooksSearchResults reducer seam, the duplicate-prompt flow generalized to book imports via pendingImportMediaType / forceDuplicateImport (also fixing the prompt's previously hardcoded Game navigation), and navigation to /books/{slug} on import; the route itself was inherited from books-f33e2.
+**Duration:** 26m
+**Verification:** PASS (iteration 1)
+**Files changed:** 3
+**Tests added:** 9
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 04:58 -- Batch started: [books-g7g1j, intelligence-dnv2y]
 
 **Type:** Work / Batch start
