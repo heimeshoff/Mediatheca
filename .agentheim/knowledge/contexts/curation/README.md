@@ -27,6 +27,7 @@ Single user.
 ## Document streams (not aggregates)
 
 - **Notes** — an event-sourced document stream, not an aggregate: there is no cross-block invariant to protect, only "the user typed; store what they typed." Built with the same decide/evolve/reconstitute/streamId/Serialization machinery as an aggregate purely because that machinery is the cheapest path to free expected-position concurrency, no-op handling, and projection catch-up — not because the concept deserves aggregate ceremony (ADR-0080).
+- **Notes removal cleanup** — on removal of a movie/series/game/book, its Notes document is cleared via an ordinary `Notes_saved []` event (never an imperative row delete) and its `content/`-prefixed uploaded images are deleted from the image store; posters/backdrops/covers are untouched (curation-h4k2p, shared `clearNotesOnRemoval` helper in `Api.fs` called from all four `removeX` handlers).
 
 ## Key events
 

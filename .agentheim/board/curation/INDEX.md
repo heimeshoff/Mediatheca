@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 7
+- **Doing:** 0
+- **Done:** 8
 <!-- task-counts:end -->
 
 ### Todo
@@ -23,12 +23,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **curation-h4k2p** — Clear the Notes document (via an ordinary `Notes_saved []` event, never an imperative row delete) and delete its `content/`-prefixed uploaded images when a movie, series, game, or book is removed — a shared helper called from all four `removeX` handlers, restoring the parity the deleted `GameJournal.deleteForGame` gave games (chore) — `doing/curation-h4k2p-clean-up-notes-owned-uploaded-content-images-on-media-remova.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **curation-h4k2p** — Clear the Notes document (via an ordinary `Notes_saved []` event, never an imperative row delete) and delete its `content/`-prefixed uploaded images when a movie, series, game, or book is removed — a shared helper called from all four `removeX` handlers, restoring the parity the deleted `GameJournal.deleteForGame` gave games (chore) — `done/curation-h4k2p-clean-up-notes-owned-uploaded-content-images-on-media-remova.md`
 - **curation-kezpv** — Retire the one-off Notes migration tooling after the harbour cutover — delete Gate 1 "Migrate to Notes", Gate 2 "Purge legacy stores" (five `IAdminApi` members, DTOs, AdminSurgery sections, `ContentBlockConversion.fs` and tests) and the Health-tab catalog media-type backfill action, once both have run on the live store (chore) — `done/curation-kezpv-retire-notes-migration-tooling-after-harbour-cutover.md`
 - **curation-n2nkm** — "`Notes_saved` is unformattable — `EventFormatting.formatEvent` dispatches by stream prefix and has no `Notes-` arm, so every Notes stream shows in the Health tab's Unformattable list and renders nothing in the event browser; add `formatNotesEvent` (block count + first text excerpt) and the guard test" (bug) — `done/curation-n2nkm-notes-saved-event-formatter-arm.md`
 - **curation-j4qqt** — Migrate and purge — two builder-triggered Administration gates: "Migrate to Notes" turns every content-block owner and game journal into one `Notes_saved` event (owners resolved by exact slug match, ambiguous/orphan ones reported, never guessed); "Purge legacy stores" bulk-deletes the `ContentBlocks-*` streams under ADR-0034 guardrails and drops both legacy tables; ContentBlocks, GameJournal, its boot migration and all content-block RPC members are deleted (ADR-0080, step 3 of 3) (feature) — `done/curation-j4qqt-migrate-content-blocks-and-game-journals-to-notes-and-purge.md`

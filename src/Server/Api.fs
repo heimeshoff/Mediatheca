@@ -126,6 +126,57 @@ module Api =
                         Projection.runProjection conn handler
                     Ok ()
 
+    /// curation-h4k2p: clears a removed media item's Notes document and
+    /// deletes its uploaded `content/` images — the ADR-0080 successor to
+    /// the deleted `GameJournal.deleteForGame`, now shared across all four
+    /// media types. Called from each `removeX` handler right after its
+    /// aggregate's `Ok ()`, alongside the existing catalog-entry and
+    /// poster/backdrop cascade.
+    ///
+    /// Order matters:
+    /// 1. Read the projection FIRST — its rows for this owner vanish the
+    ///    instant `Notes_saved []` is handled (ADR-0080 §6).
+    /// 2. Clear the document through the event log via an ordinary
+    ///    `Save_notes []` command — never an imperative `notes_blocks`
+    ///    DELETE, which a projection rebuild would resurrect (ADR-0080 §6)
+    ///    and which would destroy the user's own writing instead of leaving
+    ///    it recoverable in the stream (ADR-0043). `decide` already yields
+    ///    `Notes_saved []` when there was content, and `Ok []` (append
+    ///    nothing, create no stream) when there was none.
+    /// 3. Delete the files LAST, after the append, so a concurrency
+    ///    conflict on step 2 does not orphan files that live state still
+    ///    references. Files are cache tier, deleted imperatively at command
+    ///    time, never on projection replay (ADR-0045).
+    ///
+    /// Scoped to `content/`-prefixed `ImageRef`s only — exactly as the old
+    /// `GameJournal.deleteForGame` scoped it — never posters/backdrops/
+    /// covers/stills. Best-effort and non-transactional, matching the
+    /// existing removal cascade style: a failure here does not fail the
+    /// removal.
+    let private clearNotesOnRemoval
+        (conn: SqliteConnection)
+        (imageBasePath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (mediaType: MediaType)
+        (slug: string)
+        : unit =
+        let contentRefs =
+            NotesProjection.getForOwner conn mediaType slug
+            |> List.choose (fun (b: JournalBlockDto) -> b.ImageRef)
+            |> List.filter (fun (r: string) -> r.StartsWith("content/"))
+        let sid = Notes.streamId mediaType slug
+        executeCommandCore
+            conn sid
+            Notes.Serialization.fromStoredEvent
+            Notes.reconstitute
+            Notes.decide
+            Notes.Serialization.toEventData
+            (Notes.Save_notes [])
+            projectionHandlers
+        |> ignore
+        for ref in contentRefs do
+            try ImageStore.deleteImage imageBasePath ref with _ -> ()
+
     let private generateUniqueSlug (conn: SqliteConnection) (streamIdFn: string -> string) (baseSlug: string) : string =
         let mutable slug = baseSlug
         let mutable suffix = 2
@@ -2111,6 +2162,8 @@ module Api =
                     CastStore.removeMovieCastAndCleanup conn imageBasePath sid
                     ImageStore.deleteImage imageBasePath (sprintf "posters/%s.jpg" slug)
                     ImageStore.deleteImage imageBasePath (sprintf "backdrops/%s.jpg" slug)
+                    // curation-h4k2p: clear the Notes document and its uploaded content images
+                    clearNotesOnRemoval conn imageBasePath movieProjections Mediatheca.Shared.MediaType.Movie slug
                     return Ok ()
                 | Error e -> return Error e
             }
@@ -3139,6 +3192,8 @@ module Api =
                         let stillFiles = System.IO.Directory.GetFiles(stillsDir, sprintf "%s-s*.jpg" slug)
                         for f in stillFiles do
                             try System.IO.File.Delete(f) with _ -> ()
+                    // curation-h4k2p: clear the Notes document and its uploaded content images
+                    clearNotesOnRemoval conn imageBasePath projectionHandlers Mediatheca.Shared.MediaType.Series slug
                     return Ok ()
                 | Error e -> return Error e
             }
@@ -3642,6 +3697,8 @@ module Api =
                     // Clean up images
                     ImageStore.deleteImage imageBasePath (sprintf "posters/game-%s.jpg" slug)
                     ImageStore.deleteImage imageBasePath (sprintf "backdrops/game-%s.jpg" slug)
+                    // curation-h4k2p: clear the Notes document and its uploaded content images
+                    clearNotesOnRemoval conn imageBasePath projectionHandlers Mediatheca.Shared.MediaType.Game slug
                     return Ok ()
                 | Error e -> return Error e
             }
@@ -4005,6 +4062,8 @@ module Api =
                             projectionHandlers
                         |> ignore
                     ImageStore.deleteImage imageBasePath (sprintf "posters/book-%s.jpg" slug)
+                    // curation-h4k2p: clear the Notes document and its uploaded content images
+                    clearNotesOnRemoval conn imageBasePath projectionHandlers Mediatheca.Shared.MediaType.Book slug
                     return Ok ()
                 | Error e -> return Error e
             }

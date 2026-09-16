@@ -21,11 +21,16 @@ let private bootstrap (conn: SqliteConnection) =
     GameProjection.handler.Init conn
     BookProjection.handler.Init conn
     CatalogProjection.handler.Init conn
+    // curation-h4k2p: every removeX handler now calls the shared
+    // `clearNotesOnRemoval` helper, which reads `notes_blocks` via
+    // `NotesProjection.getForOwner` -- the table must exist even though
+    // these removal tests carry no Notes content of their own.
+    NotesProjection.handler.Init conn
     CastStore.initialize conn
 
 let private allProjectionHandlers =
     [ MovieProjection.handler; SeriesProjection.handler; GameProjection.handler
-      BookProjection.handler; CatalogProjection.handler ]
+      BookProjection.handler; CatalogProjection.handler; NotesProjection.handler ]
 
 let private noImagesDir = "test-fixtures-do-not-exist/images"
 

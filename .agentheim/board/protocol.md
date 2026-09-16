@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 00:34 -- Task verified and completed: curation-h4k2p - Clear the Notes document (via an ordinary `Notes_saved []` event, never an imperative row delete) and delete its `content/`-prefixed uploaded images when a movie, series, game, or book is removed — a shared helper called from all four `removeX` handlers, restoring the parity the deleted `GameJournal.deleteForGame` gave games
+
+**Type:** Work / Task completion
+**Task:** curation-h4k2p - Clear the Notes document (via an ordinary `Notes_saved []` event, never an imperative row delete) and delete its `content/`-prefixed uploaded images when a movie, series, game, or book is removed — a shared helper called from all four `removeX` handlers, restoring the parity the deleted `GameJournal.deleteForGame` gave games
+**Summary:** Added a shared clearNotesOnRemoval helper in Api.fs, called from removeMovie/removeSeries/removeGame/removeBook, that clears a removed item's Notes document via an ordinary Notes_saved [] event and deletes its content/-prefixed uploaded images, restoring the parity the deleted GameJournal.deleteForGame gave games.
+**Duration:** 14m20s
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 4
+**Tests added:** 2
+**ADRs written:** none
+
+---
+
 ## 2026-09-17 00:34 -- Task verified and completed: intelligence-p7k3x - Prune dead DashboardCrossMediaStats / getRecentActivity / RecentActivityItem payload
 
 **Type:** Work / Task completion

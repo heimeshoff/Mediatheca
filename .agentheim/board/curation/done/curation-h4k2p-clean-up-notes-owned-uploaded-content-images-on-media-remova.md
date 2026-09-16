@@ -1,7 +1,7 @@
 ---
 id: curation-h4k2p
 title: Clear the Notes document (via an ordinary `Notes_saved []` event, never an imperative row delete) and delete its `content/`-prefixed uploaded images when a movie, series, game, or book is removed — a shared helper called from all four `removeX` handlers, restoring the parity the deleted `GameJournal.deleteForGame` gave games
-status: doing
+status: done
 type: chore
 context: curation
 created: 2026-09-16
@@ -104,3 +104,48 @@ fail the removal).
   removal of a movie/series/game/book, its Notes document is cleared via an ordinary
   `Notes_saved []` event (never an imperative row delete) and its `content/`-prefixed uploaded
   images are deleted from the image store; posters/backdrops/covers are untouched.*
+
+## Outcome
+
+Added a module-private `clearNotesOnRemoval conn imageBasePath projectionHandlers mediaType slug`
+helper in `src/Server/Api.fs`, sibling to `executeCommandCore` (~line 129), and wired it into all
+four `removeX` handlers (`removeMovie`, `removeSeries`, `removeGame`, `removeBook`) right after
+their aggregate's `Ok ()`, alongside the existing catalog-entry and poster/backdrop cascade. It:
+
+1. Reads `NotesProjection.getForOwner conn mediaType slug` FIRST and keeps every `content/`-prefixed
+   `ImageRef` (the projection's rows vanish the instant the clearing event is handled).
+2. Clears the document through the event log via `executeCommandCore` with `Notes.Save_notes []`
+   on `Notes.streamId mediaType slug` — never an imperative `notes_blocks` DELETE. `Notes.decide`'s
+   existing rule yields `Notes_saved []` when there was content and `Ok []` (append nothing, no
+   stream created) when there was none, so a no-Notes removal is a clean no-op.
+3. Deletes the collected `content/`-prefixed files last via `ImageStore.deleteImage`, exceptions
+   swallowed, matching the removal cascade's existing best-effort/non-transactional style. Only
+   `content/`-prefixed refs are ever touched — posters/backdrops/covers/stills are untouched by
+   this helper.
+
+This restores, for all four media types, the cleanup the deleted `GameJournal.deleteForGame` used
+to give games alone.
+
+New Expecto coverage: `tests/Server.Tests/NotesRemovalCleanupTests.fs` — an API-level test through
+`Api.create`/`removeGame` with a real temp image directory (`withTempImageDir`, mirroring
+`AudibleApiTests.fs`), seeding Notes content via `api.saveNotes` and a real dummy file under
+`content/`. Mirrors the deleted `GameJournalTests.fs` "removes the game's blocks and its uploaded
+content images, leaving other games alone" case: asserts the doomed game's content image is
+deleted, `NotesProjection.getForOwner` returns `[]`, the Notes stream's event log grew from one
+`Notes_saved` snapshot to two (original preserved verbatim, new one carrying `"blocks":[]`), a kept
+game's Notes/content image are untouched, and an unrelated poster file is untouched. A second test
+covers the no-Notes no-op case (no error, no Notes stream ever created, unrelated poster untouched).
+
+Also fixed a test-bootstrap gap the task flagged: `CatalogProjectionTests.fs`'s local `bootstrap`/
+`allProjectionHandlers` didn't register `NotesProjection.handler`, which every `removeX` handler
+now depends on via `NotesProjection.getForOwner` (that table must exist even when a removal test
+carries no Notes content of its own) — two of its removal tests errored with `no such table:
+notes_blocks` until this was added.
+
+`npm test` (`dotnet run --project tests/Server.Tests/Server.Tests.fsproj`) is green: 914/914
+(912 pre-existing + 2 new), 0 failed, 0 errored.
+
+Key files: `src/Server/Api.fs` (`clearNotesOnRemoval` ~line 129; call sites in `removeMovie`,
+`removeSeries`, `removeGame`, `removeBook`), `tests/Server.Tests/NotesRemovalCleanupTests.fs` (new),
+`tests/Server.Tests/CatalogProjectionTests.fs` (bootstrap fix), `tests/Server.Tests/Server.Tests.fsproj`
+(new file registered after `AddGameFromSteamTests.fs`).
