@@ -6,7 +6,7 @@ status: accepted
 date: 2026-09-16
 supersedes: []
 superseded_by: []
-related_tasks: [curation-cyxbc, books-f3sb2]
+related_tasks: [curation-cyxbc, books-f3sb2, curation-w9fkq]
 related_research: []
 ---
 
@@ -109,3 +109,7 @@ knowing *which* kind of media an entry points at is worth an event-shape change.
   page + removal cascade).
 - ADR-0055 / `GameProjection.fs` — the `try ALTER TABLE … ADD COLUMN with _ -> ()` migration idiom.
 - ADR-0044 — projection drift discipline (the new column is projected, rebuildable, drift-checked).
+
+## Amendment 2026-09-16 (curation-cyxbc, implementation)
+
+§3's typed-pair duplicate rule cannot be enforced while §5 keeps `UNIQUE(catalog_slug, movie_slug)` — two typed entries of different `MediaType` sharing a slug in one catalog would be accepted by `decide` and then silently clobbered by the projection's `INSERT OR REPLACE` (the aggregate would hold two entries, the projection one: a replay-breaking divergence, confirmed by exercising it). Until the follow-up in §5 lands, `decide` rejects **any** same-slug add within a catalog, typed or not. §3's pair identity still governs resolution, type-scoped lookups (`getCatalogsFor*`) and the removal cascade (`getEntriesByMediaSlug`) — only the duplicate/uniqueness *key* is narrowed back to slug-only for now. Ruled by a `tactical-modeler` consult during implementation; see the follow-up task `curation-w9fkq` (backfill `media_type`, widen the UNIQUE, relax `Add_entry` back to strict pair identity).

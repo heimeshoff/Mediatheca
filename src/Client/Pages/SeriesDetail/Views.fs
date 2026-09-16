@@ -694,7 +694,7 @@ let private episodeCard
                                     prop.text episode.Overview
                                 ]
                             let epSlug = $"{model.Slug}:s%02d{seasonNumber}e%02d{episode.EpisodeNumber}"
-                            let epCatalogs = model.SeriesCatalogs |> List.filter (fun c -> c.MovieSlug = epSlug)
+                            let epCatalogs = model.SeriesCatalogs |> List.filter (fun c -> c.MediaSlug = epSlug)
                             if not (List.isEmpty epCatalogs) then
                                 Html.div [
                                     prop.className "flex flex-wrap gap-1 mt-1"
@@ -717,7 +717,7 @@ let private episodeCard
                         prop.className "relative flex items-center gap-2 flex-shrink-0"
                         prop.children [
                             let epSlugForBtn = $"{model.Slug}:s%02d{seasonNumber}e%02d{episode.EpisodeNumber}"
-                            let epInCatalog = model.SeriesCatalogs |> List.exists (fun c -> c.MovieSlug = epSlugForBtn)
+                            let epInCatalog = model.SeriesCatalogs |> List.exists (fun c -> c.MediaSlug = epSlugForBtn)
                             Html.button [
                                 prop.className (
                                     "w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer " +
@@ -1135,7 +1135,7 @@ let private episodesTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                                                             prop.text $"{season.Episodes.Length} Episodes Total"
                                                         ]
                                                         let seasonSlug = $"{model.Slug}:s%02d{season.SeasonNumber}"
-                                                        let seasonCatalogs = model.SeriesCatalogs |> List.filter (fun c -> c.MovieSlug = seasonSlug)
+                                                        let seasonCatalogs = model.SeriesCatalogs |> List.filter (fun c -> c.MediaSlug = seasonSlug)
                                                         if not (List.isEmpty seasonCatalogs) then
                                                             Html.div [
                                                                 prop.className "flex flex-wrap gap-1.5 mt-1"
@@ -1155,7 +1155,7 @@ let private episodesTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                                                 ]
                                                 // Season catalog + trailer + Mark all / Unmark all
                                                 let seasonSlugForBtn = $"{model.Slug}:s%02d{season.SeasonNumber}"
-                                                let seasonInCatalog = model.SeriesCatalogs |> List.exists (fun c -> c.MovieSlug = seasonSlugForBtn)
+                                                let seasonInCatalog = model.SeriesCatalogs |> List.exists (fun c -> c.MediaSlug = seasonSlugForBtn)
                                                 Html.div [
                                                     prop.className "flex items-center gap-3"
                                                     prop.children [
@@ -1359,7 +1359,7 @@ let private overviewTab (series: SeriesDetail) (model: Model) (dispatch: Msg -> 
                                     Html.span [ prop.className "[&>svg]:w-5 [&>svg]:h-5"; prop.children [ Icons.catalog () ] ]
                                 ]
                             ]
-                            for cat in model.SeriesCatalogs |> List.filter (fun c -> c.MovieSlug = model.Slug) do
+                            for cat in model.SeriesCatalogs |> List.filter (fun c -> c.MediaSlug = model.Slug) do
                                 Html.span [
                                     prop.className "inline-flex items-center gap-1.5 bg-transparent border border-base-content/20 text-base-content/70 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors hover:border-base-content/40 group/pill"
                                     prop.children [
@@ -1894,7 +1894,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                         | Episode_catalog (sn, en) -> $"{model.Slug}:s%02d{sn}e%02d{en}"
                     let currentCatalogs =
                         model.SeriesCatalogs
-                        |> List.filter (fun c -> c.MovieSlug = targetSlug)
+                        |> List.filter (fun c -> c.MediaSlug = targetSlug)
                     CatalogManager
                         model.AllCatalogs
                         currentCatalogs

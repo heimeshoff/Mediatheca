@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-16 14:32 -- Task verified and completed: curation-cyxbc - Typed catalog entries — an entry references `(MediaType, slug)` (ADR-0079): `Entry_added` carries the media type, legacy entries stay untyped and fall back to today's read-time inference, the projection resolves all four media types (fixing games, which render as bare slugs today), `getCatalogsForBook`, type-filtered lookups and removal cascade, and the Shared vocabulary loses its `Movie*` names
+
+**Type:** Work / Task completion
+**Task:** curation-cyxbc - Typed catalog entries — an entry references `(MediaType, slug)` (ADR-0079): `Entry_added` carries the media type, legacy entries stay untyped and fall back to today's read-time inference, the projection resolves all four media types (fixing games, which render as bare slugs today), `getCatalogsForBook`, type-filtered lookups and removal cascade, and the Shared vocabulary loses its `Movie*` names
+**Summary:** Typed catalog entries (ADR-0079) — Entry_added carries MediaType, legacy entries stay untyped with read-time inference as the NULL fallback, the projection resolves all four media types (fixing games), getCatalogsForBook plus type-filtered lookups and removal cascade, Shared DTOs lose their Movie* names; Add_entry rejects any same-slug add per catalog until the UNIQUE widens (ADR-0079 amendment, follow-up curation-w9fkq)
+**Duration:** 38m
+**Verification:** PASS (iteration 1)
+**Files changed:** 13
+**Tests added:** 11
+**ADRs written:** none
+
+---
+
 ## 2026-09-16 14:28 -- Task verified and completed: curation-h98ve - Notes server core — an event-sourced block document per (MediaType, slug) — `Notes_saved` snapshot stream, `notes_blocks` projection, `getNotes`/`saveNotes` on IMediathecaApi, `HasNotesContent` on all four detail DTOs replacing `GameDetail.HasJournalContent`, registered in every Administration registry; ContentBlocks and GameJournal left untouched (ADR-0080, step 1 of 3)
 
 **Type:** Work / Task completion

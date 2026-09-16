@@ -1,7 +1,7 @@
 # Curation
 
 ## Purpose
-User-created **collections** that group media across types — ordered lists of movies / series / games — plus **content blocks** (free-form annotations attached to catalogs and detail pages). The "I made a list" half of the app.
+User-created **collections** that group media across types — ordered lists of movies / series / games / books — plus **content blocks** (free-form annotations attached to catalogs and detail pages). The "I made a list" half of the app.
 
 ## Classification
 **supporting** — Custom-built but orthogonal to the core "watch / play" loop.
@@ -12,7 +12,7 @@ Single user.
 ## Ubiquitous language
 
 - **Catalog** — a named, ordered collection of media items. E.g. "Cinemarco favorites", "Coop games for Marco + Alice".
-- **Catalog entry** — one item in a catalog. References a media item by `(MediaType, mediaId)`. Has a position.
+- **Catalog entry** — one item in a catalog. References a media item by `(MediaType, slug)` — that pair is the entry's identity for resolution, type-scoped lookups and the removal cascade, but for now a catalog still allows at most one entry per slug regardless of type, until the projection's uniqueness constraint widens to include MediaType (ADR-0079, amended by curation-cyxbc); entries recorded before entries were typed carry no MediaType and are treated as matching any type with the same slug. Has a position.
 - **Reorder** — drag-and-drop position change; emitted as a single `Entries_reordered` event with the full new order.
 - **Content block** — a free-form chunk of content (text, image, link) attached to a context. Used on catalogs and detail pages.
 - **Block type** — the discriminator of what kind of content a block holds (`ContentBlockType` in Shared).
@@ -40,7 +40,7 @@ Single user.
 
 ## Relationships with other contexts
 
-- **Conformist to:** Movies, Series, Games. Catalog entries reference media items by id; Curation accepts whatever those BCs publish.
+- **Conformist to:** Movies, Series, Games, Books. Catalog entries reference media items by `(MediaType, slug)`; Curation accepts whatever those BCs publish.
 
 ## Frontend gate
 

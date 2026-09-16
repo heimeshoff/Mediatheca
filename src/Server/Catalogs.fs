@@ -1,6 +1,7 @@
 namespace Mediatheca.Server
 
 open Thoth.Json.Net
+open Mediatheca.Shared
 
 module Catalogs =
 
@@ -17,10 +18,15 @@ module Catalogs =
         Description: string
     }
 
+    /// curation-cyxbc (ADR-0079): `MediaType` is `Some` on every newly-added
+    /// entry — the API's `AddCatalogEntryRequest` requires it. `None` exists
+    /// only for legacy events replayed from the store (recorded before
+    /// entries were typed).
     type EntryAddedData = {
         EntryId: string
         MovieSlug: string
         Note: string option
+        MediaType: MediaType option
     }
 
     type EntryUpdatedData = {
@@ -46,6 +52,7 @@ module Catalogs =
         MovieSlug: string
         Note: string option
         Position: int
+        MediaType: MediaType option
     }
 
     type ActiveCatalog = {
@@ -91,6 +98,7 @@ module Catalogs =
                 MovieSlug = data.MovieSlug
                 Note = data.Note
                 Position = position
+                MediaType = data.MediaType
             }
             Active { catalog with Entries = catalog.Entries |> Map.add data.EntryId entry }
         | Active catalog, Entry_updated data ->
@@ -132,11 +140,32 @@ module Catalogs =
             if catalog.Entries |> Map.containsKey data.EntryId then
                 Error $"Entry with id '{data.EntryId}' already exists"
             else
-                let movieAlreadyInCatalog =
-                    catalog.Entries |> Map.values |> Seq.exists (fun e -> e.MovieSlug = data.MovieSlug)
-                if movieAlreadyInCatalog then
-                    Error $"Movie '{data.MovieSlug}' is already in this catalog"
-                else
+                // ADR-0079 §3/§5 (amended during curation-cyxbc's implementation —
+                // see the ADR's amendment note): §3's typed-pair identity
+                // (MediaType, slug) governs resolution, type-scoped lookups and the
+                // removal cascade, but is NOT YET the duplicate key here. The
+                // projection's UNIQUE(catalog_slug, movie_slug) stays slug-only
+                // (§5) until a `media_type` backfill lands, so accepting two typed
+                // entries of DIFFERENT MediaType sharing a slug in one catalog
+                // would emit an event the projection cannot durably store — its
+                // `INSERT OR REPLACE` would silently clobber the earlier entry, a
+                // replay-breaking divergence. Until that follow-up, any same-slug
+                // add within a catalog is rejected, typed or not — at most one
+                // entry per slug per catalog.
+                let sameSlugEntries =
+                    catalog.Entries |> Map.values |> Seq.filter (fun e -> e.MovieSlug = data.MovieSlug)
+                let conflict =
+                    sameSlugEntries
+                    |> Seq.tryHead
+                    |> Option.map (fun e ->
+                        match e.MediaType, data.MediaType with
+                        | Some _, Some _ ->
+                            $"Movie '{data.MovieSlug}' is already in this catalog"
+                        | _ ->
+                            $"Entry '{data.MovieSlug}' is already in this catalog (recorded before entries were typed)")
+                match conflict with
+                | Some msg -> Error msg
+                | None ->
                     let maxPos =
                         catalog.Entries
                         |> Map.values
@@ -199,18 +228,41 @@ module Catalogs =
                 Description = get.Required.Field "description" Decode.string
             })
 
+        /// curation-cyxbc (ADR-0079): DU case names, matching how other
+        /// projections store DU-valued columns/fields (e.g. GameStatus).
+        let private encodeMediaType (mediaType: MediaType) : string =
+            match mediaType with
+            | MediaType.Movie -> "Movie"
+            | MediaType.Series -> "Series"
+            | MediaType.Game -> "Game"
+            | MediaType.Book -> "Book"
+
+        let private decodeMediaType (s: string) : MediaType option =
+            match s with
+            | "Movie" -> Some MediaType.Movie
+            | "Series" -> Some MediaType.Series
+            | "Game" -> Some MediaType.Game
+            | "Book" -> Some MediaType.Book
+            | _ -> None
+
         let private encodeEntryAddedData (data: EntryAddedData) =
-            Encode.object [
+            let baseFields = [
                 "entryId", Encode.string data.EntryId
                 "movieSlug", Encode.string data.MovieSlug
                 "note", Encode.option Encode.string data.Note
             ]
+            let mediaTypeField =
+                match data.MediaType with
+                | Some mt -> [ "mediaType", Encode.string (encodeMediaType mt) ]
+                | None -> []
+            Encode.object (baseFields @ mediaTypeField)
 
         let private decodeEntryAddedData: Decoder<EntryAddedData> =
             Decode.object (fun get -> {
                 EntryId = get.Required.Field "entryId" Decode.string
                 MovieSlug = get.Required.Field "movieSlug" Decode.string
                 Note = get.Optional.Field "note" Decode.string
+                MediaType = get.Optional.Field "mediaType" Decode.string |> Option.bind decodeMediaType
             })
 
         let private encodeEntryUpdatedData (data: EntryUpdatedData) =

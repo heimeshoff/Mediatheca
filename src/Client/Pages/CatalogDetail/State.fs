@@ -50,8 +50,11 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             { model with Error = Some "Please select a movie" }, Cmd.none
         else
             let note = if model.AddEntryForm.Note.Trim() = "" then None else Some (model.AddEntryForm.Note.Trim())
+            // This form's picker only offers `AllMovies` (MovieListItem) — MediaType is
+            // always Movie here.
             let request: AddCatalogEntryRequest = {
-                MovieSlug = model.AddEntryForm.MovieSlug
+                MediaSlug = model.AddEntryForm.MovieSlug
+                MediaType = MediaType.Movie
                 Note = note
             }
             model,

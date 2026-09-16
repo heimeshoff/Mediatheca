@@ -2,6 +2,7 @@ module Mediatheca.Tests.CatalogsTests
 
 open Expecto
 open Mediatheca.Server.Catalogs
+open Mediatheca.Shared
 
 let private sampleCreateData: CatalogCreatedData = {
     Name = "My Favorites"
@@ -9,16 +10,21 @@ let private sampleCreateData: CatalogCreatedData = {
     IsSorted = true
 }
 
+// curation-cyxbc (ADR-0079): legacy-shaped (no MediaType) by default, matching
+// events recorded before entries were typed — most existing tests below exercise
+// that shape unchanged. Typed cases construct their own data explicitly.
 let private sampleEntryData: EntryAddedData = {
     EntryId = "entry-1"
     MovieSlug = "inception-2010"
     Note = Some "Mind-bending classic"
+    MediaType = None
 }
 
 let private sampleEntryData2: EntryAddedData = {
     EntryId = "entry-2"
     MovieSlug = "the-matrix-1999"
     Note = None
+    MediaType = None
 }
 
 let private givenWhenThen (given: CatalogEvent list) (command: CatalogCommand) =
@@ -134,6 +140,71 @@ let catalogTests =
                                 (Add_entry duplicateMovie)
                 match result with
                 | Error msg -> Expect.stringContains msg "already in this catalog" "Should say already in catalog"
+                | Ok _ -> failtest "Expected error"
+
+            // curation-cyxbc (ADR-0079 §3): duplicate rule cases for typed entries.
+            testCase "adding same (MediaType, slug) pair twice fails" <| fun _ ->
+                let typedMovie: EntryAddedData = { sampleEntryData with MediaType = Some MediaType.Movie }
+                let duplicate: EntryAddedData = { sampleEntryData2 with MovieSlug = "inception-2010"; MediaType = Some MediaType.Movie }
+                let result = givenWhenThen
+                                [ Catalog_created sampleCreateData; Entry_added (typedMovie, 0) ]
+                                (Add_entry duplicate)
+                match result with
+                | Error msg -> Expect.stringContains msg "already in this catalog" "Should say already in catalog"
+                | Ok _ -> failtest "Expected error"
+
+            // Amended during curation-cyxbc's implementation (see ADR-0079's
+            // amendment note): §3's typed-pair identity governs resolution,
+            // type-scoped lookups and the removal cascade, but is not yet the
+            // duplicate key here — the projection's UNIQUE(catalog_slug,
+            // movie_slug) stays slug-only (§5) until a `media_type` backfill
+            // lands, so accepting this add would emit an event the projection
+            // can't durably store (its `INSERT OR REPLACE` would silently
+            // clobber the earlier entry). Rejected for now; the follow-up that
+            // widens the UNIQUE constraint relaxes this back to strict pair
+            // identity.
+            testCase "Add_entry rejects a same-slug entry of a different media type while the projection key is slug-only (ADR-0079 §5)" <| fun _ ->
+                let typedMovie: EntryAddedData = { sampleEntryData with MediaType = Some MediaType.Movie }
+                let typedBook: EntryAddedData = { sampleEntryData2 with MovieSlug = "inception-2010"; MediaType = Some MediaType.Book }
+                let result = givenWhenThen
+                                [ Catalog_created sampleCreateData; Entry_added (typedMovie, 0) ]
+                                (Add_entry typedBook)
+                match result with
+                | Error msg -> Expect.stringContains msg "already in this catalog" "Should say already in catalog"
+                | Ok _ -> failtest "Expected error"
+
+            testCase "adding a different type with a different slug when both are typed succeeds" <| fun _ ->
+                let typedMovie: EntryAddedData = { sampleEntryData with MediaType = Some MediaType.Movie }
+                let typedBook: EntryAddedData = { sampleEntryData2 with MediaType = Some MediaType.Book }
+                let result = givenWhenThen
+                                [ Catalog_created sampleCreateData; Entry_added (typedMovie, 0) ]
+                                (Add_entry typedBook)
+                match result with
+                | Ok events ->
+                    match events.[0] with
+                    | Entry_added (data, _) ->
+                        Expect.equal data.MediaType (Some MediaType.Book) "MediaType should match"
+                    | _ -> failtest "Expected Entry_added"
+                | Error e -> failtest $"Expected success but got: {e}"
+
+            testCase "adding a same-slug entry when the existing entry is legacy-untyped fails, naming the reason" <| fun _ ->
+                let legacyMovie: EntryAddedData = { sampleEntryData with MediaType = None }
+                let typedBook: EntryAddedData = { sampleEntryData2 with MovieSlug = "inception-2010"; MediaType = Some MediaType.Book }
+                let result = givenWhenThen
+                                [ Catalog_created sampleCreateData; Entry_added (legacyMovie, 0) ]
+                                (Add_entry typedBook)
+                match result with
+                | Error msg -> Expect.stringContains msg "before entries were typed" "Should name the legacy reason"
+                | Ok _ -> failtest "Expected error"
+
+            testCase "adding a same-slug entry when the new entry is untyped fails, naming the reason" <| fun _ ->
+                let typedMovie: EntryAddedData = { sampleEntryData with MediaType = Some MediaType.Movie }
+                let legacyDuplicate: EntryAddedData = { sampleEntryData2 with MovieSlug = "inception-2010"; MediaType = None }
+                let result = givenWhenThen
+                                [ Catalog_created sampleCreateData; Entry_added (typedMovie, 0) ]
+                                (Add_entry legacyDuplicate)
+                match result with
+                | Error msg -> Expect.stringContains msg "before entries were typed" "Should name the legacy reason"
                 | Ok _ -> failtest "Expected error"
         ]
 
@@ -280,6 +351,30 @@ let catalogTests =
                 let eventType, data = Serialization.serialize event
                 let deserialized = Serialization.deserialize eventType data
                 Expect.equal deserialized (Some event) "Should round-trip"
+
+            // curation-cyxbc (ADR-0079): legacy events (recorded before entries
+            // were typed) carry no `mediaType` key at all — the decoder must
+            // treat its absence as `None`, not fail.
+            testCase "legacy JSON without mediaType decodes to MediaType = None" <| fun _ ->
+                let legacyJson = """{"data":{"entryId":"entry-1","movieSlug":"inception-2010","note":null},"position":0}"""
+                let deserialized = Serialization.deserialize "Entry_added" legacyJson
+                match deserialized with
+                | Some (Entry_added (data, position)) ->
+                    Expect.equal data.EntryId "entry-1" "EntryId should match"
+                    Expect.equal data.MovieSlug "inception-2010" "MovieSlug should match"
+                    Expect.equal data.MediaType None "MediaType should be None"
+                    Expect.equal position 0 "Position should match"
+                | _ -> failtest "Expected Entry_added"
+
+            testCase "typed Entry_added round-trips with its MediaType" <| fun _ ->
+                let typedData: EntryAddedData = { sampleEntryData with MediaType = Some MediaType.Book }
+                let event = Entry_added (typedData, 3)
+                let eventType, data = Serialization.serialize event
+                let deserialized = Serialization.deserialize eventType data
+                Expect.equal deserialized (Some event) "Should round-trip"
+                match deserialized with
+                | Some (Entry_added (d, _)) -> Expect.equal d.MediaType (Some MediaType.Book) "MediaType should round-trip"
+                | _ -> failtest "Expected Entry_added"
 
             testCase "Entry_updated round-trip" <| fun _ ->
                 let event = Entry_updated { EntryId = "e1"; Note = Some "A note" }

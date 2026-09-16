@@ -469,7 +469,8 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             | Some (Episode_catalog (sn, en)) -> $"{model.Slug}:s%02d{sn}e%02d{en}"
             | _ -> model.Slug
         let request: AddCatalogEntryRequest = {
-            MovieSlug = entrySlug
+            MediaSlug = entrySlug
+            MediaType = MediaType.Series
             Note = None
         }
         model,
@@ -503,7 +504,8 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 match! api.createCatalog request with
                 | Ok slug ->
                     let entryReq: AddCatalogEntryRequest = {
-                        MovieSlug = entrySlug
+                        MediaSlug = entrySlug
+                        MediaType = MediaType.Series
                         Note = None
                     }
                     match! api.addCatalogEntry slug entryReq with

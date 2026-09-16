@@ -35,6 +35,16 @@ module Slug =
 
 type MediaType = Movie | Series | Game | Book
 
+/// curation-cyxbc (ADR-0079): the one place the client derives a
+/// media type's route string.
+module MediaType =
+    let routePrefix (mediaType: MediaType) : string =
+        match mediaType with
+        | Movie -> "movies"
+        | Series -> "series"
+        | Game -> "games"
+        | Book -> "books"
+
 type LibrarySearchResult = {
     Slug: string
     Name: string
@@ -234,13 +244,13 @@ module JournalBlock =
 
 type CatalogEntryDto = {
     EntryId: string
-    MovieSlug: string
-    MovieName: string
-    MovieYear: int
-    MoviePosterRef: string option
+    MediaSlug: string
+    Title: string
+    Year: int
+    PosterRef: string option
     Note: string option
     Position: int
-    RoutePrefix: string
+    MediaType: MediaType
 }
 
 type CatalogListItem = {
@@ -271,7 +281,8 @@ type UpdateCatalogRequest = {
 }
 
 type AddCatalogEntryRequest = {
-    MovieSlug: string
+    MediaSlug: string
+    MediaType: MediaType
     Note: string option
 }
 
@@ -283,7 +294,8 @@ type CatalogRef = {
     Slug: string
     Name: string
     EntryId: string
-    MovieSlug: string
+    MediaSlug: string
+    MediaType: MediaType
 }
 
 // Dashboard
@@ -2160,6 +2172,7 @@ type IMediathecaApi = {
     addBookContentBlock: string -> AddContentBlockRequest -> Async<Result<string, string>>
     updateBookContentBlock: string -> string -> UpdateContentBlockRequest -> Async<Result<unit, string>>
     removeBookContentBlock: string -> string -> Async<Result<unit, string>>
+    getCatalogsForBook: string -> Async<CatalogRef list>
     // Open Library (integration-c8d4x, ADR-0075) — book search/metadata source
     searchOpenLibraryBooks: string -> Async<OpenLibrarySearchResult list>
     addBookFromOpenLibrary: AddBookFromOpenLibraryRequest -> Async<Result<AddBookOutcome, string>>

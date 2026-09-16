@@ -2095,7 +2095,7 @@ module Api =
                 match result with
                 | Ok () ->
                     // Remove catalog entries referencing this movie
-                    let catalogEntries = CatalogProjection.getEntriesByMediaSlug conn slug
+                    let catalogEntries = CatalogProjection.getEntriesByMediaSlug conn Mediatheca.Shared.MediaType.Movie slug
                     for (catalogSlug, entryId) in catalogEntries do
                         let catalogSid = Catalogs.streamId catalogSlug
                         executeCommand
@@ -2574,8 +2574,9 @@ module Api =
                 let entryId = System.Guid.NewGuid().ToString("N")
                 let data: Catalogs.EntryAddedData = {
                     EntryId = entryId
-                    MovieSlug = request.MovieSlug
+                    MovieSlug = request.MediaSlug
                     Note = request.Note
+                    MediaType = Some request.MediaType
                 }
                 let result =
                     executeCommand
@@ -2639,7 +2640,7 @@ module Api =
 
             getCatalogsForMovie = fun movieSlug -> async {
                 use conn = factory ()
-                return CatalogProjection.getCatalogsForMovie conn movieSlug
+                return CatalogProjection.getCatalogsForMedia conn Mediatheca.Shared.MediaType.Movie movieSlug
             }
 
             // Dashboard
@@ -3321,7 +3322,7 @@ module Api =
                     |> Db.setParams [ "slug", SqlType.String slug ]
                     |> Db.exec
                     // Remove catalog entries referencing this series
-                    let catalogEntries = CatalogProjection.getEntriesByMediaSlug conn slug
+                    let catalogEntries = CatalogProjection.getEntriesByMediaSlug conn Mediatheca.Shared.MediaType.Series slug
                     for (catalogSlug, entryId) in catalogEntries do
                         let catalogSid = Catalogs.streamId catalogSlug
                         executeCommand
@@ -3890,7 +3891,7 @@ module Api =
                 match result with
                 | Ok () ->
                     // Remove catalog entries referencing this game
-                    let catalogEntries = CatalogProjection.getEntriesByMediaSlug conn slug
+                    let catalogEntries = CatalogProjection.getEntriesByMediaSlug conn Mediatheca.Shared.MediaType.Game slug
                     for (catalogSlug, entryId) in catalogEntries do
                         let catalogSid = Catalogs.streamId catalogSlug
                         executeCommand
@@ -4178,7 +4179,7 @@ module Api =
 
             getCatalogsForGame = fun slug -> async {
                 use conn = factory ()
-                return CatalogProjection.getCatalogsForMovie conn slug
+                return CatalogProjection.getCatalogsForMedia conn Mediatheca.Shared.MediaType.Game slug
             }
 
             getGameImageCandidates = fun slug -> async {
@@ -4531,6 +4532,11 @@ module Api =
                         ContentBlocks.Serialization.toEventData
                         (ContentBlocks.Remove_content_block blockId)
                         projectionHandlers
+            }
+
+            getCatalogsForBook = fun slug -> async {
+                use conn = factory ()
+                return CatalogProjection.getCatalogsForMedia conn Mediatheca.Shared.MediaType.Book slug
             }
 
             // Games Settings

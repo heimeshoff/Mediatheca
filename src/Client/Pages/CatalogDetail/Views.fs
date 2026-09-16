@@ -9,9 +9,9 @@ open Mediatheca.Client.Components
 
 let private entryCard (entry: Mediatheca.Shared.CatalogEntryDto) (editingNote: EditNoteState option) (dispatch: Msg -> unit) =
     let navSlug =
-        if entry.MovieSlug.Contains(":") then entry.MovieSlug.Split(':').[0]
-        else entry.MovieSlug
-    let navPrefix = entry.RoutePrefix
+        if entry.MediaSlug.Contains(":") then entry.MediaSlug.Split(':').[0]
+        else entry.MediaSlug
+    let navPrefix = Mediatheca.Shared.MediaType.routePrefix entry.MediaType
     Html.div [
         prop.className "flex items-center gap-3 p-3 rounded-xl bg-base-100 group"
         prop.children [
@@ -23,7 +23,7 @@ let private entryCard (entry: Mediatheca.Shared.CatalogEntryDto) (editingNote: E
                 )
                 prop.className "flex-none cursor-pointer"
                 prop.children [
-                    PosterCard.thumbnail entry.MoviePosterRef entry.MovieName
+                    PosterCard.thumbnail entry.PosterRef entry.Title
                 ]
             ]
             Html.div [
@@ -36,11 +36,11 @@ let private entryCard (entry: Mediatheca.Shared.CatalogEntryDto) (editingNote: E
                             Router.navigate (navPrefix, navSlug)
                         )
                         prop.className "font-semibold text-sm truncate hover:text-primary transition-colors cursor-pointer block"
-                        prop.text entry.MovieName
+                        prop.text entry.Title
                     ]
                     Html.p [
                         prop.className "text-xs text-base-content/50"
-                        prop.text (string entry.MovieYear)
+                        prop.text (string entry.Year)
                     ]
                     match editingNote with
                     | Some state when state.EntryId = entry.EntryId ->
@@ -106,7 +106,7 @@ let private entryCard (entry: Mediatheca.Shared.CatalogEntryDto) (editingNote: E
 let private addEntryForm (model: Model) (dispatch: Msg -> unit) =
     let existingMovieSlugs =
         model.Catalog
-        |> Option.map (fun c -> c.Entries |> List.map (fun e -> e.MovieSlug) |> Set.ofList)
+        |> Option.map (fun c -> c.Entries |> List.map (fun e -> e.MediaSlug) |> Set.ofList)
         |> Option.defaultValue Set.empty
     let availableMovies =
         model.AllMovies
@@ -348,7 +348,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                     Html.p [ prop.text "No entries in this catalog yet." ]
                                     Html.p [
                                         prop.className "text-sm mt-1"
-                                        prop.text "Add movies or series to build your catalog."
+                                        prop.text "Add movies, series, games or books to build your catalog."
                                     ]
                                 ]
                             ]
@@ -356,18 +356,15 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             let entryItems : EntryList.EntryItem list =
                                 catalog.Entries
                                 |> List.map (fun e ->
-                                    let navSlug =
-                                        if e.MovieSlug.Contains(":") then e.MovieSlug.Split(':').[0]
-                                        else e.MovieSlug
-                                    { Slug = e.MovieSlug
-                                      Name = e.MovieName
-                                      Year = e.MovieYear
-                                      PosterRef = e.MoviePosterRef
+                                    { Slug = e.MediaSlug
+                                      Name = e.Title
+                                      Year = e.Year
+                                      PosterRef = e.PosterRef
                                       Rating = None
-                                      RoutePrefix = e.RoutePrefix })
+                                      RoutePrefix = Mediatheca.Shared.MediaType.routePrefix e.MediaType })
                             let entryBySlug =
                                 catalog.Entries
-                                |> List.map (fun e -> e.MovieSlug, e)
+                                |> List.map (fun e -> e.MediaSlug, e)
                                 |> Map.ofList
                             EntryList.view {
                                 Items = entryItems
