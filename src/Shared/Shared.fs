@@ -987,11 +987,19 @@ type OpenLibrarySearchResult = {
 /// OLID (`OL...M`), never an ISBN — resolved via `OpenLibrary.getEditionByOlid`.
 /// `Isbn13` is carried explicitly (from the search result's own `Isbn13`)
 /// so `Isbn13` linking never depends on parsing `EditionKey` (verifier
-/// iteration 1).
+/// iteration 1). `CoverId` and `Title` (books-xntts) are the search hit's
+/// own `OpenLibrarySearchResult.CoverId` / `.Title` — the cover the user
+/// clicked in the search tile is the cover they get (preferred over the
+/// resolved edition's own `covers[0]`, which may belong to a different
+/// language edition than the one the search tile showed), and the search
+/// hit's title is the fallback when no edition resolves at all, so an
+/// unresolvable edition never yields a book titled after the work key.
 type AddBookFromOpenLibraryRequest = {
     WorkKey: string
     EditionKey: string option
     Isbn13: string option
+    CoverId: int option
+    Title: string
     SkipDuplicateCheck: bool
 }
 

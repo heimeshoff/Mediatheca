@@ -400,6 +400,8 @@ let private updateSearchModal (api: IMediathecaApi) (childMsg: SearchModal.Msg) 
                 WorkKey = olResult.WorkKey
                 EditionKey = olResult.EditionKey
                 Isbn13 = olResult.Isbn13
+                CoverId = olResult.CoverId
+                Title = olResult.Title
                 SkipDuplicateCheck = false
             }
             let importCmd =

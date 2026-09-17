@@ -79,6 +79,64 @@ let private workJsonStringDescription =
 let private workJsonObjectDescription =
     """{"description": {"type": "/type/text", "value": "An object-shaped description."}, "subjects": []}"""
 
+// ── books-xntts: canonical-edition selection fixtures ───────────────────
+
+let private coverEditionKeyPresentFixture =
+    """
+    {
+        "docs": [
+            {
+                "key": "/works/OL27448W",
+                "title": "The Lord of the Rings",
+                "cover_edition_key": "OL51694024M",
+                "edition_key": ["OL62536872M", "OL33246498M"],
+                "language": ["eng"]
+            }
+        ]
+    }
+    """
+
+let private noCoverEditionKeyEngPresentFixture =
+    """
+    {
+        "docs": [
+            {
+                "key": "/works/OLbxxxxW",
+                "title": "Some Work",
+                "edition_key": ["OL11111111M", "OL22222222M"],
+                "language": ["spa", "eng"]
+            }
+        ]
+    }
+    """
+
+let private noCoverEditionKeyNoLanguageFixture =
+    """
+    {
+        "docs": [
+            {
+                "key": "/works/OLbyyyyW",
+                "title": "Another Work",
+                "edition_key": ["OL33333333M", "OL44444444M"]
+            }
+        ]
+    }
+    """
+
+let private noCoverEditionKeyNoEngLanguageFixture =
+    """
+    {
+        "docs": [
+            {
+                "key": "/works/OLbzzzzW",
+                "title": "Foreign Work",
+                "edition_key": ["OL55555555M", "OL66666666M"],
+                "language": ["spa"]
+            }
+        ]
+    }
+    """
+
 let private isbnEditionJson =
     """
     {
@@ -121,18 +179,65 @@ let openLibraryTests =
             Expect.equal second.CoverUrl None "No CoverId -> no CoverUrl"
             Expect.equal second.Isbn13 None "No isbn field -> None"
 
-        testCase "getWork decodes a plain string description" <| fun _ ->
+        // books-xntts: `search.json`'s `edition_key` carries no meaningful
+        // order (253 entries for a real work, the first a decades-old
+        // foreign printing) -- `cover_edition_key` is the request field that
+        // lets the request URL and decoder aim at the edition Open Library
+        // itself already picked as canonical.
+        testCase "searchBooks's request URL includes cover_edition_key and language in fields=" <| fun _ ->
+            let mutable capturedUrl = ""
+            let handler =
+                new AsyncStubHandler(fun req ->
+                    async {
+                        capturedUrl <- req.RequestUri.ToString()
+                        return jsonResponse """{"docs":[]}"""
+                    })
+            let http = new HttpClient(handler)
+            OpenLibrary.searchBooks http testConfig "books-xntts fields url unique query" |> Async.RunSynchronously |> ignore
+            Expect.isTrue (capturedUrl.Contains("cover_edition_key")) "fields= includes cover_edition_key"
+            Expect.isTrue (capturedUrl.Contains("language")) "fields= includes language"
+
+        testCase "decodeSearchDoc: cover_edition_key present is always preferred over the first edition_key" <| fun _ ->
+            let handler = new AsyncStubHandler(fun _ -> async { return jsonResponse coverEditionKeyPresentFixture })
+            let http = new HttpClient(handler)
+            let results = OpenLibrary.searchBooks http testConfig "books-xntts cover edition key unique query" |> Async.RunSynchronously
+            Expect.equal results.[0].EditionKey (Some "OL51694024M") "cover_edition_key wins over edition_key[0]"
+
+        testCase "decodeSearchDoc: no cover_edition_key, language contains eng -> first edition_key" <| fun _ ->
+            let handler = new AsyncStubHandler(fun _ -> async { return jsonResponse noCoverEditionKeyEngPresentFixture })
+            let http = new HttpClient(handler)
+            let results = OpenLibrary.searchBooks http testConfig "books-xntts eng language unique query" |> Async.RunSynchronously
+            Expect.equal results.[0].EditionKey (Some "OL11111111M") "Falls back to the first edition_key"
+
+        testCase "decodeSearchDoc: no cover_edition_key, no language field -> first edition_key" <| fun _ ->
+            let handler = new AsyncStubHandler(fun _ -> async { return jsonResponse noCoverEditionKeyNoLanguageFixture })
+            let http = new HttpClient(handler)
+            let results = OpenLibrary.searchBooks http testConfig "books-xntts no language unique query" |> Async.RunSynchronously
+            Expect.equal results.[0].EditionKey (Some "OL33333333M") "Falls back to the first edition_key"
+
+        testCase "decodeSearchDoc: no cover_edition_key, language present without eng -> first edition_key (documented ceiling)" <| fun _ ->
+            let handler = new AsyncStubHandler(fun _ -> async { return jsonResponse noCoverEditionKeyNoEngLanguageFixture })
+            let http = new HttpClient(handler)
+            let results = OpenLibrary.searchBooks http testConfig "books-xntts no eng language unique query" |> Async.RunSynchronously
+            Expect.equal results.[0].EditionKey (Some "OL55555555M") "Still falls back to the first edition_key -- today's behaviour is the ceiling, not a regression"
+
+        // books-xntts: `getWork` now converts the decoded Markdown
+        // description into `DescriptionSanitizer`'s allowlisted HTML subset
+        // at decode time -- a plain, tag-free single-line description
+        // becomes one `<p>` block (`descriptionToHtml`'s own tests below
+        // pin the conversion itself in detail).
+        testCase "getWork decodes a plain string description, converted to a <p> block" <| fun _ ->
             let handler = new AsyncStubHandler(fun _ -> async { return jsonResponse workJsonStringDescription })
             let http = new HttpClient(handler)
             let work = OpenLibrary.getWork http testConfig "/works/OL893415W" |> Async.RunSynchronously
-            Expect.equal work.Description (Some "A plain string description.") "String description decodes"
+            Expect.equal work.Description (Some "<p>A plain string description.</p>") "String description decodes and is converted to a <p> block"
             Expect.equal work.Subjects [ "Novel" ] "Subjects decoded"
 
-        testCase "getWork decodes a {type,value} object description" <| fun _ ->
+        testCase "getWork decodes a {type,value} object description, converted to a <p> block" <| fun _ ->
             let handler = new AsyncStubHandler(fun _ -> async { return jsonResponse workJsonObjectDescription })
             let http = new HttpClient(handler)
             let work = OpenLibrary.getWork http testConfig "/works/OL893415W" |> Async.RunSynchronously
-            Expect.equal work.Description (Some "An object-shaped description.") "Object-shaped description decodes via its 'value' field"
+            Expect.equal work.Description (Some "<p>An object-shaped description.</p>") "Object-shaped description decodes via its 'value' field, then is converted to a <p> block"
 
         testCase "getEditionByIsbn decodes the edition and page count" <| fun _ ->
             let handler =
@@ -285,5 +390,102 @@ let openLibraryTests =
             finally
                 OpenLibrary.throttleApiInterval <- originalApi
                 OpenLibrary.throttleCoversInterval <- originalCovers
+    ]
+    |> testSequenced
+
+/// books-xntts: `OpenLibrary.descriptionToHtml`, the pure Markdown ->
+/// `DescriptionSanitizer`-allowlisted-HTML converter `getWork` applies to
+/// every decoded work description. No HTTP involved -- these drive the
+/// function directly.
+[<Tests>]
+let openLibraryDescriptionToHtmlTests =
+    testList "OpenLibrary.descriptionToHtml (books-xntts)" [
+
+        testCase "blank-line-separated paragraphs become <p> blocks" <| fun _ ->
+            let input = "First paragraph.\n\nSecond paragraph."
+            Expect.equal (OpenLibrary.descriptionToHtml input) "<p>First paragraph.</p><p>Second paragraph.</p>" "Each blank-line-separated chunk becomes its own <p>"
+
+        testCase "a single newline inside a paragraph becomes <br>" <| fun _ ->
+            let input = "Line one.\nLine two."
+            Expect.equal (OpenLibrary.descriptionToHtml input) "<p>Line one.<br>Line two.</p>" "Internal single newline becomes <br>, not a new paragraph"
+
+        testCase "**bold** and *italic* convert to <strong>/<em>" <| fun _ ->
+            let input = "This is **bold** and *italic* text."
+            Expect.equal (OpenLibrary.descriptionToHtml input) "<p>This is <strong>bold</strong> and <em>italic</em> text.</p>" "** -> strong, * -> em"
+
+        testCase "__bold__ and _italic_ (underscore family) convert to <strong>/<em>" <| fun _ ->
+            let input = "This is __bold__ and _italic_ text."
+            Expect.equal (OpenLibrary.descriptionToHtml input) "<p>This is <strong>bold</strong> and <em>italic</em> text.</p>" "__ -> strong, _ -> em"
+
+        testCase "a [text](url) link becomes plain text" <| fun _ ->
+            let input = "See [Open Library](https://openlibrary.org/works/OL1W) for more."
+            Expect.equal (OpenLibrary.descriptionToHtml input) "<p>See Open Library for more.</p>" "Link syntax drops to its text, no anchor, no URL"
+
+        testCase "a reference-style [text][ref] link becomes plain text" <| fun _ ->
+            let input = "See [Open Library][1] for more."
+            Expect.equal (OpenLibrary.descriptionToHtml input) "<p>See Open Library for more.</p>" "Reference-style link syntax also drops to its text"
+
+        testCase "a bare <https://...> autolink is dropped" <| fun _ ->
+            let input = "Visit <https://openlibrary.org> today."
+            Expect.equal (OpenLibrary.descriptionToHtml input) "<p>Visit  today.</p>" "The autolink is removed entirely, not converted to text or a link"
+
+        testCase "a `- ` list becomes <ul><li>" <| fun _ ->
+            let input = "- one\n- two\n- three"
+            Expect.equal (OpenLibrary.descriptionToHtml input) "<ul><li>one</li><li>two</li><li>three</li></ul>" "-  items become an unordered list"
+
+        testCase "a `1. ` list becomes <ol><li>" <| fun _ ->
+            let input = "1. one\n2. two"
+            Expect.equal (OpenLibrary.descriptionToHtml input) "<ol><li>one</li><li>two</li></ol>" "Numbered items become an ordered list"
+
+        testCase "a #-heading becomes <p><strong>...</strong></p>" <| fun _ ->
+            let input = "# Great Book\n\nThe blurb."
+            Expect.equal (OpenLibrary.descriptionToHtml input) "<p><strong>Great Book</strong></p><p>The blurb.</p>" "Heading text is bolded and wrapped in its own <p>, not rendered as a real heading tag (not in the allowlist)"
+
+        testCase "\\[2/2\\] unescaping to [2/2]" <| fun _ ->
+            let input = "Split into parts \\[2/2\\] of the series."
+            Expect.equal (OpenLibrary.descriptionToHtml input) "<p>Split into parts [2/2] of the series.</p>" "Escaped brackets unescape to their literal characters, not link syntax"
+
+        testCase "\\* and \\_ unescape to their literal characters, not emphasis" <| fun _ ->
+            let input = "A literal \\*asterisk\\* and \\_underscore\\_ here."
+            Expect.equal (OpenLibrary.descriptionToHtml input) "<p>A literal *asterisk* and _underscore_ here.</p>" "Escaped emphasis markers are never interpreted as emphasis"
+
+        // The exact shape `.agentheim`'s live-evidence note describes: a
+        // blurb, a blank line, a `---` rule, a blank line, a `**Contains**`
+        // heading, a blank line, then eight `- [title](url)` bullets (their
+        // link text carrying `\[1/2\]`/`\[2/2\]` escapes) -- everything from
+        // the rule onward is editorial appendix, never rendered.
+        testCase "the exact Lord of the Rings trailer: only the blurb's <p> blocks survive, no Contains/[/https://" <| fun _ ->
+            let input =
+                "One of the most influential works of the 20th century, The Lord of the Rings is an epic set in the fictional universe of Middle-earth.\n\n" +
+                "This work includes six volumes of a trilogy told across three books.\n\n" +
+                "---\n\n" +
+                "**Contains**\n\n" +
+                "- [The Fellowship of the Ring \\[1/2\\]](https://openlibrary.org/works/OL27479W)\n" +
+                "- [The Fellowship of the Ring \\[2/2\\]](https://openlibrary.org/works/OL27480W)\n" +
+                "- [The Two Towers \\[1/2\\]](https://openlibrary.org/works/OL27482W)\n" +
+                "- [The Two Towers \\[2/2\\]](https://openlibrary.org/works/OL27483W)\n" +
+                "- [The Return of the King \\[1/2\\]](https://openlibrary.org/works/OL27484W)\n" +
+                "- [The Return of the King \\[2/2\\]](https://openlibrary.org/works/OL27485W)\n" +
+                "- [Unfinished Tales](https://openlibrary.org/works/OL1234567W)\n" +
+                "- [The Silmarillion](https://openlibrary.org/works/OL675783W)"
+            let result = OpenLibrary.descriptionToHtml input
+            let expected =
+                "<p>One of the most influential works of the 20th century, The Lord of the Rings is an epic set in the fictional universe of Middle-earth.</p>" +
+                "<p>This work includes six volumes of a trilogy told across three books.</p>"
+            Expect.equal result expected "Only the blurb's two <p> blocks survive"
+            Expect.isFalse (result.Contains("Contains")) "No Contains heading"
+            Expect.isFalse (result.Contains("[")) "No literal bracket left over"
+            Expect.isFalse (result.Contains("https://")) "No URL left over"
+
+        testCase "a description with no Markdown syntax matches DescriptionSanitizer.sanitize's own blank-line-split <p> output" <| fun _ ->
+            let input = "Paragraph one.\n\nParagraph two."
+            let expected = DescriptionSanitizer.sanitize "<p>Paragraph one.</p><p>Paragraph two.</p>"
+            Expect.equal (OpenLibrary.descriptionToHtml input) expected "Plain-prose works are unchanged in substance"
+
+        testCase "stray HTML inside the Markdown is allowlisted by DescriptionSanitizer.sanitize, not a second allowlist" <| fun _ ->
+            let input = "Text with <script>alert(1)</script> and <a href=\"http://x\">a link</a> embedded."
+            let result = OpenLibrary.descriptionToHtml input
+            Expect.isFalse (result.Contains("<script")) "No <script> tag survives"
+            Expect.isFalse (result.Contains("<a ")) "No <a> tag survives"
     ]
     |> testSequenced

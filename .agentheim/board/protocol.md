@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 01:51 -- Task verified and completed: books-xntts - Open Library import takes the work's canonical English edition (`cover_edition_key`, language-filtered fallback) instead of the first of hundreds of unordered `edition_key`s, and converts the work's Markdown description into the sanitized HTML subset at import and refresh — no more Spanish titles/covers on an English work, no more literal `[link](url)` lists
+
+**Type:** Work / Task completion
+**Task:** books-xntts - Open Library import takes the work's canonical English edition (`cover_edition_key`, language-filtered fallback) instead of the first of hundreds of unordered `edition_key`s, and converts the work's Markdown description into the sanitized HTML subset at import and refresh — no more Spanish titles/covers on an English work, no more literal `[link](url)` lists
+**Summary:** Open Library import now prefers the work's canonical edition (cover_edition_key, with a documented blind-fallback ceiling when absent) instead of an arbitrary unordered edition_key, honours the search hit's own cover/title at add time, and converts Open Library's Markdown work descriptions into the same sanitized HTML subset (OpenLibrary.descriptionToHtml) at decode time so lists/links/bold no longer render as literal Markdown text.
+**Duration:** 22m30s
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 8
+**Tests added:** 23
+**ADRs written:** none
+
+---
+
 ## 2026-09-18 01:46 -- Task verified and completed: books-xyqyb - Manual finish stamps today's local date and the hero's finished-date line is click-to-edit — `Set_book_status Finished` sends `Some localToday` instead of `None` (no more UTC-midnight drift), and the `finished {date}` line opens an `EditableDateInput` whose commit re-dates the finish via `setBookStatus slug Finished (Some picked)`
 
 **Type:** Work / Task completion

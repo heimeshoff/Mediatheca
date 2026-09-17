@@ -147,7 +147,7 @@ let booksSearchModalTests =
             Expect.equal (booksSearchPlan false false) [] "both unchecked means nothing fires"
 
         testCase "Duplicate_found on a Books import shows the prompt carrying a FromOpenLibrary pending import, and force-add flips SkipDuplicateCheck" <| fun () ->
-            let pending = FromOpenLibrary { WorkKey = "OL1W"; EditionKey = Some "OL1M"; Isbn13 = Some "9780000000000"; SkipDuplicateCheck = false }
+            let pending = FromOpenLibrary { WorkKey = "OL1W"; EditionKey = Some "OL1M"; Isbn13 = Some "9780000000000"; CoverId = None; Title = "Dune"; SkipDuplicateCheck = false }
             let model = { init () with DuplicatePrompt = Some ("dune-1965", "Dune", pending) }
 
             match model.DuplicatePrompt with
@@ -168,7 +168,7 @@ let booksSearchModalTests =
             | _ -> failwith "expected forceDuplicateImport to keep the FromAudible shape"
 
         testCase "pendingImportMediaType routes Books imports to MediaType.Book and Games imports to MediaType.Game" <| fun () ->
-            Expect.equal (pendingImportMediaType (FromOpenLibrary { WorkKey = "OL1W"; EditionKey = None; Isbn13 = None; SkipDuplicateCheck = false })) MediaType.Book "Open Library duplicates open a book"
+            Expect.equal (pendingImportMediaType (FromOpenLibrary { WorkKey = "OL1W"; EditionKey = None; Isbn13 = None; CoverId = None; Title = "x"; SkipDuplicateCheck = false })) MediaType.Book "Open Library duplicates open a book"
             Expect.equal (pendingImportMediaType (FromAudible { Asin = "B1"; SkipDuplicateCheck = false })) MediaType.Book "Audible duplicates open a book"
             Expect.equal (pendingImportMediaType (FromRawg { Name = "x"; Year = 2020; Genres = []; Description = ""; CoverRef = None; BackdropRef = None; RawgId = None; RawgRating = None; SkipDuplicateCheck = false })) MediaType.Game "RAWG duplicates still open a game"
     ]

@@ -119,6 +119,8 @@ let private sampleRequest : AddBookFromOpenLibraryRequest = {
     WorkKey = "/works/OL893415W"
     EditionKey = Some "OL33246498M"
     Isbn13 = Some "9780593135204"
+    CoverId = Some 12345678
+    Title = "Project Hail Mary"
     SkipDuplicateCheck = false
 }
 
@@ -156,7 +158,7 @@ let openLibraryApiTests =
                 Expect.equal book.CoverRef (Some (sprintf "posters/book-%s.jpg" slug)) "Cover ref recorded"
                 Expect.isTrue (File.Exists(Path.Combine(imageBasePath, sprintf "posters/book-%s.jpg" slug))) "Cover file actually downloaded to disk"
                 Expect.equal book.PageCount (Some 496) "page_count written to the cache slice"
-                Expect.equal book.Description (Some "A survival story on a dying planet.") "description written to the cache slice"
+                Expect.equal book.Description (Some "<p>A survival story on a dying planet.</p>") "description written to the cache slice, converted from Markdown to the allowlisted HTML subset (books-xntts)"
 
                 let coverRequestUserAgents =
                     recordedUserAgents
@@ -172,6 +174,93 @@ let openLibraryApiTests =
                 match second with
                 | Ok (AddBookOutcome.Duplicate_found _) -> ()
                 | other -> failtestf "Expected Duplicate_found on the second call; got %A" other)
+
+        // books-xntts: the cover the user clicked in the search tile
+        // (`request.CoverId`) must win even when the OLID `EditionKey`
+        // resolves to a different-language edition whose own `covers[0]`
+        // differs -- that was the second half of the Lord of the Rings bug
+        // (the tile showed the English cover; the imported book got the
+        // Spanish edition's cover).
+        testCase "addBookFromOpenLibrary downloads the cover for the search hit's CoverId, even when the resolved edition's covers[0] differs" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                use db = TestDb.withTempDbFactory bootstrap
+                let recordedUrls = System.Collections.Concurrent.ConcurrentBag<string>()
+                let differentCoverEditionJson =
+                    """
+                    {
+                        "key": "/books/OL33246498M",
+                        "title": "Project Hail Mary",
+                        "works": [{"key": "/works/OL893415W"}],
+                        "authors": [{"key": "/authors/OL1394865A"}],
+                        "publish_date": "2021",
+                        "publishers": ["Ballantine Books"],
+                        "number_of_pages": 496,
+                        "covers": [99999999]
+                    }
+                    """
+                let handler =
+                    new AsyncStubHandler(fun req ->
+                        async {
+                            let url = req.RequestUri.ToString()
+                            recordedUrls.Add(url)
+                            if url.Contains("covers.openlibrary.org") then
+                                let resp = new HttpResponseMessage(HttpStatusCode.OK)
+                                resp.Content <- new ByteArrayContent(fakeCoverBytes)
+                                return resp
+                            elif url.Contains("/authors/") then
+                                return jsonResponse """{"name": "Andy Weir"}"""
+                            elif url.Contains("/books/OL33246498M.json") then
+                                return jsonResponse differentCoverEditionJson
+                            elif url.Contains("/works/") then
+                                return jsonResponse workJson
+                            else
+                                return notFoundResponse ()
+                        })
+                let api = createApi db.Factory (new HttpClient(handler)) imageBasePath
+
+                // sampleRequest.CoverId = Some 12345678 (the search hit's
+                // own cover_i); the resolved edition's own cover is 99999999.
+                let result = api.addBookFromOpenLibrary sampleRequest |> Async.RunSynchronously
+                match result with
+                | Ok (AddBookOutcome.Book_added _) -> ()
+                | other -> failtestf "Expected Book_added; got %A" other
+
+                Expect.isTrue
+                    (recordedUrls |> Seq.exists (fun u -> u.Contains("covers.openlibrary.org") && u.Contains("/b/id/12345678-L.jpg")))
+                    "The cover downloaded is the search hit's own CoverId (12345678), not the resolved edition's covers[0] (99999999)"
+                Expect.isFalse
+                    (recordedUrls |> Seq.exists (fun u -> u.Contains("covers.openlibrary.org") && u.Contains("/b/id/99999999-L.jpg")))
+                    "The edition's own cover id is never requested when the request already carries one")
+
+        // books-xntts: `Option.defaultValue request.WorkKey` used to yield a
+        // book literally titled `/works/OL27448W` when the edition never
+        // resolved -- the search hit's own `Title` is the fallback now.
+        testCase "addBookFromOpenLibrary with an edition key that resolves to a 404 stores the search hit's Title, never the work key string" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                use db = TestDb.withTempDbFactory bootstrap
+                let handler =
+                    new AsyncStubHandler(fun req ->
+                        async {
+                            let url = req.RequestUri.ToString()
+                            if url.Contains("/works/") then return jsonResponse workJson
+                            else return notFoundResponse () // the edition lookup 404s
+                        })
+                let api = createApi db.Factory (new HttpClient(handler)) imageBasePath
+
+                let requestWithUnresolvableEdition = { sampleRequest with EditionKey = Some "OL00000000M" }
+                let result = api.addBookFromOpenLibrary requestWithUnresolvableEdition |> Async.RunSynchronously
+                let slug =
+                    match result with
+                    | Ok (AddBookOutcome.Book_added slug) -> slug
+                    | other -> failtestf "Expected Book_added; got %A" other
+
+                let book =
+                    match BookProjection.getBySlug db.Connection slug with
+                    | Some b -> b
+                    | None -> failtest "Expected the book to be projected"
+
+                Expect.equal book.Title sampleRequest.Title "Falls back to the search hit's own Title"
+                Expect.notEqual book.Title sampleRequest.WorkKey "Never the raw work key string")
 
         testCase "refreshBookFromOpenLibrary rewrites the cache slice only, leaving book_list.title/cover_ref untouched" <| fun _ ->
             withTempImageDir (fun imageBasePath ->
@@ -216,7 +305,7 @@ let openLibraryApiTests =
                     | None -> failtest "Expected the book to still be projected"
                 let afterListRow = BookProjection.getAll db.Connection |> List.find (fun b -> b.Slug = slug)
 
-                Expect.equal after.Description (Some "A revised description.") "Cache slice's description was rewritten by the refresh"
+                Expect.equal after.Description (Some "<p>A revised description.</p>") "Cache slice's description was rewritten by the refresh, converted from Markdown to the allowlisted HTML subset (books-xntts)"
                 Expect.equal after.Title before.Title "book_detail.title is untouched by a refresh"
                 Expect.equal after.CoverRef before.CoverRef "book_detail.cover_ref is untouched by a refresh"
                 Expect.equal afterListRow.Title beforeListRow.Title "book_list.title is untouched by a refresh"

@@ -1677,7 +1677,11 @@ module Api =
                     | Some key when isIsbnShaped key -> OpenLibrary.getEditionByIsbn httpClient config key
                     | Some _ | None -> async { return None }
 
-                let title = editionOpt |> Option.map (fun e -> e.Title) |> Option.defaultValue request.WorkKey
+                // books-xntts: the search hit's own `Title` is the fallback
+                // when no edition resolves — never the work key string
+                // (`request.WorkKey` reads like `/works/OL27448W`, which is
+                // not a title).
+                let title = editionOpt |> Option.map (fun e -> e.Title) |> Option.defaultValue request.Title
                 let authors = editionOpt |> Option.map (fun e -> e.Authors) |> Option.defaultValue []
                 let year =
                     editionOpt
@@ -1688,7 +1692,16 @@ module Api =
                             | true, y -> Some y
                             | _ -> None
                         else None)
-                let coverId = editionOpt |> Option.bind (fun e -> e.CoverId)
+                // books-xntts: the cover the user clicked in the search
+                // tile (`request.CoverId`, the search hit's own `cover_i`)
+                // is preferred over the resolved edition's `covers[0]` —
+                // the edition Open Library resolves via `EditionKey` can
+                // still be a different-language printing than the one the
+                // tile showed, in which case its own cover is wrong for the
+                // book the user actually picked.
+                let coverId =
+                    request.CoverId
+                    |> Option.orElse (editionOpt |> Option.bind (fun e -> e.CoverId))
                 // Isbn13 is never parsed out of the edition key — it rides
                 // its own explicit field, populated from the search result's
                 // own `Isbn13` (verifier iteration 1).

@@ -47,6 +47,23 @@ let richTextTests =
                   Elem("p", [ Text "Great "; Elem("strong", [ Text "game" ]); Elem("br", []); Text "with an "; Text "online"; Text " mode." ])
                   Elem("ul", [ Elem("li", [ Text "Craft" ]); Elem("li", [ Text "Build" ]) ]) ]
             Expect.equal (parse input) expected "h2/a/img (with all their attributes) gone, p/strong/br/ul/li survive"
+
+        // books-xntts: `OpenLibrary.descriptionToHtml` (server side) already
+        // strips the Markdown "Contains" appendix and converts the blurb to
+        // plain <p> blocks before this string ever reaches the client -- no
+        // Markdown syntax survives to this renderer. This fixture is that
+        // converter's own expected output for the Lord of the Rings work
+        // description (see `OpenLibraryTests.fs`'s "the exact Lord of the
+        // Rings trailer" case) -- pinning that `RichText.parse` renders it
+        // as ordinary paragraphs, with no client-side change needed.
+        testCase "books-xntts: OpenLibrary.descriptionToHtml's Lord of the Rings output renders as paragraphs only" <| fun () ->
+            let input =
+                "<p>One of the most influential works of the 20th century, The Lord of the Rings is an epic set in the fictional universe of Middle-earth.</p>" +
+                "<p>This work includes six volumes of a trilogy told across three books.</p>"
+            let expected =
+                [ Elem("p", [ Text "One of the most influential works of the 20th century, The Lord of the Rings is an epic set in the fictional universe of Middle-earth." ])
+                  Elem("p", [ Text "This work includes six volumes of a trilogy told across three books." ]) ]
+            Expect.equal (parse input) expected "Two plain paragraphs, no Contains, no link, no list -- the server-side converter already removed all of that"
     ]
 
 Mocha.runTests richTextTests |> ignore
