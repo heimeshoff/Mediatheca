@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 00:33 -- Modeling / Captured: integration-sfmxg - Remove the Goodreads integration — delete the adapter, the shelf/progress sync job, the Settings card and the API surface, and drop the Goodreads progress source and external id from the Book model; Audible and Open Library remain the only book sources
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** Builder decision to drop the Goodreads integration entirely — adapter, shelf/progress sync job, Settings card, API members, and the Goodreads progress-source and external-id cases in the Book model; Audible and Open Library stay. Filed straight to todo: scope is a bounded deletion, and both the dev and live event stores were verified (2026-09-18) to hold zero Goodreads-bearing events, settings or ids, so no replay/upcast concern. vision.md and context-map.md amended in the same capture.
+
+---
+
 ## 2026-09-17 16:59 -- Work session ended
 
 **Type:** Work / Session end

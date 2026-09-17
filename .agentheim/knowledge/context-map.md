@@ -23,8 +23,8 @@ Mediatheca is a personal media library + diary + intelligence hub built on event
 - **Key actors:** Single user.
 
 ### Books
-- **Purpose:** Owns the Book aggregate — audiobooks, print and ebooks as library entries with an identity card, external ids (ISBN-13, Open Library work/edition, Audible ASIN, Goodreads book id), a single format, a Games-shaped status lifecycle, personal rating, and event-sourced reading-progress observations.
-- **Core language:** Book, identity card, external id, format, status (Backlog → InFocus → Finished / Abandoned), reading progress, progress observation (percent, position, source: Audible | Goodreads | Manual, observed-on), length, finished on.
+- **Purpose:** Owns the Book aggregate — audiobooks, print and ebooks as library entries with an identity card, external ids (ISBN-13, Open Library work/edition, Audible ASIN), a single format, a Games-shaped status lifecycle, personal rating, and event-sourced reading-progress observations.
+- **Core language:** Book, identity card, external id, format, status (Backlog → InFocus → Finished / Abandoned), reading progress, progress observation (percent, position, source: Audible | Manual, observed-on), length, finished on.
 - **Classification:** core
 - **Key actors:** Single user. Recognized 2026-09-16 (previously v2 / out of scope).
 
@@ -55,8 +55,8 @@ Mediatheca is a personal media library + diary + intelligence hub built on event
 - **Notes:** Mostly projections that read from Movies / Series / Games / Journal event streams. Yearly intelligence reports and friend-level intelligence are v2.
 
 ### Integration
-- **Purpose:** Adapters to external systems — TMDB, RAWG, Steam, HowLongToBeat, Jellyfin, qBittorrent, and for Books: Open Library, Audible, Audnexus, Goodreads. Translates external shapes into commands the core BCs accept; scheduled sync jobs pull external state on a cadence.
-- **Core language:** Import, sync, refresh, scheduled job, external id (TMDB id, RAWG id, Steam appId, ISBN, Open Library key, Audible ASIN, Goodreads book id), adapter, auth file (Audible, ADR-0074), public feed (Goodreads, ADR-0075).
+- **Purpose:** Adapters to external systems — TMDB, RAWG, Steam, HowLongToBeat, Jellyfin, qBittorrent, and for Books: Open Library, Audible, Audnexus (Goodreads was removed 2026-09-18, integration-sfmxg). Translates external shapes into commands the core BCs accept; scheduled sync jobs pull external state on a cadence.
+- **Core language:** Import, sync, refresh, scheduled job, external id (TMDB id, RAWG id, Steam appId, ISBN, Open Library key, Audible ASIN), adapter, auth file (Audible, ADR-0074).
 - **Classification:** generic
 - **Key actors:** External services + single user (triggering manual syncs).
 

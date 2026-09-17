@@ -36,7 +36,7 @@ A cross-cutting concept that lets the user signal intent — "I want to engage w
 - A status in the lifecycle, the Games shape: Backlog → **InFocus** → Finished / Abandoned
 - InFocus means "reading or listening to this now, or next"
 - Any reading-progress observation that moves the percent forward pulls a book (from any unfinished status) into InFocus; reaching 100 % (or the source saying "finished") moves it to Finished
-- InFocus books appear on the main dashboard with their progress bar and the source of the progress (Audible, Goodreads, or entered by hand)
+- InFocus books appear on the main dashboard with their progress bar and the source of the progress (Audible, or entered by hand)
 
 ## Unified Dashboard
 
@@ -118,11 +118,11 @@ The curated overview. Answers "what's next?" at a glance.
 - Display comparison on game detail page (your play time vs average)
 - Show on Games dashboard tab
 
-### Books — Audible + Goodreads (recognized 2026-09-16, pulled forward from v2)
+### Books — Audible + Open Library (recognized 2026-09-16, pulled forward from v2; Goodreads dropped 2026-09-18)
 Books join movies, series and games as the fourth media type, served the way TMDB serves movies and Steam serves games: configured in Settings, searchable in the search modal, a detail page, and progress that comes from the outside.
-- **Sources:** Audible (audiobooks — catalog search needs no credential; the library and listening progress come through an auth file the user generates on their own machine with `audible-cli`, never a login performed by Mediatheca — ADR-0074) and Goodreads (no API exists any more — the public shelf and user-status RSS feeds, keyed by the user's Goodreads user id, give shelf membership, ratings and "page N of M" progress without any key or cookie — ADR-0075). Open Library is the key-less search/metadata source for print books.
+- **Sources:** Audible (audiobooks — catalog search needs no credential; the library and listening progress come through an auth file the user generates on their own machine with `audible-cli`, never a login performed by Mediatheca — ADR-0074). Open Library is the key-less search/metadata source for print books (ADR-0075). Goodreads was shipped on 2026-09-16 as a third source (public RSS shelf/status feeds) and **dropped on 2026-09-18** without ever being used — Audible and Open Library are the only book sources; see integration-sfmxg.
 - **Progress:** a reading-progress observation (percent, source, date) is an event, like a Steam play session; length and description are cache (ADR-0076). Manual progress entry on the detail page is the always-available fallback.
-- **Surfaces:** Settings cards (Audible, Goodreads), search-modal Books tab (Open Library + Audible sources), `/books/{slug}` detail page, dashboard Books tab and All-tab Reading rail, scheduled progress/shelf sync jobs.
+- **Surfaces:** Settings card (Audible), search-modal Books tab (Open Library + Audible sources), `/books/{slug}` detail page, dashboard Books tab and All-tab Reading rail, scheduled progress sync job.
 - **Later:** reading activity in the Journal, books in catalogs.
 
 ### Operability & Observability — Admin Console (recognized 2026-07-21)
@@ -133,7 +133,8 @@ The event-sourced store (ADR-0002) is only as trustworthy as it is inspectable. 
 
 ## Out of Scope (v1)
 
-- ~~Books (v2)~~ — pulled into v1 on 2026-09-16, see "Books — Audible + Goodreads" above
+- ~~Books (v2)~~ — pulled into v1 on 2026-09-16, see "Books — Audible + Open Library" above
+- Goodreads integration — shipped 2026-09-16, removed 2026-09-18 (integration-sfmxg); not coming back
 - Trakt.tv / Jellyfin sync (v2)
 - Yearly intelligence reports (v2)
 - Friend-level intelligence (v2)
