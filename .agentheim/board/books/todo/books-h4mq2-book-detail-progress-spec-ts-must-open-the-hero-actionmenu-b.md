@@ -1,12 +1,12 @@
 ---
 id: books-h4mq2
 title: book-detail-progress.spec.ts must open the hero ActionMenu before clicking "Update progress"
-status: backlog
+status: todo
 type: bug
 context: books
 created: 2026-09-17
 completed:
-depends_on: []
+depends_on: [design-system-001-formalize-styleguide]
 blocks: []
 tags: [books, e2e, test-debt, accessibility]
 related_adrs: [0076, 0027]

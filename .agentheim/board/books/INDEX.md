@@ -10,14 +10,15 @@ Catalog of this bounded context's tasks by status.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
-- **Todo:** 0
+- **Backlog:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 7
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **books-h4mq2** — book-detail-progress.spec.ts must open the hero ActionMenu before clicking "Update progress" (bug) — `todo/books-h4mq2-book-detail-progress-spec-ts-must-open-the-hero-actionmenu-b.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -37,7 +38,6 @@ Catalog of this bounded context's tasks by status.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **books-h4mq2** — book-detail-progress.spec.ts must open the hero ActionMenu before clicking "Update progress" (bug) — `backlog/books-h4mq2-book-detail-progress-spec-ts-must-open-the-hero-actionmenu-b.md`
 <!-- backlog-list:end -->
 
 ## Pointers

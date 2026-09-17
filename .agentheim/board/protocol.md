@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 14:30 -- Modeling / Promoted: books-h4mq2 - book-detail-progress.spec.ts must open the hero ActionMenu before clicking "Update progress"
+
+**Type:** Modeling / Promote
+**BC:** books
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-17 14:30 -- Modeling / Refined: books-h4mq2 - book-detail-progress.spec.ts must open the hero ActionMenu before clicking "Update progress"
 
 **Type:** Modeling / Refine
