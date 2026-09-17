@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 12:42 -- Modeling / Captured: books-depwh - The book detail page's Details card no longer shows a date — the metadata line under the description reads just `Publisher · Language`, dropping the published/release date that Audible imports put at its end
+
+**Type:** Modeling / Capture
+**BC:** books
+**Filed to:** todo
+**Summary:** Builder doesn't want the Audible release date at the end of the book Details card's metadata line. Display-only removal in detailsCard for all books; the cached published date is kept.
+
+---
+
 ## 2026-09-17 12:34 -- Batch started: [books-nvnyk]
 
 **Type:** Work / Batch start
