@@ -1,7 +1,7 @@
 ---
 id: books-depwh
 title: The book detail page's Details card no longer shows a date — the metadata line under the description reads just `Publisher · Language`, dropping the published/release date that Audible imports put at its end
-status: todo
+status: doing
 type: feature
 context: books
 created: 2026-09-17

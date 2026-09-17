@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 12:59 -- Batch started: [books-depwh]
+
+**Type:** Work / Batch start
+**Tasks:** books-depwh - The book detail page's Details card no longer shows a date — the metadata line under the description reads just `Publisher · Language`, dropping the published/release date that Audible imports put at its end
+**Parallel:** no (1 worker — books-depwh is the only ready task; books-jm7aa blocked on books-depwh)
+
+---
+
 ## 2026-09-17 12:58 -- Task verified and completed: books-nvnyk - Audible-imported book descriptions show their intended formatting (paragraphs, emphasis, lists) instead of raw `<p>`/`<i>` tags — the Audible adapter keeps the publisher summary as a sanitized allowlisted HTML subset (Audible and Audnexus paths alike) and the book detail page renders it through a tag-allowlisting rich-text component, never `innerHTML`
 
 **Type:** Work / Task completion
