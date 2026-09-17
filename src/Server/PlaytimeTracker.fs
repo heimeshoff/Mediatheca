@@ -318,6 +318,10 @@ module PlaytimeTracker =
                                 ShortDescription = steamShortDescription
                                 WebsiteUrl = steamWebsiteUrl
                             }
+                            // games-fffvm: creation-path identity-card write
+                            // — stamp so the row never lands in the
+                            // backfill's own candidate set.
+                            MetadataCache.stampDescriptionFetched conn slug
                             let facets = FacetDerivation.deriveFacets steamCategoryIds
                             MetadataCache.upsertGameFacets conn slug facets steamCategoryIds
                             executeGameCommand conn slug Games.Mark_as_owned projectionHandlers |> ignore

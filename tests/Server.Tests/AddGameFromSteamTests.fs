@@ -278,6 +278,21 @@ let addGameFromSteamTests =
                 | Some game -> Expect.stringContains game.Description "<strong>" "the cache-backed identity card still keeps the sanitized HTML subset"
             | Ok (Duplicate_found _) -> failtest "Expected a fresh AppId/Name pair to create, not duplicate"
             | Error e -> failtest (sprintf "Expected success, got Error %s" e)
+
+        testCase "games-fffvm: the new row is stamped description_fetched_at — never returned by findGamesNeedingDescriptionBackfill" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrap
+            let http = httpClientFor "[]" (storeDetailsJson 1620 "A puzzle game" "Long about text" []) "{}"
+            let api = createApi db.Factory http
+
+            let request: AddGameFromSteamRequest = { AppId = 1620; Name = "Stamped Steam Game"; Year = Some 2011; SkipDuplicateCheck = false }
+            let result = api.addGameFromSteam request |> Async.RunSynchronously
+
+            match result with
+            | Ok (Created slug) ->
+                let candidates = MetadataCache.findGamesNeedingDescriptionBackfill db.Connection |> List.map fst
+                Expect.isFalse (List.contains slug candidates) "the freshly-created row is not a description-backfill candidate"
+            | Ok (Duplicate_found _) -> failtest "Expected a fresh AppId/Name pair to create, not duplicate"
+            | Error e -> failtest (sprintf "Expected success, got Error %s" e)
     ]
 
 [<Tests>]

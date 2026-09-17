@@ -34,6 +34,7 @@ open System.Threading
 open System.Threading.Tasks
 open Expecto
 open Microsoft.Data.Sqlite
+open Donald
 open Mediatheca.Server
 open Mediatheca.Shared
 
@@ -141,6 +142,35 @@ let private buildHttpClient (sharedAppsJson: string) (counts: RequestCounts) : H
 let private sharedApp (appid: int) (name: string) (rtTimeAcquired: int) (ownerSteamids: string list) =
     let owners = ownerSteamids |> List.map (sprintf "\"%s\"") |> String.concat ","
     sprintf """{"appid":%d,"name":"%s","owner_steamids":[%s],"rt_time_acquired":%d}""" appid name owners rtTimeAcquired
+
+/// games-fffvm: like `buildHttpClient`, but the `appdetails` stub answers
+/// with a caller-supplied `about_the_game`/`short_description` instead of
+/// always-empty ones. The FullReenrich known-game branch only calls
+/// `updateGameIdentityCache` for `short_description` when
+/// `details.AboutTheGame <> ""` (Api.fs's own pre-existing gate, unrelated
+/// to this task) -- `buildHttpClient`'s always-empty stub never exercises
+/// that write, so this task's "short_description-only refresh must not
+/// stamp" criterion needs its own stub.
+let private buildHttpClientForFullReenrichDescription (sharedAppsJson: string) (aboutTheGame: string) (shortDesc: string) : HttpClient =
+    let handler =
+        new StubHandler(fun req ->
+            let url = req.RequestUri.ToString()
+            if url.Contains("GetOwnedGames") then
+                jsonResponse """{"response":{"game_count":0,"games":[]}}"""
+            elif url.Contains("GetFamilyGroupForUser") then
+                jsonResponse """{"response":{"family_groupid":"12345","members":[]}}"""
+            elif url.Contains("GetSharedLibraryApps") then
+                jsonResponse (sprintf """{"response":{"apps":[%s]}}""" sharedAppsJson)
+            elif url.Contains("appdetails") then
+                let m = System.Text.RegularExpressions.Regex.Match(url, @"appids=(\d+)")
+                let appid = if m.Success then m.Groups.[1].Value else "0"
+                jsonResponse (
+                    sprintf
+                        """{"%s":{"success":true,"data":{"about_the_game":"%s","short_description":"%s","detailed_description":"","website":null,"categories":[],"release_date":{"coming_soon":false,"date":""}}}}"""
+                        appid aboutTheGame shortDesc)
+            else
+                notFoundResponse ())
+    new HttpClient(handler)
 
 [<Tests>]
 let steamFamilyIncrementalImportTests =
@@ -341,4 +371,60 @@ let steamFamilyIncrementalImportTests =
             | Error e -> failtestf "Expected Ok, got Error %s" e
 
             Expect.equal (counts.Get "appdetails") 1 "Full re-enrich still fetches appdetails for the known app"
+
+        testCase "games-fffvm: a FullReenrich short_description-only refresh on a legacy row does not stamp description_fetched_at" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrap
+            SettingsStore.setSetting db.Connection "steam_family_token" "valid-family-token"
+
+            // Seed a known game with a Steam app id and a legacy, unstamped,
+            // flattened identity-card description -- the pre-games-fffvm
+            // state this task's Why section describes.
+            let slug = "legacy-flat-game-2015"
+            let legacyGameData: Games.GameAddedData =
+                { Name = "Legacy Flat Game"; Year = 2015; Genres = []; Description = ""
+                  ShortDescription = ""; WebsiteUrl = None; CoverRef = None; BackdropRef = None
+                  RawgId = None; RawgRating = None }
+            EventStore.appendToStream db.Connection (Games.streamId slug) -1L
+                [ Games.Serialization.toEventData (Games.Game_added_to_library legacyGameData) ] |> ignore
+            Projection.runProjection db.Connection GameProjection.handler
+            EventStore.appendToStream db.Connection (Games.streamId slug) 0L
+                [ Games.Serialization.toEventData (Games.Game_steam_app_id_set 620) ] |> ignore
+            Projection.runProjection db.Connection GameProjection.handler
+            MetadataCache.upsertGameIdentityCard db.Connection slug {
+                Description = "A flat legacy description"
+                ShortDescription = "old short description"
+                WebsiteUrl = None
+            }
+            // deliberately NOT stamped -- description_fetched_at stays NULL
+
+            let candidatesBefore = MetadataCache.findGamesNeedingDescriptionBackfill db.Connection |> List.map fst
+            Expect.equal candidatesBefore [ slug ] "sanity: the legacy row is a candidate before the re-enrich run"
+
+            let app = sharedApp 620 "Legacy Flat Game" 1_700_000_000 [ "76561198000000001" ]
+            let http = buildHttpClientForFullReenrichDescription app "Non-empty about text" "A refreshed short description"
+
+            let result =
+                Api.runSteamFamilyImport db.Connection http
+                    (fun () -> ({ ApiKey = "" } : Rawg.RawgConfig))
+                    (fun () -> steamConfig)
+                    noImagesDir allProjectionHandlers (fun _ -> ()) Api.FullReenrich
+                |> Async.RunSynchronously
+
+            match result with
+            | Ok _ -> ()
+            | Error e -> failtestf "Expected Ok, got Error %s" e
+
+            let row =
+                db.Connection
+                |> Db.newCommand "SELECT short_description, description_fetched_at FROM game_metadata_cache WHERE game_slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String slug ]
+                |> Db.querySingle (fun rd -> rd.ReadString "short_description", rd.IsDBNull(rd.GetOrdinal("description_fetched_at")))
+            match row with
+            | Some (shortDesc, fetchedAtIsNull) ->
+                Expect.equal shortDesc "A refreshed short description" "sanity: the short-description-only refresh really landed"
+                Expect.isTrue fetchedAtIsNull "a short_description-only refresh must never stamp description_fetched_at"
+            | None -> failtest "expected the row to still exist"
+
+            let candidatesAfter = MetadataCache.findGamesNeedingDescriptionBackfill db.Connection |> List.map fst
+            Expect.equal candidatesAfter [ slug ] "the row is still returned by findGamesNeedingDescriptionBackfill afterwards"
     ]

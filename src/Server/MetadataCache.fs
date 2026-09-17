@@ -329,6 +329,23 @@ module MetadataCache =
             conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN release_date_fetched_at TEXT" |> Db.exec
         with _ -> () // Column already exists
 
+        // games-fffvm (ADR-0043/ADR-0045): the re-sanitization backfill's OWN
+        // resume cursor for `description` -- deliberately separate from
+        // `fetched_at`/`deck_compat_fetched_at`/`release_date_fetched_at`,
+        // same reasoning as those (an independent job against a different
+        // stamping rule must never share a cursor column with another job).
+        // NULL means "never written from sanitizer output" -- true both for
+        // a legacy flattened description already on the row and for a
+        // missing row entirely (the RAWG-only legacy population). Stamped
+        // only by `stampDescriptionFetched`, called by `Api.fs`'s
+        // `updateGameIdentityCache` (iff a description is actually passed)
+        // and by every creation-path `upsertGameIdentityCard` call site --
+        // never by `upsertGameIdentityCard` itself, which stays shared with
+        // description-less refreshes.
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN description_fetched_at TEXT" |> Db.exec
+        with _ -> () // Column already exists
+
         // `fetched_at` on the renamed tables themselves — they predate this
         // cache tier and never had this column. Same `ALTER TABLE ... ADD
         // COLUMN` idiom as `SeriesProjection.createTables`'s migrations.
@@ -864,6 +881,72 @@ module MetadataCache =
             """
         |> Db.query (fun (rd: IDataReader) ->
             rd.ReadString "game_slug", rd.ReadInt32 "steam_app_id")
+
+    /// games-fffvm: the resumable description backfill's own stamp write —
+    /// deliberately NOT folded into `upsertGameIdentityCard` (that helper is
+    /// shared with `Api.fs`'s description-LESS refresh calls via
+    /// `updateGameIdentityCache`, so stamping inside it would wrongly mark a
+    /// short_description/website_url-only refresh as "description fetched",
+    /// per this task's stamping rule). `INSERT ... ON CONFLICT DO UPDATE`
+    /// names only this one column, so the stamp survives a row that doesn't
+    /// exist yet at all — the RAWG-only legacy population games-v4nqe's seed
+    /// never created a row for — without touching any other column.
+    let stampDescriptionFetched (conn: SqliteConnection) (slug: string) : unit =
+        conn
+        |> Db.newCommand
+            """
+            INSERT INTO game_metadata_cache (game_slug, description_fetched_at)
+            VALUES (@game_slug, @description_fetched_at)
+            ON CONFLICT(game_slug) DO UPDATE SET
+                description_fetched_at = excluded.description_fetched_at
+            """
+        |> Db.setParams [
+            "game_slug", SqlType.String slug
+            "description_fetched_at", SqlType.String (System.DateTime.UtcNow.ToString("o"))
+        ]
+        |> Db.exec
+
+    /// games-fffvm: which third party a description candidate's fetch
+    /// should come from — Steam's storefront (already-sanitized at decode
+    /// time, `Steam.storeDescription`) or RAWG's game-details endpoint
+    /// (sanitized by the caller, `DescriptionSanitizer.sanitize`).
+    type DescriptionSource =
+        | SteamApp of int
+        | RawgGame of int
+
+    /// games-fffvm (ADR-0043/ADR-0045): the re-sanitization backfill's own
+    /// cursor. Unlike `findGamesNeedingFacetBackfill`/
+    /// `findGamesNeedingDeckCompatBackfill` (an INNER JOIN — a game with no
+    /// cache row yet is out of scope by construction), this is a LEFT JOIN,
+    /// mirroring `GameProjection.findGamesWithEmptyDescriptionAndSteamAppId`:
+    /// the RAWG-only legacy population (games-v4nqe's seed only created rows
+    /// for games that existed at seed time) can have NO cache row at all,
+    /// and `mc.description_fetched_at IS NULL` is still true for a missing
+    /// joined row. Both ids come from `game_detail` — `game_metadata_cache`'s
+    /// own `rawg_id` column is a one-time seed copy, never updated after
+    /// (`Game_rawg_id_set` only writes `game_detail`), so reading it here
+    /// would silently miss every game whose RAWG link was set after the
+    /// seed ran. Steam wins when both ids are present (returned once, as a
+    /// Steam candidate) — no same-run fallback to RAWG on a Steam failure;
+    /// the row simply stays unstamped and is retried next run.
+    let findGamesNeedingDescriptionBackfill (conn: SqliteConnection) : (string * DescriptionSource) list =
+        conn
+        |> Db.newCommand
+            """
+            SELECT gd.slug, gd.steam_app_id, gd.rawg_id
+            FROM game_detail gd
+            LEFT JOIN game_metadata_cache mc ON mc.game_slug = gd.slug
+            WHERE mc.description_fetched_at IS NULL
+              AND (gd.steam_app_id IS NOT NULL OR gd.rawg_id IS NOT NULL)
+            """
+        |> Db.query (fun (rd: IDataReader) ->
+            let slug = rd.ReadString "slug"
+            let source =
+                if not (rd.IsDBNull(rd.GetOrdinal("steam_app_id"))) then
+                    SteamApp (rd.ReadInt32 "steam_app_id")
+                else
+                    RawgGame (rd.ReadInt32 "rawg_id")
+            slug, source)
 
     /// books-y9kxy (ADR-0076 §3 / ADR-0045): the description/length/series
     /// metadata cache slice — `page_count`, `runtime_minutes`, `description`,

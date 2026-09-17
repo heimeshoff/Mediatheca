@@ -430,6 +430,16 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
         |> Option.defaultValue 7
 
+    // games-fffvm (ADR-0043/ADR-0045): resumable throttled description
+    // re-sanitization backfill, reusing the same job shape as
+    // games-a7dqx/games-b8xnw/games-ev65k. Defaults to 08:00 local, an hour
+    // clear of the release-date backfill (07:00) so the four jobs' Steam
+    // Store fetches stay spread out.
+    let descriptionBackfillHour =
+        SettingsStore.getSetting conn "description_backfill_hour"
+        |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
+        |> Option.defaultValue 8
+
     // integration-wmqn3 (ADR-0075): defaults to 05:00 local, an hour clear
     // of the Steam playtime sync (04:00) so the two jobs' network I/O
     // windows don't pile up.
@@ -530,6 +540,17 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
                 let! result = GameReleaseDateBackfill.runBackfill jobConn jobDbLock httpClient
                 let summary = sprintf "%d/%d games fetched, %d errors" result.Succeeded result.Processed result.Errors
                 eprintfn "[GameReleaseDateBackfill] %s" summary
+                return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = summary } : ScheduledJobs.JobRunOutcome)
+            } }
+        { Name = "Game description backfill"
+          Hour = descriptionBackfillHour
+          Run = fun () ->
+            async {
+                let! result = GameDescriptionBackfill.runBackfill jobConn jobDbLock httpClient getRawgConfig
+                let summary =
+                    sprintf "%d/%d games fetched, %d errors, %d skipped (no RAWG key)"
+                        result.Succeeded result.Processed result.Errors result.Skipped
+                eprintfn "[GameDescriptionBackfill] %s" summary
                 return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = summary } : ScheduledJobs.JobRunOutcome)
             } }
         // integration-wmqn3 (ADR-0075/ADR-0010): unconfigured (no user id

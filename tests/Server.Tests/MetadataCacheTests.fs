@@ -758,4 +758,98 @@ let tests =
             MetadataCache.upsertGameFacets conn "braid-2008" facets [ 2 ]
 
             Expect.isEmpty (MetadataCache.findGamesNeedingFacetBackfill conn) "The processed game no longer appears in the cursor"
+
+        testCase "initialize adds description_fetched_at to game_metadata_cache, idempotently" <| fun _ ->
+            let conn = createConnection ()
+            MetadataCache.initialize conn
+            let colsBefore = allColumns conn "game_metadata_cache" |> Set.ofList
+            Expect.isTrue (Set.contains "description_fetched_at" colsBefore) "game_metadata_cache should have column description_fetched_at"
+
+            MetadataCache.initialize conn // second call must not throw
+            Expect.equal (allColumns conn "game_metadata_cache" |> Set.ofList) colsBefore "Schema unchanged by a second initialize"
+
+        testCase "stampDescriptionFetched creates a row when none exists yet, touching only description_fetched_at" <| fun _ ->
+            let conn = createConnection ()
+            MetadataCache.initialize conn
+            MetadataCache.stampDescriptionFetched conn "no-row-game-2020"
+
+            let row =
+                conn
+                |> Db.newCommand "SELECT description, description_fetched_at FROM game_metadata_cache WHERE game_slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String "no-row-game-2020" ]
+                |> Db.querySingle (fun rd ->
+                    rd.IsDBNull(rd.GetOrdinal("description")), rd.IsDBNull(rd.GetOrdinal("description_fetched_at")))
+            match row with
+            | Some (descriptionIsNull, fetchedAtIsNull) ->
+                Expect.isTrue descriptionIsNull "stampDescriptionFetched writes no description -- only the stamp"
+                Expect.isFalse fetchedAtIsNull "description_fetched_at is stamped"
+            | None -> failtest "expected stampDescriptionFetched to create a row for a missing slug"
+
+        testCase "stampDescriptionFetched on an existing row touches only description_fetched_at -- description/short_description/website_url survive" <| fun _ ->
+            let conn = createConnection ()
+            MetadataCache.initialize conn
+            MetadataCache.upsertGameIdentityCard conn "portal-2-2011" {
+                Description = "A puzzle game"
+                ShortDescription = "Portal sequel"
+                WebsiteUrl = Some "https://example.com"
+            }
+            MetadataCache.stampDescriptionFetched conn "portal-2-2011"
+
+            let row =
+                conn
+                |> Db.newCommand "SELECT description, short_description, website_url FROM game_metadata_cache WHERE game_slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String "portal-2-2011" ]
+                |> Db.querySingle (fun rd ->
+                    rd.ReadString "description", rd.ReadString "short_description", rd.ReadString "website_url")
+            Expect.equal row (Some ("A puzzle game", "Portal sequel", "https://example.com")) "identity-card fields survive a stamp-only call"
+
+        testCase "findGamesNeedingDescriptionBackfill: legacy Steam-linked row (has a cache row), RAWG-only game with no cache row at all, and exclusions" <| fun _ ->
+            let conn = createConnection ()
+            SettingsStore.initialize conn
+            GameProjection.handler.Init conn
+            SeriesProjection.handler.Init conn
+            MetadataCache.initialize conn
+
+            // (a) A legacy Steam-linked game that existed at seed time --
+            // gets a game_metadata_cache row from seedFromProjections, with
+            // description_fetched_at left NULL (the column didn't exist
+            // when this task's predecessors seeded it).
+            EventStore.appendToStream conn (Games.streamId "legacy-steam-2015") -1L
+                [ Games.Serialization.toEventData (Games.Game_added_to_library { sampleGameData with Name = "Legacy Steam Game"; RawgId = None }) ] |> ignore
+            Projection.runProjection conn GameProjection.handler
+            EventStore.appendToStream conn (Games.streamId "legacy-steam-2015") 0L
+                [ Games.Serialization.toEventData (Games.Game_steam_app_id_set 111) ] |> ignore
+            Projection.runProjection conn GameProjection.handler
+            MetadataCache.seedFromProjections conn // marker-gated: only "legacy-steam-2015" exists right now
+
+            // (b) A RAWG-only game added AFTER the seed marker was set --
+            // games-v4nqe's seed never created a row for it at all.
+            EventStore.appendToStream conn (Games.streamId "rawg-only-2020") -1L
+                [ Games.Serialization.toEventData (Games.Game_added_to_library { sampleGameData with Name = "Rawg Only Game"; RawgId = Some 9001 }) ] |> ignore
+            Projection.runProjection conn GameProjection.handler
+
+            // (c1) A game with neither id -- never a candidate.
+            EventStore.appendToStream conn (Games.streamId "no-ids-2019") -1L
+                [ Games.Serialization.toEventData (Games.Game_added_to_library { sampleGameData with Name = "No Ids Game"; RawgId = None }) ] |> ignore
+            Projection.runProjection conn GameProjection.handler
+
+            // (d) A game with BOTH ids -- Steam wins, returned once.
+            EventStore.appendToStream conn (Games.streamId "both-ids-2018") -1L
+                [ Games.Serialization.toEventData (Games.Game_added_to_library { sampleGameData with Name = "Both Ids Game"; RawgId = Some 7002 }) ] |> ignore
+            Projection.runProjection conn GameProjection.handler
+            EventStore.appendToStream conn (Games.streamId "both-ids-2018") 0L
+                [ Games.Serialization.toEventData (Games.Game_steam_app_id_set 222) ] |> ignore
+            Projection.runProjection conn GameProjection.handler
+
+            let candidates = MetadataCache.findGamesNeedingDescriptionBackfill conn |> List.sortBy fst
+            Expect.equal candidates
+                [ ("both-ids-2018", MetadataCache.SteamApp 222)
+                  ("legacy-steam-2015", MetadataCache.SteamApp 111)
+                  ("rawg-only-2020", MetadataCache.RawgGame 9001) ]
+                "legacy Steam-linked row, RAWG-only row with no cache row, and the both-ids row (as Steam) are the only candidates -- no-ids-2019 is excluded"
+
+            // (c2) Stamping the legacy row removes it from the cursor.
+            MetadataCache.stampDescriptionFetched conn "legacy-steam-2015"
+            let candidatesAfterStamp = MetadataCache.findGamesNeedingDescriptionBackfill conn |> List.map fst |> Set.ofList
+            Expect.isFalse (Set.contains "legacy-steam-2015" candidatesAfterStamp) "a stamped row drops out of the cursor"
     ]

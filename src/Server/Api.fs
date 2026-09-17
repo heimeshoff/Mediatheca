@@ -48,6 +48,13 @@ module Api =
     /// sites that only ever refresh short_description/website_url, for
     /// instance). Genres is NOT part of this slice — ADR-0055 (amending
     /// ADR-0043) keeps it event-carried on `game_list`/`game_detail`.
+    ///
+    /// games-fffvm: stamps `description_fetched_at` iff `description` is
+    /// `Some` — the exact "sanitizer-output description genuinely written"
+    /// rule this task's stamping section calls for. A short_description/
+    /// website_url-only refresh (`description = None`, the re-enrich
+    /// branches below) never stamps, so a legacy flattened description
+    /// stays a backfill candidate until an actual description write lands.
     let private updateGameIdentityCache
         (conn: SqliteConnection)
         (slug: string)
@@ -61,6 +68,8 @@ module Api =
             ShortDescription = shortDescription |> Option.defaultValue current.ShortDescription
             WebsiteUrl = websiteUrl |> Option.defaultValue current.WebsiteUrl
         }
+        if description.IsSome then
+            MetadataCache.stampDescriptionFetched conn slug
 
     /// games-v4nqe: derives ADR-0053 facets from a Steam fetch's category ids
     /// and writes them (plus the raw ids) to the cache — the same
@@ -918,6 +927,12 @@ module Api =
                                                         ShortDescription = steamShortDescription
                                                         WebsiteUrl = steamWebsiteUrl
                                                     }
+                                                    // games-fffvm: a creation-path identity-card
+                                                    // write always carries a sanitizer-output
+                                                    // description (Steam's or RAWG's, possibly
+                                                    // empty when both failed) — stamp so the row
+                                                    // never lands in the backfill's own candidate set.
+                                                    MetadataCache.stampDescriptionFetched conn slug
                                                     updateGameFacetsFromCategoryIds conn slug steamCategoryIds
                                                     match storeDetails with
                                                     | Ok details -> updateGameReleaseDate conn slug details
@@ -1396,6 +1411,11 @@ module Api =
                         ShortDescription = newShortDescription
                         WebsiteUrl = newWebsiteUrl
                     }
+                    // games-fffvm: attaching Steam always writes a
+                    // sanitizer-output description (Steam's, or the existing
+                    // one echoed back unchanged when already non-empty) —
+                    // stamp so this row drops out of the backfill's cursor.
+                    MetadataCache.stampDescriptionFetched conn slug
 
                     // 5. Facets — derived from Steam's category ids
                     updateGameFacetsFromCategoryIds conn slug details.CategoryIds
@@ -1522,6 +1542,9 @@ module Api =
                             ShortDescription = shortDescription
                             WebsiteUrl = websiteUrl
                         }
+                        // games-fffvm: creation-path identity-card write —
+                        // stamp so the row never lands in the backfill's set.
+                        MetadataCache.stampDescriptionFetched conn slug
                         updateGameFacetsFromCategoryIds conn slug categoryIds
                         // games-ev65k: the Tenebris Somnia (appId 2121510)
                         // end-to-end path — release date lands on the cache
@@ -3671,6 +3694,10 @@ module Api =
                                     ShortDescription = ""
                                     WebsiteUrl = None
                                 }
+                                // games-fffvm: creation-path identity-card
+                                // write — stamp so the row never lands in
+                                // the backfill's own candidate set.
+                                MetadataCache.stampDescriptionFetched conn slug
                             // Auto-attach Steam for RAWG-sourced games with a clear match.
                             // Best-effort: any failure (Steam down, no match, ambiguous) is
                             // swallowed — the user can still click Connect later.
@@ -4581,6 +4608,11 @@ module Api =
                                                 ShortDescription = steamShortDescription
                                                 WebsiteUrl = steamWebsiteUrl
                                             }
+                                            // games-fffvm: creation-path
+                                            // identity-card write — stamp so
+                                            // the row never lands in the
+                                            // backfill's own candidate set.
+                                            MetadataCache.stampDescriptionFetched conn slug
                                             updateGameFacetsFromCategoryIds conn slug steamCategoryIds
                                             match storeDetails with
                                             | Ok details -> updateGameReleaseDate conn slug details

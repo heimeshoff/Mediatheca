@@ -56,6 +56,7 @@
     <Compile Include="GameFacetBackfill.fs" />
     <Compile Include="GameDeckCompatBackfill.fs" />
     <Compile Include="GameReleaseDateBackfill.fs" />
+    <Compile Include="GameDescriptionBackfill.fs" />
     <Compile Include="GoodreadsSync.fs" />
     <Compile Include="AudibleSync.fs" />
     <Compile Include="SeriesRefresh.fs" />

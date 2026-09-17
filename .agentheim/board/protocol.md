@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 16:55 -- Task verified and completed: games-fffvm - Re-sanitize existing game descriptions — a resumable, throttled backfill that re-fetches every already-cached game's description (Steam-linked via the storefront, RAWG-only via RAWG details) through games-r1tx4's sanitizer, so games imported before it gain paragraphs/emphasis and RAWG-only games get the description games-v4nqe silently dropped
+
+**Type:** Work / Task completion
+**Task:** games-fffvm - Re-sanitize existing game descriptions — a resumable, throttled backfill that re-fetches every already-cached game's description (Steam-linked via the storefront, RAWG-only via RAWG details) through games-r1tx4's sanitizer, so games imported before it gain paragraphs/emphasis and RAWG-only games get the description games-v4nqe silently dropped
+**Summary:** Added a fourth resumable throttled backfill (GameDescriptionBackfill.fs) that re-fetches every already-cached game's description through games-r1tx4's sanitizer — Steam-linked via the storefront, RAWG-only via RAWG details — walking its own description_fetched_at cursor so legacy Steam imports gain paragraphs/emphasis and RAWG-only games get the description games-v4nqe silently dropped; stamped only where a sanitizer-output description is genuinely written, never on a short_description/website_url-only refresh.
+**Duration:** 29m19s
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 12
+**Tests added:** 10
+**ADRs written:** 0081
+
+---
+
 ## 2026-09-17 16:25 -- Batch started: [games-fffvm]
 
 **Type:** Work / Batch start

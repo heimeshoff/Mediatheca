@@ -179,4 +179,18 @@ let addGameFromRawgTests =
                 | None -> failtest "Expected a Game_added_to_library event in the stream"
             | Ok (Duplicate_found _) -> failtest "Expected a fresh RawgId/Name pair to create, not duplicate"
             | Error e -> failtest (sprintf "Expected success, got Error %s" e)
+
+        testCase "games-fffvm: the new row is stamped description_fetched_at — never returned by findGamesNeedingDescriptionBackfill" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrap
+            let http = httpClientFor (rawgDetailsJson 4200 "<p>An RPG.</p>" "An RPG.")
+            let api = createApi db.Factory http "test-rawg-key"
+
+            let result = api.addGame { sampleRequest 4200 with Name = "Stamped Rawg Game" } |> Async.RunSynchronously
+
+            match result with
+            | Ok (Created slug) ->
+                let candidates = MetadataCache.findGamesNeedingDescriptionBackfill db.Connection |> List.map fst
+                Expect.isFalse (List.contains slug candidates) "the freshly-created row is not a description-backfill candidate"
+            | Ok (Duplicate_found _) -> failtest "Expected a fresh RawgId/Name pair to create, not duplicate"
+            | Error e -> failtest (sprintf "Expected success, got Error %s" e)
     ]

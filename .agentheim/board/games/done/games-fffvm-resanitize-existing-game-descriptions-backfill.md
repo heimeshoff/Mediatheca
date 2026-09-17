@@ -1,7 +1,7 @@
 ---
 id: games-fffvm
 title: Re-sanitize existing game descriptions — a resumable, throttled backfill that re-fetches every already-cached game's description (Steam-linked via the storefront, RAWG-only via RAWG details) through games-r1tx4's sanitizer, so games imported before it gain paragraphs/emphasis and RAWG-only games get the description games-v4nqe silently dropped
-status: doing
+status: done
 type: chore
 context: games
 created: 2026-09-17
@@ -9,7 +9,7 @@ completed:
 depends_on: [games-r1tx4]
 blocks: []
 tags: [games, steam, rawg, description, backfill, metadata-cache, integration]
-related_adrs: [0043, 0045]
+related_adrs: [0043, 0045, 0081]
 related_research: []
 prior_art: [games-ev65k, games-b8xnw, games-a7dqx, games-v4nqe, games-r1tx4]
 ---
@@ -92,3 +92,67 @@ A fourth instance of the games BC's resumable throttled backfill shape (`GameFac
 - Do not add an event for the refresh (ADR-0043: third-party cache data is not event-worthy) and never write through the ProjectionHandler (ADR-0045).
 - Fixtures only, never the live DB (project standing rule); the worker never runs the job against `mediatheca.db`. The `[human-eye]` criterion is the builder's, after deploy.
 - Orchestrator not consulted at this refinement: no open domain question (cache-only, no aggregate or event change, ADR-0043/ADR-0045 already settle the tier); the refinement was a code-grounding pass over the shipped r1tx4 diff.
+
+## Outcome
+
+Added `GameDescriptionBackfill.fs`, a fourth resumable throttled backfill mirroring
+`GameFacetBackfill.fs`/`GameDeckCompatBackfill.fs`/`GameReleaseDateBackfill.fs` (ADR-0043/ADR-0045,
+this task's own ADR-0081). It re-fetches every already-cached game's description through
+games-r1tx4's sanitizer — Steam-linked via `Steam.getSteamStoreDetails`/`Steam.storeDescription`
+(already sanitized at decode time), RAWG-only via `Rawg.getGameDetails` (sanitized by the job itself,
+`Description` falling back to `DescriptionRaw`) — so games imported before r1tx4 gain
+paragraphs/emphasis on their detail page instead of one flat block, and RAWG-only games that had an
+empty description since games-v4nqe's column drop now get one.
+
+`MetadataCache.fs` grew `game_metadata_cache.description_fetched_at` (via the existing guarded,
+idempotent `ALTER TABLE ... ADD COLUMN` block `initialize` already uses for the sibling cursors), its
+own resume cursor deliberately separate from `fetched_at`/`deck_compat_fetched_at`/
+`release_date_fetched_at`; `MetadataCache.stampDescriptionFetched` (a single-column upsert that
+survives a missing row); `MetadataCache.DescriptionSource` (`SteamApp of int | RawgGame of int`); and
+`MetadataCache.findGamesNeedingDescriptionBackfill` (a LEFT JOIN over `game_detail`/
+`game_metadata_cache`, covering the RAWG-only legacy population with no cache row at all — both ids
+read from `game_detail`, never the cache's stale one-time-seeded `rawg_id`; Steam wins when both ids
+are present).
+
+The stamp deliberately lives outside `upsertGameIdentityCard` (shared with description-less
+refreshes) — `Api.fs`'s `updateGameIdentityCache` now stamps iff its `description` parameter is
+`Some`, and every direct creation-path `upsertGameIdentityCard` call site (`runSteamFamilyImport`'s
+new-game branch, `addGameFromSteamCore`, `attachSteamToGameCore`, the Steam library import's new-game
+branch, `addGame`'s RAWG path, all in `Api.fs`; `PlaytimeTracker`'s scheduled-sync new-game path) gets
+an explicit stamp call right after. `Composition.fs` registers the `"Game description backfill"`
+`JobSpec` at `description_backfill_hour` (default 08:00 local, an hour clear of the release-date
+backfill's 07:00), reading `getRawgConfig` from the same scope `PlaytimeTracker.runSync`/`Api.create`
+already use.
+
+No new event, no projection column, no `GameProjection.handleEvent` arm — `GameProjection.fs` is
+untouched by the diff (confirmed via `git diff --stat`), and `grep -rn "Game_description" src/Server/Games.fs`
+shows only the pre-existing legacy `Game_description_set` event, never a new one. No client change —
+the detail page already renders the cache-backed description through `RichText.render`.
+
+Tests (10 new, Expecto 928 -> 938, all green): `MetadataCacheTests.fs` (idempotent column addition;
+`stampDescriptionFetched` creating a row for a missing slug and touching only its own column on an
+existing one; `findGamesNeedingDescriptionBackfill`'s LEFT JOIN behavior across all five scenarios —
+legacy Steam-linked row, RAWG-only row with no cache row, exclusions for a stamped row and a
+neither-id game, and the both-ids-present-Steam-wins case). `GameDescriptionBackfillTests.fs` (a
+`GameReleaseDateBackfillTests.fs`-style `StubHandler` serving both Steam `appdetails` and RAWG
+`/games/{id}` shapes in one test: rewrites a legacy flattened Steam row keeping `<p>`/`<strong>` and
+dropping `<h2>`/`<img>`, inserts a fresh RAWG-only row, leaves a Steam-error row unstamped with its
+old description and website_url intact; a separate test for a blank-RAWG-key skip counted in
+`BackfillResult.Skipped` with zero HTTP requests made; a separate test for an `Ok` empty-description
+response still stamping). `AddGameFromSteamTests.fs`/`AddGameFromRawgTests.fs` each gained a
+"freshly-created row is stamped" case. `SteamFamilyIncrementalImportTests.fs` gained a case proving a
+`FullReenrich` short_description-only refresh on a legacy row never stamps
+`description_fetched_at`, so the row survives as a candidate.
+
+Gates: `npm run build` OK (Fable compiles clean), `dotnet` Expecto 938/938, `npm run test:client`
+Vitest 117/117 (unchanged — no client diff).
+
+Key files: `src/Server/GameDescriptionBackfill.fs`, `src/Server/MetadataCache.fs`, `src/Server/Api.fs`,
+`src/Server/PlaytimeTracker.fs`, `src/Server/Composition.fs`, `src/Server/Server.fsproj`,
+`tests/Server.Tests/GameDescriptionBackfillTests.fs`, `tests/Server.Tests/MetadataCacheTests.fs`,
+`tests/Server.Tests/AddGameFromSteamTests.fs`, `tests/Server.Tests/AddGameFromRawgTests.fs`,
+`tests/Server.Tests/SteamFamilyIncrementalImportTests.fs`, `tests/Server.Tests/Server.Tests.fsproj`.
+
+The `[human-eye]` acceptance criterion (a live library pass showing paragraph breaks on a
+pre-r1tx4-imported game and a filled-in RAWG-only description) is the builder's, after deploy — this
+worker never touched the live database, per the project's standing fixtures-only rule.
