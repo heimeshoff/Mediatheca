@@ -92,8 +92,10 @@ closest honest signal. Bearer-only auth for that endpoint is plausible but unver
 - Depends on `books-d4wtc` for `Record_prior_reading_progress` / `Prior_reading_progress_recorded`
   and `book_progress.kind`.
 - Refined 2026-09-18 (builder): the sync path no longer records priors or fetches last-listened
-  dates — priors are the bulk import's business only. A later "Import library" click still records
-  priors for titles it creates or that have no Audible row yet; that is a bulk import too. `integration-sfmxg` (Goodreads removal, in doing/) edits
+  dates — priors are the bulk import's business only. Follow-up ruling the same day: "Import
+  library" becomes one-time and the nightly sync creates unmatched books itself
+  (`integration-dvbjp`, depends on this task). On the builder's live instance the one remaining
+  import click after deploy is exactly this task's legacy repair run. `integration-sfmxg` (Goodreads removal, in doing/) edits
   `AudibleSync.fs` / `Api.fs` neighbours — rebase awareness only, no dependency.
 - Do not touch the live database (`workers-never-touch-live-database`); the builder runs "Import
   library" on the deployed instance to repair real history.

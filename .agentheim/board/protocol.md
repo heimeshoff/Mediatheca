@@ -5,6 +5,25 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 01:22 -- Modeling / Refined: integration-dtdbb - Notes updated for the one-time import ruling
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** todo
+**Summary:** Dropped the note that later 'Import library' clicks keep recording priors; integration-dvbjp makes the import one-time and the sync create unmatched books. The live instance's single remaining click after deploy is this task's legacy repair run.
+**ADRs written:** 0082 (Consequences amended)
+
+---
+
+## 2026-09-18 01:22 -- Modeling / Captured: integration-dvbjp - The nightly Audible sync creates a Book for every unmatched library ASIN (same create path as the import, then an ordinary observation) and "Import library" becomes a true one-time bootstrap — stamped `audible_library_imported_at` on its first populated run, refused by the API and hidden by the Settings card afterwards
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** Builder ruling: 'Import library' is one-time only and the nightly Audible sync creates a Book for every unmatched ASIN through the import's own create path, then observes it as an ordinary history row (never a prior, never a metadata call) — reversing integration-jjvg2's never-creates rule. The import stamps audible_library_imported_at after its first populated run; the API refuses and the Settings card hides the button afterwards. Depends on integration-dtdbb so the live instance's one remaining click is the legacy repair run. ADR-0082 Consequences amended.
+
+---
+
 ## 2026-09-18 01:16 -- Modeling / Refined: integration-dtdbb - Only "Import library" records priors and fetches the last-listened day; the nightly sync is untouched
 
 **Type:** Modeling / Refine

@@ -102,6 +102,10 @@ Separately, a manual "mark Finished" click (`BookDetail/State.fs`) sends `effect
 - `integration-dtdbb` costs one extra authenticated metadata call per imported book that has no
   Audible `book_progress` row yet — only inside "Import library", never on the nightly sync, which
   stays a single `/1.0/library` call.
+- "Import library" is a true one-time bootstrap (builder ruling 2026-09-18, `integration-dvbjp`):
+  stamped after its first populated run and refused afterwards. New purchases are created by the
+  nightly sync itself and observed normally — reversing integration-jjvg2's "the sync never creates
+  a book" rule — so the only priors a library ever holds are the ones the bootstrap recorded.
 - The manual-finish UTC-midnight drift (a book finished tonight showing as finished yesterday) is
   fixed, and a wrong or approximate `finished_at` — including one recovered by legacy repair — is now
   correctable from the book detail page itself.
