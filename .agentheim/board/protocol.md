@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 15:40 -- Modeling / Promoted: games-fffvm - Re-sanitize existing game descriptions — a resumable, throttled backfill that re-fetches every already-cached game's description (Steam-linked via the storefront, RAWG-only via RAWG details) through games-r1tx4's sanitizer, so games imported before it gain paragraphs/emphasis and RAWG-only games get the description games-v4nqe silently dropped
+
+**Type:** Modeling / Promote
+**BC:** games
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-17 15:40 -- Modeling / Refined: games-fffvm - Re-sanitize existing game descriptions (resumable throttled backfill through games-r1tx4's sanitizer)
 
 **Type:** Modeling / Refine
