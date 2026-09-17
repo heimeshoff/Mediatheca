@@ -1,7 +1,7 @@
 ---
 id: books-nvnyk
 title: Audible-imported book descriptions show their intended formatting (paragraphs, emphasis, lists) instead of raw `<p>`/`<i>` tags — the Audible adapter keeps the publisher summary as a sanitized allowlisted HTML subset (Audible and Audnexus paths alike) and the book detail page renders it through a tag-allowlisting rich-text component, never `innerHTML`
-status: todo
+status: doing
 type: bug
 context: books
 created: 2026-09-17

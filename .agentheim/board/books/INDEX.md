@@ -11,18 +11,18 @@ Catalog of this bounded context's tasks by status.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 4
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **books-nvnyk** — Audible-imported book descriptions show their intended formatting (paragraphs, emphasis, lists) instead of raw `<p>`/`<i>` tags — the Audible adapter keeps the publisher summary as a sanitized allowlisted HTML subset (Audible and Audnexus paths alike) and the book detail page renders it through a tag-allowlisting rich-text component, never `innerHTML` (bug) — `todo/books-nvnyk-audible-descriptions-render-formatting-not-raw-html.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **books-nvnyk** — Audible-imported book descriptions show their intended formatting (paragraphs, emphasis, lists) instead of raw `<p>`/`<i>` tags — the Audible adapter keeps the publisher summary as a sanitized allowlisted HTML subset (Audible and Audnexus paths alike) and the book detail page renders it through a tag-allowlisting rich-text component, never `innerHTML` (bug) — `doing/books-nvnyk-audible-descriptions-render-formatting-not-raw-html.md`
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)

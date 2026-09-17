@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 12:34 -- Batch started: [books-nvnyk]
+
+**Type:** Work / Batch start
+**Tasks:** books-nvnyk - Audible-imported book descriptions show their intended formatting (paragraphs, emphasis, lists) instead of raw `<p>`/`<i>` tags — the Audible adapter keeps the publisher summary as a sanitized allowlisted HTML subset (Audible and Audnexus paths alike) and the book detail page renders it through a tag-allowlisting rich-text component, never `innerHTML`
+**Parallel:** no (1 worker — the only ready task)
+
+---
+
 ## 2026-09-17 12:29 -- Modeling / Captured: books-nvnyk - Audible-imported book descriptions show their intended formatting (paragraphs, emphasis, lists) instead of raw `<p>`/`<i>` tags — the Audible adapter keeps the publisher summary as a sanitized allowlisted HTML subset (Audible and Audnexus paths alike) and the book detail page renders it through a tag-allowlisting rich-text component, never `innerHTML`
 
 **Type:** Modeling / Capture
