@@ -23,6 +23,7 @@
 ## Research touching this BC
 
 <!-- research-local:start -->
+- **audible-finished-and-last-listened-timestamps** -- "Last listened" is answerable: `GET /1.0/content/{asin}/metadata?response_groups=last_position_heard` returns `last_position_heard.last_updated` (one authenticated call per ASIN; bearer-only auth plausibly suffices, untested); no confirmed "finished on" date anywhere -- `is_finished` is boolean-only, `/1.0/stats/status/finished` response shape unknown, `/1.0/annotations/lastpositions` batches positions but timestamp presence unconfirmed; the app's Listen Log is non-exportable -- 2026-09-18 -- `knowledge/research/audible-finished-and-last-listened-timestamps-2026-09-18.md`
 - **steam-family-api-auto-token-refresh** -- SteamKit2 QR login + refresh tokens vs. browser-scraped `access_token` for `IFamilyGroupsService`; audience/scope of minted tokens unconfirmed -- 2026-07-20 -- `knowledge/research/steam-family-api-auto-token-refresh-2026-07-20.md`
 - **tv-series-metadata-fallback-sources** -- TheTVDB vs Trakt vs Jellyfin-as-source as a fallback when TMDB lags on a new season; recommends Jellyfin-as-source supplementing TMDB -- 2026-06-26 -- `knowledge/research/tv-series-metadata-fallback-sources-2026-06-26.md`
 <!-- research-local:end -->

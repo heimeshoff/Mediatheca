@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 00:47 -- Research: Audible finished / last-listened timestamps
+
+**Type:** Research
+**Requested by:** user
+**Report:** knowledge/research/audible-finished-and-last-listened-timestamps-2026-09-18.md
+**Review:** PASS (iteration 1)
+**Summary:**
+- "Last listened" is reachable: `GET /1.0/content/{asin}/metadata?response_groups=last_position_heard` returns `last_position_heard.last_updated` (a real timestamp) plus `position_ms`/`status`; one authenticated call per ASIN, avoids the DRM `licenserequest` path.
+- No confirmed "finished on" date: `is_finished` on `/1.0/library` is boolean-only; `/1.0/stats/status/finished` exists (params `asin`, `start_date`, `continuation_token`) but no response sample was found anywhere; `/1.0/stats/aggregates` is account-level monthly totals only.
+- `GET /1.0/annotations/lastpositions?asins=...` is a real batched alternative (AudioSilo uses it chunked) but whether it carries a timestamp is unverified; the Audible app's Listen Log is app-only and non-exportable.
+
+---
+
 ## 2026-09-18 00:45 -- Batch started: [integration-sfmxg]
 
 **Type:** Work / Batch start
