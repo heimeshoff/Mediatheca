@@ -1,7 +1,7 @@
 ---
 id: books-d4wtc
 title: Prior reading progress — the bulk import's `Record_prior_reading_progress` command yields a `Prior_reading_progress_recorded` event for a book its source has not reported on before (never InFocus-promoting, finishing with its own date; the nightly sync and Manual keep producing ordinary observations), projected as `kind = 'prior'` so the History list, the Hours Listened stat and any future Reading day never mistake an import's starting position for a listening session
-status: todo
+status: doing
 type: feature
 context: books
 created: 2026-09-18

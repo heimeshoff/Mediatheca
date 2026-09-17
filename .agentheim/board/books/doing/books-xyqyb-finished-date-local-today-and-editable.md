@@ -1,7 +1,7 @@
 ---
 id: books-xyqyb
 title: Manual finish stamps today's local date and the hero's finished-date line is click-to-edit — `Set_book_status Finished` sends `Some localToday` instead of `None` (no more UTC-midnight drift), and the `finished {date}` line opens an `EditableDateInput` whose commit re-dates the finish via `setBookStatus slug Finished (Some picked)`
-status: todo
+status: doing
 type: feature
 context: books
 created: 2026-09-18

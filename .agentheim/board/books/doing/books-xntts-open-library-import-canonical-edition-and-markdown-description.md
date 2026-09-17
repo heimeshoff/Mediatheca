@@ -1,7 +1,7 @@
 ---
 id: books-xntts
 title: Open Library import takes the work's canonical English edition (`cover_edition_key`, language-filtered fallback) instead of the first of hundreds of unordered `edition_key`s, and converts the work's Markdown description into the sanitized HTML subset at import and refresh — no more Spanish titles/covers on an English work, no more literal `[link](url)` lists
-status: todo
+status: doing
 type: bug
 context: books
 created: 2026-09-18

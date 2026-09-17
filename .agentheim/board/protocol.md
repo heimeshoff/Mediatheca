@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 01:27 -- Batch started: [books-xntts, books-d4wtc, books-xyqyb]
+
+**Type:** Work / Batch start
+**Tasks:** books-xntts - Open Library import takes the work's canonical English edition (`cover_edition_key`, language-filtered fallback) instead of the first of hundreds of unordered `edition_key`s, and converts the work's Markdown description into the sanitized HTML subset at import and refresh — no more Spanish titles/covers on an English work, no more literal `[link](url)` lists, books-d4wtc - Prior reading progress — the bulk import's `Record_prior_reading_progress` command yields a `Prior_reading_progress_recorded` event for a book its source has not reported on before (never InFocus-promoting, finishing with its own date; the nightly sync and Manual keep producing ordinary observations), projected as `kind = 'prior'` so the History list, the Hours Listened stat and any future Reading day never mistake an import's starting position for a listening session, books-xyqyb - Manual finish stamps today's local date and the hero's finished-date line is click-to-edit — `Set_book_status Finished` sends `Some localToday` instead of `None` (no more UTC-midnight drift), and the `finished {date}` line opens an `EditableDateInput` whose commit re-dates the finish via `setBookStatus slug Finished (Some picked)`
+**Parallel:** yes (3 workers — books-xntts, books-d4wtc, books-xyqyb are the whole ready set after integration-sfmxg integrated; integration-dtdbb and integration-dvbjp stay in todo, blocked on books-d4wtc → integration-dtdbb. Merge-order advisory: all three touch Shared.fs / Api.fs and d4wtc + xyqyb both touch BookDetail; squash-merge sequentially in verifier-return order)
+
+---
+
 ## 2026-09-18 01:25 -- Task verified and completed: integration-sfmxg - Remove the Goodreads integration — delete the adapter, the shelf/progress sync job, the Settings card and the API surface, and drop the Goodreads progress source and external id from the Book model; Audible and Open Library remain the only book sources
 
 **Type:** Work / Task completion
