@@ -11,18 +11,18 @@ Catalog of this bounded context's tasks by status.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 6
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **books-jm7aa** — Book detail hero mirrors the game detail hero — the personal rating sits right of the status badge as a hero control, the reading state closes the hero meta block (finished date when Finished, otherwise a percent progress line), Details print on the page background like the movie synopsis, and Links move to the right column above Recommended By (feature) — `todo/books-jm7aa-book-detail-hero-mirrors-game-detail.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **books-jm7aa** — Book detail hero mirrors the game detail hero — the personal rating sits right of the status badge as a hero control, the reading state closes the hero meta block (finished date when Finished, otherwise a percent progress line), Details print on the page background like the movie synopsis, and Links move to the right column above Recommended By (feature) — `doing/books-jm7aa-book-detail-hero-mirrors-game-detail.md`
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)

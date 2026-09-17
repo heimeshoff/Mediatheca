@@ -1,7 +1,7 @@
 ---
 id: books-jm7aa
 title: Book detail hero mirrors the game detail hero — the personal rating sits right of the status badge as a hero control, the reading state closes the hero meta block (finished date when Finished, otherwise a percent progress line), Details print on the page background like the movie synopsis, and Links move to the right column above Recommended By
-status: todo
+status: doing
 type: feature
 context: books
 created: 2026-09-17

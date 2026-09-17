@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 13:08 -- Batch started: [books-jm7aa]
+
+**Type:** Work / Batch start
+**Tasks:** books-jm7aa - Book detail hero mirrors the game detail hero — the personal rating sits right of the status badge as a hero control, the reading state closes the hero meta block (finished date when Finished, otherwise a percent progress line), Details print on the page background like the movie synopsis, and Links move to the right column above Recommended By
+**Parallel:** no (1 worker — books-jm7aa is the only ready task, unblocked by books-depwh and books-nvnyk this session)
+
+---
+
 ## 2026-09-17 13:08 -- Task verified and completed: books-depwh - The book detail page's Details card no longer shows a date — the metadata line under the description reads just `Publisher · Language`, dropping the published/release date that Audible imports put at its end
 
 **Type:** Work / Task completion
