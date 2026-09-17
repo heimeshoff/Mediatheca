@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 00:39 -- Modeling / Captured: books-xntts - Open Library import takes the work's canonical English edition (`cover_edition_key`, language-filtered fallback) instead of the first of hundreds of unordered `edition_key`s, and converts the work's Markdown description into the sanitized HTML subset at import and refresh — no more Spanish titles/covers on an English work, no more literal `[link](url)` lists
+
+**Type:** Modeling / Capture
+**BC:** books
+**Filed to:** todo
+**Summary:** Bug report from the builder, confirmed against the live Open Library API: the import keeps the first of hundreds of unordered edition_keys (a Spanish edition for The Lord of the Rings) for title/cover, and stores the work's Markdown description raw so its trailing Contains link list renders as literal text. Fix: prefer cover_edition_key with a language-filtered fallback, carry the hit's cover id and title in the request, and convert the Markdown subset into DescriptionSanitizer's HTML subset at getWork decode time so refresh repairs existing rows. Filed to todo; waits on integration-sfmxg because both edit the same OpenLibrary.fs/Api.fs lines.
+
+---
+
 ## 2026-09-18 00:33 -- Modeling / Captured: integration-sfmxg - Remove the Goodreads integration — delete the adapter, the shelf/progress sync job, the Settings card and the API surface, and drop the Goodreads progress source and external id from the Book model; Audible and Open Library remain the only book sources
 
 **Type:** Modeling / Capture
