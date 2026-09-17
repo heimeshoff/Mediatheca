@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 15:33 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 53m (batch started 14:40, last integration 15:31, suites on main green 15:33)
+**Completed:** 2 (first-try PASS: 1, re-dispatched: 1, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** books-h4mq2: 1, games-r1tx4: 2
+**Commits:** 4 (1 batch-start, 2 integration, 1 session-end)
+**Vision-conformance:** none — batch aligns with vision (vision.md carries no "What success looks like" / "Non-goals" sections; judged against the Design Principles: books-h4mq2 is an accessibility + e2e test-debt fix with no domain change; games-r1tx4 keeps sanitized descriptions in the game_metadata_cache tier and — after the iteration-1 verifier catch — keeps every Game_added_to_library payload plain text, so Replayable holds and no HTML rides an event)
+**Batch mix:** 50% product-facing / 50% harness / 0% bookkeeping (2 tasks) — heuristic artifact: games-r1tx4 is `type: chore` so classifyTask counts it as harness although every file it touched is product source/tests
+**Carry-over:** none — working tree clean (3 stranded RESULT sidecars swept; both task worktrees and the throwaway suite-check worktree torn down with their node_modules junctions unlinked first, main node_modules intact at 210 entries; both squash-merges auto-merged cleanly. On main after the batch: npm run build OK, Vitest 117/117; Expecto 928/928 run in a detached suite-check worktree because the builder's dotnet watch server holds Server.dll on main — the server survived. Session-start churn: 0 recognized machine-shape commits, 0 human commits. README deltas: games-r1tx4 applied (games README 227 lines). games-r1tx4 iteration 1 failed verification (sanitized Steam HTML leaked into Game_added_to_library payloads; fixed in iteration 2 via DescriptionSanitizer.toPlainText at all five GameAddedData sites). Builder follow-ups: the [human-eye] check on a freshly added Steam game's description, and the books e2e spec run against an isolated stack — not run this session because ports 5000/5173 were bound)
+
+---
+
 ## 2026-09-17 15:30 -- Task verified and completed: games-r1tx4 - Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG)
 
 **Type:** Work / Task completion
