@@ -5,6 +5,26 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 14:34 -- Modeling / Refined: games-r1tx4 - Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG)
+
+**Type:** Modeling / Refine
+**BC:** games
+**Status after:** todo
+**Summary:** Code-site inventory replaced the sketch. Steam: sanitize at decode time in Steam.fs and collapse the seven identical about_the_game/detailed_description selection blocks (Api.fs x6, PlaytimeTracker.fs x1) into one Steam.storeDescription helper; the three private stripHtmlTags copies go. Found a latent RAWG defect: since games-v4nqe, addGame's RAWG path writes description_raw only into the ignored Game_added_to_library payload and never calls upsertGameIdentityCard, so RAWG-only games have an empty description — the task now adds the creation-path cache write with the sanitized RAWG `description` field. The sanitizer is lifted out of Audible.fs into one shared server module. Client: both Description and ShortDescription render via RichText.render. Legacy flattened rows are explicitly out of scope and split into a backfill child. depends_on design-system-001 added (frontend gate). Orchestrator not consulted: the refinement was a call-site inventory of a shipped pattern (books-nvnyk), fully resolved from the code.
+**Split into:** games-fffvm (resumable throttled description backfill with a description_fetched_at marker column; depends_on games-r1tx4, stays in backlog)
+**ADRs written:** none
+
+---
+
+## 2026-09-17 14:34 -- Modeling / Captured: games-fffvm - Re-sanitize existing game descriptions — a resumable, throttled backfill that re-fetches every already-cached game's description (Steam-linked via the storefront, RAWG-only via RAWG details) through games-r1tx4's sanitizer, so games imported before it gain paragraphs/emphasis and RAWG-only games get the description games-v4nqe silently dropped
+
+**Type:** Modeling / Capture
+**BC:** games
+**Filed to:** backlog
+**Summary:** Split out of games-r1tx4 at refinement: a resumable throttled backfill (fourth instance of the games BC job shape) that re-fetches every legacy game description through r1tx4's sanitizer, keyed on a new description_fetched_at column. Also fills the RAWG-only games left with an empty description since games-v4nqe.
+
+---
+
 ## 2026-09-17 14:30 -- Modeling / Promoted: books-h4mq2 - book-detail-progress.spec.ts must open the hero ActionMenu before clicking "Update progress"
 
 **Type:** Modeling / Promote

@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
+- **Backlog:** 2
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 11
@@ -42,6 +42,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **games-fffvm** — Re-sanitize existing game descriptions — a resumable, throttled backfill that re-fetches every already-cached game's description (Steam-linked via the storefront, RAWG-only via RAWG details) through games-r1tx4's sanitizer, so games imported before it gain paragraphs/emphasis and RAWG-only games get the description games-v4nqe silently dropped (chore) — `backlog/games-fffvm-resanitize-existing-game-descriptions-backfill.md`
 - **games-r1tx4** — Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG) (chore) — `backlog/games-r1tx4-apply-the-audible-description-sanitizer-richtext-renderer-pa.md`
 <!-- backlog-list:end -->
 
