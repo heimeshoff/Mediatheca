@@ -53,6 +53,10 @@ test("Book detail: setting progress to 100 via the popover finishes the book", a
     // observation that follows, letting the later "remove the newest
     // observation" step prove the bar re-derives from what's left rather
     // than just clearing.
+    // books-jm7aa dissolved the "Reading Progress" card; "Update progress"
+    // now lives inside the hero's hover-reveal ActionMenu (books-h4mq2) —
+    // the menu must be opened before its item is clickable.
+    await page.getByRole("button", { name: "More actions" }).click();
     await page.getByRole("button", { name: "Update progress" }).click();
     await page.getByRole("spinbutton").fill("60");
     await page.locator('input[type="date"]').fill("2024-01-01");
@@ -62,6 +66,7 @@ test("Book detail: setting progress to 100 via the popover finishes the book", a
     // Second observation: 100%, today (the popover's own date default) —
     // the aggregate rule (a 100% observation finishes a non-Finished book,
     // ADR-0076 §5) must now be reflected in the status control's own label.
+    await page.getByRole("button", { name: "More actions" }).click();
     await page.getByRole("button", { name: "Update progress" }).click();
     await page.getByRole("spinbutton").fill("100");
     await page.getByRole("button", { name: "Save" }).click();

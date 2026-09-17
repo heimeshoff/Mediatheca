@@ -1,7 +1,7 @@
 ---
 id: books-h4mq2
 title: book-detail-progress.spec.ts must open the hero ActionMenu before clicking "Update progress"
-status: doing
+status: done
 type: bug
 context: books
 created: 2026-09-17
@@ -125,3 +125,15 @@ The task therefore touches `ActionMenu.fs` as well as the spec.
 - Any future spec that drives a `Change format` / `Event history` /
   `Remove …` menu item should open the menu the same way — this is the
   first and reference example.
+
+## Outcome
+
+Fixed the test debt `books-jm7aa` left behind: `book-detail-progress.spec.ts` was clicking `page.getByRole("button", { name: "Update progress" })` directly, but that button moved inside the hero's hover-reveal `ActionMenu` popover during `books-jm7aa`'s restructuring. The popover's trigger (`Html.button` with only an inline SVG child) had no accessible name, so there was no way for the spec to open it via role locator.
+
+Added `prop.ariaLabel "More actions"` to the trigger `Html.button` in all three `ActionMenu` views (`view`, `heroView`, `heroViewSections`) in `src/Client/Components/ActionMenu.fs` — attribute only, no class/markup/behaviour change. This also closes a pre-existing accessibility gap (icon-only button, no accessible name) on every detail page that uses the menu (movies, series, games, books), not just books.
+
+Updated `tests/e2e/book-detail-progress.spec.ts`: each of the two `"Update progress"` clicks is now immediately preceded by `page.getByRole("button", { name: "More actions" }).click()`, with a one-line comment at the first occurrence pointing at `books-jm7aa`. No other locator, assertion, or timeout in the spec changed — diff is confined to the two inserted click lines plus the explanatory comment, exactly as the task specified.
+
+Verified: `npm run build` succeeds (Fable compiles cleanly). `npm run test:client` — 17 files, 116 tests, all passing, unchanged (the Vitest suite is pure-logic tests with no DOM rendering, so it can't exercise the aria-label change directly — see `TDD_SKIPPED`). The e2e spec itself was not run: ports 5000/5173 were already bound by the builder's live dev stack at execution time, and the task explicitly forbids running without `CI=1` cold-start isolation or reusing a live stack — reporting "not run — ports bound", leaving the e2e pass to the builder's own verification.
+
+Files touched: `src/Client/Components/ActionMenu.fs`, `tests/e2e/book-detail-progress.spec.ts`.

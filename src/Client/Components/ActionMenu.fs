@@ -86,6 +86,7 @@ let view (items: ActionMenuItem list) =
             // Trigger button
             Html.button [
                 prop.className "w-8 h-8 flex items-center justify-center rounded-full text-base-content/50 hover:text-base-content hover:bg-base-content/10 transition-all cursor-pointer"
+                prop.ariaLabel "More actions"
                 prop.onClick (fun e ->
                     e.stopPropagation()
                     setIsOpen (not isOpen))
@@ -172,6 +173,7 @@ let heroView (items: ActionMenuItem list) =
             // Trigger button - matches "Change backdrop" styling
             Html.button [
                 prop.className "w-9 h-9 flex items-center justify-center rounded-full text-base-content bg-base-300/30 hover:bg-base-300/50 transition-all cursor-pointer"
+                prop.ariaLabel "More actions"
                 prop.onClick (fun e ->
                     e.stopPropagation()
                     setIsOpen (not isOpen))
@@ -232,6 +234,7 @@ let heroViewSections (sections: ActionMenuSection list) =
         prop.children [
             Html.button [
                 prop.className "w-9 h-9 flex items-center justify-center rounded-full text-base-content bg-base-300/30 hover:bg-base-300/50 transition-all cursor-pointer"
+                prop.ariaLabel "More actions"
                 prop.onClick (fun e ->
                     e.stopPropagation()
                     setIsOpen (not isOpen))

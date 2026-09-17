@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 14:50 -- Task verified and completed: books-h4mq2 - book-detail-progress.spec.ts must open the hero ActionMenu before clicking "Update progress"
+
+**Type:** Work / Task completion
+**Task:** books-h4mq2 - book-detail-progress.spec.ts must open the hero ActionMenu before clicking "Update progress"
+**Summary:** Gave the ActionMenu trigger an accessible name (`aria-label="More actions"`) in all three menu views, and updated `book-detail-progress.spec.ts` to open the hero menu before each "Update progress" click so the spec matches the post-books-jm7aa DOM path.
+**Duration:** 9m37s
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 2
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-09-17 14:40 -- Batch started: [books-h4mq2, games-r1tx4]
 
 **Type:** Work / Batch start

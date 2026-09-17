@@ -12,8 +12,8 @@ Catalog of this bounded context's tasks by status.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 7
+- **Doing:** 0
+- **Done:** 8
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,11 +22,11 @@ Catalog of this bounded context's tasks by status.
 
 ### Doing
 <!-- doing-list:start -->
-- **books-h4mq2** — book-detail-progress.spec.ts must open the hero ActionMenu before clicking "Update progress" (bug) — `doing/books-h4mq2-book-detail-progress-spec-ts-must-open-the-hero-actionmenu-b.md`
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **books-h4mq2** — book-detail-progress.spec.ts must open the hero ActionMenu before clicking "Update progress" (bug) — `done/books-h4mq2-book-detail-progress-spec-ts-must-open-the-hero-actionmenu-b.md`
 - **books-jm7aa** — Book detail hero mirrors the game detail hero — the personal rating sits right of the status badge as a hero control, the reading state closes the hero meta block (finished date when Finished, otherwise a percent progress line), Details print on the page background like the movie synopsis, and Links move to the right column above Recommended By (feature) — `done/books-jm7aa-book-detail-hero-mirrors-game-detail.md`
 - **books-depwh** — The book detail page's Details card no longer shows a date — the metadata line under the description reads just `Publisher · Language`, dropping the published/release date that Audible imports put at its end (feature) — `done/books-depwh-details-card-drops-published-date.md`
 - **books-nvnyk** — Audible-imported book descriptions show their intended formatting (paragraphs, emphasis, lists) instead of raw `<p>`/`<i>` tags — the Audible adapter keeps the publisher summary as a sanitized allowlisted HTML subset (Audible and Audnexus paths alike) and the book detail page renders it through a tag-allowlisting rich-text component, never `innerHTML` (bug) — `done/books-nvnyk-audible-descriptions-render-formatting-not-raw-html.md`
