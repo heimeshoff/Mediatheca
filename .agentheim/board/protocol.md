@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 14:35 -- Modeling / Promoted: games-r1tx4 - Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG)
+
+**Type:** Modeling / Promote
+**BC:** games
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-17 14:34 -- Modeling / Refined: games-r1tx4 - Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG)
 
 **Type:** Modeling / Refine
