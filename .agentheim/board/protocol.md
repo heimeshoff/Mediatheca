@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 13:37 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 1h04m (batch started 12:33, last integration 13:33, suites on main green 13:37)
+**Completed:** 3 (first-try PASS: 3, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 1 (books-jm7aa — the worker's first RESULT omitted CONCEPT_CANDIDATE in both header copies; the same worker re-emitted it into the same worktree, same iteration, no code change)
+**Lost-result escalations:** 0
+**Dispatches:** books-nvnyk: 1, books-depwh: 1, books-jm7aa: 1
+**Commits:** 7 (3 batch-start, 3 integration, 1 session-end)
+**Vision-conformance:** none — batch aligns with vision (vision.md carries no "What success looks like" / "Non-goals" sections; judged against the Design Principles: Replayable holds — books-nvnyk keeps the sanitized description in the book_metadata_cache tier with no new event, books-depwh and books-jm7aa are display-only view changes on the book detail page)
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (3 tasks)
+**Carry-over:** none — working tree clean (3 stranded RESULT sidecars swept; all three worktrees torn down with their node_modules junctions unlinked first, main node_modules intact at 206 entries; every squash-merge auto-merged cleanly, the three tasks ran sequentially since each unblocked the next. On main after the batch: npm run build OK, Vitest 116/116; Expecto 919/919 run in a throwaway detached worktree because the builder's dotnet watch server holds Server.dll on main. Session-start churn: 0 recognized machine-shape commits, 0 human commits. README deltas: books-nvnyk applied; its integration-README Audible sentence was hand-applied on main per the worker's Outcome. New backlog items: games-r1tx4, books-h4mq2)
+
+---
+
 ## 2026-09-17 13:32 -- Task verified and completed: books-jm7aa - Book detail hero mirrors the game detail hero — the personal rating sits right of the status badge as a hero control, the reading state closes the hero meta block (finished date when Finished, otherwise a percent progress line), Details print on the page background like the movie synopsis, and Links move to the right column above Recommended By
 
 **Type:** Work / Task completion
