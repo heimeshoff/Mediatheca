@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 12:29 -- Modeling / Captured: books-nvnyk - Audible-imported book descriptions show their intended formatting (paragraphs, emphasis, lists) instead of raw `<p>`/`<i>` tags — the Audible adapter keeps the publisher summary as a sanitized allowlisted HTML subset (Audible and Audnexus paths alike) and the book detail page renders it through a tag-allowlisting rich-text component, never `innerHTML`
+
+**Type:** Modeling / Capture
+**BC:** books
+**Filed to:** todo
+**Summary:** Audible-imported book descriptions show literal <p>/<i> tags on /books/{slug}: Audible.fs regex-strips publisher_summary (losing paragraphs/emphasis) while the Audnexus summary fallback (the usual library-import path) passes raw HTML through unstripped. Fix keeps a sanitized allowlisted HTML subset in book_metadata_cache and renders it via a DOMParser-based tag-allowlisting rich-text component (never innerHTML), backward compatible with legacy plain-text and raw-HTML rows. Filed straight to todo — cause traced in code, criteria machine-checkable.
+
+---
+
 ## 2026-09-17 00:37 -- Work session ended
 
 **Type:** Work / Session end
