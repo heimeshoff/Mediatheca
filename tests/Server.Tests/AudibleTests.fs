@@ -252,16 +252,32 @@ let private productWithoutDescriptionJson =
     """
 
 [<Tests>]
+let sanitizeDescriptionTests =
+    testList "Audible.sanitizeDescription (books-nvnyk)" [
+
+        testCase "keeps allowlisted tags (p/i/b), drops attributes, unwraps a/div/script to their text content" <| fun _ ->
+            let input = """<p>A <i>novel</i> by <a href="x"><b>Someone</b></a>.</p><div class="q"><p>Second.</p></div><script>alert(1)</script>"""
+            let expected = "<p>A <i>novel</i> by <b>Someone</b>.</p><p>Second.</p>alert(1)"
+            Expect.equal (Audible.sanitizeDescription input) expected "tag allowlist + attribute drop + unwrap"
+
+        testCase "normalizes <br/> and <br /> to <br>" <| fun _ ->
+            Expect.equal (Audible.sanitizeDescription "Line one<br/>Line two<br />Line three") "Line one<br>Line two<br>Line three" "self-closing br forms normalized"
+
+        testCase "plain text with no tags passes through unchanged" <| fun _ ->
+            Expect.equal (Audible.sanitizeDescription "Just plain text.") "Just plain text." "no tags, no change"
+    ]
+
+[<Tests>]
 let getProductTests =
     testList "Audible.getProduct" [
 
-        testCase "decodes the full product shape, stripping HTML from publisher_summary" <| fun _ ->
+        testCase "decodes the full product shape, sanitizing publisher_summary (allowlisted tags kept)" <| fun _ ->
             let handler = new RecordingHandler(fun _ -> jsonResponse HttpStatusCode.OK productWithDescriptionJson)
             use http = new HttpClient(handler)
             match getProduct http "api.audible.de" "B002V5BNGY" |> Async.RunSynchronously with
             | Some product ->
                 Expect.equal product.Title "Dune" "title"
-                Expect.equal product.Description (Some "Set on the desert planet Arrakis.") "HTML-stripped description"
+                Expect.equal product.Description (Some "<p>Set on the desert planet Arrakis.</p>") "sanitized description keeps allowlisted <p>"
                 Expect.equal product.SeriesPosition (Some 1) "sequence parsed to an int"
                 Expect.equal product.Categories [ "Science Fiction & Fantasy" ] "top-level category names"
                 Expect.equal product.CoverUrl (Some "https://m.media-amazon.com/images/dune-900.jpg") "900px cover"
@@ -296,6 +312,16 @@ let audnexusTests =
                 Expect.equal book.Narrators [ "Simon Vance" ] "narrators"
                 Expect.equal book.SeriesName (Some "Dune Chronicles") "series name"
                 Expect.equal book.SeriesPosition (Some 1) "series position"
+            | None -> failtest "Expected Some book"
+
+        testCase "a summary carrying raw HTML is sanitized (regression for the unstripped passthrough, books-nvnyk)" <| fun _ ->
+            let handler = new RecordingHandler(fun _ ->
+                jsonResponse HttpStatusCode.OK
+                    """{"summary": "<p>A <i>survival</i> story by <a href=\"x\"><b>someone</b></a>.</p><script>alert(1)</script>"}""")
+            use http = new HttpClient(handler)
+            match Audnexus.getBook http "B002V5BNGY" "de" |> Async.RunSynchronously with
+            | Some book ->
+                Expect.equal book.Description (Some "<p>A <i>survival</i> story by <b>someone</b>.</p>alert(1)") "only allowlisted tags survive, attributes dropped"
             | None -> failtest "Expected Some book"
 
         testCase "a 404 yields None, never a failure" <| fun _ ->

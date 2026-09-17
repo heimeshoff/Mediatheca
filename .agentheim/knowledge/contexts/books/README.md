@@ -24,6 +24,7 @@ Single user (library owner). External progress sources (Audible, Goodreads) act 
 - **Personal rating** — integer rating set by the user; mutates over time. Goodreads' `user_rating` seeds it once at shelf import (if unset), never overwrites.
 - **Recommended by (friend)** — provenance: this book entered the library because a friend suggested it. Same shape as Movies.
 - **Finished on** — the date of the `Book_status_changed Finished` event (event timestamp, or the Goodreads `user_read_at` date when the shelf sync imports an already-read book). Drives the dashboard's 7-day "just finished" linger (the intelligence-b1nz5 pattern).
+- **Description rendering** — `book_metadata_cache.description` (Audible/Audnexus-sourced) is stored as a sanitized, allowlisted HTML subset (`p`/`br`/`b`/`strong`/`i`/`em`/`ul`/`ol`/`li`, attributes always dropped) rather than raw HTML or a flattened plain-text blob; `BookDetail.Views.detailsCard` renders it through `RichText.render` (`src/Client/Components/RichText.fs`), a pure hand-rolled tokenizing renderer that never trusts the string a second time and is backward compatible with every row already in the cache, including pre-fix rows still carrying raw tags (books-nvnyk).
 
 ## Aggregates
 

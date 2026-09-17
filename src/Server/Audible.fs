@@ -358,8 +358,33 @@ module Audible =
         CoverUrl: string option
     }
 
-    let private stripHtml (s: string) =
-        System.Text.RegularExpressions.Regex.Replace(s, "<[^>]+>", "").Trim()
+    /// Tags kept verbatim (attributes always dropped); everything else is
+    /// unwrapped down to its own text content -- never deleted, so a
+    /// disallowed element's text (including `<script>`/`<style>` bodies)
+    /// survives as plain text rather than vanishing. This is the ONE shared
+    /// sanitizer for every Audible-sourced description (`decodeProduct`,
+    /// `decodeLibraryItem`, `Audnexus.decodeAudnexusBook`) -- see this
+    /// task's Notes for why a sanitized HTML subset, not Markdown or a
+    /// custom rich-text DU, is the stored (cache-tier, ADR-0043/ADR-0045)
+    /// shape. Entities are left alone; the client-side renderer decodes them.
+    let private allowedDescriptionTags =
+        set [ "p"; "br"; "b"; "strong"; "i"; "em"; "ul"; "ol"; "li" ]
+
+    let private tagPattern =
+        System.Text.RegularExpressions.Regex(@"<\s*(/?)\s*([a-zA-Z][a-zA-Z0-9]*)\b[^>]*?(/?)\s*>")
+
+    let sanitizeDescription (s: string) : string =
+        tagPattern.Replace(
+            s,
+            System.Text.RegularExpressions.MatchEvaluator(fun m ->
+                let closing = m.Groups.[1].Value = "/"
+                let name = m.Groups.[2].Value.ToLowerInvariant()
+                if Set.contains name allowedDescriptionTags then
+                    if name = "br" then "<br>"
+                    elif closing then sprintf "</%s>" name
+                    else sprintf "<%s>" name
+                else ""))
+        |> fun s -> s.Trim()
 
     let private decodeProduct : Decoder<AudibleProduct> =
         Decode.object (fun get ->
@@ -371,7 +396,7 @@ module Audible =
               Publisher = get.Optional.Field "publisher_name" Decode.string
               ReleaseDate = get.Optional.Field "release_date" Decode.string
               RuntimeMinutes = get.Optional.Field "runtime_length_min" Decode.int
-              Description = get.Optional.Field "publisher_summary" Decode.string |> Option.map stripHtml
+              Description = get.Optional.Field "publisher_summary" Decode.string |> Option.map sanitizeDescription
               Language = get.Optional.Field "language" Decode.string
               Rating =
                 get.Optional.Field "rating" (Decode.field "overall_distribution" (Decode.field "average_rating" Decode.string))
@@ -462,7 +487,7 @@ module Audible =
                 |> List.tryHead
                 |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
               ReleaseDate = get.Optional.Field "release_date" Decode.string
-              Description = get.Optional.Field "publisher_summary" Decode.string |> Option.map stripHtml })
+              Description = get.Optional.Field "publisher_summary" Decode.string |> Option.map sanitizeDescription })
 
     let private decodeLibraryResponse : Decoder<AudibleLibraryItem list> =
         Decode.object (fun get -> get.Required.Field "items" (Decode.list decodeLibraryItem))
@@ -553,6 +578,7 @@ module Audnexus =
             { Description =
                 get.Optional.Field "summary" Decode.string
                 |> Option.orElse (get.Optional.Field "description" Decode.string)
+                |> Option.map Audible.sanitizeDescription
               Narrators =
                 get.Optional.Field "narrators" (Decode.list (Decode.field "name" Decode.string))
                 |> Option.defaultValue []

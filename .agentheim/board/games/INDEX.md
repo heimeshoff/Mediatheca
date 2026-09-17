@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 11
@@ -42,6 +42,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **games-r1tx4** — Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG) (chore) — `backlog/games-r1tx4-apply-the-audible-description-sanitizer-richtext-renderer-pa.md`
 <!-- backlog-list:end -->
 
 

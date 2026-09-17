@@ -1,7 +1,7 @@
 ---
 id: books-nvnyk
 title: Audible-imported book descriptions show their intended formatting (paragraphs, emphasis, lists) instead of raw `<p>`/`<i>` tags — the Audible adapter keeps the publisher summary as a sanitized allowlisted HTML subset (Audible and Audnexus paths alike) and the book detail page renders it through a tag-allowlisting rich-text component, never `innerHTML`
-status: doing
+status: done
 type: bug
 context: books
 created: 2026-09-17
@@ -59,3 +59,28 @@ Out of scope, noted for a later capture: Steam's `about_the_game`/`detailed_desc
 - Fixtures: `tests/Server.Tests/AudibleTests.fs` / `AudibleLibrarySyncTests.fs` already carry Audible and Audnexus JSON shapes to extend (worker: fixtures only — never the live DB, per the project's standing rule).
 - Prior art: `books-f33e2` built the detail page and the description card this task changes. Integration's Audible adapter is documented in `contexts/integration/README.md` (integration-dhctm, integration-jjvg2) and ADR-0074; the README's Audible entry should gain one sentence on the sanitizer in the worker's README delta.
 - Follow-up candidate (not captured): apply the same sanitizer + component to game descriptions (Steam `about_the_game`, RAWG).
+
+## Outcome
+
+Root cause was two-fold in `src/Server/Audible.fs`: `decodeProduct`/`decodeLibraryItem` ran `publisher_summary` through a tag-stripping `stripHtml` (formatting lost, not just tags), while `Audnexus.decodeAudnexusBook` passed its `summary`/`description` through completely unstripped (raw tags reaching the page on the common Audnexus-fallback import path).
+
+**Server (`src/Server/Audible.fs`):** replaced `stripHtml` with one shared `Audible.sanitizeDescription : string -> string`, used by `decodeProduct`, `decodeLibraryItem` and `Audnexus.decodeAudnexusBook`. It's a regex-based tag tokenizer that keeps `p`/`br`/`b`/`strong`/`i`/`em`/`ul`/`ol`/`li` (attributes always dropped, `<br/>`/`<br />` normalized to `<br>`) and unwraps every other tag (`a`/`div`/`span`/`img`/`script`/`style`/...) down to its own text content — never deleted, never trusted. The sanitized string is still cache-tier data (`book_metadata_cache.description`, source=audible) — no event, no projection-handler involvement (ADR-0043/ADR-0045 respected as before).
+
+**Client (`src/Client/Components/RichText.fs`, new):** a small module exposing `parse : string -> Node` (a pure, allowlisted tree-builder — no `Node` case for a disallowed tag is even representable) and `render : string -> ReactElement`. Deliberately NOT built on the browser's `DOMParser`/an `innerHTML`-family API: this project's Vitest config (`vite.config.mts`) runs tests under plain Node (no `jsdom` dependency present, and the worktree's `node_modules` is a read-only junction to the main tree's real one — installing one was out of scope and risky), so `parse` is a hand-rolled tokenizer/tree-builder mirroring the server sanitizer's own allowlist, exercised directly by `RichText.test.fs` with no DOM needed. `render` maps the parsed tree to real Feliz `Html.p`/`Html.br`/`Html.strong`/`Html.em`/`Html.ul`/`Html.ol`/`Html.li` elements — never `dangerouslySetInnerHTML`/an `innerHTML`-setting API (grep-verified empty over `src/Client/**/*.fs`, excluding vendored `fable_modules/`). A legacy plain-text row (pre-fix `stripHtml` output, or an Open Library description) with no tags at all is split into paragraphs on blank lines; a legacy raw, unsanitized Audnexus row (tags present from before this fix) is sanitized here too and needs no backfill or re-import — both covered by `RichText.test.fs`.
+
+`src/Client/Client.fsproj`: added `Components\RichText.fs` (before `FuzzyMatch.fs`, well ahead of `Pages\BookDetail\Views.fs`) and `Components\RichText.test.fs` (alongside the other `*.test.fs` entries).
+
+`src/Client/Pages/BookDetail/Views.fs`'s `detailsCard`: the description now renders via `RichText.render d` (wrapped in a `mb-4` div) instead of a single `Html.p` with `prop.text`; `RichText`'s own paragraph/list styling carries the previous `text-base-content/70 leading-relaxed` voice and adds only ordinary Tailwind vertical-rhythm/list-style utilities (`space-y-3`, `list-disc`/`list-decimal list-inside space-y-1`) — no new design tokens.
+
+**Tests:**
+- `tests/Server.Tests/AudibleTests.fs`: new `Audible.sanitizeDescription (books-nvnyk)` list (the acceptance-criterion fixture, `<br>` normalization, plain-text passthrough); a new `Audnexus.getBook` regression case for a raw-HTML `summary`; the existing `Audible.getProduct` test updated from "HTML-stripped" to "sanitized, allowlisted tags kept" (its own fixture's `<p>...</p>` now correctly survives instead of being flattened — this was the old, wrong-by-this-task's-own-definition expectation).
+- `tests/Server.Tests/AudibleLibrarySyncTests.fs`: new case in `Api.importAudibleLibrary` — a library item lacking `publisher_summary` falls back to Audnexus, whose `<p>...</p><script>...</script>` fixture lands in `book_metadata_cache.description` sanitized (`<p>` present, no `<script>`/attributes).
+- `src/Client/Components/RichText.test.fs` (new): 5 cases covering the exact Vitest acceptance fixtures — nested p/em/br/ul/li, span/img unwrap-to-text, blank-line paragraph splitting, a legacy raw div/a/b fixture, and a plain single-paragraph case.
+
+**Verified:** `npm run build` (Fable compiles clean), `dotnet run --project tests/Server.Tests/Server.Tests.fsproj` (919/919, was 914), `npm run test:client` (113/113, was 108).
+
+### Integration README sentence (for the conductor to apply)
+
+Append to the end of the existing `**Audible**` bullet in `.agentheim/knowledge/contexts/integration/README.md` (integration-dhctm/integration-jjvg2, ADR-0074):
+
+> Every Audible/Audnexus-sourced description (`publisher_summary`/`summary`/`description`) is run through `Audible.sanitizeDescription` before it ever reaches `book_metadata_cache` — an allowlisted HTML-tag subset (`p`/`br`/`b`/`strong`/`i`/`em`/`ul`/`ol`/`li`, attributes always dropped), everything else unwrapped down to its own text content — so the description keeps its original paragraphs/emphasis without ever carrying raw markup or a stray `<script>`/`<a>` (books-nvnyk).

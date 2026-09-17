@@ -256,6 +256,52 @@ let importAudibleLibraryTests =
                 match observation with
                 | Some data -> Expect.equal data.ObservedOn (DateTime.Now.ToString("yyyy-MM-dd")) "the import stamps the local calendar date, matching AudibleSync.runProgressSync"
                 | None -> failtest "Expected a Reading_progress_observed event")
+
+        testCase "a library item lacking publisher_summary falls back to a sanitized Audnexus description in book_metadata_cache (books-nvnyk)" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                use db = TestDb.withTempDbFactory bootstrap
+                let itemWithoutDescription =
+                    let fields =
+                        [ "\"asin\": \"ND1\""
+                          "\"title\": \"Book No Desc\""
+                          "\"authors\": [{\"name\": \"Author ND1\"}]"
+                          "\"narrators\": []"
+                          "\"is_finished\": false"
+                          "\"product_images\": {\"500\": \"https://example.com/cover-ND1.jpg\"}"
+                          "\"release_date\": \"2020-01-01\""
+                          "\"percent_complete\": 10.0" ]
+                    "{" + String.concat ", " fields + "}"
+                let fixture = libraryResponseJson [ itemWithoutDescription ]
+                let handler =
+                    new AsyncStubHandler(fun req ->
+                        async {
+                            let url = req.RequestUri.ToString()
+                            if url.Contains("/auth/token") then
+                                return jsonResponse HttpStatusCode.OK """{"access_token": "minted-token", "expires_in": 3600}"""
+                            elif url.Contains("/1.0/library") then
+                                return jsonResponse HttpStatusCode.OK fixture
+                            elif url.Contains("api.audnex.us") then
+                                return jsonResponse HttpStatusCode.OK """{"summary": "<p>First.</p><p>Second.</p><script>alert(1)</script>"}"""
+                            else
+                                let resp = new HttpResponseMessage(HttpStatusCode.OK)
+                                resp.Content <- new ByteArrayContent(fakeCoverBytes)
+                                return resp
+                        })
+                use httpClient = new HttpClient(handler)
+                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+
+                match api.importAudibleLibrary () |> Async.RunSynchronously with
+                | Ok r -> Expect.equal r.Created 1 "the one item is still created"
+                | Error e -> failtestf "Expected Ok, got Error %s" e
+
+                let slug = BookProjection.findByExternalId db.Connection (AudibleAsin "ND1") |> Option.get
+                let metadata = MetadataCache.tryGetBookMetadata db.Connection slug
+                match metadata.Description with
+                | Some d ->
+                    Expect.stringContains d "<p>" "sanitized Audnexus fallback description keeps allowlisted <p>"
+                    Expect.isFalse (d.Contains "<script") "no <script> tag survives sanitization"
+                    Expect.isFalse (d.Contains "onclick") "no attributes survive sanitization"
+                | None -> failtest "Expected the Audnexus fallback to populate a description")
     ]
     |> testSequenced
 

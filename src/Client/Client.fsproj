@@ -22,6 +22,7 @@
     <Compile Include="Components\EventHistoryModal.fs" />
     <Compile Include="Components\HlsVideo.fs" />
     <Compile Include="Components\PlayFacetsDisplay.fs" />
+    <Compile Include="Components\RichText.fs" />
     <Compile Include="FuzzyMatch.fs" />
     <Compile Include="Components\SearchModal.fs" />
     <Compile Include="Components\Sidebar.fs" />
@@ -98,6 +99,7 @@
     <Compile Include="Route.test.fs" />
     <Compile Include="Components\SearchModal.test.fs" />
     <Compile Include="Components\LocalCopyRemovalDialog.test.fs" />
+    <Compile Include="Components\RichText.test.fs" />
     <Compile Include="Pages\SeriesDetail\NextUp.test.fs" />
     <Compile Include="Pages\GameDetail\JournalHasContent.test.fs" />
     <Compile Include="Pages\GameDetail\DefaultTab.test.fs" />

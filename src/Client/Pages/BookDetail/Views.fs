@@ -394,7 +394,7 @@ let private detailsCard (book: BookDetail) =
         Html.h3 [ prop.className "text-lg font-bold mb-4"; prop.text "Details" ]
         match book.Description with
         | Some d when not (System.String.IsNullOrWhiteSpace d) ->
-            Html.p [ prop.className "text-base-content/70 leading-relaxed mb-4"; prop.text d ]
+            Html.div [ prop.className "mb-4"; prop.children [ RichText.render d ] ]
         | _ -> ()
         if hasMeta then
             Html.p [

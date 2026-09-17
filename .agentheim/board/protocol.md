@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 12:58 -- Task verified and completed: books-nvnyk - Audible-imported book descriptions show their intended formatting (paragraphs, emphasis, lists) instead of raw `<p>`/`<i>` tags — the Audible adapter keeps the publisher summary as a sanitized allowlisted HTML subset (Audible and Audnexus paths alike) and the book detail page renders it through a tag-allowlisting rich-text component, never `innerHTML`
+
+**Type:** Work / Task completion
+**Task:** books-nvnyk - Audible-imported book descriptions show their intended formatting (paragraphs, emphasis, lists) instead of raw `<p>`/`<i>` tags — the Audible adapter keeps the publisher summary as a sanitized allowlisted HTML subset (Audible and Audnexus paths alike) and the book detail page renders it through a tag-allowlisting rich-text component, never `innerHTML`
+**Summary:** Audible/Audnexus-sourced book descriptions now keep their intended formatting instead of either raw HTML tags or a flattened run-on paragraph — `Audible.sanitizeDescription` (server) allowlists p/br/b/strong/i/em/ul/ol/li and unwraps everything else to its text content before the string ever reaches `book_metadata_cache`, and a new `RichText.render` component (client) renders that string as real Feliz paragraphs/lists/emphasis via a pure hand-rolled tokenizer, never `dangerouslySetInnerHTML`.
+**Duration:** 22m17s
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 7
+**Tests added:** 10
+**ADRs written:** none
+
+---
+
 ## 2026-09-17 12:51 -- Modeling / Captured: books-jm7aa - Book detail hero mirrors the game detail hero — the personal rating sits right of the status badge as a hero control, the reading state closes the hero meta block (finished date when Finished, otherwise a percent progress line), Details print on the page background like the movie synopsis, and Links move to the right column above Recommended By
 
 **Type:** Modeling / Capture
