@@ -42,13 +42,18 @@ closest honest signal. Bearer-only auth for that endpoint is plausible but unver
    lastListened.LastUpdatedOn |> Option.defaultValue today`; `Position` prefers `Minutes (int
    (positionMs / 60000L), Some runtime)` when `PositionMs` is present, else the existing
    `percent × runtime` estimate. The pure decision stays the one both paths share (ADR-0076).
-4. `AudibleSync.runProgressSync` and `Api.importAudibleLibraryImpl` call `getLastPositionHeard`
-   **only** for a book with no Audible `book_progress` row — add `BookProjection.hasSourceProgress
-   conn slug source : bool` and gate on it. A newly bought title first seen by the nightly sync gets
-   a properly dated prior too; an established library's sync makes zero metadata calls.
+4. **Only `Api.importAudibleLibraryImpl` records priors** (ADR-0082 §2, builder ruling
+   2026-09-18). For a book with no Audible `book_progress` row — add
+   `BookProjection.hasSourceProgress conn slug source : bool` and gate on it — the import calls
+   `getLastPositionHeard` and issues `Books.Record_prior_reading_progress data`; for a book that
+   already has one it issues plain `Observe_reading_progress` with no metadata call, exactly as
+   today. `AudibleSync.runProgressSync` is **untouched**: the nightly sync never calls
+   `getLastPositionHeard` and never issues `Record_prior_reading_progress` — a title first seen by
+   a daily run (bought yesterday, listened to yesterday) gets an ordinary `Reading_progress_observed`
+   dated to that run. An established library's sync stays a single `/1.0/library` call.
 5. A `getLastPositionHeard` failure (network, 401, decode) degrades to both-`None` — it never aborts
-   the import or the sync; the prior falls back to import/sync-day dating. Surface a count of
-   "priors dated from Audible" vs "dated today" in the result string so a silent 401 is visible.
+   the import; the prior falls back to import-day dating. Surface a count of "priors dated from
+   Audible" vs "dated today" in the result string so a silent 401 is visible.
 6. Legacy repair, inside `Api.importAudibleLibraryImpl` only ("Import library" is the builder's
    explicit act): for a known book whose Audible `book_progress` rows are exactly one row with `kind
    = 'observation'` (written before priors existed), issue `Remove_reading_progress_observation`
@@ -65,9 +70,10 @@ closest honest signal. Bearer-only auth for that endpoint is plausible but unver
 - [ ] `getLastPositionHeard` decodes the research report's captured sample (`status = "Exists"`, `last_updated = "2023-09-23 21:03:18.228"`, `position_ms = 896068`) to `{ LastUpdatedOn = Some "2023-09-23"; PositionMs = Some 896068L }`.
 - [ ] The same function returns both-`None` for `status = "DoesNotExist"` and for an undecodable body.
 - [ ] `observationFor` with `LastUpdatedOn = Some d` yields `ObservedOn = d`; with `None` it yields `today`; with `PositionMs = Some 896068L` and a known runtime it yields `Minutes (14, Some runtime)`.
-- [ ] `runProgressSync` makes zero `getLastPositionHeard` calls for a book that already has an Audible `book_progress` row (test with a counting stub).
+- [ ] `runProgressSync` makes zero `getLastPositionHeard` calls and issues zero `Record_prior_reading_progress` commands — a book with no Audible row synced for the first time ends with a `kind = 'observation'` row dated to the sync day (test with a counting stub).
 - [ ] `importAudibleLibraryImpl` on a book with no Audible row calls `getLastPositionHeard` exactly once and the resulting `book_progress` row is `kind = 'prior'` with `observed_on` = the returned date, and `finished_at` equals it when the item is finished.
-- [ ] A `getLastPositionHeard` failure never surfaces as an import/sync `Error`; the book still gets a prior dated today.
+- [ ] `importAudibleLibraryImpl` on a book that already has an Audible row makes no metadata call and appends an ordinary observation (or nothing on an unchanged percent).
+- [ ] A `getLastPositionHeard` failure never surfaces as an import `Error`; the book still gets a prior dated today.
 - [ ] Legacy repair round-trips: a fixture book whose only Audible row is `kind = 'observation'` dated the import day becomes a single `kind = 'prior'` row after one import run, with `finished_at` re-dated; a second run appends zero events.
 - [ ] `Audible.throttleMetadataCall` paces consecutive calls (mirror `OpenLibrary.throttleApiCall`'s test shape).
 - [ ] `npm run build` and Expecto are green.
@@ -83,8 +89,11 @@ closest honest signal. Bearer-only auth for that endpoint is plausible but unver
   dating by construction; only the last-listened value is lost, not correctness. Record it and
   leave a follow-up for signed (RSA-SHA256) requests — the auth file already carries `adp_token` and
   `device_private_key` (ADR-0074).
-- Depends on `books-d4wtc` for `Prior_reading_progress_recorded`, `book_progress.kind` and the
-  aggregate's first-per-source rule. `integration-sfmxg` (Goodreads removal, in doing/) edits
+- Depends on `books-d4wtc` for `Record_prior_reading_progress` / `Prior_reading_progress_recorded`
+  and `book_progress.kind`.
+- Refined 2026-09-18 (builder): the sync path no longer records priors or fetches last-listened
+  dates — priors are the bulk import's business only. A later "Import library" click still records
+  priors for titles it creates or that have no Audible row yet; that is a bulk import too. `integration-sfmxg` (Goodreads removal, in doing/) edits
   `AudibleSync.fs` / `Api.fs` neighbours — rebase awareness only, no dependency.
 - Do not touch the live database (`workers-never-touch-live-database`); the builder runs "Import
   library" on the deployed instance to repair real history.

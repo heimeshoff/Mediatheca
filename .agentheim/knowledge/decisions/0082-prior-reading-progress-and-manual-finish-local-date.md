@@ -1,6 +1,6 @@
 ---
 id: 0082
-title: A source's first-ever reading-progress report per book is a prior, not a session — `Prior_reading_progress_recorded` (never `InFocus`-promoting, dated by the source's own last-known-true day when available), and a manual Finished click stamps today's local date instead of the event's UTC append timestamp
+title: The bulk Audible import's first position report for a book is a prior, not a session — `Record_prior_reading_progress` → `Prior_reading_progress_recorded` (issued only by "Import library", never by the nightly sync; never `InFocus`-promoting; dated by Audible's last-listened day when available), and a manual Finished click stamps today's local date instead of the event's UTC append timestamp
 scope: books
 status: accepted
 date: 2026-09-18
@@ -35,19 +35,25 @@ Separately, a manual "mark Finished" click (`BookDetail/State.fs`) sends `effect
 
 1. **New event `Prior_reading_progress_recorded`**, same payload as `Reading_progress_observed`
    (`ReadingProgressObservedData`, reused verbatim — no new shape). UL term **Prior reading
-   progress**: the position a source reports the first time Mediatheca ever sees that source report
-   on this book — where the reader already was, not what they read that day. Named to match the
+   progress**: the position the bulk import ("Import library") finds for a book the source has not
+   reported on before — where the reader already was, not what they read that day. Named to match the
    codebase's own existing precedent for exactly this situation in a sibling BC,
    `Prior_play_time_recorded` (Games, ADR-0043) — not "baseline", which this BC's `Observations`
    comparison (`Books.latestPercentForSource`) and the README's "Progress regression" entry already
    use for a different concept (the per-source no-op comparison point).
-2. **Discriminator**: `Books.decide`'s `Observe_reading_progress` branch tests, before the existing
-   per-source no-op comparison, whether `data.Source <> Manual` and the source has **no** entry at
-   all yet in `Observations` (`Map.exists` over the source, not `latestPercentForSource`'s 0
-   default). When true, it emits `Prior_reading_progress_recorded` — **including at 0 %** (a
-   first-ever 0 % report must not be silently dropped by the same-percent no-op the way a genuine
-   second 0 %-again observation would be). `Source = Manual` always stays a real observation — the
-   user is present and the day is real.
+2. **The intent rides the command, never an aggregate inference (builder ruling 2026-09-18).** A
+   prior exists only for the bulk import — the explicit "Import library" run. A new command,
+   `Record_prior_reading_progress of ReadingProgressObservedData`, is issued by
+   `Api.importAudibleLibraryImpl` alone. `Books.decide` handles it as: if the source already has an
+   entry in `Observations` (`Map.exists` over the source, not `latestPercentForSource`'s 0 default),
+   behave exactly as `Observe_reading_progress` — a re-import of an already-tracked book is just
+   another observation; otherwise emit `Prior_reading_progress_recorded` — **including at 0 %** (a
+   first-ever 0 % report must not be dropped by the same-percent no-op the way a genuine
+   second 0 %-again observation would be). `Observe_reading_progress` is unchanged: the nightly sync
+   and the Manual popover always produce a real observation, so a title that first shows up in a
+   daily run — bought yesterday, listened to yesterday — gets a normal History row dated to that
+   run, never a prior. The aggregate cannot tell "first import" from "first sync" by state alone,
+   and must not guess; the edge that knows says so.
 3. **A prior never promotes.** It seeds `Observations` exactly like an observation (so later
    no-op/regression comparisons work identically), and at 100 % or an explicit `Finished` flag it
    still emits `Book_status_changed (Finished, Some data.ObservedOn)` per ADR-0077 §5 — but it never
@@ -75,9 +81,10 @@ Separately, a manual "mark Finished" click (`BookDetail/State.fs`) sends `effect
    doesn't try.
 7. **Removal is uniform.** `Reading_progress_observation_removed` covers both kinds (keyed on
    `(observedOn, source)`, not on kind); removing a book's only prior for a source empties that
-   source's history, so the next `Observe_reading_progress` is correctly re-classified as a fresh
-   prior. This is the mechanism `integration-dtdbb`'s legacy repair relies on to re-date entries
-   written before this ADR shipped.
+   source's history, so the next `Record_prior_reading_progress` (an "Import library" run) records
+   a fresh prior — while a next `Observe_reading_progress` (a nightly sync) records an ordinary
+   observation. This is the mechanism `integration-dtdbb`'s legacy repair relies on to re-date
+   entries written before this ADR shipped.
 8. **Manual Finished stamps local today.** `Set_book_status Finished` sends
    `Some (DateTime.Now.ToString("yyyy-MM-dd"))`, matching how `AudibleSync`/`importAudibleLibraryImpl`
    already stamp `ObservedOn` in local time — never `None` (which resolves to the event's UTC append
@@ -87,11 +94,14 @@ Separately, a manual "mark Finished" click (`BookDetail/State.fs`) sends `effect
 
 ## Consequences
 
-- A first-time Audible import (or a newly-bought title's first nightly sync) reads honestly in the
-  History list as a starting position, never a listening session, and a finished title's `finished_at`
-  reflects when Audible last saw the user reading it, not when Mediatheca happened to import it.
-- `integration-dtdbb` costs one extra authenticated call per book that has never had an Audible
-  `book_progress` row — bounded to new/never-synced titles, never the whole library on every sync.
+- A bulk Audible import reads honestly in the History list as a starting position, never a
+  listening session, and a finished title's `finished_at` reflects when Audible last saw the user
+  reading it, not when Mediatheca happened to import it. A title first seen by the nightly sync
+  gets an ordinary observation dated to that run — the sync never records a prior and never fetches
+  a last-listened date.
+- `integration-dtdbb` costs one extra authenticated metadata call per imported book that has no
+  Audible `book_progress` row yet — only inside "Import library", never on the nightly sync, which
+  stays a single `/1.0/library` call.
 - The manual-finish UTC-midnight drift (a book finished tonight showing as finished yesterday) is
   fixed, and a wrong or approximate `finished_at` — including one recovered by legacy repair — is now
   correctable from the book detail page itself.
@@ -109,6 +119,11 @@ Separately, a manual "mark Finished" click (`BookDetail/State.fs`) sends `effect
   with "baseline" as already used for `latestPercentForSource`'s per-source comparison value and the
   README's "Progress regression" entry; `Prior_reading_progress_recorded` matches `Prior_play_time_recorded`'s
   existing precedent for the identical situation one BC over.
+- **Aggregate-inferred priors — "a source's first-ever report on a book is a prior, whatever
+  command carried it"** (the first draft of this ADR) — rejected by the builder: a book that first
+  appears in a daily run with yesterday's listening is a real listening day, not a starting
+  position; only the bulk import is a prior, and the aggregate cannot distinguish the two by state,
+  so the command carries the intent.
 - **Promoting a prior to `InFocus` when its `ObservedOn` is recent** — rejected: would require the
   aggregate to reason about "recent" relative to wall-clock time, a heuristic ADR-0043's doctrine and
   this BC's existing design both avoid; an adapter can issue an explicit `Change_status` if desired.

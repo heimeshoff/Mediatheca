@@ -5,6 +5,26 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 01:16 -- Modeling / Refined: integration-dtdbb - Only "Import library" records priors and fetches the last-listened day; the nightly sync is untouched
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** todo
+**Summary:** Same builder ruling: `runProgressSync` no longer calls `getLastPositionHeard` or records priors — a book with no Audible row synced for the first time gets a `kind = 'observation'` row dated to the sync day. `importAudibleLibraryImpl` alone issues `Record_prior_reading_progress` (with the metadata call) for books without an Audible row, and plain `Observe_reading_progress` (no metadata call) for the rest; legacy repair unchanged. AC rewritten accordingly.
+**ADRs written:** none
+
+---
+
+## 2026-09-18 01:16 -- Modeling / Refined: books-d4wtc - Prior reading progress is the bulk import's command, never an aggregate inference
+
+**Type:** Modeling / Refine
+**BC:** books
+**Status after:** todo
+**Summary:** Builder ruling: a prior exists only for the bulk "Import library" run; a title first seen by the nightly sync — even with yesterday's listening — is an ordinary history row. The aggregate cannot tell first-import from first-sync by state, so the intent rides a new command `Record_prior_reading_progress` (prior when the source has no entry yet, otherwise identical to `Observe_reading_progress`); `Observe_reading_progress` is unchanged and never yields a prior. Task What/AC, title and INDEX line updated; ADR-0082 §2, §7, Consequences and Alternatives amended in place.
+**ADRs written:** 0082 (amended)
+
+---
+
 ## 2026-09-18 01:10 -- Modeling / Captured: books-xyqyb - Manual finish stamps today's local date and the hero's finished-date line is click-to-edit — `Set_book_status Finished` sends `Some localToday` instead of `None` (no more UTC-midnight drift), and the `finished {date}` line opens an `EditableDateInput` whose commit re-dates the finish via `setBookStatus slug Finished (Some picked)`
 
 **Type:** Modeling / Capture
