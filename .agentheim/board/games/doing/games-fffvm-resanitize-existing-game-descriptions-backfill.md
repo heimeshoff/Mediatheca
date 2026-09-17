@@ -1,7 +1,7 @@
 ---
 id: games-fffvm
 title: Re-sanitize existing game descriptions — a resumable, throttled backfill that re-fetches every already-cached game's description (Steam-linked via the storefront, RAWG-only via RAWG details) through games-r1tx4's sanitizer, so games imported before it gain paragraphs/emphasis and RAWG-only games get the description games-v4nqe silently dropped
-status: todo
+status: doing
 type: chore
 context: games
 created: 2026-09-17

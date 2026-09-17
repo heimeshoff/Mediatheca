@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 12
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **games-fffvm** — Re-sanitize existing game descriptions — a resumable, throttled backfill that re-fetches every already-cached game's description (Steam-linked via the storefront, RAWG-only via RAWG details) through games-r1tx4's sanitizer, so games imported before it gain paragraphs/emphasis and RAWG-only games get the description games-v4nqe silently dropped (chore) — `todo/games-fffvm-resanitize-existing-game-descriptions-backfill.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **games-fffvm** — Re-sanitize existing game descriptions — a resumable, throttled backfill that re-fetches every already-cached game's description (Steam-linked via the storefront, RAWG-only via RAWG details) through games-r1tx4's sanitizer, so games imported before it gain paragraphs/emphasis and RAWG-only games get the description games-v4nqe silently dropped (chore) — `doing/games-fffvm-resanitize-existing-game-descriptions-backfill.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
