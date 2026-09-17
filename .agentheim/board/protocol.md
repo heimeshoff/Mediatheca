@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 14:30 -- Modeling / Refined: books-h4mq2 - book-detail-progress.spec.ts must open the hero ActionMenu before clicking "Update progress"
+
+**Type:** Modeling / Refine
+**BC:** books
+**Status after:** todo
+**Summary:** Refinement found the hero ActionMenu trigger is an icon-only button with no accessible name (SVG child only, no aria-label/title) and no other e2e spec drives an ActionMenu item, so the task's original "copy the existing pattern" pointer had nothing to point at. Scope widened to add `prop.ariaLabel "More actions"` to the trigger in all three ActionMenu views (attribute only, also closes an a11y gap on every detail page), with the spec opening the menu via that role locator before each of its two "Update progress" clicks. The spec's other locators were checked against the post-books-jm7aa BookDetail/Views.fs and still resolve. Run rule sharpened: worker runs the spec only with CI=1 (isolated cold start) and reports "not run — ports bound" if 5000/5173 are busy, never reusing the live dev stack. Added ADR-0027 and the accessibility tag.
+
+---
+
 ## 2026-09-17 13:37 -- Work session ended
 
 **Type:** Work / Session end
