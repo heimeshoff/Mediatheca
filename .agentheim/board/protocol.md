@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 00:45 -- Batch started: [integration-sfmxg]
+
+**Type:** Work / Batch start
+**Tasks:** integration-sfmxg - Remove the Goodreads integration — delete the adapter, the shelf/progress sync job, the Settings card and the API surface, and drop the Goodreads progress source and external id from the Book model; Audible and Open Library remain the only book sources
+**Parallel:** no (1 worker — integration-sfmxg is the whole ready set; books-xntts is blocked on it by depends_on and becomes ready once it integrates)
+
+---
+
 ## 2026-09-18 00:39 -- Modeling / Captured: books-xntts - Open Library import takes the work's canonical English edition (`cover_edition_key`, language-filtered fallback) instead of the first of hundreds of unordered `edition_key`s, and converts the work's Markdown description into the sanitized HTML subset at import and refresh — no more Spanish titles/covers on an English work, no more literal `[link](url)` lists
 
 **Type:** Modeling / Capture

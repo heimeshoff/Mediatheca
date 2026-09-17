@@ -1,7 +1,7 @@
 ---
 id: integration-sfmxg
 title: Remove the Goodreads integration — delete the adapter, the shelf/progress sync job, the Settings card and the API surface, and drop the Goodreads progress source and external id from the Book model; Audible and Open Library remain the only book sources
-status: todo
+status: doing
 type: refactor
 context: integration
 created: 2026-09-18
