@@ -5,7 +5,7 @@ scope: integration
 status: accepted
 date: 2026-09-16
 supersedes: []
-superseded_by: []
+superseded_by: [0083]
 related_tasks: [integration-wmqn3]
 related_adrs: [0026, 0075]
 ---

@@ -27,7 +27,7 @@ module Books =
     /// computed at observation time (from the source's own percent, or from
     /// page/total) so the event is self-contained and replay never needs the
     /// cache. `Finished` carries a source's explicit finished flag
-    /// (Goodreads' "finished reading", Audible's `is_finished`).
+    /// (Audible's `is_finished`).
     type ReadingProgressObservedData = {
         Percent: int
         Position: ReadingPosition option
@@ -157,7 +157,6 @@ module Books =
         | OpenLibraryWork _ -> "openLibraryWork"
         | OpenLibraryEdition _ -> "openLibraryEdition"
         | AudibleAsin _ -> "audibleAsin"
-        | GoodreadsBookId _ -> "goodreadsBookId"
 
     /// The comparison baseline for `Observe_reading_progress`'s no-op/
     /// promotion rules (ADR-0076 §2): the latest percent previously observed
@@ -289,13 +288,11 @@ module Books =
         let private encodeProgressSource (source: ProgressSource) =
             match source with
             | Audible -> "Audible"
-            | Goodreads -> "Goodreads"
             | ProgressSource.Manual -> "Manual"
 
         let private decodeProgressSource (s: string) : ProgressSource =
             match s with
             | "Audible" -> Audible
-            | "Goodreads" -> Goodreads
             | _ -> ProgressSource.Manual
 
         let private encodeReadingPosition (pos: ReadingPosition) =
@@ -320,7 +317,6 @@ module Books =
             | OpenLibraryWork v -> Encode.object [ "kind", Encode.string "OpenLibraryWork"; "value", Encode.string v ]
             | OpenLibraryEdition v -> Encode.object [ "kind", Encode.string "OpenLibraryEdition"; "value", Encode.string v ]
             | AudibleAsin v -> Encode.object [ "kind", Encode.string "AudibleAsin"; "value", Encode.string v ]
-            | GoodreadsBookId v -> Encode.object [ "kind", Encode.string "GoodreadsBookId"; "value", Encode.string v ]
 
         let private decodeBookExternalId: Decoder<BookExternalId> =
             Decode.object (fun get ->
@@ -330,8 +326,7 @@ module Books =
                 | "Isbn13" -> Isbn13 value
                 | "OpenLibraryWork" -> OpenLibraryWork value
                 | "OpenLibraryEdition" -> OpenLibraryEdition value
-                | "AudibleAsin" -> AudibleAsin value
-                | _ -> GoodreadsBookId value)
+                | _ -> AudibleAsin value)
 
         let private encodeBookAddedData (data: BookAddedData) =
             Encode.object [

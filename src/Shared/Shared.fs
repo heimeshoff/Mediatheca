@@ -822,7 +822,6 @@ type BookStatus =
 /// ADR-0076 §1: who reported a reading-progress observation.
 type ProgressSource =
     | Audible
-    | Goodreads
     | Manual
 
 /// ADR-0076 §1: the user's position in a book at the moment of an
@@ -875,7 +874,6 @@ type BookExternalId =
     | OpenLibraryWork of string
     | OpenLibraryEdition of string
     | AudibleAsin of string
-    | GoodreadsBookId of string
 
 /// One row of a book's reading-progress history (`book_progress`,
 /// ADR-0076 §2) — the detail page's progress-history list.
@@ -921,7 +919,6 @@ type BookDetail = {
     OpenLibraryWorkKey: string option
     OpenLibraryEditionKey: string option
     AudibleAsin: string option
-    GoodreadsBookId: string option
     RecommendedBy: FriendRef list
     // ADR-0043/ADR-0045 cache-tier fields (book_metadata_cache), joined at
     // query time — None/empty when never fetched, the honest-degradation
@@ -1056,57 +1053,11 @@ type AudibleProgressSyncResult = {
 /// `IMediathecaApi.getAudibleSyncStatus` -- the persisted (SettingsStore, not
 /// in-memory) last-import/last-sync summary Settings shows after a reload.
 /// Kept separate from `AudibleStatus` (which is about the auth
-/// file/connection itself), mirroring how `GoodreadsSettings` keeps its own
-/// LastSync/LastResult fields.
+/// file/connection itself).
 type AudibleSyncStatus = {
     LastImportResult: string option
     LastSync: string option
     LastSyncResult: string option
-}
-
-/// integration-wmqn3 (ADR-0075): what Settings -> Goodreads shows/edits. The
-/// setting is the user's PUBLIC Goodreads user id -- never a developer key
-/// (none exists any more) and never a session cookie. `ImportShelves`
-/// defaults to `["currently-reading"]`; `read`/`to-read` are opt-in.
-type GoodreadsSettings = {
-    UserId: string option
-    ImportShelves: string list
-    LastSync: string option
-    LastResult: string option
-    LastError: string option
-}
-
-/// One shelf's contribution to a `runGoodreadsShelfSync` run.
-type GoodreadsShelfSyncSummary = {
-    Shelf: string
-    Fetched: int
-    Created: int
-    Linked: int
-    StatusChanged: int
-    Skipped: int
-}
-
-/// The user-status-feed progress step's contribution to a
-/// `runGoodreadsShelfSync` run (integration-y2ak4, ADR-0075 §4) — parsed
-/// status items joined to library books and folded into
-/// `Observe_reading_progress` commands. `Unmatched` (no library book found),
-/// `Started` (an "is starting"/"started reading" item — informational only,
-/// never emits a command) and `Ignored` (text that matched none of the four
-/// recognized shapes) are each counted separately from `ProgressObserved`.
-type GoodreadsProgressSyncSummary = {
-    ProgressObserved: int
-    Unmatched: int
-    Started: int
-    Ignored: int
-}
-
-/// `IMediathecaApi.runGoodreadsShelfSync` — persisted as JSON under
-/// `goodreads_last_sync_result` (ADR-0010: per-item failures never abort the
-/// run, so `Errors` can be non-empty alongside real shelf progress).
-type GoodreadsSyncResult = {
-    Shelves: GoodreadsShelfSyncSummary list
-    Progress: GoodreadsProgressSyncSummary
-    Errors: string list
 }
 
 // Games
@@ -2095,20 +2046,8 @@ type IMediathecaApi = {
     setAudibleMarketplace: string -> Async<unit>
     searchAudibleBooks: string -> Async<AudibleSearchResult list>
     addBookFromAudible: AddBookFromAudibleRequest -> Async<Result<AddBookOutcome, string>>
-    // Goodreads (integration-wmqn3, ADR-0075) -- the user's PUBLIC Goodreads
-    // user id (no developer key exists any more, no cookie ever) drives a
-    // daily shelf sync; Open Library resolves unknown currently-reading
-    // imports by ISBN. Goodreads has no search endpoint, so there is no
-    // searchGoodreadsBooks/addBookFromGoodreads pair here.
-    getGoodreadsSettings: unit -> Async<GoodreadsSettings>
-    setGoodreadsUserId: string -> Async<Result<string, string>>
-    setGoodreadsImportShelves: string list -> Async<unit>
-    testGoodreadsConnection: unit -> Async<Result<string, string>>
-    runGoodreadsShelfSync: unit -> Async<Result<GoodreadsSyncResult, string>>
     // Audible library import + daily progress sync (integration-jjvg2,
-    // ADR-0074/ADR-0076/ADR-0026) -- appended at the tail, after Goodreads,
-    // per this task's own Notes (avoids a manual-merge conflict with wmqn3's
-    // own tail append).
+    // ADR-0074/ADR-0076/ADR-0026).
     importAudibleLibrary: unit -> Async<Result<AudibleImportResult, string>>
     runAudibleProgressSync: unit -> Async<Result<AudibleProgressSyncResult, string>>
     getAudibleSyncStatus: unit -> Async<AudibleSyncStatus>

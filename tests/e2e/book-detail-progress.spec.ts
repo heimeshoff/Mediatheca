@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
 
 // books-f33e2: the book detail page's manual "Update progress" popover is
-// the always-available fallback ADR-0076 assumes when neither Audible nor
-// Goodreads is linked — this spec drives it end-to-end against the real
-// dev stack (ADR-0027), seeding a book hermetically via a direct `addBook`
+// the always-available fallback ADR-0076 assumes when Audible isn't linked —
+// this spec drives it end-to-end against the real dev stack (ADR-0027),
+// seeding a book hermetically via a direct `addBook`
 // API call (no Open Library/Audible network dependency). Setting progress
 // to 100% through the popover must promote the book's status to Finished
 // server-side (`Books.decide`, ADR-0076 §5) — a rule this spec proves by

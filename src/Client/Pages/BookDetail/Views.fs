@@ -28,9 +28,8 @@ let private sectionHeader (title: string) =
         ]
     ]
 
-// Books' `AverageRating` is already a 0-5 scale (Goodreads star rating,
-// `Server/Goodreads.fs`) — unlike GameDetail's 0-10 RAWG scale, this is
-// NOT halved before rendering as stars.
+// Books' `AverageRating` is already a 0-5 star scale -- unlike GameDetail's
+// 0-10 RAWG scale, this is NOT halved before rendering as stars.
 let private starRating (rating: float) =
     let fullStars = int rating
     let hasHalf = rating - float fullStars >= 0.5
@@ -274,7 +273,6 @@ let private HeroRating (averageRating: float option, personalRating: int option,
 let private sourceLabel (source: ProgressSource) =
     match source with
     | ProgressSource.Audible -> "Audible"
-    | ProgressSource.Goodreads -> "Goodreads"
     | ProgressSource.Manual -> "Manual"
 
 let private positionLabel (position: ReadingPosition option) =
@@ -497,14 +495,12 @@ let private detailsSection (book: BookDetail) : ReactElement =
     ]
 
 // ── Links panel (right column, GameDetail's Links row styling — task's
-// What §5). Audible/Open Library share `Icons.book`; Goodreads takes
-// `Icons.globe`, the closest existing icon (no new icon assets). ──
+// What §5). Audible/Open Library share `Icons.book`. ──
 
 let private linksCard (book: BookDetail) : ReactElement =
     let audibleLink = book.AudibleAsin |> Option.map (fun asin -> "Audible", $"https://www.audible.de/pd/{asin}", Icons.book)
-    let goodreadsLink = book.GoodreadsBookId |> Option.map (fun gid -> "Goodreads", $"https://www.goodreads.com/book/show/{gid}", Icons.globe)
     let openLibraryLink = book.OpenLibraryWorkKey |> Option.map (fun workKey -> "Open Library", $"https://openlibrary.org{workKey}", Icons.book)
-    let links = [ audibleLink; goodreadsLink; openLibraryLink ] |> List.choose id
+    let links = [ audibleLink; openLibraryLink ] |> List.choose id
     if List.isEmpty links then
         Html.none
     else

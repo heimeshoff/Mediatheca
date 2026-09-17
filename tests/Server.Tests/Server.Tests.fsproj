@@ -75,9 +75,6 @@
     <Compile Include="OpenLibraryApiTests.fs" />
     <Compile Include="AudibleTests.fs" />
     <Compile Include="AudibleApiTests.fs" />
-    <Compile Include="GoodreadsTests.fs" />
-    <Compile Include="GoodreadsProgressTests.fs" />
-    <Compile Include="GoodreadsSyncTests.fs" />
     <Compile Include="AudibleLibrarySyncTests.fs" />
     <Compile Include="CatalogProjectionTests.fs" />
     <Compile Include="Program.fs" />

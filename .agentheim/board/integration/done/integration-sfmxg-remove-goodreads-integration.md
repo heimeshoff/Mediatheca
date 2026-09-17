@@ -1,7 +1,7 @@
 ---
 id: integration-sfmxg
 title: Remove the Goodreads integration — delete the adapter, the shelf/progress sync job, the Settings card and the API surface, and drop the Goodreads progress source and external id from the Book model; Audible and Open Library remain the only book sources
-status: doing
+status: done
 type: refactor
 context: integration
 created: 2026-09-18
@@ -9,7 +9,7 @@ completed:
 depends_on: [integration-wmqn3, integration-y2ak4, design-system-001-formalize-styleguide]
 blocks: []
 tags: [books, goodreads, adapter, settings, sync, scheduled-job, removal]
-related_adrs: [0075, 0078, 0076, 0077]
+related_adrs: [0075, 0078, 0076, 0077, 0083]
 related_research: [goodreads-reading-progress-and-book-metadata-sources-2026-09-16]
 prior_art: [integration-wmqn3, integration-y2ak4]
 ---
@@ -161,3 +161,105 @@ untouched: Audible (integration-dhctm, integration-jjvg2, ADR-0074) and Open Lib
 - Worker discipline reminder: never touch the live DB (`workers-never-touch-live-database`);
   the evidence above was gathered by the builder side at capture.
 - Styleguide gate: `design-system-001-formalize-styleguide` is done; this task removes UI only.
+
+## Outcome
+
+Deleted the Goodreads integration in full, in one change, across server, shared, client and tests:
+
+**Server** (`src/Server/`): `Goodreads.fs` and `GoodreadsSync.fs` deleted, with their
+`Server.fsproj` `<Compile Include>` lines. `Composition.fs` lost `getGoodreadsConfig`,
+`goodreadsSyncHour`, the "Goodreads shelf sync" `JobSpec`, and `runGoodreadsShelfSyncNow`; the
+`Api.create` call site and its doc comments were updated so `runAudibleProgressSyncNow` is now the
+sole documented carrier of the ADR-0078 wrapper-JobSpec pattern. `Api.fs` lost the five
+`IMediathecaApi` members, `decode/encodeGoodreadsImportShelves`, and the `GoodreadsBookId`
+attachment at Open-Library add time. `OpenLibrary.fs`'s `OpenLibraryEdition`/`decodeEditionRaw` no
+longer carry/decode `GoodreadsIds`/`identifiers.goodreads`. `Books.fs`/`BookProjection.fs` lost the
+`Goodreads`/`GoodreadsBookId` encode/decode branches, the `goodreads_book_id` column from
+`book_detail`'s (and `book_list`'s) CREATE/INSERT/SELECT and its UNIQUE index, and the `WHEN
+'Goodreads' THEN 2` precedence rung — `recomputeProgress`'s tie-break is now `Manual > Audible`.
+`AudibleSync.fs`'s doc comments pointing at `GoodreadsSync.withLock`/`formatResult` now point at
+`PlaytimeTracker`/itself.
+
+**Shared** (`src/Shared/Shared.fs`): `ProgressSource` is `Audible | Manual`; `BookExternalId` has
+no `GoodreadsBookId` case; `BookDetail` has no `GoodreadsBookId` field; `GoodreadsSettings`,
+`GoodreadsShelfSyncSummary`, `GoodreadsProgressSyncSummary`, `GoodreadsSyncResult` and the five API
+members are gone from `IMediathecaApi`.
+
+**Client** (`src/Client/`): the Settings Goodreads card (`goodreadsDetail`, its `integrationCard`
+entry, all `Goodreads*` `Model` fields/`Msg` cases/reducer branches/init-time load) is deleted;
+`BookDetail/Views.fs` (`sourceLabel`, the links card's Goodreads link) and `Dashboard/Views.fs`
+(`progressSourceGlyph`/`progressSourceTitle`) drop their Goodreads arm; `GoodreadsCard.test.fs` and
+its `Client.fsproj` line are deleted; `AudibleImportSync.test.fs`'s stray doc-comment reference is
+fixed.
+
+**Tests** (`tests/Server.Tests/`): `GoodreadsTests.fs`, `GoodreadsProgressTests.fs`,
+`GoodreadsSyncTests.fs` and their `Server.Tests.fsproj` lines are deleted. All ~18 other files
+constructing `Api.create` (AddGameFromRawg/Steam, AdminSurgery, AudibleApi, AudibleLibrarySync,
+BooksApi, CatalogProjection, DashboardBooks/CardExpansion/Linger, GameReleaseDateProjection,
+NotesRemovalCleanup, OpenLibraryApi, RequestConnectionConcurrency, SteamFamily* (three files),
+SteamStorefrontThrottle) lost the `getGoodreadsConfig`/`runGoodreadsShelfSyncNow` arguments in the
+same change. `BooksTests.fs`'s two-Goodreads-source scenario now uses Manual as the second source.
+`OpenLibraryTests.fs`/`OpenLibraryApiTests.fs` drop the `identifiers.goodreads` fixture field and
+its `GoodreadsIds` assertions. Two new Expecto tests were added: `BookProjectionTests.fs`'s "Init
+against a book_detail table with the legacy goodreads_book_id column still projects Book_added"
+(pre-creates the full pre-removal `book_detail` schema plus the orphan column, runs
+`handler.Init`, applies `Book_added_to_library`, and asserts the book projects normally) and
+`JobRunsTests.fs`'s "getJobStatuses lists no job for an orphan job_runs row whose job is no longer
+registered" (seeds a `job_runs` row named "Goodreads shelf sync" directly, then asserts
+`getJobStatuses` against an empty `scheduledJobs` list returns nothing and does not error).
+
+**e2e**: `tests/e2e/book-detail-progress.spec.ts`'s header comment no longer describes the manual
+popover as a fallback for "neither Audible nor Goodreads" — it's simply "Audible isn't linked" now;
+the spec body (unchanged) still exercises exactly what it always did.
+
+**Gates**: `npm run build` (Fable compile), `npm test` (Expecto: 910 passed, 0 failed — down from
+938 because the three deleted Goodreads test files' ~30 tests are gone and 2 new ones were added),
+and `npm run test:client` (Vitest: 113 passed, 0 failed — down from 117 because `GoodreadsCard.test.fs`'s
+4 tests are gone) are all green.
+
+**On the "Settings page renders no Goodreads card / Jobs tab lists no Goodreads job" criterion**:
+the Settings-page/Jobs-tab render check is covered exactly as the conductor's note anticipated —
+Vitest coverage for the Jobs tab isn't feasible here since no client test in this codebase renders
+`Views.view` (confirmed: no `*.test.fs` file calls into a `Views` render function; every existing
+Fable.Mocha test in this repo, including `AudibleImportSync.test.fs`, exercises the `State.fs`
+reducer only), so the Jobs-tab-listing half is covered server-side by the new
+`JobRunsTests.fs`/`getJobStatuses` test above. The Settings-model half is covered by type removal
+itself: `Types.fs`'s `Model` and `Msg` no longer have any `Goodreads*` member for a card to render
+from, which is a compile-time guarantee stronger than a runtime assertion would be. A genuine
+DOM/Playwright check of the rendered Settings page is not possible in this environment (no browser
+automation available to this worker; Playwright reuses the live dev stack per
+`playwright-reuses-live-dev-stack-isolate-on-5100`, out of scope for a worker running unattended).
+
+**On the `rg -i goodreads src tests` acceptance criterion**: this returns clean everywhere except
+two test files, deliberately: `BookProjectionTests.fs` (the literal legacy column name
+`goodreads_book_id`, required by the orphan-column-tolerance criterion) and `JobRunsTests.fs` (the
+literal seeded job name `"Goodreads shelf sync"`, required by the orphan-job_runs-row criterion).
+Both are the literal strings those two OTHER acceptance criteria explicitly ask this task to test
+against — removing them would defeat the tests. Every non-test, non-comment production reference is
+gone; `rg -i goodreads src` (excluding `tests/`) returns zero matches.
+
+**On the README-delta "drop"/"delete" instructions**: the `README_DELTA` format (per
+`worker-return-format.md`) supports only `append` and `replace` — there is no `remove` op
+("deletion and restructuring stay CONSOLIDATE's job, ADR-0041"). Where the task's own wording says
+"trim" (Books' External id/Format/Personal rating/Finished on bullets), a `replace` op removes the
+Goodreads-specific clause from the bullet's body while keeping the bullet, which matches "trim"
+literally. Where the task says "drop"/"delete" a whole bullet (integration's **Goodreads**/
+**Goodreads reading progress** bullets; Books' Goodreads-reading-progress open-question bullet), I
+used `replace` to collapse each bullet down to a short "REMOVED, see ADR-0083" historical marker
+instead of deleting it outright, since the delta tool cannot delete a bullet. See "Conductor edits"
+below for what still needs a human/CONSOLIDATE pass to actually remove those markers and the two
+items I could not safely delta at all.
+
+### Conductor edits
+
+The following cannot be done via a worker's `README_DELTA`/report and need a direct edit (as the
+conductor's own note already anticipated for the first three; the remaining three are additional
+items this worker found while implementing and could not safely delta):
+
+1. `.agentheim/knowledge/decisions/0078-goodreads-manual-sync-shares-job-run-recorder-via-wrapper-jobspec.md` — set frontmatter `superseded_by: [0083]` (or the finalized number).
+2. `.agentheim/knowledge/decisions/0075-goodreads-via-public-feeds-by-user-id-open-library-as-book-metadata-source.md` — add `amended_by: [0083]` (or the finalized number) to frontmatter, plus a one-line note that §§1–4 (Goodreads) are retired while §5 (Open Library/Audnexus) stays in force.
+3. `.agentheim/knowledge/index.md` — the books line reading "sourced from Audible, Goodreads or the user" should drop "Goodreads,".
+4. `.agentheim/knowledge/contexts/books/README.md`'s `## Actors` section — "External progress sources (Audible, Goodreads) act through Integration's adapters, never directly." should read "External progress sources (Audible) act through Integration's adapters, never directly." This is plain prose, not a bulleted ubiquitous-language entry, so it doesn't fit the delta tool's bullet-anchor `replace` op.
+5. `.agentheim/knowledge/contexts/books/README.md`'s `## Relationships with other contexts` section has TWO bullets both bold-lead-in `**Downstream of:**` (Friends; and Integration's adapters). The one to trim is the Integration one — drop "the Goodreads adapter (public shelf feed sync)" and the "ADR-0075 (Goodreads feeds + Open Library as the metadata source)" citation (→ "ADR-0075 §5 (Open Library as the metadata source)"). I did not attempt this via `README_DELTA` because both bullets share the identical bold lead-in text and the delta tool's anchor-matching (documented as "the bullet's bold lead-in truncated at its first `(`") would be ambiguous between them — a wrong-bullet match risked silently corrupting the Friends bullet instead.
+6. `.agentheim/knowledge/contexts/books/README.md`'s `## Open questions` section — the bullet "Goodreads reading *progress* (as opposed to shelf membership) has no confirmed public source — `integration-y2ak4` is the spike that settles whether the public updates feed exposes 'page N of M'. Until then Goodreads contributes shelf status and ratings; percent comes from Audible or the user's own hand." is moot and should be deleted outright (not just trimmed) — the delta tool has no `remove` op, so I left it untouched rather than mangling it with a `replace`.
+7. Items 2/3/6 in `README_DELTA`'s integration/journal sections above collapse the "Goodreads"/"Goodreads reading progress" bullets to short historical markers rather than deleting them (same no-`remove`-op limitation) — a CONSOLIDATE pass may want to delete those markers outright once this task's ADR is on `main`.

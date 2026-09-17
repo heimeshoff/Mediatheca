@@ -2,8 +2,7 @@
 /// Settings card's import/progress-sync reducer -- persisted status loading,
 /// a successful/failed import stopping the spinner and recording the
 /// session-fresh result, and a rejected auth file from "Sync progress now"
-/// setting the standing notice. Same shape `GoodreadsCard.test.fs`/
-/// `AudibleAuthFileTests.fs` use.
+/// setting the standing notice. Same shape `AudibleAuthFileTests.fs` uses.
 module Mediatheca.Client.Pages.Settings.AudibleImportSyncTests
 
 open Fable.Mocha

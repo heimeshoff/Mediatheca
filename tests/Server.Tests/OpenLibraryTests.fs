@@ -89,8 +89,7 @@ let private isbnEditionJson =
         "publish_date": "2021",
         "publishers": ["Ballantine Books"],
         "number_of_pages": 496,
-        "covers": [12345678],
-        "identifiers": {"goodreads": ["54493401"]}
+        "covers": [12345678]
     }
     """
 
@@ -135,7 +134,7 @@ let openLibraryTests =
             let work = OpenLibrary.getWork http testConfig "/works/OL893415W" |> Async.RunSynchronously
             Expect.equal work.Description (Some "An object-shaped description.") "Object-shaped description decodes via its 'value' field"
 
-        testCase "getEditionByIsbn decodes the edition, resolves goodreads ids and page count" <| fun _ ->
+        testCase "getEditionByIsbn decodes the edition and page count" <| fun _ ->
             let handler =
                 new AsyncStubHandler(fun req ->
                     async {
@@ -157,7 +156,6 @@ let openLibraryTests =
                 Expect.equal edition.Publishers [ "Ballantine Books" ] "Publishers decoded"
                 Expect.equal edition.PageCount (Some 496) "PageCount decoded"
                 Expect.equal edition.CoverId (Some 12345678) "First cover id picked"
-                Expect.equal edition.GoodreadsIds [ "54493401" ] "Goodreads cross-reference decoded from identifiers.goodreads"
 
         testCase "getEditionByIsbn yields None on a 404, not an exception" <| fun _ ->
             let handler = new AsyncStubHandler(fun _ -> async { return notFoundResponse () })
@@ -189,7 +187,6 @@ let openLibraryTests =
                 Expect.equal edition.EditionKey "/books/OL33246498M" "EditionKey decoded"
                 Expect.equal edition.Title "Project Hail Mary" "Title decoded"
                 Expect.equal edition.CoverId (Some 12345678) "CoverId decoded"
-                Expect.equal edition.GoodreadsIds [ "54493401" ] "Goodreads cross-reference decoded"
 
         testCase "getEditionByOlid yields None on a 404, not an exception" <| fun _ ->
             let handler = new AsyncStubHandler(fun _ -> async { return notFoundResponse () })

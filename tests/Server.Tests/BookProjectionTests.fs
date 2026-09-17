@@ -87,11 +87,10 @@ let bookProjectionTests =
             let slug = "project-hail-mary-2021"
             appendBookEvent conn slug (Books.Book_added_to_library sampleBookData)
             appendBookEvent conn slug (Books.Reading_progress_observed (observation 42 Audible "2026-01-01"))
-            appendBookEvent conn slug (Books.Reading_progress_observed (observation 40 Goodreads "2026-01-01"))
             appendBookEvent conn slug (Books.Reading_progress_observed (observation 50 ProgressSource.Manual "2026-01-01"))
 
             let history = BookProjection.getProgressHistory conn slug
-            Expect.equal (List.length history) 3 "Three distinct (day, source) rows should exist"
+            Expect.equal (List.length history) 2 "Two distinct (day, source) rows should exist"
 
             match BookProjection.getBySlug conn slug with
             | Some detail ->
@@ -166,4 +165,64 @@ let bookProjectionTests =
             let drift = Administration.checkProjectionDrift liveConn shadowConn [ BookProjection.handler ] (fun _ -> ())
             let discrepancies = drift |> List.collect (fun p -> p.Discrepancies)
             Expect.isEmpty discrepancies "A shadow replay of BookProjection should match the live tables exactly"
+
+        /// integration-sfmxg: an existing projection DB may still carry the
+        /// now-orphan, nullable `book_detail.goodreads_book_id` column from
+        /// before the Goodreads integration was removed. `handler.Init`
+        /// (`CREATE TABLE IF NOT EXISTS`) never touches an already-existing
+        /// table's columns, and this handler's own INSERTs no longer name
+        /// that column -- so the column just sits there, unread and
+        /// unwritten, while projection init and a normal `Book_added_to_library`
+        /// both succeed exactly as they would against a column-free schema.
+        testCase "Init against a book_detail table with the legacy goodreads_book_id column still projects Book_added" <| fun _ ->
+            let conn = new SqliteConnection("Data Source=:memory:")
+            conn.Open()
+            EventStore.initialize conn
+            FriendProjection.handler.Init conn
+            NotesProjection.handler.Init conn
+            MetadataCache.initialize conn
+
+            // The full pre-removal `book_detail` shape, PLUS the orphan
+            // `goodreads_book_id` column current code never selects or
+            // writes -- `book_list` is left to the current handler's own
+            // `CREATE TABLE IF NOT EXISTS` (it never carried that column).
+            use cmd = conn.CreateCommand()
+            cmd.CommandText <- """
+                CREATE TABLE book_detail (
+                    slug                    TEXT PRIMARY KEY,
+                    title                   TEXT NOT NULL,
+                    authors                 TEXT NOT NULL DEFAULT '[]',
+                    year                    INTEGER,
+                    cover_ref               TEXT,
+                    subjects                TEXT NOT NULL DEFAULT '[]',
+                    format                  TEXT NOT NULL DEFAULT 'Unknown',
+                    status                  TEXT NOT NULL DEFAULT 'Backlog',
+                    progress_percent        INTEGER NOT NULL DEFAULT 0,
+                    progress_source         TEXT,
+                    progress_observed_on    TEXT,
+                    personal_rating         INTEGER,
+                    isbn13                  TEXT,
+                    openlibrary_work_key    TEXT,
+                    openlibrary_edition_key TEXT,
+                    audible_asin            TEXT,
+                    goodreads_book_id       TEXT,
+                    finished_at             TEXT,
+                    added_at                TEXT,
+                    recommended_by          TEXT NOT NULL DEFAULT '[]'
+                );
+            """
+            cmd.ExecuteNonQuery() |> ignore
+
+            // Should not throw -- CREATE TABLE IF NOT EXISTS is a no-op
+            // against the pre-existing (legacy-shaped) table.
+            BookProjection.handler.Init conn
+
+            let slug = "project-hail-mary-2021"
+            appendBookEvent conn slug (Books.Book_added_to_library sampleBookData)
+
+            match BookProjection.getBySlug conn slug with
+            | Some detail -> Expect.equal detail.Title "Project Hail Mary" "Book_added_to_library should still project despite the orphan column"
+            | None -> failtest "Expected the book to be found"
+
+            conn.Dispose()
     ]

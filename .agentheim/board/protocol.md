@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 01:25 -- Task verified and completed: integration-sfmxg - Remove the Goodreads integration — delete the adapter, the shelf/progress sync job, the Settings card and the API surface, and drop the Goodreads progress source and external id from the Book model; Audible and Open Library remain the only book sources
+
+**Type:** Work / Task completion
+**Task:** integration-sfmxg - Remove the Goodreads integration — delete the adapter, the shelf/progress sync job, the Settings card and the API surface, and drop the Goodreads progress source and external id from the Book model; Audible and Open Library remain the only book sources
+**Summary:** Removed the Goodreads integration end-to-end — deleted the adapter, the shelf/progress sync job, the Settings card and the five API members, dropped ProgressSource.Goodreads and GoodreadsBookId from the Book model (effective-progress precedence is now Manual > Audible), and fixed the ~twenty Api.create test call sites; Audible and Open Library remain the only book sources. ADR-0083 supersedes 0078 and amends 0075.
+**Duration:** 38m27s
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 44
+**Tests added:** 2
+**ADRs written:** 0083
+
+---
+
 ## 2026-09-18 01:22 -- Modeling / Refined: integration-dtdbb - Notes updated for the one-time import ruling
 
 **Type:** Modeling / Refine

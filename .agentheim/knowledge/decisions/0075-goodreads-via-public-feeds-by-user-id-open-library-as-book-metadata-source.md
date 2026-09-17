@@ -7,11 +7,14 @@ date: 2026-09-16
 supersedes: []
 superseded_by: []
 amends: []
+amended_by: [0083]
 related_tasks: [integration-wmqn3, integration-y2ak4, integration-c8d4x]
 related_research: [goodreads-reading-progress-and-book-metadata-sources-2026-09-16]
 ---
 
 # ADR 0075: Goodreads via public feeds by user id; Open Library as the book metadata source
+
+> **Amended by ADR-0083 (2026-09-18, integration-sfmxg):** §§1–4 — the Goodreads shelf/progress sync — are retired; the Goodreads integration was removed outright (a clean delete: no persisted event, setting or id ever referenced Goodreads). §5 — Open Library as the book search/metadata source and Audnexus as the audiobook metadata fallback — stays in force, unchanged.
 
 ## Context
 

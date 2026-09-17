@@ -33,7 +33,6 @@ module BookProjection =
                 openlibrary_work_key    TEXT,
                 openlibrary_edition_key TEXT,
                 audible_asin            TEXT,
-                goodreads_book_id       TEXT,
                 finished_at             TEXT,
                 added_at                TEXT
             );
@@ -55,7 +54,6 @@ module BookProjection =
                 openlibrary_work_key    TEXT,
                 openlibrary_edition_key TEXT,
                 audible_asin            TEXT,
-                goodreads_book_id       TEXT,
                 finished_at             TEXT,
                 added_at                TEXT,
                 recommended_by          TEXT NOT NULL DEFAULT '[]'
@@ -72,15 +70,11 @@ module BookProjection =
         """
         |> Db.exec
 
-        // Duplicate-add backstops (mirrors movie_detail.tmdb_id) — partial
-        // since audible_asin/goodreads_book_id are nullable and a book may
-        // carry neither, one, or both.
+        // Duplicate-add backstop (mirrors movie_detail.tmdb_id) — partial
+        // since audible_asin is nullable and a book may carry it or not.
         try
             conn |> Db.newCommand "CREATE UNIQUE INDEX IF NOT EXISTS idx_book_detail_audible_asin ON book_detail(audible_asin) WHERE audible_asin IS NOT NULL" |> Db.exec
         with ex -> eprintfn "[BookProjection] Could not create UNIQUE index on book_detail.audible_asin: %s" ex.Message
-        try
-            conn |> Db.newCommand "CREATE UNIQUE INDEX IF NOT EXISTS idx_book_detail_goodreads_book_id ON book_detail(goodreads_book_id) WHERE goodreads_book_id IS NOT NULL" |> Db.exec
-        with ex -> eprintfn "[BookProjection] Could not create UNIQUE index on book_detail.goodreads_book_id: %s" ex.Message
 
     let private dropTables (conn: SqliteConnection) : unit =
         conn
@@ -127,13 +121,11 @@ module BookProjection =
     let private encodeProgressSource (source: ProgressSource) =
         match source with
         | Audible -> "Audible"
-        | Goodreads -> "Goodreads"
         | ProgressSource.Manual -> "Manual"
 
     let private parseProgressSource (s: string) : ProgressSource =
         match s with
         | "Audible" -> Audible
-        | "Goodreads" -> Goodreads
         | _ -> ProgressSource.Manual
 
     let private encodeReadingPosition (pos: ReadingPosition) =
@@ -169,7 +161,6 @@ module BookProjection =
         | OpenLibraryWork v -> "openlibrary_work_key", v
         | OpenLibraryEdition v -> "openlibrary_edition_key", v
         | AudibleAsin v -> "audible_asin", v
-        | GoodreadsBookId v -> "goodreads_book_id", v
 
     let private updateJsonList (conn: SqliteConnection) (table: string) (column: string) (slug: string) (add: bool) (value: string) : unit =
         let currentJson =
@@ -189,8 +180,9 @@ module BookProjection =
 
     /// Recomputes `book_list`/`book_detail`'s denormalized `progress_*`
     /// columns from `book_progress`'s latest row by `observed_on` (ties:
-    /// Manual > Audible > Goodreads, ADR-0076 §2) — or clears them when no
-    /// observation rows remain (e.g. the last one was removed).
+    /// Manual > Audible, ADR-0076 §2's precedence with its now-removed third
+    /// rung) — or clears them when no observation rows remain (e.g. the last
+    /// one was removed).
     let private recomputeProgress (conn: SqliteConnection) (slug: string) : unit =
         let latest =
             conn
@@ -198,7 +190,7 @@ module BookProjection =
                 SELECT source, percent, observed_on FROM book_progress
                 WHERE book_slug = @slug
                 ORDER BY observed_on DESC,
-                    CASE source WHEN 'Manual' THEN 0 WHEN 'Audible' THEN 1 WHEN 'Goodreads' THEN 2 ELSE 3 END
+                    CASE source WHEN 'Manual' THEN 0 WHEN 'Audible' THEN 1 ELSE 2 END
                 LIMIT 1
             """
             |> Db.setParams [ "slug", SqlType.String slug ]
@@ -240,12 +232,12 @@ module BookProjection =
                         INSERT OR REPLACE INTO book_list
                             (slug, title, authors, year, cover_ref, subjects, format, status,
                              progress_percent, progress_source, progress_observed_on, personal_rating,
-                             isbn13, openlibrary_work_key, openlibrary_edition_key, audible_asin, goodreads_book_id,
+                             isbn13, openlibrary_work_key, openlibrary_edition_key, audible_asin,
                              finished_at, added_at)
                         VALUES
                             (@slug, @title, @authors, @year, @cover_ref, @subjects, @format, 'Backlog',
                              0, NULL, NULL, NULL,
-                             @isbn13, @openlibrary_work_key, @openlibrary_edition_key, @audible_asin, @goodreads_book_id,
+                             @isbn13, @openlibrary_work_key, @openlibrary_edition_key, @audible_asin,
                              NULL, @added_at)
                     """
                     |> Db.setParams [
@@ -260,7 +252,6 @@ module BookProjection =
                         "openlibrary_work_key", sqlOptString (extVal "openlibrary_work_key")
                         "openlibrary_edition_key", sqlOptString (extVal "openlibrary_edition_key")
                         "audible_asin", sqlOptString (extVal "audible_asin")
-                        "goodreads_book_id", sqlOptString (extVal "goodreads_book_id")
                         "added_at", SqlType.String addedAt
                     ]
                     |> Db.exec
@@ -270,12 +261,12 @@ module BookProjection =
                         INSERT OR REPLACE INTO book_detail
                             (slug, title, authors, year, cover_ref, subjects, format, status,
                              progress_percent, progress_source, progress_observed_on, personal_rating,
-                             isbn13, openlibrary_work_key, openlibrary_edition_key, audible_asin, goodreads_book_id,
+                             isbn13, openlibrary_work_key, openlibrary_edition_key, audible_asin,
                              finished_at, added_at, recommended_by)
                         VALUES
                             (@slug, @title, @authors, @year, @cover_ref, @subjects, @format, 'Backlog',
                              0, NULL, NULL, NULL,
-                             @isbn13, @openlibrary_work_key, @openlibrary_edition_key, @audible_asin, @goodreads_book_id,
+                             @isbn13, @openlibrary_work_key, @openlibrary_edition_key, @audible_asin,
                              NULL, @added_at, '[]')
                     """
                     |> Db.setParams [
@@ -290,7 +281,6 @@ module BookProjection =
                         "openlibrary_work_key", sqlOptString (extVal "openlibrary_work_key")
                         "openlibrary_edition_key", sqlOptString (extVal "openlibrary_edition_key")
                         "audible_asin", sqlOptString (extVal "audible_asin")
-                        "goodreads_book_id", sqlOptString (extVal "goodreads_book_id")
                         "added_at", SqlType.String addedAt
                     ]
                     |> Db.exec
@@ -453,7 +443,7 @@ module BookProjection =
             SELECT
                 bd.slug, bd.title, bd.authors, bd.year, bd.cover_ref, bd.subjects, bd.format, bd.status,
                 bd.progress_percent, bd.progress_source, bd.progress_observed_on, bd.personal_rating,
-                bd.isbn13, bd.openlibrary_work_key, bd.openlibrary_edition_key, bd.audible_asin, bd.goodreads_book_id,
+                bd.isbn13, bd.openlibrary_work_key, bd.openlibrary_edition_key, bd.audible_asin,
                 bd.finished_at, bd.added_at, bd.recommended_by,
                 mc.description, mc.page_count, mc.runtime_minutes, mc.narrators, mc.series_name, mc.series_position,
                 mc.publisher, mc.published_date, mc.average_rating, mc.language
@@ -482,7 +472,6 @@ module BookProjection =
               OpenLibraryWorkKey = readOptString rd "openlibrary_work_key"
               OpenLibraryEditionKey = readOptString rd "openlibrary_edition_key"
               AudibleAsin = readOptString rd "audible_asin"
-              GoodreadsBookId = readOptString rd "goodreads_book_id"
               RecommendedBy = resolveFriendRefs conn recommendedBySlugs
               Description = readOptString rd "description"
               PageCount = readOptInt rd "page_count"

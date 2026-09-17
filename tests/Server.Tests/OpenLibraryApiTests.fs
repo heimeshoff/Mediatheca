@@ -56,8 +56,6 @@ let private createApi (factory: unit -> SqliteConnection) (httpClient: HttpClien
         (fun () -> ({ Url = ""; Username = ""; Password = "" } : Qbittorrent.QbittorrentConfig))
         (fun () -> testConfig)
         (fun () -> ({ AuthFile = None; Marketplace = "de"; CachedAccessToken = None; CachedAccessTokenExpiresAt = None } : Audible.AudibleConfig))
-        (fun () -> ({ UserId = None; ImportShelves = [ "currently-reading" ] } : Goodreads.GoodreadsConfig))
-        (fun () -> async { return Error "not wired in tests" })
         (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         imageBasePath
@@ -78,8 +76,7 @@ let private editionJson =
         "publish_date": "2021",
         "publishers": ["Ballantine Books"],
         "number_of_pages": 496,
-        "covers": [12345678],
-        "identifiers": {"goodreads": ["54493401"]}
+        "covers": [12345678]
     }
     """
 

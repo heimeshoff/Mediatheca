@@ -123,9 +123,8 @@ type Model = {
     // `AudibleLastSync`/`AudibleLastSyncResult` are the persisted (not
     // in-memory) summaries `getAudibleSyncStatus` reads back after a reload;
     // `AudibleImportResult`/`AudibleProgressSyncResult` are this SESSION's
-    // fresh outcome for the success/error alert, the same
-    // session-vs-persisted split `GoodreadsSyncResult`/`GoodreadsLastResult`
-    // already establish.
+    // fresh outcome for the success/error alert, separate from the
+    // persisted `AudibleLast*` summaries below.
     IsImportingAudibleLibrary: bool
     AudibleImportResult: Result<AudibleImportResult, string> option
     IsSyncingAudibleProgress: bool
@@ -133,25 +132,6 @@ type Model = {
     AudibleLastImportResult: string option
     AudibleLastSync: string option
     AudibleLastSyncResult: string option
-    // Goodreads Integration (integration-wmqn3, ADR-0075): the user's PUBLIC
-    // Goodreads user id (no developer key exists any more, no cookie ever).
-    // `GoodreadsUserIdInput` is the profile-URL-or-bare-id text box;
-    // `GoodreadsReadShelfOptedIn`/`GoodreadsToReadShelfOptedIn` back the two
-    // opt-in shelf checkboxes (`currently-reading` is always on, no state
-    // needed for it).
-    GoodreadsUserId: string option
-    GoodreadsUserIdInput: string
-    GoodreadsReadShelfOptedIn: bool
-    GoodreadsToReadShelfOptedIn: bool
-    GoodreadsLastSync: string option
-    GoodreadsLastResult: string option
-    GoodreadsLastError: string option
-    IsSavingGoodreads: bool
-    IsTestingGoodreads: bool
-    IsSyncingGoodreads: bool
-    GoodreadsSaveResult: Result<string, string> option
-    GoodreadsTestResult: Result<string, string> option
-    GoodreadsSyncResult: Result<GoodreadsSyncResult, string> option
     // Sync Status
     PlaytimeSyncStatus: PlaytimeSyncStatus option
     JellyfinLastSyncTime: string option
@@ -298,18 +278,6 @@ type Msg =
     | Audible_import_completed of Result<AudibleImportResult, string>
     | Sync_audible_progress_now
     | Audible_progress_sync_completed of Result<AudibleProgressSyncResult, string>
-    // Goodreads Integration (integration-wmqn3, ADR-0075)
-    | Load_goodreads_settings
-    | Goodreads_settings_loaded of GoodreadsSettings
-    | Goodreads_user_id_input_changed of string
-    | Save_goodreads_user_id
-    | Goodreads_save_result of Result<string, string>
-    | Toggle_goodreads_read_shelf
-    | Toggle_goodreads_to_read_shelf
-    | Test_goodreads_connection
-    | Goodreads_test_result of Result<string, string>
-    | Sync_goodreads_now
-    | Goodreads_sync_completed of Result<GoodreadsSyncResult, string>
     // Sync Status
     | Load_playtime_sync_status
     | Playtime_sync_status_loaded of PlaytimeSyncStatus

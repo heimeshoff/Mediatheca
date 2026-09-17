@@ -149,9 +149,9 @@ let booksTests =
             | Error e -> failtest $"Expected success but got: {e}"
             | Ok firstEvents ->
                 let afterFirst = given @ firstEvents
-                match givenWhenThen afterFirst (Observe_reading_progress (observation 40 Goodreads "2026-01-01" false)) with
+                match givenWhenThen afterFirst (Observe_reading_progress (observation 40 ProgressSource.Manual "2026-01-01" false)) with
                 | Ok secondEvents ->
-                    Expect.equal secondEvents [ Reading_progress_observed (observation 40 Goodreads "2026-01-01" false) ]
+                    Expect.equal secondEvents [ Reading_progress_observed (observation 40 ProgressSource.Manual "2026-01-01" false) ]
                         "Second source's observation should record without re-promoting"
                 | Error e -> failtest $"Expected success but got: {e}"
 

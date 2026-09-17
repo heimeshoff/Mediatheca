@@ -11,8 +11,8 @@ open Mediatheca.Shared
 /// book's reading position into an `Observe_reading_progress` command --
 /// this module NEVER creates a book (creation is the explicit "Import
 /// library" click, `Api.importAudibleLibrary`). Compiled BEFORE `Api.fs`
-/// (`Server.fsproj`), so -- same as `GoodreadsSync.fs`/`PlaytimeTracker.fs`
-/// above it -- this module carries its own local command-execution helper
+/// (`Server.fsproj`), so -- same as `PlaytimeTracker.fs` above it -- this
+/// module carries its own local command-execution helper
 /// rather than reaching into `Api.fs`'s private one. `observationFor` is the
 /// ONE pure decision `Api.importAudibleLibrary` also calls, so import and
 /// the daily sync are the same writer of `Reading_progress_observed`
@@ -22,7 +22,7 @@ module AudibleSync =
 
     /// ADR-0028/administration-tj8n2: acquired only around a brief DB
     /// moment, never across an awaited HTTP call -- the same discipline
-    /// `PlaytimeTracker.withLock`/`GoodreadsSync.withLock` establish.
+    /// `PlaytimeTracker.withLock` establishes.
     let inline private withLock (jobLock: SemaphoreSlim) (f: unit -> 'a) : 'a =
         jobLock.Wait()
         try f() finally jobLock.Release() |> ignore
@@ -83,8 +83,8 @@ module AudibleSync =
 
     /// The plain, human-readable summary `Api.importAudibleLibrary` persists
     /// under `audible_last_import_result` -- same convention as
-    /// `formatResult`/`GoodreadsSync.formatResult` (a formatted string, not
-    /// literal JSON, despite this task's own "What" section saying "JSON").
+    /// `formatResult` above (a formatted string, not literal JSON, despite
+    /// this task's own "What" section saying "JSON").
     let formatImportResult (r: AudibleImportResult) : string =
         let base_ = sprintf "%d total, %d created, %d already known, %d progress observed" r.Total r.Created r.AlreadyKnown r.ProgressObserved
         if List.isEmpty r.Errors then base_

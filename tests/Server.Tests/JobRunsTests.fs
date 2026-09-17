@@ -300,4 +300,29 @@ let jobRunsTests =
             match api.runJobNow "No such job" |> Async.RunSynchronously with
             | RunJobRejected -> ()
             | RunJobStarted _ -> failwith "An unregistered job name should be rejected, not started"
+
+        /// integration-sfmxg: the daily schedule ran "Goodreads shelf sync"
+        /// (reporting "skipped: not configured") before the Goodreads
+        /// integration was removed outright -- live may still carry
+        /// `job_runs` rows under that name. `getJobStatuses` iterates the
+        /// registered `scheduledJobs` list, not `job_runs` itself, so an
+        /// orphan row for a job no longer registered must be inert: it does
+        /// not appear in the listing and does not error the read.
+        testCase "getJobStatuses lists no job for an orphan job_runs row whose job is no longer registered" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrapJobRuns
+            let conn = db.Connection
+            let recorder = makeRecorder conn
+
+            use cmd = conn.CreateCommand()
+            cmd.CommandText <- "INSERT INTO job_runs (job_name, trigger, status, summary, started_at, finished_at) VALUES (@n, 'scheduled', 'skipped', 'not configured', @t, @t)"
+            cmd.Parameters.AddWithValue("@n", "Goodreads shelf sync") |> ignore
+            cmd.Parameters.AddWithValue("@t", DateTime.UtcNow.ToString("o")) |> ignore
+            cmd.ExecuteNonQuery() |> ignore
+
+            // No spec named "Goodreads shelf sync" is registered -- mirrors
+            // Composition.fs's `scheduledJobs` list post-removal.
+            let api = Administration.create db.Factory noStoragePath noImagesDir [] [] recorder (Administration.makeGuards ())
+            let statuses = api.getJobStatuses () |> Async.RunSynchronously
+
+            Expect.isEmpty statuses "No registered job means no entry in the listing, orphan row or not"
     ]

@@ -816,14 +816,12 @@ let private gameInFocusPosterCard (card: DashboardCard) (item: DashboardGameInFo
 let private progressSourceGlyph (source: ProgressSource option) =
     match source with
     | Some ProgressSource.Audible -> "A"
-    | Some ProgressSource.Goodreads -> "G"
     | Some ProgressSource.Manual -> "M"
     | None -> "?"
 
 let private progressSourceTitle (source: ProgressSource option) =
     match source with
     | Some ProgressSource.Audible -> "Audible"
-    | Some ProgressSource.Goodreads -> "Goodreads"
     | Some ProgressSource.Manual -> "Manual"
     | None -> "No progress yet"
 

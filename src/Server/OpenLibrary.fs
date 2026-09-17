@@ -220,7 +220,6 @@ module OpenLibrary =
         Publishers: string list
         PageCount: int option
         CoverId: int option
-        GoodreadsIds: string list
     }
 
     let private decodeAuthorKeys : Decoder<string list> =
@@ -229,7 +228,7 @@ module OpenLibrary =
             Decode.succeed []
         ]
 
-    let private decodeEditionRaw : Decoder<{| Key: string; WorkKey: string option; Title: string; AuthorKeys: string list; PublishDate: string option; Publishers: string list; PageCount: int option; CoverId: int option; GoodreadsIds: string list |}> =
+    let private decodeEditionRaw : Decoder<{| Key: string; WorkKey: string option; Title: string; AuthorKeys: string list; PublishDate: string option; Publishers: string list; PageCount: int option; CoverId: int option |}> =
         Decode.object (fun get ->
             {| Key = get.Required.Field "key" Decode.string
                WorkKey =
@@ -241,10 +240,7 @@ module OpenLibrary =
                PublishDate = get.Optional.Field "publish_date" Decode.string
                Publishers = get.Optional.Field "publishers" (Decode.list Decode.string) |> Option.defaultValue []
                PageCount = get.Optional.Field "number_of_pages" Decode.int
-               CoverId = get.Optional.Field "covers" (Decode.list Decode.int) |> Option.defaultValue [] |> List.tryHead
-               GoodreadsIds =
-                get.Optional.Field "identifiers" (Decode.field "goodreads" (Decode.list Decode.string))
-                |> Option.defaultValue [] |})
+               CoverId = get.Optional.Field "covers" (Decode.list Decode.int) |> Option.defaultValue [] |> List.tryHead |})
 
     let private decodeAuthorName : Decoder<string> =
         Decode.field "name" Decode.string
@@ -289,7 +285,6 @@ module OpenLibrary =
                         Publishers = raw.Publishers
                         PageCount = raw.PageCount
                         CoverId = raw.CoverId
-                        GoodreadsIds = raw.GoodreadsIds
                     }
         }
 

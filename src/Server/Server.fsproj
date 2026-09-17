@@ -36,7 +36,6 @@
     <Compile Include="LocalCopyRemoval.fs" />
     <Compile Include="OpenLibrary.fs" />
     <Compile Include="Audible.fs" />
-    <Compile Include="Goodreads.fs" />
     <Compile Include="ImageStore.fs" />
     <Compile Include="CastStore.fs" />
     <Compile Include="SettingsStore.fs" />
@@ -57,7 +56,6 @@
     <Compile Include="GameDeckCompatBackfill.fs" />
     <Compile Include="GameReleaseDateBackfill.fs" />
     <Compile Include="GameDescriptionBackfill.fs" />
-    <Compile Include="GoodreadsSync.fs" />
     <Compile Include="AudibleSync.fs" />
     <Compile Include="SeriesRefresh.fs" />
     <Compile Include="ScheduledJobs.fs" />
