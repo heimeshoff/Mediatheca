@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 12:51 -- Modeling / Captured: books-jm7aa - Book detail hero mirrors the game detail hero — the personal rating sits right of the status badge as a hero control, the reading state closes the hero meta block (finished date when Finished, otherwise a percent progress line), Details print on the page background like the movie synopsis, and Links move to the right column above Recommended By
+
+**Type:** Modeling / Capture
+**BC:** books
+**Filed to:** todo
+**Summary:** Builder wants the book detail page to read like the game detail page: rating control right of the status badge in the hero (My Rating card removed), reading state (finished date or percent progress line) closing the hero meta block, Details on the page background movie-style, Links in the right column. Badge sizes measured identical to Games at desktop width; worker re-verifies at phone width. Filed to todo behind books-nvnyk and books-depwh, which both edit detailsCard.
+
+---
+
 ## 2026-09-17 12:42 -- Modeling / Captured: books-depwh - The book detail page's Details card no longer shows a date — the metadata line under the description reads just `Publisher · Language`, dropping the published/release date that Audible imports put at its end
 
 **Type:** Modeling / Capture
