@@ -32,6 +32,16 @@ let lengthLine (format: BookFormat) (runtimeMinutes: int option) (pageCount: int
         | Some pages when pages > 0 -> Some $"{pages} pages"
         | _ -> None
 
+/// The Details card's metadata line: "Publisher · Language" from whichever
+/// of the two are present, joined by " · "; `None` when neither is present.
+/// Deliberately excludes `PublishedDate` (books-depwh) — Audible's release
+/// date is still carried in `BookDetail.PublishedDate`/`book_metadata_cache`,
+/// it just isn't shown on this line.
+let metaLine (publisher: string option) (language: string option) : string option =
+    match [ publisher; language ] |> List.choose id with
+    | [] -> None
+    | parts -> Some (String.concat " · " parts)
+
 /// "Book 2 of *Series*" when the cache carries a series position/name;
 /// omitted (`None`) unless both are present — a bare series name with no
 /// position isn't a claim this line is prepared to make.

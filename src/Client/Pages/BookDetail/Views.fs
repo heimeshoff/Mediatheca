@@ -388,23 +388,20 @@ let private progressPopover (book: BookDetail) (draft: ProgressDraft) (dispatch:
 // ── Details / Links cards ──
 
 let private detailsCard (book: BookDetail) =
-    let hasMeta =
-        [ book.Publisher; book.PublishedDate; book.Language ] |> List.exists Option.isSome
+    let meta = metaLine book.Publisher book.Language
     panelCard [
         Html.h3 [ prop.className "text-lg font-bold mb-4"; prop.text "Details" ]
         match book.Description with
         | Some d when not (System.String.IsNullOrWhiteSpace d) ->
             Html.div [ prop.className "mb-4"; prop.children [ RichText.render d ] ]
         | _ -> ()
-        if hasMeta then
+        match meta with
+        | Some line ->
             Html.p [
                 prop.className "text-sm text-base-content/60 mb-3 font-mono"
-                prop.text (
-                    [ book.Publisher; book.PublishedDate; book.Language ]
-                    |> List.choose id
-                    |> String.concat " · "
-                )
+                prop.text line
             ]
+        | None -> ()
         if not (List.isEmpty book.Subjects) then
             Html.div [
                 prop.className "flex flex-wrap gap-2 mb-3"

@@ -36,6 +36,18 @@ let formatTests =
         testCase "series line is absent without a position" <| fun () ->
             let result = seriesLine (Some "The Expanse") None
             Expect.equal result None "no position, no claim"
+
+        testCase "meta line joins publisher and language" <| fun () ->
+            let result = metaLine (Some "Penguin") (Some "English")
+            Expect.equal result (Some "Penguin · English") "publisher + language"
+
+        testCase "meta line renders just the publisher when language is absent" <| fun () ->
+            let result = metaLine (Some "Penguin") None
+            Expect.equal result (Some "Penguin") "publisher only"
+
+        testCase "meta line is absent when publisher and language are both absent" <| fun () ->
+            let result = metaLine None None
+            Expect.equal result None "books-depwh: a published date alone renders no line"
     ]
 
 Mocha.runTests formatTests |> ignore

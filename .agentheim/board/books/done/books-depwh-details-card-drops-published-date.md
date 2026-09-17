@@ -1,7 +1,7 @@
 ---
 id: books-depwh
 title: The book detail page's Details card no longer shows a date — the metadata line under the description reads just `Publisher · Language`, dropping the published/release date that Audible imports put at its end
-status: doing
+status: done
 type: feature
 context: books
 created: 2026-09-17
@@ -49,3 +49,7 @@ future view wants it. No server, Shared, or schema change.
 - Purchase date (`purchase_date` in `Audible.fs`'s library item) isn't carried into the book
   metadata at all — the date on the card is the release date written by `Api.fs`'s Audible paths
   (`PublishedDate = product.ReleaseDate` / `item.ReleaseDate`).
+
+## Outcome
+
+`BookDetail.Views.detailsCard`'s metadata line now reads only `Publisher · Language`, dropping `PublishedDate`. The join and its presence check were factored into a new pure `Format.metaLine : string option -> string option -> string option` (`src/Client/Pages/BookDetail/Format.fs`), covered by three new Vitest/Fable.Mocha cases in `src/Client/Pages/BookDetail/Format.test.fs` (publisher+language, publisher-only, and the both-absent case that matters here — a book with only a `PublishedDate` now renders no metadata line at all). `detailsCard` (`src/Client/Pages/BookDetail/Views.fs`) calls `metaLine book.Publisher book.Language` and renders it (or nothing) — the description (`RichText.render`, from `books-nvnyk`), subject chips, and average rating are untouched. `BookDetail.PublishedDate` and the `published_date` cache column are unchanged; no Shared, server, or migration edits. `npm run build` and `npm run test:client` (116/116) both pass.

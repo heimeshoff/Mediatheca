@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 13:08 -- Task verified and completed: books-depwh - The book detail page's Details card no longer shows a date — the metadata line under the description reads just `Publisher · Language`, dropping the published/release date that Audible imports put at its end
+
+**Type:** Work / Task completion
+**Task:** books-depwh - The book detail page's Details card no longer shows a date — the metadata line under the description reads just `Publisher · Language`, dropping the published/release date that Audible imports put at its end
+**Summary:** The book detail page's Details card metadata line now reads only `Publisher · Language`, via a new pure `Format.metaLine` helper; the Audible-sourced release date stays in `BookDetail.PublishedDate`/the cache but is no longer read by `detailsCard`.
+**Duration:** 8m10s
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 3
+**Tests added:** 3
+**ADRs written:** none
+
+---
+
 ## 2026-09-17 12:59 -- Batch started: [books-depwh]
 
 **Type:** Work / Batch start
