@@ -30,6 +30,9 @@ type Model = {
     IsLoading: bool
     IsRatingOpen: bool
     IsStatusOpen: bool
+    // books-xyqyb: the hero's `finished {date}` line, click-to-edit via
+    // `EditableDateInput` (ADR-0082 §8).
+    IsEditingFinishedDate: bool
     ShowFriendPicker: bool
     ConfirmingRemove: bool
     ShowEventHistory: bool
@@ -61,6 +64,9 @@ type Msg =
     | Toggle_status_dropdown
     | Set_book_status of BookStatus
     | Status_result of Result<unit, string>
+    | Edit_finished_date
+    | Cancel_edit_finished_date
+    | Commit_finished_date of string
     | Open_progress_popover
     | Close_progress_popover
     | Set_progress_tab of ProgressTab

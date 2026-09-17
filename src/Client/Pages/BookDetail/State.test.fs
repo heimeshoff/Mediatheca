@@ -121,4 +121,93 @@ let stateTests =
             Expect.isFalse closed.ShowCatalogPicker "picker closes"
     ]
 
+/// books-xyqyb: `Set_book_status Finished` stamps today's local date instead
+/// of `None` (ADR-0082 §8), and the hero's `finished {date}` line becomes
+/// click-to-edit via `Edit_finished_date` / `Commit_finished_date` /
+/// `Cancel_edit_finished_date`.
+let finishedDateTests =
+    testList "books-xyqyb: BookDetail.State finished-date" [
+
+        testCaseAsync "Set_book_status Finished sends effectiveOn = Some <today, yyyy-MM-dd>" <| async {
+            let mutable captured : (string * BookStatus * string option) option = None
+            let api : IMediathecaApi =
+                createObj [
+                    "setBookStatus" ==> (fun (slug: string) (status: BookStatus) (effectiveOn: string option) ->
+                        captured <- Some (slug, status, effectiveOn)
+                        async { return Ok () })
+                ] |> unbox
+            let model, _ = init "some-book"
+            let _, cmd = update api (Set_book_status BookStatus.Finished) model
+            let! _ = runCmd cmd
+            let expectedToday = System.DateTime.Now.ToString("yyyy-MM-dd")
+            match captured with
+            | Some (slug, status, effectiveOn) ->
+                Expect.equal slug "some-book" "the book's own slug"
+                Expect.equal status BookStatus.Finished "the requested status"
+                Expect.equal effectiveOn (Some expectedToday) "effectiveOn is today's local date, not None"
+            | None -> failtest "expected setBookStatus to have been called"
+        }
+
+        testCaseAsync "Set_book_status Backlog/InFocus/Abandoned still send effectiveOn = None" <| async {
+            for status in [ BookStatus.Backlog; BookStatus.InFocus; BookStatus.Abandoned ] do
+                let mutable captured : string option option = None
+                let api : IMediathecaApi =
+                    createObj [
+                        "setBookStatus" ==> (fun (_: string) (_: BookStatus) (effectiveOn: string option) ->
+                            captured <- Some effectiveOn
+                            async { return Ok () })
+                    ] |> unbox
+                let model, _ = init "some-book"
+                let _, cmd = update api (Set_book_status status) model
+                let! _ = runCmd cmd
+                Expect.equal captured (Some None) (sprintf "%A carries no source date" status)
+        }
+
+        testCaseAsync "Commit_finished_date issues setBookStatus Finished (Some picked) and reloads on Ok" <| async {
+            let mutable captured : (string * BookStatus * string option) option = None
+            let calls = ResizeArray<string>()
+            let api : IMediathecaApi =
+                createObj [
+                    "setBookStatus" ==> (fun (slug: string) (status: BookStatus) (effectiveOn: string option) ->
+                        captured <- Some (slug, status, effectiveOn)
+                        calls.Add "setBookStatus"
+                        async { return Ok () })
+                    "getBook" ==> (fun (_: string) -> calls.Add "getBook"; async { return None })
+                ] |> unbox
+            let model, _ = init "moby-dick-1851"
+            let editing = { model with IsEditingFinishedDate = true }
+            let afterCommit, cmd = update api (Commit_finished_date "2026-03-10") editing
+            Expect.isFalse afterCommit.IsEditingFinishedDate "editing closes immediately on commit"
+            let! dispatched = runCmd cmd
+            match captured with
+            | Some (slug, status, effectiveOn) ->
+                Expect.equal slug "moby-dick-1851" "the book's own slug"
+                Expect.equal status BookStatus.Finished "re-dating stays Finished"
+                Expect.equal effectiveOn (Some "2026-03-10") "the picked date"
+            | None -> failtest "expected setBookStatus to have been called"
+            // Status_result (Ok ()) reloads the book — dispatched, then run again.
+            for msg in dispatched do
+                let _, reloadCmd = update api msg model
+                let! _ = runCmd reloadCmd
+                ()
+            Expect.isTrue (calls |> Seq.contains "getBook") "the book reloads after a successful re-date"
+        }
+
+        testCase "Cancel_edit_finished_date clears IsEditingFinishedDate with no api call" <| fun () ->
+            let fakeApi : IMediathecaApi = Unchecked.defaultof<IMediathecaApi>
+            let model, _ = init "some-book"
+            let editing = { model with IsEditingFinishedDate = true }
+            let cancelled, cmd = update fakeApi Cancel_edit_finished_date editing
+            Expect.isFalse cancelled.IsEditingFinishedDate "editing closes"
+            Expect.isEmpty cmd "no command — no api call"
+
+        testCase "Edit_finished_date sets IsEditingFinishedDate with no api call" <| fun () ->
+            let fakeApi : IMediathecaApi = Unchecked.defaultof<IMediathecaApi>
+            let model, _ = init "some-book"
+            let editing, cmd = update fakeApi Edit_finished_date model
+            Expect.isTrue editing.IsEditingFinishedDate "editing opens"
+            Expect.isEmpty cmd "no command — no api call"
+    ]
+
 Mocha.runTests stateTests |> ignore
+Mocha.runTests finishedDateTests |> ignore

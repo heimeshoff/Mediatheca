@@ -30,6 +30,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       IsLoading = true
       IsRatingOpen = false
       IsStatusOpen = false
+      IsEditingFinishedDate = false
       ShowFriendPicker = false
       ConfirmingRemove = false
       ShowEventHistory = false
@@ -149,12 +150,16 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with IsStatusOpen = not model.IsStatusOpen }, Cmd.none
 
     | Set_book_status status ->
-        // Manual override from the segmented control — no source date to
-        // carry, so `effectiveOn = None` (ADR-0077 §1: "the day this event
-        // was appended").
+        // Manual override from the segmented control. Finished stamps
+        // today's local date (ADR-0082 §8: `None` resolves to the event
+        // store's UTC append timestamp, which drifts a day for a finish
+        // clicked after ~22:00 CEST); other statuses carry no source date,
+        // so `effectiveOn = None` (ADR-0077 §1: "the day this event was
+        // appended").
+        let effectiveOn = if status = BookStatus.Finished then Some (today ()) else None
         { model with IsStatusOpen = false },
         Cmd.OfAsync.either
-            (fun () -> api.setBookStatus model.Slug status None)
+            (fun () -> api.setBookStatus model.Slug status effectiveOn)
             ()
             Status_result
             (fun ex -> Status_result (Error ex.Message))
@@ -164,6 +169,23 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | Status_result (Error err) ->
         { model with Error = Some err }, Cmd.none
+
+    | Edit_finished_date ->
+        { model with IsEditingFinishedDate = true }, Cmd.none
+
+    | Cancel_edit_finished_date ->
+        { model with IsEditingFinishedDate = false }, Cmd.none
+
+    | Commit_finished_date picked ->
+        // ADR-0077 §4: re-dating an already-Finished book is a legitimate
+        // event, not a no-op, unless `picked` matches the currently
+        // displayed date.
+        { model with IsEditingFinishedDate = false },
+        Cmd.OfAsync.either
+            (fun () -> api.setBookStatus model.Slug BookStatus.Finished (Some picked))
+            ()
+            Status_result
+            (fun ex -> Status_result (Error ex.Message))
 
     | Open_progress_popover ->
         { model with

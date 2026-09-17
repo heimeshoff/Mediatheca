@@ -826,10 +826,18 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                 | BookStatus.Finished ->
                                                     match book.FinishedAt with
                                                     | Some finishedAt ->
-                                                        Html.p [
-                                                            prop.className "text-sm text-base-content/50 font-mono"
-                                                            prop.text $"finished {finishedAt}"
-                                                        ]
+                                                        if model.IsEditingFinishedDate then
+                                                            EditableDateInput.EditableDateInput
+                                                                finishedAt
+                                                                "input-xs w-36"
+                                                                (fun v -> dispatch (Commit_finished_date v))
+                                                                (fun () -> dispatch Cancel_edit_finished_date)
+                                                        else
+                                                            Html.p [
+                                                                prop.className "text-sm text-base-content/50 font-mono cursor-pointer hover:text-primary transition-colors"
+                                                                prop.onClick (fun _ -> dispatch Edit_finished_date)
+                                                                prop.text $"finished {finishedAt}"
+                                                            ]
                                                     | None -> ()
                                                 | _ -> heroProgressLine book
                                             ]

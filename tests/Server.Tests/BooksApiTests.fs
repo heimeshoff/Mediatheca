@@ -112,4 +112,33 @@ let booksApiTests =
             Expect.equal history.[0].Percent 40 "120 of 300 pages should derive 40 percent"
             Expect.equal history.[0].Source ProgressSource.Manual "setBookProgress always records Manual"
             Expect.equal history.[0].Position (Some (Page (120, Some 300))) "Position should carry the page/total"
+
+        // books-xyqyb: `setBookStatus`'s date-range validation lives at the
+        // edge (ADR-0077 §6), not in `Books.decide` — a future `effectiveOn`
+        // is rejected here, before the command ever reaches the domain.
+        testCase "setBookStatus rejects a future effectiveOn but accepts today and past dates" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrap
+            let api = createApi db.Factory
+
+            let created = api.addBook sampleRequest |> Async.RunSynchronously
+            let slug =
+                match created with
+                | Ok (AddBookOutcome.Book_added slug) -> slug
+                | other -> failtestf "Expected Book_added; got %A" other
+
+            let tomorrow = System.DateTime.Now.AddDays(1.0).ToString("yyyy-MM-dd")
+            let today = System.DateTime.Now.ToString("yyyy-MM-dd")
+            let yesterday = System.DateTime.Now.AddDays(-1.0).ToString("yyyy-MM-dd")
+
+            match api.setBookStatus slug BookStatus.Finished (Some tomorrow) |> Async.RunSynchronously with
+            | Error _ -> ()
+            | Ok () -> failtest "Expected a future effectiveOn to be rejected"
+
+            match api.setBookStatus slug BookStatus.Finished (Some today) |> Async.RunSynchronously with
+            | Ok () -> ()
+            | Error e -> failtestf "Expected today's date to be accepted, got Error %s" e
+
+            match api.setBookStatus slug BookStatus.InFocus (Some yesterday) |> Async.RunSynchronously with
+            | Ok () -> ()
+            | Error e -> failtestf "Expected a past date to be accepted, got Error %s" e
     ]

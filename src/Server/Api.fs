@@ -4092,18 +4092,29 @@ module Api =
                 | Error e -> return Error e
             }
 
+            // books-xyqyb: date-range validation is an edge concern (ADR-0077
+            // §6, mirroring how `setBookProgress`'s `ObservedOn` is treated)
+            // — `decide` only validates the yyyy-MM-dd format, not whether
+            // the date has already happened.
             setBookStatus = fun slug status effectiveOn -> async {
-                use conn = factory ()
-                let sid = Books.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        Books.Serialization.fromStoredEvent
-                        Books.reconstitute
-                        Books.decide
-                        Books.Serialization.toEventData
-                        (Books.Change_status (status, effectiveOn))
-                        projectionHandlers
+                let isFuture =
+                    match effectiveOn with
+                    | Some d -> d > System.DateTime.Now.ToString("yyyy-MM-dd")
+                    | None -> false
+                if isFuture then
+                    return Error "effectiveOn cannot be in the future"
+                else
+                    use conn = factory ()
+                    let sid = Books.streamId slug
+                    return
+                        executeCommand
+                            conn sid
+                            Books.Serialization.fromStoredEvent
+                            Books.reconstitute
+                            Books.decide
+                            Books.Serialization.toEventData
+                            (Books.Change_status (status, effectiveOn))
+                            projectionHandlers
             }
 
             setBookFormat = fun slug format -> async {

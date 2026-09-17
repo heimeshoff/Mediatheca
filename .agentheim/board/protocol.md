@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 01:46 -- Task verified and completed: books-xyqyb - Manual finish stamps today's local date and the hero's finished-date line is click-to-edit — `Set_book_status Finished` sends `Some localToday` instead of `None` (no more UTC-midnight drift), and the `finished {date}` line opens an `EditableDateInput` whose commit re-dates the finish via `setBookStatus slug Finished (Some picked)`
+
+**Type:** Work / Task completion
+**Task:** books-xyqyb - Manual finish stamps today's local date and the hero's finished-date line is click-to-edit — `Set_book_status Finished` sends `Some localToday` instead of `None` (no more UTC-midnight drift), and the `finished {date}` line opens an `EditableDateInput` whose commit re-dates the finish via `setBookStatus slug Finished (Some picked)`
+**Summary:** Manual Finished status changes now stamp today's local date instead of None (no more UTC-midnight drift), and the book detail hero's finished-date line is click-to-edit via EditableDateInput, re-dating through Commit_finished_date; setBookStatus rejects a future effectiveOn at the API edge.
+**Duration:** 17m30s
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 6
+**Tests added:** 6
+**ADRs written:** none
+
+---
+
 ## 2026-09-18 01:27 -- Batch started: [books-xntts, books-d4wtc, books-xyqyb]
 
 **Type:** Work / Batch start
