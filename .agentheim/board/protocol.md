@@ -5,6 +5,31 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 15:30 -- Task verified and completed: games-r1tx4 - Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG)
+
+**Type:** Work / Task completion
+**Task:** games-r1tx4 - Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG)
+**Summary:** Game descriptions from Steam and RAWG are sanitized through one shared HTML-subset sanitizer (DescriptionSanitizer, lifted out of Audible.fs) and rendered via RichText on the game detail page, with the sanitized markup confined to game_metadata_cache — the Game_added_to_library event payload stays plain text on every creation path (Steam and RAWG alike), and addGame's RAWG path now writes the identity card it had skipped since games-v4nqe.
+**Duration:** 49m52s
+**Verification:** PASS (iteration 2)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 12
+**Tests added:** 10
+**ADRs written:** none
+
+---
+
+## 2026-09-17 15:07 -- Verification failed: games-r1tx4 - Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG)
+
+**Type:** Work / Verification failure
+**Task:** games-r1tx4 - Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG)
+**Iteration:** 1 of 3
+**Reasons:** README_DELTA claims no HTML ever rides an event but decode-time Steam sanitization now feeds sanitized HTML into Game_added_to_library.Description at three Steam creation paths (Api.fs runSteamFamilyImport new-game branch, addGameFromSteamCore, Steam library import), the Outcome misreports the same (scopes the plain-payload claim to RAWG only and is silent on Steam), and the wrong invariant is load-bearing for games-fffvm
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-09-17 14:50 -- Task verified and completed: books-h4mq2 - book-detail-progress.spec.ts must open the hero ActionMenu before clicking "Update progress"
 
 **Type:** Work / Task completion

@@ -38,6 +38,15 @@ let richTextTests =
         testCase "plain text with no blank line stays one paragraph" <| fun () ->
             let input = "Just plain text."
             Expect.equal (parse input) [ Elem("p", [ Text "Just plain text." ]) ] "single paragraph, unchanged"
+
+        testCase "games-r1tx4: Steam-shaped about_the_game markup -- h2 unwraps to a paragraph of its own text, strong/br/ul/li kept, a unwraps to its label, img contributes nothing" <| fun () ->
+            let input =
+                """<h2 class="bb_tag">Features</h2><p>Great <strong>game</strong><br>with an <a href="https://x.com">online</a> mode.</p><ul class="bb_ul"><li>Craft</li><li>Build</li></ul><img class="bb_img" src="y.jpg">"""
+            let expected =
+                [ Elem("p", [ Text "Features" ])
+                  Elem("p", [ Text "Great "; Elem("strong", [ Text "game" ]); Elem("br", []); Text "with an "; Text "online"; Text " mode." ])
+                  Elem("ul", [ Elem("li", [ Text "Craft" ]); Elem("li", [ Text "Build" ]) ]) ]
+            Expect.equal (parse input) expected "h2/a/img (with all their attributes) gone, p/strong/br/ul/li survive"
     ]
 
 Mocha.runTests richTextTests |> ignore

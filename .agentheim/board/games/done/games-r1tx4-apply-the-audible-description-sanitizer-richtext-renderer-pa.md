@@ -1,7 +1,7 @@
 ---
 id: games-r1tx4
 title: Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG)
-status: doing
+status: done
 type: chore
 context: games
 created: 2026-09-17
@@ -57,3 +57,34 @@ Mirror books-nvnyk's shape in the games BC — one server-side sanitizer, one cl
 - `RichText.fs`/`RichText.parse`/`RichText.render` already exist (books-nvnyk) and are generic over any allowlisted-HTML string — no game-specific rendering logic needed.
 - Cache tier per ADR-0043/ADR-0045 — no event, no projection-handler involvement, same as books.
 - Fixtures only, never the live DB (project standing rule).
+
+## Verifier note (iteration 1)
+
+REASONS:
+- README_DELTA mismatch (check 5). The single `append` op to the games README's "Ubiquitous language" section asserts: "The event payload itself keeps carrying the plain, unsanitized `description_raw` — no HTML ever rides an event (ADR-0043)." The diff falsifies the generalized half of that claim. Because Steam is now sanitized at decode time (`src/Server/Steam.fs:205-206`), `Steam.storeDescription` returns sanitized HTML, and that value flows straight into `Games.GameAddedData.Description` — i.e. the `Game_added_to_library` event payload — at three Steam creation paths: `src/Server/Api.fs:864` (`runSteamFamilyImport` new-game branch, via `Api.fs:847`), `src/Server/Api.fs:1466` (`addGameFromSteamCore`, via `Api.fs:1456`), and `src/Server/Api.fs:4502` (Steam library import new-game branch, via `Api.fs:4483`). Before this diff all three wrote `stripHtmlTags` output — plain text — into the same event field.
+- The same fact is misreported in the `## Outcome` (check 5's "body must match what the diff introduced"): the Outcome states the `Game_added_to_library` payload is untouched only for the RAWG path (true and test-covered at `src/Server/Api.fs:3619`), and is silent about the three Steam paths now appending `<p>`/`<br>`/`<strong>`/`<ul>`/`<li>` markup permanently into the append-only event log. No acceptance criterion, no test, and no ADR covers that change — `tests/Server.Tests/AddGameFromRawgTests.fs`'s "The Game_added_to_library event payload keeps the plain description_raw" case pins only the RAWG side.
+- The wrong invariant is load-bearing for the next task in this chain: `games-fffvm` (this task's declared `blocks:`) is the follow-up that re-fetches and re-sanitizes exactly these description rows, and would be written against a README statement about event payloads that no longer holds for Steam-created games.
+
+SUGGESTED_FIX: Either keep the stated invariant true — give `Games.GameAddedData.Description` a plain-text value at `Api.fs:864`/`1466`/`4502` (e.g. a `Steam.storePlainDescription` sibling, or strip the allowlisted subset on the event path only) while the `MetadataCache.upsertGameIdentityCard` writes keep the sanitized HTML — or accept the change and correct the README_DELTA plus `## Outcome` to scope the "plain payload" sentence to the RAWG path and say explicitly that Steam creation-path `Game_added_to_library` events now carry the sanitized HTML subset; either way pin the chosen shape with an Expecto case in `AddGameFromSteamTests.fs` mirroring the RAWG one.
+
+ITERATION_HINT: likely-fixable
+
+## Outcome
+
+Applied the books-nvnyk sanitizer + `RichText` renderer pattern to game descriptions, and closed the RAWG identity-card gap `games-v4nqe` left open — across two iterations.
+
+**Sanitizer.** `src/Server/DescriptionSanitizer.fs` is the one shared HTML-subset sanitizer (`sanitize`: allowlist `p`/`br`/`b`/`strong`/`i`/`em`/`ul`/`ol`/`li`, attributes dropped, every other tag unwrapped to text), compiled ahead of `Audible.fs`/`Steam.fs`/`Rawg.fs` in `Server.fsproj`. `Audible.sanitizeDescription` is now an alias onto it (`Audible.fs`); its own Expecto list passes unchanged.
+
+**Steam.** `Steam.fs`'s `decodeStoreData` sanitizes `about_the_game`/`detailed_description` at decode time, so every caller gets sanitized values already; a single `Steam.storeDescription` helper (about-the-game first, detailed-description fallback) replaced all seven duplicated selection blocks across `Api.fs` and `PlaytimeTracker.fs`. `grep -rn stripHtmlTags src/Server` returns nothing — all three private copies (`Api.fs`, `PlaytimeTracker.fs`, `Rawg.fs`) are deleted.
+
+**RAWG.** `addGame`'s RAWG path now calls `MetadataCache.upsertGameIdentityCard` after `Add_game` succeeds, writing RAWG's sanitized HTML `description` (fallback `description_raw`, then `request.Description`) into the identity card — closing the latent empty-description defect the task's Why section named.
+
+**Event-payload invariant (verifier iteration 2 fix).** The verifier's first pass found the sanitized Steam HTML was flowing straight into the `Game_added_to_library` event payload at three Steam creation sites (`runSteamFamilyImport`'s new-game branch, `addGameFromSteamCore`, the Steam library import's new-game branch) plus a fourth the conductor flagged (`PlaytimeTracker`'s scheduled-sync new-game path) — all four build the same `Games.GameAddedData` record. Kept the invariant true rather than relaxing it: added `DescriptionSanitizer.toPlainText` (projects an already-sanitized string down to tagless text — `<br>`/`</p>`/`</li>` become a single newline, every other allowed tag is dropped without inserting whitespace, repeat newlines collapse, result is trimmed) and, at each of those four sites, pass the plain-text projection into `GameAddedData.Description` while the identity-card cache write on the same path keeps the sanitized HTML (`description`/`Steam.storeDescription details` unchanged). The RAWG path already had this split correct (test-covered at `Api.fs`'s `addGame`). Net result: **on every creation path — Steam and RAWG alike — the `Game_added_to_library` event payload's `Description` carries plain text; only the `game_metadata_cache` identity-card tier ever carries the sanitized HTML subset.** The "backfill empty descriptions" loop and `attachSteamToGameCore` still correctly write only the cache (no event) — unchanged. `runSteamFamilyImport`'s `FullReenrich` branch (computes `desc`, writes only `ShortDescription` to the cache) is unchanged, out of scope per the task's own Notes.
+
+**Client.** `GameDetail/Views.fs`'s Description section renders both `game.Description` and `game.ShortDescription` through `RichText.render`; the expand/collapse toggle (`Toggle_description_expanded`) is untouched. `RichText.test.fs` gained a Steam-shaped `<h2>`/`<img>`/`bb_ul` fixture case.
+
+**Tests.** `AddGameFromSteamTests.fs` gained: the sanitizer-at-the-cache-tier case from iteration 1 (`<h2>`/`<img>`/`<a>`/`bb_ul` fixture, asserts `game_metadata_cache.description` keeps the allowlisted subset and drops everything else), a new case mirroring `AddGameFromRawgTests.fs`'s event-payload case (decodes the stored `Game_added_to_library` event's JSON `Data`, asserts its `description` field contains no `<` at all while text content survives, and that `GameProjection.getBySlug`'s cache-backed `Description` still keeps `<strong>`), and a new `DescriptionSanitizer.toPlainText` unit `testList` (three cases: tag/newline behaviour, an already-plain string passes through trimmed, empty stays empty). `AddGameFromRawgTests.fs` (iteration 1) already pins the RAWG-side identity-card write and its own plain-event-payload case.
+
+**Gates (iteration 2, run from the worktree):** `npm run build` — clean Fable client build. `npm test` — Expecto 928/928 passed (up from iteration 1's 924; +4 new cases). `npm run test:client` — Vitest 117/117 passed (unchanged from iteration 1, client-side work untouched this iteration).
+
+Key files: `src/Server/DescriptionSanitizer.fs`, `src/Server/Steam.fs`, `src/Server/Api.fs`, `src/Server/PlaytimeTracker.fs`, `src/Server/Audible.fs`, `src/Server/Rawg.fs`, `src/Client/Pages/GameDetail/Views.fs`, `src/Client/Components/RichText.test.fs`, `tests/Server.Tests/AddGameFromSteamTests.fs`, `tests/Server.Tests/AddGameFromRawgTests.fs`.

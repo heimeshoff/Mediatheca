@@ -1004,10 +1004,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                         if showShort then
                                                             Html.div [
                                                                 prop.children [
-                                                                    Html.p [
-                                                                        prop.className "text-base-content/70 leading-relaxed text-lg"
-                                                                        prop.text game.ShortDescription
-                                                                    ]
+                                                                    Html.div [ prop.className "text-lg"; prop.children [ RichText.render game.ShortDescription ] ]
                                                                     Html.button [
                                                                         prop.className "text-primary text-sm font-medium mt-2 cursor-pointer hover:underline"
                                                                         prop.onClick (fun _ -> dispatch Toggle_description_expanded)
@@ -1018,10 +1015,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                         elif hasFull then
                                                             Html.div [
                                                                 prop.children [
-                                                                    Html.p [
-                                                                        prop.className "text-base-content/70 leading-relaxed text-lg"
-                                                                        prop.text game.Description
-                                                                    ]
+                                                                    Html.div [ prop.className "text-lg"; prop.children [ RichText.render game.Description ] ]
                                                                     if hasShort then
                                                                         Html.button [
                                                                             prop.className "text-primary text-sm font-medium mt-2 cursor-pointer hover:underline"
@@ -1031,10 +1025,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                                 ]
                                                             ]
                                                         else
-                                                            Html.p [
-                                                                prop.className "text-base-content/70 leading-relaxed text-lg"
-                                                                prop.text game.ShortDescription
-                                                            ]
+                                                            Html.div [ prop.className "text-lg"; prop.children [ RichText.render game.ShortDescription ] ]
                                                     ]
                                                 ]
                                             ]

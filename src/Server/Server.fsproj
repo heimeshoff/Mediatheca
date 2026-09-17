@@ -26,6 +26,7 @@
     <Compile Include="FacetDerivation.fs" />
     <Compile Include="ReleaseDateParsing.fs" />
     <Compile Include="Tmdb.fs" />
+    <Compile Include="DescriptionSanitizer.fs" />
     <Compile Include="Rawg.fs" />
     <Compile Include="Steam.fs" />
     <Compile Include="HowLongToBeat.fs" />

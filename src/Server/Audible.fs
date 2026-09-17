@@ -358,33 +358,17 @@ module Audible =
         CoverUrl: string option
     }
 
-    /// Tags kept verbatim (attributes always dropped); everything else is
-    /// unwrapped down to its own text content -- never deleted, so a
-    /// disallowed element's text (including `<script>`/`<style>` bodies)
-    /// survives as plain text rather than vanishing. This is the ONE shared
-    /// sanitizer for every Audible-sourced description (`decodeProduct`,
-    /// `decodeLibraryItem`, `Audnexus.decodeAudnexusBook`) -- see this
-    /// task's Notes for why a sanitized HTML subset, not Markdown or a
-    /// custom rich-text DU, is the stored (cache-tier, ADR-0043/ADR-0045)
-    /// shape. Entities are left alone; the client-side renderer decodes them.
-    let private allowedDescriptionTags =
-        set [ "p"; "br"; "b"; "strong"; "i"; "em"; "ul"; "ol"; "li" ]
-
-    let private tagPattern =
-        System.Text.RegularExpressions.Regex(@"<\s*(/?)\s*([a-zA-Z][a-zA-Z0-9]*)\b[^>]*?(/?)\s*>")
-
-    let sanitizeDescription (s: string) : string =
-        tagPattern.Replace(
-            s,
-            System.Text.RegularExpressions.MatchEvaluator(fun m ->
-                let closing = m.Groups.[1].Value = "/"
-                let name = m.Groups.[2].Value.ToLowerInvariant()
-                if Set.contains name allowedDescriptionTags then
-                    if name = "br" then "<br>"
-                    elif closing then sprintf "</%s>" name
-                    else sprintf "<%s>" name
-                else ""))
-        |> fun s -> s.Trim()
+    /// games-r1tx4: alias for the shared server-wide sanitizer, lifted out
+    /// of this module into `DescriptionSanitizer.fs` (compiled ahead of
+    /// Audible.fs/Steam.fs/Rawg.fs) so Steam and RAWG descriptions go
+    /// through the exact same implementation instead of their own copies.
+    /// Kept under this name -- rather than having every caller switch to
+    /// `DescriptionSanitizer.sanitize` directly -- so the existing
+    /// `Audible.sanitizeDescription (books-nvnyk)` Expecto cases, and every
+    /// other Audible-module caller (`decodeProduct`, `decodeLibraryItem`,
+    /// `Audnexus.decodeAudnexusBook`), keep compiling and behaving exactly
+    /// as before.
+    let sanitizeDescription : string -> string = DescriptionSanitizer.sanitize
 
     let private decodeProduct : Decoder<AudibleProduct> =
         Decode.object (fun get ->

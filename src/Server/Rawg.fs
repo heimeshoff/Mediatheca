@@ -407,10 +407,6 @@ module Rawg =
 
     // ─── Preview function (for search hover preview) ──────────────────
 
-    let private stripHtmlTags (html: string) =
-        if System.String.IsNullOrEmpty(html) then ""
-        else System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", "")
-
     let previewGame (httpClient: HttpClient) (config: RawgConfig) (rawgId: int) : Async<Mediatheca.Shared.RawgPreviewData option> =
         async {
             if System.String.IsNullOrWhiteSpace(config.ApiKey) then return None
@@ -438,7 +434,10 @@ module Rawg =
                         let preview : Mediatheca.Shared.RawgPreviewData = {
                             Name = details.Name
                             Year = parseYear details.Released
-                            Description = stripHtmlTags details.DescriptionRaw
+                            // games-r1tx4: `description_raw` is RAWG's own
+                            // plain-text field -- no private regex copy
+                            // needed to strip tags that were never there.
+                            Description = details.DescriptionRaw
                             Genres = details.Genres |> List.map (fun g -> g.Name)
                             BackgroundImage = details.BackgroundImage
                             Screenshots = screenshots

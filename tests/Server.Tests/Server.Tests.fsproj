@@ -61,6 +61,7 @@
     <Compile Include="LocalCopyRemovalTests.fs" />
     <Compile Include="SteamFamilyTokenTests.fs" />
     <Compile Include="AddGameFromSteamTests.fs" />
+    <Compile Include="AddGameFromRawgTests.fs" />
     <Compile Include="NotesRemovalCleanupTests.fs" />
     <Compile Include="SteamFamilyImportOwnedGamesTests.fs" />
     <Compile Include="PlaytimeSyncKeyRejectionTests.fs" />

@@ -4,14 +4,9 @@ open System
 open System.Net.Http
 open System.Threading
 open Microsoft.Data.Sqlite
-open System.Text.RegularExpressions
 open Mediatheca.Shared
 
 module PlaytimeTracker =
-
-    let private stripHtmlTags (html: string) =
-        if String.IsNullOrEmpty(html) then ""
-        else Regex.Replace(html, "<[^>]+>", "")
 
     /// administration-tj8n2: the job connection (`runSync`'s `conn` param) is
     /// dedicated to scheduled-job use but is shared by BOTH jobs (Steam sync,
@@ -267,16 +262,20 @@ module PlaytimeTracker =
                 let steamDescription, steamShortDescription, steamWebsiteUrl, steamCategoryIds =
                     match storeDetails with
                     | Ok details ->
-                        let desc =
-                            if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
-                            elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
-                            else ""
-                        desc, details.ShortDescription, details.WebsiteUrl, details.CategoryIds
+                        Steam.storeDescription details, details.ShortDescription, details.WebsiteUrl, details.CategoryIds
                     | Error _ -> "", "", None, []
 
                 let description =
                     if steamDescription <> "" then steamDescription
                     else ""
+
+                // games-r1tx4 (verifier iteration 2): the plain-text
+                // sibling of `description` above, for the
+                // `Game_added_to_library` payload -- an event never
+                // carries HTML (ADR-0043), even though `description`
+                // (sanitized HTML from Steam.storeDescription) is what the
+                // identity-card cache write below keeps.
+                let plainDescription = DescriptionSanitizer.toPlainText description
 
                 let baseSlug = Slug.gameSlug steamGame.Name (if year > 0 then year else 2000)
                 let slug = withLock jobLock (fun () -> generateUniqueSlug conn Games.streamId baseSlug)
@@ -287,7 +286,7 @@ module PlaytimeTracker =
                     Name = steamGame.Name
                     Year = if year > 0 then year else 0
                     Genres = genres
-                    Description = description
+                    Description = plainDescription
                     ShortDescription = steamShortDescription
                     WebsiteUrl = steamWebsiteUrl
                     CoverRef = coverRef

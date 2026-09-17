@@ -213,6 +213,93 @@ let addGameFromSteamTests =
                 Expect.exists upcoming (fun g -> g.Slug = slug) "Tenebris Somnia appears as a row in the Upcoming section"
             | Ok (Duplicate_found _) -> failtest "Expected a fresh import to create, not duplicate"
             | Error e -> failtest (sprintf "Expected success, got Error %s" e)
+
+        testCase "games-r1tx4: Steam's about_the_game markup is sanitized before it lands in game_metadata_cache -- h2/img/a unwrapped (no attributes, no disallowed tags), p/br/strong/ul/li survive" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrap
+            // Steam-shaped about_the_game markup this task's Notes call out:
+            // a heading, an image, a br run, strong, a bb_ul list, and a
+            // link -- single-quoted attributes so the fixture JSON string
+            // itself needs no escaping.
+            let steamHtml =
+                "<h2 class='bb_tag'>Explore</h2><p>Great <strong>game</strong><br>with an <a href='https://x.com'>online</a> mode.</p><ul class='bb_ul'><li>Craft</li></ul><img class='bb_img' src='y.jpg'>"
+            let http = httpClientFor "[]" (storeDetailsJson 730 "A tactical shooter" steamHtml []) "{}"
+            let api = createApi db.Factory http
+
+            let request: AddGameFromSteamRequest = { AppId = 730; Name = "Sanitizer Test Game"; Year = Some 2012; SkipDuplicateCheck = false }
+            let result = api.addGameFromSteam request |> Async.RunSynchronously
+
+            match result with
+            | Ok (Created slug) ->
+                match GameProjection.getBySlug db.Connection slug with
+                | None -> failtest "Expected the newly created game to be readable from the projection"
+                | Some game ->
+                    let desc = game.Description
+                    Expect.stringContains desc "<p>" "keeps <p>"
+                    Expect.stringContains desc "<br>" "keeps <br>"
+                    Expect.stringContains desc "<strong>game</strong>" "keeps <strong>"
+                    Expect.stringContains desc "<ul>" "keeps <ul>, class attribute dropped"
+                    Expect.stringContains desc "<li>Craft</li>" "keeps <li>"
+                    Expect.isFalse (desc.Contains "<h2") "no <h2> tag survives"
+                    Expect.isFalse (desc.Contains "<img") "no <img> tag survives"
+                    Expect.isFalse (desc.Contains "<a ") "no <a> tag survives"
+                    Expect.isFalse (desc.Contains "class=") "no attribute survives, on any kept or unwrapped tag"
+                    Expect.stringContains desc "Explore" "the <h2>'s own text content survives, unwrapped"
+                    Expect.stringContains desc "online" "the <a>'s own text content survives, unwrapped"
+            | Ok (Duplicate_found _) -> failtest "Expected a fresh AppId/Name pair to create, not duplicate"
+            | Error e -> failtest (sprintf "Expected success, got Error %s" e)
+
+        testCase "games-r1tx4 (verifier iteration 2): the Game_added_to_library event payload keeps a plain-text description -- no HTML ever rides the event" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrap
+            let steamHtml = "<p>Great <strong>game</strong><br>with an online mode.</p><ul><li>Craft</li></ul>"
+            let http = httpClientFor "[]" (storeDetailsJson 850 "A tactical shooter" steamHtml []) "{}"
+            let api = createApi db.Factory http
+
+            let request: AddGameFromSteamRequest = { AppId = 850; Name = "Event Payload Steam Game"; Year = Some 2015; SkipDuplicateCheck = false }
+            let result = api.addGameFromSteam request |> Async.RunSynchronously
+
+            match result with
+            | Ok (Created slug) ->
+                let addedEvent =
+                    EventStore.readStream db.Connection (Games.streamId slug)
+                    |> List.tryFind (fun e -> e.EventType = "Game_added_to_library")
+                match addedEvent with
+                | Some stored ->
+                    match Thoth.Json.Net.Decode.fromString (Thoth.Json.Net.Decode.field "description" Thoth.Json.Net.Decode.string) stored.Data with
+                    | Ok description ->
+                        Expect.isFalse (description.Contains "<") "the event payload carries no HTML tag at all, never the sanitized markup"
+                        Expect.stringContains description "Great" "the description's own text content survives"
+                        Expect.stringContains description "game" "the description's own text content survives"
+                        Expect.stringContains description "Craft" "the description's own text content survives"
+                    | Error e -> failtest (sprintf "Failed to decode Game_added_to_library payload: %s" e)
+                | None -> failtest "Expected a Game_added_to_library event in the stream"
+
+                match GameProjection.getBySlug db.Connection slug with
+                | None -> failtest "Expected the newly created game to be readable from the projection"
+                | Some game -> Expect.stringContains game.Description "<strong>" "the cache-backed identity card still keeps the sanitized HTML subset"
+            | Ok (Duplicate_found _) -> failtest "Expected a fresh AppId/Name pair to create, not duplicate"
+            | Error e -> failtest (sprintf "Expected success, got Error %s" e)
+    ]
+
+[<Tests>]
+let descriptionSanitizerToPlainTextTests =
+    testList "DescriptionSanitizer.toPlainText (games-r1tx4, verifier iteration 2)" [
+
+        testCase "Turns <br> and </p>/</li> boundaries into newlines, drops every other allowed tag without adding whitespace" <| fun _ ->
+            let input = "<p>Great <strong>game</strong><br>with an online mode.</p><ul><li>Craft</li><li>Build</li></ul>"
+            let result = DescriptionSanitizer.toPlainText input
+            Expect.isFalse (result.Contains "<") "no HTML tag survives"
+            Expect.stringContains result "Great" "text content survives"
+            Expect.stringContains result "game" "text content survives"
+            Expect.stringContains result "with an online mode." "text content after <br> survives"
+            Expect.stringContains result "Craft" "list item text survives"
+            Expect.stringContains result "Build" "list item text survives"
+
+        testCase "An already-plain string (no tags) passes through unchanged, just trimmed" <| fun _ ->
+            let result = DescriptionSanitizer.toPlainText "  Just plain text.  "
+            Expect.equal result "Just plain text." "trims whitespace, otherwise unchanged"
+
+        testCase "An empty string stays empty" <| fun _ ->
+            Expect.equal (DescriptionSanitizer.toPlainText "") "" "empty in, empty out"
     ]
 
 [<Tests>]

@@ -2,17 +2,12 @@ namespace Mediatheca.Server
 
 open System.Data
 open System.Net.Http
-open System.Text.RegularExpressions
 open Microsoft.Data.Sqlite
 open Donald
 open Giraffe
 open Mediatheca.Shared
 
 module Api =
-
-    let private stripHtmlTags (html: string) =
-        if System.String.IsNullOrEmpty(html) then ""
-        else Regex.Replace(html, "<[^>]+>", "")
 
     /// `Qbittorrent.QbittorrentError` -> a plain message, the sibling of how
     /// `Jellyfin.withReauthRetry`'s errors are already flattened to strings
@@ -779,10 +774,7 @@ module Api =
                                             match storeDetails with
                                             | Ok details ->
                                                 if details.AboutTheGame <> "" then
-                                                    let desc =
-                                                        if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
-                                                        elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
-                                                        else ""
+                                                    let desc = Steam.storeDescription details
                                                     if desc <> "" then
                                                         updateGameIdentityCache conn slug None (Some details.ShortDescription) None
                                                 if details.WebsiteUrl.IsSome then
@@ -852,15 +844,23 @@ module Api =
                                                 let steamDescription, steamShortDescription, steamWebsiteUrl, steamCategoryIds =
                                                     match storeDetails with
                                                     | Ok details ->
-                                                        let desc =
-                                                            if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
-                                                            elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
-                                                            else ""
-                                                        desc, details.ShortDescription, details.WebsiteUrl, details.CategoryIds
+                                                        Steam.storeDescription details, details.ShortDescription, details.WebsiteUrl, details.CategoryIds
                                                     | Error _ -> "", "", None, []
 
                                                 let description =
                                                     if steamDescription <> "" then steamDescription
+                                                    elif rawgDescription <> "" then rawgDescription
+                                                    else ""
+
+                                                // games-r1tx4 (verifier iteration 2): the
+                                                // plain-text sibling of `description` above,
+                                                // for the `Game_added_to_library` payload --
+                                                // an event never carries HTML (ADR-0043), even
+                                                // though `description` (sanitized HTML when it
+                                                // came from Steam) is what the identity-card
+                                                // cache write below keeps.
+                                                let plainDescription =
+                                                    if steamDescription <> "" then DescriptionSanitizer.toPlainText steamDescription
                                                     elif rawgDescription <> "" then rawgDescription
                                                     else ""
 
@@ -873,7 +873,7 @@ module Api =
                                                     Name = app.Name
                                                     Year = if year > 0 then year else 0
                                                     Genres = genres
-                                                    Description = description
+                                                    Description = plainDescription
                                                     ShortDescription = steamShortDescription
                                                     WebsiteUrl = steamWebsiteUrl
                                                     CoverRef = coverRef
@@ -1375,10 +1375,7 @@ module Api =
                         projectionHandlers |> ignore
 
                     // 2. Description — only if the current one is empty
-                    let computedDesc =
-                        if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
-                        elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
-                        else ""
+                    let computedDesc = Steam.storeDescription details
                     let newDescription =
                         if System.String.IsNullOrWhiteSpace(game.Description) && computedDesc <> "" then computedDesc
                         else game.Description
@@ -1468,12 +1465,16 @@ module Api =
                     let description, shortDescription, websiteUrl, categoryIds =
                         match storeDetails with
                         | Ok details ->
-                            let desc =
-                                if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
-                                elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
-                                else ""
-                            desc, details.ShortDescription, details.WebsiteUrl, details.CategoryIds
+                            Steam.storeDescription details, details.ShortDescription, details.WebsiteUrl, details.CategoryIds
                         | Error _ -> "", "", None, []
+
+                    // games-r1tx4 (verifier iteration 2): `description` above
+                    // is sanitized HTML (Steam.storeDescription sanitizes at
+                    // decode time) -- kept for the identity-card cache write
+                    // below. The `Game_added_to_library` payload instead
+                    // carries this plain-text projection: an event never
+                    // carries HTML (ADR-0043).
+                    let plainDescription = DescriptionSanitizer.toPlainText description
 
                     let! coverRef = Steam.downloadSteamCover httpClient request.AppId slug imageBasePath
                     let! backdropRef = Steam.downloadSteamBackdrop httpClient request.AppId slug imageBasePath
@@ -1482,7 +1483,7 @@ module Api =
                         Name = request.Name
                         Year = year
                         Genres = []
-                        Description = description
+                        Description = plainDescription
                         ShortDescription = shortDescription
                         WebsiteUrl = websiteUrl
                         CoverRef = coverRef
@@ -3582,7 +3583,7 @@ module Api =
                         let sid = Games.streamId slug
 
                         // If we have a RAWG ID, fetch full details for description + download images
-                        let! description, coverRef, backdropRef =
+                        let! description, coverRef, backdropRef, cacheDescription =
                             match request.RawgId with
                             | Some rawgId ->
                                 async {
@@ -3601,6 +3602,19 @@ module Api =
                                         | Some d when d.DescriptionRaw <> "" -> d.DescriptionRaw
                                         | _ -> request.Description
 
+                                    // games-r1tx4: the sanitized-HTML sibling of `desc`
+                                    // above, written to the identity card cache (never
+                                    // the `Game_added_to_library` payload, which keeps
+                                    // carrying the plain `desc` exactly as before) —
+                                    // RAWG's HTML `description` field first, falling
+                                    // back to `description_raw`, then the request's own
+                                    // plain description.
+                                    let cacheDesc =
+                                        match details with
+                                        | Some d when d.Description <> "" -> DescriptionSanitizer.sanitize d.Description
+                                        | Some d when d.DescriptionRaw <> "" -> DescriptionSanitizer.sanitize d.DescriptionRaw
+                                        | _ -> DescriptionSanitizer.sanitize request.Description
+
                                     // Download images locally
                                     let bgImage =
                                         match details with
@@ -3613,10 +3627,10 @@ module Api =
                                         | None -> None
 
                                     let! coverRef, backdropRef = Rawg.downloadGameImages httpClient slug bgImage bgImageAdditional imageBasePath
-                                    return desc, coverRef, backdropRef
+                                    return desc, coverRef, backdropRef, cacheDesc
                                 }
                             | None ->
-                                async { return request.Description, request.CoverRef, request.BackdropRef }
+                                async { return request.Description, request.CoverRef, request.BackdropRef, "" }
 
                         let gameData: Games.GameAddedData = {
                             Name = request.Name
@@ -3644,6 +3658,19 @@ module Api =
                         match result with
                         | Error e -> return Error e
                         | Ok () ->
+                            // games-r1tx4: the RAWG path's own creation-code-path
+                            // identity-card write (ADR-0045's hard constraint: never
+                            // the ProjectionHandler) — the same imperative write the
+                            // Steam sites already do. Closes the latent defect (this
+                            // task's Why): since games-v4nqe dropped `game_detail`'s
+                            // `description` projection column, a RAWG-added game had
+                            // an empty description until this write happened.
+                            if request.RawgId.IsSome then
+                                MetadataCache.upsertGameIdentityCard conn slug {
+                                    Description = cacheDescription
+                                    ShortDescription = ""
+                                    WebsiteUrl = None
+                                }
                             // Auto-attach Steam for RAWG-sourced games with a clear match.
                             // Best-effort: any failure (Steam down, no match, ambiguous) is
                             // swallowed — the user can still click Connect later.
@@ -4473,16 +4500,24 @@ module Api =
                                         let steamDescription, steamShortDescription, steamWebsiteUrl, steamCategoryIds =
                                             match storeDetails with
                                             | Ok details ->
-                                                let desc =
-                                                    if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
-                                                    elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
-                                                    else ""
-                                                desc, details.ShortDescription, details.WebsiteUrl, details.CategoryIds
+                                                Steam.storeDescription details, details.ShortDescription, details.WebsiteUrl, details.CategoryIds
                                             | Error _ -> "", "", None, []
 
                                         // Use Steam description if available, then RAWG, then empty
                                         let description =
                                             if steamDescription <> "" then steamDescription
+                                            elif rawgDescription <> "" then rawgDescription
+                                            else ""
+
+                                        // games-r1tx4 (verifier iteration 2): the
+                                        // plain-text sibling of `description` above, for
+                                        // the `Game_added_to_library` payload -- an event
+                                        // never carries HTML (ADR-0043), even though
+                                        // `description` (sanitized HTML when it came from
+                                        // Steam) is what the identity-card cache write
+                                        // below keeps.
+                                        let plainDescription =
+                                            if steamDescription <> "" then DescriptionSanitizer.toPlainText steamDescription
                                             elif rawgDescription <> "" then rawgDescription
                                             else ""
 
@@ -4496,7 +4531,7 @@ module Api =
                                             Name = steamGame.Name
                                             Year = if year > 0 then year else 0
                                             Genres = genres
-                                            Description = description
+                                            Description = plainDescription
                                             ShortDescription = steamShortDescription
                                             WebsiteUrl = steamWebsiteUrl
                                             CoverRef = coverRef
@@ -4576,10 +4611,7 @@ module Api =
                                 let! storeDetails = Steam.getSteamStoreDetails httpClient steamAppId
                                 match storeDetails with
                                 | Ok details ->
-                                    let desc =
-                                        if details.AboutTheGame <> "" then stripHtmlTags details.AboutTheGame
-                                        elif details.DetailedDescription <> "" then stripHtmlTags details.DetailedDescription
-                                        else ""
+                                    let desc = Steam.storeDescription details
                                     if desc <> "" then
                                         updateGameIdentityCache conn slug (Some desc) None None
                                     if details.ShortDescription <> "" then

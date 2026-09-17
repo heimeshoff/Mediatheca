@@ -193,9 +193,17 @@ module Steam =
             let comingSoon, releaseDateRaw =
                 get.Optional.Field "release_date" decodeReleaseDate |> Option.defaultValue (false, "")
             {
+                // games-r1tx4: sanitized at decode time (once, here) rather
+                // than at each of the seven call sites that used to run
+                // `about_the_game`/`detailed_description` through their own
+                // private tag-stripping regex -- makes an unsanitized Steam
+                // string unrepresentable downstream, the same placement
+                // `Audible.fs`'s decoders already use for book summaries.
+                // `short_description` is left untouched: Steam sends it
+                // tagless.
                 ShortDescription = get.Optional.Field "short_description" Decode.string |> Option.defaultValue ""
-                DetailedDescription = get.Optional.Field "detailed_description" Decode.string |> Option.defaultValue ""
-                AboutTheGame = get.Optional.Field "about_the_game" Decode.string |> Option.defaultValue ""
+                DetailedDescription = get.Optional.Field "detailed_description" Decode.string |> Option.defaultValue "" |> DescriptionSanitizer.sanitize
+                AboutTheGame = get.Optional.Field "about_the_game" Decode.string |> Option.defaultValue "" |> DescriptionSanitizer.sanitize
                 WebsiteUrl = get.Optional.Field "website" Decode.string
                 Categories = categories |> List.map (fun c -> c.Description)
                 CategoryIds = categories |> List.map (fun c -> c.Id)
@@ -213,6 +221,17 @@ module Steam =
             else
                 Error "Steam Store API returned success=false"
         )
+
+    /// games-r1tx4: the ONE about-the-game/detailed-description selection
+    /// rule -- about-the-game first, detailed-description fallback, ""
+    /// otherwise -- collapsing seven identical inline blocks that used to
+    /// live across `Api.fs` (x6) and `PlaytimeTracker.fs` (x1). Both fields
+    /// are already sanitized at decode time (`decodeStoreData` above), so
+    /// this is a plain selection, no further stripping needed.
+    let storeDescription (details: SteamStoreDetails) : string =
+        if details.AboutTheGame <> "" then details.AboutTheGame
+        elif details.DetailedDescription <> "" then details.DetailedDescription
+        else ""
 
     // Helpers
 
