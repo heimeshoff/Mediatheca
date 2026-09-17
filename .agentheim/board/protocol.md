@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 13:32 -- Task verified and completed: books-jm7aa - Book detail hero mirrors the game detail hero — the personal rating sits right of the status badge as a hero control, the reading state closes the hero meta block (finished date when Finished, otherwise a percent progress line), Details print on the page background like the movie synopsis, and Links move to the right column above Recommended By
+
+**Type:** Work / Task completion
+**Task:** books-jm7aa - Book detail hero mirrors the game detail hero — the personal rating sits right of the status badge as a hero control, the reading state closes the hero meta block (finished date when Finished, otherwise a percent progress line), Details print on the page background like the movie synopsis, and Links move to the right column above Recommended By
+**Summary:** The book detail page's hero now mirrors the game detail hero — a `HeroRating` control sits in the badge row right of the status badge, the reading-state line (progress bar or `finished {date}`) closes the hero meta block, `Details`/`History` render as movie-style page-background sections instead of cards, and the `Links` panel moved to the right column above `Recommended By`; `personalRatingCard`/`progressCard`(as a card)/`detailsCard` are gone from `BookDetail/Views.fs`.
+**Duration:** 23m05s
+**Verification:** PASS (iteration 1)
+**Result source:** re-dispatch · layout both+sentinel · sidecar present
+**Files changed:** 1
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-09-17 13:08 -- Batch started: [books-jm7aa]
 
 **Type:** Work / Batch start

@@ -1,7 +1,7 @@
 ---
 id: books-jm7aa
 title: Book detail hero mirrors the game detail hero — the personal rating sits right of the status badge as a hero control, the reading state closes the hero meta block (finished date when Finished, otherwise a percent progress line), Details print on the page background like the movie synopsis, and Links move to the right column above Recommended By
-status: doing
+status: done
 type: feature
 context: books
 created: 2026-09-17
@@ -123,3 +123,107 @@ Notes editor stays in the right column under Recommended By, unchanged.
   hero rating dropdown — no new floating surface is introduced.
 - Prior art: `books-f33e2` built the page this task reshapes; its task file lists the cards
   being dissolved here.
+
+## Outcome
+
+`src/Client/Pages/BookDetail/Views.fs` was restructured so the book detail
+page reads like the game detail page (games-shape parity), reusing
+`RichText.render` (books-nvnyk) and `Format.metaLine` (books-depwh) as-is:
+
+- **Badge row** (`flex flex-wrap items-center gap-3 mb-3`): format badge →
+  `HeroStatus` → new `HeroRating`, in that order. `HeroRating` is
+  `GameDetail.Views.HeroRating` copied verbatim with `book.AverageRating`
+  (already a 0-5 Goodreads scale, `Server/Goodreads.fs` line 36 — NOT
+  halved, unlike Games' 0-10 RAWG scale) standing in for `RawgRating`; a
+  new local `starRating` renders the 0-5 value. `personalRatingCard` and
+  its call are deleted.
+- **Hero reading-state line** closes the meta block: `Finished` still
+  renders `finished {FinishedAt}`; every other status renders a new
+  `heroProgressLine` (the old progress card's summary row — bar +
+  `{Percent}%` + source + `observed {date}` — moved verbatim into the
+  hero). No observation → bar at 0%, no source/observed text (verified:
+  screenshot equivalent state showed `0%` and nothing else).
+- **Reading Progress card dissolved**: `progressCard` (the panel) is gone;
+  its `Update progress` button is now an `ActionMenu.ActionMenuItem`
+  (`Icons.chartBar`) in the hero's `ActionMenu.heroView`, dispatching the
+  unchanged `Open_progress_popover`/`progressPopover`. The history list
+  survives as `historySection` — a `sectionHeader "History"` + the
+  unchanged `progressHistoryRow` list (remove-confirm flow untouched) — on
+  the page background, guarded the same way the old card guarded it (no
+  section when history is empty).
+- **Details section**: `detailsCard` (a `panelCard`) became `detailsSection`
+  (a plain `Html.section`) headed by a local `sectionHeader` copied from
+  `GameDetail`/`MovieDetail` (both already carry their own private copy of
+  the identical composition — Books following suit rather than adding a
+  third DesignSystem consumer was the worker's call per the task's
+  wording). Order: description (`RichText.render`, wrapped in a `text-lg`
+  div so its own `text-base-content/70 leading-relaxed` classes plus the
+  wrapper's size class match the movie Synopsis's exact class string) →
+  subject chips → `metaLine` (`books-depwh`, unchanged) → average rating.
+  No `velvet-card`/`panelCard` wrapper remains anywhere in the left column
+  (`grep` confirms the only `velvetCard` reference left in the file is
+  `panelCard` itself, used solely by the right-column `linksCard`/
+  `friendsCard`).
+- **Links panel**: moved into the right column (`lg:col-span-4`), directly
+  above `friendsCard`. Each row now matches `GameDetail`'s link-row classes
+  exactly (`flex items-center gap-3 p-2 rounded-lg hover:bg-base-content/5
+  transition-colors text-sm font-medium text-base-content/70
+  hover:text-primary`), with a leading icon (`Icons.book` for
+  Audible/Open Library, `Icons.globe` for Goodreads — no new icon assets)
+  and a trailing `Icons.externalLink` at `ml-auto text-base-content/30`.
+  Same three links, same presence rule, `target="_blank"` +
+  `rel="noopener noreferrer"` unchanged. Absent (`Html.none`) when the
+  book has no external id — confirmed by screenshot before/after linking
+  fixture ids via `linkBookExternalId`.
+- Left column spacing changed from `space-y-6` to `space-y-10`, matching
+  the movie page.
+
+**Badge parity, measured against an isolated dotnet instance** (built
+client + `dotnet <worktree>/src/Server/bin/Debug/net9.0/Server.dll` on
+`127.0.0.1:5100`, `DATA_DIR` a throwaway temp folder, one fixture game and
+one fixture book seeded via direct `addGame`/`addBook` — both left at
+their default `Backlog` status so the two hero compositions are compared
+like-for-like), via a throwaway Playwright script:
+
+| | 1519 px | | 390 px | |
+|---|---|---|---|---|
+| | height | font-size | height | font-size |
+| Game genre badge | 24px | 12px | 24px | 12px |
+| Book format badge | 24px | 12px | 24px | 12px |
+| Game status badge (Backlog) | 25px | 10px | 25px | 10px |
+| Book status badge (Backlog) | 25px | 10px | 25px | 10px |
+
+Byte-identical at both viewports once both fixtures are compared at the
+same status. (An earlier pass compared a `Backlog` game against an
+`InFocus` book and saw a spurious 25px-vs-27px gap — that was
+`.status-badge-in-focus`'s own, pre-existing, intentional extra padding
+(`padding: 6px 13px` vs the default, `index.css` line 289), which the
+in-focus gold-sweep variant already carries identically on *both* pages;
+it was an artifact of comparing two different statuses, not a hero-parity
+bug, and needed no fix.) The class strings were already byte-identical in
+source (as the task's Notes anticipated); no change was needed to make
+them so. The composition difference the builder perceived (Games' three
+gold genre badges + status + stars vs. Books' one gold badge + status)
+is real and unchanged by this task — reproduced in side-by-side
+screenshots — but is a content-volume fact (Games carries more badges),
+not a sizing bug, matching the task Notes' own hypothesis.
+
+Screenshots taken during verification (not carried anywhere, described
+here only): book hero with an in-progress read (progress bar + Details/
+History sections, no Details card chrome); book hero for a `Finished`
+book (`finished {date}`, no bar); book hero with all three external ids
+linked (Links panel in the right column, above Recommended By); book hero
+with a personal rating set (`HeroRating` shows the rated icon + name,
+`rating-dropdown` opens with all six options + "Clear rating").
+
+Verified: `npm run build` succeeds; `npm run test:client` — 17 files, 116
+tests, all passing (unchanged — `State.test.fs`/`Progress.test.fs`/
+`Format.test.fs` are pure-logic tests untouched by this view-only
+restructure).
+
+Not touched, out of scope per the task's own "All changes are in
+`Views.fs`" framing: `Types.fs`, `State.fs`, Shared, server, and
+`tests/e2e/book-detail-progress.spec.ts` (see `BACKLOG_ITEMS` — that spec
+now needs an extra click to open the hero `ActionMenu` before it can find
+"Update progress", since the button moved out of the dissolved Reading
+Progress card).
