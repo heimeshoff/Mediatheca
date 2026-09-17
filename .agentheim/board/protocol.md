@@ -5,6 +5,33 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 01:10 -- Modeling / Captured: books-xyqyb - Manual finish stamps today's local date and the hero's finished-date line is click-to-edit — `Set_book_status Finished` sends `Some localToday` instead of `None` (no more UTC-midnight drift), and the `finished {date}` line opens an `EditableDateInput` whose commit re-dates the finish via `setBookStatus slug Finished (Some picked)`
+
+**Type:** Modeling / Capture
+**BC:** books
+**Filed to:** todo
+**Summary:** Manual Finished sends today's local date instead of None (the projection defaulted to the event's UTC append date, so a late-evening finish was dated yesterday), and the hero's 'finished {date}' line becomes click-to-edit via the existing EditableDateInput, committing setBookStatus slug Finished (Some picked) under ADR-0077 §4 re-dating; the edge rejects future dates. Independent of the prior work; depends on the styleguide gate (done). Filed to todo.
+
+---
+
+## 2026-09-18 01:10 -- Modeling / Captured: integration-dtdbb - Audible priors carry the last-listened day — import and nightly sync fetch `last_position_heard` (`GET /1.0/content/{asin}/metadata`) only for books with no Audible progress row yet, date the prior (and so the finished date) to Audible's `last_updated`, use `position_ms` for the position, and "Import library" repairs the import-day observations written before priors existed
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** Wires the 2026-09-18 research finding into import and sync: GET /1.0/content/{asin}/metadata?response_groups=last_position_heard gives last_updated and position_ms, fetched only for books with no Audible progress row, so the prior (and thus finished_at for an already-finished audiobook) is dated to Audible's last-listened day, falling back to today on any failure. 'Import library' also repairs the pre-prior import-day observations already in the live log (remove, re-observe, idempotent). One real call settles the unverified bearer-only auth. Filed to todo; depends on books-d4wtc.
+
+---
+
+## 2026-09-18 01:10 -- Modeling / Captured: books-d4wtc - Prior reading progress — a source's first-ever position report for a book is a `Prior_reading_progress_recorded` event (never InFocus-promoting, finishing with its own date), projected as `kind = 'prior'` so the History list, the Hours Listened stat and any future Reading day never mistake an import's starting position for a listening session
+
+**Type:** Modeling / Capture
+**BC:** books
+**Filed to:** todo
+**Summary:** Builder ask: the first Audible import stamps every title with a same-day observation at its full position, reading like a marathon listening session and setting finished_at to the import day. New event Prior_reading_progress_recorded (name follows Games' Prior_play_time_recorded; 'baseline' is taken in the Books UL): a non-Manual source's first-ever report per book seeds the per-source baseline, never promotes to InFocus, finishes with its own ObservedOn, projects as book_progress.kind = 'prior' and is excluded from Hours Listened and any Reading day. ADR-0082 written (amends 0076 §2, 0077 §5). Filed to todo; blocks integration-dtdbb.
+
+---
+
 ## 2026-09-18 00:47 -- Research: Audible finished / last-listened timestamps
 
 **Type:** Research
