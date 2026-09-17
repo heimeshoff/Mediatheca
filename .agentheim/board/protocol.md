@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 15:40 -- Modeling / Refined: games-fffvm - Re-sanitize existing game descriptions (resumable throttled backfill through games-r1tx4's sanitizer)
+
+**Type:** Modeling / Refine
+**BC:** games
+**Status after:** todo
+**Summary:** Code-grounded the task against the shipped games-r1tx4 diff. Corrected the candidate query (RAWG id comes from game_detail, the cache's rawg_id is a stale one-time seed; legacy RAWG-only games have no cache row, so LEFT JOIN + upserting stamp), pinned the stamping rule (stamp only where sanitizer output is written; short_description/website_url-only refreshes never stamp; upsertGameIdentityCard stays stamp-free), enumerated the seven sanitized write sites, added getRawgConfig to the job signature with a blank-key skip path, dropped the 'stamp rows with neither id' idea (WHERE clause excludes them), confirmed the Jobs tab Run-now comes from the registry with no bespoke trigger, and rewrote the acceptance criteria to match (one [human-eye] post-deploy check). Dependency games-r1tx4 is in done/, so the promote gate is satisfied. Orchestrator not consulted — no open domain question.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-09-17 15:33 -- Work session ended
 
 **Type:** Work / Session end
