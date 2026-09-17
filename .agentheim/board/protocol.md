@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 16:59 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 33m (batch started 16:26, integrated 16:56, main gates green 16:58)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** games-fffvm: 1
+**Commits:** 3 (1 batch-start, 1 integration, 1 session-end)
+**Vision-conformance:** none — batch aligns with vision (vision.md carries no "What success looks like" / "Non-goals" sections; judged against the Design Principles: games-fffvm keeps third-party descriptions in the game_metadata_cache tier on their own cursor, adds no event and touches no projection, so Replayable holds and ADR-0043/ADR-0045 are honored)
+**Batch mix:** 0% product-facing / 100% harness / 0% bookkeeping (1 task) — heuristic artifact: games-fffvm is `type: chore` so classifyTask counts it as harness although every file it touched is product source/tests
+**Carry-over:** none — working tree clean (2 stranded RESULT sidecar files swept; the games-fffvm worktree torn down with its root node_modules junction unlinked first, main node_modules intact at 206 entries; the squash-merge auto-merged cleanly. On main after the batch: npm run build OK, Vitest 117/117; Expecto 938/938 was run by the verifier in the worktree at the same base main now holds — a single-task batch with no sibling, so not re-run on main where dotnet watch holds Server.dll. Session-start churn: 0 recognized machine-shape commits, 0 human commits. README delta: applied (games README 227 lines). ADR-0081 kept its provisional number. Concept candidate surfaced to the builder: resumable-cache-backfill-jobs (games) — 4 converging artifacts. Builder follow-ups: the [human-eye] check after deploy — one scheduled/Run-now pass of "Game description backfill" on the live library, then a pre-r1tx4 Steam game's detail page showing paragraphs and a RAWG-only game showing a description)
+
+---
+
 ## 2026-09-17 16:55 -- Task verified and completed: games-fffvm - Re-sanitize existing game descriptions — a resumable, throttled backfill that re-fetches every already-cached game's description (Steam-linked via the storefront, RAWG-only via RAWG details) through games-r1tx4's sanitizer, so games imported before it gain paragraphs/emphasis and RAWG-only games get the description games-v4nqe silently dropped
 
 **Type:** Work / Task completion
