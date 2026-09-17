@@ -1,7 +1,7 @@
 ---
 id: games-r1tx4
 title: Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG)
-status: todo
+status: doing
 type: chore
 context: games
 created: 2026-09-17

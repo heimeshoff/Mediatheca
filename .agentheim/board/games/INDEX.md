@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 1
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 11
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **games-r1tx4** — Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG) (chore) — `todo/games-r1tx4-apply-the-audible-description-sanitizer-richtext-renderer-pa.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **games-r1tx4** — Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG) (chore) — `doing/games-r1tx4-apply-the-audible-description-sanitizer-richtext-renderer-pa.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

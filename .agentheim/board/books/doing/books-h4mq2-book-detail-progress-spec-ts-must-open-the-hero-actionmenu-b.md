@@ -1,7 +1,7 @@
 ---
 id: books-h4mq2
 title: book-detail-progress.spec.ts must open the hero ActionMenu before clicking "Update progress"
-status: todo
+status: doing
 type: bug
 context: books
 created: 2026-09-17

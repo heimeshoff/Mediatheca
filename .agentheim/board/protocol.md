@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-17 14:40 -- Batch started: [books-h4mq2, games-r1tx4]
+
+**Type:** Work / Batch start
+**Tasks:** books-h4mq2 - book-detail-progress.spec.ts must open the hero ActionMenu before clicking "Update progress", games-r1tx4 - Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG)
+**Parallel:** yes (2 workers — books-h4mq2 and games-r1tx4 are the whole ready set across 2 contexts; no source-file overlap between them, so merge order is free)
+
+---
+
 ## 2026-09-17 14:35 -- Modeling / Promoted: games-r1tx4 - Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG)
 
 **Type:** Modeling / Promote
