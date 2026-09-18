@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 03:56 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 3h11m (first batch started 00:45, last integration 03:53, main gates green 03:56)
+**Completed:** 6 (first-try PASS: 4, re-dispatched: 2, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** integration-sfmxg: 1, books-xyqyb: 1, books-xntts: 1, books-d4wtc: 2, integration-dtdbb: 3, integration-dvbjp: 1
+**Commits:** 11 (4 batch-start, 6 integration, 1 session-end)
+**Vision-conformance:** none — batch aligns with vision (vision.md carries no "What success looks like" / "Non-goals" sections; judged against Out of Scope and the Design Principles: integration-sfmxg is the Goodreads removal the Out of Scope list itself records; books-d4wtc / integration-dtdbb / integration-dvbjp keep every reading-progress prior and finish date in events and every third-party position in the Audible call path, so Replayable holds; books-xntts changes only the add-time request and the cache-tier description; books-xyqyb dates an event the user already emits)
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (6 tasks)
+**Carry-over:** none — working tree clean (9 stranded RESULT sidecar files swept; all six task worktrees torn down with their root node_modules junctions unlinked first, main node_modules intact at 210 entries; the detached suite-check worktree used for Expecto on main torn down the same way. Every squash-merge auto-merged cleanly, including the three parallel books tasks that all touched Shared.fs / Api.fs / BookDetail Views. On main after the last integration: npm run build OK, Vitest 120/120, Expecto 968/968 (run in the suite-check worktree because the builder's dotnet watch server holds Server.dll; the server survived, pid changed on each rebuild). Session-start churn: 0 recognized machine-shape commits, 0 human commits. A concurrent modeling session ran alongside: it wrote ADR-0082 and promoted books-d4wtc, books-xyqyb, integration-dtdbb, integration-dvbjp mid-run, all picked up by the Phase 2 re-scan; integration-sfmxg's provisional ADR-0082 was renumbered to ADR-0083 by finalizeAdrNumbering. Verification: books-d4wtc iteration 1 failed (NULL-unsafe progress_kind filter on migrated DBs — fixed with COALESCE + Init-time backfill), integration-dtdbb iteration 1 failed (legacy repair left an already-Finished book's finished_at on the import day — fixed with an explicit Change_status) and iteration 2 failed (no counting-stub test for the nightly sync never calling the metadata endpoint — test added); every other task passed first try. README deltas: 12 ops across integration / books / journal all applied; one conductor correction (integration-dtdbb's iteration-3 block named a non-existent section, corrected to Ubiquitous language before applying). Conductor edits for integration-sfmxg: ADR-0078 superseded_by, ADR-0075 amended_by + note, knowledge/index.md books line, books README Actors / Downstream-of / open-question bullet. Builder follow-ups, all [human-eye]: the book detail hero finished-date picker (books-xyqyb); a prior row rendering muted as "starting position" (books-d4wtc); the Settings → Audible card after deploy — the single remaining "Import library" click runs integration-dtdbb's legacy repair, settles whether the metadata endpoint accepts bearer-only auth, and stamps audible_library_imported_at so the button disappears (integration-dtdbb / integration-dvbjp); an Open Library refresh on an affected book repairing its Markdown description (books-xntts))
+
+---
+
 ## 2026-09-18 03:52 -- Task verified and completed: integration-dvbjp - The nightly Audible sync creates a Book for every unmatched library ASIN (same create path as the import, then an ordinary observation) and "Import library" becomes a true one-time bootstrap — stamped `audible_library_imported_at` on its first populated run, refused by the API and hidden by the Settings card afterwards
 
 **Type:** Work / Task completion
