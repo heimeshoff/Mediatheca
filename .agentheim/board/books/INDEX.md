@@ -11,13 +11,14 @@ Catalog of this bounded context's tasks by status.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 11
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **books-wk67x** — Reading history appends, never overwrites — a prior is set once and no later listening data replaces it, and any change in position or percent adds a NEW history entry even on the same day from the same source (reverses ADR-0076 §2's same-day collapse). (feature) — `todo/books-wk67x-history-entries-append-never-overwrite-prior-immutable.md`
 <!-- todo-list:end -->
 
 ### Doing

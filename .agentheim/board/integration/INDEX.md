@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 30
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **integration-fn3yx** — Audible sync decides on listened minutes and calculates the percent — position comes from `last_position_heard`, not the library listing's unreliable `percent_complete`; fixes the decoder that reads that endpoint at the wrong nesting level (reverses ADR-0082's "the sync never fetches last-listened"). (feature) — `todo/integration-fn3yx-audible-sync-decides-on-minutes-percent-calculated.md`
 <!-- todo-list:end -->
 
 ### Doing

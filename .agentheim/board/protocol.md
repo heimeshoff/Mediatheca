@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 10:39 -- Modeling / Captured: integration-fn3yx - Audible sync decides on listened minutes and calculates the percent — position comes from `last_position_heard`, not the library listing's unreliable `percent_complete`; fixes the decoder that reads that endpoint at the wrong nesting level (reverses ADR-0082's "the sync never fetches last-listened").
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** The Audible sync stops trusting the library listing's percent_complete (seen resetting to 0.0 at playback start) and instead fetches last_position_heard per title, decides on minutes and calculates the percent. Includes the decoder fix for the content_metadata nesting that made every import prior fall back to today's date.
+
+---
+
+## 2026-09-18 10:39 -- Modeling / Captured: books-wk67x - Reading history appends, never overwrites — a prior is set once and no later listening data replaces it, and any change in position or percent adds a NEW history entry even on the same day from the same source (reverses ADR-0076 §2's same-day collapse).
+
+**Type:** Modeling / Capture
+**BC:** books
+**Filed to:** todo
+**Summary:** Builder ruling after the 2026-09-18 Audible incident: reading history becomes append-only. A prior is never overwritten, and any change in position or percent adds a new entry even on the same day from the same source, reversing ADR-0076 section 2's same-day collapse.
+
+---
+
 ## 2026-09-18 10:21 -- Modeling / Captured: games-kfpqp - Deck-compat job — re-check already recorded verdicts once they pass an age limit (Unknown 30 days, Playable/Unsupported 90, Verified 180), capped per night, so Valve's verdict changes reach existing games
 
 **Type:** Modeling / Capture
