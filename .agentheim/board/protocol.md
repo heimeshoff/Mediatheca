@@ -5,6 +5,31 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 12:04 -- Task verified and completed: books-wk67x - Reading history appends, never overwrites — a prior is set once and no later listening data replaces it, and any change in position or percent adds a NEW history entry even on the same day from the same source (reverses ADR-0076 §2's same-day collapse).
+
+**Type:** Work / Task completion
+**Task:** books-wk67x - Reading history appends, never overwrites — a prior is set once and no later listening data replaces it, and any change in position or percent adds a NEW history entry even on the same day from the same source (reverses ADR-0076 §2's same-day collapse).
+**Summary:** Reading-progress history is append-only: a prior or observation is never overwritten by later listening data, even same day and same source; entries are identified by the recording event's store position, the no-op rule compares percent AND position, removal names one entry by id (the old day+source removal replays unchanged), and book_progress migrates to one row per entry (ADR-0085).
+**Duration:** 1h17m
+**Verification:** PASS (iteration 2)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 16
+**Tests added:** 14
+**ADRs written:** 0085
+
+---
+
+## 2026-09-18 11:46 -- Verification failed: books-wk67x - Reading history appends, never overwrites (append-only entries keyed by event position, prior immutable, no-op on percent AND position)
+
+**Type:** Work / Verification failure
+**Task:** books-wk67x - Reading history appends, never overwrites (append-only entries keyed by event position, prior immutable, no-op on percent AND position)
+**Iteration:** 1 of 3
+**Reasons:** the client-test acceptance criterion is half covered — removal-by-id dispatch is pinned, but no test covers the History list keeping two same-day same-source rows or its new newest-first `(ObservedOn, EntryId)` sort, which sits private in `Views.fs` (house pattern: a DTO-only seam like `BookDetail/Progress.fs`); plus a stale `getReadingStats` doc comment naming the dropped primary key. Runner green: build OK, Expecto 977/977, Vitest 122/122
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-09-18 11:11 -- Task verified and completed: games-wkyf0 - Deck-compat job — stop re-fetching permanently failing games every night by recording failed attempts and retrying them on a growing delay
 
 **Type:** Work / Task completion

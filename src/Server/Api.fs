@@ -110,6 +110,62 @@ module Api =
                         Projection.runProjection conn handler
                     Ok ()
 
+    /// books-wk67x (amending ADR-0076 §2): every Books command goes through
+    /// this Books-specific executor now, never the generic
+    /// `executeCommandCore` above — `Books.reconstitute` needs each
+    /// history-producing event's real store position (its
+    /// `StoredEvent.GlobalPosition`) to seed `ActiveBook.Observations`
+    /// with the SAME entry ids the projection/DTO expose, so a removal
+    /// issued against an id the client got from `ReadingProgressDto`
+    /// resolves to the right entry. `executeCommandCore`'s `'Event` type
+    /// parameter is bound uniformly across load AND decide/append, so it
+    /// cannot express "loading needs a position tag, deciding doesn't"
+    /// without leaking that plumbing into `Books.decide` itself — a
+    /// dedicated executor keeps `Books.fs` free of it instead.
+    ///
+    /// integration-jjvg2: reports the events actually appended (not just
+    /// `Result<unit, string>`) because the import needs to know whether an
+    /// `Observe_reading_progress` call was a legitimate no-op (ADR-0076
+    /// §2) — same shape as `AudibleSync.fs`'s own local copy, which
+    /// carries an identical position-aware load for the same reason.
+    let private executeBookCommandWithEvents
+        (conn: SqliteConnection)
+        (slug: string)
+        (command: Books.BookCommand)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        : Result<Books.BookEvent list, string> =
+        let streamId = Books.streamId slug
+        let storedEvents = EventStore.readStream conn streamId
+        let events =
+            storedEvents
+            |> List.choose (fun se -> Books.Serialization.fromStoredEvent se |> Option.map (fun e -> se.GlobalPosition, e))
+        let state = Books.reconstitute events
+        let currentPosition = EventStore.getStreamPosition conn streamId
+        match Books.decide state command with
+        | Error e -> Error e
+        | Ok [] -> Ok []
+        | Ok newEvents ->
+            let eventDataList = newEvents |> List.map Books.Serialization.toEventData
+            match EventStore.appendToStream conn streamId currentPosition eventDataList with
+            | EventStore.ConcurrencyConflict _ -> Error "Concurrency conflict"
+            | EventStore.Success _ ->
+                for handler in projectionHandlers do
+                    Projection.runProjection conn handler
+                Ok newEvents
+
+    /// Thin `Result<unit, _>` wrapper for the many Books command handlers
+    /// below that don't need the appended-events list `IMediathecaApi`'s
+    /// existing `Result<unit, string>`-shaped members expect (every Books
+    /// command except the Audible sync/import paths, which call
+    /// `executeBookCommandWithEvents` directly).
+    let private executeBookCommand
+        (conn: SqliteConnection)
+        (slug: string)
+        (command: Books.BookCommand)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        : Result<unit, string> =
+        executeBookCommandWithEvents conn slug command projectionHandlers |> Result.map ignore
+
     /// curation-h4k2p: clears a removed media item's Notes document and
     /// deletes its uploaded `content/` images — the ADR-0080 successor to
     /// the deleted `GameJournal.deleteForGame`, now shared across all four
@@ -1613,7 +1669,6 @@ module Api =
                     return Ok (AddBookOutcome.Duplicate_found (existingSlug, existingTitle))
                 | None ->
                     let slug = locker.Run(fun () -> generateUniqueSlug conn Books.streamId baseSlug)
-                    let sid = Books.streamId slug
 
                     let! coverRef =
                         match coverDownloader with
@@ -1645,14 +1700,7 @@ module Api =
 
                     let result =
                         locker.Run(fun () ->
-                            executeCommandCore
-                                conn sid
-                                Books.Serialization.fromStoredEvent
-                                Books.reconstitute
-                                Books.decide
-                                Books.Serialization.toEventData
-                                (Books.Add_book_to_library bookData)
-                                projectionHandlers)
+                            executeBookCommand conn slug (Books.Add_book_to_library bookData) projectionHandlers)
 
                     match result with
                     | Error e -> return Error e
@@ -2006,35 +2054,6 @@ module Api =
                 return Error $"Failed to add book from Audible: {ex.Message}"
         }
 
-    /// integration-jjvg2: `executeCommandCore` only reports `Result<unit,
-    /// string>`, but the import needs to know whether the
-    /// `Observe_reading_progress` command it issues actually appended an
-    /// event (a same-percent-per-source observation is a legitimate no-op,
-    /// ADR-0076 §2, and must not inflate `ProgressObserved`). Same shape as
-    /// `AudibleSync.fs`'s own local copy.
-    let private executeBookCommandWithEvents
-        (conn: SqliteConnection)
-        (slug: string)
-        (command: Books.BookCommand)
-        (projectionHandlers: Projection.ProjectionHandler list)
-        : Result<Books.BookEvent list, string> =
-        let streamId = Books.streamId slug
-        let storedEvents = EventStore.readStream conn streamId
-        let events = storedEvents |> List.choose Books.Serialization.fromStoredEvent
-        let state = Books.reconstitute events
-        let currentPosition = EventStore.getStreamPosition conn streamId
-        match Books.decide state command with
-        | Error e -> Error e
-        | Ok [] -> Ok []
-        | Ok newEvents ->
-            let eventDataList = newEvents |> List.map Books.Serialization.toEventData
-            match EventStore.appendToStream conn streamId currentPosition eventDataList with
-            | EventStore.ConcurrencyConflict _ -> Error "Concurrency conflict"
-            | EventStore.Success _ ->
-                for handler in projectionHandlers do
-                    Projection.runProjection conn handler
-                Ok newEvents
-
     /// integration-dvbjp: renders the UTC ISO `audible_library_imported_at`
     /// setting as a plain calendar date for the "already imported" refusal
     /// message -- falls back to the raw stored string on anything
@@ -2134,8 +2153,8 @@ module Api =
                             // the book carries a `prior` row and this finds
                             // nothing on the next run.
                             match BookProjection.legacyObservationToRepair conn slug ProgressSource.Audible with
-                            | Some observedOn ->
-                                match executeBookCommandWithEvents conn slug (Books.Remove_reading_progress_observation (observedOn, ProgressSource.Audible)) projectionHandlers with
+                            | Some (entryId, _observedOn) ->
+                                match executeBookCommandWithEvents conn slug (Books.Remove_reading_progress_entry entryId) projectionHandlers with
                                 | Ok events when not (List.isEmpty events) -> repaired <- repaired + 1
                                 | Ok _ -> ()
                                 | Error e -> errors <- errors @ [ sprintf "%s (%s): repair failed: %s" item.Title item.Asin e ]
@@ -4234,16 +4253,7 @@ module Api =
 
             removeBook = fun slug -> async {
                 use conn = factory ()
-                let sid = Books.streamId slug
-                let result =
-                    executeCommand
-                        conn sid
-                        Books.Serialization.fromStoredEvent
-                        Books.reconstitute
-                        Books.decide
-                        Books.Serialization.toEventData
-                        Books.Remove_book_from_library
-                        projectionHandlers
+                let result = executeBookCommand conn slug Books.Remove_book_from_library projectionHandlers
                 match result with
                 | Ok () ->
                     // Remove catalog entries referencing this book
@@ -4279,44 +4289,17 @@ module Api =
                     return Error "effectiveOn cannot be in the future"
                 else
                     use conn = factory ()
-                    let sid = Books.streamId slug
-                    return
-                        executeCommand
-                            conn sid
-                            Books.Serialization.fromStoredEvent
-                            Books.reconstitute
-                            Books.decide
-                            Books.Serialization.toEventData
-                            (Books.Change_status (status, effectiveOn))
-                            projectionHandlers
+                    return executeBookCommand conn slug (Books.Change_status (status, effectiveOn)) projectionHandlers
             }
 
             setBookFormat = fun slug format -> async {
                 use conn = factory ()
-                let sid = Books.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        Books.Serialization.fromStoredEvent
-                        Books.reconstitute
-                        Books.decide
-                        Books.Serialization.toEventData
-                        (Books.Set_format format)
-                        projectionHandlers
+                return executeBookCommand conn slug (Books.Set_format format) projectionHandlers
             }
 
             setBookPersonalRating = fun slug rating -> async {
                 use conn = factory ()
-                let sid = Books.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        Books.Serialization.fromStoredEvent
-                        Books.reconstitute
-                        Books.decide
-                        Books.Serialization.toEventData
-                        (Books.Set_personal_rating rating)
-                        projectionHandlers
+                return executeBookCommand conn slug (Books.Set_personal_rating rating) projectionHandlers
             }
 
             // Manual source, today's date unless given; percent is computed
@@ -4348,72 +4331,27 @@ module Api =
                         ObservedOn = observedOn
                         Finished = false
                     }
-                    let sid = Books.streamId request.Slug
-                    return
-                        executeCommand
-                            conn sid
-                            Books.Serialization.fromStoredEvent
-                            Books.reconstitute
-                            Books.decide
-                            Books.Serialization.toEventData
-                            (Books.Observe_reading_progress data)
-                            projectionHandlers
+                    return executeBookCommand conn request.Slug (Books.Observe_reading_progress data) projectionHandlers
             }
 
-            removeBookProgressObservation = fun slug observedOn source -> async {
+            removeBookProgressEntry = fun slug entryId -> async {
                 use conn = factory ()
-                let sid = Books.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        Books.Serialization.fromStoredEvent
-                        Books.reconstitute
-                        Books.decide
-                        Books.Serialization.toEventData
-                        (Books.Remove_reading_progress_observation (observedOn, source))
-                        projectionHandlers
+                return executeBookCommand conn slug (Books.Remove_reading_progress_entry entryId) projectionHandlers
             }
 
             linkBookExternalId = fun slug externalId -> async {
                 use conn = factory ()
-                let sid = Books.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        Books.Serialization.fromStoredEvent
-                        Books.reconstitute
-                        Books.decide
-                        Books.Serialization.toEventData
-                        (Books.Link_external_id externalId)
-                        projectionHandlers
+                return executeBookCommand conn slug (Books.Link_external_id externalId) projectionHandlers
             }
 
             recommendBookBy = fun slug friendSlug -> async {
                 use conn = factory ()
-                let sid = Books.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        Books.Serialization.fromStoredEvent
-                        Books.reconstitute
-                        Books.decide
-                        Books.Serialization.toEventData
-                        (Books.Recommend_by friendSlug)
-                        projectionHandlers
+                return executeBookCommand conn slug (Books.Recommend_by friendSlug) projectionHandlers
             }
 
             removeBookRecommendation = fun slug friendSlug -> async {
                 use conn = factory ()
-                let sid = Books.streamId slug
-                return
-                    executeCommand
-                        conn sid
-                        Books.Serialization.fromStoredEvent
-                        Books.reconstitute
-                        Books.decide
-                        Books.Serialization.toEventData
-                        (Books.Remove_recommendation friendSlug)
-                        projectionHandlers
+                return executeBookCommand conn slug (Books.Remove_recommendation friendSlug) projectionHandlers
             }
 
             getCatalogsForBook = fun slug -> async {

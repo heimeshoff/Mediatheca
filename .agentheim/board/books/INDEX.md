@@ -12,8 +12,8 @@ Catalog of this bounded context's tasks by status.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 11
+- **Doing:** 0
+- **Done:** 12
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,11 +22,11 @@ Catalog of this bounded context's tasks by status.
 
 ### Doing
 <!-- doing-list:start -->
-- **books-wk67x** — Reading history appends, never overwrites — a prior is set once and no later listening data replaces it, and any change in position or percent adds a NEW history entry even on the same day from the same source (reverses ADR-0076 §2's same-day collapse). (feature) — `doing/books-wk67x-history-entries-append-never-overwrite-prior-immutable.md`
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **books-wk67x** — Reading history appends, never overwrites — a prior is set once and no later listening data replaces it, and any change in position or percent adds a NEW history entry even on the same day from the same source (reverses ADR-0076 §2's same-day collapse). (feature) — `done/books-wk67x-history-entries-append-never-overwrite-prior-immutable.md`
 - **books-d4wtc** — Prior reading progress — the bulk import's `Record_prior_reading_progress` command yields a `Prior_reading_progress_recorded` event for a book its source has not reported on before (never InFocus-promoting, finishing with its own date; the nightly sync and Manual keep producing ordinary observations), projected as `kind = 'prior'` so the History list, the Hours Listened stat and any future Reading day never mistake an import's starting position for a listening session (feature) — `done/books-d4wtc-prior-reading-progress-event.md`
 - **books-xntts** — Open Library import takes the work's canonical English edition (`cover_edition_key`, language-filtered fallback) instead of the first of hundreds of unordered `edition_key`s, and converts the work's Markdown description into the sanitized HTML subset at import and refresh — no more Spanish titles/covers on an English work, no more literal `[link](url)` lists (bug) — `done/books-xntts-open-library-import-canonical-edition-and-markdown-description.md`
 - **books-xyqyb** — Manual finish stamps today's local date and the hero's finished-date line is click-to-edit — `Set_book_status Finished` sends `Some localToday` instead of `None` (no more UTC-midnight drift), and the `finished {date}` line opens an `EditableDateInput` whose commit re-dates the finish via `setBookStatus slug Finished (Some picked)` (feature) — `done/books-xyqyb-finished-date-local-today-and-editable.md`

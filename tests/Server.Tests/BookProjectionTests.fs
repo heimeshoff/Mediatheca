@@ -81,7 +81,11 @@ let bookProjectionTests =
                 Expect.isEmpty detail.ProgressHistory "No observations yet"
             | None -> failtest "Expected the book to be found"
 
-        testCase "Two same-day same-source observations leave one row with the later percent" <| fun _ ->
+        // books-wk67x (amending ADR-0076 §2): same-day same-source
+        // observations no longer collapse — each is its own append-only
+        // row, and the denormalized percent follows whichever was
+        // recorded LAST (append order), not a source-priority tie-break.
+        testCase "Two same-day same-source observations leave two rows; the denormalized percent follows the one recorded last" <| fun _ ->
             use conn = createConnection ()
             let slug = "project-hail-mary-2021"
             appendBookEvent conn slug (Books.Book_added_to_library sampleBookData)
@@ -89,14 +93,15 @@ let bookProjectionTests =
             appendBookEvent conn slug (Books.Reading_progress_observed (observation 35 Audible "2026-01-01"))
 
             let history = BookProjection.getProgressHistory conn slug
-            Expect.equal (List.length history) 1 "Same-day same-source observations should collapse to one row"
-            Expect.equal history.[0].Percent 35 "The later percent should win"
+            Expect.equal (List.length history) 2 "Same-day same-source observations should both be kept as history entries"
+            Expect.equal (history |> List.map (fun r -> r.Percent)) [ 20; 35 ] "Both percents survive, oldest first"
+            Expect.isFalse (history.[0].EntryId = history.[1].EntryId) "the two entries have distinct ids"
 
             match BookProjection.getBySlug conn slug with
-            | Some detail -> Expect.equal detail.ProgressPercent 35 "book_detail's denormalized percent should reflect the collapsed row"
+            | Some detail -> Expect.equal detail.ProgressPercent 35 "book_detail's denormalized percent should follow the entry recorded last"
             | None -> failtest "Expected the book to be found"
 
-        testCase "Same-day observations from two sources leave two rows; Manual wins the tie" <| fun _ ->
+        testCase "Same-day observations from two sources leave two rows; the one recorded last wins the denormalized percent" <| fun _ ->
             use conn = createConnection ()
             let slug = "project-hail-mary-2021"
             appendBookEvent conn slug (Books.Book_added_to_library sampleBookData)
@@ -104,12 +109,15 @@ let bookProjectionTests =
             appendBookEvent conn slug (Books.Reading_progress_observed (observation 50 ProgressSource.Manual "2026-01-01"))
 
             let history = BookProjection.getProgressHistory conn slug
-            Expect.equal (List.length history) 2 "Two distinct (day, source) rows should exist"
+            Expect.equal (List.length history) 2 "Two distinct rows should exist"
 
             match BookProjection.getBySlug conn slug with
             | Some detail ->
-                Expect.equal detail.ProgressPercent 50 "Manual should win the same-day tie"
-                Expect.equal detail.ProgressSource (Some ProgressSource.Manual) "Manual should be the winning source"
+                // books-wk67x: the old Manual > Audible tie-break is gone —
+                // Manual wins here only because it was appended SECOND
+                // (later entry_id), not because of its source.
+                Expect.equal detail.ProgressPercent 50 "The entry recorded last should win"
+                Expect.equal detail.ProgressSource (Some ProgressSource.Manual) "Manual, recorded last, should be the winning source"
             | None -> failtest "Expected the book to be found"
 
         testCase "finished_at is a date string, set from effectiveOn, and cleared on leaving Finished" <| fun _ ->
@@ -191,6 +199,31 @@ let bookProjectionTests =
                 |> Db.querySingle (fun rd -> rd.ReadString "progress_kind")
             Expect.equal latestKind (Some "prior") "book_list.progress_kind should fall back to the remaining prior row"
 
+        // books-wk67x (amending ADR-0076 §2): the exact incident this task
+        // exists to fix — a same-day, same-source observation must never
+        // overwrite a prior.
+        testCase "A prior plus a same-day same-source observation leaves two rows; the prior keeps its own percent/position/date and book_detail follows the later entry" <| fun _ ->
+            use conn = createConnection ()
+            let slug = "project-hail-mary-2021"
+            let priorData : Books.ReadingProgressObservedData =
+                { Percent = 14; Position = Some (Minutes (75, Some 539)); Source = Audible; ObservedOn = "2026-09-18"; Finished = false }
+            appendBookEvent conn slug (Books.Book_added_to_library sampleBookData)
+            appendBookEvent conn slug (Books.Prior_reading_progress_recorded priorData)
+            appendBookEvent conn slug (Books.Reading_progress_observed (observation 20 Audible "2026-09-18"))
+
+            let history = BookProjection.getProgressHistory conn slug
+            Expect.equal (List.length history) 2 "the prior and the same-day observation both survive as separate rows"
+            let prior = history |> List.find (fun r -> r.Kind = Prior)
+            let observed = history |> List.find (fun r -> r.Kind = Observed)
+            Expect.equal prior.Percent 14 "the prior's own percent is untouched"
+            Expect.equal prior.Position (Some (Minutes (75, Some 539))) "the prior's own position is untouched"
+            Expect.equal prior.ObservedOn "2026-09-18" "the prior's own date is untouched"
+            Expect.equal observed.Percent 20 "the new observation's own percent"
+
+            match BookProjection.getBySlug conn slug with
+            | Some detail -> Expect.equal detail.ProgressPercent 20 "book_detail.progress_percent should reflect the later (observation) entry, not the prior"
+            | None -> failtest "Expected the book to be found"
+
         testCase "Rebuilding from a log holding only legacy Reading_progress_observed events produces zero kind = 'prior' rows" <| fun _ ->
             use liveConn = createConnection ()
             let slug = "project-hail-mary-2021"
@@ -204,6 +237,30 @@ let bookProjectionTests =
                 |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
                 |> Option.defaultValue -1
             Expect.equal priorRowCount 0 "No upcast of historical Reading_progress_observed events into priors"
+
+        // books-wk67x, point 6: the legacy `Reading_progress_observation_removed
+        // (observedOn, source)` event keeps its ORIGINAL replay meaning —
+        // deletes every entry of that day/source that exists at that point
+        // in the stream. Before this task, at most one row could ever match
+        // (same-day/source always collapsed), so the removal always left
+        // zero rows for that book; after this task, the SAME event, replayed
+        // in a FULL REBUILD, still leaves zero rows for this exact
+        // single-observation-then-remove shape — the surviving-row count a
+        // pre-books-wk67x database would have produced.
+        testCase "A full rebuild over a stream containing a legacy Reading_progress_observation_removed event leaves the same surviving rows it produced before this task" <| fun _ ->
+            use conn = createConnection ()
+            let slug = "project-hail-mary-2021"
+            appendBookEvent conn slug (Books.Book_added_to_library sampleBookData)
+            appendBookEvent conn slug (Books.Reading_progress_observed (observation 20 Audible "2026-01-01"))
+            appendBookEvent conn slug (Books.Reading_progress_observation_removed ("2026-01-01", Audible))
+
+            Expect.isEmpty (BookProjection.getProgressHistory conn slug) "the single row is gone after a live catch-up"
+
+            Projection.rebuildProjection conn BookProjection.handler
+            Expect.isEmpty (BookProjection.getProgressHistory conn slug) "a full rebuild replays the legacy removal identically — still zero surviving rows"
+            match BookProjection.getBySlug conn slug with
+            | Some detail -> Expect.equal detail.ProgressPercent 0 "the denormalized percent clears, exactly as it did before this task"
+            | None -> failtest "Expected the book to be found"
 
         testCase "getReadingStats().HoursListenedThisYear excludes a book whose latest Audible row is kind = 'prior'" <| fun _ ->
             use conn = createConnection ()
@@ -230,6 +287,48 @@ let bookProjectionTests =
             let stats = BookProjection.getReadingStats conn
             Expect.equal stats.HoursListenedThisYear (Some 10.0)
                 "A book finished via an ordinary observation should count its full runtime"
+
+        // books-wk67x, point 8: several same-day entries must count as ONE
+        // book's runtime, not one per entry — `HoursListenedThisYear` reads
+        // `book_list`'s single denormalized `progress_percent`, so several
+        // same-day Audible rows before the finish can never inflate it.
+        testCase "getReadingStats().HoursListenedThisYear is not inflated by several same-day entries — the book counts once" <| fun _ ->
+            use conn = createConnection ()
+            let slug = "project-hail-mary-2021"
+            let today = DateTime.UtcNow.ToString("yyyy-MM-dd")
+            appendBookEvent conn slug (Books.Book_added_to_library sampleBookData)
+            appendBookEvent conn slug (Books.Reading_progress_observed (observation 40 Audible today))
+            appendBookEvent conn slug (Books.Reading_progress_observed (observation 70 Audible today))
+            appendBookEvent conn slug (Books.Reading_progress_observed (observation 100 Audible today))
+            appendBookEvent conn slug (Books.Book_status_changed (BookStatus.Finished, Some today))
+            MetadataCache.upsertBookMetadata conn slug (bookMetadataWithRuntime 600)
+
+            Expect.equal (List.length (BookProjection.getProgressHistory conn slug)) 3 "sanity: three separate same-day entries exist"
+            let stats = BookProjection.getReadingStats conn
+            Expect.equal stats.HoursListenedThisYear (Some 10.0)
+                "The book's runtime counts once, at the LATEST entry's percent (100%%), never summed across same-day entries"
+
+        // books-wk67x: `PagesReadThisYear`'s correlated subquery must name
+        // book_progress's own LATEST row per book (observed_on, then
+        // entry_id) — a plain join on (observed_on, source) would now fan
+        // out across every same-day entry a finished book carries and
+        // double-count its pages.
+        testCase "getReadingStats().PagesReadThisYear is not inflated by several same-day entries for the same finished book" <| fun _ ->
+            use conn = createConnection ()
+            let slug = "project-hail-mary-2021"
+            let today = DateTime.UtcNow.ToString("yyyy-MM-dd")
+            appendBookEvent conn slug (Books.Book_added_to_library sampleBookData)
+            let observeAtPage (page: int) =
+                Books.Reading_progress_observed { Percent = page * 100 / 248; Position = Some (Page (page, Some 248)); Source = Audible; ObservedOn = today; Finished = false }
+            appendBookEvent conn slug (observeAtPage 100)
+            appendBookEvent conn slug (observeAtPage 200)
+            appendBookEvent conn slug (observeAtPage 248)
+            appendBookEvent conn slug (Books.Book_status_changed (BookStatus.Finished, Some today))
+
+            Expect.equal (List.length (BookProjection.getProgressHistory conn slug)) 3 "sanity: three separate same-day entries exist"
+            let stats = BookProjection.getReadingStats conn
+            Expect.equal stats.PagesReadThisYear (Some 248)
+                "Pages count once, at the book's own latest entry — never summed across same-day entries"
 
         /// books-d4wtc iteration 2 (verifier fix): a real, already-populated
         /// database predates this task's `progress_kind`/`kind` columns.

@@ -244,16 +244,16 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Progress_result (Error err) ->
         { model with ProgressDraft = { model.ProgressDraft with Error = Some err } }, Cmd.none
 
-    | Confirm_remove_observation (observedOn, source) ->
-        { model with ConfirmingRemoveObservation = Some (observedOn, source) }, Cmd.none
+    | Confirm_remove_observation entryId ->
+        { model with ConfirmingRemoveObservation = Some entryId }, Cmd.none
 
     | Cancel_remove_observation ->
         { model with ConfirmingRemoveObservation = None }, Cmd.none
 
-    | Remove_observation (observedOn, source) ->
+    | Remove_observation entryId ->
         { model with ConfirmingRemoveObservation = None },
         Cmd.OfAsync.either
-            (fun () -> api.removeBookProgressObservation model.Slug observedOn source)
+            (fun () -> api.removeBookProgressEntry model.Slug entryId)
             ()
             Observation_removed
             (fun ex -> Observation_removed (Error ex.Message))

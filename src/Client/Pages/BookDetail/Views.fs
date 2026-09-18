@@ -6,6 +6,7 @@ open Feliz.Router
 open Mediatheca.Shared
 open Mediatheca.Client.Pages.BookDetail.Types
 open Mediatheca.Client.Pages.BookDetail.Format
+open Mediatheca.Client.Pages.BookDetail.History
 open Mediatheca.Client
 open Mediatheca.Client.Components
 
@@ -284,13 +285,12 @@ let private positionLabel (position: ReadingPosition option) =
     | None -> ""
 
 let private progressHistoryRow (model: Model) (dispatch: Msg -> unit) (row: ReadingProgressDto) =
-    let key = row.ObservedOn, row.Source
-    // ADR-0082 §5: a `Prior` row is where the reader already was, not a
-    // session read that day — rendered muted, with "starting position" in
-    // place of the source badge, in place of the observation styling.
+    // books-wk67x (amending ADR-0076 §2): rows are keyed by entry id now —
+    // several same-day, same-source rows can coexist, so the old
+    // (observedOn, source) natural key can no longer tell them apart.
     let isPrior = row.Kind = Prior
     Html.div [
-        prop.key ($"{row.ObservedOn}-{sourceLabel row.Source}")
+        prop.key (string row.EntryId)
         prop.className (
             "flex items-center justify-between py-2 border-b border-base-content/5 last:border-0 group/row"
             + (if isPrior then " opacity-50" else "")
@@ -309,13 +309,13 @@ let private progressHistoryRow (model: Model) (dispatch: Msg -> unit) (row: Read
                         Html.span [ prop.className "text-xs text-base-content/40 font-mono"; prop.text (positionLabel row.Position) ]
                 ]
             ]
-            if model.ConfirmingRemoveObservation = Some key then
+            if model.ConfirmingRemoveObservation = Some row.EntryId then
                 Html.div [
                     prop.className "flex items-center gap-2"
                     prop.children [
                         Html.button [
                             prop.className "text-xs text-error font-semibold cursor-pointer"
-                            prop.onClick (fun _ -> dispatch (Remove_observation (row.ObservedOn, row.Source)))
+                            prop.onClick (fun _ -> dispatch (Remove_observation row.EntryId))
                             prop.text "Remove"
                         ]
                         Html.button [
@@ -329,7 +329,7 @@ let private progressHistoryRow (model: Model) (dispatch: Msg -> unit) (row: Read
                 Html.button [
                     prop.className "opacity-0 group-hover/row:opacity-100 transition-opacity text-base-content/30 hover:text-error text-xs"
                     prop.title "Remove observation"
-                    prop.onClick (fun _ -> dispatch (Confirm_remove_observation (row.ObservedOn, row.Source)))
+                    prop.onClick (fun _ -> dispatch (Confirm_remove_observation row.EntryId))
                     prop.children [ Icons.trash () ]
                 ]
         ]
@@ -366,7 +366,7 @@ let private heroProgressLine (book: BookDetail) : ReactElement =
 /// now a plain `sectionHeader`-led section on the page background instead
 /// of a `panelCard`.
 let private historySection (book: BookDetail) (model: Model) (dispatch: Msg -> unit) : ReactElement =
-    let history = book.ProgressHistory |> List.sortByDescending (fun r -> r.ObservedOn)
+    let history = orderNewestFirst book.ProgressHistory
     if List.isEmpty history then
         Html.none
     else

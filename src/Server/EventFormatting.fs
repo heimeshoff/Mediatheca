@@ -16,6 +16,11 @@ module EventFormatting =
         | Ok v -> Some v
         | Error _ -> None
 
+    let private tryFieldInt64 (fieldName: string) (data: string) : int64 option =
+        match Decode.fromString (Decode.field fieldName Decode.int64) data with
+        | Ok v -> Some v
+        | Error _ -> None
+
     let private tryFieldFloat (fieldName: string) (data: string) : float option =
         match Decode.fromString (Decode.field fieldName Decode.float) data with
         | Ok v -> Some v
@@ -387,6 +392,9 @@ module EventFormatting =
             let observedOn = tryField "observedOn" data |> Option.defaultValue "?"
             let source = tryField "source" data |> Option.defaultValue "?"
             Some { Timestamp = ts; Label = "Reading progress observation removed"; Details = [ $"{observedOn} ({source})" ] }
+        | "Reading_progress_entry_removed" ->
+            let entryId = tryFieldInt64 "entryId" data |> Option.map string |> Option.defaultValue "?"
+            Some { Timestamp = ts; Label = "Reading progress entry removed"; Details = [ $"Entry #{entryId}" ] }
         | "Book_personal_rating_set" ->
             let rating = tryFieldOptionalInt "rating" data
             match rating with

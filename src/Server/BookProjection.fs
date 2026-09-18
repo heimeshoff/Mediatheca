@@ -13,6 +13,23 @@ open Mediatheca.Shared
 /// handler never reads or writes that cache tier.
 module BookProjection =
 
+    /// True when the LIVE `book_progress` table (if any) still carries the
+    /// pre-books-wk67x `PRIMARY KEY (book_slug, observed_on, source)` —
+    /// read straight from `sqlite_master`'s stored DDL text, the same
+    /// idiom `CatalogProjection.fs`'s `catalogEntriesNeedsWidening` uses.
+    /// `None` (table doesn't exist yet — a fresh database, or the
+    /// shadow-replay drift check's always-fresh connection) -> false: the
+    /// `CREATE TABLE IF NOT EXISTS` just above always creates the CURRENT
+    /// (entry_id-keyed) shape, so there is nothing to migrate.
+    let private oldBookProgressPrimaryKey = "PRIMARY KEY (book_slug, observed_on, source)"
+
+    let private bookProgressNeedsEntryIdMigration (conn: SqliteConnection) : bool =
+        conn
+        |> Db.newCommand "SELECT sql FROM sqlite_master WHERE type='table' AND name='book_progress'"
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "sql")
+        |> Option.map (fun sql -> sql.Contains(oldBookProgressPrimaryKey))
+        |> Option.defaultValue false
+
     let private createTables (conn: SqliteConnection) : unit =
         conn
         |> Db.newCommand """
@@ -62,14 +79,15 @@ module BookProjection =
             );
 
             CREATE TABLE IF NOT EXISTS book_progress (
-                book_slug    TEXT NOT NULL,
-                observed_on  TEXT NOT NULL,
-                source       TEXT NOT NULL,
-                percent      INTEGER NOT NULL,
+                entry_id      INTEGER PRIMARY KEY,
+                book_slug     TEXT NOT NULL,
+                observed_on   TEXT NOT NULL,
+                source        TEXT NOT NULL,
+                percent       INTEGER NOT NULL,
                 position_json TEXT,
-                kind         TEXT NOT NULL DEFAULT 'observation',
-                PRIMARY KEY (book_slug, observed_on, source)
+                kind          TEXT NOT NULL DEFAULT 'observation'
             );
+            CREATE INDEX IF NOT EXISTS idx_book_progress_book_slug ON book_progress(book_slug);
         """
         |> Db.exec
 
@@ -89,23 +107,108 @@ module BookProjection =
             conn |> Db.newCommand "ALTER TABLE book_progress ADD COLUMN kind TEXT NOT NULL DEFAULT 'observation'" |> Db.exec
         with _ -> ()
 
+        // books-wk67x (amending ADR-0076 §2): `book_progress` drops the old
+        // `(book_slug, observed_on, source)` primary key in favour of
+        // `entry_id` alone, so the same day/source can hold several
+        // append-only entries. `ALTER TABLE` cannot change a table's
+        // primary key, so a table that predates this task is migrated by
+        // rename + recreate + copy — the exact idiom
+        // `CatalogProjection.fs`'s `catalogEntriesNeedsWidening` self-heal
+        // established for curation-w9fkq's own widened-UNIQUE migration.
+        // Detected from `sqlite_master`'s stored DDL text (a table freshly
+        // created by the `CREATE TABLE IF NOT EXISTS` above, or the
+        // shadow-replay drift check's own always-fresh connection, never
+        // matches — no `events` table dependency for either of those).
+        // Each pre-existing row's `entry_id` is recovered as the real
+        // `global_position` of whichever `Reading_progress_observed` /
+        // `Prior_reading_progress_recorded` event on this book's own
+        // stream last wrote its (observed_on, source) pair — the same
+        // event a full rebuild would derive that row from — falling back
+        // to `-rowid` (negative, so it can never collide with a real,
+        // always-positive `global_position`) on the rare row with no
+        // matching event to find (e.g. a row inserted directly by a test).
+        if bookProgressNeedsEntryIdMigration conn then
+            // `MetadataCache.fs`'s own module doc comment documents the
+            // exact quirk this defends against: SQLite revalidates EVERY
+            // view in the schema during ANY `ALTER TABLE ... RENAME`, on
+            // ANY table — this connection may carry `series_next_up`/
+            // `series_episode_counts` (created by `MetadataCache.initialize`,
+            // which runs before every projection's `Init` in
+            // `Composition.fs`'s real boot order) with no
+            // `series_episode_cache` table behind them yet on THIS
+            // connection, which would otherwise fail the rename below with
+            // "no such table: main.series_episode_cache" — an unrelated
+            // Series view breaking an unrelated Books migration. Dropped
+            // defensively (`IF EXISTS`, harmless whether or not they exist,
+            // or whether `series_episode_cache` itself exists) and restored
+            // immediately after via `MetadataCache.initialize`'s own
+            // idempotent `CREATE VIEW IF NOT EXISTS` step — the same
+            // drop-then-let-the-owning-initializer-recreate idiom
+            // `MetadataCache.recoverStranded`'s own view-safety fix
+            // established, just called from the migration that needs it
+            // instead of from inside `MetadataCache.fs` itself.
+            conn |> Db.newCommand "DROP VIEW IF EXISTS series_next_up" |> Db.exec
+            conn |> Db.newCommand "DROP VIEW IF EXISTS series_episode_counts" |> Db.exec
+
+            conn |> Db.newCommand "ALTER TABLE book_progress RENAME TO book_progress_pre_wk67x" |> Db.exec
+            conn
+            |> Db.newCommand """
+                CREATE TABLE book_progress (
+                    entry_id      INTEGER PRIMARY KEY,
+                    book_slug     TEXT NOT NULL,
+                    observed_on   TEXT NOT NULL,
+                    source        TEXT NOT NULL,
+                    percent       INTEGER NOT NULL,
+                    position_json TEXT,
+                    kind          TEXT NOT NULL DEFAULT 'observation'
+                );
+
+                INSERT INTO book_progress (entry_id, book_slug, observed_on, source, percent, position_json, kind)
+                SELECT
+                    COALESCE(
+                        (SELECT e.global_position FROM events e
+                         WHERE e.stream_id = 'Book-' || bp.book_slug
+                           AND e.event_type IN ('Reading_progress_observed', 'Prior_reading_progress_recorded')
+                           AND json_extract(e.data, '$.observedOn') = bp.observed_on
+                           AND json_extract(e.data, '$.source') = bp.source
+                         ORDER BY e.global_position DESC
+                         LIMIT 1),
+                        -bp.rowid
+                    ),
+                    bp.book_slug, bp.observed_on, bp.source, bp.percent, bp.position_json, bp.kind
+                FROM book_progress_pre_wk67x bp;
+
+                DROP TABLE book_progress_pre_wk67x;
+
+                CREATE INDEX IF NOT EXISTS idx_book_progress_book_slug ON book_progress(book_slug);
+            """
+            |> Db.exec
+
+            // Restores the two views the drop above stranded — idempotent,
+            // and cheap even though it re-runs every one of
+            // `MetadataCache.fs`'s own migration steps (each individually
+            // a no-op once already applied).
+            MetadataCache.initialize conn
+
         // Backfill `progress_kind` on `book_list`/`book_detail` rows that
         // predate the ALTER above (books-d4wtc iteration 2, verifier fix).
         // A live NULL versus a rebuilt 'observation'/'prior' value is drift
         // (ADR-0031's shadow-replay comparison), so leaving the column NULL
         // for every pre-existing book — relying on the query-side COALESCE
         // alone — is not enough. Mirrors `recomputeProgress`'s own
-        // latest-row-per-book ordering exactly, so the backfilled value is
-        // the same one a full rebuild would produce. No-op once a row's
-        // `progress_kind` is non-NULL, so this is safe to run every boot.
+        // latest-row-per-book ordering exactly (observed_on, then entry_id
+        // — books-wk67x replaces the old Manual/Audible tie-break with
+        // append order, since either source's entries can now repeat
+        // same-day), so the backfilled value is the same one a full
+        // rebuild would produce. No-op once a row's `progress_kind` is
+        // non-NULL, so this is safe to run every boot.
         conn
         |> Db.newCommand """
             UPDATE book_list
             SET progress_kind = (
                 SELECT kind FROM book_progress
                 WHERE book_progress.book_slug = book_list.slug
-                ORDER BY observed_on DESC,
-                    CASE source WHEN 'Manual' THEN 0 WHEN 'Audible' THEN 1 ELSE 2 END
+                ORDER BY observed_on DESC, entry_id DESC
                 LIMIT 1
             )
             WHERE progress_kind IS NULL
@@ -117,8 +220,7 @@ module BookProjection =
             SET progress_kind = (
                 SELECT kind FROM book_progress
                 WHERE book_progress.book_slug = book_detail.slug
-                ORDER BY observed_on DESC,
-                    CASE source WHEN 'Manual' THEN 0 WHEN 'Audible' THEN 1 ELSE 2 END
+                ORDER BY observed_on DESC, entry_id DESC
                 LIMIT 1
             )
             WHERE progress_kind IS NULL
@@ -239,18 +341,20 @@ module BookProjection =
         |> Db.exec
 
     /// Recomputes `book_list`/`book_detail`'s denormalized `progress_*`
-    /// columns from `book_progress`'s latest row by `observed_on` (ties:
-    /// Manual > Audible, ADR-0076 §2's precedence with its now-removed third
-    /// rung) — or clears them when no observation rows remain (e.g. the last
-    /// one was removed).
+    /// columns from `book_progress`'s latest row — ordered by `observed_on`,
+    /// then `entry_id` (append order) within a day (books-wk67x, amending
+    /// ADR-0076 §2: same-day entries no longer collapse, and either
+    /// source's entry can now repeat same-day, so the old Manual > Audible
+    /// tie-break no longer identifies "the latest" — the entry recorded
+    /// LAST wins, whichever source it came from) — or clears them when no
+    /// observation rows remain (e.g. the last one was removed).
     let private recomputeProgress (conn: SqliteConnection) (slug: string) : unit =
         let latest =
             conn
             |> Db.newCommand """
                 SELECT source, percent, observed_on, kind FROM book_progress
                 WHERE book_slug = @slug
-                ORDER BY observed_on DESC,
-                    CASE source WHEN 'Manual' THEN 0 WHEN 'Audible' THEN 1 ELSE 2 END
+                ORDER BY observed_on DESC, entry_id DESC
                 LIMIT 1
             """
             |> Db.setParams [ "slug", SqlType.String slug ]
@@ -386,17 +490,19 @@ module BookProjection =
                          |> Db.setParams [ "slug", SqlType.String slug; "status", SqlType.String statusStr; "finished_at", finishedAt ] |> Db.exec
 
                 | Books.Reading_progress_observed data ->
+                    // books-wk67x (amending ADR-0076 §2): a plain insert,
+                    // one row per event — same-day/same-source no longer
+                    // collapses. `entry_id` is this event's own store
+                    // position, exactly the id `Books.evolve` assigns this
+                    // same entry when the aggregate reconstitutes.
                     let positionJson = data.Position |> Option.map (encodeReadingPosition >> Encode.toString 0)
                     conn
                     |> Db.newCommand """
-                        INSERT INTO book_progress (book_slug, observed_on, source, percent, position_json, kind)
-                        VALUES (@slug, @observed_on, @source, @percent, @position_json, 'observation')
-                        ON CONFLICT(book_slug, observed_on, source) DO UPDATE SET
-                            percent = excluded.percent,
-                            position_json = excluded.position_json,
-                            kind = excluded.kind
+                        INSERT INTO book_progress (entry_id, book_slug, observed_on, source, percent, position_json, kind)
+                        VALUES (@entry_id, @slug, @observed_on, @source, @percent, @position_json, 'observation')
                     """
                     |> Db.setParams [
+                        "entry_id", SqlType.Int64 event.GlobalPosition
                         "slug", SqlType.String slug
                         "observed_on", SqlType.String data.ObservedOn
                         "source", SqlType.String (encodeProgressSource data.Source)
@@ -413,14 +519,11 @@ module BookProjection =
                     let positionJson = data.Position |> Option.map (encodeReadingPosition >> Encode.toString 0)
                     conn
                     |> Db.newCommand """
-                        INSERT INTO book_progress (book_slug, observed_on, source, percent, position_json, kind)
-                        VALUES (@slug, @observed_on, @source, @percent, @position_json, 'prior')
-                        ON CONFLICT(book_slug, observed_on, source) DO UPDATE SET
-                            percent = excluded.percent,
-                            position_json = excluded.position_json,
-                            kind = excluded.kind
+                        INSERT INTO book_progress (entry_id, book_slug, observed_on, source, percent, position_json, kind)
+                        VALUES (@entry_id, @slug, @observed_on, @source, @percent, @position_json, 'prior')
                     """
                     |> Db.setParams [
+                        "entry_id", SqlType.Int64 event.GlobalPosition
                         "slug", SqlType.String slug
                         "observed_on", SqlType.String data.ObservedOn
                         "source", SqlType.String (encodeProgressSource data.Source)
@@ -431,6 +534,12 @@ module BookProjection =
                     recomputeProgress conn slug
 
                 | Books.Reading_progress_observation_removed (observedOn, source) ->
+                    // Legacy replay-only (books-wk67x, point 6): deletes
+                    // every entry of that day/source — there is at most one
+                    // for events recorded before this task, and this same
+                    // WHERE clause is exactly as correct for however many
+                    // exist AT THIS POINT in a replay of a stream that mixes
+                    // pre- and post-task events.
                     conn
                     |> Db.newCommand "DELETE FROM book_progress WHERE book_slug = @slug AND observed_on = @observed_on AND source = @source"
                     |> Db.setParams [
@@ -438,6 +547,13 @@ module BookProjection =
                         "observed_on", SqlType.String observedOn
                         "source", SqlType.String (encodeProgressSource source)
                     ]
+                    |> Db.exec
+                    recomputeProgress conn slug
+
+                | Books.Reading_progress_entry_removed entryId ->
+                    conn
+                    |> Db.newCommand "DELETE FROM book_progress WHERE entry_id = @entry_id"
+                    |> Db.setParams [ "entry_id", SqlType.Int64 entryId ]
                     |> Db.exec
                     recomputeProgress conn slug
 
@@ -508,14 +624,18 @@ module BookProjection =
         """
         |> Db.query readListItemRow
 
-    /// A book's full reading-progress history, oldest first — the detail
-    /// page's progress-history list.
+    /// A book's full reading-progress history, oldest first, several rows
+    /// per day when they exist (books-wk67x, amending ADR-0076 §2) — the
+    /// detail page's progress-history list. `entry_id` is the secondary
+    /// sort key within a day, so same-day entries come back in the order
+    /// they were actually recorded.
     let getProgressHistory (conn: SqliteConnection) (slug: string) : ReadingProgressDto list =
         conn
-        |> Db.newCommand "SELECT observed_on, source, percent, position_json, kind FROM book_progress WHERE book_slug = @slug ORDER BY observed_on"
+        |> Db.newCommand "SELECT entry_id, observed_on, source, percent, position_json, kind FROM book_progress WHERE book_slug = @slug ORDER BY observed_on, entry_id"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.query (fun (rd: IDataReader) ->
-            { ReadingProgressDto.ObservedOn = rd.ReadString "observed_on"
+            { ReadingProgressDto.EntryId = rd.ReadInt64 "entry_id"
+              ObservedOn = rd.ReadString "observed_on"
               Source = parseProgressSource (rd.ReadString "source")
               Percent = rd.ReadInt32 "percent"
               Position =
@@ -602,18 +722,19 @@ module BookProjection =
 
     /// integration-dtdbb (ADR-0082 §7): a book's ONLY `book_progress` row
     /// from `source` predates priors -- exactly one row, `kind =
-    /// 'observation'`. `Some observedOn` when that legacy shape is found (so
-    /// the caller can `Remove_reading_progress_observation` it and re-record
-    /// a correctly-dated prior); `None` for a book already carrying a prior,
-    /// more than one row, or no row at all.
-    let legacyObservationToRepair (conn: SqliteConnection) (slug: string) (source: ProgressSource) : string option =
+    /// 'observation'`. `Some (entryId, observedOn)` when that legacy shape
+    /// is found (so the caller can `Remove_reading_progress_entry` it and
+    /// re-record a correctly-dated prior -- books-wk67x replaces the old
+    /// day+source removal with entry id); `None` for a book already
+    /// carrying a prior, more than one row, or no row at all.
+    let legacyObservationToRepair (conn: SqliteConnection) (slug: string) (source: ProgressSource) : (int64 * string) option =
         let rows =
             conn
-            |> Db.newCommand "SELECT observed_on, kind FROM book_progress WHERE book_slug = @slug AND source = @source"
+            |> Db.newCommand "SELECT entry_id, observed_on, kind FROM book_progress WHERE book_slug = @slug AND source = @source"
             |> Db.setParams [ "slug", SqlType.String slug; "source", SqlType.String (encodeProgressSource source) ]
-            |> Db.query (fun (rd: IDataReader) -> rd.ReadString "observed_on", rd.ReadString "kind")
+            |> Db.query (fun (rd: IDataReader) -> rd.ReadInt64 "entry_id", rd.ReadString "observed_on", rd.ReadString "kind")
         match rows with
-        | [ (observedOn, "observation") ] -> Some observedOn
+        | [ (entryId, observedOn, "observation") ] -> Some (entryId, observedOn)
         | _ -> None
 
     /// Case-insensitive title match — the `addBook` duplicate-check fallback
@@ -726,15 +847,17 @@ module BookProjection =
         |> Db.setParams [ "limit", SqlType.Int32 (RowLimit.toSql limit) ]
         |> Db.query readListItemRow
 
-    /// The Books tab's stat-tile row. `PagesReadThisYear` joins each
-    /// finished-this-year book to the exact `book_progress` row that produced
-    /// its denormalized latest observation (the `(book_slug, observed_on,
-    /// source)` primary key `book_list`'s own `progress_observed_on` /
-    /// `progress_source` were computed from, `recomputeProgress` above) and
-    /// sums any `Page` position found; `HoursListenedThisYear` sums
-    /// `runtime_minutes x percent` (in hours) over the same cohort restricted
-    /// to an Audible-sourced latest observation with a known cache-tier
-    /// runtime. Both are `None`, not `Some 0`, when nothing contributes.
+    /// The Books tab's stat-tile row. `PagesReadThisYear` names each
+    /// finished-this-year book's own LATEST `book_progress` row via a
+    /// correlated subquery ordered `(observed_on, entry_id)` — the same
+    /// ordering `recomputeProgress` above uses, since `book_progress` no
+    /// longer has a `(book_slug, observed_on, source)` primary key to join
+    /// on directly (books-wk67x/ADR-0085: several rows can now share that
+    /// triple) — and sums any `Page` position found; `HoursListenedThisYear`
+    /// sums `runtime_minutes x percent` (in hours) over the same cohort
+    /// restricted to an Audible-sourced latest observation with a known
+    /// cache-tier runtime. Both are `None`, not `Some 0`, when nothing
+    /// contributes.
     let getReadingStats (conn: SqliteConnection) : Mediatheca.Shared.DashboardBookStats =
         let count (whereClause: string) =
             conn
@@ -745,15 +868,23 @@ module BookProjection =
         let inFocus = count "status = 'InFocus'"
         let finishedThisYear = count "status = 'Finished' AND strftime('%Y', finished_at) = strftime('%Y', 'now')"
         let finishedAllTime = count "status = 'Finished'"
+        // books-wk67x (amending ADR-0076 §2): a plain JOIN on
+        // (observed_on, source) would now fan out across every same-day
+        // same-source entry a finished book happens to carry, double
+        // (or triple-) counting its pages. A correlated subquery picking
+        // book_progress's own latest row per book — the exact
+        // `recomputeProgress` ordering (observed_on, then entry_id) —
+        // names the ONE row unambiguously instead.
         let pagesReadThisYear =
             conn
             |> Db.newCommand """
-                SELECT bp.position_json
+                SELECT (
+                    SELECT bp.position_json FROM book_progress bp
+                    WHERE bp.book_slug = bl.slug
+                    ORDER BY bp.observed_on DESC, bp.entry_id DESC
+                    LIMIT 1
+                ) as position_json
                 FROM book_list bl
-                JOIN book_progress bp
-                    ON bp.book_slug = bl.slug
-                   AND bp.observed_on = bl.progress_observed_on
-                   AND bp.source = bl.progress_source
                 WHERE bl.status = 'Finished' AND strftime('%Y', bl.finished_at) = strftime('%Y', 'now')
             """
             |> Db.query (fun (rd: IDataReader) ->

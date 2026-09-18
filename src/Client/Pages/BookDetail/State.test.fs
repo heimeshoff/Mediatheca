@@ -209,5 +209,83 @@ let finishedDateTests =
             Expect.isEmpty cmd "no command — no api call"
     ]
 
+/// books-wk67x (amending ADR-0076 §2): the History list can hold several
+/// same-day, same-source rows now — `EntryId`, not `(ObservedOn, Source)`,
+/// is what a row is keyed and removed by. `sampleBook` carries two such
+/// rows (same day, same source, different EntryId) exactly as the History
+/// list would render them; the tests below prove the remove flow tracks
+/// and dispatches the RIGHT row's id, never the other one's.
+let private sampleBook (history: ReadingProgressDto list) : BookDetail =
+    { Slug = "moby-dick-1851"
+      Title = "Moby-Dick"
+      Authors = [ "Herman Melville" ]
+      Year = Some 1851
+      CoverRef = None
+      Subjects = []
+      Format = BookFormat.Audiobook
+      Status = BookStatus.InFocus
+      ProgressPercent = 40
+      ProgressSource = Some ProgressSource.Audible
+      ProgressObservedOn = Some "2026-09-18"
+      PersonalRating = None
+      FinishedAt = None
+      AddedAt = Some "2026-09-01"
+      Isbn13 = None
+      OpenLibraryWorkKey = None
+      OpenLibraryEditionKey = None
+      AudibleAsin = Some "B000JMKNQQ"
+      RecommendedBy = []
+      Description = None
+      PageCount = None
+      RuntimeMinutes = None
+      Narrators = []
+      SeriesName = None
+      SeriesPosition = None
+      Publisher = None
+      PublishedDate = None
+      AverageRating = None
+      Language = None
+      ProgressHistory = history
+      HasNotesContent = false }
+
+let private twoSameDaySameSourceRows : ReadingProgressDto list =
+    [ { EntryId = 101L; ObservedOn = "2026-09-18"; Source = ProgressSource.Audible; Percent = 20; Position = None; Kind = Observed }
+      { EntryId = 205L; ObservedOn = "2026-09-18"; Source = ProgressSource.Audible; Percent = 40; Position = None; Kind = Observed } ]
+
+let historyEntryRemovalTests =
+    testList "books-wk67x: BookDetail.State history-entry removal by id" [
+
+        testCase "Confirm_remove_observation tracks the SPECIFIC row's entry id, not the other same-day/source row's" <| fun () ->
+            let fakeApi : IMediathecaApi = Unchecked.defaultof<IMediathecaApi>
+            let model, _ = init "moby-dick-1851"
+            let loaded = { model with Book = Some (sampleBook twoSameDaySameSourceRows) }
+            let confirmed, cmd = update fakeApi (Confirm_remove_observation 205L) loaded
+            Expect.equal confirmed.ConfirmingRemoveObservation (Some 205L) "tracks the row the user actually clicked"
+            Expect.isFalse (confirmed.ConfirmingRemoveObservation = Some 101L) "never confused with the OTHER same-day/source row"
+            Expect.isEmpty cmd "confirming alone makes no api call"
+
+        testCaseAsync "Remove_observation dispatches removeBookProgressEntry with the confirmed row's own id, never the sibling row's" <| async {
+            let mutable captured : (string * int64) option = None
+            let api : IMediathecaApi =
+                createObj [
+                    "removeBookProgressEntry" ==> (fun (slug: string) (entryId: int64) ->
+                        captured <- Some (slug, entryId)
+                        async { return Ok () })
+                ] |> unbox
+            let model, _ = init "moby-dick-1851"
+            let loaded = { model with Book = Some (sampleBook twoSameDaySameSourceRows); ConfirmingRemoveObservation = Some 205L }
+            let cleared, cmd = update api (Remove_observation 205L) loaded
+            Expect.equal cleared.ConfirmingRemoveObservation None "the confirm state clears immediately"
+            let! _ = runCmd cmd
+            match captured with
+            | Some (slug, entryId) ->
+                Expect.equal slug "moby-dick-1851" "the book's own slug"
+                Expect.equal entryId 205L "removes the row the user confirmed"
+                Expect.isFalse (entryId = 101L) "never removes the OTHER same-day/source row instead"
+            | None -> failtest "expected removeBookProgressEntry to have been called"
+        }
+    ]
+
 Mocha.runTests stateTests |> ignore
 Mocha.runTests finishedDateTests |> ignore
+Mocha.runTests historyEntryRemovalTests |> ignore

@@ -840,9 +840,12 @@ let importPriorRecordingTests =
 
                 let slugF = BookProjection.findByExternalId db.Connection (AudibleAsin "F1") |> Option.get
                 let detail = BookProjection.getBySlug db.Connection slugF |> Option.get
-                Expect.equal detail.ProgressHistory (
-                    [ { ObservedOn = "2023-09-23"; Source = ProgressSource.Audible; Percent = 100; Position = Some (Minutes (14, Some 600)); Kind = ProgressKind.Prior } ]
-                ) "one prior row, dated/positioned from Audible's own metadata"
+                // books-wk67x: EntryId is the entry's real store position —
+                // not predictable here, so compare every OTHER field.
+                Expect.equal
+                    (detail.ProgressHistory |> List.map (fun r -> r.ObservedOn, r.Source, r.Percent, r.Position, r.Kind))
+                    [ "2023-09-23", ProgressSource.Audible, 100, Some (Minutes (14, Some 600)), ProgressKind.Prior ]
+                    "one prior row, dated/positioned from Audible's own metadata"
                 Expect.equal detail.Status BookStatus.Finished "is_finished lands Finished even as a prior"
                 Expect.equal detail.FinishedAt (Some "2023-09-23") "finished_at matches the metadata's own last-listened date")
 
@@ -884,18 +887,19 @@ let importPriorRecordingTests =
                 Expect.equal result.PriorsFromAudible 0 "no new prior this run"
                 Expect.equal result.PriorsToday 0 "no new prior this run"
 
-                // The seeded prior and the new observation share the same
-                // calendar day, so ADR-0076 §2's existing same-day/same-
-                // source collapse (the `book_progress` PK is (book_slug,
-                // observed_on, source)) upserts the ordinary observation
-                // over the prior's own row -- an intentional, pre-existing
-                // behaviour this task does not change, not a second row.
+                // books-wk67x (amending ADR-0076 §2): the seeded prior and
+                // the new observation share the same calendar day and
+                // source, but history is append-only now -- the prior
+                // stays exactly as recorded, and the observation is a
+                // SECOND, distinct row, never an upsert over the first.
                 let history = (BookProjection.getBySlug db.Connection slug |> Option.get).ProgressHistory
                 match history with
-                | [ row ] ->
-                    Expect.equal row.Kind ProgressKind.Observed "the plain Observe_reading_progress command's write wins the same-day collapse"
-                    Expect.equal row.Percent 40 "the latest percent"
-                | other -> failtestf "Expected exactly one (same-day-collapsed) progress row, got %A" other)
+                | [ prior; observed ] ->
+                    Expect.equal prior.Kind ProgressKind.Prior "the seeded prior is untouched"
+                    Expect.equal prior.Percent 20 "the prior's own percent survives, not overwritten"
+                    Expect.equal observed.Kind ProgressKind.Observed "the new entry is a plain observation"
+                    Expect.equal observed.Percent 40 "the new entry's own percent"
+                | other -> failtestf "Expected the prior plus one new observation row, got %A" other)
 
         testCase "a getLastPositionHeard failure (401) never surfaces as an import Error -- the book still gets a prior, dated today" <| fun _ ->
             withTempImageDir (fun imageBasePath ->
@@ -969,9 +973,12 @@ let importPriorRecordingTests =
                 Expect.equal result.AlreadyKnown 1 "the book is matched by ASIN, not re-created"
 
                 let detailAfterRepair = BookProjection.getBySlug db.Connection slug |> Option.get
-                Expect.equal detailAfterRepair.ProgressHistory (
-                    [ { ObservedOn = "2024-03-01"; Source = ProgressSource.Audible; Percent = 60; Position = Some (Minutes (360, Some 600)); Kind = ProgressKind.Prior } ]
-                ) "the legacy row is replaced by a single, correctly-dated prior"
+                // books-wk67x: EntryId is the entry's real store position —
+                // not predictable here, so compare every OTHER field.
+                Expect.equal
+                    (detailAfterRepair.ProgressHistory |> List.map (fun r -> r.ObservedOn, r.Source, r.Percent, r.Position, r.Kind))
+                    [ "2024-03-01", ProgressSource.Audible, 60, Some (Minutes (360, Some 600)), ProgressKind.Prior ]
+                    "the legacy row is replaced by a single, correctly-dated prior"
 
                 // integration-dvbjp (ADR-0082 Consequences): the one-time
                 // bootstrap gate refuses a second call outright.

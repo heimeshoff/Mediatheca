@@ -6,6 +6,7 @@ status: accepted
 date: 2026-09-18
 supersedes: []
 superseded_by: []
+amended_by: [0085]
 amends: [0076, 0077]
 related_tasks: [books-d4wtc, integration-dtdbb, books-xyqyb]
 related_research: [audible-finished-and-last-listened-timestamps-2026-09-18]

@@ -45,6 +45,7 @@
     <Compile Include="Pages\GameDetail\Views.fs" />
     <Compile Include="Pages\BookDetail\Progress.fs" />
     <Compile Include="Pages\BookDetail\Format.fs" />
+    <Compile Include="Pages\BookDetail\History.fs" />
     <Compile Include="Pages\BookDetail\Types.fs" />
     <Compile Include="Pages\BookDetail\State.fs" />
     <Compile Include="Pages\BookDetail\Views.fs" />
@@ -105,6 +106,7 @@
     <Compile Include="Pages\GameDetail\DefaultTab.test.fs" />
     <Compile Include="Pages\BookDetail\Progress.test.fs" />
     <Compile Include="Pages\BookDetail\Format.test.fs" />
+    <Compile Include="Pages\BookDetail\History.test.fs" />
     <Compile Include="Pages\BookDetail\State.test.fs" />
     <Compile Include="Pages\Settings\FamilyTokenRejected.test.fs" />
     <Compile Include="Pages\Settings\AudibleAuthFile.test.fs" />

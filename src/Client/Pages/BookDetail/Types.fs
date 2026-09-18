@@ -38,9 +38,10 @@ type Model = {
     ShowEventHistory: bool
     ShowProgressPopover: bool
     ProgressDraft: ProgressDraft
-    // Progress-history rows are keyed by their natural key (ADR-0076 §2) —
-    // there is no synthetic id to carry instead.
-    ConfirmingRemoveObservation: (string * ProgressSource) option
+    // books-wk67x (amending ADR-0076 §2): rows are keyed by entry id now —
+    // several same-day, same-source rows can coexist, so the old
+    // (observedOn, source) natural key no longer names a single one.
+    ConfirmingRemoveObservation: int64 option
     ShowFormatPicker: bool
     Error: string option
 }
@@ -76,9 +77,9 @@ type Msg =
     | Set_progress_date_text of string
     | Submit_progress
     | Progress_result of Result<unit, string>
-    | Confirm_remove_observation of observedOn: string * source: ProgressSource
+    | Confirm_remove_observation of entryId: int64
     | Cancel_remove_observation
-    | Remove_observation of observedOn: string * source: ProgressSource
+    | Remove_observation of entryId: int64
     | Observation_removed of Result<unit, string>
     | Open_friend_picker
     | Close_friend_picker

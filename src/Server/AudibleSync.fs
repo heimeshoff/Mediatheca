@@ -42,7 +42,12 @@ module AudibleSync =
         : Result<Books.BookEvent list, string> =
         let streamId = Books.streamId slug
         let storedEvents = EventStore.readStream conn streamId
-        let events = storedEvents |> List.choose Books.Serialization.fromStoredEvent
+        // books-wk67x: positioned, like `Api.fs`'s `executeBookCommandWithEvents`
+        // — each history entry's id must be its real store position so it
+        // matches what the projection/DTO expose for the same entry.
+        let events =
+            storedEvents
+            |> List.choose (fun se -> Books.Serialization.fromStoredEvent se |> Option.map (fun e -> se.GlobalPosition, e))
         let state = Books.reconstitute events
         let currentPosition = EventStore.getStreamPosition conn streamId
         match Books.decide state command with

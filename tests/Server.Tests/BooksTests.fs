@@ -17,11 +17,15 @@ let private sampleBookData: BookAddedData = {
 let private observation (percent: int) (source: ProgressSource) (observedOn: string) (finished: bool) : ReadingProgressObservedData =
     { Percent = percent; Position = None; Source = source; ObservedOn = observedOn; Finished = finished }
 
+// books-wk67x: `reconstituteEvents` (a plain `BookEvent list`, auto-numbered
+// entry ids) is the right reconstitution path for these tests — none of
+// them round-trip an entry id through a real store, only through ORDER,
+// which auto-numbering preserves exactly.
 let private givenWhenThen (given: BookEvent list) (command: BookCommand) =
-    let state = reconstitute given
+    let state = reconstituteEvents given
     decide state command
 
-let private applyEvents (events: BookEvent list) = reconstitute events
+let private applyEvents (events: BookEvent list) = reconstituteEvents events
 
 [<Tests>]
 let booksTests =
@@ -40,7 +44,7 @@ let booksTests =
                     Expect.equal book.PersonalRating None "PersonalRating should default to None"
                     Expect.equal book.FinishedOn None "FinishedOn should default to None"
                     Expect.isTrue (Set.isEmpty book.RecommendedBy) "RecommendedBy should be empty"
-                    Expect.isTrue (Map.isEmpty book.Observations) "Observations should be empty"
+                    Expect.isEmpty book.Observations "Observations should be empty"
                 | _ -> failtest "Expected Active state"
             | Error e -> failtest $"Expected success but got: {e}"
 
@@ -82,6 +86,100 @@ let booksTests =
             ]
             match givenWhenThen given (Observe_reading_progress (observation 20 Audible "2026-01-02" false)) with
             | Ok events -> Expect.isEmpty events "Same-source same-percent observation should be a no-op"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        // books-wk67x (amending ADR-0076 §2): the exact incident this task
+        // exists to fix — a same-day, same-source observation must never
+        // overwrite a prior.
+        testCase "A prior at 14%%/75min, then a same-day same-source observation at 11%%/60min, yields two entries and leaves the prior unchanged" <| fun _ ->
+            let priorData = { observation 14 Audible "2026-09-18" false with Position = Some (Minutes (75, Some 539)) }
+            let given = [
+                Book_added_to_library sampleBookData
+                Prior_reading_progress_recorded priorData
+            ]
+            let obsData = { observation 11 Audible "2026-09-18" false with Position = Some (Minutes (60, Some 539)) }
+            match givenWhenThen given (Observe_reading_progress obsData) with
+            | Ok events ->
+                Expect.equal events [ Reading_progress_observed obsData ]
+                    "the same-day observation is a new entry, not a no-op or an overwrite"
+                match applyEvents (given @ events) with
+                | Active book ->
+                    Expect.equal (List.length book.Observations) 2 "two entries should exist"
+                    let prior = book.Observations |> List.find (fun e -> e.Kind = Prior)
+                    Expect.equal prior.Percent 14 "the prior's own percent is untouched"
+                    Expect.equal prior.Position (Some (Minutes (75, Some 539))) "the prior's own position is untouched"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Two same-day observations with different minutes but the same whole percent both produce Reading_progress_observed" <| fun _ ->
+            let given = [ Book_added_to_library sampleBookData ]
+            let first = { observation 50 Audible "2026-01-01" false with Position = Some (Minutes (300, Some 600)) }
+            match givenWhenThen given (Observe_reading_progress first) with
+            | Ok firstEvents ->
+                Expect.equal firstEvents [
+                    Reading_progress_observed first
+                    Book_status_changed (BookStatus.InFocus, Some "2026-01-01")
+                ] "first observation records and promotes"
+                let afterFirst = given @ firstEvents
+                let second = { observation 50 Audible "2026-01-01" false with Position = Some (Minutes (305, Some 600)) }
+                match givenWhenThen afterFirst (Observe_reading_progress second) with
+                | Ok secondEvents ->
+                    Expect.equal secondEvents [ Reading_progress_observed second ]
+                        "different minutes at the same whole percent is a new entry, not a no-op"
+                | Error e -> failtest $"Expected success but got: {e}"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "An observation whose percent AND position both equal the source's latest entry is a no-op; an untouched daily sync appends nothing" <| fun _ ->
+            let entryData = { observation 50 Audible "2026-01-01" false with Position = Some (Minutes (300, Some 600)) }
+            let given = [
+                Book_added_to_library sampleBookData
+                Reading_progress_observed entryData
+            ]
+            let sameAgain = { entryData with ObservedOn = "2026-01-02" }
+            match givenWhenThen given (Observe_reading_progress sameAgain) with
+            | Ok events -> Expect.isEmpty events "same percent AND same position — a genuine no-op, an untouched library's daily sync"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Record_prior_reading_progress on a source that already has a prior never emits a second prior and never alters the first" <| fun _ ->
+            let priorData = observation 30 Audible "2025-01-01" false
+            let given = [
+                Book_added_to_library sampleBookData
+                Prior_reading_progress_recorded priorData
+            ]
+            let secondPriorAttempt = observation 45 Audible "2026-02-01" false
+            match givenWhenThen given (Record_prior_reading_progress secondPriorAttempt) with
+            | Ok events ->
+                Expect.equal events [
+                    Reading_progress_observed secondPriorAttempt
+                    Book_status_changed (BookStatus.InFocus, Some "2026-02-01")
+                ] "behaves exactly like Observe_reading_progress — never a second Prior_reading_progress_recorded"
+                match applyEvents (given @ events) with
+                | Active book ->
+                    let priors = book.Observations |> List.filter (fun e -> e.Kind = Prior)
+                    Expect.equal (List.length priors) 1 "still exactly one prior"
+                    Expect.equal priors.[0].Percent 30 "the original prior is untouched"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Removing one entry by id among two same-source same-day entries leaves the other, and the per-source baseline falls back to it" <| fun _ ->
+            let given = [
+                Book_added_to_library sampleBookData
+                Reading_progress_observed (observation 20 Audible "2026-01-01" false)
+                Reading_progress_observed (observation 35 Audible "2026-01-01" false)
+            ]
+            // `reconstituteEvents` numbers `given` 1-based by list position:
+            // entry 2 = 20%%, entry 3 = 35%%.
+            match givenWhenThen given (Remove_reading_progress_entry 3L) with
+            | Ok events ->
+                Expect.equal events [ Reading_progress_entry_removed 3L ] "should remove the entry named by id"
+                match applyEvents (given @ events) with
+                | Active book ->
+                    Expect.equal (List.length book.Observations) 1 "one entry remains"
+                    Expect.equal book.Observations.[0].Percent 20 "the remaining entry is the one that survived"
+                | _ -> failtest "Expected Active state"
+                match givenWhenThen (given @ events) (Observe_reading_progress (observation 20 Audible "2026-01-02" false)) with
+                | Ok noOpEvents -> Expect.isEmpty noOpEvents "the remaining entry (20%%) is now the baseline — observing it again is a no-op"
+                | Error e -> failtest $"Expected success but got: {e}"
             | Error e -> failtest $"Expected success but got: {e}"
 
         testCase "A higher observation from Backlog emits the observation and promotes to InFocus" <| fun _ ->
@@ -135,9 +233,11 @@ let booksTests =
                 Reading_progress_observed (observation 100 Audible "2026-01-01" false)
                 Book_status_changed (BookStatus.Finished, Some "2026-01-01")
             ]
-            match givenWhenThen given (Remove_reading_progress_observation ("2026-01-01", Audible)) with
+            // books-wk67x: `reconstituteEvents` numbers `given` 1-based by
+            // list position — the observation is entry 2.
+            match givenWhenThen given (Remove_reading_progress_entry 2L) with
             | Ok events ->
-                Expect.equal events [ Reading_progress_observation_removed ("2026-01-01", Audible) ] "Should remove the observation"
+                Expect.equal events [ Reading_progress_entry_removed 2L ] "Should remove the observation"
                 match applyEvents (given @ events) with
                 | Active book -> Expect.equal book.Status BookStatus.Finished "Status should stay Finished (no auto-revert)"
                 | _ -> failtest "Expected Active state"
@@ -227,9 +327,10 @@ let booksTests =
                 Book_added_to_library sampleBookData
                 Prior_reading_progress_recorded (observation 30 Audible "2025-01-01" false)
             ]
-            match givenWhenThen given (Remove_reading_progress_observation ("2025-01-01", Audible)) with
+            // books-wk67x: the prior is entry 2 (1-based list position).
+            match givenWhenThen given (Remove_reading_progress_entry 2L) with
             | Ok events ->
-                Expect.equal events [ Reading_progress_observation_removed ("2025-01-01", Audible) ] "Should remove the prior"
+                Expect.equal events [ Reading_progress_entry_removed 2L ] "Should remove the prior"
                 let afterRemoval = given @ events
                 match givenWhenThen afterRemoval (Record_prior_reading_progress (observation 10 Audible "2026-02-01" false)) with
                 | Ok priorEvents ->
@@ -323,6 +424,7 @@ let booksTests =
                 Reading_progress_observed { observation 42 ProgressSource.Manual "2026-01-02" false with Position = Some (Page (120, Some 300)) }
                 Prior_reading_progress_recorded (observation 30 Audible "2025-01-01" false)
                 Reading_progress_observation_removed ("2026-01-01", Audible)
+                Reading_progress_entry_removed 42L
                 Book_personal_rating_set (Some 4)
                 Book_personal_rating_set None
                 Book_recommended_by "marco"
@@ -345,6 +447,7 @@ let booksTests =
                 "Reading_progress_observed"
                 "Prior_reading_progress_recorded"
                 "Reading_progress_observation_removed"
+                "Reading_progress_entry_removed"
                 "Book_personal_rating_set"
                 "Book_recommended_by"
                 "Book_recommendation_removed"

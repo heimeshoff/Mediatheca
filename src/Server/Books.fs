@@ -6,8 +6,11 @@ open Mediatheca.Shared
 /// The Book aggregate (books-y9kxy) — the server core of the fourth media
 /// type. Model of record: ADR-0076 (Books model — progress observations are
 /// events; length is cache; status mirrors Games), amended by ADR-0077
-/// (status changes carry an effective-on date). Mirrors `Games.fs`'s shape
-/// (DU + decide + Serialization) exactly, per this task's own instructions.
+/// (status changes carry an effective-on date), ADR-0082 (prior reading
+/// progress; manual-finish local date) and ADR-0085 (books-wk67x — history
+/// entries append, never overwrite a prior, amending ADR-0076 §2 and
+/// ADR-0082 §7). Mirrors `Games.fs`'s shape (DU + decide + Serialization)
+/// exactly, per this task's own instructions.
 module Books =
 
     // Data records for events
@@ -56,10 +59,44 @@ module Books =
         /// rules see it, but never promotes to InFocus (only
         /// `Reading_progress_observed` does that).
         | Prior_reading_progress_recorded of ReadingProgressObservedData
+        /// Legacy — replay-only (books-wk67x, amending ADR-0076 §2). No
+        /// command emits this any more; kept solely so a historical stream
+        /// still decodes and replays with its ORIGINAL meaning: removes
+        /// every entry of that day/source that existed at that point in the
+        /// stream (there was at most one, before this task, since same-day
+        /// same-source observations used to collapse). New removals use
+        /// `Reading_progress_entry_removed` below.
         | Reading_progress_observation_removed of observedOn: string * source: ProgressSource
+        /// books-wk67x: names the ONE history entry to remove, by its entry
+        /// id (see `ObservationEntry.EntryId` below) — the mechanism that
+        /// lets a user remove one of several same-day, same-source entries
+        /// without touching its siblings.
+        | Reading_progress_entry_removed of entryId: int64
         | Book_personal_rating_set of rating: int option
         | Book_recommended_by of friendSlug: string
         | Book_recommendation_removed of friendSlug: string
+
+    /// books-wk67x (amending ADR-0076 §2): one append-only history entry —
+    /// a prior or an observation never overwrites another; a change in
+    /// percent OR position always adds a new entry, even same-day
+    /// same-source. `EntryId` identifies the entry for removal
+    /// (`Reading_progress_entry_removed`) — assigned by whoever folds the
+    /// event stream: `evolve`'s caller supplies it per event, since the
+    /// value itself (the event's own position in the store) isn't part of
+    /// the event's payload. Production command execution supplies the
+    /// event's real `StoredEvent.GlobalPosition`; `reconstituteEvents`
+    /// (tests, and any caller with no real store position) supplies a
+    /// synthetic but equally monotonic 1-based sequence instead — either
+    /// way, `EntryId` values are unique and increase in append order within
+    /// one call, which is all `decide`/`evolve` ever rely on.
+    type ObservationEntry = {
+        EntryId: int64
+        ObservedOn: string
+        Source: ProgressSource
+        Percent: int
+        Position: ReadingPosition option
+        Kind: ProgressKind
+    }
 
     // State
 
@@ -79,12 +116,13 @@ module Books =
         FinishedOn: string option
         PersonalRating: int option
         RecommendedBy: Set<string>
-        /// `(observedOn, source) -> percent` — needed for the per-source
-        /// no-op/promotion rules in `decide` (the comparison baseline is the
-        /// latest percent previously observed from that SAME source, not the
-        /// book's global current percent) and for exact
-        /// `Reading_progress_observation_removed` handling.
-        Observations: Map<string * ProgressSource, int>
+        /// Every reading-progress history entry (prior or observation) ever
+        /// recorded and not since removed, in append order (books-wk67x,
+        /// amending ADR-0076 §2 — a later entry never overwrites an
+        /// earlier one, even same day/source). The per-source no-op/
+        /// promotion rules in `decide` walk this list for the SAME source's
+        /// latest entry, not the book's global current percent.
+        Observations: ObservationEntry list
     }
 
     type BookState =
@@ -106,14 +144,25 @@ module Books =
         /// (integration-dtdbb) — the aggregate never infers a prior from
         /// state, the intent rides the command.
         | Record_prior_reading_progress of ReadingProgressObservedData
-        | Remove_reading_progress_observation of observedOn: string * source: ProgressSource
+        /// books-wk67x: replaces `Remove_reading_progress_observation`
+        /// (day+source) as the ONLY command that removes a history entry —
+        /// named by `ObservationEntry.EntryId`, so removing one of several
+        /// same-day same-source entries never touches its siblings. The
+        /// old day+source SHAPE survives only as `BookEvent`'s
+        /// `Reading_progress_observation_removed` case, for replaying
+        /// history recorded before this task.
+        | Remove_reading_progress_entry of entryId: int64
         | Set_personal_rating of rating: int option
         | Recommend_by of friendSlug: string
         | Remove_recommendation of friendSlug: string
 
     // Evolve
 
-    let evolve (state: BookState) (event: BookEvent) : BookState =
+    /// `entryId` is the store position of `event` — see
+    /// `ObservationEntry.EntryId`'s doc comment for who supplies it and why
+    /// it isn't part of the event's own payload. Ignored by every event
+    /// case except the two that create or reference a history entry.
+    let evolve (state: BookState) (entryId: int64, event: BookEvent) : BookState =
         match state, event with
         | Not_created, Book_added_to_library data ->
             Active {
@@ -128,7 +177,7 @@ module Books =
                 FinishedOn = None
                 PersonalRating = None
                 RecommendedBy = Set.empty
-                Observations = Map.empty
+                Observations = []
             }
         | Active _, Book_removed_from_library -> Removed
         | Active book, Book_cover_replaced coverRef ->
@@ -141,11 +190,18 @@ module Books =
             let finishedOn = if status = BookStatus.Finished then effectiveOn else None
             Active { book with Status = status; FinishedOn = finishedOn }
         | Active book, Reading_progress_observed data ->
-            Active { book with Observations = book.Observations |> Map.add (data.ObservedOn, data.Source) data.Percent }
+            let entry = { EntryId = entryId; ObservedOn = data.ObservedOn; Source = data.Source; Percent = data.Percent; Position = data.Position; Kind = Observed }
+            Active { book with Observations = book.Observations @ [ entry ] }
         | Active book, Prior_reading_progress_recorded data ->
-            Active { book with Observations = book.Observations |> Map.add (data.ObservedOn, data.Source) data.Percent }
+            let entry = { EntryId = entryId; ObservedOn = data.ObservedOn; Source = data.Source; Percent = data.Percent; Position = data.Position; Kind = Prior }
+            Active { book with Observations = book.Observations @ [ entry ] }
         | Active book, Reading_progress_observation_removed (observedOn, source) ->
-            Active { book with Observations = book.Observations |> Map.remove (observedOn, source) }
+            // Legacy replay semantics (books-wk67x, point 6): removes every
+            // entry of that day/source that exists AT THIS POINT in the
+            // stream — never an upcast, so history replays identically.
+            Active { book with Observations = book.Observations |> List.filter (fun e -> not (e.ObservedOn = observedOn && e.Source = source)) }
+        | Active book, Reading_progress_entry_removed removedEntryId ->
+            Active { book with Observations = book.Observations |> List.filter (fun e -> e.EntryId <> removedEntryId) }
         | Active book, Book_personal_rating_set rating ->
             Active { book with PersonalRating = rating }
         | Active book, Book_recommended_by friendSlug ->
@@ -154,8 +210,23 @@ module Books =
             Active { book with RecommendedBy = book.RecommendedBy |> Set.remove friendSlug }
         | _ -> state
 
-    let reconstitute (events: BookEvent list) : BookState =
+    /// The real reconstitution path: `entryId` for each event is the exact
+    /// value that identifies its history entry everywhere else (the
+    /// projection, the DTO, a removal command) — production command
+    /// execution supplies each event's true `StoredEvent.GlobalPosition`
+    /// here (see `Api.fs`'s `executeBookCommandWithEvents`).
+    let reconstitute (events: (int64 * BookEvent) list) : BookState =
         List.fold evolve Not_created events
+
+    /// Convenience for callers with no real store position to hand
+    /// `evolve` — every existing test, and any future caller that only
+    /// needs correct ORDER (never a removal-by-id round trip against a
+    /// real store) — assigning entries a synthetic 1-based sequence by
+    /// their position in `events`. Safe because `decide`/`evolve` never
+    /// depend on the actual numeric value of `EntryId`, only on it being
+    /// unique and increasing in append order.
+    let reconstituteEvents (events: BookEvent list) : BookState =
+        events |> List.mapi (fun i e -> (int64 (i + 1), e)) |> reconstitute
 
     // Decide
 
@@ -172,18 +243,17 @@ module Books =
         | AudibleAsin _ -> "audibleAsin"
 
     /// The comparison baseline for `Observe_reading_progress`'s no-op/
-    /// promotion rules (ADR-0076 §2): the latest percent previously observed
-    /// from the SAME source (0 when the source has no prior observation),
-    /// found by walking `Observations` for that source and taking the entry
-    /// with the most recent `observedOn`.
-    let private latestPercentForSource (book: ActiveBook) (source: ProgressSource) : int =
+    /// promotion rules: the SAME source's latest entry — ordered by
+    /// `ObservedOn`, then by `EntryId` (append order) within a day, so two
+    /// same-day same-source entries pick the one recorded LAST as the
+    /// baseline for the next observation (books-wk67x, amending ADR-0076
+    /// §2 — the old natural key `(observedOn, source)` no longer identifies
+    /// a single entry).
+    let private latestEntryForSource (book: ActiveBook) (source: ProgressSource) : ObservationEntry option =
         book.Observations
-        |> Map.toList
-        |> List.choose (fun ((observedOn, src), percent) -> if src = source then Some (observedOn, percent) else None)
-        |> List.sortByDescending fst
+        |> List.filter (fun e -> e.Source = source)
+        |> List.sortByDescending (fun e -> e.ObservedOn, e.EntryId)
         |> List.tryHead
-        |> Option.map snd
-        |> Option.defaultValue 0
 
     /// ADR-0077 §4: `Change_status (status, effectiveOn)` is a no-op only
     /// when the status is unchanged AND the effective date would not change.
@@ -202,11 +272,19 @@ module Books =
         elif not (isValidDate data.ObservedOn) then
             Error "ObservedOn must be a yyyy-MM-dd date"
         else
-            let baseline = latestPercentForSource book data.Source
-            if data.Percent = baseline then
-                // Per-source no-op (ADR-0076 §2): a daily sync reporting
-                // the same percent as last time from the same source
-                // appends nothing — not even the observation itself.
+            let latest = latestEntryForSource book data.Source
+            // books-wk67x (amending ADR-0076 §2): the latest entry no
+            // longer collapses same-day/source — a change in EITHER
+            // percent OR position always appends a new entry, even same
+            // day, same source. When the source has no entry yet, the
+            // baseline is the virtual `{ Percent = 0; Position = None }`
+            // entry `latestPercentForSource` used to default to, so a
+            // genuine first-ever 0%/no-position observation is still a
+            // no-op exactly as before.
+            let baselinePercent = latest |> Option.map (fun e -> e.Percent) |> Option.defaultValue 0
+            let baselinePosition = latest |> Option.bind (fun e -> e.Position)
+            let isNoOp = data.Percent = baselinePercent && data.Position = baselinePosition
+            if isNoOp then
                 Ok []
             else
                 let observedEvent = Reading_progress_observed data
@@ -214,7 +292,7 @@ module Books =
                     if data.Percent = 100 || data.Finished then
                         if book.Status = BookStatus.Finished then []
                         else [ Book_status_changed (BookStatus.Finished, Some data.ObservedOn) ]
-                    elif data.Percent > baseline then
+                    elif data.Percent > baselinePercent then
                         match book.Status with
                         | BookStatus.Backlog | BookStatus.Abandoned ->
                             [ Book_status_changed (BookStatus.InFocus, Some data.ObservedOn) ]
@@ -259,7 +337,7 @@ module Books =
             // aggregate reads that intent off the command, never infers it.
             // Once the source already has an entry, this behaves exactly
             // like Observe_reading_progress (no second prior, ever).
-            if book.Observations |> Map.exists (fun (_, src) _ -> src = data.Source) then
+            if book.Observations |> List.exists (fun e -> e.Source = data.Source) then
                 decideObserveProgress book data
             elif data.Percent < 0 || data.Percent > 100 then
                 Error "Percent must be between 0 and 100"
@@ -276,10 +354,10 @@ module Books =
                         // percent — only a raising observation does that.
                         []
                 Ok (priorEvent :: statusEvents)
-        | Active book, Remove_reading_progress_observation (observedOn, source) ->
-            match book.Observations |> Map.tryFind (observedOn, source) with
-            | None -> Error "Reading progress observation not found"
-            | Some _ -> Ok [ Reading_progress_observation_removed (observedOn, source) ]
+        | Active book, Remove_reading_progress_entry entryId ->
+            match book.Observations |> List.tryFind (fun e -> e.EntryId = entryId) with
+            | None -> Error "Reading progress entry not found"
+            | Some _ -> Ok [ Reading_progress_entry_removed entryId ]
         | Active book, Set_personal_rating rating ->
             if book.PersonalRating = rating then Ok [] else Ok [ Book_personal_rating_set rating ]
         | Active book, Recommend_by friendSlug ->
@@ -438,6 +516,8 @@ module Books =
                     "observedOn", Encode.string observedOn
                     "source", Encode.string (encodeProgressSource source)
                 ])
+            | Reading_progress_entry_removed entryId ->
+                "Reading_progress_entry_removed", Encode.toString 0 (Encode.object [ "entryId", Encode.int64 entryId ])
             | Book_personal_rating_set rating ->
                 "Book_personal_rating_set", Encode.toString 0 (Encode.object [ "rating", Encode.option Encode.int rating ])
             | Book_recommended_by friendSlug ->
@@ -489,6 +569,10 @@ module Books =
                 )) data
                 |> Result.toOption
                 |> Option.map Reading_progress_observation_removed
+            | "Reading_progress_entry_removed" ->
+                Decode.fromString (Decode.field "entryId" Decode.int64) data
+                |> Result.toOption
+                |> Option.map Reading_progress_entry_removed
             | "Book_personal_rating_set" ->
                 Decode.fromString (Decode.object (fun get -> get.Optional.Field "rating" Decode.int)) data
                 |> Result.toOption
@@ -516,6 +600,7 @@ module Books =
             "Reading_progress_observed"
             "Prior_reading_progress_recorded"
             "Reading_progress_observation_removed"
+            "Reading_progress_entry_removed"
             "Book_personal_rating_set"
             "Book_recommended_by"
             "Book_recommendation_removed"

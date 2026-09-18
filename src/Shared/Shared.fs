@@ -883,8 +883,13 @@ type ProgressKind =
     | Prior
 
 /// One row of a book's reading-progress history (`book_progress`,
-/// ADR-0076 §2) — the detail page's progress-history list.
+/// ADR-0076 §2, amended by ADR-0085/books-wk67x) — the detail page's
+/// progress-history list. History entries are append-only now: same day
+/// and same source no longer identify a single row, so `EntryId` (the
+/// event's own store position) is what the client keys React rows on and
+/// names when removing one entry.
 type ReadingProgressDto = {
+    EntryId: int64
     ObservedOn: string
     Source: ProgressSource
     Percent: int
@@ -2064,7 +2069,10 @@ type IMediathecaApi = {
     setBookFormat: string -> BookFormat -> Async<Result<unit, string>>
     setBookPersonalRating: string -> int option -> Async<Result<unit, string>>
     setBookProgress: SetReadingProgressRequest -> Async<Result<unit, string>>
-    removeBookProgressObservation: string -> string -> ProgressSource -> Async<Result<unit, string>>
+    // books-wk67x (amending ADR-0076 §2): replaces the old day+source
+    // removal — an entry id, not a (day, source) pair, identifies one
+    // history row now that same-day/source entries no longer collapse.
+    removeBookProgressEntry: string -> int64 -> Async<Result<unit, string>>
     linkBookExternalId: string -> BookExternalId -> Async<Result<unit, string>>
     recommendBookBy: string -> string -> Async<Result<unit, string>>
     removeBookRecommendation: string -> string -> Async<Result<unit, string>>
