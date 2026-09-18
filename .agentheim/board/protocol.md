@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 12:41 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 2h02m (first batch started 10:44, last integration 12:43)
+**Completed:** 3 (first-try PASS: 1, re-dispatched: 2, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** games-wkyf0: 2, books-wk67x: 2, integration-fn3yx: 1
+**Commits:** 6 (2 batch-start, 3 integration, 1 session-end)
+**Vision-conformance:** none — batch aligns with vision (vision.md carries no "What success looks like" / "Non-goals" sections; judged against Out of Scope and the Design Principles: games-wkyf0 keeps its failure bookkeeping in the cache tier, no event and no Projected column, so Replayable holds; books-wk67x makes history append-only while the legacy day+source removal replays with its original meaning and a full rebuild yields the same rows; integration-fn3yx keeps the third-party position inside the Audible call path and events only the user's own listening observation)
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (3 tasks)
+**Carry-over:** none — working tree clean (5 stranded RESULT sidecar files swept; all three task worktrees and the detached suite-check worktree torn down with their root node_modules junctions unlinked first, main node_modules intact at 210 entries). Incident: the books-wk67x worker edited nine source files in the MAIN tree instead of its worktree for about 20 minutes; spotted via git status during the games-wkyf0 integration (whose scoped commit was unaffected), relocated by file copy into the worktree (all nine verified byte-identical), main restored with git checkout, safety patch kept at .agentheim/salvage/books-wk67x-stray-main-edits.patch; the integration-fn3yx spawn prompt carried an explicit worktree-path rule and a background watch on main, and stayed clean. Session-start churn: 0 recognized machine-shape commits, 0 human commits. Verification: games-wkyf0 iteration 1 failed on check 6 only (no ADR for the backoff cursor diverging from ADR-0059's retry semantics — ADR-0084 added, no code change); books-wk67x iteration 1 failed on a half-covered client-test criterion (the History list's newest-first sort sat private in Views.fs — extracted to BookDetail/History.fs with tests) plus a stale doc comment; integration-fn3yx passed first try. ADR numbering: books-wk67x's provisional 0084 collided with the games ADR integrated first; re-minted as 0085 in iteration 2, and the conductor patched the two code comments still citing ADR-0084 (Books.fs, Shared.fs) at integration. Conductor edits: amended_by backlinks on ADR-0059, ADR-0076 and ADR-0082; the integration README's legacy-repair clause corrected to Remove_reading_progress_entry. Every squash-merge was clean. Gates on merged main after games + books: npm run build OK, Expecto 981/981 (suite-check worktree, the builder's dev server untouched), Vitest 125/125; integration-fn3yx's verifier ran build + Expecto 991/991 in a worktree byte-equal to the final main. Behaviour change for the builder to know: under ADR-0086 a never-started, unfinished Audible title (status DoesNotExist) now gets NO history entry at all, from the sync and from a fresh import alike, where ADR-0082 had recorded a 0 % prior. Builder follow-ups, all [human-eye]: the book detail History list with several same-day entries and per-row remove (books-wk67x); the first boot after deploy migrates book_progress in place (rename + recreate + copy) — a projection rebuild afterwards recovers any entry the old same-day collapse had hidden; the next nightly Audible sync takes about a minute longer (one metadata call per title) and should show real minute positions (integration-fn3yx); the Deck-compat job summary now reports failed fetches separately (games-wkyf0). games-kfpqp is unblocked in backlog (its dependency games-wkyf0 is done) and needs a modeling promote.
+
+---
+
 ## 2026-09-18 12:41 -- Task verified and completed: integration-fn3yx - Audible sync decides on listened minutes and calculates the percent — position comes from `last_position_heard`, not the library listing's unreliable `percent_complete`; fixes the decoder that reads that endpoint at the wrong nesting level (reverses ADR-0082's "the sync never fetches last-listened").
 
 **Type:** Work / Task completion
