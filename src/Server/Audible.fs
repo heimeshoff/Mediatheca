@@ -540,11 +540,14 @@ module Audible =
 
     /// `GET /1.0/content/{asin}/metadata?response_groups=last_position_heard`
     /// (research 2026-09-18) -- the only confirmed source of a "last
-    /// listened" day. Both fields land `None` when the wire reports
-    /// `status = "DoesNotExist"` or when the body fails to decode; only
-    /// `LastUpdatedOn`'s date part (`yyyy-MM-dd`, first 10 characters, no
-    /// timezone conversion -- the field's own zone is undocumented) and the
-    /// raw `PositionMs` are ever carried further.
+    /// listened" day AND the true listening position (integration-fn3yx,
+    /// ADR-0086: the library listing's own `percent_complete` resets to 0
+    /// the moment playback starts and is not a trustworthy position). Both
+    /// fields land `None` when the wire reports `status = "DoesNotExist"` or
+    /// when the body fails to decode; only `LastUpdatedOn`'s date part
+    /// (`yyyy-MM-dd`, first 10 characters, no timezone conversion -- the
+    /// field's own zone is undocumented) and the raw `PositionMs` are ever
+    /// carried further.
     type LastPositionHeard = {
         LastUpdatedOn: string option
         PositionMs: int64 option
@@ -567,8 +570,16 @@ module Audible =
               LastUpdated = get.Optional.Field "last_updated" Decode.string
               PositionMs = get.Optional.Field "position_ms" Decode.int64 })
 
+    /// integration-fn3yx: the wire nests `last_position_heard` under
+    /// `content_metadata` -- `{"content_metadata":{"last_position_heard":
+    /// {...}}}` -- NOT at the body's top level. A prior version of this
+    /// decoder read it un-nested and therefore always decoded to "nothing to
+    /// report" against the real API (every stub in
+    /// `AudibleLibrarySyncTests.fs` shared the same wrong, un-nested
+    /// assumption, which is how it shipped green). No fallback to the old
+    /// top-level shape -- it never existed on the wire.
     let private decodeLastPositionHeard : Decoder<LastPositionHeard> =
-        Decode.object (fun get -> get.Optional.Field "last_position_heard" decodeRawLastPositionHeard)
+        Decode.object (fun get -> get.Optional.At [ "content_metadata"; "last_position_heard" ] decodeRawLastPositionHeard)
         |> Decode.map (fun rawOpt ->
             match rawOpt with
             | Some raw when raw.Status = "Exists" ->

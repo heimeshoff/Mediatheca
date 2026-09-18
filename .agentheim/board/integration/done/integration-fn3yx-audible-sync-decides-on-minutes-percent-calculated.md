@@ -1,7 +1,7 @@
 ---
 id: integration-fn3yx
 title: Audible sync decides on listened minutes and calculates the percent — position comes from `last_position_heard`, not the library listing's unreliable `percent_complete`; fixes the decoder that reads that endpoint at the wrong nesting level (reverses ADR-0082's "the sync never fetches last-listened").
-status: doing
+status: done
 type: feature
 context: integration
 created: 2026-09-18
@@ -9,7 +9,7 @@ completed:
 depends_on: [books-wk67x]
 blocks: []
 tags: [audible, integration, reading-progress, sync, minutes, last-position-heard]
-related_adrs: [0082, 0076, 0074, 0066]
+related_adrs: [0082, 0076, 0074, 0066, 0085, 0086]
 related_research: [audible-finished-and-last-listened-timestamps-2026-09-18, audible-api-surface-and-listening-progress-2026-09-16]
 prior_art: [integration-dtdbb, integration-dvbjp, integration-jjvg2]
 ---
@@ -104,3 +104,55 @@ uses the wrong, un-nested shape, which is how it shipped green.
 - Timezone evidence for whoever revisits the truncation: the listen ended 10:25 local (CEST) and `last_updated` read `08:25:17`, so the field is UTC. Truncating the date part therefore misdates listening between 00:00 and 02:00 local by one day. Left out of scope here on purpose; ADR-0082 §4 called the zone undocumented, and this is the first hard data point.
 - Capture defaults chosen without the builder in the loop, open to a veto before `work` runs: fetch for every library item rather than only unfinished ones (point 2); skip-and-report on a failed metadata call (point 5); floored percent, keeping ADR-0076's "99.6 never rounds to 100" guard (point 4).
 - The dev database is disposable — no repair of the 2026-09-18 0 % observation is wanted.
+
+## Outcome
+
+Fixed a real decoder bug and changed the Audible progress sync's percent source, per the builder's
+2026-09-18 ruling: minutes decide, percent is calculated.
+
+**The decoder bug.** `Audible.decodeLastPositionHeard` read `last_position_heard` at the body's top
+level; the real wire nests it under `content_metadata` (`{"content_metadata":{"last_position_heard":
+{...}}}`). The decoder now reads `content_metadata.last_position_heard` via
+`get.Optional.At [ "content_metadata"; "last_position_heard" ]` (the `Steam.fs` `.At` idiom already
+used elsewhere), with no fallback to the wrong shape. This is why the 2026-09-18 import reported "0
+priors from Audible, 84 priors dated today" — every prior silently fell back to today-dating because
+the field was never actually found against the real API, even though every existing test stub
+happened to share the same wrong assumption and passed anyway.
+
+**Minutes decide, percent is calculated (ADR-0086, amending ADR-0082 §2/Consequences and ADR-0076
+§1).** `AudibleSync.runProgressSync` now calls `Audible.getLastPositionHeard` for EVERY library item
+(reversing integration-dtdbb's "the sync never fetches a last-listened date"), reusing the same
+access token `Audible.withAccessToken` already minted for the `/1.0/library` fetch, through the
+existing 700ms `Audible.throttleMetadataCall` gate. `AudibleSync.observationFor` — the one pure
+decision both the sync and `Api.importAudibleLibraryImpl` funnel through — now calculates the
+percent from the true position (`floor (minutes / runtimeMinutes × 100)`, clamped 0-100) whenever
+both a real `position_ms` and the item's `RuntimeMinutes` are known, never from the library listing's
+`percent_complete` (which resets to 0 the instant playback starts — the exact defect behind the
+2026-09-18 incident this ADR reproduces and fixes as a test). `AudibleSync.percentOf` (the old
+floor-the-listing's-percent helper) is now only a fallback for two degraded cases: `RuntimeMinutes`
+unknown, or the caller never fetched metadata at all (Api.fs's own already-tracked-book
+re-observation branch). A `status = "DoesNotExist"` metadata response never falls back to the
+listing's percent either — no observation at all unless the item's own `IsFinished` flag is set, in
+which case `Percent = 100, Position = None`. A failed metadata HTTP call for one sync item is skipped
+and reported in the run's `Errors`, never falling back to the listing's percent for that item; the
+other items in the run are unaffected. The sync still never records a prior — only "Import library"
+does.
+
+**Tests.** Rewrote `tests/Server.Tests/AudibleLibrarySyncTests.fs`'s metadata stubs to the real
+nested wire shape throughout, replaced the counting-stub test that pinned "the nightly sync never
+calls the metadata endpoint" with one pinning "exactly one call per library item", and added the
+full acceptance-criteria set of sync-level tests: the incident reproduction itself (0.0 listing
+percent + a real `position_ms` for a 539-minute title → `Percent = 11, Position = Minutes (60, Some
+539)`), a position-only change (60→62 minutes, percent unchanged at 11%) still writing a second
+event, a genuine no-op (position AND percent both unchanged), a failed metadata call skipping one
+item while others observe normally, `DoesNotExist` with/without `is_finished`, and the
+`RuntimeMinutes`-unknown fallback. Also rewrote `AudibleSync.observationFor`'s own pure-function unit
+tests and `tests/Server.Tests/AudibleTests.fs`'s `getLastPositionHeard` decode tests for the nested
+shape (plus a test proving the OLD un-nested shape now correctly decodes to nothing). 10 net new
+tests; full suite: 991 Expecto tests green, `npm run build` (Fable compile) green.
+
+Key files: `src/Server/Audible.fs` (`decodeLastPositionHeard`, `getLastPositionHeard`), `src/Server/AudibleSync.fs`
+(`percentOf`, `calculatePercent`, `observationFor`, `runProgressSync`),
+`tests/Server.Tests/AudibleLibrarySyncTests.fs`, `tests/Server.Tests/AudibleTests.fs`. `src/Server/Api.fs`
+was read but not modified — `importAudibleLibraryImpl` needed no code change, only the benefit of the
+shared `observationFor`'s new rules.

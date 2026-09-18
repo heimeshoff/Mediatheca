@@ -5,6 +5,21 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 12:41 -- Task verified and completed: integration-fn3yx - Audible sync decides on listened minutes and calculates the percent — position comes from `last_position_heard`, not the library listing's unreliable `percent_complete`; fixes the decoder that reads that endpoint at the wrong nesting level (reverses ADR-0082's "the sync never fetches last-listened").
+
+**Type:** Work / Task completion
+**Task:** integration-fn3yx - Audible sync decides on listened minutes and calculates the percent — position comes from `last_position_heard`, not the library listing's unreliable `percent_complete`; fixes the decoder that reads that endpoint at the wrong nesting level (reverses ADR-0082's "the sync never fetches last-listened").
+**Summary:** The Audible sync decides on listened minutes and calculates the percent from last_position_heard's true position_ms, fetched for every library item through the metadata throttle, instead of trusting the library listing's percent_complete; the last-position decoder now reads the real content_metadata nesting it always missed (ADR-0086).
+**Duration:** 33m
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**README delta:** conductor correction after applying — integration README §Ubiquitous language "Audible" bullet: the legacy-repair clause named `Remove_reading_progress_observation`, stale since books-wk67x (ADR-0085) moved the repair to `Remove_reading_progress_entry`; corrected in place (the worker's replace op itself disposed `applied`)
+**Files changed:** 4
+**Tests added:** 10
+**ADRs written:** 0086
+
+---
+
 ## 2026-09-18 12:05 -- Batch started: [integration-fn3yx]
 
 **Type:** Work / Batch start

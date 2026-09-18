@@ -6,7 +6,7 @@ status: accepted
 date: 2026-09-16
 supersedes: []
 superseded_by: []
-amended_by: [0082, 0085]
+amended_by: [0082, 0085, 0086]
 amends: []
 related_tasks: [books-y9kxy, books-f33e2, integration-jjvg2, integration-y2ak4]
 related_research: [audible-api-surface-and-listening-progress-2026-09-16, goodreads-reading-progress-and-book-metadata-sources-2026-09-16]

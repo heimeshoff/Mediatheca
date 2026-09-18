@@ -1,17 +1,22 @@
 module Mediatheca.Tests.AudibleLibrarySyncTests
 
 /// integration-jjvg2 (ADR-0074/ADR-0076/ADR-0026), reversed for the nightly
-/// sync's create path by integration-dvbjp (ADR-0082): "Import Audible
-/// library" (`Api.importAudibleLibrary`) is now a ONE-TIME bootstrap --
-/// creates a Book per library title (matched by ASIN), records a PRIOR for
-/// any book with no Audible row yet, stamps `audible_library_imported_at`
-/// after a populated run, and refuses a second run once stamped. The
-/// "Audible progress sync" scheduled job (`AudibleSync.runProgressSync`) now
-/// ALSO creates a book for an unmatched ASIN (via the `createBook` function
+/// sync's create path by integration-dvbjp (ADR-0082); minutes-based percent
+/// added by integration-fn3yx (ADR-0086): "Import Audible library"
+/// (`Api.importAudibleLibrary`) is now a ONE-TIME bootstrap -- creates a
+/// Book per library title (matched by ASIN), records a PRIOR for any book
+/// with no Audible row yet, stamps `audible_library_imported_at` after a
+/// populated run, and refuses a second run once stamped. The "Audible
+/// progress sync" scheduled job (`AudibleSync.runProgressSync`) now ALSO
+/// creates a book for an unmatched ASIN (via the `createBook` function
 /// parameter, `Api.createBookFromAudibleItem` in real wiring), then observes
-/// it exactly like a matched book -- an ordinary observation, NEVER a prior,
-/// NEVER a `getLastPositionHeard` call. `Audible.getLibrary` pages until a
-/// short page; a rejected auth file ends the job run `error` (never
+/// it exactly like a matched book -- an ordinary observation, NEVER a prior.
+/// integration-fn3yx: the sync now calls `Audible.getLastPositionHeard` for
+/// EVERY item (matched, or one it just created) -- the library listing's own
+/// `percent_complete` is no longer trusted as a position; the true
+/// `position_ms` decides, and the percent is calculated from it whenever
+/// both it and the item's own runtime are known. `Audible.getLibrary` pages
+/// until a short page; a rejected auth file ends the job run `error` (never
 /// `Skipped`), while no auth file at all IS `Skipped`. No live Audible call
 /// -- every request goes through a stub `HttpMessageHandler`.
 
@@ -82,6 +87,27 @@ let private libraryItemJson (asin: string) (title: string) (percentComplete: flo
 let private libraryResponseJson (items: string list) : string =
     sprintf "{\"items\": [%s]}" (String.concat ", " items)
 
+/// integration-fn3yx (ADR-0086): the real wire shape --
+/// `content_metadata.last_position_heard`, NOT a top-level field (the bug
+/// this task fixes). `lastUpdated = None` omits the field entirely, matching
+/// a genuine `status = "DoesNotExist"` payload that carries no date either.
+let private lastPositionHeardJson (status: string) (lastUpdated: string option) (positionMs: int64 option) : string =
+    let fields =
+        [ Some (sprintf "\"status\": \"%s\"" status)
+          lastUpdated |> Option.map (fun d -> sprintf "\"last_updated\": \"%s\"" d)
+          positionMs |> Option.map (fun p -> sprintf "\"position_ms\": %d" p) ]
+        |> List.choose id
+    sprintf "{\"content_metadata\": {\"last_position_heard\": {%s}}}" (String.concat ", " fields)
+
+/// A successful `Exists` metadata response naming an exact position in
+/// minutes -- the test's own arithmetic stays in minutes, not raw
+/// milliseconds (`minutes * 60000L` is exact int division's own inverse).
+let private existsAt (lastUpdated: string) (minutes: int) : HttpStatusCode * string =
+    HttpStatusCode.OK, lastPositionHeardJson "Exists" (Some lastUpdated) (Some (int64 minutes * 60000L))
+
+let private doesNotExist : HttpStatusCode * string =
+    HttpStatusCode.OK, lastPositionHeardJson "DoesNotExist" None None
+
 let private authFile : Audible.AudibleAuthFile =
     { RefreshToken = "refresh-token"
       AdpToken = "adp"
@@ -124,12 +150,13 @@ let private httpClientForLibrary (pagesByNumber: Map<int, string>) : HttpClient 
             })
     new HttpClient(handler), (fun () -> requestedUrls |> List.ofSeq)
 
-/// integration-dtdbb (ADR-0082): like `httpClientForLibrary`, but also
-/// dispatches `/1.0/content/{asin}/metadata` (the last-position-heard
+/// integration-dtdbb (ADR-0082), used by both the import and (since
+/// integration-fn3yx) the nightly sync: like `httpClientForLibrary`, but
+/// also dispatches `/1.0/content/{asin}/metadata` (the last-position-heard
 /// endpoint) per `metadataResponses` (`asin -> status, body`); an ASIN with
-/// no entry there gets a plain `status: "DoesNotExist"` 200. Every metadata
-/// URL hit is recorded (by ASIN) for the "exactly once" / "never called"
-/// assertions.
+/// no entry there gets a plain, correctly-nested `status: "DoesNotExist"`
+/// 200 (`doesNotExist`). Every metadata URL hit is recorded (by ASIN) for
+/// the "exactly once" / "never called" assertions.
 let private httpClientForImportWithMetadata (libraryFixture: string) (metadataResponses: Map<string, HttpStatusCode * string>) : HttpClient * (unit -> string list) =
     let metadataCalls = Collections.Generic.List<string>()
     let handler =
@@ -146,7 +173,7 @@ let private httpClientForImportWithMetadata (libraryFixture: string) (metadataRe
                     metadataCalls.Add(asin)
                     match metadataResponses.TryFind asin with
                     | Some (status, body) -> return jsonResponse status body
-                    | None -> return jsonResponse HttpStatusCode.OK """{"last_position_heard": {"status": "DoesNotExist"}}"""
+                    | None -> return jsonResponse (fst doesNotExist) (snd doesNotExist)
                 elif url.Contains("api.audnex.us") then
                     return new HttpResponseMessage(HttpStatusCode.NotFound)
                 else
@@ -224,14 +251,25 @@ let private httpClientThatMustNotBeCalled () : HttpClient =
 let importAudibleLibraryTests =
     testList "Api.importAudibleLibrary (integration-jjvg2)" [
 
-        testCase "a 3-item fixture (0%, 42%, finished) creates 3 books, each recording a PRIOR (integration-dtdbb, ADR-0082); a second import call is refused outright by the one-time bootstrap gate (integration-dvbjp)" <| fun _ ->
+        testCase "a 3-item fixture (0%, 42%, finished) creates 3 books, each recording a PRIOR with a calculated percent (integration-dtdbb, ADR-0082; minutes-based percent, integration-fn3yx, ADR-0086); a second import call is refused outright by the one-time bootstrap gate (integration-dvbjp)" <| fun _ ->
             withTempImageDir (fun imageBasePath ->
                 use db = TestDb.withTempDbFactory bootstrap
+                // The listing's own percent_complete is irrelevant now
+                // whenever the metadata endpoint reports a real position
+                // (ADR-0086) -- A1/B1 still carry it for realism, but their
+                // recorded percent comes from `existsAt`'s minutes, not this
+                // field. C1 (finished, no percent) is left unstubbed --
+                // DoesNotExist + is_finished lands Percent=100 (ADR-0086).
                 let itemZero = libraryItemJson "A1" "Book A" (Some 0.0) false (Some 600)
                 let itemMid = libraryItemJson "B1" "Book B" (Some 42.0) false (Some 600)
                 let itemFinished = libraryItemJson "C1" "Book C" None true (Some 600)
                 let fixture = libraryResponseJson [ itemZero; itemMid; itemFinished ]
-                let httpClient, _ = httpClientForLibrary (Map.ofList [ 1, fixture ])
+                let metadataResponses =
+                    Map.ofList [
+                        "A1", existsAt "2026-01-01" 0     // 0 / 600 = 0%
+                        "B1", existsAt "2026-01-02" 252    // 252 / 600 = 42%
+                    ]
+                let httpClient, _ = httpClientForImportWithMetadata fixture metadataResponses
                 let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
 
                 let result =
@@ -303,11 +341,20 @@ let importAudibleLibraryTests =
                 | Some msg -> Expect.stringContains msg "a prior run" "an inconclusive empty response must NOT clear a standing notice"
                 | None -> failtest "Expected the pre-set audible_last_error to survive an empty library response")
 
-        testCase "the import path stamps a fresh book's PRIOR's ObservedOn as the local calendar date when the metadata call yields no last-listened date" <| fun _ ->
+        testCase "the import path stamps a fresh book's PRIOR's ObservedOn as the local calendar date when the metadata call yields no last-listened date (DoesNotExist + is_finished, ADR-0086)" <| fun _ ->
             withTempImageDir (fun imageBasePath ->
                 use db = TestDb.withTempDbFactory bootstrap
-                let fixture = libraryResponseJson [ libraryItemJson "D1" "Book D" (Some 30.0) false (Some 400) ]
-                let httpClient, _ = httpClientForLibrary (Map.ofList [ 1, fixture ])
+                // integration-fn3yx (ADR-0086): a plain, not-finished
+                // DoesNotExist item records NO prior at all any more (the
+                // listing's own percent_complete is never trusted as a
+                // fallback -- see the dedicated observationFor test below).
+                // The only way a DoesNotExist item still records something
+                // is the source's own explicit is_finished flag, which is
+                // what this test exercises -- and it is exactly the "no
+                // last-listened date" case this test's title describes,
+                // since a DoesNotExist body carries no last_updated either.
+                let fixture = libraryResponseJson [ libraryItemJson "D1" "Book D" None true (Some 400) ]
+                let httpClient, _ = httpClientForImportWithMetadata fixture Map.empty
                 let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
 
                 api.importAudibleLibrary () |> Async.RunSynchronously |> ignore
@@ -322,8 +369,11 @@ let importAudibleLibraryTests =
                         | Books.Prior_reading_progress_recorded data -> Some data
                         | _ -> None)
                 match observation with
-                | Some data -> Expect.equal data.ObservedOn (DateTime.Now.ToString("yyyy-MM-dd")) "the import stamps the local calendar date, matching AudibleSync.runProgressSync"
-                | None -> failtest "Expected a Reading_progress_observed event")
+                | Some data ->
+                    Expect.equal data.ObservedOn (DateTime.Now.ToString("yyyy-MM-dd")) "the import stamps the local calendar date, matching AudibleSync.runProgressSync"
+                    Expect.equal data.Percent 100 "DoesNotExist + is_finished lands Percent = 100 (ADR-0086), never guessed from the listing"
+                    Expect.isNone data.Position "DoesNotExist carries no position"
+                | None -> failtest "Expected a Prior_reading_progress_recorded event")
 
         testCase "a library item lacking publisher_summary falls back to a sanitized Audnexus description in book_metadata_cache (books-nvnyk)" <| fun _ ->
             withTempImageDir (fun imageBasePath ->
@@ -430,11 +480,15 @@ let audibleOneTimeImportGateTests =
 let audibleProgressSyncJobTests =
     testList "AudibleSync.runProgressSync -- the scheduled job (integration-jjvg2)" [
 
-        testCase "an unmatched ASIN is created by the nightly sync itself and observed like any other item -- never a prior, never a getLastPositionHeard call (ADR-0082/integration-dvbjp reverses integration-jjvg2's 'this job never creates a book' rule)" <| fun _ ->
+        testCase "an unmatched ASIN is created by the nightly sync itself and observed with a calculated percent -- never a prior, but the metadata endpoint IS now called (integration-fn3yx/ADR-0086 reverses integration-dtdbb's 'the sync never calls getLastPositionHeard'; ADR-0082/integration-dvbjp reverses integration-jjvg2's 'this job never creates a book' rule)" <| fun _ ->
             withTempImageDir (fun imageBasePath ->
                 use db = TestDb.withTempDbFactory bootstrap
+                let today = DateTime.Now.ToString("yyyy-MM-dd")
                 let fixture = libraryResponseJson [ libraryItemJson "NEW1" "New Purchase" (Some 20.0) false (Some 400) ]
-                let httpClient, metadataCalls = httpClientForImportWithMetadata fixture Map.empty
+                // 80 / 400 = 20%; the listing's own percent_complete (also
+                // 20%) is irrelevant now -- this is the CALCULATED value.
+                let metadataResponses = Map.ofList [ "NEW1", existsAt today 80 ]
+                let httpClient, metadataCalls = httpClientForImportWithMetadata fixture metadataResponses
                 let jobLock = new SemaphoreSlim(1, 1)
 
                 let result =
@@ -447,7 +501,7 @@ let audibleProgressSyncJobTests =
                     Expect.equal r.Observed 1 "the newly-created book's first percent is observed"
                 | Error e -> failtestf "Expected Ok, got Error %s" e
 
-                Expect.isEmpty (metadataCalls ()) "the job never calls getLastPositionHeard, even for a book it just created"
+                Expect.equal (metadataCalls ()) [ "NEW1" ] "the job now calls getLastPositionHeard once, even for a book it just created"
 
                 let slug = BookProjection.findByExternalId db.Connection (AudibleAsin "NEW1") |> Option.get
                 let detail = BookProjection.getBySlug db.Connection slug |> Option.get
@@ -457,18 +511,21 @@ let audibleProgressSyncJobTests =
                 let events = EventStore.readStream db.Connection (Books.streamId slug) |> List.choose Books.Serialization.fromStoredEvent
                 match events |> List.filter (function Books.Reading_progress_observed _ | Books.Prior_reading_progress_recorded _ -> true | _ -> false) with
                 | [ Books.Reading_progress_observed data ] ->
-                    Expect.equal data.Percent 20 "the observed percent"
-                    Expect.equal data.ObservedOn (DateTime.Now.ToString("yyyy-MM-dd")) "dated to the sync day, never a prior"
+                    Expect.equal data.Percent 20 "the calculated percent (80 minutes of 400)"
+                    Expect.equal data.Position (Some (Minutes (80, Some 400))) "the true position, not a percent x runtime estimate"
+                    Expect.equal data.ObservedOn today "never a prior"
                 | other -> failtestf "Expected exactly one Reading_progress_observed and NO Prior_reading_progress_recorded, got %A" other
 
                 let metadata = MetadataCache.tryGetBookMetadata db.Connection slug
                 Expect.equal metadata.Source (Some "audible") "the metadata cache slice is tagged as an audible source")
 
-        testCase "a second sync of the same library creates nothing and appends nothing for the book it created on the first run" <| fun _ ->
+        testCase "a second sync of the same library creates nothing and appends nothing for the book it created on the first run (position AND percent both unchanged -- books-wk67x's no-op rule)" <| fun _ ->
             withTempImageDir (fun imageBasePath ->
                 use db = TestDb.withTempDbFactory bootstrap
+                let today = DateTime.Now.ToString("yyyy-MM-dd")
                 let fixture = libraryResponseJson [ libraryItemJson "NEW2" "New Purchase Two" (Some 20.0) false (Some 400) ]
-                let httpClient, _ = httpClientForLibrary (Map.ofList [ 1, fixture ])
+                let metadataResponses = Map.ofList [ "NEW2", existsAt today 80 ]
+                let httpClient, _ = httpClientForImportWithMetadata fixture metadataResponses
                 let jobLock = new SemaphoreSlim(1, 1)
 
                 AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
@@ -485,7 +542,7 @@ let audibleProgressSyncJobTests =
                 match result with
                 | Ok r ->
                     Expect.equal r.Created 0 "the book already exists -- the second run never re-creates it"
-                    Expect.equal r.Observed 0 "same percent as before -- a same-source no-op"
+                    Expect.equal r.Observed 0 "same percent AND position as before -- a no-op (books-wk67x)"
                 | Error e -> failtestf "Expected Ok, got Error %s" e
 
                 Expect.equal (EventStore.readStream db.Connection (Books.streamId slug) |> List.length) eventsBeforeSecondRun "the second run appends zero events")
@@ -514,11 +571,14 @@ let audibleProgressSyncJobTests =
                 Expect.isNone (BookProjection.findByExternalId db.Connection (AudibleAsin "FAIL1")) "the failed item never got a book"
                 Expect.isSome (BookProjection.findByExternalId db.Connection (AudibleAsin "OK2")) "the other item was still created despite the first item's failure")
 
-        testCase "changing a known book's percent from 42%% to 55%% (after the import's own prior) appends the observation AND promotes to InFocus" <| fun _ ->
+        testCase "changing a known book's calculated percent from 42%% to 55%% (after the import's own prior) appends the observation AND promotes to InFocus" <| fun _ ->
             withTempImageDir (fun imageBasePath ->
                 use db = TestDb.withTempDbFactory bootstrap
+                let today = DateTime.Now.ToString("yyyy-MM-dd")
                 let firstFixture = libraryResponseJson [ libraryItemJson "B1" "Book B" (Some 42.0) false (Some 600) ]
-                let httpClient1, _ = httpClientForLibrary (Map.ofList [ 1, firstFixture ])
+                // 252 / 600 = 42%.
+                let firstMetadata = Map.ofList [ "B1", existsAt today 252 ]
+                let httpClient1, _ = httpClientForImportWithMetadata firstFixture firstMetadata
                 let api = createApi db.Factory httpClient1 imageBasePath (fun () -> configuredAudibleConfig)
                 api.importAudibleLibrary () |> Async.RunSynchronously |> ignore
 
@@ -531,7 +591,11 @@ let audibleProgressSyncJobTests =
                 let eventsBeforeJob = EventStore.readStream db.Connection (Books.streamId slugB) |> List.length
 
                 let secondFixture = libraryResponseJson [ libraryItemJson "B1" "Book B" (Some 55.0) false (Some 600) ]
-                let httpClient2, _ = httpClientForLibrary (Map.ofList [ 1, secondFixture ])
+                // 330 / 600 = 55%; the listing's own percent_complete (also
+                // "55.0" here) is irrelevant -- this is the CALCULATED
+                // value, from a real position beyond the prior's 252 minutes.
+                let secondMetadata = Map.ofList [ "B1", existsAt today 330 ]
+                let httpClient2, _ = httpClientForImportWithMetadata secondFixture secondMetadata
                 let jobLock = new SemaphoreSlim(1, 1)
 
                 let result =
@@ -548,12 +612,225 @@ let audibleProgressSyncJobTests =
                 let newEvents = eventsAfterJob |> List.skip eventsBeforeJob |> List.choose Books.Serialization.fromStoredEvent
                 match newEvents with
                 | [ Books.Reading_progress_observed data; Books.Book_status_changed (BookStatus.InFocus, _) ] ->
-                    Expect.equal data.Percent 55 "the new percent"
+                    Expect.equal data.Percent 55 "the new, calculated percent"
+                    Expect.equal data.Position (Some (Minutes (330, Some 600))) "the true position"
                     Expect.equal data.Source ProgressSource.Audible "sourced from Audible"
-                    Expect.equal data.ObservedOn (DateTime.Now.ToString("yyyy-MM-dd")) "observed today"
+                    Expect.equal data.ObservedOn today "observed today"
                 | other -> failtestf "Expected [Reading_progress_observed; Book_status_changed InFocus], got %A" other
 
                 Expect.equal (BookProjection.getBySlug db.Connection slugB |> Option.get).Status BookStatus.InFocus "the ordinary observation promotes Backlog -> InFocus once the prior's baseline (42%%) is exceeded")
+
+        // ── integration-fn3yx / ADR-0086: minutes decide, percent is
+        // calculated -- the task's own acceptance criteria, pinned directly. ──
+
+        testCase "reproduces the 2026-09-18 incident: the library listing reports percent_complete 0.0 while the metadata endpoint reports a real position_ms for a 539-minute title -- the observation trusts the metadata, never the reset listing percent" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                use db = TestDb.withTempDbFactory bootstrap
+                let today = DateTime.Now.ToString("yyyy-MM-dd")
+                let asin = "B06Y5MY16Q"
+                let fixture = libraryResponseJson [ libraryItemJson asin "For We Are Many" (Some 0.0) false (Some 539) ]
+                // The live captured sample: position_ms 3627052 (about 60
+                // minutes) for a 539-minute runtime.
+                let metadataResponses = Map.ofList [ asin, (HttpStatusCode.OK, lastPositionHeardJson "Exists" (Some today) (Some 3627052L)) ]
+                let httpClient, _ = httpClientForImportWithMetadata fixture metadataResponses
+                let jobLock = new SemaphoreSlim(1, 1)
+
+                let result =
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                    |> Async.RunSynchronously
+
+                match result with
+                | Ok r -> Expect.equal r.Observed 1 "the item is observed from the true position"
+                | Error e -> failtestf "Expected Ok, got Error %s" e
+
+                let slug = BookProjection.findByExternalId db.Connection (AudibleAsin asin) |> Option.get
+                let events = EventStore.readStream db.Connection (Books.streamId slug) |> List.choose Books.Serialization.fromStoredEvent
+                match events |> List.filter (function Books.Reading_progress_observed _ -> true | _ -> false) with
+                | [ Books.Reading_progress_observed data ] ->
+                    Expect.equal data.Percent 11 "60 / 539 = 11%%, never the listing's reset 0%%"
+                    Expect.equal data.Position (Some (Minutes (60, Some 539))) "3627052ms / 60000 = 60 minutes (int division)"
+                | other -> failtestf "Expected exactly one Reading_progress_observed, got %A" other)
+
+        testCase "the position moves from 60 to 62 minutes with the calculated percent unchanged at 11%% -- a second Reading_progress_observed is still written (books-wk67x: position, not just percent, drives the no-op comparison)" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                use db = TestDb.withTempDbFactory bootstrap
+                let today = DateTime.Now.ToString("yyyy-MM-dd")
+                let asin = "B06Y5MY16Q"
+                let fixture = libraryResponseJson [ libraryItemJson asin "For We Are Many" (Some 0.0) false (Some 539) ]
+                let firstMetadata = Map.ofList [ asin, existsAt today 60 ]
+                let httpClient1, _ = httpClientForImportWithMetadata fixture firstMetadata
+                let jobLock = new SemaphoreSlim(1, 1)
+                AudibleSync.runProgressSync db.Connection jobLock httpClient1 (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient1 imageBasePath) allProjectionHandlers
+                |> Async.RunSynchronously
+                |> ignore
+
+                let slug = BookProjection.findByExternalId db.Connection (AudibleAsin asin) |> Option.get
+                let eventsBeforeSecondRun = EventStore.readStream db.Connection (Books.streamId slug) |> List.length
+
+                let secondMetadata = Map.ofList [ asin, existsAt today 62 ]
+                let httpClient2, _ = httpClientForImportWithMetadata fixture secondMetadata
+
+                let result =
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient2 (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
+                    |> Async.RunSynchronously
+
+                match result with
+                | Ok r -> Expect.equal r.Observed 1 "the position change still counts as an observation despite the unchanged percent"
+                | Error e -> failtestf "Expected Ok, got Error %s" e
+
+                let eventsAfterSecondRun = EventStore.readStream db.Connection (Books.streamId slug)
+                Expect.equal (List.length eventsAfterSecondRun) (eventsBeforeSecondRun + 1) "exactly one new event, a second Reading_progress_observed"
+
+                let newEvents = eventsAfterSecondRun |> List.skip eventsBeforeSecondRun |> List.choose Books.Serialization.fromStoredEvent
+                match newEvents with
+                | [ Books.Reading_progress_observed data ] ->
+                    Expect.equal data.Percent 11 "62 / 539 = 11%% too -- the percent alone did not change"
+                    Expect.equal data.Position (Some (Minutes (62, Some 539))) "but the position did"
+                | other -> failtestf "Expected exactly one new Reading_progress_observed, got %A" other)
+
+        testCase "position and percent both unchanged since the last run -- zero events appended, Observed = 0" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                use db = TestDb.withTempDbFactory bootstrap
+                let today = DateTime.Now.ToString("yyyy-MM-dd")
+                let asin = "UNCHANGED1"
+                let fixture = libraryResponseJson [ libraryItemJson asin "Unchanged Book" (Some 0.0) false (Some 539) ]
+                let metadataResponses = Map.ofList [ asin, existsAt today 60 ]
+                let httpClient, _ = httpClientForImportWithMetadata fixture metadataResponses
+                let jobLock = new SemaphoreSlim(1, 1)
+                AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                |> Async.RunSynchronously
+                |> ignore
+
+                let slug = BookProjection.findByExternalId db.Connection (AudibleAsin asin) |> Option.get
+                let eventsBeforeSecondRun = EventStore.readStream db.Connection (Books.streamId slug) |> List.length
+
+                let result =
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
+                    |> Async.RunSynchronously
+
+                match result with
+                | Ok r -> Expect.equal r.Observed 0 "identical position and percent -- a genuine no-op"
+                | Error e -> failtestf "Expected Ok, got Error %s" e
+
+                Expect.equal (EventStore.readStream db.Connection (Books.streamId slug) |> List.length) eventsBeforeSecondRun "zero events appended")
+
+        testCase "the metadata call fails for one item -- that item is skipped and listed in Errors, the other items are still observed, and the listing's percent is never used for the failed item" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                use db = TestDb.withTempDbFactory bootstrap
+                let today = DateTime.Now.ToString("yyyy-MM-dd")
+                let fixture =
+                    libraryResponseJson [
+                        libraryItemJson "FAILM1" "Book Fail Metadata" (Some 40.0) false (Some 300)
+                        libraryItemJson "OKM1" "Book OK Metadata" (Some 10.0) false (Some 300)
+                    ]
+                let metadataResponses =
+                    Map.ofList [
+                        "FAILM1", (HttpStatusCode.InternalServerError, "")
+                        "OKM1", existsAt today 60
+                    ]
+                let httpClient, _ = httpClientForImportWithMetadata fixture metadataResponses
+                let jobLock = new SemaphoreSlim(1, 1)
+
+                let result =
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                    |> Async.RunSynchronously
+
+                match result with
+                | Ok r ->
+                    Expect.equal r.Observed 1 "only the successfully-fetched item is observed"
+                    Expect.equal (List.length r.Errors) 1 "the failed metadata call is reported as an error"
+                    Expect.stringContains r.Errors.[0] "FAILM1" "the error names the failing item"
+                | Error e -> failtestf "Expected Ok, got Error %s" e
+
+                let slugFail = BookProjection.findByExternalId db.Connection (AudibleAsin "FAILM1") |> Option.get
+                Expect.isEmpty (BookProjection.getBySlug db.Connection slugFail |> Option.get).ProgressHistory "the failing item's book creation is unaffected (creation precedes the metadata fetch), but NO progress row exists -- the listing's own 40%% was never used as a fallback"
+
+                let slugOk = BookProjection.findByExternalId db.Connection (AudibleAsin "OKM1") |> Option.get
+                match (BookProjection.getBySlug db.Connection slugOk |> Option.get).ProgressHistory with
+                | [ row ] -> Expect.equal row.Percent 20 "60 / 300 = 20%%, calculated from the true position"
+                | other -> failtestf "Expected exactly one progress row for OKM1, got %A" other)
+
+        testCase "DoesNotExist with is_finished = false writes nothing; DoesNotExist with is_finished = true writes a finishing observation" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                use db = TestDb.withTempDbFactory bootstrap
+                let fixture =
+                    libraryResponseJson [
+                        libraryItemJson "NEVER1" "Never Started" (Some 0.0) false (Some 300)
+                        libraryItemJson "FINISHED1" "Finished Never-Fetched" None true (Some 300)
+                    ]
+                // Neither ASIN has a metadataResponses entry -- both default
+                // to the nested DoesNotExist stub.
+                let httpClient, _ = httpClientForImportWithMetadata fixture Map.empty
+                let jobLock = new SemaphoreSlim(1, 1)
+
+                let result =
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                    |> Async.RunSynchronously
+
+                match result with
+                | Ok r -> Expect.equal r.Observed 1 "only the finished title writes an observation"
+                | Error e -> failtestf "Expected Ok, got Error %s" e
+
+                let slugNever = BookProjection.findByExternalId db.Connection (AudibleAsin "NEVER1") |> Option.get
+                Expect.isEmpty (BookProjection.getBySlug db.Connection slugNever |> Option.get).ProgressHistory "not finished, DoesNotExist -- no observation at all, never guessed from the listing's percent_complete"
+
+                let slugFinished = BookProjection.findByExternalId db.Connection (AudibleAsin "FINISHED1") |> Option.get
+                match (BookProjection.getBySlug db.Connection slugFinished |> Option.get).ProgressHistory with
+                | [ row ] ->
+                    Expect.equal row.Percent 100 "DoesNotExist + is_finished lands Percent = 100"
+                    Expect.isNone row.Position "DoesNotExist carries no position"
+                | other -> failtestf "Expected exactly one progress row for FINISHED1, got %A" other
+                Expect.equal (BookProjection.getBySlug db.Connection slugFinished |> Option.get).Status BookStatus.Finished "the explicit is_finished flag still finishes the book")
+
+        testCase "a title with no RuntimeMinutes falls back to the floored listing percent, Position = None -- the only remaining use of the listing's percent" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                use db = TestDb.withTempDbFactory bootstrap
+                let today = DateTime.Now.ToString("yyyy-MM-dd")
+                let fixture = libraryResponseJson [ libraryItemJson "NORUNTIME1" "No Runtime Known" (Some 33.7) false None ]
+                let metadataResponses = Map.ofList [ "NORUNTIME1", existsAt today 10 ]
+                let httpClient, _ = httpClientForImportWithMetadata fixture metadataResponses
+                let jobLock = new SemaphoreSlim(1, 1)
+
+                let result =
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                    |> Async.RunSynchronously
+
+                match result with
+                | Ok r -> Expect.equal r.Observed 1 "the item is still observed, via the listing fallback"
+                | Error e -> failtestf "Expected Ok, got Error %s" e
+
+                let slug = BookProjection.findByExternalId db.Connection (AudibleAsin "NORUNTIME1") |> Option.get
+                match (BookProjection.getBySlug db.Connection slug |> Option.get).ProgressHistory with
+                | [ row ] ->
+                    Expect.equal row.Percent 33 "33.7%% floors to 33%%, never rounds to 34%%"
+                    Expect.isNone row.Position "no runtime to place a position against, even though a real position_ms was fetched"
+                | other -> failtestf "Expected exactly one progress row, got %A" other)
+
+        testCase "the sync calls getLastPositionHeard exactly once per library item, through Audible.throttleMetadataCall -- replaces the pre-fn3yx counting-stub that pinned the sync NEVER calling it" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                use db = TestDb.withTempDbFactory bootstrap
+                let today = DateTime.Now.ToString("yyyy-MM-dd")
+                let fixture =
+                    libraryResponseJson [
+                        libraryItemJson "CNT1" "Count One" (Some 10.0) false (Some 200)
+                        libraryItemJson "CNT2" "Count Two" (Some 20.0) false (Some 200)
+                        libraryItemJson "CNT3" "Count Three" (Some 30.0) false (Some 200)
+                    ]
+                let metadataResponses =
+                    Map.ofList [
+                        "CNT1", existsAt today 20
+                        "CNT2", existsAt today 40
+                        "CNT3", existsAt today 60
+                    ]
+                let httpClient, metadataCalls = httpClientForImportWithMetadata fixture metadataResponses
+                let jobLock = new SemaphoreSlim(1, 1)
+
+                AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                |> Async.RunSynchronously
+                |> ignore
+
+                let calls = metadataCalls () |> List.sort
+                Expect.equal calls [ "CNT1"; "CNT2"; "CNT3" ] "exactly one metadata call per library item, no more, no fewer")
 
         testCase "paging: a fixture returning 1000 then 3 items makes exactly two requests, page=1 and page=2" <| fun _ ->
             withTempImageDir (fun _ ->
@@ -631,7 +908,7 @@ let audibleProgressSyncJobTests =
                 | Some msg -> Expect.stringContains msg "a prior run" "an inconclusive empty response must NOT clear a standing notice"
                 | None -> failtest "Expected the pre-set audible_last_error to survive an empty library response")
 
-        testCase "a book with no Audible progress row, synced for the FIRST TIME by the JOB (not the import), gets a plain observation and never a prior -- zero getLastPositionHeard calls (ADR-0082 §2, integration-dtdbb)" <| fun _ ->
+        testCase "a book with no Audible progress row, synced for the FIRST TIME by the JOB (not the import), gets a plain, calculated-percent observation and never a prior -- ONE getLastPositionHeard call, its date wins ObservedOn (integration-fn3yx/ADR-0086 reverses integration-dtdbb's 'zero getLastPositionHeard calls')" <| fun _ ->
             withTempImageDir (fun _ ->
                 use db = TestDb.withTempDbFactory bootstrap
                 // Seed a known book matched by ASIN but with NO Audible
@@ -651,10 +928,9 @@ let audibleProgressSyncJobTests =
                 Expect.isEmpty (BookProjection.getBySlug db.Connection slug |> Option.get).ProgressHistory "sanity: no Audible book_progress row exists yet"
 
                 let fixture = libraryResponseJson [ libraryItemJson "N1" "Job First Sync Book" (Some 35.0) false (Some 500) ]
-                let metadataResponses =
-                    Map.ofList [
-                        "N1", (HttpStatusCode.OK, """{"last_position_heard": {"last_updated": "2024-05-05", "position_ms": 1000, "status": "Exists"}}""")
-                    ]
+                // 175 / 500 = 35%; the listing's own percent_complete (also
+                // "35.0" here) is irrelevant -- this is the CALCULATED value.
+                let metadataResponses = Map.ofList [ "N1", existsAt "2024-05-05" 175 ]
                 let httpClient, metadataCalls = httpClientForImportWithMetadata fixture metadataResponses
                 let jobLock = new SemaphoreSlim(1, 1)
 
@@ -666,12 +942,13 @@ let audibleProgressSyncJobTests =
                 | Ok r -> Expect.equal r.Observed 1 "the book's first-ever percent is observed by the job"
                 | Error e -> failtestf "Expected Ok, got Error %s" e
 
-                Expect.isEmpty (metadataCalls ()) "the job never calls getLastPositionHeard, even for a book with no prior Audible row -- priors are the import's business only (ADR-0082 §2)"
+                Expect.equal (metadataCalls ()) [ "N1" ] "the job calls getLastPositionHeard exactly once now, even for a book with no prior Audible row -- priors stay the import's business only (ADR-0082 §2), but the metadata fetch itself is no longer import-exclusive (ADR-0086)"
 
                 let events = EventStore.readStream db.Connection (Books.streamId slug) |> List.choose Books.Serialization.fromStoredEvent
                 match events |> List.filter (function Books.Reading_progress_observed _ | Books.Prior_reading_progress_recorded _ -> true | _ -> false) with
                 | [ Books.Reading_progress_observed data ] ->
-                    Expect.equal data.Percent 35 "the observed percent"
+                    Expect.equal data.Percent 35 "the calculated percent (175 minutes of 500)"
+                    Expect.equal data.Position (Some (Minutes (175, Some 500))) "the true position"
                     Expect.equal data.Source ProgressSource.Audible "sourced from Audible"
                 | other -> failtestf "Expected exactly one Reading_progress_observed and no Prior_reading_progress_recorded on the raw stream, got %A" other
 
@@ -679,7 +956,7 @@ let audibleProgressSyncJobTests =
                 match detail.ProgressHistory with
                 | [ row ] ->
                     Expect.equal row.Kind ProgressKind.Observed "the job's sync writes a plain observation, never a prior"
-                    Expect.equal row.ObservedOn (DateTime.Now.ToString("yyyy-MM-dd")) "dated to the sync day, not Audible's (uncalled) last-listened day"
+                    Expect.equal row.ObservedOn "2024-05-05" "dated to Audible's own last-listened day (ADR-0086 point 6), not the sync's run day"
                 | other -> failtestf "Expected exactly one progress row, got %A" other)
     ]
     |> testSequenced
@@ -765,47 +1042,68 @@ let audibleSyncStatusPersistenceTests =
                 Expect.isSome afterSync.LastSyncResult "the sync result summary is persisted via SettingsStore")
     ]
 
-/// integration-dtdbb (ADR-0082): `AudibleSync.observationFor`'s pure
-/// last-listened-date/position decision, exercised directly (no HTTP, no DB).
+/// integration-dtdbb (ADR-0082), amended by integration-fn3yx (ADR-0086):
+/// `AudibleSync.observationFor`'s pure last-listened-date/position/percent
+/// decision, exercised directly (no HTTP, no DB).
 [<Tests>]
 let observationForTests =
     let baseItem : Audible.AudibleLibraryItem =
         { Asin = "X1"; Title = "Book X"; Authors = []; Narrators = []; RuntimeMinutes = Some 600
           PercentComplete = Some 50.0; IsFinished = false; PurchaseDate = None; CoverUrl = None
           SeriesName = None; SeriesPosition = None; ReleaseDate = None; Description = None }
-    testList "AudibleSync.observationFor (integration-dtdbb, ADR-0082)" [
+    testList "AudibleSync.observationFor (integration-dtdbb/ADR-0082, minutes decide/ADR-0086)" [
 
-        testCase "lastListened = None (the nightly sync's own call shape): ObservedOn defaults to today, Position is the percent x runtime estimate" <| fun _ ->
+        testCase "lastListened = None (never fetched -- Api.fs's already-has-an-Audible-row re-observation branch): ObservedOn defaults to today, Position is the percent x runtime estimate, from the listing's own percent" <| fun _ ->
             match AudibleSync.observationFor baseItem "2026-09-18" None with
             | Some data ->
                 Expect.equal data.ObservedOn "2026-09-18" "defaults to today when there's no last-listened info at all"
+                Expect.equal data.Percent 50 "the listing's own percent -- never fetched, so never calculated"
                 Expect.equal data.Position (Some (Minutes (300, Some 600))) "percent x runtime estimate: 50%% of 600 = 300"
             | None -> failtest "Expected Some data"
 
-        testCase "LastUpdatedOn = Some d: ObservedOn is d, not today" <| fun _ ->
-            let lastListened : Audible.LastPositionHeard = { LastUpdatedOn = Some "2023-09-23"; PositionMs = None }
-            match AudibleSync.observationFor baseItem "2026-09-18" (Some lastListened) with
-            | Some data -> Expect.equal data.ObservedOn "2023-09-23" "prefers the source's own last-listened day over today"
-            | None -> failtest "Expected Some data"
-
-        testCase "LastUpdatedOn = None inside a Some LastPositionHeard (a metadata call that found nothing): ObservedOn falls back to today" <| fun _ ->
-            let lastListened : Audible.LastPositionHeard = { LastUpdatedOn = None; PositionMs = None }
-            match AudibleSync.observationFor baseItem "2026-09-18" (Some lastListened) with
-            | Some data -> Expect.equal data.ObservedOn "2026-09-18" "no last-listened date known, falls back to today exactly like the None case"
-            | None -> failtest "Expected Some data"
-
-        testCase "PositionMs = Some 896068L with a known runtime: Position is Minutes (14, Some runtime), preferred over the percent estimate" <| fun _ ->
+        testCase "PositionMs AND RuntimeMinutes both known: MINUTES DECIDE -- the percent is CALCULATED from the true position, never the listing's own percent_complete" <| fun _ ->
             let item = { baseItem with RuntimeMinutes = Some 999; PercentComplete = Some 10.0 }
             let lastListened : Audible.LastPositionHeard = { LastUpdatedOn = Some "2023-09-23"; PositionMs = Some 896068L }
             match AudibleSync.observationFor item "2026-09-18" (Some lastListened) with
-            | Some data -> Expect.equal data.Position (Some (Minutes (14, Some 999))) "896068ms / 60000 = 14 minutes (int division), NOT the 10%% x 999 estimate"
+            | Some data ->
+                Expect.equal data.ObservedOn "2023-09-23" "prefers the source's own last-listened day over today"
+                Expect.equal data.Position (Some (Minutes (14, Some 999))) "896068ms / 60000 = 14 minutes (int division), NOT the 10%% x 999 estimate"
+                Expect.equal data.Percent 1 "floor (14 / 999 x 100) = 1 -- CALCULATED, never the listing's own 10%%"
             | None -> failtest "Expected Some data"
 
-        testCase "PositionMs present but no runtime known: Position is None (mirrors the existing percent-estimate guard)" <| fun _ ->
+        testCase "the calculated percent clamps at 100 when the position exceeds the runtime" <| fun _ ->
+            let item = { baseItem with RuntimeMinutes = Some 60 }
+            let lastListened : Audible.LastPositionHeard = { LastUpdatedOn = Some "2023-09-23"; PositionMs = Some (70L * 60000L) }
+            match AudibleSync.observationFor item "2026-09-18" (Some lastListened) with
+            | Some data -> Expect.equal data.Percent 100 "70 minutes of a 60-minute runtime clamps to 100%%, never overshoots"
+            | None -> failtest "Expected Some data"
+
+        testCase "PositionMs known, RuntimeMinutes unknown: falls back to the listing's own floored percent, Position = None -- the only remaining use of the listing's percent" <| fun _ ->
             let item = { baseItem with RuntimeMinutes = None }
             let lastListened : Audible.LastPositionHeard = { LastUpdatedOn = Some "2023-09-23"; PositionMs = Some 896068L }
             match AudibleSync.observationFor item "2026-09-18" (Some lastListened) with
-            | Some data -> Expect.isNone data.Position "no runtime -- no Position, regardless of PositionMs"
+            | Some data ->
+                Expect.equal data.Percent 50 "the listing's own floored percent -- no runtime to calculate against"
+                Expect.isNone data.Position "no runtime -- no Position, regardless of PositionMs"
+            | None -> failtest "Expected Some data"
+
+        testCase "status = DoesNotExist (PositionMs = None), is_finished = false: no observation at all -- never guessed from the listing's percent_complete" <| fun _ ->
+            let lastListened : Audible.LastPositionHeard = { LastUpdatedOn = None; PositionMs = None }
+            Expect.isNone (AudibleSync.observationFor baseItem "2026-09-18" (Some lastListened)) "DoesNotExist + not finished writes nothing"
+
+        testCase "status = DoesNotExist (PositionMs = None), LastUpdatedOn known but not finished: STILL no observation -- the date alone is not enough" <| fun _ ->
+            let lastListened : Audible.LastPositionHeard = { LastUpdatedOn = Some "2023-09-23"; PositionMs = None }
+            Expect.isNone (AudibleSync.observationFor baseItem "2026-09-18" (Some lastListened)) "a known last-listened date with no position is still nothing to report, unless finished"
+
+        testCase "status = DoesNotExist (PositionMs = None), is_finished = true: Percent = 100, Position = None, ObservedOn falls back to today (no last-listened date on a DoesNotExist body)" <| fun _ ->
+            let item = { baseItem with IsFinished = true }
+            let lastListened : Audible.LastPositionHeard = { LastUpdatedOn = None; PositionMs = None }
+            match AudibleSync.observationFor item "2026-09-18" (Some lastListened) with
+            | Some data ->
+                Expect.equal data.Percent 100 "the source's own explicit Finished flag, not a rounding artifact"
+                Expect.isNone data.Position "DoesNotExist carries no position"
+                Expect.equal data.ObservedOn "2026-09-18" "no last-listened date known, falls back to today"
+                Expect.isTrue data.Finished "Finished rides through"
             | None -> failtest "Expected Some data"
     ]
 
@@ -818,13 +1116,13 @@ let observationForTests =
 let importPriorRecordingTests =
     testList "Api.importAudibleLibrary priors (integration-dtdbb, ADR-0082)" [
 
-        testCase "a fresh book (no Audible row yet) calls getLastPositionHeard exactly once; the resulting row is kind = prior, dated from Audible, and finished_at matches when the item is finished" <| fun _ ->
+        testCase "a fresh book (no Audible row yet) calls getLastPositionHeard exactly once; the resulting row is kind = prior, dated/positioned/PERCENT-CALCULATED from Audible, and finished_at matches when the item is finished (integration-fn3yx: real content_metadata nesting, calculated percent)" <| fun _ ->
             withTempImageDir (fun imageBasePath ->
                 use db = TestDb.withTempDbFactory bootstrap
                 let fixture = libraryResponseJson [ libraryItemJson "F1" "Book F" None true (Some 600) ]
                 let metadataResponses =
                     Map.ofList [
-                        "F1", (HttpStatusCode.OK, """{"last_position_heard": {"last_updated": "2023-09-23 21:03:18.228", "position_ms": 896068, "status": "Exists"}}""")
+                        "F1", (HttpStatusCode.OK, """{"content_metadata": {"last_position_heard": {"last_updated": "2023-09-23 21:03:18.228", "position_ms": 896068, "status": "Exists"}}}""")
                     ]
                 let httpClient, metadataCalls = httpClientForImportWithMetadata fixture metadataResponses
                 let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
@@ -842,11 +1140,14 @@ let importPriorRecordingTests =
                 let detail = BookProjection.getBySlug db.Connection slugF |> Option.get
                 // books-wk67x: EntryId is the entry's real store position —
                 // not predictable here, so compare every OTHER field.
+                // 896068ms / 60000 = 14 minutes (int division); floor (14 /
+                // 600 x 100) = 2 -- CALCULATED (ADR-0086), never 100 (the
+                // item carries no percent_complete at all, only is_finished).
                 Expect.equal
                     (detail.ProgressHistory |> List.map (fun r -> r.ObservedOn, r.Source, r.Percent, r.Position, r.Kind))
-                    [ "2023-09-23", ProgressSource.Audible, 100, Some (Minutes (14, Some 600)), ProgressKind.Prior ]
-                    "one prior row, dated/positioned from Audible's own metadata"
-                Expect.equal detail.Status BookStatus.Finished "is_finished lands Finished even as a prior"
+                    [ "2023-09-23", ProgressSource.Audible, 2, Some (Minutes (14, Some 600)), ProgressKind.Prior ]
+                    "one prior row, dated/positioned/percent-calculated from Audible's own metadata"
+                Expect.equal detail.Status BookStatus.Finished "is_finished lands Finished regardless of the (low) calculated percent -- the explicit flag decides, not the percent"
                 Expect.equal detail.FinishedAt (Some "2023-09-23") "finished_at matches the metadata's own last-listened date")
 
         testCase "a book that already has an Audible row makes no metadata call and appends an ordinary observation" <| fun _ ->
@@ -959,7 +1260,7 @@ let importPriorRecordingTests =
                 let fixture = libraryResponseJson [ libraryItemJson "L1" "Legacy Book" (Some 60.0) false (Some 600) ]
                 let metadataResponses =
                     Map.ofList [
-                        "L1", (HttpStatusCode.OK, """{"last_position_heard": {"last_updated": "2024-03-01 10:00:00.000", "position_ms": 21600000, "status": "Exists"}}""")
+                        "L1", (HttpStatusCode.OK, """{"content_metadata": {"last_position_heard": {"last_updated": "2024-03-01 10:00:00.000", "position_ms": 21600000, "status": "Exists"}}}""")
                     ]
                 let httpClient, _ = httpClientForImportWithMetadata fixture metadataResponses
                 let api = createApi db.Factory httpClient "unused-image-dir" (fun () -> configuredAudibleConfig)
@@ -1026,7 +1327,7 @@ let importPriorRecordingTests =
                 let fixture = libraryResponseJson [ libraryItemJson "M1" "Legacy Finished Book" None true (Some 600) ]
                 let metadataResponses =
                     Map.ofList [
-                        "M1", (HttpStatusCode.OK, """{"last_position_heard": {"last_updated": "2023-09-23 21:03:18.228", "position_ms": 36000000, "status": "Exists"}}""")
+                        "M1", (HttpStatusCode.OK, """{"content_metadata": {"last_position_heard": {"last_updated": "2023-09-23 21:03:18.228", "position_ms": 36000000, "status": "Exists"}}}""")
                     ]
                 let httpClient, _ = httpClientForImportWithMetadata fixture metadataResponses
                 let api = createApi db.Factory httpClient "unused-image-dir" (fun () -> configuredAudibleConfig)

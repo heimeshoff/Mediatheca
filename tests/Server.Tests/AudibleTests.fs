@@ -373,11 +373,11 @@ let getCustomerSummaryTests =
 let getLastPositionHeardTests =
     testList "Audible.getLastPositionHeard (integration-dtdbb, ADR-0082)" [
 
-        testCase "decodes the research report's captured sample to a Some date part and the raw position_ms" <| fun _ ->
+        testCase "decodes the research report's captured sample (real wire shape: content_metadata.last_position_heard) to a Some date part and the raw position_ms" <| fun _ ->
             let handler =
                 new RecordingHandler(fun _ ->
                     jsonResponse HttpStatusCode.OK
-                        """{"last_position_heard": {"last_updated": "2023-09-23 21:03:18.228", "position_ms": 896068, "status": "Exists"}}""")
+                        """{"content_metadata": {"last_position_heard": {"last_updated": "2023-09-23 21:03:18.228", "position_ms": 896068, "status": "Exists"}}}""")
             use http = new HttpClient(handler)
             let result = getLastPositionHeard http "api.audible.de" "my-access-token" "B002V5BNGY" |> Async.RunSynchronously
             Expect.equal result (Ok { LastUpdatedOn = Some "2023-09-23"; PositionMs = Some 896068L }) "date-part-only LastUpdatedOn, raw PositionMs"
@@ -385,8 +385,17 @@ let getLastPositionHeardTests =
             Expect.stringContains (request.RequestUri.ToString()) "/1.0/content/B002V5BNGY/metadata?response_groups=last_position_heard" "hits the confirmed endpoint/response_groups"
             Expect.equal (request.Headers.GetValues("Authorization") |> Seq.head) "Bearer my-access-token" "Bearer auth, same as every other authenticated call"
 
-        testCase "status = DoesNotExist degrades to both-None" <| fun _ ->
-            let handler = new RecordingHandler(fun _ -> jsonResponse HttpStatusCode.OK """{"last_position_heard": {"status": "DoesNotExist"}}""")
+        testCase "the OLD, un-nested top-level shape decodes to both-None -- integration-fn3yx: there is no fallback to it, it never existed on the wire" <| fun _ ->
+            let handler =
+                new RecordingHandler(fun _ ->
+                    jsonResponse HttpStatusCode.OK
+                        """{"last_position_heard": {"last_updated": "2023-09-23 21:03:18.228", "position_ms": 896068, "status": "Exists"}}""")
+            use http = new HttpClient(handler)
+            let result = getLastPositionHeard http "api.audible.de" "my-access-token" "B002V5BNGY" |> Async.RunSynchronously
+            Expect.equal result (Ok { LastUpdatedOn = None; PositionMs = None }) "un-nested is simply not found -- degrades to both-None like any other undecodable shape"
+
+        testCase "status = DoesNotExist (nested under content_metadata) degrades to both-None" <| fun _ ->
+            let handler = new RecordingHandler(fun _ -> jsonResponse HttpStatusCode.OK """{"content_metadata": {"last_position_heard": {"status": "DoesNotExist"}}}""")
             use http = new HttpClient(handler)
             let result = getLastPositionHeard http "api.audible.de" "my-access-token" "B002V5BNGY" |> Async.RunSynchronously
             Expect.equal result (Ok { LastUpdatedOn = None; PositionMs = None }) "DoesNotExist is an ordinary both-None shape, not an error"
