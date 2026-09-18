@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 12:54 -- Modeling / Promoted: games-kfpqp - Deck-compat job — re-check already recorded verdicts once they pass an age limit (Unknown 30 days, Playable/Unsupported 90, Verified 180), capped per night, so Valve's verdict changes reach existing games
+
+**Type:** Modeling / Promote
+**BC:** games
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-18 12:54 -- Modeling / Refined: games-kfpqp - Deck-compat job — age-based re-check of recorded verdicts
 
 **Type:** Modeling / Refine

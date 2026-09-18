@@ -1,7 +1,7 @@
 ---
 id: games-kfpqp
 title: Deck-compat job — re-check already recorded verdicts once they pass an age limit (Unknown 30 days, Playable/Unsupported 90, Verified 180), capped per night, so Valve's verdict changes reach existing games
-status: backlog
+status: todo
 type: feature
 context: games
 created: 2026-09-18
