@@ -25,7 +25,7 @@ research touching this BC, and concept synthesis pages.
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
-### Done (most recent first; older entries kept for prior-art search)
+### Done (current-month entries live; older months archived verbatim under `done-archive/` — kept for prior-art search, ADR-0039 convention)
 <!-- done-list:start -->
 - **integration-fn3yx** — Audible sync decides on listened minutes and calculates the percent — position comes from `last_position_heard`, not the library listing's unreliable `percent_complete`; fixes the decoder that reads that endpoint at the wrong nesting level (reverses ADR-0082's "the sync never fetches last-listened"). (feature) — `done/integration-fn3yx-audible-sync-decides-on-minutes-percent-calculated.md`
 - **integration-dvbjp** — The nightly Audible sync creates a Book for every unmatched library ASIN (same create path as the import, then an ordinary observation) and "Import library" becomes a true one-time bootstrap — stamped `audible_library_imported_at` on its first populated run, refused by the API and hidden by the Settings card afterwards (feature) — `done/integration-dvbjp-nightly-sync-creates-unmatched-books-import-one-time.md`
@@ -54,10 +54,6 @@ research touching this BC, and concept synthesis pages.
 - **integration-m4k7p** -- Materialize a missing season/episode from Jellyfin when TMDB lacks it -- `feature` -- `done/integration-m4k7p-materialize-missing-season-from-jellyfin.md`
 - **integration-006** -- Nightly series refresh skips Ended series, so a TMDB-added season is never auto-picked-up -- `bug` -- `done/integration-006-nightly-refresh-skips-ended-series.md`
 - **integration-005** -- Spike — fallback metadata source when TMDB lags on new seasons -- `spike` -- `done/integration-005-fallback-metadata-source-spike.md`
-- **integration-004** -- Steam playtime sync silently drops same-day deltas -- `bug` -- `done/integration-004-steam-sync-drops-same-day-delta.md`
-- **integration-003** -- Surface the persisted Jellyfin sync failure in the Settings UI -- `feature` -- `done/integration-003-surface-jellyfin-sync-failure-in-settings.md`
-- **integration-002** -- Re-authenticate Jellyfin and retry once on a 401/403 during sync -- `bug` -- `done/integration-002-jellyfin-reauth-on-401.md`
-- **integration-001** -- Jellyfin sync silently stopped writing episode watch history -- `bug` -- `done/integration-001-jellyfin-sync-silently-stopped.md`
 <!-- done-list:end -->
 
 ### Backlog
