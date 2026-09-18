@@ -1,7 +1,7 @@
 ---
 id: integration-dtdbb
 title: Audible priors carry the last-listened day — import and nightly sync fetch `last_position_heard` (`GET /1.0/content/{asin}/metadata`) only for books with no Audible progress row yet, date the prior (and so the finished date) to Audible's `last_updated`, use `position_ms` for the position, and "Import library" repairs the import-day observations written before priors existed
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-09-18

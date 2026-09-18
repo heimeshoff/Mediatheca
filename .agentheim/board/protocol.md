@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 02:11 -- Batch started: [integration-dtdbb]
+
+**Type:** Work / Batch start
+**Tasks:** integration-dtdbb - Audible priors carry the last-listened day — import and nightly sync fetch `last_position_heard` (`GET /1.0/content/{asin}/metadata`) only for books with no Audible progress row yet, date the prior (and so the finished date) to Audible's `last_updated`, use `position_ms` for the position, and "Import library" repairs the import-day observations written before priors existed
+**Parallel:** no (1 worker — integration-dtdbb is the whole ready set after books-d4wtc integrated; integration-dvbjp stays in todo, blocked on integration-dtdbb)
+
+---
+
 ## 2026-09-18 02:10 -- Task verified and completed: books-d4wtc - Prior reading progress — the bulk import's `Record_prior_reading_progress` command yields a `Prior_reading_progress_recorded` event for a book its source has not reported on before (never InFocus-promoting, finishing with its own date; the nightly sync and Manual keep producing ordinary observations), projected as `kind = 'prior'` so the History list, the Hours Listened stat and any future Reading day never mistake an import's starting position for a listening session
 
 **Type:** Work / Task completion
