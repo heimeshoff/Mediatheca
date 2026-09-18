@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 12:58 -- Batch started: [games-kfpqp]
+
+**Type:** Work / Batch start
+**Tasks:** games-kfpqp - Deck-compat job — re-check already recorded verdicts once they pass an age limit (Unknown 30 days, Playable/Unsupported 90, Verified 180), capped per night, so Valve's verdict changes reach existing games
+**Parallel:** no (1 worker — games-kfpqp is the whole ready set; todo/ is otherwise empty across every BC)
+
+---
+
 ## 2026-09-18 12:54 -- Modeling / Promoted: games-kfpqp - Deck-compat job — re-check already recorded verdicts once they pass an age limit (Unknown 30 days, Playable/Unsupported 90, Verified 180), capped per night, so Valve's verdict changes reach existing games
 
 **Type:** Modeling / Promote

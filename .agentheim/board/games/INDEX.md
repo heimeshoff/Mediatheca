@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 14
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **games-kfpqp** — Deck-compat job — re-check already recorded verdicts once they pass an age limit (Unknown 30 days, Playable/Unsupported 90, Verified 180), capped per night, so Valve's verdict changes reach existing games (feature) — `todo/games-kfpqp-deck-compat-age-based-verdict-recheck.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **games-kfpqp** — Deck-compat job — re-check already recorded verdicts once they pass an age limit (Unknown 30 days, Playable/Unsupported 90, Verified 180), capped per night, so Valve's verdict changes reach existing games (feature) — `doing/games-kfpqp-deck-compat-age-based-verdict-recheck.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
