@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 10:21 -- Modeling / Captured: games-kfpqp - Deck-compat job — re-check already recorded verdicts once they pass an age limit (Unknown 30 days, Playable/Unsupported 90, Verified 180), capped per night, so Valve's verdict changes reach existing games
+
+**Type:** Modeling / Capture
+**BC:** games
+**Filed to:** backlog
+**Summary:** Adds an age-based re-check cohort to the Deck-compat job (Unknown 30 days, Playable/Unsupported 90, Verified 180; 25 re-checks per run) so Valve's verdict changes reach existing games. Fully refined; waits in backlog on games-wkyf0, which edits the same cursor query.
+
+---
+
+## 2026-09-18 10:21 -- Modeling / Captured: games-wkyf0 - Deck-compat job — stop re-fetching permanently failing games every night by recording failed attempts and retrying them on a growing delay
+
+**Type:** Modeling / Capture
+**BC:** games
+**Filed to:** todo
+**Summary:** The Deck-compat job is the only writer of the verdict, so it stays scheduled; this fixes its one real cost. Failed fetches are recorded and retried on a growing delay (2 to 30 days) instead of every night, and reported in the job summary.
+
+---
+
 ## 2026-09-18 03:56 -- Work session ended
 
 **Type:** Work / Session end
