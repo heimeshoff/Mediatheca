@@ -1,7 +1,7 @@
 ---
 id: games-wkyf0
 title: Deck-compat job — stop re-fetching permanently failing games every night by recording failed attempts and retrying them on a growing delay
-status: todo
+status: doing
 type: bug
 context: games
 created: 2026-09-18

@@ -1,7 +1,7 @@
 ---
 id: books-wk67x
 title: Reading history appends, never overwrites — a prior is set once and no later listening data replaces it, and any change in position or percent adds a NEW history entry even on the same day from the same source (reverses ADR-0076 §2's same-day collapse).
-status: todo
+status: doing
 type: feature
 context: books
 created: 2026-09-18

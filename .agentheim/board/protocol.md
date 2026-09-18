@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 10:44 -- Batch started: [books-wk67x, games-wkyf0]
+
+**Type:** Work / Batch start
+**Tasks:** books-wk67x - Reading history appends, never overwrites — a prior is set once and no later listening data replaces it, and any change in position or percent adds a NEW history entry even on the same day from the same source (reverses ADR-0076 §2's same-day collapse)., games-wkyf0 - Deck-compat job — stop re-fetching permanently failing games every night by recording failed attempts and retrying them on a growing delay
+**Parallel:** yes (2 workers — books-wk67x and games-wkyf0 are the whole ready set; integration-fn3yx held back, depends_on books-wk67x which is not yet done)
+
+---
+
 ## 2026-09-18 10:39 -- Modeling / Captured: integration-fn3yx - Audible sync decides on listened minutes and calculates the percent — position comes from `last_position_heard`, not the library listing's unreliable `percent_complete`; fixes the decoder that reads that endpoint at the wrong nesting level (reverses ADR-0082's "the sync never fetches last-listened").
 
 **Type:** Modeling / Capture

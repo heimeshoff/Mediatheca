@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 1
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 13
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **games-wkyf0** — Deck-compat job — stop re-fetching permanently failing games every night by recording failed attempts and retrying them on a growing delay (bug) — `todo/games-wkyf0-deck-compat-failed-fetch-retry-backoff.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **games-wkyf0** — Deck-compat job — stop re-fetching permanently failing games every night by recording failed attempts and retrying them on a growing delay (bug) — `doing/games-wkyf0-deck-compat-failed-fetch-retry-backoff.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
