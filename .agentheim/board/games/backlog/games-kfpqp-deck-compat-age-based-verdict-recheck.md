@@ -9,7 +9,7 @@ completed:
 depends_on: [games-wkyf0]
 blocks: []
 tags: [games, metadata, cache, steam, steam-deck]
-related_adrs: [0043, 0045, 0059, 0060, 0066]
+related_adrs: [0043, 0045, 0059, 0060, 0066, 0084]
 related_research: []
 prior_art: [games-b8xnw, games-ev65k]
 ---
@@ -41,10 +41,27 @@ age limit that depends on the verdict — the same self-selecting shape
   one large burst against the storefront; with it the initial hump drains over a few weeks and the
   steady state is roughly ten requests a night for ~1000 Steam games. The never-fetched cohort is
   NOT capped — a newly added game is still picked up the next morning.
-- A successful re-check overwrites `deck_compat` and re-stamps `deck_compat_fetched_at` (the
-  existing `upsertGameDeckCompat` already does both).
-- A failed re-check keeps the verdict on record and goes through games-wkyf0's failed-attempt
-  backoff instead of being retried nightly.
+- **The cap counts only games that are actually eligible.** games-wkyf0's backoff filter runs in F#
+  after the SQL read, so the 25 are taken *after* that filter (age limit → backoff → oldest first →
+  take 25). Capping in SQL first would let 25 re-checks sitting in backoff occupy every slot and
+  starve the cohort.
+- A stored `deck_compat` string that is NULL or not one of the four encoded verdicts is treated as
+  Unknown (30 days).
+- The cursor tells the job which cohort each candidate came from (first fetch vs. re-check), so the
+  job can count them separately. It also returns the verdict on record for re-checks, so the job
+  can count how many re-checks came back with a *different* verdict — the only evidence there will
+  be for tuning the intervals later.
+- A successful re-check overwrites `deck_compat` and re-stamps `deck_compat_fetched_at` via the
+  existing `upsertGameDeckCompat`. That writer currently stamps `DateTime.UtcNow` itself; it takes
+  the job's injected `now` instead, so the stamp and the age-limit comparison share one clock (an
+  injected-clock test would otherwise see a just-re-checked game as still due).
+- A failed re-check keeps the verdict and its stamp on record and goes through games-wkyf0's
+  `recordDeckCompatFailedAttempt` — the same `min(2^attempts, 30)`-day backoff (ADR-0084), applied
+  to the re-check cohort exactly as to the never-fetched one. `upsertGameDeckCompat` already
+  clears the failure columns on the next success.
+- `BackfillResult` gains `Rechecks` (candidates from the re-check cohort) and `VerdictsChanged`
+  (successful re-checks whose verdict differs from the one on record); `Processed`, `Succeeded`,
+  `Failed`, `Errors` keep their meaning across both cohorts.
 - Intervals and cap are plain constants next to the cursor query, not settings.
 
 ## Acceptance criteria
@@ -54,21 +71,40 @@ age limit that depends on the verdict — the same self-selecting shape
       clock (Expecto, in-memory SQLite).
 - [ ] With more than 25 due re-checks, one run returns exactly the 25 with the oldest
       `deck_compat_fetched_at`; the rest come due on later runs.
+- [ ] Due re-checks that are still inside their failed-attempt backoff do not consume cap slots:
+      with 25 such games plus 5 eligible due re-checks, the run returns the 5.
 - [ ] Never-fetched games are returned in full regardless of the re-check cap.
 - [ ] A re-check that returns a different verdict overwrites `deck_compat` and re-stamps
-      `deck_compat_fetched_at`; a list/detail read then shows the new verdict.
-- [ ] A re-check whose fetch fails leaves the recorded verdict and its stamp untouched and is
-      subject to games-wkyf0's backoff (not retried the next night).
-- [ ] The scheduled job's summary line reports first fetches and re-checks as separate numbers.
+      `deck_compat_fetched_at` with the injected `now`; a list/detail read then shows the new
+      verdict, and the game is no longer due on a second run with the same clock.
+- [ ] A re-check whose fetch fails (both the `Error` result and the exception branch) leaves the
+      recorded verdict and its stamp untouched, records the failed attempt, and is absent from the
+      cursor until `min(2^attempts, 30)` days have passed (not retried the next night).
+- [ ] `BackfillResult` reports `Rechecks` and `VerdictsChanged`, and the scheduled job's summary
+      line shows first fetches, re-checks and changed verdicts as separate numbers next to the
+      existing failed/errors counts.
+- [ ] An ADR (scope `games`, `related_tasks: [games-kfpqp]`, amends 0084, ADR-0060's structure)
+      records the age-based re-check cohort: the per-verdict limits and why they differ, the
+      25-per-run cap and why never-fetched games are exempt, cap-after-backoff, and the timer
+      remaining the only trigger. The Games README's Deck-compat entry names it.
 - [ ] Cache tier only: `checkProjectionDrift` stays zero for `GameProjection`, no `*Projection.fs`
       file references `MetadataCache` (ADR-0045); pacing comes solely from
       `Steam.throttleStorefrontCall` (ADR-0066).
 
 ## Notes
 
-- Fully refined; it waits in backlog only because it depends on games-wkyf0, which edits the same
-  cursor query (`MetadataCache.findGamesNeedingDeckCompatBackfill`) and job
-  (`src/Server/GameDeckCompatBackfill.fs`). Promote once games-wkyf0 is in `done/`.
+- Refined 2026-09-18 against what games-wkyf0 shipped (now in `done/`, ADR-0084). That task left
+  `findGamesNeedingDeckCompatBackfill conn now` returning `(slug, steamAppId)` from a
+  `deck_compat_fetched_at IS NULL` read with the backoff applied as an F# `List.filter`, and
+  `runBackfill conn jobLock httpClient now`; its Outcome notes the re-check cohort can be added
+  against `deck_compat_fetched_at IS NOT NULL` without touching the existing WHERE clause.
+- Code: `src/Server/MetadataCache.fs` (`findGamesNeedingDeckCompatBackfill`,
+  `upsertGameDeckCompat`, `deckCompatBackoffDays`), `src/Server/GameDeckCompatBackfill.fs`
+  (`BackfillResult`, `runBackfill`), `src/Server/Composition.fs` ("Game Deck-compat backfill"
+  summary line), `tests/Server.Tests/GameDeckCompatBackfillTests.fs`.
+- The ADR criterion is there because games-wkyf0's verifier failed iteration 1 on exactly this:
+  a backfill-cursor-shape decision narrated only in task Notes (ADR-0060 and ADR-0084 are the
+  precedent). ADR-0084's References name this task by its `backlog/` path; leave that as written.
 - The intervals are a modeling-session proposal (2026-09-18), not observed Valve behaviour — cheap
   to tune later since they are constants.
 - The job keeps its "backfill" name and 06:00 slot; renaming it is not part of this task.

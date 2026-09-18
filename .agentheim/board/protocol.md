@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 12:54 -- Modeling / Refined: games-kfpqp - Deck-compat job — age-based re-check of recorded verdicts
+
+**Type:** Modeling / Refine
+**BC:** games
+**Status after:** todo
+**Summary:** Reconciled the task against what games-wkyf0 shipped (ADR-0084). Pinned that the 25-per-run cap is taken after the failed-attempt backoff filter so games in backoff cannot occupy every slot; that upsertGameDeckCompat takes the injected now instead of stamping UtcNow itself; that an unrecognised stored verdict counts as Unknown; that BackfillResult gains Rechecks and VerdictsChanged (the only evidence for tuning the intervals later); and added an ADR acceptance criterion, since games-wkyf0's verifier failed iteration 1 on a cursor-shape decision without one. No split.
+
+---
+
 ## 2026-09-18 12:41 -- Work session ended
 
 **Type:** Work / Session end
