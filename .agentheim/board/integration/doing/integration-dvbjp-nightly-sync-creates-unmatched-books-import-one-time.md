@@ -1,7 +1,7 @@
 ---
 id: integration-dvbjp
 title: The nightly Audible sync creates a Book for every unmatched library ASIN (same create path as the import, then an ordinary observation) and "Import library" becomes a true one-time bootstrap — stamped `audible_library_imported_at` on its first populated run, refused by the API and hidden by the Settings card afterwards
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-09-18

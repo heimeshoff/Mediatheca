@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 03:14 -- Batch started: [integration-dvbjp]
+
+**Type:** Work / Batch start
+**Tasks:** integration-dvbjp - The nightly Audible sync creates a Book for every unmatched library ASIN (same create path as the import, then an ordinary observation) and "Import library" becomes a true one-time bootstrap — stamped `audible_library_imported_at` on its first populated run, refused by the API and hidden by the Settings card afterwards
+**Parallel:** no (1 worker — integration-dvbjp is the whole ready set after integration-dtdbb integrated; todo/ is otherwise empty across every BC)
+
+---
+
 ## 2026-09-18 03:14 -- Task verified and completed: integration-dtdbb - Audible priors carry the last-listened day — import and nightly sync fetch `last_position_heard` (`GET /1.0/content/{asin}/metadata`) only for books with no Audible progress row yet, date the prior (and so the finished date) to Audible's `last_updated`, use `position_ms` for the position, and "Import library" repairs the import-day observations written before priors existed
 
 **Type:** Work / Task completion

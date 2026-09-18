@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 29
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **integration-dvbjp** — The nightly Audible sync creates a Book for every unmatched library ASIN (same create path as the import, then an ordinary observation) and "Import library" becomes a true one-time bootstrap — stamped `audible_library_imported_at` on its first populated run, refused by the API and hidden by the Settings card afterwards (feature) — `todo/integration-dvbjp-nightly-sync-creates-unmatched-books-import-one-time.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **integration-dvbjp** — The nightly Audible sync creates a Book for every unmatched library ASIN (same create path as the import, then an ordinary observation) and "Import library" becomes a true one-time bootstrap — stamped `audible_library_imported_at` on its first populated run, refused by the API and hidden by the Settings card afterwards (feature) — `doing/integration-dvbjp-nightly-sync-creates-unmatched-books-import-one-time.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
