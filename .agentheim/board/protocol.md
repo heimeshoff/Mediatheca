@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 12:05 -- Batch started: [integration-fn3yx]
+
+**Type:** Work / Batch start
+**Tasks:** integration-fn3yx - Audible sync decides on listened minutes and calculates the percent — position comes from `last_position_heard`, not the library listing's unreliable `percent_complete`; fixes the decoder that reads that endpoint at the wrong nesting level (reverses ADR-0082's "the sync never fetches last-listened").
+**Parallel:** no (1 worker — integration-fn3yx is the whole ready set now that books-wk67x is done; todo/ is otherwise empty across every BC)
+
+---
+
 ## 2026-09-18 12:04 -- Task verified and completed: books-wk67x - Reading history appends, never overwrites — a prior is set once and no later listening data replaces it, and any change in position or percent adds a NEW history entry even on the same day from the same source (reverses ADR-0076 §2's same-day collapse).
 
 **Type:** Work / Task completion

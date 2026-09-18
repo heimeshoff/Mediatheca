@@ -1,7 +1,7 @@
 ---
 id: integration-fn3yx
 title: Audible sync decides on listened minutes and calculates the percent — position comes from `last_position_heard`, not the library listing's unreliable `percent_complete`; fixes the decoder that reads that endpoint at the wrong nesting level (reverses ADR-0082's "the sync never fetches last-listened").
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-09-18
