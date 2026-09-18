@@ -1,10 +1,16 @@
 module Mediatheca.Tests.AudibleLibrarySyncTests
 
-/// integration-jjvg2 (ADR-0074/ADR-0076/ADR-0026): "Import Audible library"
-/// (`Api.importAudibleLibrary`) creates a Book per library title (matched by
-/// ASIN) and observes reading progress for every item with one; the "Audible
-/// progress sync" scheduled job (`AudibleSync.runProgressSync`) re-observes
-/// KNOWN books only and never creates one; `Audible.getLibrary` pages until a
+/// integration-jjvg2 (ADR-0074/ADR-0076/ADR-0026), reversed for the nightly
+/// sync's create path by integration-dvbjp (ADR-0082): "Import Audible
+/// library" (`Api.importAudibleLibrary`) is now a ONE-TIME bootstrap --
+/// creates a Book per library title (matched by ASIN), records a PRIOR for
+/// any book with no Audible row yet, stamps `audible_library_imported_at`
+/// after a populated run, and refuses a second run once stamped. The
+/// "Audible progress sync" scheduled job (`AudibleSync.runProgressSync`) now
+/// ALSO creates a book for an unmatched ASIN (via the `createBook` function
+/// parameter, `Api.createBookFromAudibleItem` in real wiring), then observes
+/// it exactly like a matched book -- an ordinary observation, NEVER a prior,
+/// NEVER a `getLastPositionHeard` call. `Audible.getLibrary` pages until a
 /// short page; a rejected auth file ends the job run `error` (never
 /// `Skipped`), while no auth file at all IS `Skipped`. No live Audible call
 /// -- every request goes through a stub `HttpMessageHandler`.
@@ -190,11 +196,35 @@ let private totalEventCount (conn: SqliteConnection) : int64 =
 
 let private noopPersistToken (_: Audible.AudibleAccessToken) : unit = ()
 
+/// integration-dvbjp: `AudibleSync.runProgressSync`'s new `createBook`
+/// parameter, for tests whose fixture only ever carries ALREADY-matched
+/// ASINs (or hits an auth-file error before the per-item loop runs) --
+/// asserts the create path is never reached in those tests instead of
+/// silently wiring in a working stub that would mask a regression.
+let private createBookMustNotBeCalled : Audible.AudibleLibraryItem -> Async<Result<AddBookOutcome, string>> =
+    fun item -> async { return Error (sprintf "createBook should not have been called for %s in this test" item.Asin) }
+
+/// integration-dvbjp: the real create path (`Api.createBookFromAudibleItem`,
+/// `Api.noLocker` -- this per-test `SqliteConnection` is never shared with a
+/// second thread), for tests that exercise the sync's own book-creation
+/// behaviour directly (bypassing `Api.create`/`Composition.fs`'s wiring,
+/// mirroring how `Composition.fs`'s own `createBookForAudibleSync` closure
+/// wires it for the real job).
+let private realCreateBook (conn: SqliteConnection) (httpClient: HttpClient) (imageBasePath: string) : Audible.AudibleLibraryItem -> Async<Result<AddBookOutcome, string>> =
+    fun item -> Api.createBookFromAudibleItem conn httpClient imageBasePath allProjectionHandlers Api.noLocker "us" item
+
+/// integration-dvbjp: proves the one-time-gate refusal never reaches Audible
+/// at all -- any request throws, failing the test loudly instead of a stub
+/// that quietly returns something plausible.
+let private httpClientThatMustNotBeCalled () : HttpClient =
+    let handler = new AsyncStubHandler(fun req -> failwith (sprintf "Audible must not be called once the library is already imported (requested %s)" (req.RequestUri.ToString())))
+    new HttpClient(handler)
+
 [<Tests>]
 let importAudibleLibraryTests =
     testList "Api.importAudibleLibrary (integration-jjvg2)" [
 
-        testCase "a 3-item fixture (0%, 42%, finished) creates 3 books, each recording a PRIOR (integration-dtdbb, ADR-0082); a second import is a total no-op" <| fun _ ->
+        testCase "a 3-item fixture (0%, 42%, finished) creates 3 books, each recording a PRIOR (integration-dtdbb, ADR-0082); a second import call is refused outright by the one-time bootstrap gate (integration-dvbjp)" <| fun _ ->
             withTempImageDir (fun imageBasePath ->
                 use db = TestDb.withTempDbFactory bootstrap
                 let itemZero = libraryItemJson "A1" "Book A" (Some 0.0) false (Some 600)
@@ -233,15 +263,17 @@ let importAudibleLibraryTests =
                     |> List.sumBy (fun slug -> (BookProjection.getBySlug db.Connection slug |> Option.get).ProgressHistory |> List.length)
                 Expect.equal progressRowCount 3 "exactly 3 book_progress rows total -- one prior per book, including 0%%"
 
+                // integration-dvbjp (ADR-0082 Consequences): the first
+                // populated run stamps the one-time bootstrap gate, so a
+                // second call is refused outright -- it never reaches
+                // Audible or the aggregate again. New purchases/percent
+                // changes from here on are the nightly sync's job
+                // (AudibleSync.runProgressSync tests below).
                 let eventsBeforeSecondImport = totalEventCount db.Connection
-                let second =
-                    match api.importAudibleLibrary () |> Async.RunSynchronously with
-                    | Ok r -> r
-                    | Error e -> failtestf "Expected Ok on re-run, got Error %s" e
-                Expect.equal second.Created 0 "re-run creates nothing"
-                Expect.equal second.AlreadyKnown 3 "all three now known"
-                Expect.equal second.ProgressObserved 0 "every book already carries an Audible prior row, so the re-run falls through to a same-percent-per-source no-op"
-                Expect.equal (totalEventCount db.Connection) eventsBeforeSecondImport "the second import appends ZERO events")
+                match api.importAudibleLibrary () |> Async.RunSynchronously with
+                | Error msg -> Expect.stringContains msg "already imported" "the one-time gate refuses a second call"
+                | Ok r -> failtestf "Expected the one-time gate to refuse a second call, got Ok %A" r
+                Expect.equal (totalEventCount db.Connection) eventsBeforeSecondImport "the refused second call appends ZERO events")
 
         testCase "an unknown ASIN (404 from the catalog fallback path) does not abort the run -- errors are collected, not thrown" <| fun _ ->
             withTempImageDir (fun imageBasePath ->
@@ -341,28 +373,146 @@ let importAudibleLibraryTests =
     ]
     |> testSequenced
 
+/// integration-dvbjp (ADR-0082 Consequences): "Import library" is a true
+/// one-time bootstrap -- stamped `audible_library_imported_at` after its
+/// first populated run, refused (with no Audible call at all) once stamped.
+[<Tests>]
+let audibleOneTimeImportGateTests =
+    testList "Api.importAudibleLibrary one-time bootstrap gate (integration-dvbjp, ADR-0082)" [
+
+        testCase "a populated run stamps audible_library_imported_at; an empty-but-200 response never stamps it" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                use db = TestDb.withTempDbFactory bootstrap
+                let emptyFixture = libraryResponseJson []
+                let httpClientEmpty, _ = httpClientForLibrary (Map.ofList [ 1, emptyFixture ])
+                let apiEmpty = createApi db.Factory httpClientEmpty imageBasePath (fun () -> configuredAudibleConfig)
+                apiEmpty.importAudibleLibrary () |> Async.RunSynchronously |> ignore
+                Expect.isNone (SettingsStore.getSetting db.Connection "audible_library_imported_at") "an empty-but-200 response never stamps the one-time gate (ADR-0068's lesson)"
+
+                let fixture = libraryResponseJson [ libraryItemJson "S1" "Stamped Book" (Some 10.0) false (Some 300) ]
+                let httpClient, _ = httpClientForLibrary (Map.ofList [ 1, fixture ])
+                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+                match api.importAudibleLibrary () |> Async.RunSynchronously with
+                | Ok _ -> ()
+                | Error e -> failtestf "Expected Ok, got Error %s" e
+                Expect.isSome (SettingsStore.getSetting db.Connection "audible_library_imported_at") "a genuinely populated run stamps the one-time gate")
+
+        testCase "once stamped, a second importAudibleLibrary call is refused, names the date, and never calls Audible" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                use db = TestDb.withTempDbFactory bootstrap
+                SettingsStore.setSetting db.Connection "audible_library_imported_at" "2026-09-18T05:00:00.0000000Z"
+                let httpClient = httpClientThatMustNotBeCalled ()
+                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+
+                match api.importAudibleLibrary () |> Async.RunSynchronously with
+                | Error msg ->
+                    Expect.stringContains msg "2026-09-18" "the refusal names the stamped date"
+                    Expect.stringContains msg "already imported" "the refusal explains why -- new purchases arrive with the nightly sync"
+                | Ok r -> failtestf "Expected Error, got Ok %A" r)
+
+        testCase "getAudibleSyncStatus().LibraryImportedAt round-trips the one-time bootstrap stamp" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                use db = TestDb.withTempDbFactory bootstrap
+                let fixture = libraryResponseJson [ libraryItemJson "R1" "Roundtrip Book" (Some 10.0) false (Some 300) ]
+                let httpClient, _ = httpClientForLibrary (Map.ofList [ 1, fixture ])
+                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+
+                let beforeImport = api.getAudibleSyncStatus () |> Async.RunSynchronously
+                Expect.isNone beforeImport.LibraryImportedAt "not stamped before any import runs"
+
+                api.importAudibleLibrary () |> Async.RunSynchronously |> ignore
+                let afterImport = api.getAudibleSyncStatus () |> Async.RunSynchronously
+                Expect.isSome afterImport.LibraryImportedAt "the stamp round-trips through getAudibleSyncStatus")
+    ]
+    |> testSequenced
+
 [<Tests>]
 let audibleProgressSyncJobTests =
     testList "AudibleSync.runProgressSync -- the scheduled job (integration-jjvg2)" [
 
-        testCase "the job never creates a book -- an unknown ASIN is counted Unmatched" <| fun _ ->
+        testCase "an unmatched ASIN is created by the nightly sync itself and observed like any other item -- never a prior, never a getLastPositionHeard call (ADR-0082/integration-dvbjp reverses integration-jjvg2's 'this job never creates a book' rule)" <| fun _ ->
             withTempImageDir (fun imageBasePath ->
                 use db = TestDb.withTempDbFactory bootstrap
-                let fixture = libraryResponseJson [ libraryItemJson "UNKNOWN1" "Mystery Book" (Some 50.0) false (Some 400) ]
-                let httpClient, _ = httpClientForLibrary (Map.ofList [ 1, fixture ])
+                let fixture = libraryResponseJson [ libraryItemJson "NEW1" "New Purchase" (Some 20.0) false (Some 400) ]
+                let httpClient, metadataCalls = httpClientForImportWithMetadata fixture Map.empty
                 let jobLock = new SemaphoreSlim(1, 1)
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
                     |> Async.RunSynchronously
 
                 match result with
                 | Ok r ->
-                    Expect.equal r.Unmatched 1 "the unknown ASIN is counted as unmatched"
-                    Expect.equal r.Observed 0 "nothing was observed"
+                    Expect.equal r.Created 1 "the unmatched ASIN was created"
+                    Expect.equal r.Observed 1 "the newly-created book's first percent is observed"
                 | Error e -> failtestf "Expected Ok, got Error %s" e
 
-                Expect.isEmpty (BookProjection.getAll db.Connection) "no book was created by the job")
+                Expect.isEmpty (metadataCalls ()) "the job never calls getLastPositionHeard, even for a book it just created"
+
+                let slug = BookProjection.findByExternalId db.Connection (AudibleAsin "NEW1") |> Option.get
+                let detail = BookProjection.getBySlug db.Connection slug |> Option.get
+                Expect.equal detail.Format BookFormat.Audiobook "created as an audiobook"
+                Expect.equal detail.AudibleAsin (Some "NEW1") "linked to the library item's ASIN"
+
+                let events = EventStore.readStream db.Connection (Books.streamId slug) |> List.choose Books.Serialization.fromStoredEvent
+                match events |> List.filter (function Books.Reading_progress_observed _ | Books.Prior_reading_progress_recorded _ -> true | _ -> false) with
+                | [ Books.Reading_progress_observed data ] ->
+                    Expect.equal data.Percent 20 "the observed percent"
+                    Expect.equal data.ObservedOn (DateTime.Now.ToString("yyyy-MM-dd")) "dated to the sync day, never a prior"
+                | other -> failtestf "Expected exactly one Reading_progress_observed and NO Prior_reading_progress_recorded, got %A" other
+
+                let metadata = MetadataCache.tryGetBookMetadata db.Connection slug
+                Expect.equal metadata.Source (Some "audible") "the metadata cache slice is tagged as an audible source")
+
+        testCase "a second sync of the same library creates nothing and appends nothing for the book it created on the first run" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                use db = TestDb.withTempDbFactory bootstrap
+                let fixture = libraryResponseJson [ libraryItemJson "NEW2" "New Purchase Two" (Some 20.0) false (Some 400) ]
+                let httpClient, _ = httpClientForLibrary (Map.ofList [ 1, fixture ])
+                let jobLock = new SemaphoreSlim(1, 1)
+
+                AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                |> Async.RunSynchronously
+                |> ignore
+
+                let slug = BookProjection.findByExternalId db.Connection (AudibleAsin "NEW2") |> Option.get
+                let eventsBeforeSecondRun = EventStore.readStream db.Connection (Books.streamId slug) |> List.length
+
+                let result =
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                    |> Async.RunSynchronously
+
+                match result with
+                | Ok r ->
+                    Expect.equal r.Created 0 "the book already exists -- the second run never re-creates it"
+                    Expect.equal r.Observed 0 "same percent as before -- a same-source no-op"
+                | Error e -> failtestf "Expected Ok, got Error %s" e
+
+                Expect.equal (EventStore.readStream db.Connection (Books.streamId slug) |> List.length) eventsBeforeSecondRun "the second run appends zero events")
+
+        testCase "a create failure for one item is reported in Errors and does not abort the run for the others" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                use db = TestDb.withTempDbFactory bootstrap
+                let fixture = libraryResponseJson [ libraryItemJson "FAIL1" "Book Fail" (Some 10.0) false (Some 300); libraryItemJson "OK2" "Book OK2" (Some 20.0) false (Some 300) ]
+                let httpClient, _ = httpClientForLibrary (Map.ofList [ 1, fixture ])
+                let jobLock = new SemaphoreSlim(1, 1)
+                let createBook (item: Audible.AudibleLibraryItem) : Async<Result<AddBookOutcome, string>> =
+                    if item.Asin = "FAIL1" then async { return Error "boom" }
+                    else realCreateBook db.Connection httpClient imageBasePath item
+
+                let result =
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBook allProjectionHandlers
+                    |> Async.RunSynchronously
+
+                match result with
+                | Ok r ->
+                    Expect.equal r.Created 1 "only the successfully-created item counts"
+                    Expect.equal (List.length r.Errors) 1 "the failed creation is reported as an error"
+                    Expect.stringContains r.Errors.[0] "FAIL1" "the error names the failing item"
+                | Error e -> failtestf "Expected Ok, got Error %s" e
+
+                Expect.isNone (BookProjection.findByExternalId db.Connection (AudibleAsin "FAIL1")) "the failed item never got a book"
+                Expect.isSome (BookProjection.findByExternalId db.Connection (AudibleAsin "OK2")) "the other item was still created despite the first item's failure")
 
         testCase "changing a known book's percent from 42%% to 55%% (after the import's own prior) appends the observation AND promotes to InFocus" <| fun _ ->
             withTempImageDir (fun imageBasePath ->
@@ -385,7 +535,7 @@ let audibleProgressSyncJobTests =
                 let jobLock = new SemaphoreSlim(1, 1)
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient2 (fun () -> configuredAudibleConfig) noopPersistToken allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient2 (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
                     |> Async.RunSynchronously
 
                 match result with
@@ -433,7 +583,7 @@ let audibleProgressSyncJobTests =
                 let httpClient, _ = httpClientForLibrary Map.empty
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> noAuthFileConfig) noopPersistToken allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> noAuthFileConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
                     |> Async.RunSynchronously
 
                 match result with
@@ -448,7 +598,7 @@ let audibleProgressSyncJobTests =
                 let httpClient = httpClientAlwaysUnauthorized ()
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
                     |> Async.RunSynchronously
 
                 match result with
@@ -468,13 +618,13 @@ let audibleProgressSyncJobTests =
                 let httpClient, _ = httpClientForLibrary (Map.ofList [ 1, emptyFixture ])
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
                     |> Async.RunSynchronously
 
                 match result with
                 | Ok r ->
                     Expect.equal r.Observed 0 "an empty library observes nothing"
-                    Expect.equal r.Unmatched 0 "an empty library reports 0 items plainly, not an error"
+                    Expect.equal r.Created 0 "an empty library reports 0 items plainly, not an error"
                 | Error e -> failtestf "Expected Ok, got Error %s" e
 
                 match SettingsStore.getSetting db.Connection "audible_last_error" with
@@ -509,7 +659,7 @@ let audibleProgressSyncJobTests =
                 let jobLock = new SemaphoreSlim(1, 1)
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
                     |> Async.RunSynchronously
 
                 match result with
@@ -552,7 +702,7 @@ let audibleProgressSyncJobRegistrationTests =
                     Hour = 5
                     Run = fun () ->
                         async {
-                            match! AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken allProjectionHandlers with
+                            match! AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers with
                             | Ok result -> return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = AudibleSync.formatResult result } : ScheduledJobs.JobRunOutcome)
                             | Error err when err.StartsWith(Audible.authFileRejectedPrefix) -> return failwith err
                             | Error err -> return ({ Disposition = ScheduledJobs.JobDisposition.Skipped; Summary = err } : ScheduledJobs.JobRunOutcome)
@@ -606,7 +756,7 @@ let audibleSyncStatusPersistenceTests =
                 Expect.isNone afterImport.LastSync "no sync has run yet"
 
                 let jobLock = new SemaphoreSlim(1, 1)
-                AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken allProjectionHandlers
+                AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
                 |> Async.RunSynchronously
                 |> ignore
 
@@ -699,33 +849,48 @@ let importPriorRecordingTests =
         testCase "a book that already has an Audible row makes no metadata call and appends an ordinary observation" <| fun _ ->
             withTempImageDir (fun imageBasePath ->
                 use db = TestDb.withTempDbFactory bootstrap
-                let firstFixture = libraryResponseJson [ libraryItemJson "G1" "Book G" (Some 20.0) false (Some 600) ]
-                let httpClient1, metadataCalls1 = httpClientForImportWithMetadata firstFixture Map.empty
-                let api1 = createApi db.Factory httpClient1 imageBasePath (fun () -> configuredAudibleConfig)
-                api1.importAudibleLibrary () |> Async.RunSynchronously |> ignore
-                Expect.equal (metadataCalls1 () |> List.length) 1 "sanity: the first (prior-recording) import called the metadata endpoint once"
+                // integration-dvbjp (ADR-0082 Consequences): the one-time
+                // bootstrap gate refuses a SECOND `importAudibleLibrary`
+                // call outright, so this scenario -- a book that already
+                // carries an Audible row by the time the (single) import
+                // runs -- is seeded directly instead of via two public
+                // import calls.
+                let today = DateTime.Now.ToString("yyyy-MM-dd")
+                let slug = "g1-book"
+                let addedData : Books.BookAddedData = {
+                    Title = "Book G"; Authors = [ "Author" ]; Year = None; CoverRef = None
+                    Subjects = []; Format = BookFormat.Audiobook; ExternalIds = [ AudibleAsin "G1" ]
+                }
+                let priorData : Books.ReadingProgressObservedData = {
+                    Percent = 20; Position = Some (Minutes (120, Some 600)); Source = ProgressSource.Audible
+                    ObservedOn = today; Finished = false
+                }
+                let seedEvents = [ Books.Book_added_to_library addedData; Books.Prior_reading_progress_recorded priorData ]
+                match EventStore.appendToStream db.Connection (Books.streamId slug) -1L (seedEvents |> List.map Books.Serialization.toEventData) with
+                | EventStore.Success _ -> ()
+                | EventStore.ConcurrencyConflict _ -> failtest "unexpected concurrency conflict seeding the fixture"
+                for handler in allProjectionHandlers do Projection.runProjection db.Connection handler
 
-                let secondFixture = libraryResponseJson [ libraryItemJson "G1" "Book G" (Some 40.0) false (Some 600) ]
-                let httpClient2, metadataCalls2 = httpClientForImportWithMetadata secondFixture Map.empty
-                let api2 = createApi db.Factory httpClient2 imageBasePath (fun () -> configuredAudibleConfig)
+                let fixture = libraryResponseJson [ libraryItemJson "G1" "Book G" (Some 40.0) false (Some 600) ]
+                let httpClient, metadataCalls = httpClientForImportWithMetadata fixture Map.empty
+                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
                 let result =
-                    match api2.importAudibleLibrary () |> Async.RunSynchronously with
+                    match api.importAudibleLibrary () |> Async.RunSynchronously with
                     | Ok r -> r
                     | Error e -> failtestf "Expected Ok, got Error %s" e
 
-                Expect.equal (metadataCalls2 () |> List.length) 0 "a book that already carries an Audible row never calls the metadata endpoint again"
+                Expect.equal (metadataCalls () |> List.length) 0 "a book that already carries an Audible row never calls the metadata endpoint"
                 Expect.equal result.ProgressObserved 1 "the percent change (20%% -> 40%%) appends an ordinary observation"
                 Expect.equal result.PriorsFromAudible 0 "no new prior this run"
                 Expect.equal result.PriorsToday 0 "no new prior this run"
 
-                // Both imports run on the same calendar day in this test, so
-                // ADR-0076 §2's existing same-day/same-source collapse (the
-                // `book_progress` PK is (book_slug, observed_on, source))
-                // upserts the ordinary observation over the prior's own row
-                // -- an intentional, pre-existing behaviour this task does
-                // not change, not a second row.
-                let slugG = BookProjection.findByExternalId db.Connection (AudibleAsin "G1") |> Option.get
-                let history = (BookProjection.getBySlug db.Connection slugG |> Option.get).ProgressHistory
+                // The seeded prior and the new observation share the same
+                // calendar day, so ADR-0076 §2's existing same-day/same-
+                // source collapse (the `book_progress` PK is (book_slug,
+                // observed_on, source)) upserts the ordinary observation
+                // over the prior's own row -- an intentional, pre-existing
+                // behaviour this task does not change, not a second row.
+                let history = (BookProjection.getBySlug db.Connection slug |> Option.get).ProgressHistory
                 match history with
                 | [ row ] ->
                     Expect.equal row.Kind ProgressKind.Observed "the plain Observe_reading_progress command's write wins the same-day collapse"
@@ -758,7 +923,7 @@ let importPriorRecordingTests =
                     Expect.equal row.ObservedOn (DateTime.Now.ToString("yyyy-MM-dd")) "falls back to today"
                 | other -> failtestf "Expected exactly one progress row, got %A" other)
 
-        testCase "legacy repair: a book whose only Audible row is kind=observation becomes a single re-dated prior after one import; a second run is a no-op" <| fun _ ->
+        testCase "legacy repair: a book whose only Audible row is kind=observation becomes a single re-dated prior after one import; a second import call is refused by the one-time gate (integration-dvbjp)" <| fun _ ->
             withTempImageDir (fun _ ->
                 use db = TestDb.withTempDbFactory bootstrap
                 // Seed the "legacy" shape directly: a book created and its
@@ -808,15 +973,15 @@ let importPriorRecordingTests =
                     [ { ObservedOn = "2024-03-01"; Source = ProgressSource.Audible; Percent = 60; Position = Some (Minutes (360, Some 600)); Kind = ProgressKind.Prior } ]
                 ) "the legacy row is replaced by a single, correctly-dated prior"
 
+                // integration-dvbjp (ADR-0082 Consequences): the one-time
+                // bootstrap gate refuses a second call outright.
                 let eventsBeforeSecondRun = EventStore.readStream db.Connection (Books.streamId slug) |> List.length
-                let second =
-                    match api.importAudibleLibrary () |> Async.RunSynchronously with
-                    | Ok r -> r
-                    | Error e -> failtestf "Expected Ok on re-run, got Error %s" e
-                Expect.equal second.Repaired 0 "idempotent: a second run finds a prior, not a legacy row, so there is nothing left to repair"
-                Expect.equal (EventStore.readStream db.Connection (Books.streamId slug) |> List.length) eventsBeforeSecondRun "the second run appends zero events")
+                match api.importAudibleLibrary () |> Async.RunSynchronously with
+                | Error msg -> Expect.stringContains msg "already imported" "the one-time gate refuses a second call"
+                | Ok r -> failtestf "Expected the one-time gate to refuse a second call, got Ok %A" r
+                Expect.equal (EventStore.readStream db.Connection (Books.streamId slug) |> List.length) eventsBeforeSecondRun "the refused second call appends zero events")
 
-        testCase "legacy repair on an ALREADY-FINISHED book re-dates finished_at to Audible's last-listened day; a second run is a no-op" <| fun _ ->
+        testCase "legacy repair on an ALREADY-FINISHED book re-dates finished_at to Audible's last-listened day; a second import call is refused by the one-time gate (integration-dvbjp)" <| fun _ ->
             withTempImageDir (fun _ ->
                 use db = TestDb.withTempDbFactory bootstrap
                 // Seed the "legacy, already finished" shape directly: a book
@@ -874,11 +1039,11 @@ let importPriorRecordingTests =
                 | other -> failtestf "Expected exactly one progress row, got %A" other
                 Expect.equal detailAfterRepair.FinishedAt (Some "2023-09-23") "finished_at is RE-DATED to the last-listened day, not stuck at the old import day (the exact defect this task exists to fix)"
 
+                // integration-dvbjp (ADR-0082 Consequences): the one-time
+                // bootstrap gate refuses a second call outright.
                 let eventsBeforeSecondRun = EventStore.readStream db.Connection (Books.streamId slug) |> List.length
-                let second =
-                    match api.importAudibleLibrary () |> Async.RunSynchronously with
-                    | Ok r -> r
-                    | Error e -> failtestf "Expected Ok on re-run, got Error %s" e
-                Expect.equal second.Repaired 0 "idempotent: a second run finds a prior, not a legacy row"
-                Expect.equal (EventStore.readStream db.Connection (Books.streamId slug) |> List.length) eventsBeforeSecondRun "the second run appends zero events -- the re-finish Change_status is a no-op once the date already matches")
+                match api.importAudibleLibrary () |> Async.RunSynchronously with
+                | Error msg -> Expect.stringContains msg "already imported" "the one-time gate refuses a second call"
+                | Ok r -> failtestf "Expected the one-time gate to refuse a second call, got Ok %A" r
+                Expect.equal (EventStore.readStream db.Connection (Books.streamId slug) |> List.length) eventsBeforeSecondRun "the refused second call appends zero events")
     ]

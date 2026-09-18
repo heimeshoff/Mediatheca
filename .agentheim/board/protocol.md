@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 03:52 -- Task verified and completed: integration-dvbjp - The nightly Audible sync creates a Book for every unmatched library ASIN (same create path as the import, then an ordinary observation) and "Import library" becomes a true one-time bootstrap — stamped `audible_library_imported_at` on its first populated run, refused by the API and hidden by the Settings card afterwards
+
+**Type:** Work / Task completion
+**Task:** integration-dvbjp - The nightly Audible sync creates a Book for every unmatched library ASIN (same create path as the import, then an ordinary observation) and "Import library" becomes a true one-time bootstrap — stamped `audible_library_imported_at` on its first populated run, refused by the API and hidden by the Settings card afterwards
+**Summary:** The nightly Audible sync now creates a Book for every unmatched library ASIN (via a single shared create path, Api.createBookFromAudibleItem, also used by the one-time import) and observes it as an ordinary reading-progress entry, never a prior; "Import library" is a true one-time bootstrap, stamping audible_library_imported_at after its first populated run and refusing every later call, with the Settings card hiding the button and showing the imported-on date instead.
+**Duration:** 39m
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 9
+**Tests added:** 7
+**ADRs written:** none
+
+---
+
 ## 2026-09-18 03:14 -- Batch started: [integration-dvbjp]
 
 **Type:** Work / Batch start

@@ -284,6 +284,7 @@ let init () : Model * Cmd<Msg> =
       AudibleLastImportResult = None
       AudibleLastSync = None
       AudibleLastSyncResult = None
+      AudibleLibraryImportedAt = None
       PlaytimeSyncStatus = None
       JellyfinLastSyncTime = None
       JellyfinSyncStatus = None
@@ -823,7 +824,8 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
         { model with
             AudibleLastImportResult = status.LastImportResult
             AudibleLastSync = status.LastSync
-            AudibleLastSyncResult = status.LastSyncResult },
+            AudibleLastSyncResult = status.LastSyncResult
+            AudibleLibraryImportedAt = status.LibraryImportedAt },
         Cmd.none
 
     | Import_audible_library ->

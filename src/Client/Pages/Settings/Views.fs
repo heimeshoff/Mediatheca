@@ -1795,7 +1795,7 @@ let private audibleDetail (model: Model) (dispatch: Msg -> unit) =
                                 prop.children [
                                     Html.span [
                                         prop.className "text-sm"
-                                        prop.text (sprintf "Synced: %d observed, %d unmatched" result.Observed result.Unmatched)
+                                        prop.text (sprintf "Synced: %d observed, %d created" result.Observed result.Created)
                                     ]
                                 ]
                             ]
@@ -1826,21 +1826,35 @@ let private audibleDetail (model: Model) (dispatch: Msg -> unit) =
                             ]
                         | _ -> Html.none
 
+                        // integration-dvbjp (ADR-0082): once the one-time
+                        // bootstrap is stamped, "Import library" is hidden --
+                        // new purchases arrive via the nightly sync itself
+                        // from here on -- and this line explains why the
+                        // button is gone instead of just vanishing silently.
+                        match model.AudibleLibraryImportedAt with
+                        | Some importedAt ->
+                            Html.div [
+                                prop.className "mb-2 text-sm text-base-content/60"
+                                prop.children [ Html.text (sprintf "Library imported %s · new purchases arrive with the nightly sync" importedAt) ]
+                            ]
+                        | None -> Html.none
+
                         Html.div [
                             prop.className "flex gap-2"
                             prop.children [
-                                Daisy.button.button [
-                                    button.outline
-                                    button.sm
-                                    if model.IsImportingAudibleLibrary then button.disabled
-                                    prop.onClick (fun _ -> dispatch Import_audible_library)
-                                    prop.disabled model.IsImportingAudibleLibrary
-                                    prop.children [
-                                        if model.IsImportingAudibleLibrary then
-                                            Daisy.loading [ loading.spinner; loading.sm ]
-                                        Html.text "Import library"
+                                if Option.isNone model.AudibleLibraryImportedAt then
+                                    Daisy.button.button [
+                                        button.outline
+                                        button.sm
+                                        if model.IsImportingAudibleLibrary then button.disabled
+                                        prop.onClick (fun _ -> dispatch Import_audible_library)
+                                        prop.disabled model.IsImportingAudibleLibrary
+                                        prop.children [
+                                            if model.IsImportingAudibleLibrary then
+                                                Daisy.loading [ loading.spinner; loading.sm ]
+                                            Html.text "Import library"
+                                        ]
                                     ]
-                                ]
                                 Daisy.button.button [
                                     button.ghost
                                     button.sm

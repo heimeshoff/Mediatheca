@@ -459,6 +459,29 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         SettingsStore.setSetting conn "audible_access_token" token.AccessToken
         SettingsStore.setSetting conn "audible_access_token_expires" (token.ExpiresAt.ToString("o"))
 
+    /// integration-dvbjp (ADR-0028): the job-shared `IDbLocker` --
+    /// `Api.createBookFromAudibleItem`'s two DB touches (the `addBookToLibraryImpl`
+    /// call and this function's own metadata-cache write) lock around
+    /// `jobDbLock` exactly like every other job-body DB touch above, while
+    /// its Audnexus/cover HTTP calls run outside any lock.
+    let audibleCreateBookLocker =
+        { new Api.IDbLocker with
+            member _.Run f =
+                jobDbLock.Wait()
+                try f () finally jobDbLock.Release() |> ignore }
+
+    /// integration-dvbjp/ADR-0082: the create path `AudibleSync.
+    /// runProgressSync` calls for an ASIN it doesn't recognize -- the SAME
+    /// `Api.createBookFromAudibleItem` the one-time import bootstrap uses,
+    /// wired in here since `AudibleSync.fs` compiles before `Api.fs` and
+    /// can't reference it directly.
+    let createBookForAudibleSync (item: Audible.AudibleLibraryItem) : Async<Result<AddBookOutcome, string>> =
+        let localeCode =
+            (getAudibleConfig ()).AuthFile
+            |> Option.map (fun a -> a.LocaleCode)
+            |> Option.defaultValue "de"
+        Api.createBookFromAudibleItem jobConn httpClient imageBasePath projectionHandlers audibleCreateBookLocker localeCode item
+
     let scheduledJobs : ScheduledJobs.JobSpec list = [
         { Name = "Steam playtime sync"
           Hour = playtimeSyncHour
@@ -538,7 +561,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
           Hour = audibleSyncHour
           Run = fun () ->
             async {
-                match! AudibleSync.runProgressSync jobConn jobDbLock httpClient getAudibleConfig (persistAudibleAccessTokenForJob jobConn) projectionHandlers with
+                match! AudibleSync.runProgressSync jobConn jobDbLock httpClient getAudibleConfig (persistAudibleAccessTokenForJob jobConn) createBookForAudibleSync projectionHandlers with
                 | Ok result ->
                     let summary = AudibleSync.formatResult result
                     eprintfn "[AudibleSync] Sync complete: %s" summary
@@ -584,7 +607,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
                 spec with
                     Run = fun () ->
                         async {
-                            match! AudibleSync.runProgressSync jobConn jobDbLock httpClient getAudibleConfig (persistAudibleAccessTokenForJob jobConn) projectionHandlers with
+                            match! AudibleSync.runProgressSync jobConn jobDbLock httpClient getAudibleConfig (persistAudibleAccessTokenForJob jobConn) createBookForAudibleSync projectionHandlers with
                             | Ok result ->
                                 resultCell.Value <- Some (Ok result)
                                 return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = AudibleSync.formatResult result } : ScheduledJobs.JobRunOutcome)

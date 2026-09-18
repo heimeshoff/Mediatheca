@@ -1046,11 +1046,15 @@ type AddBookFromAudibleRequest = {
 }
 
 /// `IMediathecaApi.importAudibleLibrary` (integration-jjvg2, ADR-0074/
-/// ADR-0076): the one-time "Import library" click -- creates a Book per
-/// library title not yet matched by ASIN, then observes reading progress for
-/// every item (known or newly created) that carries one. Never creates a
-/// book again after this -- that is the daily sync's whole point of
-/// difference (`AudibleProgressSyncResult` below never creates one).
+/// ADR-0076, one-time bootstrap per ADR-0082/integration-dvbjp): the ONE-TIME
+/// "Import library" click -- creates a Book per library title not yet
+/// matched by ASIN, then observes reading progress for every item (known or
+/// newly created) that carries one, recording a PRIOR (`Record_prior_reading_
+/// progress`) for any book with no Audible row yet. Refused by the API once
+/// `audible_library_imported_at` is stamped (the nightly sync is where new
+/// purchases enter the library from then on -- see `AudibleProgressSyncResult`
+/// below, which now creates a book too, but observes it normally, never as a
+/// prior).
 type AudibleImportResult = {
     Total: int
     Created: int
@@ -1070,23 +1074,29 @@ type AudibleImportResult = {
 }
 
 /// `IMediathecaApi.runAudibleProgressSync` / the "Audible progress sync"
-/// scheduled job (ADR-0026/ADR-0074/ADR-0076): known books only -- NEVER
-/// creates one. `Unmatched` counts a library item whose ASIN isn't linked to
-/// any book yet (surfaced in the result, never silently dropped).
+/// scheduled job (ADR-0026/ADR-0074/ADR-0076, reversed by ADR-0082/
+/// integration-dvbjp): an ASIN not yet matched to a book is now CREATED by
+/// the job itself (`Created`) and observed like any other item -- a new
+/// purchase heard yesterday is a real listening day, never a prior. `Errors`
+/// still carries any per-item failure (including a failed creation), so a
+/// bad item never silently vanishes.
 type AudibleProgressSyncResult = {
     Observed: int
-    Unmatched: int
+    Created: int
     Errors: string list
 }
 
 /// `IMediathecaApi.getAudibleSyncStatus` -- the persisted (SettingsStore, not
 /// in-memory) last-import/last-sync summary Settings shows after a reload.
 /// Kept separate from `AudibleStatus` (which is about the auth
-/// file/connection itself).
+/// file/connection itself). `LibraryImportedAt` (integration-dvbjp, ADR-0082):
+/// once set, the Settings card hides "Import library" and shows the
+/// imported-on date instead -- the one-time bootstrap gate.
 type AudibleSyncStatus = {
     LastImportResult: string option
     LastSync: string option
     LastSyncResult: string option
+    LibraryImportedAt: string option
 }
 
 // Games

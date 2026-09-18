@@ -2,6 +2,7 @@ namespace Mediatheca.Server
 
 open System.Data
 open System.Net.Http
+open System.Threading
 open Microsoft.Data.Sqlite
 open Donald
 open Giraffe
@@ -1538,9 +1539,29 @@ module Api =
                 return Error (sprintf "Failed to add game from Steam: %s" ex.Message)
         }
 
-    /// Shared by `addBook` and `addBookFromOpenLibrary` (integration-c8d4x) —
-    /// extracted so the Open Library import path reuses the exact same
-    /// duplicate-check/slug/cover-download/command sequence rather than
+    /// integration-dvbjp (ADR-0028): the ONE generic "run this DB touch,
+    /// possibly under a lock" abstraction `addBookToLibraryImpl`/
+    /// `createBookFromAudibleItem` thread through below. A plain function
+    /// parameter can't be generic over the different return types each call
+    /// site needs (slug generation returns a bare `string`, the final
+    /// command returns a `Result`), so this rides an interface's generic
+    /// method instead -- the same trick `IComparer`/`IEqualityComparer`
+    /// use. `noLocker` (every call site EXCEPT the Audible nightly sync's
+    /// shared `jobConn`) runs the block inline: each API request owns its
+    /// own pooled connection, so there is no cross-thread race to guard
+    /// against. `Composition.fs`'s own job-shared locker wraps ONLY the DB
+    /// touches below, never the Audnexus/cover HTTP calls in between them.
+    type IDbLocker =
+        abstract member Run: (unit -> 'a) -> 'a
+
+    let noLocker =
+        { new IDbLocker with
+            member _.Run f = f () }
+
+    /// Shared by `addBook`, `addBookFromOpenLibrary` (integration-c8d4x), and
+    /// `createBookFromAudibleItem` below — extracted so the Open Library
+    /// import path and the Audible library-item create path reuse the exact
+    /// same duplicate-check/slug/cover-download/command sequence rather than
     /// re-deriving it, the `addMovieToLibraryImpl`/`addMovieToLibrary`
     /// precedent above.
     let private addBookToLibraryImpl
@@ -1557,6 +1578,7 @@ module Api =
         // `None` (the manual-entry `addBook` path) preserves the original
         // CoverUrl-fetch behaviour.
         (coverDownloader: (string -> Async<string option>) option)
+        (locker: IDbLocker)
         : Async<Result<AddBookOutcome, string>> = async {
             try
                 let year = request.Year |> Option.defaultValue 0
@@ -1567,29 +1589,30 @@ module Api =
                 // first author -> Duplicate_found. SkipDuplicateCheck
                 // bypasses both.
                 let existing =
-                    if request.SkipDuplicateCheck then None
-                    else
-                        let byExternalId =
-                            request.ExternalIds
-                            |> List.tryPick (fun eid -> BookProjection.findByExternalId conn eid)
-                        match byExternalId with
-                        | Some existingSlug ->
-                            match BookProjection.getBySlug conn existingSlug with
-                            | Some b -> Some (existingSlug, b.Title)
-                            | None -> Some (existingSlug, request.Title)
-                        | None ->
-                            let firstAuthor = request.Authors |> List.tryHead |> Option.map (fun a -> a.ToLowerInvariant())
-                            BookProjection.findByTitle conn request.Title
-                            |> List.tryFind (fun (candidateSlug, _) ->
-                                match BookProjection.getBySlug conn candidateSlug with
-                                | Some b -> (b.Authors |> List.tryHead |> Option.map (fun a -> a.ToLowerInvariant())) = firstAuthor
-                                | None -> false)
+                    locker.Run(fun () ->
+                        if request.SkipDuplicateCheck then None
+                        else
+                            let byExternalId =
+                                request.ExternalIds
+                                |> List.tryPick (fun eid -> BookProjection.findByExternalId conn eid)
+                            match byExternalId with
+                            | Some existingSlug ->
+                                match BookProjection.getBySlug conn existingSlug with
+                                | Some b -> Some (existingSlug, b.Title)
+                                | None -> Some (existingSlug, request.Title)
+                            | None ->
+                                let firstAuthor = request.Authors |> List.tryHead |> Option.map (fun a -> a.ToLowerInvariant())
+                                BookProjection.findByTitle conn request.Title
+                                |> List.tryFind (fun (candidateSlug, _) ->
+                                    match BookProjection.getBySlug conn candidateSlug with
+                                    | Some b -> (b.Authors |> List.tryHead |> Option.map (fun a -> a.ToLowerInvariant())) = firstAuthor
+                                    | None -> false))
 
                 match existing with
                 | Some (existingSlug, existingTitle) ->
                     return Ok (AddBookOutcome.Duplicate_found (existingSlug, existingTitle))
                 | None ->
-                    let slug = generateUniqueSlug conn Books.streamId baseSlug
+                    let slug = locker.Run(fun () -> generateUniqueSlug conn Books.streamId baseSlug)
                     let sid = Books.streamId slug
 
                     let! coverRef =
@@ -1621,20 +1644,89 @@ module Api =
                     }
 
                     let result =
-                        executeCommandCore
-                            conn sid
-                            Books.Serialization.fromStoredEvent
-                            Books.reconstitute
-                            Books.decide
-                            Books.Serialization.toEventData
-                            (Books.Add_book_to_library bookData)
-                            projectionHandlers
+                        locker.Run(fun () ->
+                            executeCommandCore
+                                conn sid
+                                Books.Serialization.fromStoredEvent
+                                Books.reconstitute
+                                Books.decide
+                                Books.Serialization.toEventData
+                                (Books.Add_book_to_library bookData)
+                                projectionHandlers)
 
                     match result with
                     | Error e -> return Error e
                     | Ok () -> return Ok (AddBookOutcome.Book_added slug)
             with ex ->
                 return Error $"Failed to add book: {ex.Message}"
+        }
+
+    /// The per-Audible-library-item create path (integration-jjvg2, extracted
+    /// by integration-dvbjp/ADR-0082 so `Api.importAudibleLibraryImpl`'s
+    /// bootstrap AND `AudibleSync.runProgressSync`'s nightly create-on-
+    /// unmatched path are the SAME function -- one implementation, no copy):
+    /// `AddBookRequest` from the library item (`SkipDuplicateCheck = true`,
+    /// same as integration-jjvg2 always set), `addBookToLibraryImpl`, then
+    /// the Audnexus fallback for description/narrators when the item itself
+    /// lacks them, and the `book_metadata_cache` upsert with `source =
+    /// "audible"`. `locker` is `noLocker` from the import path (its own
+    /// per-request `conn`) and the job-shared lock from `Composition.fs` for
+    /// the nightly sync's shared `jobConn` -- wrapping only the two DB
+    /// touches (`addBookToLibraryImpl`'s own locked sections, and this
+    /// function's own final cache write below), never the Audnexus/cover
+    /// HTTP calls in between (ADR-0028).
+    let createBookFromAudibleItem
+        (conn: SqliteConnection)
+        (httpClient: HttpClient)
+        (imageBasePath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (locker: IDbLocker)
+        (localeCode: string)
+        (item: Audible.AudibleLibraryItem)
+        : Async<Result<AddBookOutcome, string>> = async {
+            let year =
+                item.ReleaseDate
+                |> Option.bind (fun d ->
+                    if d.Length >= 4 then
+                        match System.Int32.TryParse(d.Substring(0, 4)) with
+                        | true, y -> Some y
+                        | _ -> None
+                    else None)
+            let addRequest : AddBookRequest = {
+                Title = item.Title
+                Authors = item.Authors
+                Year = year
+                CoverUrl = item.CoverUrl
+                Subjects = []
+                Format = BookFormat.Audiobook
+                ExternalIds = [ AudibleAsin item.Asin ]
+                SkipDuplicateCheck = true
+            }
+            let! addResult = addBookToLibraryImpl conn httpClient imageBasePath projectionHandlers addRequest None locker
+            match addResult with
+            | Ok (AddBookOutcome.Book_added slug) ->
+                let! audnexusOpt =
+                    if Option.isNone item.Description || List.isEmpty item.Narrators then
+                        Audnexus.getBook httpClient item.Asin localeCode
+                    else async { return None }
+                let metadata : MetadataCache.BookMetadata = {
+                    Description = item.Description |> Option.orElse (audnexusOpt |> Option.bind (fun a -> a.Description))
+                    PageCount = None
+                    RuntimeMinutes = item.RuntimeMinutes
+                    Narrators =
+                        if not (List.isEmpty item.Narrators) then item.Narrators
+                        else audnexusOpt |> Option.map (fun a -> a.Narrators) |> Option.defaultValue []
+                    SeriesName = item.SeriesName |> Option.orElse (audnexusOpt |> Option.bind (fun a -> a.SeriesName))
+                    SeriesPosition = item.SeriesPosition |> Option.orElse (audnexusOpt |> Option.bind (fun a -> a.SeriesPosition))
+                    Publisher = None
+                    PublishedDate = item.ReleaseDate
+                    AverageRating = None
+                    Language = None
+                    Source = Some "audible"
+                }
+                locker.Run(fun () -> MetadataCache.upsertBookMetadata conn slug metadata)
+                return Ok (AddBookOutcome.Book_added slug)
+            | other -> return other
         }
 
     /// `search.json`'s `edition_key` is an OLID (`OL33246498M`), never an
@@ -1735,7 +1827,7 @@ module Api =
                     SkipDuplicateCheck = false
                 }
 
-                let! result = addBookToLibraryImpl conn httpClient imageBasePath projectionHandlers addRequest coverDownloader
+                let! result = addBookToLibraryImpl conn httpClient imageBasePath projectionHandlers addRequest coverDownloader noLocker
                 match result with
                 | Ok (AddBookOutcome.Book_added slug) ->
                     let metadata: MetadataCache.BookMetadata = {
@@ -1891,7 +1983,7 @@ module Api =
                         SkipDuplicateCheck = request.SkipDuplicateCheck
                     }
 
-                    let! result = addBookToLibraryImpl conn httpClient imageBasePath projectionHandlers addRequest None
+                    let! result = addBookToLibraryImpl conn httpClient imageBasePath projectionHandlers addRequest None noLocker
                     match result with
                     | Ok (AddBookOutcome.Book_added slug) ->
                         let metadata : MetadataCache.BookMetadata = {
@@ -1943,8 +2035,21 @@ module Api =
                     Projection.runProjection conn handler
                 Ok newEvents
 
-    /// integration-jjvg2 (ADR-0074/ADR-0076): the one-time "Import library"
-    /// click. Known items (matched by ASIN via `BookProjection.findByExternalId`)
+    /// integration-dvbjp: renders the UTC ISO `audible_library_imported_at`
+    /// setting as a plain calendar date for the "already imported" refusal
+    /// message -- falls back to the raw stored string on anything
+    /// unparseable rather than throwing (should never happen; this setting
+    /// is only ever written by `System.DateTime.UtcNow.ToString("o")` above).
+    let private formatImportedOnDate (isoUtc: string) : string =
+        match System.DateTime.TryParse(isoUtc, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind) with
+        | true, dt -> dt.ToString("yyyy-MM-dd")
+        | false, _ -> isoUtc
+
+    /// integration-jjvg2 (ADR-0074/ADR-0076), one-time bootstrap per
+    /// ADR-0082/integration-dvbjp: the ONE-TIME "Import library" click, now
+    /// truly one-time -- `create`'s `importAudibleLibrary` field below
+    /// refuses to call this at all once `audible_library_imported_at` is
+    /// stamped. Known items (matched by ASIN via `BookProjection.findByExternalId`)
     /// are never re-created; new items are created directly from the library
     /// response's OWN fields (no per-title `getProduct` call -- ADR-0069's
     /// "diff, don't re-enrich"), Audnexus only filling description/narrators
@@ -2086,48 +2191,14 @@ module Api =
                                 alreadyKnown <- alreadyKnown + 1
                                 do! observe slug item
                             | None ->
-                                let year =
-                                    item.ReleaseDate
-                                    |> Option.bind (fun d ->
-                                        if d.Length >= 4 then
-                                            match System.Int32.TryParse(d.Substring(0, 4)) with
-                                            | true, y -> Some y
-                                            | _ -> None
-                                        else None)
-                                let addRequest : AddBookRequest = {
-                                    Title = item.Title
-                                    Authors = item.Authors
-                                    Year = year
-                                    CoverUrl = item.CoverUrl
-                                    Subjects = []
-                                    Format = BookFormat.Audiobook
-                                    ExternalIds = [ AudibleAsin item.Asin ]
-                                    SkipDuplicateCheck = true
-                                }
-                                let! addResult = addBookToLibraryImpl conn httpClient imageBasePath projectionHandlers addRequest None
-                                match addResult with
+                                // integration-dvbjp/ADR-0082: the extracted
+                                // create path both the import and the
+                                // nightly sync share (`noLocker` -- this
+                                // request owns its own connection).
+                                let! createResult = createBookFromAudibleItem conn httpClient imageBasePath projectionHandlers noLocker authFile.LocaleCode item
+                                match createResult with
                                 | Ok (AddBookOutcome.Book_added slug) ->
                                     created <- created + 1
-                                    let! audnexusOpt =
-                                        if Option.isNone item.Description || List.isEmpty item.Narrators then
-                                            Audnexus.getBook httpClient item.Asin authFile.LocaleCode
-                                        else async { return None }
-                                    let metadata : MetadataCache.BookMetadata = {
-                                        Description = item.Description |> Option.orElse (audnexusOpt |> Option.bind (fun a -> a.Description))
-                                        PageCount = None
-                                        RuntimeMinutes = item.RuntimeMinutes
-                                        Narrators =
-                                            if not (List.isEmpty item.Narrators) then item.Narrators
-                                            else audnexusOpt |> Option.map (fun a -> a.Narrators) |> Option.defaultValue []
-                                        SeriesName = item.SeriesName |> Option.orElse (audnexusOpt |> Option.bind (fun a -> a.SeriesName))
-                                        SeriesPosition = item.SeriesPosition |> Option.orElse (audnexusOpt |> Option.bind (fun a -> a.SeriesPosition))
-                                        Publisher = None
-                                        PublishedDate = item.ReleaseDate
-                                        AverageRating = None
-                                        Language = None
-                                        Source = Some "audible"
-                                    }
-                                    MetadataCache.upsertBookMetadata conn slug metadata
                                     do! observe slug item
                                 | Ok (AddBookOutcome.Duplicate_found (existingSlug, _)) ->
                                     alreadyKnown <- alreadyKnown + 1
@@ -2155,6 +2226,14 @@ module Api =
                     // Api.fs's Steam `Ok []` vs `Ok games` split above).
                     if not (List.isEmpty items) then
                         SettingsStore.deleteSetting conn "audible_last_error"
+                        // integration-dvbjp (ADR-0082 Consequences): the
+                        // one-time bootstrap gate -- stamped ONLY after a
+                        // genuinely populated run (same empty-but-200
+                        // distinction as the `audible_last_error` clear just
+                        // above), never overwritten once set (the outer
+                        // `importAudibleLibrary` wrapper refuses to even
+                        // reach this function once the setting exists).
+                        SettingsStore.setSetting conn "audible_library_imported_at" (System.DateTime.UtcNow.ToString("o"))
                     return Ok result
         }
 
@@ -4150,7 +4229,7 @@ module Api =
 
             addBook = fun request -> async {
                 use conn = factory ()
-                return! addBookToLibraryImpl conn httpClient imageBasePath projectionHandlers request None
+                return! addBookToLibraryImpl conn httpClient imageBasePath projectionHandlers request None noLocker
             }
 
             removeBook = fun slug -> async {
@@ -5682,10 +5761,15 @@ module Api =
             }
 
             // Audible library import + daily progress sync (integration-jjvg2,
-            // ADR-0074/ADR-0076/ADR-0026).
+            // ADR-0074/ADR-0076/ADR-0026; one-time bootstrap gate per
+            // ADR-0082/integration-dvbjp).
             importAudibleLibrary = fun () -> async {
                 use conn = factory ()
-                return! importAudibleLibraryImpl conn httpClient getAudibleConfig imageBasePath projectionHandlers
+                match SettingsStore.getSetting conn "audible_library_imported_at" with
+                | Some importedAt ->
+                    return Error (sprintf "Audible library already imported on %s — new purchases arrive with the nightly sync" (formatImportedOnDate importedAt))
+                | None ->
+                    return! importAudibleLibraryImpl conn httpClient getAudibleConfig imageBasePath projectionHandlers
             }
 
             runAudibleProgressSync = fun () -> runAudibleProgressSyncNow ()
@@ -5696,6 +5780,7 @@ module Api =
                     LastImportResult = SettingsStore.getSetting conn "audible_last_import_result"
                     LastSync = SettingsStore.getSetting conn "audible_last_sync"
                     LastSyncResult = SettingsStore.getSetting conn "audible_last_sync_result"
+                    LibraryImportedAt = SettingsStore.getSetting conn "audible_library_imported_at"
                 }
             }
         }

@@ -132,6 +132,10 @@ type Model = {
     AudibleLastImportResult: string option
     AudibleLastSync: string option
     AudibleLastSyncResult: string option
+    /// integration-dvbjp (ADR-0082): once set, the "Import library" button
+    /// is hidden and this date is shown instead -- the one-time bootstrap
+    /// gate.
+    AudibleLibraryImportedAt: string option
     // Sync Status
     PlaytimeSyncStatus: PlaytimeSyncStatus option
     JellyfinLastSyncTime: string option

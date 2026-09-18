@@ -6,11 +6,18 @@ open System.Threading
 open Microsoft.Data.Sqlite
 open Mediatheca.Shared
 
-/// The Audible progress sync (integration-jjvg2, ADR-0074/ADR-0076): reads
-/// `/1.0/library`'s `percent_complete`/`is_finished` and turns each KNOWN
-/// book's reading position into an `Observe_reading_progress` command --
-/// this module NEVER creates a book (creation is the explicit "Import
-/// library" click, `Api.importAudibleLibrary`). Compiled BEFORE `Api.fs`
+/// The Audible progress sync (integration-jjvg2, ADR-0074/ADR-0076; reversed
+/// by ADR-0082/integration-dvbjp): reads `/1.0/library`'s
+/// `percent_complete`/`is_finished` and turns each book's reading position
+/// into an `Observe_reading_progress` command. An ASIN not yet matched to a
+/// book is now CREATED by this module itself (via the `createBook` function
+/// `runProgressSync` takes as a parameter -- `Api.createBookFromAudibleItem`,
+/// wired in from `Composition.fs`, since this module compiles BEFORE `Api.fs`
+/// and can't reference it directly), then observed like any other item: a
+/// new purchase heard yesterday is a real listening day, never a prior.
+/// "Import library" (`Api.importAudibleLibrary`) is the only Audible-sourced
+/// writer of `Record_prior_reading_progress` -- this module NEVER records a
+/// prior and NEVER calls `getLastPositionHeard`. Compiled BEFORE `Api.fs`
 /// (`Server.fsproj`), so -- same as `PlaytimeTracker.fs` above it -- this
 /// module carries its own local command-execution helper
 /// rather than reaching into `Api.fs`'s private one. `observationFor` is the
@@ -89,7 +96,7 @@ module AudibleSync =
               Finished = item.IsFinished })
 
     let formatResult (r: AudibleProgressSyncResult) : string =
-        let base_ = sprintf "%d observed, %d unmatched" r.Observed r.Unmatched
+        let base_ = sprintf "%d observed, %d created" r.Observed r.Created
         if List.isEmpty r.Errors then base_
         else sprintf "%s (%d item error(s))" base_ (List.length r.Errors)
 
@@ -107,18 +114,24 @@ module AudibleSync =
         if List.isEmpty r.Errors then base_
         else sprintf "%s (%d item error(s))" base_ (List.length r.Errors)
 
-    /// Runs the daily progress sync for KNOWN books only -- never creates a
-    /// book (this task's own "What" section: creation is the explicit
-    /// "Import library" click). `Error` carries `Audible.authFileRejectedPrefix`
-    /// when the auth file itself was rejected -- the caller (`Composition.fs`'s
-    /// job body) must surface THAT as a genuine job failure, never a
-    /// `Skipped` disposition; any other `Error` means "not configured".
+    /// Runs the daily progress sync: a matched ASIN is observed as before; an
+    /// unmatched ASIN is now CREATED via `createBook` (`Api.
+    /// createBookFromAudibleItem`, wired in from `Composition.fs` since this
+    /// module compiles before `Api.fs`) and then observed exactly the same
+    /// way -- an ordinary `Observe_reading_progress`, never a prior, never a
+    /// `getLastPositionHeard` call (ADR-0082/integration-dvbjp reverses
+    /// integration-jjvg2's "this job never creates a book" rule). `Error`
+    /// carries `Audible.authFileRejectedPrefix` when the auth file itself was
+    /// rejected -- the caller (`Composition.fs`'s job body) must surface THAT
+    /// as a genuine job failure, never a `Skipped` disposition; any other
+    /// `Error` means "not configured".
     let runProgressSync
         (conn: SqliteConnection)
         (jobLock: SemaphoreSlim)
         (httpClient: HttpClient)
         (getAudibleConfig: unit -> Audible.AudibleConfig)
         (persistAccessToken: Audible.AudibleAccessToken -> unit)
+        (createBook: Audible.AudibleLibraryItem -> Async<Result<AddBookOutcome, string>>)
         (projectionHandlers: Projection.ProjectionHandler list)
         : Async<Result<AudibleProgressSyncResult, string>> =
         async {
@@ -145,18 +158,44 @@ module AudibleSync =
                 | Ok items ->
                     let today = DateTime.Now.ToString("yyyy-MM-dd")
                     let mutable observed = 0
-                    let mutable unmatched = 0
+                    let mutable created = 0
                     let mutable errors : string list = []
                     for item in items do
                         try
                             let existingSlug = withLock jobLock (fun () -> BookProjection.findByExternalId conn (AudibleAsin item.Asin))
-                            match existingSlug with
-                            | None -> unmatched <- unmatched + 1
+                            // ADR-0082/integration-dvbjp: an unmatched ASIN is
+                            // CREATED here (via `createBook`, wired to
+                            // `Api.createBookFromAudibleItem`) instead of
+                            // being counted `Unmatched` and skipped --
+                            // integration-jjvg2's "this job never creates a
+                            // book" rule is reversed. `Duplicate_found` should
+                            // not happen in practice (the create path always
+                            // sets `SkipDuplicateCheck = true`), but is
+                            // handled the same as a fresh create -- both
+                            // resolve to a slug to observe.
+                            let! slugToObserve =
+                                match existingSlug with
+                                | Some slug -> async { return Some slug }
+                                | None ->
+                                    async {
+                                        match! createBook item with
+                                        | Ok (AddBookOutcome.Book_added slug) ->
+                                            created <- created + 1
+                                            return Some slug
+                                        | Ok (AddBookOutcome.Duplicate_found (slug, _)) ->
+                                            return Some slug
+                                        | Error e ->
+                                            errors <- errors @ [ sprintf "%s (%s): %s" item.Title item.Asin e ]
+                                            return None
+                                    }
+                            match slugToObserve with
+                            | None -> ()
                             | Some slug ->
                                 // integration-dtdbb, ADR-0082 §2: the nightly
                                 // sync never fetches a last-listened date and
                                 // never records a prior -- `lastListened` is
-                                // always `None` here.
+                                // always `None` here, for a matched book AND
+                                // for one it just created.
                                 match observationFor item today None with
                                 | None -> ()
                                 | Some data ->
@@ -167,7 +206,7 @@ module AudibleSync =
                                     | Error e -> errors <- errors @ [ sprintf "%s (%s): %s" item.Title item.Asin e ]
                         with ex ->
                             errors <- errors @ [ sprintf "%s (%s): %s" item.Title item.Asin ex.Message ]
-                    let result = { Observed = observed; Unmatched = unmatched; Errors = errors }
+                    let result = { Observed = observed; Created = created; Errors = errors }
                     withLock jobLock (fun () ->
                         SettingsStore.setSetting conn "audible_last_sync" (DateTime.UtcNow.ToString("o"))
                         SettingsStore.setSetting conn "audible_last_sync_result" (formatResult result)

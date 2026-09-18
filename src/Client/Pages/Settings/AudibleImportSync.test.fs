@@ -18,11 +18,18 @@ let audibleImportSyncTests =
 
         testCase "Audible_sync_status_loaded records the persisted last-import/last-sync fields" <| fun () ->
             let model, _ = init ()
-            let status : AudibleSyncStatus = { LastImportResult = Some "3 total, 3 created, 0 already known, 2 progress observed"; LastSync = Some "2026-09-16T05:00:00Z"; LastSyncResult = Some "2 observed, 0 unmatched" }
+            let status : AudibleSyncStatus = { LastImportResult = Some "3 total, 3 created, 0 already known, 2 progress observed"; LastSync = Some "2026-09-16T05:00:00Z"; LastSyncResult = Some "2 observed, 0 created"; LibraryImportedAt = None }
             let updated, _ = update fakeApi fakeAdminApi (Audible_sync_status_loaded status) model
             Expect.equal updated.AudibleLastImportResult status.LastImportResult "last import summary recorded"
             Expect.equal updated.AudibleLastSync status.LastSync "last sync time recorded"
             Expect.equal updated.AudibleLastSyncResult status.LastSyncResult "last sync result recorded"
+            Expect.isNone updated.AudibleLibraryImportedAt "no import stamped yet"
+
+        testCase "Audible_sync_status_loaded records a stamped LibraryImportedAt (integration-dvbjp, ADR-0082 one-time bootstrap)" <| fun () ->
+            let model, _ = init ()
+            let status : AudibleSyncStatus = { LastImportResult = Some "3 total, 3 created, 0 already known, 2 progress observed"; LastSync = None; LastSyncResult = None; LibraryImportedAt = Some "2026-09-18" }
+            let updated, _ = update fakeApi fakeAdminApi (Audible_sync_status_loaded status) model
+            Expect.equal updated.AudibleLibraryImportedAt (Some "2026-09-18") "the one-time bootstrap stamp round-trips into the model"
 
         testCase "a successful import stops the spinner and records the session-fresh result" <| fun () ->
             let model, _ = init ()
@@ -54,7 +61,7 @@ let audibleImportSyncTests =
 
         testCase "a successful progress sync leaves any existing notice untouched -- the follow-up Load_audible_sync_status is the single source of truth" <| fun () ->
             let model, _ = init ()
-            let result : AudibleProgressSyncResult = { Observed = 1; Unmatched = 0; Errors = [] }
+            let result : AudibleProgressSyncResult = { Observed = 1; Created = 0; Errors = [] }
             let updated, _ = update fakeApi fakeAdminApi (Audible_progress_sync_completed (Ok result)) { model with IsSyncingAudibleProgress = true; AudibleLastError = Some "stale notice" }
             Expect.isFalse updated.IsSyncingAudibleProgress "the spinner stops"
             Expect.equal updated.AudibleLastError (Some "stale notice") "the reducer itself never clears the notice out of band"
