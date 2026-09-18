@@ -32,6 +32,18 @@ module GameDeckCompatBackfill =
         /// summary.
         Failed: int
         Errors: int
+        /// games-kfpqp (ADR-0087): candidates drawn from the re-check
+        /// cohort (`MetadataCache.findGamesNeedingDeckCompatBackfill`'s
+        /// `Some verdict` candidates) — already counted once in `Processed`,
+        /// this is the subset of `Processed` that came due for a re-check
+        /// rather than a first-ever fetch (`Processed - Rechecks` is the
+        /// never-fetched cohort's count).
+        Rechecks: int
+        /// games-kfpqp (ADR-0087): successful re-checks whose fresh verdict
+        /// differs from the one on record before this run — the only
+        /// evidence there will be for tuning the per-verdict age limits
+        /// later.
+        VerdictsChanged: int
     }
 
     /// Same "acquire only around the brief DB moment, never across an
@@ -51,7 +63,16 @@ module GameDeckCompatBackfill =
             let mutable succeeded = 0
             let mutable failed = 0
             let mutable errors = 0
-            for (slug, steamAppId) in candidates do
+            let mutable rechecks = 0
+            let mutable verdictsChanged = 0
+            for (slug, steamAppId, recordedVerdict) in candidates do
+                // games-kfpqp: `recordedVerdict` is `Some _` exactly for a
+                // re-check-cohort candidate (see
+                // `MetadataCache.findGamesNeedingDeckCompatBackfill`) —
+                // counted here regardless of the outcome below, since
+                // `Rechecks` reports how many re-checks were attempted, not
+                // how many succeeded.
+                if recordedVerdict.IsSome then rechecks <- rechecks + 1
                 try
                     // Pacing lives inside Steam.getDeckCompatibility itself now
                     // (integration-w7ktb's Adapter-owned storefront throttle, which
@@ -60,13 +81,20 @@ module GameDeckCompatBackfill =
                     let! compatResult = Steam.getDeckCompatibility httpClient steamAppId
                     match compatResult with
                     | Ok compat ->
-                        withLock jobLock (fun () -> MetadataCache.upsertGameDeckCompat conn slug compat)
+                        withLock jobLock (fun () -> MetadataCache.upsertGameDeckCompat conn slug compat now)
                         succeeded <- succeeded + 1
+                        // games-kfpqp: only a re-check has a prior recorded
+                        // verdict to compare the fresh one against — a
+                        // first-ever fetch (`None`) can never have "changed".
+                        match recordedVerdict with
+                        | Some recorded when recorded <> compat -> verdictsChanged <- verdictsChanged + 1
+                        | _ -> ()
                     | Error _ ->
                         // Steam had nothing usable for this appId right now —
-                        // leave deck_compat_fetched_at NULL so a later run can
-                        // retry it (the resumability the WHERE-clause cursor
-                        // promises), but record the attempt so
+                        // leave deck_compat_fetched_at (and, for a re-check,
+                        // the already-recorded verdict) untouched so a later
+                        // run can retry it (the resumability the WHERE-clause
+                        // cursor promises), but record the attempt so
                         // findGamesNeedingDeckCompatBackfill's backoff skips
                         // it until min(2^attempts, 30) days have passed
                         // (games-wkyf0) instead of retrying every night
@@ -77,8 +105,17 @@ module GameDeckCompatBackfill =
                     // games-wkyf0: an unhandled exception backs off exactly
                     // like an `Error` result — see MetadataCache.fs's
                     // `deckCompatBackoffDays` doc comment for why every
-                    // failure kind shares one rule.
+                    // failure kind shares one rule. This applies identically
+                    // to a re-check candidate: its recorded verdict and stamp
+                    // are left untouched, same as an `Error` result above.
                     withLock jobLock (fun () -> MetadataCache.recordDeckCompatFailedAttempt conn slug now)
                     errors <- errors + 1
-            return { Processed = List.length candidates; Succeeded = succeeded; Failed = failed; Errors = errors }
+            return {
+                Processed = List.length candidates
+                Succeeded = succeeded
+                Failed = failed
+                Errors = errors
+                Rechecks = rechecks
+                VerdictsChanged = verdictsChanged
+            }
         }

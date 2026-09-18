@@ -1,5 +1,6 @@
 module Mediatheca.Tests.GameDeckCompatProjectionTests
 
+open System
 open Expecto
 open Microsoft.Data.Sqlite
 open Donald
@@ -57,7 +58,7 @@ let tests =
         testCase "Once the backfill writes a verdict, getBySlug/getAll both read it straight through — no merge involved" <| fun _ ->
             let conn = createConnection ()
             appendGameAdded conn "hades-2020" sampleGameData
-            MetadataCache.upsertGameDeckCompat conn "hades-2020" Verified
+            MetadataCache.upsertGameDeckCompat conn "hades-2020" Verified DateTime.UtcNow
 
             let detail = GameProjection.getBySlug conn "hades-2020"
             Expect.equal (detail |> Option.map (fun d -> d.DeckCompat)) (Some Verified) "getBySlug reads the cached verdict"
@@ -68,7 +69,7 @@ let tests =
         testCase "getRecentlyAddedGames also wires DeckCompat" <| fun _ ->
             let conn = createConnection ()
             appendGameAdded conn "hades-2020" sampleGameData
-            MetadataCache.upsertGameDeckCompat conn "hades-2020" Playable
+            MetadataCache.upsertGameDeckCompat conn "hades-2020" Playable DateTime.UtcNow
 
             let recent = GameProjection.getRecentlyAddedGames conn (Some 10) |> List.tryFind (fun g -> g.Slug = "hades-2020")
             Expect.equal (recent |> Option.map (fun g -> g.DeckCompat)) (Some Playable) "getRecentlyAddedGames reads the cached verdict too"
@@ -77,7 +78,7 @@ let tests =
             let conn = createConnection ()
             appendGameAdded conn "hades-2020" sampleGameData
             MetadataCache.seedFromProjections conn
-            MetadataCache.upsertGameDeckCompat conn "hades-2020" Unsupported
+            MetadataCache.upsertGameDeckCompat conn "hades-2020" Unsupported DateTime.UtcNow
 
             let shadow = new SqliteConnection("Data Source=:memory:")
             shadow.Open()

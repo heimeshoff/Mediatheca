@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 13:32 -- Task verified and completed: games-kfpqp - Deck-compat job — re-check already recorded verdicts once they pass an age limit (Unknown 30 days, Playable/Unsupported 90, Verified 180), capped per night, so Valve's verdict changes reach existing games
+
+**Type:** Work / Task completion
+**Task:** games-kfpqp - Deck-compat job — re-check already recorded verdicts once they pass an age limit (Unknown 30 days, Playable/Unsupported 90, Verified 180), capped per night, so Valve's verdict changes reach existing games
+**Summary:** The Deck-compat backfill re-checks already-recorded verdicts once they pass a per-verdict age limit (Unknown 30 days, Playable/Unsupported 90, Verified 180), capped at 25 due re-checks per run (oldest first, counted after the failed-attempt backoff filter), so a Valve verdict change reaches games the job already fetched once; the job summary reports first fetches, re-checks and changed verdicts separately (ADR-0087).
+**Duration:** 33m
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present (first sidecar write was rejected `missing-block` — no BACKLOG_ITEMS block; the same worker re-emitted it via SendMessage, no re-dispatch)
+**Files changed:** 5
+**Tests added:** 10
+**ADRs written:** 0087
+
+---
+
 ## 2026-09-18 12:58 -- Batch started: [games-kfpqp]
 
 **Type:** Work / Batch start

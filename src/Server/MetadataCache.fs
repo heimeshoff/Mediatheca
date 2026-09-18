@@ -760,6 +760,22 @@ module MetadataCache =
         | Unsupported -> "Unsupported"
         | Unknown -> "Unknown"
 
+    /// games-kfpqp: the re-check cohort's own decode of the stored verdict —
+    /// deliberately local to this module rather than reusing
+    /// `GameProjection.fs`'s private `decodeDeckCompat` (ADR-0045's
+    /// by-construction invariant runs one way only: no `*Projection.fs` file
+    /// may reference `MetadataCache`, not the reverse). A NULL or otherwise
+    /// unrecognised stored string decodes to `Unknown`, matching the badge's
+    /// own honest-degradation default and giving the re-check cursor the
+    /// shortest, most eager age limit for a row whose stored value can't be
+    /// trusted at all.
+    let private decodeDeckCompat (s: string option) : DeckCompatibility =
+        match s with
+        | Some "Verified" -> Verified
+        | Some "Playable" -> Playable
+        | Some "Unsupported" -> Unsupported
+        | _ -> Unknown
+
     /// games-b8xnw: the ongoing write path for `game_metadata_cache.deck_compat`
     /// — the resumable Deck-compat backfill job's only writer, stamping its
     /// OWN `deck_compat_fetched_at` cursor column (never the play-facets
@@ -774,7 +790,13 @@ module MetadataCache =
     /// that failed N times and then succeeds is no longer "in backoff" for
     /// anything, since `findGamesNeedingDeckCompatBackfill` drops it from its
     /// cursor entirely once `deck_compat_fetched_at` is stamped.
-    let upsertGameDeckCompat (conn: SqliteConnection) (slug: string) (compat: DeckCompatibility) : unit =
+    ///
+    /// games-kfpqp: `now` is the caller's injected clock instead of this
+    /// function stamping `DateTime.UtcNow` itself — a re-check's success
+    /// re-stamps `deck_compat_fetched_at`, and that stamp must share the
+    /// exact same clock the cursor's own age-limit comparison uses, or an
+    /// injected-clock test would see a just-re-checked game as still due.
+    let upsertGameDeckCompat (conn: SqliteConnection) (slug: string) (compat: DeckCompatibility) (now: System.DateTime) : unit =
         conn
         |> Db.newCommand
             """
@@ -790,7 +812,7 @@ module MetadataCache =
         |> Db.setParams [
             "game_slug", SqlType.String slug
             "deck_compat", SqlType.String (encodeDeckCompat compat)
-            "deck_compat_fetched_at", SqlType.String (System.DateTime.UtcNow.ToString("o"))
+            "deck_compat_fetched_at", SqlType.String (now.ToString("o"))
         ]
         |> Db.exec
 
@@ -820,13 +842,14 @@ module MetadataCache =
         |> Db.exec
 
     /// games-b8xnw (verifier iteration 1 fix): the cache-tier read of
-    /// `deck_compat` was dropped from here — `GameProjection.fs` now keeps
-    /// its own private `readDeckCompat`/`decodeDeckCompat` duplicate (same
-    /// precedent as `decodeVrSupport`) rather than calling into this module,
-    /// so `*Projection.fs` files never reference `MetadataCache` in code
-    /// (ADR-0045's by-construction invariant). The now-unused decode half
-    /// was removed from here; only `encodeDeckCompat` remains, for
-    /// `upsertGameDeckCompat`'s write path.
+    /// `deck_compat` for badge-rendering purposes was dropped from here —
+    /// `GameProjection.fs` keeps its own private `readDeckCompat`/
+    /// `decodeDeckCompat` duplicate (same precedent as `decodeVrSupport`)
+    /// rather than calling into this module, so `*Projection.fs` files never
+    /// reference `MetadataCache` in code (ADR-0045's by-construction
+    /// invariant, which runs one way only — nothing bars this module from
+    /// decoding its own column for its own cursor's purposes, which
+    /// games-kfpqp's `decodeDeckCompat` above does).
 
     /// games-wkyf0: the backoff delay for a game with `failedAttempts` prior
     /// failed fetches — `min(2^attempts, 30)` days (2, 4, 8, 16, then a flat
@@ -839,39 +862,121 @@ module MetadataCache =
     let private deckCompatBackoffDays (failedAttempts: int) : float =
         min (2.0 ** float failedAttempts) 30.0
 
-    /// games-b8xnw (games-wkyf0: now clock-injected and backoff-aware): the
-    /// resumable Deck-compat backfill job's cursor — same shape as
+    /// games-kfpqp (ADR-0087): how long a recorded verdict is trusted before
+    /// the re-check cohort re-fetches it, per verdict on record. `Unknown`
+    /// gets the shortest window since it is the verdict most likely still in
+    /// flux as Valve tests more of the catalogue; `Verified` the longest
+    /// since a confirmed-working game is the least likely to regress.
+    /// `Playable`/`Unsupported` share the middle value — both can move either
+    /// direction (a patch, an anti-cheat change) with no evidence either one
+    /// is more volatile than the other. A stored verdict that fails to decode
+    /// (NULL or unrecognised — see `decodeDeckCompat` above) is `Unknown` for
+    /// this purpose too, the shortest, most eager window.
+    let private deckCompatRecheckAgeLimitDays (verdict: DeckCompatibility) : float =
+        match verdict with
+        | Unknown -> 30.0
+        | Playable | Unsupported -> 90.0
+        | Verified -> 180.0
+
+    /// games-kfpqp (ADR-0087): the re-check cohort is capped at this many
+    /// games per run. Without a cap, every game stamped during the initial
+    /// never-fetched pass comes due on the same night once its age limit
+    /// elapses, producing one large burst against the storefront; with it,
+    /// the initial hump drains over a few weeks and the steady state is a
+    /// small, steady trickle. The never-fetched cohort below is NOT subject
+    /// to this cap — a newly added game must still be picked up the very
+    /// next morning regardless of how many re-checks are already due.
+    let private deckCompatRecheckCap = 25
+
+    /// games-b8xnw (games-wkyf0: now clock-injected and backoff-aware;
+    /// games-kfpqp/ADR-0087: gained the re-check cohort below): the resumable
+    /// Deck-compat backfill job's cursor — same shape as
     /// `findGamesNeedingFacetBackfill`, but walking its own
-    /// `deck_compat_fetched_at IS NULL` column so the two backfills' resume
-    /// cursors never interfere with each other. A never-attempted game
+    /// `deck_compat_fetched_at` column so the two backfills' resume cursors
+    /// never interfere with each other. A never-attempted game
     /// (`deck_compat_last_attempt_at IS NULL`) is always eligible; a game
     /// with prior failed attempts is skipped until `deckCompatBackoffDays`
     /// have passed since its last attempt. `now` is the caller's injected
-    /// clock, so the backoff is testable without sleeping.
-    let findGamesNeedingDeckCompatBackfill (conn: SqliteConnection) (now: System.DateTime) : (string * int) list =
-        conn
-        |> Db.newCommand
-            """
-            SELECT mc.game_slug, gd.steam_app_id, mc.deck_compat_failed_attempts, mc.deck_compat_last_attempt_at
-            FROM game_metadata_cache mc
-            JOIN game_detail gd ON gd.slug = mc.game_slug
-            WHERE mc.deck_compat_fetched_at IS NULL AND gd.steam_app_id IS NOT NULL
-            """
-        |> Db.query (fun (rd: IDataReader) ->
-            let slug = rd.ReadString "game_slug"
-            let steamAppId = rd.ReadInt32 "steam_app_id"
-            let failedAttempts =
-                if rd.IsDBNull(rd.GetOrdinal("deck_compat_failed_attempts")) then 0
-                else rd.ReadInt32 "deck_compat_failed_attempts"
-            let lastAttemptAt =
-                if rd.IsDBNull(rd.GetOrdinal("deck_compat_last_attempt_at")) then None
-                else Some (System.DateTime.Parse(rd.ReadString "deck_compat_last_attempt_at", null, System.Globalization.DateTimeStyles.RoundtripKind))
-            (slug, steamAppId, failedAttempts, lastAttemptAt))
-        |> List.filter (fun (_, _, failedAttempts, lastAttemptAt) ->
+    /// clock, so both the backoff and the re-check age limits are testable
+    /// without sleeping.
+    ///
+    /// Returns each candidate's recorded verdict: `None` for the
+    /// never-fetched cohort, `Some verdict` for the re-check cohort — the
+    /// only way the caller (`GameDeckCompatBackfill.runBackfill`) can count
+    /// the two cohorts separately and detect a re-check whose fresh verdict
+    /// differs from the one on record.
+    let findGamesNeedingDeckCompatBackfill (conn: SqliteConnection) (now: System.DateTime) : (string * int * DeckCompatibility option) list =
+        let notInBackoff (failedAttempts: int) (lastAttemptAt: System.DateTime option) =
             match lastAttemptAt with
             | None -> true // never attempted — always eligible
-            | Some lastAttempt -> now >= lastAttempt.AddDays(deckCompatBackoffDays failedAttempts))
-        |> List.map (fun (slug, steamAppId, _, _) -> (slug, steamAppId))
+            | Some lastAttempt -> now >= lastAttempt.AddDays(deckCompatBackoffDays failedAttempts)
+
+        // The never-fetched cohort: unchanged in shape from before
+        // games-kfpqp, and NOT subject to `deckCompatRecheckCap` — see that
+        // constant's doc comment for why.
+        let neverFetched =
+            conn
+            |> Db.newCommand
+                """
+                SELECT mc.game_slug, gd.steam_app_id, mc.deck_compat_failed_attempts, mc.deck_compat_last_attempt_at
+                FROM game_metadata_cache mc
+                JOIN game_detail gd ON gd.slug = mc.game_slug
+                WHERE mc.deck_compat_fetched_at IS NULL AND gd.steam_app_id IS NOT NULL
+                """
+            |> Db.query (fun (rd: IDataReader) ->
+                let slug = rd.ReadString "game_slug"
+                let steamAppId = rd.ReadInt32 "steam_app_id"
+                let failedAttempts =
+                    if rd.IsDBNull(rd.GetOrdinal("deck_compat_failed_attempts")) then 0
+                    else rd.ReadInt32 "deck_compat_failed_attempts"
+                let lastAttemptAt =
+                    if rd.IsDBNull(rd.GetOrdinal("deck_compat_last_attempt_at")) then None
+                    else Some (System.DateTime.Parse(rd.ReadString "deck_compat_last_attempt_at", null, System.Globalization.DateTimeStyles.RoundtripKind))
+                (slug, steamAppId, failedAttempts, lastAttemptAt))
+            |> List.filter (fun (_, _, failedAttempts, lastAttemptAt) -> notInBackoff failedAttempts lastAttemptAt)
+            |> List.map (fun (slug, steamAppId, _, _) -> (slug, steamAppId, None))
+
+        // games-kfpqp/ADR-0087: the re-check cohort — a game whose verdict is
+        // already recorded but old enough, per `deckCompatRecheckAgeLimitDays`,
+        // that it is worth re-fetching. The failed-attempt backoff filter
+        // (`notInBackoff`) runs BEFORE the cap below, per this task's
+        // explicit ordering: age limit -> backoff -> oldest-first -> take 25.
+        // Capping in SQL first (e.g. `LIMIT 25`) would let 25 re-checks
+        // sitting in backoff occupy every slot and starve the cohort of
+        // actually-eligible candidates.
+        let dueRechecks =
+            conn
+            |> Db.newCommand
+                """
+                SELECT mc.game_slug, gd.steam_app_id, mc.deck_compat, mc.deck_compat_fetched_at,
+                       mc.deck_compat_failed_attempts, mc.deck_compat_last_attempt_at
+                FROM game_metadata_cache mc
+                JOIN game_detail gd ON gd.slug = mc.game_slug
+                WHERE mc.deck_compat_fetched_at IS NOT NULL AND gd.steam_app_id IS NOT NULL
+                """
+            |> Db.query (fun (rd: IDataReader) ->
+                let slug = rd.ReadString "game_slug"
+                let steamAppId = rd.ReadInt32 "steam_app_id"
+                let verdict =
+                    decodeDeckCompat (
+                        if rd.IsDBNull(rd.GetOrdinal("deck_compat")) then None
+                        else Some (rd.ReadString "deck_compat"))
+                let fetchedAt = System.DateTime.Parse(rd.ReadString "deck_compat_fetched_at", null, System.Globalization.DateTimeStyles.RoundtripKind)
+                let failedAttempts =
+                    if rd.IsDBNull(rd.GetOrdinal("deck_compat_failed_attempts")) then 0
+                    else rd.ReadInt32 "deck_compat_failed_attempts"
+                let lastAttemptAt =
+                    if rd.IsDBNull(rd.GetOrdinal("deck_compat_last_attempt_at")) then None
+                    else Some (System.DateTime.Parse(rd.ReadString "deck_compat_last_attempt_at", null, System.Globalization.DateTimeStyles.RoundtripKind))
+                (slug, steamAppId, verdict, fetchedAt, failedAttempts, lastAttemptAt))
+            |> List.filter (fun (_, _, verdict, fetchedAt, _, _) ->
+                now >= fetchedAt.AddDays(deckCompatRecheckAgeLimitDays verdict))
+            |> List.filter (fun (_, _, _, _, failedAttempts, lastAttemptAt) -> notInBackoff failedAttempts lastAttemptAt)
+            |> List.sortBy (fun (_, _, _, fetchedAt, _, _) -> fetchedAt) // oldest deck_compat_fetched_at first
+            |> List.truncate deckCompatRecheckCap
+            |> List.map (fun (slug, steamAppId, verdict, _, _, _) -> (slug, steamAppId, Some verdict))
+
+        neverFetched @ dueRechecks
 
     /// games-a7dqx: the resumable backfill job's cursor — every game whose
     /// cache row is still seed-only (`fetched_at IS NULL`, ADR-0045's

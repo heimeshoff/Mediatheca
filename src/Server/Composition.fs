@@ -528,8 +528,12 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
             async {
                 let! result = GameDeckCompatBackfill.runBackfill jobConn jobDbLock httpClient DateTime.UtcNow
                 let summary =
-                    sprintf "%d/%d games fetched, %d failed, %d errors"
-                        result.Succeeded result.Processed result.Failed result.Errors
+                    // games-kfpqp (ADR-0087): first fetches are Processed minus
+                    // the re-check cohort's own count (Rechecks), since every
+                    // candidate is exactly one or the other.
+                    sprintf "%d/%d games fetched (%d first fetches, %d re-checks, %d verdicts changed), %d failed, %d errors"
+                        result.Succeeded result.Processed (result.Processed - result.Rechecks) result.Rechecks
+                        result.VerdictsChanged result.Failed result.Errors
                 eprintfn "[GameDeckCompatBackfill] %s" summary
                 return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = summary } : ScheduledJobs.JobRunOutcome)
             } }

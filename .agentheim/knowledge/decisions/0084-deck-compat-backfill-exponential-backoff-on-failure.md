@@ -7,6 +7,7 @@ date: 2026-09-18
 supersedes: []
 superseded_by: []
 amends: [0059]
+amended_by: [0087]
 related_tasks: [games-wkyf0]
 related_research: []
 ---
