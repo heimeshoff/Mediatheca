@@ -1,5 +1,6 @@
 module Mediatheca.Tests.GameDeckCompatBackfillTests
 
+open System
 open System.Net
 open System.Net.Http
 open System.Threading
@@ -68,29 +69,36 @@ let tests =
 
         testCase "Fetches Deck-compat for a never-fetched game and stamps deck_compat_fetched_at, dropping it from the next run's cursor" <| fun _ ->
             let conn = createConnection ()
+            let now = DateTime.UtcNow
             seedGameWithSteamAppId conn "hades-2020" 1145360
-            let candidatesBefore = MetadataCache.findGamesNeedingDeckCompatBackfill conn
+            let candidatesBefore = MetadataCache.findGamesNeedingDeckCompatBackfill conn now
             Expect.equal candidatesBefore [ ("hades-2020", 1145360) ] "sanity: the seeded, never-fetched game is the one candidate"
 
             let httpClient = new HttpClient(new StubHttpMessageHandler(fun _ -> hardwareCompatHtml 1145360 3))
-            let result = GameDeckCompatBackfill.runBackfill conn (new SemaphoreSlim(1, 1)) httpClient |> Async.RunSynchronously
+            let result = GameDeckCompatBackfill.runBackfill conn (new SemaphoreSlim(1, 1)) httpClient now |> Async.RunSynchronously
 
             Expect.equal result.Processed 1 "One candidate processed"
             Expect.equal result.Succeeded 1 "One candidate succeeded"
+            Expect.equal result.Failed 0 "No failed fetches"
             Expect.equal result.Errors 0 "No errors"
 
             let row =
                 conn
-                |> Db.newCommand "SELECT deck_compat, deck_compat_fetched_at FROM game_metadata_cache WHERE game_slug = @slug"
+                |> Db.newCommand
+                    "SELECT deck_compat, deck_compat_fetched_at, deck_compat_failed_attempts, deck_compat_last_attempt_at FROM game_metadata_cache WHERE game_slug = @slug"
                 |> Db.setParams [ "slug", SqlType.String "hades-2020" ]
                 |> Db.querySingle (fun rd ->
-                    rd.ReadString "deck_compat", rd.IsDBNull(rd.GetOrdinal("deck_compat_fetched_at")))
-            Expect.equal row (Some ("Verified", false)) "Verified verdict written, deck_compat_fetched_at now stamped (not NULL)"
+                    rd.ReadString "deck_compat",
+                    rd.IsDBNull(rd.GetOrdinal("deck_compat_fetched_at")),
+                    rd.IsDBNull(rd.GetOrdinal("deck_compat_failed_attempts")),
+                    rd.IsDBNull(rd.GetOrdinal("deck_compat_last_attempt_at")))
+            Expect.equal row (Some ("Verified", false, true, true))
+                "Verified verdict written, deck_compat_fetched_at now stamped (not NULL), no failure bookkeeping"
 
             // Resumability: the WHERE deck_compat_fetched_at IS NULL clause
             // IS the cursor — a successfully-processed row drops out on its
             // own.
-            let candidatesAfter = MetadataCache.findGamesNeedingDeckCompatBackfill conn
+            let candidatesAfter = MetadataCache.findGamesNeedingDeckCompatBackfill conn now
             Expect.isEmpty candidatesAfter "The processed row no longer appears in the next run's cursor"
 
         testCase "A game with no Steam app id is never a candidate" <| fun _ ->
@@ -100,20 +108,109 @@ let tests =
             Projection.runProjection conn GameProjection.handler
             MetadataCache.seedFromProjections conn
 
-            let candidates = MetadataCache.findGamesNeedingDeckCompatBackfill conn
+            let candidates = MetadataCache.findGamesNeedingDeckCompatBackfill conn DateTime.UtcNow
             Expect.isEmpty candidates "No steam_app_id — never a fetchable candidate"
 
-        testCase "A fetch failure (e.g. missing attribute) leaves deck_compat_fetched_at NULL, so the game is retried on the next run" <| fun _ ->
+        testCase "A fetch failure (e.g. missing attribute) increments deck_compat_failed_attempts and stamps deck_compat_last_attempt_at, leaving deck_compat/deck_compat_fetched_at untouched" <| fun _ ->
             let conn = createConnection ()
+            let now = DateTime.UtcNow
             seedGameWithSteamAppId conn "hades-2020" 1145360
             let httpClient = new HttpClient(new StubHttpMessageHandler(fun _ -> "<html><body>no attribute</body></html>"))
-            let result = GameDeckCompatBackfill.runBackfill conn (new SemaphoreSlim(1, 1)) httpClient |> Async.RunSynchronously
+            let result = GameDeckCompatBackfill.runBackfill conn (new SemaphoreSlim(1, 1)) httpClient now |> Async.RunSynchronously
 
             Expect.equal result.Processed 1 "One candidate attempted"
             Expect.equal result.Succeeded 0 "Steam returned nothing usable — not a success"
+            Expect.equal result.Failed 1 "The Error result is reported as a failed fetch, not silently dropped"
+            Expect.equal result.Errors 0 "Not an exception"
 
-            let candidatesAfter = MetadataCache.findGamesNeedingDeckCompatBackfill conn
-            Expect.equal candidatesAfter [ ("hades-2020", 1145360) ] "deck_compat_fetched_at is still NULL — the game remains a candidate for the next run"
+            let row =
+                conn
+                |> Db.newCommand
+                    "SELECT deck_compat_failed_attempts, deck_compat_last_attempt_at, deck_compat, deck_compat_fetched_at FROM game_metadata_cache WHERE game_slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String "hades-2020" ]
+                |> Db.querySingle (fun rd ->
+                    rd.ReadInt32 "deck_compat_failed_attempts",
+                    rd.IsDBNull(rd.GetOrdinal("deck_compat_last_attempt_at")),
+                    rd.IsDBNull(rd.GetOrdinal("deck_compat")),
+                    rd.IsDBNull(rd.GetOrdinal("deck_compat_fetched_at")))
+            Expect.equal row (Some (1, false, true, true))
+                "One failed attempt recorded, last-attempt stamped, deck_compat/deck_compat_fetched_at still untouched"
+
+        testCase "A failed game is absent from the backfill cursor until its backoff window elapses, then present again" <| fun _ ->
+            let conn = createConnection ()
+            let t0 = DateTime.UtcNow
+            seedGameWithSteamAppId conn "hades-2020" 1145360
+            let httpClient = new HttpClient(new StubHttpMessageHandler(fun _ -> "<html><body>no attribute</body></html>"))
+            GameDeckCompatBackfill.runBackfill conn (new SemaphoreSlim(1, 1)) httpClient t0 |> Async.RunSynchronously |> ignore
+
+            // One failed attempt -> backoff = min(2^1, 30) = 2 days.
+            let candidatesJustAfter = MetadataCache.findGamesNeedingDeckCompatBackfill conn t0
+            Expect.isEmpty candidatesJustAfter "In backoff immediately after the failed attempt"
+
+            let candidatesBeforeWindow = MetadataCache.findGamesNeedingDeckCompatBackfill conn (t0.AddDays(1.9))
+            Expect.isEmpty candidatesBeforeWindow "Still in backoff just under 2 days later"
+
+            let candidatesAfterWindow = MetadataCache.findGamesNeedingDeckCompatBackfill conn (t0.AddDays(2.1))
+            Expect.equal candidatesAfterWindow [ ("hades-2020", 1145360) ] "Eligible again once the 2-day backoff has elapsed"
+
+        testCase "A never-attempted, never-fetched game is always eligible regardless of the clock" <| fun _ ->
+            let conn = createConnection ()
+            seedGameWithSteamAppId conn "hades-2020" 1145360
+            let candidates = MetadataCache.findGamesNeedingDeckCompatBackfill conn (DateTime.UtcNow.AddYears(10))
+            Expect.equal candidates [ ("hades-2020", 1145360) ] "No prior attempt recorded -- always eligible"
+
+        testCase "The backoff caps at 30 days flat, even for a large attempt count" <| fun _ ->
+            let conn = createConnection ()
+            let t0 = DateTime.UtcNow
+            seedGameWithSteamAppId conn "hades-2020" 1145360
+            // Directly seed a high attempt count (2^6 = 64, above the cap) --
+            // reaching this via six real failed runs would just be six
+            // repetitions of the same assertion this test already makes for
+            // one attempt.
+            conn
+            |> Db.newCommand
+                "UPDATE game_metadata_cache SET deck_compat_failed_attempts = 6, deck_compat_last_attempt_at = @last_attempt_at WHERE game_slug = @slug"
+            |> Db.setParams [ "slug", SqlType.String "hades-2020"; "last_attempt_at", SqlType.String (t0.ToString("o")) ]
+            |> Db.exec
+
+            let candidatesBeforeCap = MetadataCache.findGamesNeedingDeckCompatBackfill conn (t0.AddDays(29.0))
+            Expect.isEmpty candidatesBeforeCap "Still in backoff just under the 30-day cap"
+
+            let candidatesAfterCap = MetadataCache.findGamesNeedingDeckCompatBackfill conn (t0.AddDays(31.0))
+            Expect.equal candidatesAfterCap [ ("hades-2020", 1145360) ] "Eligible again once the 30-day cap has elapsed, not 2^6 = 64 days"
+
+        testCase "A successful fetch after earlier failures writes the verdict and resets both failure columns" <| fun _ ->
+            let conn = createConnection ()
+            let t0 = DateTime.UtcNow
+            seedGameWithSteamAppId conn "hades-2020" 1145360
+            let failingHttpClient = new HttpClient(new StubHttpMessageHandler(fun _ -> "<html><body>no attribute</body></html>"))
+            GameDeckCompatBackfill.runBackfill conn (new SemaphoreSlim(1, 1)) failingHttpClient t0 |> Async.RunSynchronously |> ignore
+
+            let attemptsAfterFailure =
+                conn
+                |> Db.newCommand "SELECT deck_compat_failed_attempts FROM game_metadata_cache WHERE game_slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String "hades-2020" ]
+                |> Db.querySingle (fun rd -> rd.ReadInt32 "deck_compat_failed_attempts")
+            Expect.equal attemptsAfterFailure (Some 1) "sanity: one failed attempt recorded"
+
+            // Past the 2-day backoff so the game is a candidate again.
+            let laterNow = t0.AddDays(3.0)
+            let succeedingHttpClient = new HttpClient(new StubHttpMessageHandler(fun _ -> hardwareCompatHtml 1145360 3))
+            let result = GameDeckCompatBackfill.runBackfill conn (new SemaphoreSlim(1, 1)) succeedingHttpClient laterNow |> Async.RunSynchronously
+            Expect.equal result.Succeeded 1 "The retried fetch succeeds"
+
+            let row =
+                conn
+                |> Db.newCommand
+                    "SELECT deck_compat, deck_compat_fetched_at, deck_compat_failed_attempts, deck_compat_last_attempt_at FROM game_metadata_cache WHERE game_slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String "hades-2020" ]
+                |> Db.querySingle (fun rd ->
+                    rd.ReadString "deck_compat",
+                    rd.IsDBNull(rd.GetOrdinal("deck_compat_fetched_at")),
+                    rd.IsDBNull(rd.GetOrdinal("deck_compat_failed_attempts")),
+                    rd.IsDBNull(rd.GetOrdinal("deck_compat_last_attempt_at")))
+            Expect.equal row (Some ("Verified", false, true, true))
+                "Verdict written and deck_compat_fetched_at stamped; both failure columns reset by the success"
 
         testCase "The Deck-compat backfill never touches the play-facets fetched_at cursor — the two backfills' cursors stay independent" <| fun _ ->
             let conn = createConnection ()
@@ -124,7 +221,7 @@ let tests =
                 |> Db.setParams [ "slug", SqlType.String "hades-2020" ]
                 |> Db.querySingle (fun rd -> rd.IsDBNull(rd.GetOrdinal("fetched_at")))
             let httpClient = new HttpClient(new StubHttpMessageHandler(fun _ -> hardwareCompatHtml 1145360 3))
-            GameDeckCompatBackfill.runBackfill conn (new SemaphoreSlim(1, 1)) httpClient |> Async.RunSynchronously |> ignore
+            GameDeckCompatBackfill.runBackfill conn (new SemaphoreSlim(1, 1)) httpClient DateTime.UtcNow |> Async.RunSynchronously |> ignore
             let facetsFetchedAtAfter =
                 conn
                 |> Db.newCommand "SELECT fetched_at FROM game_metadata_cache WHERE game_slug = @slug"
@@ -136,7 +233,7 @@ let tests =
             let conn = createConnection ()
             seedGameWithSteamAppId conn "hades-2020" 1145360
             let httpClient = new HttpClient(new StubHttpMessageHandler(fun _ -> hardwareCompatHtml 1145360 2))
-            GameDeckCompatBackfill.runBackfill conn (new SemaphoreSlim(1, 1)) httpClient |> Async.RunSynchronously |> ignore
+            GameDeckCompatBackfill.runBackfill conn (new SemaphoreSlim(1, 1)) httpClient DateTime.UtcNow |> Async.RunSynchronously |> ignore
 
             let overrideStillNull =
                 conn

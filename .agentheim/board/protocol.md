@@ -5,6 +5,31 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 11:11 -- Task verified and completed: games-wkyf0 - Deck-compat job — stop re-fetching permanently failing games every night by recording failed attempts and retrying them on a growing delay
+
+**Type:** Work / Task completion
+**Task:** games-wkyf0 - Deck-compat job — stop re-fetching permanently failing games every night by recording failed attempts and retrying them on a growing delay
+**Summary:** The Deck-compat backfill records failed fetches (Error result or exception) as an attempt count and timestamp on game_metadata_cache and skips a failing game until min(2^attempts, 30) days have passed instead of re-fetching it every night; a success resets the bookkeeping, and the job summary reports failed fetches separately (ADR-0084).
+**Duration:** 25m
+**Verification:** PASS (iteration 2)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 4
+**Tests added:** 4
+**ADRs written:** 0084
+
+---
+
+## 2026-09-18 11:02 -- Verification failed: games-wkyf0 - Deck-compat job — stop re-fetching permanently failing games every night by recording failed attempts and retrying them on a growing delay
+
+**Type:** Work / Verification failure
+**Task:** games-wkyf0 - Deck-compat job — stop re-fetching permanently failing games every night by recording failed attempts and retrying them on a growing delay
+**Iteration:** 1 of 3
+**Reasons:** check 6 (ADRs for decisions) — the backoff cursor diverges from the permanent `fetched_at IS NULL` drain shape ADR-0059 says this job reuses, and no ADR records the `min(2^N, 30)` schedule, the single shared failure policy, or the reset-on-success choice (precedent: ADR-0060); checks 1–5 pass, build + 972/972 Expecto green
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-09-18 10:44 -- Batch started: [books-wk67x, games-wkyf0]
 
 **Type:** Work / Batch start

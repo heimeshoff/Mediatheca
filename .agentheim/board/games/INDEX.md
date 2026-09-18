@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 1
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 13
+- **Doing:** 0
+- **Done:** 14
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **games-wkyf0** — Deck-compat job — stop re-fetching permanently failing games every night by recording failed attempts and retrying them on a growing delay (bug) — `doing/games-wkyf0-deck-compat-failed-fetch-retry-backoff.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **games-wkyf0** — Deck-compat job — stop re-fetching permanently failing games every night by recording failed attempts and retrying them on a growing delay (bug) — `done/games-wkyf0-deck-compat-failed-fetch-retry-backoff.md`
 - **games-fffvm** — Re-sanitize existing game descriptions — a resumable, throttled backfill that re-fetches every already-cached game's description (Steam-linked via the storefront, RAWG-only via RAWG details) through games-r1tx4's sanitizer, so games imported before it gain paragraphs/emphasis and RAWG-only games get the description games-v4nqe silently dropped (chore) — `done/games-fffvm-resanitize-existing-game-descriptions-backfill.md`
 - **games-r1tx4** — Apply the Audible description sanitizer + RichText renderer pattern to game descriptions (Steam/RAWG) (chore) — `done/games-r1tx4-apply-the-audible-description-sanitizer-richtext-renderer-pa.md`
 - **games-t69rb** — Game detail page — keep the right-hand card column (Links, play facets, friends, …) mounted across the Overview/Journal tabs so switching only swaps the content column, and open on the Journal tab when the game's journal document already has content, Overview otherwise (feature) — `done/games-t69rb-game-detail-persistent-side-cards-journal-first.md`

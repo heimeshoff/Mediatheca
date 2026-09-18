@@ -526,8 +526,10 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
           Hour = deckCompatBackfillHour
           Run = fun () ->
             async {
-                let! result = GameDeckCompatBackfill.runBackfill jobConn jobDbLock httpClient
-                let summary = sprintf "%d/%d games fetched, %d errors" result.Succeeded result.Processed result.Errors
+                let! result = GameDeckCompatBackfill.runBackfill jobConn jobDbLock httpClient DateTime.UtcNow
+                let summary =
+                    sprintf "%d/%d games fetched, %d failed, %d errors"
+                        result.Succeeded result.Processed result.Failed result.Errors
                 eprintfn "[GameDeckCompatBackfill] %s" summary
                 return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = summary } : ScheduledJobs.JobRunOutcome)
             } }

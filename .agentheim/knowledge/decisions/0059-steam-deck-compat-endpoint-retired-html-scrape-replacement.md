@@ -6,6 +6,7 @@ status: accepted
 date: 2026-08-04
 supersedes: []
 superseded_by: []
+amended_by: [0084]
 related_tasks: [games-b8xnw, games-a7dqx]
 related_research: []
 ---

@@ -302,6 +302,25 @@ module MetadataCache =
             conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN deck_compat_fetched_at TEXT" |> Db.exec
         with _ -> () // Column already exists
 
+        // games-wkyf0: retry backoff for a Deck-compat fetch that comes back
+        // `Error` (store page without `data-hardwarecompatibility` —
+        // delisted apps, age-gate redirects, tools/DLC) or throws. Cache-tier
+        // bookkeeping only (ADR-0043/ADR-0045) — no event, no `Projected`
+        // table; `deck_compat`/`deck_compat_fetched_at` above stay the only
+        // columns a success ever writes. `deck_compat_failed_attempts` is
+        // NULL/0 for "never failed"; `deck_compat_last_attempt_at` is its OWN
+        // stamp, deliberately never conflated with `deck_compat_fetched_at`
+        // (that column means "a verdict was written", this one means "an
+        // attempt, successful or not, happened") — same independent-cursor
+        // lesson as every other column pair in this table. A successful
+        // fetch resets both columns via `upsertGameDeckCompat`.
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN deck_compat_failed_attempts INTEGER" |> Db.exec
+        with _ -> () // Column already exists
+        try
+            conn |> Db.newCommand "ALTER TABLE game_metadata_cache ADD COLUMN deck_compat_last_attempt_at TEXT" |> Db.exec
+        with _ -> () // Column already exists
+
         // games-ev65k (ADR-0043): Steam's own release-date facts —
         // cache-tier only, no event, no override (a third party's
         // re-fetchable description, exactly like facets/deck_compat).
@@ -749,20 +768,54 @@ module MetadataCache =
     /// discipline as `upsertGameFacets`/`upsertGameIdentityCard`: only these
     /// two columns are named, so an existing row's facet/identity-card/hltb
     /// columns are never touched.
+    ///
+    /// games-wkyf0: a genuine success also clears
+    /// `deck_compat_failed_attempts`/`deck_compat_last_attempt_at` — a game
+    /// that failed N times and then succeeds is no longer "in backoff" for
+    /// anything, since `findGamesNeedingDeckCompatBackfill` drops it from its
+    /// cursor entirely once `deck_compat_fetched_at` is stamped.
     let upsertGameDeckCompat (conn: SqliteConnection) (slug: string) (compat: DeckCompatibility) : unit =
         conn
         |> Db.newCommand
             """
-            INSERT INTO game_metadata_cache (game_slug, deck_compat, deck_compat_fetched_at)
-            VALUES (@game_slug, @deck_compat, @deck_compat_fetched_at)
+            INSERT INTO game_metadata_cache
+                (game_slug, deck_compat, deck_compat_fetched_at, deck_compat_failed_attempts, deck_compat_last_attempt_at)
+            VALUES (@game_slug, @deck_compat, @deck_compat_fetched_at, 0, NULL)
             ON CONFLICT(game_slug) DO UPDATE SET
                 deck_compat = excluded.deck_compat,
-                deck_compat_fetched_at = excluded.deck_compat_fetched_at
+                deck_compat_fetched_at = excluded.deck_compat_fetched_at,
+                deck_compat_failed_attempts = NULL,
+                deck_compat_last_attempt_at = NULL
             """
         |> Db.setParams [
             "game_slug", SqlType.String slug
             "deck_compat", SqlType.String (encodeDeckCompat compat)
             "deck_compat_fetched_at", SqlType.String (System.DateTime.UtcNow.ToString("o"))
+        ]
+        |> Db.exec
+
+    /// games-wkyf0: the Deck-compat backfill job's failed-attempt bookkeeping
+    /// — called on both a `Steam.getDeckCompatibility` `Error` result and an
+    /// unhandled exception (`GameDeckCompatBackfill.runBackfill`'s two
+    /// failure branches). Increments the row's own attempt counter and
+    /// stamps the attempt time; never touches `deck_compat`/
+    /// `deck_compat_fetched_at`, so a game that has never had a successful
+    /// fetch keeps rendering the "Unknown" badge exactly as before this task.
+    /// `now` is an injected clock (the caller's own parameter, ultimately
+    /// `Composition.fs`'s `DateTime.UtcNow` in production) so backoff is
+    /// testable without sleeping.
+    let recordDeckCompatFailedAttempt (conn: SqliteConnection) (slug: string) (now: System.DateTime) : unit =
+        conn
+        |> Db.newCommand
+            """
+            UPDATE game_metadata_cache
+            SET deck_compat_failed_attempts = COALESCE(deck_compat_failed_attempts, 0) + 1,
+                deck_compat_last_attempt_at = @deck_compat_last_attempt_at
+            WHERE game_slug = @game_slug
+            """
+        |> Db.setParams [
+            "game_slug", SqlType.String slug
+            "deck_compat_last_attempt_at", SqlType.String (now.ToString("o"))
         ]
         |> Db.exec
 
@@ -775,21 +828,50 @@ module MetadataCache =
     /// was removed from here; only `encodeDeckCompat` remains, for
     /// `upsertGameDeckCompat`'s write path.
 
-    /// games-b8xnw: the resumable Deck-compat backfill job's cursor — same
-    /// shape as `findGamesNeedingFacetBackfill`, but walking its own
+    /// games-wkyf0: the backoff delay for a game with `failedAttempts` prior
+    /// failed fetches — `min(2^attempts, 30)` days (2, 4, 8, 16, then a flat
+    /// 30-day ceiling). All failure kinds (a `Steam.getDeckCompatibility`
+    /// `Error` result and an unhandled exception alike) back off the same
+    /// way on purpose — see the task's Notes: a transient network error
+    /// costs at most two extra days, which does not matter for a
+    /// never-time-critical badge, and one rule is easier to pin than a
+    /// transient/permanent classifier.
+    let private deckCompatBackoffDays (failedAttempts: int) : float =
+        min (2.0 ** float failedAttempts) 30.0
+
+    /// games-b8xnw (games-wkyf0: now clock-injected and backoff-aware): the
+    /// resumable Deck-compat backfill job's cursor — same shape as
+    /// `findGamesNeedingFacetBackfill`, but walking its own
     /// `deck_compat_fetched_at IS NULL` column so the two backfills' resume
-    /// cursors never interfere with each other.
-    let findGamesNeedingDeckCompatBackfill (conn: SqliteConnection) : (string * int) list =
+    /// cursors never interfere with each other. A never-attempted game
+    /// (`deck_compat_last_attempt_at IS NULL`) is always eligible; a game
+    /// with prior failed attempts is skipped until `deckCompatBackoffDays`
+    /// have passed since its last attempt. `now` is the caller's injected
+    /// clock, so the backoff is testable without sleeping.
+    let findGamesNeedingDeckCompatBackfill (conn: SqliteConnection) (now: System.DateTime) : (string * int) list =
         conn
         |> Db.newCommand
             """
-            SELECT mc.game_slug, gd.steam_app_id
+            SELECT mc.game_slug, gd.steam_app_id, mc.deck_compat_failed_attempts, mc.deck_compat_last_attempt_at
             FROM game_metadata_cache mc
             JOIN game_detail gd ON gd.slug = mc.game_slug
             WHERE mc.deck_compat_fetched_at IS NULL AND gd.steam_app_id IS NOT NULL
             """
         |> Db.query (fun (rd: IDataReader) ->
-            rd.ReadString "game_slug", rd.ReadInt32 "steam_app_id")
+            let slug = rd.ReadString "game_slug"
+            let steamAppId = rd.ReadInt32 "steam_app_id"
+            let failedAttempts =
+                if rd.IsDBNull(rd.GetOrdinal("deck_compat_failed_attempts")) then 0
+                else rd.ReadInt32 "deck_compat_failed_attempts"
+            let lastAttemptAt =
+                if rd.IsDBNull(rd.GetOrdinal("deck_compat_last_attempt_at")) then None
+                else Some (System.DateTime.Parse(rd.ReadString "deck_compat_last_attempt_at", null, System.Globalization.DateTimeStyles.RoundtripKind))
+            (slug, steamAppId, failedAttempts, lastAttemptAt))
+        |> List.filter (fun (_, _, failedAttempts, lastAttemptAt) ->
+            match lastAttemptAt with
+            | None -> true // never attempted — always eligible
+            | Some lastAttempt -> now >= lastAttempt.AddDays(deckCompatBackoffDays failedAttempts))
+        |> List.map (fun (slug, steamAppId, _, _) -> (slug, steamAppId))
 
     /// games-a7dqx: the resumable backfill job's cursor — every game whose
     /// cache row is still seed-only (`fetched_at IS NULL`, ADR-0045's
