@@ -506,6 +506,98 @@ module Audible =
             }
         loop 1 []
 
+    // ── Last-listened metadata (integration-dtdbb, ADR-0082) ────────────────
+    //
+    // A dedicated adapter-owned throttle (ADR-0066's shape, copied from
+    // `OpenLibrary.throttleApiCall`/`Audnexus.throttled` -- not shared),
+    // separate from the library fetch above and from `Audnexus`'s own gate:
+    // this endpoint is called once per book that is about to record a
+    // prior (`Api.importAudibleLibraryImpl`), never from the nightly sync.
+    let mutable throttleMetadataInterval = TimeSpan.FromMilliseconds(700.0)
+
+    let private metadataGate = new System.Threading.SemaphoreSlim(1, 1)
+    let mutable private lastMetadataCallStartedAt : DateTime option = None
+
+    /// Runs `fetch` under the metadata endpoint's own throttle -- exposed so
+    /// tests can exercise the gate directly (`OpenLibrary.throttleApiCall`'s
+    /// precedent).
+    let throttleMetadataCall (fetch: unit -> Async<'a>) : Async<'a> =
+        async {
+            do! metadataGate.WaitAsync() |> Async.AwaitTask
+            try
+                let now = DateTime.UtcNow
+                match lastMetadataCallStartedAt with
+                | Some last ->
+                    let remaining = throttleMetadataInterval - (now - last)
+                    if remaining > TimeSpan.Zero then
+                        do! Async.Sleep remaining
+                | None -> ()
+                lastMetadataCallStartedAt <- Some DateTime.UtcNow
+                return! fetch ()
+            finally
+                metadataGate.Release() |> ignore
+        }
+
+    /// `GET /1.0/content/{asin}/metadata?response_groups=last_position_heard`
+    /// (research 2026-09-18) -- the only confirmed source of a "last
+    /// listened" day. Both fields land `None` when the wire reports
+    /// `status = "DoesNotExist"` or when the body fails to decode; only
+    /// `LastUpdatedOn`'s date part (`yyyy-MM-dd`, first 10 characters, no
+    /// timezone conversion -- the field's own zone is undocumented) and the
+    /// raw `PositionMs` are ever carried further.
+    type LastPositionHeard = {
+        LastUpdatedOn: string option
+        PositionMs: int64 option
+    }
+
+    let private emptyLastPositionHeard = { LastUpdatedOn = None; PositionMs = None }
+
+    let private truncateToDate (s: string) : string =
+        if s.Length >= 10 then s.Substring(0, 10) else s
+
+    type private RawLastPositionHeard = {
+        Status: string
+        LastUpdated: string option
+        PositionMs: int64 option
+    }
+
+    let private decodeRawLastPositionHeard : Decoder<RawLastPositionHeard> =
+        Decode.object (fun get ->
+            { Status = get.Required.Field "status" Decode.string
+              LastUpdated = get.Optional.Field "last_updated" Decode.string
+              PositionMs = get.Optional.Field "position_ms" Decode.int64 })
+
+    let private decodeLastPositionHeard : Decoder<LastPositionHeard> =
+        Decode.object (fun get -> get.Optional.Field "last_position_heard" decodeRawLastPositionHeard)
+        |> Decode.map (fun rawOpt ->
+            match rawOpt with
+            | Some raw when raw.Status = "Exists" ->
+                { LastUpdatedOn = raw.LastUpdated |> Option.map truncateToDate
+                  PositionMs = raw.PositionMs }
+            | _ -> emptyLastPositionHeard)
+
+    /// Authenticated, throttled fetch of a single title's last-listened
+    /// position. `Ok emptyLastPositionHeard` covers `status =
+    /// "DoesNotExist"` and an undecodable body alike -- both are ordinary,
+    /// expected shapes of "nothing to report", never a caller-visible
+    /// error. `Error` is reserved for a failed HTTP round trip itself
+    /// (network, 401/403, 5xx) -- `Api.importAudibleLibraryImpl` degrades
+    /// THAT to both-`None` too (this task's own "What" section point 5), so
+    /// no caller ever needs to distinguish the two.
+    let getLastPositionHeard (httpClient: HttpClient) (host: string) (token: string) (asin: string) : Async<Result<LastPositionHeard, string>> =
+        throttleMetadataCall (fun () ->
+            async {
+                let url = sprintf "https://%s/1.0/content/%s/metadata?response_groups=last_position_heard" host asin
+                let! result = sendAuthenticated httpClient url token
+                match result with
+                | Error Unauthorized -> return Error "Unauthorized"
+                | Error (OtherFailure msg) -> return Error msg
+                | Ok body ->
+                    match Decode.fromString decodeLastPositionHeard body with
+                    | Ok v -> return Ok v
+                    | Error _ -> return Ok emptyLastPositionHeard
+            })
+
     // ── Runtime config (Composition.fs's `getAudibleConfig`, ADR-0074) ──────
 
     /// `AuthFile` is `None` until Settings saves one; `Marketplace` is the

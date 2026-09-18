@@ -365,3 +365,80 @@ let getCustomerSummaryTests =
             let result = getCustomerSummary http "api.audible.de" "rejected-token" |> Async.RunSynchronously
             Expect.equal result (Error Unauthorized) "401 is the retry trigger, not a generic failure"
     ]
+
+/// integration-dtdbb (ADR-0082): `Audible.getLastPositionHeard`, the only
+/// confirmed source of a "last listened" day (research 2026-09-18's captured
+/// sample, `GET /1.0/content/{asin}/metadata?response_groups=last_position_heard`).
+[<Tests>]
+let getLastPositionHeardTests =
+    testList "Audible.getLastPositionHeard (integration-dtdbb, ADR-0082)" [
+
+        testCase "decodes the research report's captured sample to a Some date part and the raw position_ms" <| fun _ ->
+            let handler =
+                new RecordingHandler(fun _ ->
+                    jsonResponse HttpStatusCode.OK
+                        """{"last_position_heard": {"last_updated": "2023-09-23 21:03:18.228", "position_ms": 896068, "status": "Exists"}}""")
+            use http = new HttpClient(handler)
+            let result = getLastPositionHeard http "api.audible.de" "my-access-token" "B002V5BNGY" |> Async.RunSynchronously
+            Expect.equal result (Ok { LastUpdatedOn = Some "2023-09-23"; PositionMs = Some 896068L }) "date-part-only LastUpdatedOn, raw PositionMs"
+            let request = handler.Requests.[0]
+            Expect.stringContains (request.RequestUri.ToString()) "/1.0/content/B002V5BNGY/metadata?response_groups=last_position_heard" "hits the confirmed endpoint/response_groups"
+            Expect.equal (request.Headers.GetValues("Authorization") |> Seq.head) "Bearer my-access-token" "Bearer auth, same as every other authenticated call"
+
+        testCase "status = DoesNotExist degrades to both-None" <| fun _ ->
+            let handler = new RecordingHandler(fun _ -> jsonResponse HttpStatusCode.OK """{"last_position_heard": {"status": "DoesNotExist"}}""")
+            use http = new HttpClient(handler)
+            let result = getLastPositionHeard http "api.audible.de" "my-access-token" "B002V5BNGY" |> Async.RunSynchronously
+            Expect.equal result (Ok { LastUpdatedOn = None; PositionMs = None }) "DoesNotExist is an ordinary both-None shape, not an error"
+
+        testCase "an undecodable body degrades to both-None, never a caller-visible error" <| fun _ ->
+            let handler = new RecordingHandler(fun _ -> jsonResponse HttpStatusCode.OK """not json at all""")
+            use http = new HttpClient(handler)
+            let result = getLastPositionHeard http "api.audible.de" "my-access-token" "B002V5BNGY" |> Async.RunSynchronously
+            Expect.equal result (Ok { LastUpdatedOn = None; PositionMs = None }) "a decode failure is treated exactly like DoesNotExist"
+
+        testCase "a 401/403 surfaces as Error, never an exception" <| fun _ ->
+            let handler = new RecordingHandler(fun _ -> new HttpResponseMessage(HttpStatusCode.Unauthorized))
+            use http = new HttpClient(handler)
+            let result = getLastPositionHeard http "api.audible.de" "rejected-token" "B002V5BNGY" |> Async.RunSynchronously
+            match result with
+            | Error _ -> ()
+            | Ok v -> failtestf "Expected Error on a 401, got Ok %A" v
+
+        testCase "a network/5xx failure surfaces as Error, never an exception" <| fun _ ->
+            let handler = new RecordingHandler(fun _ -> new HttpResponseMessage(HttpStatusCode.InternalServerError))
+            use http = new HttpClient(handler)
+            let result = getLastPositionHeard http "api.audible.de" "my-access-token" "B002V5BNGY" |> Async.RunSynchronously
+            match result with
+            | Error _ -> ()
+            | Ok v -> failtestf "Expected Error on a 500, got Ok %A" v
+    ]
+
+/// integration-dtdbb (ADR-0066's shape): `Audible.throttleMetadataCall`, a
+/// dedicated gate for the last-listened metadata endpoint, separate from
+/// `Audnexus`'s own gate and from the library fetch. Mirrors
+/// `OpenLibraryTests.fs`'s "three concurrent calls" pacing test shape.
+[<Tests>]
+let throttleMetadataCallTests =
+    testList "Audible.throttleMetadataCall (integration-dtdbb, ADR-0066)" [
+
+        testCase "paces consecutive calls by at least the configured interval" <| fun _ ->
+            let originalInterval = Audible.throttleMetadataInterval
+            let interval = TimeSpan.FromMilliseconds(50.0)
+            try
+                Audible.throttleMetadataInterval <- interval
+                let sw = System.Diagnostics.Stopwatch.StartNew()
+                [ 1 .. 3 ]
+                |> List.map (fun _ -> Audible.throttleMetadataCall (fun () -> async { return () }))
+                |> Async.Parallel
+                |> Async.RunSynchronously
+                |> ignore
+                sw.Stop()
+                let clockTolerance = TimeSpan.FromMilliseconds(5.0)
+                let expectedMinimum = interval + interval - clockTolerance
+                Expect.isTrue
+                    (sw.Elapsed >= expectedMinimum)
+                    (sprintf "Expected 3 gated calls to take at least %A, took %A" expectedMinimum sw.Elapsed)
+            finally
+                Audible.throttleMetadataInterval <- originalInterval
+    ]

@@ -586,6 +586,36 @@ module BookProjection =
         |> Db.setParams [ "value", SqlType.String value ]
         |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "slug")
 
+    /// integration-dtdbb (ADR-0082 §2): does this book already carry a
+    /// `book_progress` row from `source`? Gates whether
+    /// `Api.importAudibleLibraryImpl` issues `Record_prior_reading_progress`
+    /// (no row yet) or a plain `Observe_reading_progress` (a row already
+    /// exists) -- a small read-only existence check, never a count
+    /// consumer needs.
+    let hasSourceProgress (conn: SqliteConnection) (slug: string) (source: ProgressSource) : bool =
+        conn
+        |> Db.newCommand "SELECT COUNT(*) as cnt FROM book_progress WHERE book_slug = @slug AND source = @source"
+        |> Db.setParams [ "slug", SqlType.String slug; "source", SqlType.String (encodeProgressSource source) ]
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadInt64 "cnt")
+        |> Option.defaultValue 0L
+        |> fun cnt -> cnt > 0L
+
+    /// integration-dtdbb (ADR-0082 §7): a book's ONLY `book_progress` row
+    /// from `source` predates priors -- exactly one row, `kind =
+    /// 'observation'`. `Some observedOn` when that legacy shape is found (so
+    /// the caller can `Remove_reading_progress_observation` it and re-record
+    /// a correctly-dated prior); `None` for a book already carrying a prior,
+    /// more than one row, or no row at all.
+    let legacyObservationToRepair (conn: SqliteConnection) (slug: string) (source: ProgressSource) : string option =
+        let rows =
+            conn
+            |> Db.newCommand "SELECT observed_on, kind FROM book_progress WHERE book_slug = @slug AND source = @source"
+            |> Db.setParams [ "slug", SqlType.String slug; "source", SqlType.String (encodeProgressSource source) ]
+            |> Db.query (fun (rd: IDataReader) -> rd.ReadString "observed_on", rd.ReadString "kind")
+        match rows with
+        | [ (observedOn, "observation") ] -> Some observedOn
+        | _ -> None
+
     /// Case-insensitive title match — the `addBook` duplicate-check fallback
     /// when no external id matched.
     let findByTitle (conn: SqliteConnection) (title: string) : (string * string) list =

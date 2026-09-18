@@ -26,7 +26,7 @@ let audibleImportSyncTests =
 
         testCase "a successful import stops the spinner and records the session-fresh result" <| fun () ->
             let model, _ = init ()
-            let result : AudibleImportResult = { Total = 3; Created = 3; AlreadyKnown = 0; ProgressObserved = 2; Errors = [] }
+            let result : AudibleImportResult = { Total = 3; Created = 3; AlreadyKnown = 0; ProgressObserved = 2; PriorsFromAudible = 0; PriorsToday = 0; Repaired = 0; Errors = [] }
             let updated, _ = update fakeApi fakeAdminApi (Audible_import_completed (Ok result)) { model with IsImportingAudibleLibrary = true }
             Expect.isFalse updated.IsImportingAudibleLibrary "the spinner stops"
             match updated.AudibleImportResult with

@@ -1056,6 +1056,16 @@ type AudibleImportResult = {
     Created: int
     AlreadyKnown: int
     ProgressObserved: int
+    /// integration-dtdbb (ADR-0082): of the priors recorded this run, how
+    /// many were dated from Audible's own `last_position_heard` versus
+    /// falling back to today (a silent metadata-call failure/401 stays
+    /// visible as a `PriorsToday` count instead of `PriorsFromAudible`).
+    PriorsFromAudible: int
+    PriorsToday: int
+    /// integration-dtdbb (ADR-0082 §7): a book whose only Audible
+    /// `book_progress` row predated priors, repaired this run (its
+    /// import-day observation replaced by a correctly-dated prior).
+    Repaired: int
     Errors: string list
 }
 

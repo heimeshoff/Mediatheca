@@ -61,19 +61,31 @@ module AudibleSync =
         | None -> if item.IsFinished then Some 100 else None
 
     /// The one pure decision both the import and the daily sync funnel
-    /// through (ADR-0076): `None` when the item carries neither a percent
-    /// nor an explicit finished flag -- nothing to observe. `Position` is
-    /// `Minutes (round (percent/100 x runtime), Some runtime)` when the
-    /// runtime is known, else `None` (this task's own "What" section).
-    let observationFor (item: Audible.AudibleLibraryItem) (today: string) : Books.ReadingProgressObservedData option =
+    /// through (ADR-0076, amended by ADR-0082/integration-dtdbb): `None`
+    /// when the item carries neither a percent nor an explicit finished
+    /// flag -- nothing to observe. `lastListened` is `None` on every call
+    /// from `runProgressSync` (the nightly sync never fetches it) and
+    /// `Some` (possibly both-`None` fields) only from
+    /// `Api.importAudibleLibraryImpl`'s prior-recording path.
+    /// `ObservedOn` prefers `lastListened`'s own last-updated day over
+    /// `today`; `Position` prefers `Minutes (int (positionMs / 60000L), Some
+    /// runtime)` -- Audible's own reported elapsed time -- over the
+    /// `percent x runtime` estimate when a `PositionMs` is present.
+    let observationFor (item: Audible.AudibleLibraryItem) (today: string) (lastListened: Audible.LastPositionHeard option) : Books.ReadingProgressObservedData option =
         percentOf item
         |> Option.map (fun percent ->
-            { Percent = percent
-              Position =
+            let observedOn =
+                lastListened |> Option.bind (fun l -> l.LastUpdatedOn) |> Option.defaultValue today
+            let position =
                 item.RuntimeMinutes
-                |> Option.map (fun total -> Minutes (int (Math.Round(float percent / 100.0 * float total)), Some total))
+                |> Option.map (fun total ->
+                    match lastListened |> Option.bind (fun l -> l.PositionMs) with
+                    | Some positionMs -> Minutes (int (positionMs / 60000L), Some total)
+                    | None -> Minutes (int (Math.Round(float percent / 100.0 * float total)), Some total))
+            { Percent = percent
+              Position = position
               Source = ProgressSource.Audible
-              ObservedOn = today
+              ObservedOn = observedOn
               Finished = item.IsFinished })
 
     let formatResult (r: AudibleProgressSyncResult) : string =
@@ -84,9 +96,14 @@ module AudibleSync =
     /// The plain, human-readable summary `Api.importAudibleLibrary` persists
     /// under `audible_last_import_result` -- same convention as
     /// `formatResult` above (a formatted string, not literal JSON, despite
-    /// this task's own "What" section saying "JSON").
+    /// this task's own "What" section saying "JSON"). integration-dtdbb adds
+    /// the priors-from-Audible/priors-dated-today split (so a silent 401 on
+    /// the metadata endpoint stays visible) and the legacy-repair count.
     let formatImportResult (r: AudibleImportResult) : string =
-        let base_ = sprintf "%d total, %d created, %d already known, %d progress observed" r.Total r.Created r.AlreadyKnown r.ProgressObserved
+        let base_ =
+            sprintf
+                "%d total, %d created, %d already known, %d progress observed, %d priors from Audible, %d priors dated today, %d repaired"
+                r.Total r.Created r.AlreadyKnown r.ProgressObserved r.PriorsFromAudible r.PriorsToday r.Repaired
         if List.isEmpty r.Errors then base_
         else sprintf "%s (%d item error(s))" base_ (List.length r.Errors)
 
@@ -136,7 +153,11 @@ module AudibleSync =
                             match existingSlug with
                             | None -> unmatched <- unmatched + 1
                             | Some slug ->
-                                match observationFor item today with
+                                // integration-dtdbb, ADR-0082 §2: the nightly
+                                // sync never fetches a last-listened date and
+                                // never records a prior -- `lastListened` is
+                                // always `None` here.
+                                match observationFor item today None with
                                 | None -> ()
                                 | Some data ->
                                     let result = withLock jobLock (fun () -> executeBookCommand conn slug (Books.Observe_reading_progress data) projectionHandlers)

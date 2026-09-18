@@ -1968,12 +1968,21 @@ module Api =
                     match config.CachedAccessToken, config.CachedAccessTokenExpiresAt with
                     | Some t, Some e -> Some (t, e)
                     | _ -> None
+                // integration-dtdbb (ADR-0074): the token actually used to
+                // authenticate the (possibly retried-after-401) library
+                // fetch, captured as a side effect so the per-book
+                // `getLastPositionHeard` calls below reuse it directly
+                // rather than re-running `withAccessToken`'s whole
+                // cache/refresh/retry orchestration for every title.
+                let mutable currentAccessToken : string option = None
                 let! libraryResult =
                     Audible.withAccessToken
                         cached
                         (fun () -> Audible.refreshAccessToken httpClient authFile)
                         (persistAudibleAccessToken conn)
-                        (fun token -> Audible.getLibrary httpClient host token)
+                        (fun token ->
+                            currentAccessToken <- Some token
+                            Audible.getLibrary httpClient host token)
                 match libraryResult with
                 | Error msg ->
                     if msg.StartsWith(Audible.authFileRejectedPrefix) then
@@ -1989,23 +1998,93 @@ module Api =
                     let mutable created = 0
                     let mutable alreadyKnown = 0
                     let mutable progressObserved = 0
+                    let mutable priorsFromAudible = 0
+                    let mutable priorsToday = 0
+                    let mutable repaired = 0
                     let mutable errors : string list = []
 
-                    let observe (slug: string) (item: Audible.AudibleLibraryItem) =
-                        match AudibleSync.observationFor item today with
-                        | None -> ()
-                        | Some data ->
-                            match executeBookCommandWithEvents conn slug (Books.Observe_reading_progress data) projectionHandlers with
-                            | Ok events when not (List.isEmpty events) -> progressObserved <- progressObserved + 1
-                            | Ok _ -> ()
-                            | Error e -> errors <- errors @ [ sprintf "%s (%s): %s" item.Title item.Asin e ]
+                    // integration-dtdbb, ADR-0082 §2/§5: `None` on a failed
+                    // round trip (network/401/decode) degrades to
+                    // both-`None` exactly like `Audible.getLastPositionHeard`
+                    // itself does for a "DoesNotExist"/undecodable body --
+                    // the caller never distinguishes the two, and the prior
+                    // still gets recorded, just dated to `today`.
+                    let fetchLastPositionHeard (asin: string) : Async<Audible.LastPositionHeard option> =
+                        async {
+                            match currentAccessToken with
+                            | None -> return None
+                            | Some token ->
+                                match! Audible.getLastPositionHeard httpClient host token asin with
+                                | Ok v -> return Some v
+                                | Error _ -> return None
+                        }
+
+                    let observe (slug: string) (item: Audible.AudibleLibraryItem) : Async<unit> =
+                        async {
+                            // Legacy repair (ADR-0082 §7): a book whose ONLY
+                            // Audible row predates priors -- exactly one row,
+                            // `kind = 'observation'` -- is removed so the
+                            // fall-through below records a correctly-dated
+                            // prior in its place. Idempotent: once repaired,
+                            // the book carries a `prior` row and this finds
+                            // nothing on the next run.
+                            match BookProjection.legacyObservationToRepair conn slug ProgressSource.Audible with
+                            | Some observedOn ->
+                                match executeBookCommandWithEvents conn slug (Books.Remove_reading_progress_observation (observedOn, ProgressSource.Audible)) projectionHandlers with
+                                | Ok events when not (List.isEmpty events) -> repaired <- repaired + 1
+                                | Ok _ -> ()
+                                | Error e -> errors <- errors @ [ sprintf "%s (%s): repair failed: %s" item.Title item.Asin e ]
+                            | None -> ()
+
+                            if BookProjection.hasSourceProgress conn slug ProgressSource.Audible then
+                                match AudibleSync.observationFor item today None with
+                                | None -> ()
+                                | Some data ->
+                                    match executeBookCommandWithEvents conn slug (Books.Observe_reading_progress data) projectionHandlers with
+                                    | Ok events when not (List.isEmpty events) -> progressObserved <- progressObserved + 1
+                                    | Ok _ -> ()
+                                    | Error e -> errors <- errors @ [ sprintf "%s (%s): %s" item.Title item.Asin e ]
+                            else
+                                let! lastPositionOpt = fetchLastPositionHeard item.Asin
+                                match AudibleSync.observationFor item today lastPositionOpt with
+                                | None -> ()
+                                | Some data ->
+                                    match executeBookCommandWithEvents conn slug (Books.Record_prior_reading_progress data) projectionHandlers with
+                                    | Ok events when not (List.isEmpty events) ->
+                                        progressObserved <- progressObserved + 1
+                                        if lastPositionOpt |> Option.bind (fun l -> l.LastUpdatedOn) |> Option.isSome then
+                                            priorsFromAudible <- priorsFromAudible + 1
+                                        else
+                                            priorsToday <- priorsToday + 1
+                                        // integration-dtdbb (verifier iteration 1): `Books.decide`'s
+                                        // `Record_prior_reading_progress` branch only emits
+                                        // `Book_status_changed` when the book isn't ALREADY
+                                        // Finished (it behaves like a no-op re-finish otherwise) --
+                                        // so a legacy repair on an already-Finished book (the
+                                        // dominant real-world repair case) recorded a correctly-dated
+                                        // prior but left `finished_at` stamped at the OLD
+                                        // (e.g. import-day) date. Re-dating an already-Finished book
+                                        // is a legitimate event (ADR-0077 §4); `Change_status` is a
+                                        // no-op only when the effective date is unchanged
+                                        // (`statusChangeIsNoOp`), so issuing it unconditionally here
+                                        // is harmless when `decide` already set the right date (the
+                                        // fresh-book path, where the book starts non-Finished) and
+                                        // corrects it when it didn't (the repair path, where the
+                                        // book was already Finished before the repair ran).
+                                        if data.Percent = 100 || data.Finished then
+                                            match executeBookCommandWithEvents conn slug (Books.Change_status (BookStatus.Finished, Some data.ObservedOn)) projectionHandlers with
+                                            | Ok _ -> ()
+                                            | Error e -> errors <- errors @ [ sprintf "%s (%s): re-finish failed: %s" item.Title item.Asin e ]
+                                    | Ok _ -> ()
+                                    | Error e -> errors <- errors @ [ sprintf "%s (%s): %s" item.Title item.Asin e ]
+                        }
 
                     for item in items do
                         try
                             match BookProjection.findByExternalId conn (AudibleAsin item.Asin) with
                             | Some slug ->
                                 alreadyKnown <- alreadyKnown + 1
-                                observe slug item
+                                do! observe slug item
                             | None ->
                                 let year =
                                     item.ReleaseDate
@@ -2049,10 +2128,10 @@ module Api =
                                         Source = Some "audible"
                                     }
                                     MetadataCache.upsertBookMetadata conn slug metadata
-                                    observe slug item
+                                    do! observe slug item
                                 | Ok (AddBookOutcome.Duplicate_found (existingSlug, _)) ->
                                     alreadyKnown <- alreadyKnown + 1
-                                    observe existingSlug item
+                                    do! observe existingSlug item
                                 | Error e -> errors <- errors @ [ sprintf "%s (%s): %s" item.Title item.Asin e ]
                         with ex ->
                             errors <- errors @ [ sprintf "%s (%s): %s" item.Title item.Asin ex.Message ]
@@ -2062,6 +2141,9 @@ module Api =
                         Created = created
                         AlreadyKnown = alreadyKnown
                         ProgressObserved = progressObserved
+                        PriorsFromAudible = priorsFromAudible
+                        PriorsToday = priorsToday
+                        Repaired = repaired
                         Errors = errors
                     }
                     SettingsStore.setSetting conn "audible_last_import_result" (AudibleSync.formatImportResult result)

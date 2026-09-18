@@ -5,6 +5,43 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 03:14 -- Task verified and completed: integration-dtdbb - Audible priors carry the last-listened day — import and nightly sync fetch `last_position_heard` (`GET /1.0/content/{asin}/metadata`) only for books with no Audible progress row yet, date the prior (and so the finished date) to Audible's `last_updated`, use `position_ms` for the position, and "Import library" repairs the import-day observations written before priors existed
+
+**Type:** Work / Task completion
+**Task:** integration-dtdbb - Audible priors carry the last-listened day — import and nightly sync fetch `last_position_heard` (`GET /1.0/content/{asin}/metadata`) only for books with no Audible progress row yet, date the prior (and so the finished date) to Audible's `last_updated`, use `position_ms` for the position, and "Import library" repairs the import-day observations written before priors existed
+**Summary:** Audible priors now carry Audible's own last-listened day: "Import library" fetches GET /1.0/content/{asin}/metadata?response_groups=last_position_heard (throttled, bearer-only) exactly once per book with no Audible progress row yet, records Record_prior_reading_progress dated/positioned from that response (degrading gracefully to today's date on any failure), re-dates finished_at for an already-Finished book via an explicit Change_status, leaves the nightly sync untouched (pinned by a counting-stub test), and repairs pre-existing import-day observations into correctly-dated priors.
+**Duration:** 1h02m
+**Verification:** PASS (iteration 3)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**README delta:** integration README §Ubiquitous language anchor "Audible": applied — the worker's iteration-3 block named a non-existent section ("Bounded contexts"); the conductor corrected it to "Ubiquitous language" (where the anchor and expected text match byte-for-byte, as the iteration-2 block had stated) before applying, avoiding an appended-fallback duplicate bullet
+**Files changed:** 9
+**Tests added:** 17
+**ADRs written:** none
+
+---
+
+## 2026-09-18 02:58 -- Verification failed: integration-dtdbb - Audible priors carry the last-listened day (import-only last_position_heard fetch, legacy repair)
+
+**Type:** Work / Verification failure
+**Task:** integration-dtdbb - Audible priors carry the last-listened day (import-only last_position_heard fetch, legacy repair)
+**Iteration:** 2 of 3
+**Reasons:** acceptance criterion 4 has no regression-catching test — no runProgressSync exercise uses the counting metadata stub, so a sync that started calling /1.0/content/{asin}/metadata would pass; the zero-Record_prior_reading_progress half is unasserted because the only candidate test runs against a book that already carries a prior row (the two commands emit the same event there); the matched-no-row-book-synced-first-time scenario is not exercised anywhere. The iteration-1 finished_at re-dating defect is confirmed closed.
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
+## 2026-09-18 02:39 -- Verification failed: integration-dtdbb - Audible priors carry the last-listened day (import-only last_position_heard fetch, legacy repair)
+
+**Type:** Work / Verification failure
+**Task:** integration-dtdbb - Audible priors carry the last-listened day (import-only last_position_heard fetch, legacy repair)
+**Iteration:** 1 of 3
+**Reasons:** legacy repair of an already-Finished book does not re-date finished_at (Books.decide emits no status event for a prior on a Finished book and only Book_status_changed writes finished_at, so the repaired book keeps its import-day finish date — the exact defect the task exists to fix), the legacy-repair test uses a not-finished fixture and asserts nothing about FinishedAt
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-09-18 02:11 -- Batch started: [integration-dtdbb]
 
 **Type:** Work / Batch start

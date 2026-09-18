@@ -1775,7 +1775,7 @@ let private audibleDetail (model: Model) (dispatch: Msg -> unit) =
                                 prop.children [
                                     Html.span [
                                         prop.className "text-sm"
-                                        prop.text (sprintf "Imported: %d total, %d created, %d already known, %d progress observed" result.Total result.Created result.AlreadyKnown result.ProgressObserved)
+                                        prop.text (sprintf "Imported: %d total, %d created, %d already known, %d progress observed, %d repaired" result.Total result.Created result.AlreadyKnown result.ProgressObserved result.Repaired)
                                     ]
                                 ]
                             ]
