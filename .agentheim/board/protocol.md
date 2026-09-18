@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 13:34 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 36m (batch started 12:58, integration 13:33)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** games-kfpqp: 1
+**Commits:** 3 (1 batch-start, 1 integration, 1 session-end)
+**Vision-conformance:** none — batch aligns with vision (vision.md carries no "What success looks like" / "Non-goals" sections; judged against Out of Scope and the Design Principles: games-kfpqp keeps the re-check cohort entirely in the cache tier — no event, no Projected column — so Replayable holds, and the timer stays the only trigger)
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task)
+**Carry-over:** none — working tree clean (1 stranded RESULT sidecar swept; the games-kfpqp worktree torn down with its root node_modules junction unlinked first, main node_modules intact at 210 entries). Session-start churn: 0 recognized machine-shape commits, 0 human commits. RESULT transport: the worker's first sidecar was rejected missing-block (no BACKLOG_ITEMS block, which is required even when empty); the same worker re-emitted it via SendMessage and the second write parsed clean — no re-dispatch, no lost-result budget spent. A background watch on main src/ and tests/ stayed clean for the whole worker run (the spawn prompt carried the explicit worktree-path rule). Squash-merge clean; ADR-0087 kept its provisional number. Conductor edits: ADR-0087 frontmatter id normalised from ADR-0087 to the house style 0087, amended_by: [0087] backlink on ADR-0084, 0087 appended to the task's related_adrs. Gates: the verifier ran npm run build OK and Expecto 1001/1001 in a worktree whose src/ and tests/ are byte-equal to the final main (single-task batch, no sibling); Vitest not re-run (no client or shared file changed; 125/125 at the previous session end). Nothing was listening on port 5000 at session end — not checked at session start, so whether the builder's dev server was up before is unknown. Behaviour for the builder to know: from the next 06:00 run the Deck-compat job re-fetches up to 25 already-stamped games a night (Unknown older than 30 days first come due), and its summary line now reads fetched (first fetches, re-checks, verdicts changed), failed, errors. todo/ is empty across every BC.
+
+---
+
 ## 2026-09-18 13:32 -- Task verified and completed: games-kfpqp - Deck-compat job — re-check already recorded verdicts once they pass an age limit (Unknown 30 days, Playable/Unsupported 90, Verified 180), capped per night, so Valve's verdict changes reach existing games
 
 **Type:** Work / Task completion
