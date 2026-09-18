@@ -1,5 +1,6 @@
 module Mediatheca.Tests.BookProjectionTests
 
+open System
 open Expecto
 open Microsoft.Data.Sqlite
 open Donald
@@ -39,6 +40,19 @@ let private appendBookEvent (conn: SqliteConnection) (slug: string) (event: Book
 
 let private observation (percent: int) (source: ProgressSource) (observedOn: string) : Books.ReadingProgressObservedData =
     { Percent = percent; Position = None; Source = source; ObservedOn = observedOn; Finished = false }
+
+let private bookMetadataWithRuntime (minutes: int) : MetadataCache.BookMetadata =
+    { Description = None
+      PageCount = None
+      RuntimeMinutes = Some minutes
+      Narrators = []
+      SeriesName = None
+      SeriesPosition = None
+      Publisher = None
+      PublishedDate = None
+      AverageRating = None
+      Language = None
+      Source = None }
 
 let private latestBookStatusChangedTimestamp (conn: SqliteConnection) (slug: string) : string =
     conn
@@ -138,6 +152,197 @@ let bookProjectionTests =
                 Expect.equal detail.ProgressPercent 0 "Progress should reset once no observations remain"
                 Expect.equal detail.ProgressSource None "Progress source should clear"
             | None -> failtest "Expected the book to be found"
+
+        testCase "Reading_progress_observed rows carry kind = 'observation'; Prior_reading_progress_recorded rows carry kind = 'prior'" <| fun _ ->
+            use conn = createConnection ()
+            let slug = "project-hail-mary-2021"
+            appendBookEvent conn slug (Books.Book_added_to_library sampleBookData)
+            appendBookEvent conn slug (Books.Prior_reading_progress_recorded (observation 60 Audible "2025-01-01"))
+            appendBookEvent conn slug (Books.Reading_progress_observed (observation 75 Audible "2026-01-05"))
+
+            let history = BookProjection.getProgressHistory conn slug
+            Expect.equal (List.length history) 2 "Both rows should be present"
+            let prior = history |> List.find (fun r -> r.ObservedOn = "2025-01-01")
+            let observed = history |> List.find (fun r -> r.ObservedOn = "2026-01-05")
+            Expect.equal prior.Kind Prior "The prior row should carry Kind = Prior"
+            Expect.equal observed.Kind Observed "The observation row should carry Kind = Observed"
+
+            match BookProjection.getBySlug conn slug with
+            | Some detail ->
+                Expect.equal detail.ProgressPercent 75 "book_detail should reflect the latest (observation) row"
+                let priorViaDetail = detail.ProgressHistory |> List.find (fun r -> r.ObservedOn = "2025-01-01")
+                let observedViaDetail = detail.ProgressHistory |> List.find (fun r -> r.ObservedOn = "2026-01-05")
+                Expect.equal priorViaDetail.Kind Prior "ReadingProgressDto.Kind should round-trip through getBySlug for the prior row"
+                Expect.equal observedViaDetail.Kind Observed "ReadingProgressDto.Kind should round-trip through getBySlug for the observation row"
+            | None -> failtest "Expected the book to be found"
+
+        testCase "book_list.progress_kind follows the latest row, including back to 'prior' after the observation is removed" <| fun _ ->
+            use conn = createConnection ()
+            let slug = "project-hail-mary-2021"
+            appendBookEvent conn slug (Books.Book_added_to_library sampleBookData)
+            appendBookEvent conn slug (Books.Prior_reading_progress_recorded (observation 60 Audible "2025-01-01"))
+            appendBookEvent conn slug (Books.Reading_progress_observed (observation 75 Audible "2026-01-05"))
+            appendBookEvent conn slug (Books.Reading_progress_observation_removed ("2026-01-05", Audible))
+
+            let latestKind =
+                conn
+                |> Db.newCommand "SELECT progress_kind FROM book_list WHERE slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String slug ]
+                |> Db.querySingle (fun rd -> rd.ReadString "progress_kind")
+            Expect.equal latestKind (Some "prior") "book_list.progress_kind should fall back to the remaining prior row"
+
+        testCase "Rebuilding from a log holding only legacy Reading_progress_observed events produces zero kind = 'prior' rows" <| fun _ ->
+            use liveConn = createConnection ()
+            let slug = "project-hail-mary-2021"
+            appendBookEvent liveConn slug (Books.Book_added_to_library sampleBookData)
+            appendBookEvent liveConn slug (Books.Reading_progress_observed (observation 20 Audible "2026-01-01"))
+            appendBookEvent liveConn slug (Books.Reading_progress_observed (observation 55 Audible "2026-01-05"))
+
+            let priorRowCount =
+                liveConn
+                |> Db.newCommand "SELECT COUNT(*) as cnt FROM book_progress WHERE kind = 'prior'"
+                |> Db.querySingle (fun rd -> rd.ReadInt32 "cnt")
+                |> Option.defaultValue -1
+            Expect.equal priorRowCount 0 "No upcast of historical Reading_progress_observed events into priors"
+
+        testCase "getReadingStats().HoursListenedThisYear excludes a book whose latest Audible row is kind = 'prior'" <| fun _ ->
+            use conn = createConnection ()
+            let slug = "project-hail-mary-2021"
+            let today = DateTime.UtcNow.ToString("yyyy-MM-dd")
+            appendBookEvent conn slug (Books.Book_added_to_library sampleBookData)
+            appendBookEvent conn slug (Books.Prior_reading_progress_recorded (observation 100 Audible today))
+            appendBookEvent conn slug (Books.Book_status_changed (BookStatus.Finished, Some today))
+            MetadataCache.upsertBookMetadata conn slug (bookMetadataWithRuntime 600)
+
+            let stats = BookProjection.getReadingStats conn
+            Expect.equal stats.HoursListenedThisYear None
+                "A prior-only latest Audible row should never count as hours listened this year"
+
+        testCase "getReadingStats().HoursListenedThisYear counts a book whose latest Audible row is an ordinary observation" <| fun _ ->
+            use conn = createConnection ()
+            let slug = "project-hail-mary-2021"
+            let today = DateTime.UtcNow.ToString("yyyy-MM-dd")
+            appendBookEvent conn slug (Books.Book_added_to_library sampleBookData)
+            appendBookEvent conn slug (Books.Reading_progress_observed (observation 100 Audible today))
+            appendBookEvent conn slug (Books.Book_status_changed (BookStatus.Finished, Some today))
+            MetadataCache.upsertBookMetadata conn slug (bookMetadataWithRuntime 600)
+
+            let stats = BookProjection.getReadingStats conn
+            Expect.equal stats.HoursListenedThisYear (Some 10.0)
+                "A book finished via an ordinary observation should count its full runtime"
+
+        /// books-d4wtc iteration 2 (verifier fix): a real, already-populated
+        /// database predates this task's `progress_kind`/`kind` columns.
+        /// `ALTER TABLE ... ADD COLUMN progress_kind TEXT` (no DEFAULT) adds
+        /// it as NULL for every pre-existing `book_list`/`book_detail` row,
+        /// so this test pre-creates the pre-task schema directly (mirroring
+        /// the legacy-goodreads-column test above), inserts a row the way
+        /// it would have existed before this task, then runs `handler.Init`
+        /// so the ALTER (and the new backfill) actually fire against
+        /// pre-existing data -- proving a migrated row is neither NULL
+        /// forever nor silently dropped from `HoursListenedThisYear`.
+        testCase "Init against a pre-migration book_list/book_detail/book_progress schema backfills progress_kind and keeps counting hours" <| fun _ ->
+            let conn = new SqliteConnection("Data Source=:memory:")
+            conn.Open()
+            EventStore.initialize conn
+            FriendProjection.handler.Init conn
+            NotesProjection.handler.Init conn
+            MetadataCache.initialize conn
+
+            let slug = "project-hail-mary-2021"
+            let today = DateTime.UtcNow.ToString("yyyy-MM-dd")
+
+            // The pre-task shape: no `progress_kind` on book_list/book_detail,
+            // no `kind` on book_progress.
+            use cmd = conn.CreateCommand()
+            cmd.CommandText <- """
+                CREATE TABLE book_list (
+                    slug                    TEXT PRIMARY KEY,
+                    title                   TEXT NOT NULL,
+                    authors                 TEXT NOT NULL DEFAULT '[]',
+                    year                    INTEGER,
+                    cover_ref               TEXT,
+                    subjects                TEXT NOT NULL DEFAULT '[]',
+                    format                  TEXT NOT NULL DEFAULT 'Unknown',
+                    status                  TEXT NOT NULL DEFAULT 'Backlog',
+                    progress_percent        INTEGER NOT NULL DEFAULT 0,
+                    progress_source         TEXT,
+                    progress_observed_on    TEXT,
+                    personal_rating         INTEGER,
+                    isbn13                  TEXT,
+                    openlibrary_work_key    TEXT,
+                    openlibrary_edition_key TEXT,
+                    audible_asin            TEXT,
+                    finished_at             TEXT,
+                    added_at                TEXT
+                );
+
+                CREATE TABLE book_detail (
+                    slug                    TEXT PRIMARY KEY,
+                    title                   TEXT NOT NULL,
+                    authors                 TEXT NOT NULL DEFAULT '[]',
+                    year                    INTEGER,
+                    cover_ref               TEXT,
+                    subjects                TEXT NOT NULL DEFAULT '[]',
+                    format                  TEXT NOT NULL DEFAULT 'Unknown',
+                    status                  TEXT NOT NULL DEFAULT 'Backlog',
+                    progress_percent        INTEGER NOT NULL DEFAULT 0,
+                    progress_source         TEXT,
+                    progress_observed_on    TEXT,
+                    personal_rating         INTEGER,
+                    isbn13                  TEXT,
+                    openlibrary_work_key    TEXT,
+                    openlibrary_edition_key TEXT,
+                    audible_asin            TEXT,
+                    finished_at             TEXT,
+                    added_at                TEXT,
+                    recommended_by          TEXT NOT NULL DEFAULT '[]'
+                );
+
+                CREATE TABLE book_progress (
+                    book_slug    TEXT NOT NULL,
+                    observed_on  TEXT NOT NULL,
+                    source       TEXT NOT NULL,
+                    percent      INTEGER NOT NULL,
+                    position_json TEXT,
+                    PRIMARY KEY (book_slug, observed_on, source)
+                );
+            """
+            cmd.ExecuteNonQuery() |> ignore
+
+            conn
+            |> Db.newCommand "INSERT INTO book_list (slug, title, status, progress_percent, progress_source, progress_observed_on, finished_at, added_at) VALUES (@slug, @title, 'Finished', 100, 'Audible', @observed_on, @finished_at, @added_at)"
+            |> Db.setParams [ "slug", SqlType.String slug; "title", SqlType.String "Project Hail Mary"; "observed_on", SqlType.String today; "finished_at", SqlType.String today; "added_at", SqlType.String today ]
+            |> Db.exec
+            conn
+            |> Db.newCommand "INSERT INTO book_detail (slug, title, status, progress_percent, progress_source, progress_observed_on, finished_at, added_at) VALUES (@slug, @title, 'Finished', 100, 'Audible', @observed_on, @finished_at, @added_at)"
+            |> Db.setParams [ "slug", SqlType.String slug; "title", SqlType.String "Project Hail Mary"; "observed_on", SqlType.String today; "finished_at", SqlType.String today; "added_at", SqlType.String today ]
+            |> Db.exec
+            conn
+            |> Db.newCommand "INSERT INTO book_progress (book_slug, observed_on, source, percent, position_json) VALUES (@slug, @observed_on, 'Audible', 100, NULL)"
+            |> Db.setParams [ "slug", SqlType.String slug; "observed_on", SqlType.String today ]
+            |> Db.exec
+
+            MetadataCache.upsertBookMetadata conn slug (bookMetadataWithRuntime 600)
+
+            // Should not throw, and must retrofit the pre-existing rows --
+            // not merely add the columns and leave them NULL.
+            BookProjection.handler.Init conn
+
+            let listKind =
+                conn
+                |> Db.newCommand "SELECT progress_kind FROM book_list WHERE slug = @slug"
+                |> Db.setParams [ "slug", SqlType.String slug ]
+                |> Db.querySingle (fun rd -> if rd.IsDBNull(rd.GetOrdinal("progress_kind")) then None else Some (rd.ReadString "progress_kind"))
+                |> Option.flatten
+            Expect.equal listKind (Some "observation")
+                "A pre-existing book_list row's progress_kind should be backfilled from its book_progress history, not left NULL"
+
+            let stats = BookProjection.getReadingStats conn
+            Expect.equal stats.HoursListenedThisYear (Some 10.0)
+                "A migrated (pre-existing) Audible observation should still count toward hours listened this year"
+
+            conn.Dispose()
 
         testCase "Book_removed_from_library deletes book_list, book_detail and book_progress rows" <| fun _ ->
             use conn = createConnection ()

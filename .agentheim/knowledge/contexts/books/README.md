@@ -25,6 +25,7 @@ Single user (library owner). External progress sources (Audible) act through Int
 - **Recommended by (friend)** — provenance: this book entered the library because a friend suggested it. Same shape as Movies.
 - **Finished on** — the date of the `Book_status_changed Finished` event: a manual finish now stamps today's local date (not the event's UTC append timestamp, ADR-0082 §8 — avoids a late-evening finish landing on yesterday), while Audible's `is_finished` import and other sources carry their own effective-on date (ADR-0077). Click-to-edit on the book detail hero via `EditableDateInput` (books-xyqyb); re-dating an already-Finished book is a legitimate event (ADR-0077 §4), and a future date is rejected at the API edge. Drives the dashboard's 7-day "just finished" linger (the intelligence-b1nz5 pattern).
 - **Description rendering** — `book_metadata_cache.description` (Audible/Audnexus-sourced) is stored as a sanitized, allowlisted HTML subset (`p`/`br`/`b`/`strong`/`i`/`em`/`ul`/`ol`/`li`, attributes always dropped) rather than raw HTML or a flattened plain-text blob; `BookDetail.Views.detailsCard` renders it through `RichText.render` (`src/Client/Components/RichText.fs`), a pure hand-rolled tokenizing renderer that never trusts the string a second time and is backward compatible with every row already in the cache, including pre-fix rows still carrying raw tags (books-nvnyk). Open Library work descriptions are Markdown, not HTML — `OpenLibrary.descriptionToHtml` (books-xntts) converts the Markdown subset Open Library actually uses (paragraphs, `**bold**`/`*italic*`, `- `/`1. ` lists, `[text](url)` links dropped to plain text, `#`-headings) into the same allowlisted HTML subset at decode time, discarding the trailing `---`-separated editorial appendix ("Contains"/"See also"/source citations) entirely; existing rows are repaired by re-running `refreshBookFromOpenLibrary`, not a startup backfill.
+- **Prior reading progress** — a source's first-ever reported position for a book: where the reader already was, not a session read that day. `Prior_reading_progress_recorded`, same payload as an observation; seeds the per-source baseline, never promotes to InFocus, finishes with its own `ObservedOn` when at 100 % or flagged finished; dated by the source's own last-known-true day when available, else the day Mediatheca learned it. Projected as `book_progress.kind = 'prior'`. Once a source already has an entry, `Record_prior_reading_progress` behaves exactly like `Observe_reading_progress` — the aggregate never infers a prior from state; the intent rides the command (ADR-0082).
 
 ## Aggregates
 
@@ -33,10 +34,12 @@ Single user (library owner). External progress sources (Audible) act through Int
 ## Key events
 
 `Book_added_to_library`, `Book_removed_from_library`, `Book_cover_replaced`, `Book_external_id_linked`, `Book_format_set`, `Book_status_changed`, `Reading_progress_observed`, `Reading_progress_observation_removed`, `Book_personal_rating_set`, `Book_recommended_by`, `Book_recommendation_removed`.
+- `Prior_reading_progress_recorded` — a source's first-ever reported position for a book: where the reader already was, not a session read that day; same payload as `Reading_progress_observed`, but never promotes to InFocus and finishes with its own `ObservedOn` at 100 % or when flagged finished. Emitted by `Record_prior_reading_progress` (ADR-0082).
 
 ## Key commands
 
 `Add_book_to_library`, `Remove_book_from_library`, `Replace_cover`, `Link_external_id`, `Set_format`, `Change_status`, `Observe_reading_progress`, `Remove_reading_progress_observation`, `Set_personal_rating`, `Recommend_by`, `Remove_recommendation`.
+- `Record_prior_reading_progress` — the bulk import's counterpart to `Observe_reading_progress`: when the source has no entry yet, records the position as a `Prior_reading_progress_recorded` event (never InFocus-promoting); once the source already has an entry it behaves exactly like `Observe_reading_progress` (ADR-0082).
 
 ## Read models
 

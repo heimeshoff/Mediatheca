@@ -49,6 +49,13 @@ module Books =
         /// this event was appended".
         | Book_status_changed of status: BookStatus * effectiveOn: string option
         | Reading_progress_observed of ReadingProgressObservedData
+        /// ADR-0082: a source's first-ever reported position for a book —
+        /// where the reader already was, not a session read that day. Same
+        /// payload as `Reading_progress_observed`, reused verbatim; seeds
+        /// `Observations` identically so the per-source no-op/regression
+        /// rules see it, but never promotes to InFocus (only
+        /// `Reading_progress_observed` does that).
+        | Prior_reading_progress_recorded of ReadingProgressObservedData
         | Reading_progress_observation_removed of observedOn: string * source: ProgressSource
         | Book_personal_rating_set of rating: int option
         | Book_recommended_by of friendSlug: string
@@ -95,6 +102,10 @@ module Books =
         | Set_format of format: BookFormat
         | Change_status of status: BookStatus * effectiveOn: string option
         | Observe_reading_progress of ReadingProgressObservedData
+        /// ADR-0082 §2: issued only by the bulk "Import library" run
+        /// (integration-dtdbb) — the aggregate never infers a prior from
+        /// state, the intent rides the command.
+        | Record_prior_reading_progress of ReadingProgressObservedData
         | Remove_reading_progress_observation of observedOn: string * source: ProgressSource
         | Set_personal_rating of rating: int option
         | Recommend_by of friendSlug: string
@@ -130,6 +141,8 @@ module Books =
             let finishedOn = if status = BookStatus.Finished then effectiveOn else None
             Active { book with Status = status; FinishedOn = finishedOn }
         | Active book, Reading_progress_observed data ->
+            Active { book with Observations = book.Observations |> Map.add (data.ObservedOn, data.Source) data.Percent }
+        | Active book, Prior_reading_progress_recorded data ->
             Active { book with Observations = book.Observations |> Map.add (data.ObservedOn, data.Source) data.Percent }
         | Active book, Reading_progress_observation_removed (observedOn, source) ->
             Active { book with Observations = book.Observations |> Map.remove (observedOn, source) }
@@ -177,6 +190,38 @@ module Books =
     let private statusChangeIsNoOp (current: BookStatus) (currentFinishedOn: string option) (status: BookStatus) (effectiveOn: string option) : bool =
         status = current && (status <> BookStatus.Finished || effectiveOn = None || effectiveOn = currentFinishedOn)
 
+    /// The shared observation logic behind `Observe_reading_progress` and
+    /// `Record_prior_reading_progress` (ADR-0082 §2: once a source already
+    /// has an entry, a prior command "behaves exactly as
+    /// Observe_reading_progress" — same validation, same per-source
+    /// no-op/regression/promotion rules, same `Reading_progress_observed`
+    /// event).
+    let private decideObserveProgress (book: ActiveBook) (data: ReadingProgressObservedData) : Result<BookEvent list, string> =
+        if data.Percent < 0 || data.Percent > 100 then
+            Error "Percent must be between 0 and 100"
+        elif not (isValidDate data.ObservedOn) then
+            Error "ObservedOn must be a yyyy-MM-dd date"
+        else
+            let baseline = latestPercentForSource book data.Source
+            if data.Percent = baseline then
+                // Per-source no-op (ADR-0076 §2): a daily sync reporting
+                // the same percent as last time from the same source
+                // appends nothing — not even the observation itself.
+                Ok []
+            else
+                let observedEvent = Reading_progress_observed data
+                let statusEvents =
+                    if data.Percent = 100 || data.Finished then
+                        if book.Status = BookStatus.Finished then []
+                        else [ Book_status_changed (BookStatus.Finished, Some data.ObservedOn) ]
+                    elif data.Percent > baseline then
+                        match book.Status with
+                        | BookStatus.Backlog | BookStatus.Abandoned ->
+                            [ Book_status_changed (BookStatus.InFocus, Some data.ObservedOn) ]
+                        | _ -> []
+                    else []
+                Ok (observedEvent :: statusEvents)
+
     let decide (state: BookState) (command: BookCommand) : Result<BookEvent list, string> =
         match state, command with
         | Not_created, Add_book_to_library data ->
@@ -208,30 +253,29 @@ module Books =
                 if statusChangeIsNoOp book.Status book.FinishedOn status effectiveOn then Ok []
                 else Ok [ Book_status_changed (status, effectiveOn) ]
         | Active book, Observe_reading_progress data ->
-            if data.Percent < 0 || data.Percent > 100 then
+            decideObserveProgress book data
+        | Active book, Record_prior_reading_progress data ->
+            // ADR-0082 §2: a prior exists only for the bulk import — the
+            // aggregate reads that intent off the command, never infers it.
+            // Once the source already has an entry, this behaves exactly
+            // like Observe_reading_progress (no second prior, ever).
+            if book.Observations |> Map.exists (fun (_, src) _ -> src = data.Source) then
+                decideObserveProgress book data
+            elif data.Percent < 0 || data.Percent > 100 then
                 Error "Percent must be between 0 and 100"
             elif not (isValidDate data.ObservedOn) then
                 Error "ObservedOn must be a yyyy-MM-dd date"
             else
-                let baseline = latestPercentForSource book data.Source
-                if data.Percent = baseline then
-                    // Per-source no-op (ADR-0076 §2): a daily sync reporting
-                    // the same percent as last time from the same source
-                    // appends nothing — not even the observation itself.
-                    Ok []
-                else
-                    let observedEvent = Reading_progress_observed data
-                    let statusEvents =
-                        if data.Percent = 100 || data.Finished then
-                            if book.Status = BookStatus.Finished then []
-                            else [ Book_status_changed (BookStatus.Finished, Some data.ObservedOn) ]
-                        elif data.Percent > baseline then
-                            match book.Status with
-                            | BookStatus.Backlog | BookStatus.Abandoned ->
-                                [ Book_status_changed (BookStatus.InFocus, Some data.ObservedOn) ]
-                            | _ -> []
-                        else []
-                    Ok (observedEvent :: statusEvents)
+                let priorEvent = Prior_reading_progress_recorded data
+                let statusEvents =
+                    if data.Percent = 100 || data.Finished then
+                        if book.Status = BookStatus.Finished then []
+                        else [ Book_status_changed (BookStatus.Finished, Some data.ObservedOn) ]
+                    else
+                        // A prior never promotes to InFocus, regardless of
+                        // percent — only a raising observation does that.
+                        []
+                Ok (priorEvent :: statusEvents)
         | Active book, Remove_reading_progress_observation (observedOn, source) ->
             match book.Observations |> Map.tryFind (observedOn, source) with
             | None -> Error "Reading progress observation not found"
@@ -387,6 +431,8 @@ module Books =
                 ])
             | Reading_progress_observed data ->
                 "Reading_progress_observed", Encode.toString 0 (encodeReadingProgressObservedData data)
+            | Prior_reading_progress_recorded data ->
+                "Prior_reading_progress_recorded", Encode.toString 0 (encodeReadingProgressObservedData data)
             | Reading_progress_observation_removed (observedOn, source) ->
                 "Reading_progress_observation_removed", Encode.toString 0 (Encode.object [
                     "observedOn", Encode.string observedOn
@@ -431,6 +477,10 @@ module Books =
                 Decode.fromString decodeReadingProgressObservedData data
                 |> Result.toOption
                 |> Option.map Reading_progress_observed
+            | "Prior_reading_progress_recorded" ->
+                Decode.fromString decodeReadingProgressObservedData data
+                |> Result.toOption
+                |> Option.map Prior_reading_progress_recorded
             | "Reading_progress_observation_removed" ->
                 Decode.fromString (Decode.object (fun get ->
                     let observedOn = get.Required.Field "observedOn" Decode.string
@@ -464,6 +514,7 @@ module Books =
             "Book_format_set"
             "Book_status_changed"
             "Reading_progress_observed"
+            "Prior_reading_progress_recorded"
             "Reading_progress_observation_removed"
             "Book_personal_rating_set"
             "Book_recommended_by"

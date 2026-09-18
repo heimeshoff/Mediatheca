@@ -875,6 +875,13 @@ type BookExternalId =
     | OpenLibraryEdition of string
     | AudibleAsin of string
 
+/// ADR-0082 §1/§5: whether a `book_progress` row came from an ordinary
+/// observation or a source's first-ever reported position for a book (a
+/// "prior" — where the reader already was, not a session read that day).
+type ProgressKind =
+    | Observed
+    | Prior
+
 /// One row of a book's reading-progress history (`book_progress`,
 /// ADR-0076 §2) — the detail page's progress-history list.
 type ReadingProgressDto = {
@@ -882,6 +889,10 @@ type ReadingProgressDto = {
     Source: ProgressSource
     Percent: int
     Position: ReadingPosition option
+    /// ADR-0082 §5: `Prior` renders distinctly (muted, "starting position")
+    /// in the History list, and is excluded from any future Journal
+    /// "Reading day" derivation.
+    Kind: ProgressKind
 }
 
 type BookListItem = {

@@ -155,6 +155,96 @@ let booksTests =
                         "Second source's observation should record without re-promoting"
                 | Error e -> failtest $"Expected success but got: {e}"
 
+        testCase "Record_prior_reading_progress with zero entries for its source records a prior, never Ok []" <| fun _ ->
+            let given = [ Book_added_to_library sampleBookData ]
+            match givenWhenThen given (Record_prior_reading_progress (observation 0 Audible "2026-01-01" false)) with
+            | Ok events ->
+                Expect.equal events [ Prior_reading_progress_recorded (observation 0 Audible "2026-01-01" false) ]
+                    "A first-ever 0%% prior should still be recorded"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Record_prior_reading_progress at 100 percent records the prior and finishes the book with its own date" <| fun _ ->
+            let given = [ Book_added_to_library sampleBookData ]
+            match givenWhenThen given (Record_prior_reading_progress (observation 100 Audible "2025-06-01" false)) with
+            | Ok events ->
+                Expect.equal events [
+                    Prior_reading_progress_recorded (observation 100 Audible "2025-06-01" false)
+                    Book_status_changed (BookStatus.Finished, Some "2025-06-01")
+                ] "Should record the prior and finish"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Record_prior_reading_progress with the Finished flag also finishes the book" <| fun _ ->
+            let given = [ Book_added_to_library sampleBookData ]
+            match givenWhenThen given (Record_prior_reading_progress (observation 60 Audible "2025-06-01" true)) with
+            | Ok events ->
+                Expect.equal events [
+                    Prior_reading_progress_recorded (observation 60 Audible "2025-06-01" true)
+                    Book_status_changed (BookStatus.Finished, Some "2025-06-01")
+                ] "Should record the prior and finish via the Finished flag"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Record_prior_reading_progress never promotes to InFocus, regardless of percent" <| fun _ ->
+            let given = [ Book_added_to_library sampleBookData ]
+            match givenWhenThen given (Record_prior_reading_progress (observation 42 Audible "2025-06-01" false)) with
+            | Ok events ->
+                Expect.equal events [ Prior_reading_progress_recorded (observation 42 Audible "2025-06-01" false) ]
+                    "A prior at any non-finishing percent should record only itself, never InFocus"
+                match applyEvents (given @ events) with
+                | Active book -> Expect.equal book.Status BookStatus.Backlog "Status should stay Backlog"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Record_prior_reading_progress on a source that already has an entry behaves exactly like Observe_reading_progress" <| fun _ ->
+            let given = [
+                Book_added_to_library sampleBookData
+                Reading_progress_observed (observation 20 Audible "2026-01-01" false)
+            ]
+            // Same percent as the existing entry: no-op, never a second prior.
+            match givenWhenThen given (Record_prior_reading_progress (observation 20 Audible "2026-01-05" false)) with
+            | Ok events -> Expect.isEmpty events "Same-percent should be a no-op, like Observe_reading_progress"
+            | Error e -> failtest $"Expected success but got: {e}"
+            // A raise: ordinary observation + InFocus promotion, never a prior.
+            match givenWhenThen given (Record_prior_reading_progress (observation 55 Audible "2026-01-05" false)) with
+            | Ok events ->
+                Expect.equal events [
+                    Reading_progress_observed (observation 55 Audible "2026-01-05" false)
+                    Book_status_changed (BookStatus.InFocus, Some "2026-01-05")
+                ] "A raise should behave exactly like Observe_reading_progress, never emitting a second prior"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Observe_reading_progress with zero entries for its source emits an ordinary observation and promotes, never a prior" <| fun _ ->
+            let given = [ Book_added_to_library sampleBookData ]
+            match givenWhenThen given (Observe_reading_progress (observation 15 ProgressSource.Manual "2026-01-01" false)) with
+            | Ok events ->
+                Expect.equal events [
+                    Reading_progress_observed (observation 15 ProgressSource.Manual "2026-01-01" false)
+                    Book_status_changed (BookStatus.InFocus, Some "2026-01-01")
+                ] "A raise from the 0 baseline should observe and promote, never emit a prior"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Removing a prior empties that source's entries, so the next prior is fresh and the next observation is ordinary" <| fun _ ->
+            let given = [
+                Book_added_to_library sampleBookData
+                Prior_reading_progress_recorded (observation 30 Audible "2025-01-01" false)
+            ]
+            match givenWhenThen given (Remove_reading_progress_observation ("2025-01-01", Audible)) with
+            | Ok events ->
+                Expect.equal events [ Reading_progress_observation_removed ("2025-01-01", Audible) ] "Should remove the prior"
+                let afterRemoval = given @ events
+                match givenWhenThen afterRemoval (Record_prior_reading_progress (observation 10 Audible "2026-02-01" false)) with
+                | Ok priorEvents ->
+                    Expect.equal priorEvents [ Prior_reading_progress_recorded (observation 10 Audible "2026-02-01" false) ]
+                        "A following Record_prior_reading_progress should record a fresh prior"
+                | Error e -> failtest $"Expected success but got: {e}"
+                match givenWhenThen afterRemoval (Observe_reading_progress (observation 10 Audible "2026-02-01" false)) with
+                | Ok obsEvents ->
+                    Expect.equal obsEvents [
+                        Reading_progress_observed (observation 10 Audible "2026-02-01" false)
+                        Book_status_changed (BookStatus.InFocus, Some "2026-02-01")
+                    ] "A following Observe_reading_progress should record an ordinary observation (and promote, from the emptied baseline)"
+                | Error e -> failtest $"Expected success but got: {e}"
+            | Error e -> failtest $"Expected success but got: {e}"
+
         testCase "Re-linking a different ASIN is refused; re-linking the same ASIN is a no-op" <| fun _ ->
             let given = [ Book_added_to_library sampleBookData ]
             match givenWhenThen given (Link_external_id (AudibleAsin "B99DIFFERENT")) with
@@ -231,6 +321,7 @@ let booksTests =
                 Book_status_changed (BookStatus.Backlog, None)
                 Reading_progress_observed (observation 42 Audible "2026-01-01" false)
                 Reading_progress_observed { observation 42 ProgressSource.Manual "2026-01-02" false with Position = Some (Page (120, Some 300)) }
+                Prior_reading_progress_recorded (observation 30 Audible "2025-01-01" false)
                 Reading_progress_observation_removed ("2026-01-01", Audible)
                 Book_personal_rating_set (Some 4)
                 Book_personal_rating_set None
@@ -252,6 +343,7 @@ let booksTests =
                 "Book_format_set"
                 "Book_status_changed"
                 "Reading_progress_observed"
+                "Prior_reading_progress_recorded"
                 "Reading_progress_observation_removed"
                 "Book_personal_rating_set"
                 "Book_recommended_by"

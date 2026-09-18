@@ -5,6 +5,31 @@ Newest entries on top.
 
 ---
 
+## 2026-09-18 02:10 -- Task verified and completed: books-d4wtc - Prior reading progress — the bulk import's `Record_prior_reading_progress` command yields a `Prior_reading_progress_recorded` event for a book its source has not reported on before (never InFocus-promoting, finishing with its own date; the nightly sync and Manual keep producing ordinary observations), projected as `kind = 'prior'` so the History list, the Hours Listened stat and any future Reading day never mistake an import's starting position for a listening session
+
+**Type:** Work / Task completion
+**Task:** books-d4wtc - Prior reading progress — the bulk import's `Record_prior_reading_progress` command yields a `Prior_reading_progress_recorded` event for a book its source has not reported on before (never InFocus-promoting, finishing with its own date; the nightly sync and Manual keep producing ordinary observations), projected as `kind = 'prior'` so the History list, the Hours Listened stat and any future Reading day never mistake an import's starting position for a listening session
+**Summary:** Added Prior_reading_progress_recorded (event) and Record_prior_reading_progress (command) to the Books aggregate per ADR-0082 — a source's first-ever reported position seeds Observations like an ordinary observation but never promotes to InFocus, finishes with its own date at 100%/Finished, and delegates to the existing Observe_reading_progress logic once that source already has an entry. Projected as book_progress.kind / book_list.progress_kind / book_detail.progress_kind ('prior' | 'observation'), excluded from HoursListenedThisYear (NULL-tolerant, with an Init-time backfill for pre-migration rows), round-tripped through ReadingProgressDto.Kind, and rendered muted with a 'starting position' label in the History list.
+**Duration:** 41m30s
+**Verification:** PASS (iteration 2)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 7
+**Tests added:** 13
+**ADRs written:** none
+
+---
+
+## 2026-09-18 01:53 -- Verification failed: books-d4wtc - Prior reading progress — Record_prior_reading_progress → Prior_reading_progress_recorded, projected as kind = 'prior'
+
+**Type:** Work / Verification failure
+**Task:** books-d4wtc - Prior reading progress — Record_prior_reading_progress → Prior_reading_progress_recorded, projected as kind = 'prior'
+**Iteration:** 1 of 3
+**Reasons:** getReadingStats HoursListenedThisYear filter `bl.progress_kind <> 'prior'` is NULL-unsafe on a migrated DB (ALTER TABLE adds progress_kind nullable with no backfill, so every existing row is filtered out and the stat silently returns None until an operator rebuild; same asymmetry yields false drift in the shadow-replay check), Books README `## Key events` / `## Key commands` lists get no README_DELTA op for the new event and command
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-09-18 01:51 -- Task verified and completed: books-xntts - Open Library import takes the work's canonical English edition (`cover_edition_key`, language-filtered fallback) instead of the first of hundreds of unordered `edition_key`s, and converts the work's Markdown description into the sanitized HTML subset at import and refresh — no more Spanish titles/covers on an English work, no more literal `[link](url)` lists
 
 **Type:** Work / Task completion

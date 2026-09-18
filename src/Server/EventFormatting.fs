@@ -378,6 +378,11 @@ module EventFormatting =
             let source = tryField "source" data |> Option.defaultValue "?"
             let observedOn = tryField "observedOn" data |> Option.defaultValue "?"
             Some { Timestamp = ts; Label = "Reading progress observed"; Details = [ $"{observedOn}: {percent}%% ({source})" ] }
+        | "Prior_reading_progress_recorded" ->
+            let percent = tryFieldInt "percent" data |> Option.defaultValue 0
+            let source = tryField "source" data |> Option.defaultValue "?"
+            let observedOn = tryField "observedOn" data |> Option.defaultValue "?"
+            Some { Timestamp = ts; Label = "Prior reading progress recorded"; Details = [ $"{observedOn}: {percent}%% ({source}) before tracking began" ] }
         | "Reading_progress_observation_removed" ->
             let observedOn = tryField "observedOn" data |> Option.defaultValue "?"
             let source = tryField "source" data |> Option.defaultValue "?"

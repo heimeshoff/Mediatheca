@@ -285,16 +285,26 @@ let private positionLabel (position: ReadingPosition option) =
 
 let private progressHistoryRow (model: Model) (dispatch: Msg -> unit) (row: ReadingProgressDto) =
     let key = row.ObservedOn, row.Source
+    // ADR-0082 §5: a `Prior` row is where the reader already was, not a
+    // session read that day — rendered muted, with "starting position" in
+    // place of the source badge, in place of the observation styling.
+    let isPrior = row.Kind = Prior
     Html.div [
         prop.key ($"{row.ObservedOn}-{sourceLabel row.Source}")
-        prop.className "flex items-center justify-between py-2 border-b border-base-content/5 last:border-0 group/row"
+        prop.className (
+            "flex items-center justify-between py-2 border-b border-base-content/5 last:border-0 group/row"
+            + (if isPrior then " opacity-50" else "")
+        )
         prop.children [
             Html.div [
                 prop.className "flex items-center gap-3"
                 prop.children [
                     Html.span [ prop.className "text-xs font-mono text-base-content/50"; prop.text (formatDateOnly row.ObservedOn) ]
                     Html.span [ prop.className "text-sm font-mono font-semibold"; prop.text (string row.Percent + "%") ]
-                    Html.span [ prop.className "text-xs uppercase tracking-wide text-base-content/40"; prop.text (sourceLabel row.Source) ]
+                    Html.span [
+                        prop.className "text-xs uppercase tracking-wide text-base-content/40"
+                        prop.text (if isPrior then "starting position" else sourceLabel row.Source)
+                    ]
                     if positionLabel row.Position <> "" then
                         Html.span [ prop.className "text-xs text-base-content/40 font-mono"; prop.text (positionLabel row.Position) ]
                 ]

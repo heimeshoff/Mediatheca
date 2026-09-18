@@ -28,6 +28,7 @@ module BookProjection =
                 progress_percent        INTEGER NOT NULL DEFAULT 0,
                 progress_source         TEXT,
                 progress_observed_on    TEXT,
+                progress_kind           TEXT,
                 personal_rating         INTEGER,
                 isbn13                  TEXT,
                 openlibrary_work_key    TEXT,
@@ -49,6 +50,7 @@ module BookProjection =
                 progress_percent        INTEGER NOT NULL DEFAULT 0,
                 progress_source         TEXT,
                 progress_observed_on    TEXT,
+                progress_kind           TEXT,
                 personal_rating         INTEGER,
                 isbn13                  TEXT,
                 openlibrary_work_key    TEXT,
@@ -65,8 +67,61 @@ module BookProjection =
                 source       TEXT NOT NULL,
                 percent      INTEGER NOT NULL,
                 position_json TEXT,
+                kind         TEXT NOT NULL DEFAULT 'observation',
                 PRIMARY KEY (book_slug, observed_on, source)
             );
+        """
+        |> Db.exec
+
+        // `progress_kind`/`book_progress.kind` are additive columns
+        // (books-d4wtc, ADR-0082 §5) — an already-existing table from before
+        // this task predates them, and `CREATE TABLE IF NOT EXISTS` never
+        // retrofits a pre-existing table's columns. Mirrors
+        // `GameProjection.fs`'s `try ALTER TABLE ... ADD COLUMN with _ -> ()`
+        // migration idiom exactly.
+        try
+            conn |> Db.newCommand "ALTER TABLE book_list ADD COLUMN progress_kind TEXT" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "ALTER TABLE book_detail ADD COLUMN progress_kind TEXT" |> Db.exec
+        with _ -> ()
+        try
+            conn |> Db.newCommand "ALTER TABLE book_progress ADD COLUMN kind TEXT NOT NULL DEFAULT 'observation'" |> Db.exec
+        with _ -> ()
+
+        // Backfill `progress_kind` on `book_list`/`book_detail` rows that
+        // predate the ALTER above (books-d4wtc iteration 2, verifier fix).
+        // A live NULL versus a rebuilt 'observation'/'prior' value is drift
+        // (ADR-0031's shadow-replay comparison), so leaving the column NULL
+        // for every pre-existing book — relying on the query-side COALESCE
+        // alone — is not enough. Mirrors `recomputeProgress`'s own
+        // latest-row-per-book ordering exactly, so the backfilled value is
+        // the same one a full rebuild would produce. No-op once a row's
+        // `progress_kind` is non-NULL, so this is safe to run every boot.
+        conn
+        |> Db.newCommand """
+            UPDATE book_list
+            SET progress_kind = (
+                SELECT kind FROM book_progress
+                WHERE book_progress.book_slug = book_list.slug
+                ORDER BY observed_on DESC,
+                    CASE source WHEN 'Manual' THEN 0 WHEN 'Audible' THEN 1 ELSE 2 END
+                LIMIT 1
+            )
+            WHERE progress_kind IS NULL
+        """
+        |> Db.exec
+        conn
+        |> Db.newCommand """
+            UPDATE book_detail
+            SET progress_kind = (
+                SELECT kind FROM book_progress
+                WHERE book_progress.book_slug = book_detail.slug
+                ORDER BY observed_on DESC,
+                    CASE source WHEN 'Manual' THEN 0 WHEN 'Audible' THEN 1 ELSE 2 END
+                LIMIT 1
+            )
+            WHERE progress_kind IS NULL
         """
         |> Db.exec
 
@@ -128,6 +183,11 @@ module BookProjection =
         | "Audible" -> Audible
         | _ -> ProgressSource.Manual
 
+    let private parseProgressKind (s: string) : ProgressKind =
+        match s with
+        | "prior" -> Prior
+        | _ -> Observed
+
     let private encodeReadingPosition (pos: ReadingPosition) =
         match pos with
         | Page (page, total) ->
@@ -187,7 +247,7 @@ module BookProjection =
         let latest =
             conn
             |> Db.newCommand """
-                SELECT source, percent, observed_on FROM book_progress
+                SELECT source, percent, observed_on, kind FROM book_progress
                 WHERE book_slug = @slug
                 ORDER BY observed_on DESC,
                     CASE source WHEN 'Manual' THEN 0 WHEN 'Audible' THEN 1 ELSE 2 END
@@ -195,18 +255,18 @@ module BookProjection =
             """
             |> Db.setParams [ "slug", SqlType.String slug ]
             |> Db.querySingle (fun (rd: IDataReader) ->
-                rd.ReadString "source", rd.ReadInt32 "percent", rd.ReadString "observed_on")
-        let percent, source, observedOn =
+                rd.ReadString "source", rd.ReadInt32 "percent", rd.ReadString "observed_on", rd.ReadString "kind")
+        let percent, source, observedOn, kind =
             match latest with
-            | Some (source, percent, observedOn) -> percent, SqlType.String source, SqlType.String observedOn
-            | None -> 0, SqlType.Null, SqlType.Null
+            | Some (source, percent, observedOn, kind) -> percent, SqlType.String source, SqlType.String observedOn, SqlType.String kind
+            | None -> 0, SqlType.Null, SqlType.Null, SqlType.Null
         conn
-        |> Db.newCommand "UPDATE book_list SET progress_percent = @percent, progress_source = @source, progress_observed_on = @observed_on WHERE slug = @slug"
-        |> Db.setParams [ "slug", SqlType.String slug; "percent", SqlType.Int32 percent; "source", source; "observed_on", observedOn ]
+        |> Db.newCommand "UPDATE book_list SET progress_percent = @percent, progress_source = @source, progress_observed_on = @observed_on, progress_kind = @kind WHERE slug = @slug"
+        |> Db.setParams [ "slug", SqlType.String slug; "percent", SqlType.Int32 percent; "source", source; "observed_on", observedOn; "kind", kind ]
         |> Db.exec
         conn
-        |> Db.newCommand "UPDATE book_detail SET progress_percent = @percent, progress_source = @source, progress_observed_on = @observed_on WHERE slug = @slug"
-        |> Db.setParams [ "slug", SqlType.String slug; "percent", SqlType.Int32 percent; "source", source; "observed_on", observedOn ]
+        |> Db.newCommand "UPDATE book_detail SET progress_percent = @percent, progress_source = @source, progress_observed_on = @observed_on, progress_kind = @kind WHERE slug = @slug"
+        |> Db.setParams [ "slug", SqlType.String slug; "percent", SqlType.Int32 percent; "source", source; "observed_on", observedOn; "kind", kind ]
         |> Db.exec
 
     let private handleEvent (conn: SqliteConnection) (event: EventStore.StoredEvent) : unit =
@@ -329,11 +389,36 @@ module BookProjection =
                     let positionJson = data.Position |> Option.map (encodeReadingPosition >> Encode.toString 0)
                     conn
                     |> Db.newCommand """
-                        INSERT INTO book_progress (book_slug, observed_on, source, percent, position_json)
-                        VALUES (@slug, @observed_on, @source, @percent, @position_json)
+                        INSERT INTO book_progress (book_slug, observed_on, source, percent, position_json, kind)
+                        VALUES (@slug, @observed_on, @source, @percent, @position_json, 'observation')
                         ON CONFLICT(book_slug, observed_on, source) DO UPDATE SET
                             percent = excluded.percent,
-                            position_json = excluded.position_json
+                            position_json = excluded.position_json,
+                            kind = excluded.kind
+                    """
+                    |> Db.setParams [
+                        "slug", SqlType.String slug
+                        "observed_on", SqlType.String data.ObservedOn
+                        "source", SqlType.String (encodeProgressSource data.Source)
+                        "percent", SqlType.Int32 data.Percent
+                        "position_json", sqlOptString positionJson
+                    ]
+                    |> Db.exec
+                    recomputeProgress conn slug
+
+                | Books.Prior_reading_progress_recorded data ->
+                    // ADR-0082 §5: identical INSERT to Reading_progress_observed
+                    // above, except `kind = 'prior'` — a source's first-ever
+                    // reported position, not a session read that day.
+                    let positionJson = data.Position |> Option.map (encodeReadingPosition >> Encode.toString 0)
+                    conn
+                    |> Db.newCommand """
+                        INSERT INTO book_progress (book_slug, observed_on, source, percent, position_json, kind)
+                        VALUES (@slug, @observed_on, @source, @percent, @position_json, 'prior')
+                        ON CONFLICT(book_slug, observed_on, source) DO UPDATE SET
+                            percent = excluded.percent,
+                            position_json = excluded.position_json,
+                            kind = excluded.kind
                     """
                     |> Db.setParams [
                         "slug", SqlType.String slug
@@ -427,7 +512,7 @@ module BookProjection =
     /// page's progress-history list.
     let getProgressHistory (conn: SqliteConnection) (slug: string) : ReadingProgressDto list =
         conn
-        |> Db.newCommand "SELECT observed_on, source, percent, position_json FROM book_progress WHERE book_slug = @slug ORDER BY observed_on"
+        |> Db.newCommand "SELECT observed_on, source, percent, position_json, kind FROM book_progress WHERE book_slug = @slug ORDER BY observed_on"
         |> Db.setParams [ "slug", SqlType.String slug ]
         |> Db.query (fun (rd: IDataReader) ->
             { ReadingProgressDto.ObservedOn = rd.ReadString "observed_on"
@@ -435,7 +520,8 @@ module BookProjection =
               Percent = rd.ReadInt32 "percent"
               Position =
                 if rd.IsDBNull(rd.GetOrdinal("position_json")) then None
-                else decodeReadingPositionJson (rd.ReadString "position_json") })
+                else decodeReadingPositionJson (rd.ReadString "position_json")
+              Kind = parseProgressKind (rd.ReadString "kind") })
 
     let getBySlug (conn: SqliteConnection) (slug: string) : BookDetail option =
         conn
@@ -658,6 +744,7 @@ module BookProjection =
                 WHERE bl.status = 'Finished'
                   AND strftime('%Y', bl.finished_at) = strftime('%Y', 'now')
                   AND bl.progress_source = 'Audible'
+                  AND COALESCE(bl.progress_kind, 'observation') <> 'prior'
                   AND mc.runtime_minutes IS NOT NULL
             """
             |> Db.query (fun (rd: IDataReader) ->
