@@ -1,7 +1,7 @@
 ---
 id: games-b76z3
 title: Research IGDB as a third game-metadata source next to RAWG and Steam — time-to-beat as a scheduled backfill replacing the manual HowLongToBeat scrape (989 of 1026 games have no estimate), game/multiplayer modes as a cross-check of Steam-derived play facets, franchise/collection links, and external_games as a Steam-appId join key — and weigh Twitch client-credential access against what RAWG plus Steam give
-status: backlog
+status: todo
 type: spike
 context: games
 created: 2026-09-23
