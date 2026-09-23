@@ -5,6 +5,17 @@ Newest entries on top.
 
 ---
 
+## 2026-09-23 17:26 -- Modeling / Refined: games-b76z3 - Research IGDB as a third game-metadata source next to RAWG and Steam
+
+**Type:** Modeling / Refine
+**BC:** games
+**Status after:** backlog
+**Summary:** Reordered the spike's pressures against the live library (1026 games, 1021 Steam-linked, 5 RAWG-only, 1 without a RAWG id; HLTB hours cached for 37 games because the fetch is manual per game, no backfill job): time to beat via a scheduled IGDB backfill is now the lead question, play facets are a cross-check of the ADR-0054 derivation rather than a gap, and the identity-card question was corrected to slug-is-identity / RawgId-is-optional (per tactical-modeler) — the spike gathers field-quality and external_games evidence, any re-sourcing of identity-card fields becomes a follow-up decision task. Pinned a ten-game sample with current Mediatheca values, added a per-question acceptance criterion for time-to-beat, identity card, facets and external ids (one [human-eye]), added Integration adapter constraints for follow-ups, fixed the stray ADR-0065 stop-loss citation, and tightened the title under the ADR-0060 cap. No split, no ADR.
+**Split into:** none
+**ADRs written:** none
+
+---
+
 ## 2026-09-23 17:15 -- Modeling / Captured: games-b76z3 - Research IGDB as a supplement to, or successor of, RAWG for game metadata — game modes / multiplayer modes for non-Steam play facets, franchise and collection links, time-to-beat as a HowLongToBeat scraping replacement, external-id mapping to Steam appIds — and weigh the Twitch client-credential cost against the RAWG identity-card migration question (ADR-0055)
 
 **Type:** Modeling / Capture
