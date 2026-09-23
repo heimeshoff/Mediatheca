@@ -5,6 +5,19 @@ Newest entries on top.
 
 ---
 
+## 2026-09-23 17:02 -- Research: RomM vs. Mediatheca — games capability gap analysis
+
+**Type:** Research
+**Requested by:** user
+**Report:** knowledge/research/romm-vs-mediatheca-2026-09-23.md
+**Review:** PASS (iteration 3)
+**Summary:**
+- RomM is a ROM file server + browser emulator; its file-serving, emulation, save/state sync, netplay, patching and companion-app surface is out of scope for Mediatheca's catalogue/journal by design.
+- In-scope gaps: smart/rule-based and virtual collections (Curation has only manual catalogs, across all media), RetroAchievements, and persisted/per-game achievement history (Mediatheca already shows a live, cached Steam recent-achievements dashboard card).
+- Multi-user, permission groups, OIDC and API tokens are real RomM capabilities but out of scope for a single-user, no-auth app.
+
+---
+
 ## 2026-09-18 13:34 -- Work session ended
 
 **Type:** Work / Session end

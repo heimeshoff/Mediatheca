@@ -17,6 +17,7 @@
 ## Research touching this BC
 
 <!-- research-local:start -->
+- **romm-vs-mediatheca** -- RomM (5.3.x) is a ROM file server + browser emulator; its ROM hosting, emulation, save/state sync, netplay, patching, companion apps and multi-user/OIDC surface is out of scope by design; in-scope gaps are smart/rule-based and virtual collections (Curation has only manual catalogs), RetroAchievements, and persisted per-game achievement history (today only a live, cached Steam recent-achievements dashboard card) -- 2026-09-23 -- `knowledge/research/romm-vs-mediatheca-2026-09-23.md`
 <!-- no research touching this BC -->
 <!-- research-local:end -->
 
