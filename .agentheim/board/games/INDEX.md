@@ -11,14 +11,13 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
+- **Todo:** 0
 - **Doing:** 0
 - **Done:** 15
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **games-b76z3** — Research IGDB as a third game-metadata source next to RAWG and Steam — time-to-beat as a scheduled backfill replacing the manual HowLongToBeat scrape (989 of 1026 games have no estimate), game/multiplayer modes as a cross-check of Steam-derived play facets, franchise/collection links, and external_games as a Steam-appId join key — and weigh Twitch client-credential access against what RAWG plus Steam give (spike) — `todo/games-b76z3-igdb-as-rawg-supplement-or-successor-research.md`
 <!-- todo-list:end -->
 
 ### Doing
