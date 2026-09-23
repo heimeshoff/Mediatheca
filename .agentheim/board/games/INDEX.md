@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 15
@@ -46,6 +46,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **games-b76z3** — Research IGDB as a supplement to, or successor of, RAWG for game metadata — game modes / multiplayer modes for non-Steam play facets, franchise and collection links, time-to-beat as a HowLongToBeat scraping replacement, external-id mapping to Steam appIds — and weigh the Twitch client-credential cost against the RAWG identity-card migration question (ADR-0055) (spike) — `backlog/games-b76z3-igdb-as-rawg-supplement-or-successor-research.md`
 <!-- backlog-list:end -->
 
 

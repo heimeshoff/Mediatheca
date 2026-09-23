@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-23 17:15 -- Modeling / Captured: games-b76z3 - Research IGDB as a supplement to, or successor of, RAWG for game metadata — game modes / multiplayer modes for non-Steam play facets, franchise and collection links, time-to-beat as a HowLongToBeat scraping replacement, external-id mapping to Steam appIds — and weigh the Twitch client-credential cost against the RAWG identity-card migration question (ADR-0055)
+
+**Type:** Modeling / Capture
+**BC:** games
+**Filed to:** backlog
+**Summary:** Research spike: IGDB as supplement to or successor of RAWG for game metadata (game modes for non-Steam play facets, franchise links, time-to-beat vs HLTB scraping, Steam appId mapping), weighing Twitch credential cost against the ADR-0055 identity-card migration. Triggered by the RomM comparison research of 2026-09-23. Filed to backlog; executed via the research skill.
+
+---
+
 ## 2026-09-23 17:02 -- Research: RomM vs. Mediatheca — games capability gap analysis
 
 **Type:** Research
