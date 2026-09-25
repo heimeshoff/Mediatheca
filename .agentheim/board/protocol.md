@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-25 13:33 -- Modeling / Promoted: games-rmxg2 - Games — RomM as a third play-session source, with a RomM rom id as external identity and a session-id cursor; fixes PlaySessionProjection mapping every non-Manual source to SteamSync
+
+**Type:** Modeling / Promote
+**BC:** games
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-25 13:33 -- Modeling / Refined: integration-jkbm1 - RomM adapter
 
 **Type:** Modeling / Refine
