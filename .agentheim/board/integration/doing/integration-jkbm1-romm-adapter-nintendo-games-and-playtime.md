@@ -132,3 +132,25 @@ lands. ADR-0088 has the session-id cursor design.
   rating stay authoritative; only play sessions drive InFocus promotion.
 - **Research scope.** Research report `romm-vs-mediatheca-2026-09-23` §11 puts "API" out of
   scope, but that means Mediatheca *exposing* a companion API. It doesn't apply here.
+
+## Verifier note (iteration 1)
+
+**REASONS:**
+- Check 1, criterion 1 (Settings card: base URL, masked token, platform picker filled live from `GET /api/platforms`, Nintendo pre-checked on first load, saving persists `romm_base_url` / `romm_api_token` / `romm_platform_ids` as a JSON array through `SettingsStore`) has no test and no artifact covering it. No Expecto test calls `Api.setRomMSettings` / `getRomMSettings` / `fetchRomMPlatforms`. That leaves the JSON-array persistence and the parse in `Composition.getRomMConfig` (src/Server/Composition.fs:510) unpinned, and nothing checks that `getRomMSettings` never returns the token. The Nintendo pre-check branch in `RomM_platforms_loaded` (src/Client/Pages/Settings/State.fs, around lines 91-110) has no Vitest case, even though `npm run test:client` exists. The Outcome has no manual-exercise note for this criterion either; it only calls the code "trivial Elmish plumbing", which does not count as coverage. The `[human-eye]` marker is on criterion 2, not criterion 1.
+- Check 1, criterion 13 (`RomM.fs` decoding tested "against recorded RomM JSON fixtures") is not met as written. The fixtures are hand-authored ("matching the RomM v5.3.1 schemas"), but the task's Notes say to record them from the live instance with a read-only token, scrubbing the token. The decoders make wire-shape assumptions that only a recorded fixture can confirm: `/api/play-sessions` decoded as a plain array while `/api/roms` is a paged `{items,...}` envelope; `metadatum.first_release_date` treated as Unix seconds; `url_cover` assumed same-host and needing the bearer token.
+- Minor, related to criterion 4: `fetchRomMPlatforms` in src/Server/Api.fs writes `romm_last_error` on a 401/403 but does not clear it when a later call succeeds.
+- Also noted: the `Set_romm_rom_id` results in `RomMSync.resolveSlug` are discarded with `|> ignore`. If linking fails, sessions are still imported and the rom counts as linked or created.
+
+**SUGGESTED_FIX:** Record real responses for `/api/platforms`, `/api/roms`, `/api/roms/{id}` and `/api/play-sessions` from the live RomM instance with a scrubbed read-only token (RomM HTTP only, never Mediatheca's live DB), use them as the fixtures, and fix any decoder they break. Add an Expecto test for `setRomMSettings`/`getRomMSettings` (JSON-array persistence, token never returned) and a Vitest case for the Nintendo pre-check in `RomM_platforms_loaded`. Clear `romm_last_error` when `fetchRomMPlatforms` succeeds.
+
+**ITERATION_HINT:** likely-fixable
+
+**Conductor note:** RomM's public `/openapi.json` (no auth) confirms `/api/play-sessions` → plain array, `/api/platforms` → plain array, `/api/roms` → `CustomLimitOffsetPage_SimpleRomSchema_` envelope, `first_release_date` → integer (unit not stated by the spec), `url_cover` → nullable string. Every `/api/*` data endpoint answers 401 without a token.
+
+## Salvage note
+
+Paused by the builder after verification iteration 1 (2026-09-25 18:05) until a read-only RomM Client API Token is available for recording real fixtures. The worktree `.worktrees/integration-jkbm1` (branch `aw/integration-jkbm1`) is kept with the iteration-1 work committed as `wip [integration-jkbm1] iter 1`.
+- Code diff salvaged to `.agentheim/salvage/integration-jkbm1-escalated-iter1.patch`
+- Worker's iteration-1 RESULT (README_DELTA + OUTCOME drafts) salvaged to `.agentheim/salvage/integration-jkbm1-escalated-iter1.bookkeeping.md`
+
+To resume: provide the token (a scratchpad file, never committed), then run `/agentheim:work integration-jkbm1`. Phase 1 recovery reuses this worktree and re-dispatches iteration 2 against the Verifier note above.

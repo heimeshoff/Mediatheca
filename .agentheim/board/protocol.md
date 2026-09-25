@@ -5,6 +5,46 @@ Newest entries on top.
 
 ---
 
+## 2026-09-25 18:04 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 32m (batch started 17:33)
+**Completed:** 0 (first-try PASS: 0, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 1 (integration-jkbm1 — paused by builder after iteration 1, awaiting a RomM token for recorded fixtures)
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** integration-jkbm1: 1
+**Commits:** 2
+**Vision-conformance:** none — batch aligns with vision
+**Batch mix:** none — no tasks completed this session
+**Carry-over:** .agentheim/board/integration/doing/integration-jkbm1-romm-adapter-nintendo-games-and-playtime.md: committed (verifier + salvage notes); .worktrees/integration-jkbm1: kept (owner: integration-jkbm1, paused after iteration 1, salvaged: .agentheim/salvage/integration-jkbm1-escalated-iter1.patch)
+
+---
+
+## 2026-09-25 18:04 -- Verification failed — escalating to user: integration-jkbm1 - RomM adapter
+
+**Type:** Work / Verification failure
+**Task:** integration-jkbm1 - RomM adapter
+**Iteration:** 1 of 3
+**Reasons:** re-dispatch needs a read-only RomM Client API Token to record real fixtures (every /api/* endpoint answers 401 without one); builder chose to pause rather than accept spec-derived fixtures
+**Iteration hint:** likely-fixable
+**Next:** escalated to user — paused; worktree .worktrees/integration-jkbm1 kept, salvaged to .agentheim/salvage/integration-jkbm1-escalated-iter1.patch
+
+---
+
+## 2026-09-25 18:01 -- Verification failed: integration-jkbm1 - RomM adapter
+
+**Type:** Work / Verification failure
+**Task:** integration-jkbm1 - RomM adapter
+**Iteration:** 1 of 3
+**Reasons:** criterion 1 (Settings persistence / token-never-returned / Nintendo pre-check) untested, criterion 13 fixtures hand-authored rather than recorded from the live RomM instance, fetchRomMPlatforms never clears romm_last_error on success, Set_romm_rom_id result discarded in RomMSync.resolveSlug
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-09-25 17:33 -- Batch started: [integration-jkbm1]
 
 **Type:** Work / Batch start
