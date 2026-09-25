@@ -1,15 +1,15 @@
 ---
 id: integration-jkbm1
-title: RomM adapter — import Nintendo games' metadata and play sessions from the self-hosted RomM instance via its REST API
+title: RomM adapter — import games' metadata and play sessions for the platforms picked in Settings (Nintendo by default) from the self-hosted RomM instance, on a scheduled sync
 status: backlog
 type: feature
 context: integration
 created: 2026-09-25
 completed:
-depends_on: []
+depends_on: [games-rmxg2]
 blocks: []
 tags: [romm, games, playtime, nintendo, sync]
-related_adrs: []
+related_adrs: [0088, 0065, 0078]
 related_research: [romm-vs-mediatheca-2026-09-23]
 prior_art: []
 ---
@@ -17,74 +17,97 @@ prior_art: []
 ## Why
 Nintendo games are played outside Steam, so Mediatheca's playtime and diary never see them.
 RomM (self-hosted on harbour at `https://romm.elver-minor.ts.net`, v5.3.1) already catalogues
-those ROMs with rich metadata and records play sessions. It exposes a REST API, so Mediatheca
-can pull that data the same way it pulls Steam playtime, without anyone entering it by hand.
+those ROMs with rich metadata and records real play sessions. It exposes a REST API, so
+Mediatheca can pull that data the same way it pulls Steam playtime, without anyone entering it
+by hand.
 
 ## What
-A new Integration adapter (`RomM.fs`) plus a sync that:
+A new `RomM.fs` adapter plus a scheduled sync that:
 
-- lists the Nintendo platforms and their games from RomM,
-- matches or creates the corresponding **Game** in the Games BC,
-- imports RomM **play sessions** as Games play sessions with a new session source (`RomM`,
-  alongside `SteamSync` and `Manual`), so they feed play time, the Journal diary and the
-  "any play session promotes to InFocus" rule.
+- lists the configured platforms' games from RomM (`GET /api/platforms`,
+  `GET /api/roms?platform_ids=…`),
+- matches or creates the corresponding **Game**, then links it with the rom-id external
+  identity that `games-rmxg2` adds (`Set_romm_rom_id`),
+- imports RomM **play sessions** (`GET /api/play-sessions?rom_id=…`) as Games play sessions
+  with source `RomM`, via `games-rmxg2`'s `Record_romm_play_session`.
+
+This task adds no new `GameCommand` or `GameEvent`. It only calls the ones `games-rmxg2`
+lands. ADR-0088 has the session-id cursor design.
 
 ### RomM API surface (checked against the live instance's `/openapi.json`, 2026-09-25)
 - **Auth:** Client API Token (`rmm_` + 64 hex chars), sent as `Authorization: Bearer rmm_…`.
-  Per-user, and you choose its scopes. Read-only is enough: `roms.read`, `roms.user.read`,
-  `platforms.read`, and `assets.read` only if covers are pulled. HTTP Basic and OAuth2 password
-  (`POST /api/token`) also exist. Interactive docs: `https://romm.elver-minor.ts.net/api/docs`.
-- `GET /api/platforms` — platform ids and slugs, used to select the Nintendo ones.
-- `GET /api/roms?platform_ids=…&updated_after=…&limit=&offset=` — paged game list, which
-  suits incremental sync. It can also filter by `last_played`.
-- `GET /api/roms/{id}` → `DetailedRomSchema`: name, summary, `metadatum` (genres, companies…),
-  provider ids (`igdb_id`, `ss_id`, `hltb_id`, `ra_id`, `steam_id`, `moby_id`…), per-provider
-  metadata including `hltb_metadata`, covers (`url_cover`, `path_cover_large`), and
-  `rom_user` { `last_played`, `now_playing`, `backlogged`, `status`, `completion`, `rating`,
-  `difficulty`, `hidden` }.
-- `GET /api/play-sessions?rom_id=&device_id=&start_after=&end_before=&limit=&offset=` (scope
+  Per-user, and you choose its scopes: `roms.read`, `roms.user.read`, `platforms.read`, and
+  `assets.read` for covers. Interactive docs: `https://romm.elver-minor.ts.net/api/docs`.
+- `GET /api/platforms`: platform ids and slugs, used by the Settings picker.
+- `GET /api/roms?platform_ids=…&updated_after=…&limit=&offset=`: paged, suits incremental sync.
+- `GET /api/roms/{id}` → `DetailedRomSchema`: name, summary, `metadatum` (genres,
+  companies…), provider ids (`igdb_id`, `ss_id`, `hltb_id`, `steam_id`…), covers
+  (`url_cover`, `path_cover_large`), and `rom_user` (ignored, see below).
+- `GET /api/play-sessions?rom_id=&start_after=&end_before=&limit=&offset=` (scope
   `roms.user.read`) → `PlaySessionSchema` { `id`, `rom_id`, `device_id`, `save_slot`,
   `start_time`, `end_time`, `duration_ms`, `created_at`, `updated_at` }.
 
 ## Acceptance criteria
-- [ ] The RomM base URL and Client API Token are configurable in Settings. The token is never
-      logged, and a 401/403 surfaces as a clear "token invalid" state, like Steam's manual token.
-- [ ] A sync imports every game on the configured Nintendo platforms. A game already in the
-      library is matched rather than duplicated (matching rule decided in refinement).
-- [ ] Every RomM play session becomes a Games play session with source `RomM`, attributed to
-      the right gaming day. Re-running the sync with no new RomM sessions produces zero new
-      events (idempotent).
-- [ ] A RomM session on a game that isn't InFocus promotes it to InFocus, just like Steam and
-      manual sessions do.
-- [ ] Adapter decoding is covered by tests against recorded RomM JSON fixtures (platforms,
-      roms list, rom detail, play sessions).
+- [ ] Settings has a RomM card with Base URL, API Token (masked input), and a platform picker
+      populated live from `GET /api/platforms`. Nintendo platforms are pre-checked on first
+      load. Saving persists `romm_base_url`, `romm_api_token` and `romm_platform_ids` (a JSON
+      array, like `steam_family_members`) via `SettingsStore`.
+- [ ] The RomM card matches the existing Steam, Jellyfin and Audible cards
+      (DesignSystem.fs compositions, paper overlay for any floating surface) and introduces no
+      new component. [human-eye]
+- [ ] The token never appears in a log line. No logging call interpolates the raw token or
+      the `Authorization` header value.
+- [ ] A 401/403 from any RomM call becomes a typed `TokenRejected` result. It is persisted to
+      `romm_last_error` with a fixed `"RomM token rejected: "` prefix, mirroring
+      `Steam.webApiKeyRejectedMessage`/`steam_api_key_last_error` (ADR-0065), and the next
+      successful call clears it. Tested with a stubbed 401 response.
+- [ ] For every rom on a selected platform, a sync run tries these in order:
+      1. `GameProjection.findByRommRomId`.
+      2. On a miss, match an existing library game by normalized name, plus release year when
+         both have one, and attach the rom id via `Set_romm_rom_id`.
+      3. If nothing matches, create the Game from RomM's own metadata (name, summary, cover,
+         genres, release date) through the identity-card path Steam creation uses
+         (`MetadataCache.upsertGameIdentityCard`), then attach the rom id.
+
+      Each branch has a fixture-driven test.
+- [ ] Every RomM session with `end_time` set on a linked rom becomes a `Play_session_recorded`
+      (`Source = RomM`) via `Record_romm_play_session`. Its gaming day comes from the session's
+      `start_time` through `PlaytimeTracker`'s existing gaming-day function, the same one
+      Steam and manual sessions use: one session, one day, no splitting. Sessions without
+      `end_time` are skipped and imported on a later sync once RomM closes them.
+- [ ] `duration_ms` is rounded to the nearest minute, with a minimum of 1 for any
+      `duration_ms > 0`. A real short session still consumes its RomM session id instead of
+      being retried forever.
+- [ ] Re-running the sync against unchanged fixture data (same roms, same sessions) appends
+      zero new events. A fixture-driven Expecto test asserts the game stream's position is
+      unchanged after a second identical sync.
+- [ ] A RomM session on a game that isn't InFocus promotes it to InFocus, exercised end-to-end
+      through the sync test.
+- [ ] `rom_user` fields (`status`, `completion`, `rating`, `backlogged`, `now_playing`) never
+      reach a command. The adapter's domain mapping does not reference them.
+- [ ] A new `"RomM sync"` `JobSpec` in `ScheduledJobs.fs` runs at a configurable local hour
+      (`romm_sync_hour`). Its default differs from `playtime_sync_hour`, so the two jobs don't
+      contend for `PlaytimeTracker`'s shared `jobLock` in the same minute. A "Sync now" button
+      in Settings shares the same `JobRunRecorder`/`tryStartJob` path, following the Audible
+      sync's wrapper-`JobSpec` pattern (ADR-0078). `romm_last_sync` and `romm_last_error` are
+      shown on the card.
+- [ ] `RomM.fs` decoding is covered by Expecto tests against recorded RomM JSON fixtures:
+      platforms, roms list, rom detail, and play sessions.
 
 ## Notes
-- **Playtime only exists if a RomM client records it.** RomM stores sessions only when a
-  client posts them (`POST /api/play-sessions`): the RomM desktop app timing a native emulator
-  launch, or a handheld companion syncing. Games played on real Switch hardware or in an
-  emulator RomM doesn't know about have no sessions. Before building the playtime half, check
-  what harbour's instance actually holds (one `curl` with a token to `/api/play-sessions`).
-  The metadata import is useful even with zero sessions.
-- **Open questions for refinement:**
-  - **Identity matching.** Mediatheca Games are keyed on RAWG id (plus an optional Steam
-    appId), but RomM carries IGDB, ScreenScraper, HLTB and similar ids, never RAWG. Options:
-    match by name+year, resolve through RAWG search, or store a RomM rom id / IGDB id as a new
-    external id on Game (a Games BC change, like `Set_steam_app_id`).
-  - **Session granularity.** RomM sessions are individual start/end intervals. Games play
-    sessions are one per `(gameSlug, gamingDay)` and merge by summing. Idempotency therefore
-    needs a cursor that remembers which RomM session ids were already imported. Ideally it is
-    derivable from the event log, in the spirit of ADR-0050's `SteamObservedMinutes`, rather
-    than external imperative state.
-  - **Games BC impact.** A new play-session source value (`RomM`) in the Games domain. Decide
-    whether that is part of this task or a split-off Games task.
-  - **Cadence.** Scheduled (`ScheduledJobs.fs`, like Steam) or client-initiated with a
-    cooldown (like Jellyfin).
-  - **What to take from `rom_user`.** Whether RomM's `status`, `completion` and `rating` should
-    map onto Mediatheca status and rating, or be ignored in favour of Mediatheca's own
-    lifecycle.
-  - **Scope.** Nintendo platforms only, or every RomM platform with a platform filter in
-    Settings.
-- The research report `romm-vs-mediatheca-2026-09-23` §11 tags "API" as out of scope. That
-  finding is about Mediatheca *exposing* a companion API. *Consuming* RomM's API, as here, is a
-  different question that the report didn't evaluate.
+- **Sessions exist.** The builder confirmed on 2026-09-25 that harbour's RomM already holds
+  play sessions recorded by a RomM-aware client. Games played on real Switch hardware or in an
+  emulator RomM doesn't know about still produce none; for those, the metadata import alone is
+  the value.
+- **Recording fixtures.** Record the fixtures from the live instance with a read-only token,
+  scrubbing the token. The worker records RomM
+  HTTP responses only. It never touches Mediatheca's live DB.
+- **Cadence.** Scheduled, like Steam playtime, rather than client-initiated with a cooldown,
+  like Jellyfin. RomM playtime builds up while the user is away from Mediatheca, so a sync
+  triggered on page load would skip days when the SPA is never opened.
+- **Platform scope.** The picker lists every RomM platform, not just Nintendo, with Nintendo
+  pre-selected (builder decision, 2026-09-25).
+- **`rom_user` is ignored** (builder decision, 2026-09-25). Mediatheca's own lifecycle and
+  rating stay authoritative; only play sessions drive InFocus promotion.
+- **Research scope.** Research report `romm-vs-mediatheca-2026-09-23` §11 puts "API" out of
+  scope, but that means Mediatheca *exposing* a companion API. It doesn't apply here.

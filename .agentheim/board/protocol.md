@@ -5,6 +5,26 @@ Newest entries on top.
 
 ---
 
+## 2026-09-25 13:33 -- Modeling / Refined: integration-jkbm1 - RomM adapter
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** backlog
+**Summary:** Builder decisions: RomM already holds real play sessions (playtime in scope now); RomM rom id stored as a new external id on Game, matched on first sync by normalized name + year, unmatched games created from RomM metadata; rom_user status/completion/rating ignored; Settings platform picker with Nintendo pre-selected. Orchestrator split the Games-aggregate change into games-rmxg2 (RomM source, rom-id identity, session-id cursor, PlaySessionProjection mapping fix) and chose a scheduled ScheduledJobs cadence with a Sync-now button and an ADR-0065-shaped token rejection. integration-jkbm1 now depends on games-rmxg2 and stays in backlog until it ships.
+**Split into:** games-rmxg2
+**ADRs written:** 0088
+
+---
+
+## 2026-09-25 13:33 -- Modeling / Captured: games-rmxg2 - Games — RomM as a third play-session source, with a RomM rom id as external identity and a session-id cursor; fixes PlaySessionProjection mapping every non-Manual source to SteamSync
+
+**Type:** Modeling / Capture
+**BC:** games
+**Filed to:** backlog
+**Summary:** Split out of integration-jkbm1 during refinement: the Games-aggregate half of the RomM import (RomM play-session source, RomM rom id as external identity, session-id cursor per ADR-0088, PlaySessionProjection three-way source mapping fix). Blocks integration-jkbm1.
+
+---
+
 ## 2026-09-25 11:39 -- Modeling / Captured: integration-jkbm1 - RomM adapter — import Nintendo games' metadata and play sessions from the self-hosted RomM instance via its REST API
 
 **Type:** Modeling / Capture
