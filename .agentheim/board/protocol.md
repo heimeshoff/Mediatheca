@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-25 17:33 -- Batch started: [integration-jkbm1]
+
+**Type:** Work / Batch start
+**Tasks:** integration-jkbm1 - RomM adapter — on a scheduled sync, import play sessions from the self-hosted RomM instance for the platforms picked in Settings (Nintendo by default), linking or creating a Game only for roms that have played sessions
+**Parallel:** no (1 worker) — the only ready task across all BCs
+
+---
+
 ## 2026-09-25 17:19 -- Modeling / Promoted: integration-jkbm1 - RomM adapter — on a scheduled sync, import play sessions from the self-hosted RomM instance for the platforms picked in Settings (Nintendo by default), linking or creating a Game only for roms that have played sessions
 
 **Type:** Modeling / Promote

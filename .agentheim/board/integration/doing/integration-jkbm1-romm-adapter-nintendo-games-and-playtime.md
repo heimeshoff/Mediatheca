@@ -1,7 +1,7 @@
 ---
 id: integration-jkbm1
 title: RomM adapter — on a scheduled sync, import play sessions from the self-hosted RomM instance for the platforms picked in Settings (Nintendo by default), linking or creating a Game only for roms that have played sessions
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-09-25

@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 31
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **integration-jkbm1** — RomM adapter — on a scheduled sync, import play sessions from the self-hosted RomM instance for the platforms picked in Settings (Nintendo by default), linking or creating a Game only for roms that have played sessions (feature) — `todo/integration-jkbm1-romm-adapter-nintendo-games-and-playtime.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **integration-jkbm1** — RomM adapter — on a scheduled sync, import play sessions from the self-hosted RomM instance for the platforms picked in Settings (Nintendo by default), linking or creating a Game only for roms that have played sessions (feature) — `doing/integration-jkbm1-romm-adapter-nintendo-games-and-playtime.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
