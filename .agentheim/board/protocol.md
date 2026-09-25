@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-25 17:19 -- Modeling / Promoted: integration-jkbm1 - RomM adapter — on a scheduled sync, import play sessions from the self-hosted RomM instance for the platforms picked in Settings (Nintendo by default), linking or creating a Game only for roms that have played sessions
+
+**Type:** Modeling / Promote
+**BC:** integration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-25 17:19 -- Modeling / Refined: integration-jkbm1 - RomM adapter
 
 **Type:** Modeling / Refine
