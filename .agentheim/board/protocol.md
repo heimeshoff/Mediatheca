@@ -5,6 +5,16 @@ Newest entries on top.
 
 ---
 
+## 2026-09-25 17:19 -- Modeling / Refined: integration-jkbm1 - RomM adapter
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** todo
+**Summary:** Second pass after games-rmxg2 shipped. Builder decisions: only roms with at least one closed play session are linked/created (sessions-first sync via one paged GET /api/play-sessions, rom_id optional per live schema); an ambiguous name(+year) match is skipped and reported, never guessed; kept as one task (no frontend/backend split). Sharpened: gaming day = PlaytimeTracker.toGamingDay with playtime_sync_hour on UTC->local start_time, one Record_romm_play_session per (game, gaming day); added design-system-001 to depends_on (styleguide gate for the Settings card).
+**ADRs written:** none
+
+---
+
 ## 2026-09-25 13:57 -- Work session ended
 
 **Type:** Work / Session end

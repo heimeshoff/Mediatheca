@@ -1,12 +1,12 @@
 ---
 id: integration-jkbm1
-title: RomM adapter — import games' metadata and play sessions for the platforms picked in Settings (Nintendo by default) from the self-hosted RomM instance, on a scheduled sync
+title: RomM adapter — on a scheduled sync, import play sessions from the self-hosted RomM instance for the platforms picked in Settings (Nintendo by default), linking or creating a Game only for roms that have played sessions
 status: backlog
 type: feature
 context: integration
 created: 2026-09-25
 completed:
-depends_on: [games-rmxg2]
+depends_on: [games-rmxg2, design-system-001]
 blocks: []
 tags: [romm, games, playtime, nintendo, sync]
 related_adrs: [0088, 0065, 0078]
@@ -24,12 +24,15 @@ by hand.
 ## What
 A new `RomM.fs` adapter plus a scheduled sync that:
 
-- lists the configured platforms' games from RomM (`GET /api/platforms`,
-  `GET /api/roms?platform_ids=…`),
+- pages through RomM's **play sessions** (`GET /api/play-sessions`, no `rom_id` filter, which
+  the live schema allows) and keeps only closed ones (`end_time` set),
+- groups them by `rom_id` and keeps roms whose platform (from `GET /api/roms/{id}`) is among
+  the selected platforms. **Roms with no closed session are never touched**: no Game is
+  created or linked for them (builder decision, 2026-09-25),
 - matches or creates the corresponding **Game**, then links it with the rom-id external
   identity that `games-rmxg2` adds (`Set_romm_rom_id`),
-- imports RomM **play sessions** (`GET /api/play-sessions?rom_id=…`) as Games play sessions
-  with source `RomM`, via `games-rmxg2`'s `Record_romm_play_session`.
+- imports the sessions as Games play sessions with source `RomM`: one
+  `games-rmxg2` `Record_romm_play_session` per (game, gaming day).
 
 This task adds no new `GameCommand` or `GameEvent`. It only calls the ones `games-rmxg2`
 lands. ADR-0088 has the session-id cursor design.
@@ -43,8 +46,8 @@ lands. ADR-0088 has the session-id cursor design.
 - `GET /api/roms/{id}` → `DetailedRomSchema`: name, summary, `metadatum` (genres,
   companies…), provider ids (`igdb_id`, `ss_id`, `hltb_id`, `steam_id`…), covers
   (`url_cover`, `path_cover_large`), and `rom_user` (ignored, see below).
-- `GET /api/play-sessions?rom_id=&start_after=&end_before=&limit=&offset=` (scope
-  `roms.user.read`) → `PlaySessionSchema` { `id`, `rom_id`, `device_id`, `save_slot`,
+- `GET /api/play-sessions?rom_id=&device_id=&start_after=&end_before=&limit=&offset=` (scope
+  `roms.user.read`; every parameter optional, `limit` defaults to 50) → `PlaySessionSchema` { `id`, `rom_id`, `device_id`, `save_slot`,
   `start_time`, `end_time`, `duration_ms`, `created_at`, `updated_at` }.
 
 ## Acceptance criteria
@@ -61,20 +64,29 @@ lands. ADR-0088 has the session-id cursor design.
       `romm_last_error` with a fixed `"RomM token rejected: "` prefix, mirroring
       `Steam.webApiKeyRejectedMessage`/`steam_api_key_last_error` (ADR-0065), and the next
       successful call clears it. Tested with a stubbed 401 response.
-- [ ] For every rom on a selected platform, a sync run tries these in order:
+- [ ] Only roms with at least one closed RomM session on a selected platform are processed. A
+      rom with no sessions, or only open ones, creates and links nothing (fixture test).
+- [ ] For every such rom not yet linked, a sync run tries these in order:
       1. `GameProjection.findByRommRomId`.
       2. On a miss, match an existing library game by normalized name, plus release year when
-         both have one, and attach the rom id via `Set_romm_rom_id`.
+         both have one, and attach the rom id via `Set_romm_rom_id`. If **more than one**
+         library game matches, the rom is skipped: nothing is linked or created, its sessions
+         aren't imported, and it's counted as `ambiguous` (with its name) in the run summary.
+         It is retried on every run, so linking it by hand later is enough.
       3. If nothing matches, create the Game from RomM's own metadata (name, summary, cover,
          genres, release date) through the identity-card path Steam creation uses
          (`MetadataCache.upsertGameIdentityCard`), then attach the rom id.
 
-      Each branch has a fixture-driven test.
-- [ ] Every RomM session with `end_time` set on a linked rom becomes a `Play_session_recorded`
-      (`Source = RomM`) via `Record_romm_play_session`. Its gaming day comes from the session's
-      `start_time` through `PlaytimeTracker`'s existing gaming-day function, the same one
-      Steam and manual sessions use: one session, one day, no splitting. Sessions without
-      `end_time` are skipped and imported on a later sync once RomM closes them.
+      Each branch, including the ambiguous skip, has a fixture-driven test.
+- [ ] Every RomM session with `end_time` set on a linked rom becomes part of a
+      `Play_session_recorded` (`Source = RomM`) via `Record_romm_play_session`. Its gaming day
+      is `PlaytimeTracker.toGamingDay (PlaytimeTracker.getSyncHour conn)` applied to the
+      session's `start_time` converted from UTC to server-local time. This is the same
+      function and the same `playtime_sync_hour` boundary Steam and manual sessions use, never
+      `romm_sync_hour`. One session lands on one day with no splitting, and all of a game's
+      new sessions on the same gaming day go in one command. A test pins a UTC `start_time`
+      just before and after the boundary. Sessions without `end_time` are skipped and
+      imported on a later sync once RomM closes them.
 - [ ] `duration_ms` is rounded to the nearest minute, with a minimum of 1 for any
       `duration_ms > 0`. A real short session still consumes its RomM session id instead of
       being retried forever.
@@ -97,8 +109,17 @@ lands. ADR-0088 has the session-id cursor design.
 ## Notes
 - **Sessions exist.** The builder confirmed on 2026-09-25 that harbour's RomM already holds
   play sessions recorded by a RomM-aware client. Games played on real Switch hardware or in an
-  emulator RomM doesn't know about still produce none; for those, the metadata import alone is
-  the value.
+  emulator RomM doesn't know about still produce none, so they don't enter Mediatheca through
+  this adapter.
+- **Sessions-first scope** (builder decision, 2026-09-25, second refine). A Game is created or
+  linked only when its rom has a closed play session. This keeps never-played ROM dumps out of
+  the library, so new games still land in Backlog and are promoted to InFocus by the session
+  itself. It is also why the sync starts from `/api/play-sessions` rather than from the rom
+  list: fetching sessions first means one paged call per run instead of one call per rom.
+- **Ambiguous matches are skipped, never guessed** (builder decision, 2026-09-25). A duplicate
+  Game is worse than a rom waiting to be linked by hand.
+- **One task, not split** (builder decision, 2026-09-25). The Settings card is meaningless
+  without its endpoints, which matches how the Audible sync shipped.
 - **Recording fixtures.** Record the fixtures from the live instance with a read-only token,
   scrubbing the token. The worker records RomM
   HTTP responses only. It never touches Mediatheca's live DB.
