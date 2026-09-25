@@ -1608,6 +1608,7 @@ type SteamSearchResult = {
 type PlaySessionSource =
     | SteamSync
     | Manual
+    | RomM
 
 type PlaySessionDto = {
     GameSlug: string

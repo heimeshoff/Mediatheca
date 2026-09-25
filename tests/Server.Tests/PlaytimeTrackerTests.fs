@@ -402,3 +402,47 @@ let legacyStatusUpcastTests =
             Expect.isFalse (rawStatuses |> List.contains "OnHold") "No legacy 'OnHold' strings remain in game_list"
             Expect.isFalse (rawStatuses |> List.contains "Completed") "No legacy 'Completed' strings remain in game_list"
     ]
+
+/// ADR-0088 (games-rmxg2): RomM as a third play-session source, with a RomM
+/// rom id as external identity. This is the regression coverage for the
+/// latent bug the ADR calls out: prior to this task,
+/// `PlaySessionProjection.fs`'s `encodeSource`/`getSource`/`toPlaySessionDto`
+/// mapped any source string that wasn't the literal `"Manual"` to
+/// `SteamSync`, so a RomM-sourced diary row would read as Steam.
+[<Tests>]
+let rommPlaySessionProjectionTests =
+    testList "RomM play sessions (ADR-0088)" [
+
+        testCase "A RomM-sourced Play_session_recorded round-trips through PlaySessionProjection" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+
+            match runCmd conn gameSlug (Games.Record_romm_play_session ("2024-06-01", [ "romm-session-1", 45 ])) with
+            | Error e -> failtest $"Expected Ok, got: {e}"
+            | Ok () ->
+                let rawSource =
+                    conn
+                    |> Db.newCommand "SELECT source FROM game_play_session WHERE game_slug = @slug AND date = @day"
+                    |> Db.setParams [ "slug", SqlType.String gameSlug; "day", SqlType.String "2024-06-01" ]
+                    |> Db.querySingle (fun rd -> rd.ReadString "source")
+                Expect.equal rawSource (Some "RomM") "game_play_session.source should be the literal string 'RomM'"
+
+                match PlaySessionProjection.getForGame conn gameSlug with
+                | [ dto ] -> Expect.equal dto.Source RomM "getForGame should report Source = RomM"
+                | other -> failtest $"Expected exactly one session row, got: {other}"
+
+                match PlaySessionProjection.getBySlugAndDay conn gameSlug "2024-06-01" with
+                | Some dto -> Expect.equal dto.Source RomM "getBySlugAndDay should report Source = RomM"
+                | None -> failtest "Expected a session row"
+
+        testCase "findByRommRomId returns the matching slug after Game_romm_rom_id_set" <| fun _ ->
+            let conn = createInMemoryConnection ()
+            seedGame conn
+
+            Expect.equal (GameProjection.findByRommRomId conn 777) None "No game linked yet"
+
+            match runCmd conn gameSlug (Games.Set_romm_rom_id 777) with
+            | Error e -> failtest $"Expected Ok, got: {e}"
+            | Ok () ->
+                Expect.equal (GameProjection.findByRommRomId conn 777) (Some gameSlug) "Should find the slug by its RomM rom id"
+    ]

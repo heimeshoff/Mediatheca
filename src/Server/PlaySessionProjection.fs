@@ -48,6 +48,18 @@ module PlaySessionProjection =
         match source with
         | SteamSync -> "SteamSync"
         | Manual -> "Manual"
+        | RomM -> "RomM"
+
+    /// ADR-0088: the exhaustive counterpart to `encodeSource` above. Prior to
+    /// this task, `getSource`/`toPlaySessionDto` collapsed anything that
+    /// wasn't the literal string `"Manual"` to `SteamSync` — a latent bug a
+    /// third source would otherwise trip silently (every RomM-sourced diary
+    /// row would read as Steam).
+    let private decodeSource (s: string) : PlaySessionSource =
+        match s with
+        | "Manual" -> Manual
+        | "RomM" -> RomM
+        | _ -> SteamSync
 
     /// Insert-or-merge: if a row for `(slug, day)` already exists (two Steam
     /// syncs attributing to the same gaming day — integration-004), sum the
@@ -76,7 +88,7 @@ module PlaySessionProjection =
         |> Db.newCommand "SELECT source FROM game_play_session WHERE game_slug = @slug AND date = @day"
         |> Db.setParams [ "slug", SqlType.String slug; "day", SqlType.String day ]
         |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "source")
-        |> Option.map (fun s -> if s = "Manual" then Manual else SteamSync)
+        |> Option.map decodeSource
         |> Option.defaultValue Manual
 
     let private handleEvent (conn: SqliteConnection) (event: EventStore.StoredEvent) : unit =
@@ -132,7 +144,7 @@ module PlaySessionProjection =
     // Query functions
 
     let private toPlaySessionDto (rd: IDataReader) : PlaySessionDto =
-        let source = if rd.ReadString "source" = "Manual" then Manual else SteamSync
+        let source = decodeSource (rd.ReadString "source")
         { GameSlug = rd.ReadString "game_slug"
           Date = rd.ReadString "date"
           MinutesPlayed = rd.ReadInt32 "minutes_played"

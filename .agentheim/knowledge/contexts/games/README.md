@@ -11,7 +11,7 @@ Single user.
 
 ## Ubiquitous language
 
-- **Game** — a video game in the library. Carries a RAWG id (canonical metadata) and optionally a Steam appId.
+- **Game** — a video game in the library. Carries a RAWG id (canonical metadata) and optionally a Steam appId and/or a RomM rom id (`RommRomId`, mirroring `SteamAppId` — games-rmxg2, ADR-0088).
 - **Status** — lifecycle position, exactly five states (remodeled 2026-08-01,
   games-status-vocabulary-reconcile): `Backlog | InFocus | Retired | Abandoned | Dismissed`.
   `Playing` never exists as a status — `InFocus` covers "actively playing" alongside
@@ -27,9 +27,7 @@ Single user.
 - **Play time** — total minutes played: `PriorPlayTimeMinutes` (accumulated before tracking
   began, dateless) plus the sum of every **play session** (below). Games-p6vkz (2026-08-01):
   play sessions are first-class events, not a republished total.
-- **Play session** — one gaming day's worth of playtime for one game. Natural key
-  `(gameSlug, gamingDay)` — no synthetic id; two deltas landing on the same day merge
-  (summed), never overwrite. Source is `SteamSync` or `Manual`.
+- **Play session** — one gaming day's worth of playtime for one game. Natural key `(gameSlug, gamingDay)` — no synthetic id; two deltas landing on the same day merge (summed), never overwrite. Source is `SteamSync`, `Manual`, or `RomM` (games-rmxg2, ADR-0088) — a `RomM`-sourced record additionally carries `RommSessionIds: Set<string>`, the ids of the contributing RomM sessions (empty for the other two sources).
 - **Prior playtime** — playtime accumulated before session tracking began, recorded once per
   game (`Prior_play_time_recorded`, refused if already set). No date — never appears in the
   Journal diary, only in the total. A first Steam observation over 960 minutes (16h) is
@@ -193,7 +191,7 @@ Single user.
 
 ## Aggregates
 
-- **Game** — protects: status transitions follow the lifecycle DU; play time settable any time after `Game_added_to_library`; family owners and played-with are sets. HLTB hours are no longer aggregate-settable (games-v4nqe demoted `Set_hltb_hours`/`Game_hltb_hours_set` — HLTB hours are cache-derived, `MetadataCache.upsertGameHltbHours`). Play time is a two-fold: `TotalPlayTimeMinutes` (`PriorPlayTimeMinutes` + Σ session minutes, what the user asserts happened) and `SteamObservedMinutes` (what Steam has told us, never reduced by correction/move/removal) — the second fold is what makes the Steam sync cursor derivable rather than externally-guarded state (ADR-0050). `PlayFacetsOverride` (ADR-0053) is cache-blind by construction: no invariant here ever reads `game_metadata_cache`, so a redundant-but-harmless override is accepted as normal, self-correcting state, not refused. Only recording a *new* session promotes to InFocus; correcting, moving, removing a session, or recording prior playtime never does.
+- **Game** — protects: status transitions follow the lifecycle DU; play time settable any time after `Game_added_to_library`; family owners and played-with are sets. HLTB hours are no longer aggregate-settable (games-v4nqe demoted `Set_hltb_hours`/`Game_hltb_hours_set` — HLTB hours are cache-derived, `MetadataCache.upsertGameHltbHours`). Play time is a two-fold: `TotalPlayTimeMinutes` (`PriorPlayTimeMinutes` + Σ session minutes, what the user asserts happened) and `SteamObservedMinutes` (what Steam has told us, never reduced by correction/move/removal) — the second fold is what makes the Steam sync cursor derivable rather than externally-guarded state (ADR-0050). A parallel cursor, `ImportedRommSessionIds` (a `Set<string>` of RomM session ids already imported, also never reduced by a later edit), gives `RomM`-sourced sessions the same idempotent-sync property, keyed on session identity rather than a running total (games-rmxg2, ADR-0088). `PlayFacetsOverride` (ADR-0053) is cache-blind by construction: no invariant here ever reads `game_metadata_cache`, so a redundant-but-harmless override is accepted as normal, self-correcting state, not refused. Only recording a *new* session promotes to InFocus; correcting, moving, removing a session, or recording prior playtime never does.
 
 ## Key events
 
@@ -203,6 +201,7 @@ All "legacy, evolve/projection no-op" events stay in the codec (`Games.Serializa
 still deserializes them; `evolve`/`GameProjection.handleEvent` are explicit no-ops,
 the `Game_store_added` precedent) so pre-cutover event streams keep replaying without
 error or corrupted state — only their commands are gone.
+- `Game_romm_rom_id_set` (games-rmxg2, ADR-0088) mirrors `Game_steam_app_id_set` — links a game to its RomM rom id, backing `GameProjection.findByRommRomId`.
 
 ## Key commands
 

@@ -211,7 +211,7 @@ let safeReadCompositionTests =
                 "A game whose only history is dateless prior playtime (here: none at all) must read None"
 
             EventStore.appendToStream conn (Games.streamId "portal-2-2011") 0L
-                [ Games.Serialization.toEventData (Games.Play_session_recorded { Day = "2024-06-15"; Minutes = 60; Source = Manual }) ] |> ignore
+                [ Games.Serialization.toEventData (Games.Play_session_recorded { Day = "2024-06-15"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty }) ] |> ignore
             Projection.runProjection conn PlaySessionProjection.handler
             Projection.runProjection conn GameProjection.handler
 

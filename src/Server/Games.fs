@@ -30,6 +30,11 @@ module Games =
         Day: string
         Minutes: int
         Source: PlaySessionSource
+        /// The RomM session ids that contributed to this record — empty for
+        /// `SteamSync`/`Manual` records, populated only for `RomM`-sourced
+        /// ones (ADR-0088). Old serialized events without this field decode
+        /// it as `Set.empty`.
+        RommSessionIds: Set<string>
     }
 
     /// A first Steam observation at or under this many minutes is plausibly
@@ -77,6 +82,9 @@ module Games =
         | Game_played_with of friendSlug: string
         | Game_played_with_removed of friendSlug: string
         | Game_steam_app_id_set of steamAppId: int
+        /// Mirrors `Game_steam_app_id_set` — the RomM rom id join key
+        /// `integration-jkbm1`'s matching step needs (ADR-0088).
+        | Game_romm_rom_id_set of rommRomId: int
         | Game_play_time_set of totalMinutes: int
         // Legacy — superseded by Prior_play_time_recorded plus the four
         // session events below (games-p6vkz). Kept in the DU (never rewritten,
@@ -125,6 +133,9 @@ module Games =
         PersonalRating: int option
         Status: GameStatus
         SteamAppId: int option
+        /// The RomM rom id this game is linked to, mirroring `SteamAppId`
+        /// (ADR-0088).
+        RommRomId: int option
         TotalPlayTimeMinutes: int
         /// Playtime accumulated before session tracking began — a distinct,
         /// dateless fact (games-p6vkz): "this much was played before we
@@ -140,6 +151,14 @@ module Games =
         /// it is what makes the old Steam-sync cursor table derivable rather
         /// than merely guardable — see the ADR's phantom-session example.
         SteamObservedMinutes: int
+        /// The RomM session-id cursor (ADR-0088): every session id that has
+        /// ever contributed to a `RomM`-sourced `Play_session_recorded`,
+        /// **never reduced** by a later correction, move, or removal —
+        /// mirroring `SteamObservedMinutes`'s own "never reduced" rule, but
+        /// shaped as a set of identities rather than a running total, since
+        /// RomM hands us discrete, individually identified sessions instead
+        /// of a cumulative lifetime total.
+        ImportedRommSessionIds: Set<string>
         FamilyOwners: Set<string>
         RecommendedBy: Set<string>
         WantToPlayWith: Set<string>
@@ -177,6 +196,8 @@ module Games =
         | Add_played_with of friendSlug: string
         | Remove_played_with of friendSlug: string
         | Set_steam_app_id of steamAppId: int
+        /// Mirrors `Set_steam_app_id` — links the RomM rom id (ADR-0088).
+        | Set_romm_rom_id of rommRomId: int
         // The old direct play-time setter is deleted (games-p6vkz) —
         // superseded by the commands below. Removing it (rather than leaving
         // it unreachable) is mandatory: games-h4mrd appends session events to
@@ -195,6 +216,12 @@ module Games =
         /// so the adapter (`PlaytimeTracker.runSync`) only ever supplies
         /// `(observedMinutes, gamingDay)` and enforces the migration gate.
         | Record_steam_observed_total of observedMinutes: int * gamingDay: string
+        /// The RomM session-id cursor's own entry point (ADR-0088), mirroring
+        /// `Record_steam_observed_total`'s shape as one pure decision: the
+        /// caller (the RomM adapter, `integration-jkbm1`) has already grouped
+        /// RomM's individually identified sessions onto one gaming day, and
+        /// `decide` keeps only the ids not already in `ImportedRommSessionIds`.
+        | Record_romm_play_session of day: string * sessions: (string * int) list
         | Set_steam_library_date of dateAdded: string option
         | Mark_as_owned
         | Remove_ownership
@@ -234,10 +261,12 @@ module Games =
                 PersonalRating = None
                 Status = Backlog
                 SteamAppId = None
+                RommRomId = None
                 TotalPlayTimeMinutes = 0
                 PriorPlayTimeMinutes = 0
                 PlaySessions = Map.empty
                 SteamObservedMinutes = 0
+                ImportedRommSessionIds = Set.empty
                 FamilyOwners = Set.empty
                 RecommendedBy = Set.empty
                 WantToPlayWith = Set.empty
@@ -278,6 +307,8 @@ module Games =
             Active { game with PlayedWith = game.PlayedWith |> Set.remove friendSlug }
         | Active game, Game_steam_app_id_set steamAppId ->
             Active { game with SteamAppId = Some steamAppId }
+        | Active game, Game_romm_rom_id_set rommRomId ->
+            Active { game with RommRomId = Some rommRomId }
         // Legacy, mandatory no-op (games-p6vkz — see the DU comment on
         // Game_play_time_set above): must NOT re-derive TotalPlayTimeMinutes
         // from the old republished SUM, or replaying a stream that has both
@@ -294,8 +325,19 @@ module Games =
             let updatedSteamObserved =
                 match d.Source with
                 | SteamSync -> game.SteamObservedMinutes + d.Minutes
-                | Manual -> game.SteamObservedMinutes
-            Active (recomputeTotal { game with PlaySessions = updatedSessions; SteamObservedMinutes = updatedSteamObserved })
+                | Manual | RomM -> game.SteamObservedMinutes
+            // ADR-0088's second cursor, folded the same "never reduced" way
+            // as SteamObservedMinutes above: only a RomM-sourced record ever
+            // grows this set, and Play_session_minutes_corrected/moved/removed
+            // never touch it.
+            let updatedImportedRommSessionIds =
+                match d.Source with
+                | RomM -> Set.union game.ImportedRommSessionIds d.RommSessionIds
+                | SteamSync | Manual -> game.ImportedRommSessionIds
+            Active (recomputeTotal { game with
+                                        PlaySessions = updatedSessions
+                                        SteamObservedMinutes = updatedSteamObserved
+                                        ImportedRommSessionIds = updatedImportedRommSessionIds })
         | Active game, Play_session_minutes_corrected (day, newMinutes, _previousMinutes) ->
             Active (recomputeTotal { game with PlaySessions = game.PlaySessions |> Map.add day newMinutes })
         | Active game, Play_session_moved (fromDay, toDay, minutes) ->
@@ -391,6 +433,9 @@ module Games =
         | Active game, Set_steam_app_id steamAppId ->
             if game.SteamAppId = Some steamAppId then Ok []
             else Ok [ Game_steam_app_id_set steamAppId ]
+        | Active game, Set_romm_rom_id rommRomId ->
+            if game.RommRomId = Some rommRomId then Ok []
+            else Ok [ Game_romm_rom_id_set rommRomId ]
         | Active game, Record_prior_play_time minutes ->
             // Refusal is the domain-level guard that makes a lost or reset
             // sync cursor harmless: prior playtime is recorded once per game.
@@ -402,7 +447,7 @@ module Games =
             if minutesPlayed <= 0 then
                 Error "Session minutes must be greater than 0"
             else
-                Ok ([ Play_session_recorded { Day = day; Minutes = minutesPlayed; Source = Manual } ] @ promotionEvents game.Status)
+                Ok ([ Play_session_recorded { Day = day; Minutes = minutesPlayed; Source = Manual; RommSessionIds = Set.empty } ] @ promotionEvents game.Status)
         | Active game, Correct_play_session_minutes (day, newMinutes) ->
             if newMinutes <= 0 then
                 Error "Session minutes must be greater than 0"
@@ -431,18 +476,33 @@ module Games =
                 if observedMinutes > PriorPlayTimeThresholdMinutes then
                     Ok [ Prior_play_time_recorded observedMinutes ]
                 elif observedMinutes > 0 then
-                    Ok ([ Play_session_recorded { Day = gamingDay; Minutes = observedMinutes; Source = SteamSync } ] @ promotionEvents game.Status)
+                    Ok ([ Play_session_recorded { Day = gamingDay; Minutes = observedMinutes; Source = SteamSync; RommSessionIds = Set.empty } ] @ promotionEvents game.Status)
                 else
                     Ok []
             else
                 let delta = observedMinutes - game.SteamObservedMinutes
                 if delta > 0 then
-                    Ok ([ Play_session_recorded { Day = gamingDay; Minutes = delta; Source = SteamSync } ] @ promotionEvents game.Status)
+                    Ok ([ Play_session_recorded { Day = gamingDay; Minutes = delta; Source = SteamSync; RommSessionIds = Set.empty } ] @ promotionEvents game.Status)
                 else
                     // Zero or negative: emit nothing, adjust nothing — a
                     // corrected/removed session must not be silently re-added
                     // on the very next sync (the phantom-session case).
                     Ok []
+        | Active game, Record_romm_play_session (day, sessions) ->
+            // ADR-0088's session-id cursor: "have we already imported this
+            // id", not a delta against a re-derived total. Only ids not
+            // already in ImportedRommSessionIds contribute; if none are new,
+            // or their summed minutes round to zero, the whole call is a
+            // no-op — mirroring Record_steam_observed_total's own "emit
+            // nothing, adjust nothing" phantom-session guard.
+            let newSessions =
+                sessions |> List.filter (fun (id, _) -> not (game.ImportedRommSessionIds |> Set.contains id))
+            let newMinutes = newSessions |> List.sumBy snd
+            if List.isEmpty newSessions || newMinutes <= 0 then
+                Ok []
+            else
+                let newIds = newSessions |> List.map fst |> Set.ofList
+                Ok ([ Play_session_recorded { Day = day; Minutes = newMinutes; Source = RomM; RommSessionIds = newIds } ] @ promotionEvents game.Status)
         | Active game, Set_steam_library_date dateAdded ->
             if game.SteamLibraryDate = dateAdded then Ok []
             else Ok [ Game_steam_library_date_set dateAdded ]
@@ -560,10 +620,12 @@ module Games =
             match source with
             | SteamSync -> "SteamSync"
             | Manual -> "Manual"
+            | RomM -> "RomM"
 
         let private decodePlaySessionSource (s: string) : PlaySessionSource =
             match s with
             | "Manual" -> Manual
+            | "RomM" -> RomM
             | _ -> SteamSync
 
         let serialize (event: GameEvent) : string * string =
@@ -610,6 +672,8 @@ module Games =
                 "Game_played_with_removed", Encode.toString 0 (Encode.object [ "friendSlug", Encode.string friendSlug ])
             | Game_steam_app_id_set steamAppId ->
                 "Game_steam_app_id_set", Encode.toString 0 (Encode.object [ "steamAppId", Encode.int steamAppId ])
+            | Game_romm_rom_id_set rommRomId ->
+                "Game_romm_rom_id_set", Encode.toString 0 (Encode.object [ "rommRomId", Encode.int rommRomId ])
             | Game_play_time_set totalMinutes ->
                 "Game_play_time_set", Encode.toString 0 (Encode.object [ "totalMinutes", Encode.int totalMinutes ])
             | Prior_play_time_recorded minutes ->
@@ -619,6 +683,7 @@ module Games =
                     "day", Encode.string d.Day
                     "minutes", Encode.int d.Minutes
                     "source", Encode.string (encodePlaySessionSource d.Source)
+                    "rommSessionIds", d.RommSessionIds |> Set.toList |> List.map Encode.string |> Encode.list
                 ])
             | Play_session_minutes_corrected (day, newMinutes, previousMinutes) ->
                 "Play_session_minutes_corrected", Encode.toString 0 (Encode.object [
@@ -746,6 +811,10 @@ module Games =
                 Decode.fromString (Decode.field "steamAppId" Decode.int) data
                 |> Result.toOption
                 |> Option.map Game_steam_app_id_set
+            | "Game_romm_rom_id_set" ->
+                Decode.fromString (Decode.field "rommRomId" Decode.int) data
+                |> Result.toOption
+                |> Option.map Game_romm_rom_id_set
             | "Game_play_time_set" ->
                 Decode.fromString (Decode.field "totalMinutes" Decode.int) data
                 |> Result.toOption
@@ -758,7 +827,13 @@ module Games =
                 Decode.fromString (Decode.object (fun get ->
                     { Day = get.Required.Field "day" Decode.string
                       Minutes = get.Required.Field "minutes" Decode.int
-                      Source = get.Required.Field "source" Decode.string |> decodePlaySessionSource }
+                      Source = get.Required.Field "source" Decode.string |> decodePlaySessionSource
+                      // ADR-0088: absent on every pre-existing serialized
+                      // event — decodes as Set.empty rather than failing.
+                      RommSessionIds =
+                        get.Optional.Field "rommSessionIds" (Decode.list Decode.string)
+                        |> Option.map Set.ofList
+                        |> Option.defaultValue Set.empty }
                 )) data
                 |> Result.toOption
                 |> Option.map Play_session_recorded
@@ -861,6 +936,7 @@ module Games =
             "Game_played_with"
             "Game_played_with_removed"
             "Game_steam_app_id_set"
+            "Game_romm_rom_id_set"
             "Game_play_time_set"
             "Prior_play_time_recorded"
             "Play_session_recorded"

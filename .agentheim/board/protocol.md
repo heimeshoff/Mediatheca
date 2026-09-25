@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-25 13:57 -- Task verified and completed: games-rmxg2 - Games — RomM as a third play-session source, with a RomM rom id as external identity and a session-id cursor; fixes PlaySessionProjection mapping every non-Manual source to SteamSync
+
+**Type:** Work / Task completion
+**Task:** games-rmxg2 - Games — RomM as a third play-session source, with a RomM rom id as external identity and a session-id cursor; fixes PlaySessionProjection mapping every non-Manual source to SteamSync
+**Summary:** add RomM as a third play-session source with rom-id identity and session-id cursor
+**Duration:** 21m45s
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 8
+**Tests added:** 15
+**ADRs written:** none
+
+---
+
 ## 2026-09-25 13:34 -- Batch started: [games-rmxg2]
 
 **Type:** Work / Batch start

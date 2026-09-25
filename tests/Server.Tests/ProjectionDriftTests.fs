@@ -196,8 +196,8 @@ let projectionDriftTests =
             appendGameAdded conn "hollow-knight-2017"
             let events: Games.GameEvent list = [
                 Games.Prior_play_time_recorded 600
-                Games.Play_session_recorded { Day = "2024-06-01"; Minutes = 120; Source = SteamSync }
-                Games.Play_session_recorded { Day = "2024-06-02"; Minutes = 45; Source = Manual }
+                Games.Play_session_recorded { Day = "2024-06-01"; Minutes = 120; Source = SteamSync; RommSessionIds = Set.empty }
+                Games.Play_session_recorded { Day = "2024-06-02"; Minutes = 45; Source = Manual; RommSessionIds = Set.empty }
                 Games.Play_session_minutes_corrected ("2024-06-02", 60, 45)
                 Games.Play_session_moved ("2024-06-01", "2024-06-03", 120)
             ]

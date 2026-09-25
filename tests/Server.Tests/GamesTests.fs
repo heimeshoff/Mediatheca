@@ -333,6 +333,34 @@ let gameTests =
             let withDuplicate = reconstitute [ Game_added_to_library sampleGameData; Game_steam_app_id_set 292030; Game_steam_app_id_set 292030 ]
             Expect.equal withDuplicate withoutDuplicate "State should be identical regardless of duplicate Game_steam_app_id_set events"
 
+        // ADR-0088: Set_romm_rom_id mirrors Set_steam_app_id exactly.
+        testCase "Setting romm rom id" <| fun _ ->
+            let result = givenWhenThen [ Game_added_to_library sampleGameData ] (Set_romm_rom_id 42)
+            match result with
+            | Ok events ->
+                Expect.equal (List.length events) 1 "Should produce one event"
+                let state = applyEvents ([ Game_added_to_library sampleGameData ] @ events)
+                match state with
+                | Active game -> Expect.equal game.RommRomId (Some 42) "RommRomId should be 42"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Setting same romm rom id is idempotent" <| fun _ ->
+            let result = givenWhenThen
+                            [ Game_added_to_library sampleGameData; Game_romm_rom_id_set 42 ]
+                            (Set_romm_rom_id 42)
+            match result with
+            | Ok events -> Expect.equal (List.length events) 0 "Should produce no events"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Setting a different romm rom id is not idempotent" <| fun _ ->
+            let result = givenWhenThen
+                            [ Game_added_to_library sampleGameData; Game_romm_rom_id_set 42 ]
+                            (Set_romm_rom_id 43)
+            match result with
+            | Ok events -> Expect.equal (List.length events) 1 "A different rommRomId should produce one event"
+            | Error e -> failtest $"Expected success but got: {e}"
+
         testCase "Marking a game as owned" <| fun _ ->
             let result = givenWhenThen [ Game_added_to_library sampleGameData ] Mark_as_owned
             match result with
@@ -613,6 +641,15 @@ let gameSerializationTests =
             let deserialized = Serialization.deserialize eventType data
             Expect.equal deserialized (Some event) "Should round-trip"
 
+        testCase "Game_romm_rom_id_set round-trips" <| fun _ ->
+            let event = Game_romm_rom_id_set 42
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Game_romm_rom_id_set is in handledEventTypes" <| fun _ ->
+            Expect.contains Serialization.handledEventTypes "Game_romm_rom_id_set" "Should be a recognized event type"
+
         testCase "Game_play_time_set round-trips" <| fun _ ->
             let event = Game_play_time_set 3600
             let eventType, data = Serialization.serialize event
@@ -626,16 +663,30 @@ let gameSerializationTests =
             Expect.equal deserialized (Some event) "Should round-trip"
 
         testCase "Play_session_recorded round-trips (SteamSync)" <| fun _ ->
-            let event = Play_session_recorded { Day = "2024-06-01"; Minutes = 120; Source = SteamSync }
+            let event = Play_session_recorded { Day = "2024-06-01"; Minutes = 120; Source = SteamSync; RommSessionIds = Set.empty }
             let eventType, data = Serialization.serialize event
             let deserialized = Serialization.deserialize eventType data
             Expect.equal deserialized (Some event) "Should round-trip"
 
         testCase "Play_session_recorded round-trips (Manual)" <| fun _ ->
-            let event = Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual }
+            let event = Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty }
             let eventType, data = Serialization.serialize event
             let deserialized = Serialization.deserialize eventType data
             Expect.equal deserialized (Some event) "Should round-trip"
+
+        testCase "Play_session_recorded round-trips (RomM, with contributing session ids)" <| fun _ ->
+            let event = Play_session_recorded { Day = "2024-06-01"; Minutes = 90; Source = RomM; RommSessionIds = Set.ofList [ "romm-session-1"; "romm-session-2" ] }
+            let eventType, data = Serialization.serialize event
+            let deserialized = Serialization.deserialize eventType data
+            Expect.equal deserialized (Some event) "Should round-trip, including the RommSessionIds set"
+
+        testCase "A legacy Play_session_recorded payload with no rommSessionIds field still decodes, as Set.empty" <| fun _ ->
+            let legacyJson = """{"day":"2024-06-01","minutes":120,"source":"SteamSync"}"""
+            let deserialized = Serialization.deserialize "Play_session_recorded" legacyJson
+            Expect.equal
+                deserialized
+                (Some (Play_session_recorded { Day = "2024-06-01"; Minutes = 120; Source = SteamSync; RommSessionIds = Set.empty }))
+                "A legacy payload with no rommSessionIds field should decode with RommSessionIds = Set.empty"
 
         testCase "Play_session_minutes_corrected round-trips" <| fun _ ->
             let event = Play_session_minutes_corrected ("2024-06-01", 90, 60)
@@ -748,10 +799,12 @@ let gameSerializationTests =
                 Game_played_with "marco"
                 Game_played_with_removed "marco"
                 Game_steam_app_id_set 292030
+                Game_romm_rom_id_set 42
                 Game_play_time_set 3600
                 Prior_play_time_recorded 30000
-                Play_session_recorded { Day = "2024-06-01"; Minutes = 120; Source = SteamSync }
-                Play_session_recorded { Day = "2024-06-02"; Minutes = 60; Source = Manual }
+                Play_session_recorded { Day = "2024-06-01"; Minutes = 120; Source = SteamSync; RommSessionIds = Set.empty }
+                Play_session_recorded { Day = "2024-06-02"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty }
+                Play_session_recorded { Day = "2024-06-03"; Minutes = 90; Source = RomM; RommSessionIds = Set.ofList [ "romm-session-1" ] }
                 Play_session_minutes_corrected ("2024-06-01", 90, 60)
                 Play_session_moved ("2024-06-01", "2024-06-02", 60)
                 Play_session_removed ("2024-06-01", 60)
@@ -797,7 +850,7 @@ let playSessionDecideTests =
             match result with
             | Ok events ->
                 Expect.equal events
-                    [ Play_session_recorded { Day = "2024-06-01"; Minutes = 180; Source = SteamSync }; Game_status_changed InFocus ]
+                    [ Play_session_recorded { Day = "2024-06-01"; Minutes = 180; Source = SteamSync; RommSessionIds = Set.empty }; Game_status_changed InFocus ]
                     "Should emit a dated session plus promotion (default status is Backlog)"
             | Error e -> failtest $"Expected success but got: {e}"
 
@@ -818,7 +871,7 @@ let playSessionDecideTests =
             match givenWhenThen given (Record_steam_observed_total (30120, "2024-06-02")) with
             | Ok events ->
                 Expect.equal events
-                    [ Play_session_recorded { Day = "2024-06-02"; Minutes = 120; Source = SteamSync }; Game_status_changed InFocus ]
+                    [ Play_session_recorded { Day = "2024-06-02"; Minutes = 120; Source = SteamSync; RommSessionIds = Set.empty }; Game_status_changed InFocus ]
                     "Should emit exactly a 120-minute session (30120 - 30000)"
             | Error e -> failtest $"Expected success but got: {e}"
 
@@ -831,9 +884,9 @@ let playSessionDecideTests =
             let given =
                 [ Game_added_to_library sampleGameData
                   Prior_play_time_recorded 509
-                  Play_session_recorded { Day = "2024-01-01"; Minutes = 1000; Source = SteamSync }
-                  Play_session_recorded { Day = "2024-01-02"; Minutes = 773; Source = SteamSync }
-                  Play_session_recorded { Day = "2024-01-03"; Minutes = 670; Source = SteamSync }
+                  Play_session_recorded { Day = "2024-01-01"; Minutes = 1000; Source = SteamSync; RommSessionIds = Set.empty }
+                  Play_session_recorded { Day = "2024-01-02"; Minutes = 773; Source = SteamSync; RommSessionIds = Set.empty }
+                  Play_session_recorded { Day = "2024-01-03"; Minutes = 670; Source = SteamSync; RommSessionIds = Set.empty }
                   Play_session_removed ("2024-01-03", 670) ]
             let state = applyEvents given
             match state with
@@ -848,7 +901,7 @@ let playSessionDecideTests =
         testCase "Steam_observed_total_reconciled repairs a desynced cursor without touching the recorded total" <| fun _ ->
             let given =
                 [ Game_added_to_library sampleGameData
-                  Play_session_recorded { Day = "2024-01-01"; Minutes = 2282; Source = SteamSync } ]
+                  Play_session_recorded { Day = "2024-01-01"; Minutes = 2282; Source = SteamSync; RommSessionIds = Set.empty } ]
             let state = applyEvents given
             match decide state (Reconcile_steam_observed_total 2952) with
             | Ok events ->
@@ -876,7 +929,7 @@ let playSessionDecideTests =
             | Ok _ -> failtest "Expected an error for zero minutes"
 
         testCase "decide rejects zero or negative minutes on Correct_play_session_minutes" <| fun _ ->
-            let given = [ Game_added_to_library sampleGameData; Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual } ]
+            let given = [ Game_added_to_library sampleGameData; Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty } ]
             match givenWhenThen given (Correct_play_session_minutes ("2024-06-01", 0)) with
             | Error _ -> ()
             | Ok _ -> failtest "Expected an error for zero minutes — correcting to 0 is refused, use remove"
@@ -886,7 +939,7 @@ let playSessionDecideTests =
             match givenWhenThen given (Record_play_session ("2024-06-01", 60)) with
             | Ok events ->
                 Expect.equal events
-                    [ Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual }; Game_status_changed InFocus ]
+                    [ Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty }; Game_status_changed InFocus ]
                     "Should promote from Retired"
             | Error e -> failtest $"Expected success but got: {e}"
 
@@ -895,7 +948,7 @@ let playSessionDecideTests =
             match givenWhenThen given (Record_play_session ("2024-06-01", 60)) with
             | Ok events ->
                 Expect.equal events
-                    [ Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual } ]
+                    [ Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty } ]
                     "Should not re-promote an already-InFocus game"
             | Error e -> failtest $"Expected success but got: {e}"
 
@@ -907,7 +960,7 @@ let playSessionDecideTests =
                 let baseEvents =
                     [ Game_added_to_library sampleGameData
                       Game_status_changed status
-                      Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual } ]
+                      Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty } ]
 
                 match givenWhenThen baseEvents (Correct_play_session_minutes ("2024-06-01", 90)) with
                 | Ok events -> Expect.isFalse (emittedPromotion events) $"Correct should not promote from {status}"
@@ -943,4 +996,95 @@ let playSessionDecideTests =
             let stateBefore = applyEvents given
             let stateAfter = applyEvents (given @ [ Game_play_time_set 999999 ])
             Expect.equal stateAfter stateBefore "Replaying Game_play_time_set must not change state"
+    ]
+
+/// ADR-0088: RomM's session-id cursor — "have we already imported this id",
+/// not a delta against a re-derived total (unlike SteamObservedMinutes
+/// above). `ImportedRommSessionIds` is folded the same "never reduced" way.
+[<Tests>]
+let rommPlaySessionDecideTests =
+    testList "Games RomM play sessions (ADR-0088)" [
+
+        testCase "Record_romm_play_session on a game with an empty ImportedRommSessionIds sums all sessions into one Play_session_recorded, plus promotion" <| fun _ ->
+            let given = [ Game_added_to_library sampleGameData ]
+            match givenWhenThen given (Record_romm_play_session ("2024-06-01", [ "id1", 30; "id2", 45 ])) with
+            | Ok events ->
+                Expect.equal events
+                    [ Play_session_recorded { Day = "2024-06-01"; Minutes = 75; Source = RomM; RommSessionIds = Set.ofList [ "id1"; "id2" ] }
+                      Game_status_changed InFocus ]
+                    "Should emit exactly one Play_session_recorded summing both sessions' minutes, carrying both ids, plus promotion (default status is Backlog)"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Record_romm_play_session idempotency: after folding the result through evolve, the same call returns Ok []" <| fun _ ->
+            let given = [ Game_added_to_library sampleGameData ]
+            let cmd = Record_romm_play_session ("2024-06-01", [ "id1", 30; "id2", 45 ])
+            match givenWhenThen given cmd with
+            | Ok firstEvents ->
+                let state = applyEvents (given @ firstEvents)
+                match decide state cmd with
+                | Ok secondEvents -> Expect.equal secondEvents [] "Repeating the exact same call after folding must be a no-op"
+                | Error e -> failtest $"Expected success but got: {e}"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Record_romm_play_session with one known id and one new id sums only the new id's minutes, and RommSessionIds carries only the new id" <| fun _ ->
+            let given = [ Game_added_to_library sampleGameData ]
+            match givenWhenThen given (Record_romm_play_session ("2024-06-01", [ "id1", 30 ])) with
+            | Ok firstEvents ->
+                let state = applyEvents (given @ firstEvents)
+                match decide state (Record_romm_play_session ("2024-06-01", [ "id1", 30; "id2", 20 ])) with
+                | Ok events ->
+                    Expect.equal events
+                        [ Play_session_recorded { Day = "2024-06-01"; Minutes = 20; Source = RomM; RommSessionIds = Set.ofList [ "id2" ] } ]
+                        "Only id2's 20 minutes should be recorded; id1 is already known"
+                | Error e -> failtest $"Expected success but got: {e}"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Play_session_removed/moved/minutes_corrected on a RomM-sourced day never remove entries from ImportedRommSessionIds — a later Record_romm_play_session with the same, since edited-away, id still returns Ok []" <| fun _ ->
+            let given = [ Game_added_to_library sampleGameData ]
+            match givenWhenThen given (Record_romm_play_session ("2024-06-01", [ "id1", 30 ])) with
+            | Ok firstEvents ->
+                let stateAfterRecord = applyEvents (given @ firstEvents)
+                // Correct, then move, then remove the resulting session — the
+                // ADR-0050 "Grounded" phantom-session shape, applied to RomM's
+                // own cursor.
+                match decide stateAfterRecord (Correct_play_session_minutes ("2024-06-01", 99)) with
+                | Error e -> failtest $"Expected success but got: {e}"
+                | Ok correctedEvents ->
+                    let stateAfterCorrect = applyEvents (given @ firstEvents @ correctedEvents)
+                    match decide stateAfterCorrect (Move_play_session ("2024-06-01", "2024-06-02")) with
+                    | Error e -> failtest $"Expected success but got: {e}"
+                    | Ok movedEvents ->
+                        let stateAfterMove = applyEvents (given @ firstEvents @ correctedEvents @ movedEvents)
+                        match decide stateAfterMove (Remove_play_session "2024-06-02") with
+                        | Error e -> failtest $"Expected success but got: {e}"
+                        | Ok removedEvents ->
+                            let finalState = applyEvents (given @ firstEvents @ correctedEvents @ movedEvents @ removedEvents)
+                            match finalState with
+                            | Active game ->
+                                Expect.isTrue (game.ImportedRommSessionIds |> Set.contains "id1") "id1 must still be remembered as imported, despite the session being corrected/moved/removed"
+                            | _ -> failtest "Expected Active state"
+                            match decide finalState (Record_romm_play_session ("2024-06-02", [ "id1", 30 ])) with
+                            | Ok phantomEvents -> Expect.equal phantomEvents [] "Replaying the same, since edited-away, id must not silently re-add the phantom session"
+                            | Error e -> failtest $"Expected success but got: {e}"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "A RomM session on a game that isn't InFocus promotes it" <| fun _ ->
+            let given = [ Game_added_to_library sampleGameData; Game_status_changed Retired ]
+            match givenWhenThen given (Record_romm_play_session ("2024-06-01", [ "id1", 30 ])) with
+            | Ok events ->
+                Expect.equal events
+                    [ Play_session_recorded { Day = "2024-06-01"; Minutes = 30; Source = RomM; RommSessionIds = Set.ofList [ "id1" ] }
+                      Game_status_changed InFocus ]
+                    "Should promote from Retired"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Record_romm_play_session with no new ids returns Ok []" <| fun _ ->
+            let given = [ Game_added_to_library sampleGameData ]
+            match givenWhenThen given (Record_romm_play_session ("2024-06-01", [ "id1", 30 ])) with
+            | Ok firstEvents ->
+                let state = applyEvents (given @ firstEvents)
+                match decide state (Record_romm_play_session ("2024-06-01", [ "id1", 30 ])) with
+                | Ok events -> Expect.equal events [] "No new ids: should be a no-op"
+                | Error e -> failtest $"Expected success but got: {e}"
+            | Error e -> failtest $"Expected success but got: {e}"
     ]

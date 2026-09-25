@@ -1,7 +1,7 @@
 ---
 id: games-rmxg2
 title: Games — RomM as a third play-session source, with a RomM rom id as external identity and a session-id cursor; fixes PlaySessionProjection mapping every non-Manual source to SteamSync
-status: doing
+status: done
 type: feature
 context: games
 created: 2026-09-25
@@ -90,3 +90,53 @@ would immediately be mislabelled, so every RomM-sourced diary row would show as 
 - If the client renders a per-source label or icon for play sessions (e.g. in the Journal or
   on the game detail page), the new case needs a label there. The compiler flags every such
   match.
+
+## Outcome
+
+Implemented ADR-0088's second (session-id) cursor as a Games-BC aggregate/projection-only
+change, with no HTTP and no `RomM.fs`, exactly as scoped:
+
+- `Shared.PlaySessionSource` gains `RomM` (`SteamSync | Manual | RomM`).
+- `Games.PlaySessionRecordedData` gains `RommSessionIds: Set<string>` — empty for
+  `SteamSync`/`Manual`, populated for `RomM`; a legacy payload with no `rommSessionIds`
+  field decodes as `Set.empty` (`Games.Serialization`'s `Play_session_recorded` decoder).
+- `Games.ActiveGame` gains `RommRomId: int option` and `ImportedRommSessionIds: Set<string>`.
+- New pair `Set_romm_rom_id`/`Game_romm_rom_id_set`, mirroring `Set_steam_app_id`/
+  `Game_steam_app_id_set` exactly (no-op on a redundant set). `GameProjection.findByRommRomId`
+  mirrors `findBySteamAppId`, backed by a new `game_detail.romm_rom_id` column (added via the
+  same `ALTER TABLE ... try/with` migration idiom every other column addition in
+  `GameProjection.createTables` uses).
+- New command `Record_romm_play_session (day, sessions: (rommSessionId * minutes) list)`:
+  `decide` keeps only ids not already in `ImportedRommSessionIds`, emits one
+  `Play_session_recorded { Source = RomM }` carrying the new ids and their summed minutes
+  (plus `promotionEvents`), or `Ok []` if no ids are new or the new minutes sum to zero.
+- `evolve`'s `Play_session_recorded` arm unions a `RomM` record's `RommSessionIds` into
+  `ImportedRommSessionIds`; `Play_session_minutes_corrected`/`Play_session_moved`/
+  `Play_session_removed` never touch that set (unchanged arms — they only ever touched
+  `PlaySessions`), verified directly by a Grounded-shaped regression test (correct, move,
+  then remove a RomM session; the id stays "known"; a later `Record_romm_play_session` with
+  the same id still returns `Ok []`).
+- Fixed the latent bug the ADR calls out: `PlaySessionProjection.fs`'s
+  `encodeSource`/`getSource`/`toPlaySessionDto` are now an exhaustive 3-way match
+  (`SteamSync | Manual | RomM`) instead of collapsing anything non-`"Manual"` to `SteamSync`.
+  A regression test proves a `RomM`-sourced `Play_session_recorded` round-trips through
+  `game_play_session.source = 'RomM'` and both `getForGame`/`getBySlugAndDay`.
+- `Games.Serialization.handledEventTypes` includes `Game_romm_rom_id_set`.
+
+Key files: `src/Shared/Shared.fs` (`PlaySessionSource`), `src/Server/Games.fs` (events,
+commands, `evolve`, `decide`, `Serialization`), `src/Server/GameProjection.fs`
+(`romm_rom_id` column, `Game_romm_rom_id_set` projection arm, `findByRommRomId`),
+`src/Server/PlaySessionProjection.fs` (exhaustive source encode/decode). Tests:
+`tests/Server.Tests/GamesTests.fs` (`rommPlaySessionDecideTests` covers every acceptance
+criterion at the `decide`/`evolve` level, plus `Set_romm_rom_id`/serialization coverage),
+`tests/Server.Tests/PlaytimeTrackerTests.fs` (`rommPlaySessionProjectionTests` covers the
+DB round-trip and `findByRommRomId`); `ProjectionDriftTests.fs`/`GameFacetProjectionTests.fs`
+updated only for the `PlaySessionRecordedData` record shape change (added
+`RommSessionIds = Set.empty` to their existing literals).
+
+`npm run build`, `dotnet run --project tests/Server.Tests/Server.Tests.fsproj` (1016 passed),
+and `npm run test:client` (125 passed) all green — the client build confirms no non-exhaustive
+match was left anywhere on the new `PlaySessionSource` case.
+
+`integration-jkbm1` (the RomM HTTP adapter, blocked on this task) can now call
+`Set_romm_rom_id`/`Record_romm_play_session` and `GameProjection.findByRommRomId` directly.

@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 15
+- **Doing:** 0
+- **Done:** 16
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **games-rmxg2** — Games — RomM as a third play-session source, with a RomM rom id as external identity and a session-id cursor; fixes PlaySessionProjection mapping every non-Manual source to SteamSync (feature) — `doing/games-rmxg2-romm-play-session-source-and-rom-id.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **games-rmxg2** — Games — RomM as a third play-session source, with a RomM rom id as external identity and a session-id cursor; fixes PlaySessionProjection mapping every non-Manual source to SteamSync (feature) — `done/games-rmxg2-romm-play-session-source-and-rom-id.md`
 - **games-kfpqp** — Deck-compat job — re-check already recorded verdicts once they pass an age limit (Unknown 30 days, Playable/Unsupported 90, Verified 180), capped per night, so Valve's verdict changes reach existing games (feature) — `done/games-kfpqp-deck-compat-age-based-verdict-recheck.md`
 - **games-wkyf0** — Deck-compat job — stop re-fetching permanently failing games every night by recording failed attempts and retrying them on a growing delay (bug) — `done/games-wkyf0-deck-compat-failed-fetch-retry-backoff.md`
 - **games-fffvm** — Re-sanitize existing game descriptions — a resumable, throttled backfill that re-fetches every already-cached game's description (Steam-linked via the storefront, RAWG-only via RAWG details) through games-r1tx4's sanitizer, so games imported before it gain paragraphs/emphasis and RAWG-only games get the description games-v4nqe silently dropped (chore) — `done/games-fffvm-resanitize-existing-game-descriptions-backfill.md`

@@ -120,6 +120,13 @@ module GameProjection =
             conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN facet_override_vr TEXT" |> Db.exec
         with _ -> ()
 
+        // games-rmxg2 (ADR-0088): the RomM rom id join key, mirroring
+        // steam_app_id — `findByRommRomId` below is `findBySteamAppId`'s
+        // exact counterpart, both querying game_detail only.
+        try
+            conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN romm_rom_id INTEGER" |> Db.exec
+        with _ -> ()
+
         // intelligence-b1nz5: WHEN a game was retired, event-derived (written
         // by the `Game_status_changed Retired` handler below from that
         // event's own `StoredEvent.Timestamp`, therefore replayable,
@@ -429,6 +436,12 @@ module GameProjection =
                     conn
                     |> Db.newCommand "UPDATE game_detail SET steam_app_id = @steam_app_id WHERE slug = @slug"
                     |> Db.setParams [ "slug", SqlType.String slug; "steam_app_id", SqlType.Int32 steamAppId ]
+                    |> Db.exec
+
+                | Games.Game_romm_rom_id_set rommRomId ->
+                    conn
+                    |> Db.newCommand "UPDATE game_detail SET romm_rom_id = @romm_rom_id WHERE slug = @slug"
+                    |> Db.setParams [ "slug", SqlType.String slug; "romm_rom_id", SqlType.Int32 rommRomId ]
                     |> Db.exec
 
                 | Games.Game_play_time_set _ ->
@@ -918,6 +931,14 @@ module GameProjection =
         conn
         |> Db.newCommand "SELECT slug FROM game_detail WHERE steam_app_id = @app_id LIMIT 1"
         |> Db.setParams [ "app_id", SqlType.Int32 appId ]
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "slug")
+
+    /// Mirrors `findBySteamAppId` — the RomM rom id join key `integration-jkbm1`'s
+    /// matching step needs (ADR-0088).
+    let findByRommRomId (conn: SqliteConnection) (rommRomId: int) : string option =
+        conn
+        |> Db.newCommand "SELECT slug FROM game_detail WHERE romm_rom_id = @romm_rom_id LIMIT 1"
+        |> Db.setParams [ "romm_rom_id", SqlType.Int32 rommRomId ]
         |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "slug")
 
     /// games-v4nqe: rewritten to query the cache tier — description/
