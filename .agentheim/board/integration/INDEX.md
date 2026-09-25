@@ -10,7 +10,7 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 0
 - **Doing:** 0
 - **Done:** 31
@@ -58,6 +58,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **integration-jkbm1** — RomM adapter — import Nintendo games' metadata and play sessions from the self-hosted RomM instance via its REST API (feature) — `backlog/integration-jkbm1-romm-adapter-nintendo-games-and-playtime.md`
 <!-- backlog-list:end -->
 
 

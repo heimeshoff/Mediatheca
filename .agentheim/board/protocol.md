@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-25 11:39 -- Modeling / Captured: integration-jkbm1 - RomM adapter — import Nintendo games' metadata and play sessions from the self-hosted RomM instance via its REST API
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** backlog
+**Summary:** New RomM adapter to import Nintendo games metadata and play sessions from the self-hosted RomM instance via its REST API (Client API Token, /api/roms, /api/play-sessions). Backlog: identity matching, session idempotency cursor and Games session-source change still open.
+
+---
+
 ## 2026-09-23 23:41 -- Modeling / Dismissed: games-b76z3
 
 **Type:** Modeling / Dismiss
