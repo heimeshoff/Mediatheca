@@ -1,7 +1,7 @@
 ---
 id: games-rmxg2
 title: Games — RomM as a third play-session source, with a RomM rom id as external identity and a session-id cursor; fixes PlaySessionProjection mapping every non-Manual source to SteamSync
-status: todo
+status: doing
 type: feature
 context: games
 created: 2026-09-25

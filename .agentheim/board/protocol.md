@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-25 13:34 -- Batch started: [games-rmxg2]
+
+**Type:** Work / Batch start
+**Tasks:** games-rmxg2 - Games — RomM as a third play-session source, with a RomM rom id as external identity and a session-id cursor; fixes PlaySessionProjection mapping every non-Manual source to SteamSync
+**Parallel:** no (1 worker) — the only ready task across all BCs
+
+---
+
 ## 2026-09-25 13:33 -- Modeling / Promoted: games-rmxg2 - Games — RomM as a third play-session source, with a RomM rom id as external identity and a session-id cursor; fixes PlaySessionProjection mapping every non-Manual source to SteamSync
 
 **Type:** Modeling / Promote

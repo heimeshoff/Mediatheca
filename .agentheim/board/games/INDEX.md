@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 15
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **games-rmxg2** — Games — RomM as a third play-session source, with a RomM rom id as external identity and a session-id cursor; fixes PlaySessionProjection mapping every non-Manual source to SteamSync (feature) — `todo/games-rmxg2-romm-play-session-source-and-rom-id.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **games-rmxg2** — Games — RomM as a third play-session source, with a RomM rom id as external identity and a session-id cursor; fixes PlaySessionProjection mapping every non-Manual source to SteamSync (feature) — `doing/games-rmxg2-romm-play-session-source-and-rom-id.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
