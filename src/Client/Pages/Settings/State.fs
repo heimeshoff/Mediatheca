@@ -285,6 +285,21 @@ let init () : Model * Cmd<Msg> =
       AudibleLastSync = None
       AudibleLastSyncResult = None
       AudibleLibraryImportedAt = None
+      RomMBaseUrl = ""
+      RomMBaseUrlInput = ""
+      RomMTokenInput = ""
+      RomMTokenConfigured = false
+      RomMSelectedPlatformIds = []
+      RomMSyncHour = 9
+      IsSavingRomM = false
+      RomMSaveResult = None
+      RomMPlatforms = []
+      IsLoadingRomMPlatforms = false
+      RomMPlatformsError = None
+      RomMLastSync = None
+      RomMLastError = None
+      IsSyncingRomMNow = false
+      RomMSyncResult = None
       PlaytimeSyncStatus = None
       JellyfinLastSyncTime = None
       JellyfinSyncStatus = None
@@ -304,7 +319,7 @@ let init () : Model * Cmd<Msg> =
       JobsSectionLoaded = false
       SurgerySectionOpen = false
       SurgerySectionLoaded = false },
-    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_qbittorrent_settings; Cmd.ofMsg Load_audible_status; Cmd.ofMsg Load_audible_sync_status; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync; Cmd.ofMsg Load_steam_api_key_last_error; Cmd.ofMsg Load_steam_family_last_result ]
+    Cmd.batch [ Cmd.ofMsg Load_tmdb_key; Cmd.ofMsg Load_rawg_key; Cmd.ofMsg Load_steam_key; Cmd.ofMsg Load_steam_id; Cmd.ofMsg Load_steam_family_token; Cmd.ofMsg Load_steam_family_members; Cmd.ofMsg Load_friends; Cmd.ofMsg Load_jellyfin_settings; Cmd.ofMsg Load_qbittorrent_settings; Cmd.ofMsg Load_audible_status; Cmd.ofMsg Load_audible_sync_status; Cmd.ofMsg Load_romm_settings; Cmd.ofMsg Load_playtime_sync_status; Cmd.ofMsg Load_jellyfin_sync_status; Cmd.ofMsg Load_steam_family_last_sync; Cmd.ofMsg Load_steam_api_key_last_error; Cmd.ofMsg Load_steam_family_last_result ]
 
 let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
@@ -854,6 +869,100 @@ let update (api: IMediathecaApi) (adminApi: IAdminApi) (msg: Msg) (model: Model)
             AudibleProgressSyncResult = Some result
             AudibleLastError = audibleLastError },
         Cmd.ofMsg Load_audible_sync_status
+
+    // RomM Integration (integration-jkbm1, ADR-0088/ADR-0078)
+    | Load_romm_settings ->
+        model, Cmd.OfAsync.perform api.getRomMSettings () RomM_settings_loaded
+
+    | RomM_settings_loaded settings ->
+        let model =
+            { model with
+                RomMBaseUrl = settings.BaseUrl
+                RomMBaseUrlInput = settings.BaseUrl
+                RomMTokenConfigured = settings.TokenConfigured
+                RomMSelectedPlatformIds = settings.SelectedPlatformIds
+                RomMSyncHour = settings.SyncHour
+                RomMLastSync = settings.LastSync
+                RomMLastError = settings.LastError }
+        // Nothing saved yet (never selected a platform) but connected
+        // enough to fetch the live list -- pre-fetch so Nintendo can be
+        // pre-checked (builder decision, 2026-09-25) without waiting for
+        // the operator to expand the card first.
+        let cmd =
+            if List.isEmpty settings.SelectedPlatformIds && settings.BaseUrl <> "" && settings.TokenConfigured then
+                Cmd.ofMsg Load_romm_platforms
+            else
+                Cmd.none
+        model, cmd
+
+    | RomM_base_url_input_changed value ->
+        { model with RomMBaseUrlInput = value; RomMSaveResult = None }, Cmd.none
+
+    | RomM_token_input_changed value ->
+        { model with RomMTokenInput = value; RomMSaveResult = None }, Cmd.none
+
+    | RomM_platform_toggled platformId ->
+        let selected =
+            if model.RomMSelectedPlatformIds |> List.contains platformId then
+                model.RomMSelectedPlatformIds |> List.filter (fun id -> id <> platformId)
+            else
+                model.RomMSelectedPlatformIds @ [ platformId ]
+        { model with RomMSelectedPlatformIds = selected }, Cmd.none
+
+    | Load_romm_platforms ->
+        { model with IsLoadingRomMPlatforms = true; RomMPlatformsError = None },
+        Cmd.OfAsync.either api.fetchRomMPlatforms ()
+            RomM_platforms_loaded
+            (fun ex -> RomM_platforms_loaded (Error ex.Message))
+
+    | RomM_platforms_loaded result ->
+        match result with
+        | Ok platforms ->
+            // Nintendo pre-checked on first load (builder decision,
+            // 2026-09-25) -- only when nothing has been selected yet, never
+            // overriding a saved selection.
+            let selected =
+                if List.isEmpty model.RomMSelectedPlatformIds then
+                    platforms
+                    |> List.filter (fun p ->
+                        p.Name.ToLowerInvariant().Contains("nintendo") || p.Slug.ToLowerInvariant().Contains("nintendo"))
+                    |> List.map (fun p -> p.Id)
+                else
+                    model.RomMSelectedPlatformIds
+            { model with
+                RomMPlatforms = platforms
+                IsLoadingRomMPlatforms = false
+                RomMPlatformsError = None
+                RomMSelectedPlatformIds = selected },
+            Cmd.none
+        | Error e ->
+            { model with IsLoadingRomMPlatforms = false; RomMPlatformsError = Some e }, Cmd.none
+
+    | Save_romm_settings ->
+        let request: SetRomMSettingsRequest =
+            { BaseUrl = model.RomMBaseUrlInput
+              ApiToken = if model.RomMTokenInput = "" then None else Some model.RomMTokenInput
+              SelectedPlatformIds = model.RomMSelectedPlatformIds
+              SyncHour = model.RomMSyncHour }
+        { model with IsSavingRomM = true; RomMSaveResult = None },
+        Cmd.OfAsync.either api.setRomMSettings request
+            RomM_save_result
+            (fun ex -> RomM_save_result (Error ex.Message))
+
+    | RomM_save_result result ->
+        let tokenInput = match result with Ok () -> "" | Error _ -> model.RomMTokenInput
+        let cmd = match result with Ok () -> Cmd.ofMsg Load_romm_settings | Error _ -> Cmd.none
+        { model with IsSavingRomM = false; RomMSaveResult = Some result; RomMTokenInput = tokenInput }, cmd
+
+    | Sync_romm_now ->
+        { model with IsSyncingRomMNow = true; RomMSyncResult = None },
+        Cmd.OfAsync.either api.runRomMSyncNow ()
+            RomM_sync_completed
+            (fun ex -> RomM_sync_completed (Error ex.Message))
+
+    | RomM_sync_completed result ->
+        { model with IsSyncingRomMNow = false; RomMSyncResult = Some result },
+        Cmd.ofMsg Load_romm_settings
 
     // Sync Status
     | Load_playtime_sync_status ->

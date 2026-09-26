@@ -54,6 +54,8 @@ let private createApi (factory: unit -> SqliteConnection) (httpClient: HttpClien
         (fun () -> ({ UserAgent = "Mediatheca/1.0 (+https://github.com/heimeshoff/mediatheca)" } : OpenLibrary.OpenLibraryConfig))
         getAudibleConfig
         (fun () -> async { return Error "not wired in tests" })
+        (fun () -> ({ BaseUrl = ""; ApiToken = ""; SelectedPlatformIds = [] } : RomM.RomMConfig))
+        (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         imageBasePath
         allProjectionHandlers

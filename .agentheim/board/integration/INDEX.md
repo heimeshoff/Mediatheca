@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 31
+- **Doing:** 0
+- **Done:** 32
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **integration-jkbm1** — RomM adapter — on a scheduled sync, import play sessions from the self-hosted RomM instance for the platforms picked in Settings (Nintendo by default), linking or creating a Game only for roms that have played sessions (feature) — `doing/integration-jkbm1-romm-adapter-nintendo-games-and-playtime.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (current-month entries live; older months archived verbatim under `done-archive/` — kept for prior-art search, ADR-0039 convention)
 <!-- done-list:start -->
+- **integration-jkbm1** — RomM adapter — on a scheduled sync, import play sessions from the self-hosted RomM instance for the platforms picked in Settings (Nintendo by default), linking or creating a Game only for roms that have played sessions (feature) — `done/integration-jkbm1-romm-adapter-nintendo-games-and-playtime.md`
 - **integration-fn3yx** — Audible sync decides on listened minutes and calculates the percent — position comes from `last_position_heard`, not the library listing's unreliable `percent_complete`; fixes the decoder that reads that endpoint at the wrong nesting level (reverses ADR-0082's "the sync never fetches last-listened"). (feature) — `done/integration-fn3yx-audible-sync-decides-on-minutes-percent-calculated.md`
 - **integration-dvbjp** — The nightly Audible sync creates a Book for every unmatched library ASIN (same create path as the import, then an ordinary observation) and "Import library" becomes a true one-time bootstrap — stamped `audible_library_imported_at` on its first populated run, refused by the API and hidden by the Settings card afterwards (feature) — `done/integration-dvbjp-nightly-sync-creates-unmatched-books-import-one-time.md`
 - **integration-dtdbb** — Audible priors carry the last-listened day — import and nightly sync fetch `last_position_heard` (`GET /1.0/content/{asin}/metadata`) only for books with no Audible progress row yet, date the prior (and so the finished date) to Audible's `last_updated`, use `position_ms` for the position, and "Import library" repairs the import-day observations written before priors existed (feature) — `done/integration-dtdbb-audible-last-listened-date-for-priors.md`

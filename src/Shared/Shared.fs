@@ -1104,6 +1104,52 @@ type AudibleSyncStatus = {
     LibraryImportedAt: string option
 }
 
+// RomM Integration (integration-jkbm1, ADR-0088/ADR-0078): a self-hosted
+// RomM instance's closed play sessions become Games play sessions (source
+// `RomM`). The API token is a secret -- never round-tripped to the client;
+// `RomMSettingsDto` carries only whether one is configured, mirroring
+// `AudibleStatus`'s auth-file-configured shape and the qBittorrent card's
+// "the password never leaves the server" convention.
+
+type RomMPlatformDto = {
+    Id: int
+    Name: string
+    Slug: string
+}
+
+type RomMSettingsDto = {
+    BaseUrl: string
+    TokenConfigured: bool
+    SelectedPlatformIds: int list
+    SyncHour: int
+    LastSync: string option
+    LastError: string option
+}
+
+/// `IMediathecaApi.setRomMSettings` -- `ApiToken = None` keeps whatever
+/// token is already saved. A masked token is never round-tripped back to
+/// the client for the input to start from, so the client only ever sends
+/// `Some` when the operator actually typed a new one.
+type SetRomMSettingsRequest = {
+    BaseUrl: string
+    ApiToken: string option
+    SelectedPlatformIds: int list
+    SyncHour: int
+}
+
+/// `IMediathecaApi.runRomMSyncNow` / the "RomM sync" scheduled job's typed
+/// result (ADR-0078's wrapper-JobSpec pattern). `Ambiguous` names every rom
+/// this run skipped because more than one library game matched it by
+/// normalized name (+ release year) -- retried every run until linked by
+/// hand.
+type RomMSyncResult = {
+    SessionsRecorded: int
+    GamesCreated: int
+    GamesLinked: int
+    GamesPromotedToFocus: int
+    Ambiguous: string list
+}
+
 // Games
 
 type GameStatus =
@@ -2099,6 +2145,15 @@ type IMediathecaApi = {
     importAudibleLibrary: unit -> Async<Result<AudibleImportResult, string>>
     runAudibleProgressSync: unit -> Async<Result<AudibleProgressSyncResult, string>>
     getAudibleSyncStatus: unit -> Async<AudibleSyncStatus>
+    // RomM Integration (integration-jkbm1, ADR-0088/ADR-0078): a self-hosted
+    // RomM instance's closed play sessions imported as Games play sessions.
+    getRomMSettings: unit -> Async<RomMSettingsDto>
+    setRomMSettings: SetRomMSettingsRequest -> Async<Result<unit, string>>
+    /// Live fetch against the SAVED base url/token (for the Settings
+    /// picker) -- mirrors `fetchSteamFamilyMembers`'s "live fetch using
+    /// stored credentials" shape.
+    fetchRomMPlatforms: unit -> Async<Result<RomMPlatformDto list, string>>
+    runRomMSyncNow: unit -> Async<Result<RomMSyncResult, string>>
 }
 
 // Administration console — a separate Remoting contract (ADR-0004 allows multiple

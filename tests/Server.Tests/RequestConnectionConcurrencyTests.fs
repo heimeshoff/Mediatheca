@@ -58,6 +58,8 @@ let private createApi (factory: unit -> SqliteConnection) (imageBasePath: string
         (fun () -> ({ UserAgent = "Mediatheca/1.0 (+https://github.com/heimeshoff/mediatheca)" } : OpenLibrary.OpenLibraryConfig))
         (fun () -> ({ AuthFile = None; Marketplace = "de"; CachedAccessToken = None; CachedAccessTokenExpiresAt = None } : Audible.AudibleConfig))
         (fun () -> async { return Error "not wired in tests" })
+        (fun () -> ({ BaseUrl = ""; ApiToken = ""; SelectedPlatformIds = [] } : RomM.RomMConfig))
+        (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         imageBasePath
         [] // no projection handlers needed — addFriend only touches the event store

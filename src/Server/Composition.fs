@@ -286,6 +286,26 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
             |> Option.defaultValue ""
         { ApiKey = apiKey; SteamId = steamId }
 
+    /// Dynamic RomM config provider (integration-jkbm1, ADR-0088): reads the
+    /// base URL, API token, and selected platform ids from `SettingsStore`
+    /// on every call -- the same re-read-every-call shape `getSteamConfig`/
+    /// `getAudibleConfig` use. `romm_platform_ids` is a JSON array of ints,
+    /// the same JSON-string-in-SettingsStore shape `steam_family_members`
+    /// uses for its own list-valued setting; an unparsable or missing value
+    /// degrades to an empty selection rather than throwing.
+    let getRomMConfig () : RomM.RomMConfig =
+        use conn = connectionFactory ()
+        let platformIds =
+            SettingsStore.getSetting conn "romm_platform_ids"
+            |> Option.bind (fun json ->
+                match Thoth.Json.Net.Decode.fromString (Thoth.Json.Net.Decode.list Thoth.Json.Net.Decode.int) json with
+                | Ok ids -> Some ids
+                | Error _ -> None)
+            |> Option.defaultValue []
+        { BaseUrl = SettingsStore.getSetting conn "romm_base_url" |> Option.defaultValue ""
+          ApiToken = SettingsStore.getSetting conn "romm_api_token" |> Option.defaultValue ""
+          SelectedPlatformIds = platformIds }
+
     let httpClient = new HttpClient()
 
     // qBittorrent gets its own cookie-jar-free client (ADR-0072): the shared
@@ -433,6 +453,16 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
         |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
         |> Option.defaultValue 5
 
+    // integration-jkbm1 (ADR-0088): defaults to 09:00 local -- clear of the
+    // Steam playtime sync (04:00) and every existing backfill/sync hour
+    // above, so "RomM sync" never contends for `PlaytimeTracker`'s shared
+    // `jobLock` in the same minute (an acceptance criterion: its default
+    // must differ from `playtime_sync_hour`).
+    let rommSyncHour =
+        SettingsStore.getSetting conn "romm_sync_hour"
+        |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
+        |> Option.defaultValue 9
+
     // administration-tj8n2 (ADR-0028): scheduled jobs get their OWN connection,
     // dedicated and never shared with request threads or `conn` — separate
     // from the request-serving `conn` above. Both jobs (and the job-runs
@@ -579,6 +609,28 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
                     eprintfn "[AudibleSync] Sync skipped: %s" err
                     return ({ Disposition = ScheduledJobs.JobDisposition.Skipped; Summary = err } : ScheduledJobs.JobRunOutcome)
             } }
+        // integration-jkbm1 (ADR-0088): "not configured" (blank base
+        // url/token) is a config gap (`Skipped`), same as every other
+        // adapter's job body above -- a rejected token is likewise
+        // `Skipped` (never `failwith`), distinct from Audible's job, whose
+        // `failwith` on a rejected auth file exists specifically so a
+        // config regression stays loud; RomM's own standing
+        // `romm_last_error` notice already carries that signal to Settings.
+        { Name = "RomM sync"
+          Hour = rommSyncHour
+          Run = fun () ->
+            async {
+                match! RomMSync.runSync jobConn jobDbLock httpClient getRomMConfig imageBasePath projectionHandlers with
+                | Ok result ->
+                    let summary =
+                        sprintf "%d sessions, %d games created, %d games linked, %d promoted to focus, %d ambiguous"
+                            result.SessionsRecorded result.GamesCreated result.GamesLinked result.GamesPromotedToFocus (List.length result.Ambiguous)
+                    eprintfn "[RomMSync] Sync complete: %s" summary
+                    return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = summary } : ScheduledJobs.JobRunOutcome)
+                | Error err ->
+                    eprintfn "[RomMSync] Sync skipped: %s" err
+                    return ({ Disposition = ScheduledJobs.JobDisposition.Skipped; Summary = err } : ScheduledJobs.JobRunOutcome)
+            } }
     ]
 
     // job_runs table + startup crash reconciliation (ADR-0026) — table
@@ -634,13 +686,47 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
                 | None -> return Error "Audible progress sync did not report a result"
         }
 
+    /// integration-jkbm1 (ADR-0078's wrapper-JobSpec pattern): the RomM
+    /// Settings card's own "Sync now" button, sharing the SAME
+    /// `tryStartJob`/`jobRunRecorder` guard slot as the "RomM sync"
+    /// scheduled entry above -- recorded as a `job_runs` row (trigger =
+    /// "manual") and refused if the nightly fire is already in flight.
+    let runRomMSyncNow () : Async<Result<RomMSyncResult, string>> =
+        async {
+            let spec = scheduledJobs |> List.find (fun s -> s.Name = "RomM sync")
+            let resultCell : Result<RomMSyncResult, string> option ref = ref None
+            let wrappedSpec : ScheduledJobs.JobSpec = {
+                spec with
+                    Run = fun () ->
+                        async {
+                            match! RomMSync.runSync jobConn jobDbLock httpClient getRomMConfig imageBasePath projectionHandlers with
+                            | Ok result ->
+                                resultCell.Value <- Some (Ok result)
+                                let summary =
+                                    sprintf "%d sessions, %d games created, %d games linked, %d promoted to focus, %d ambiguous"
+                                        result.SessionsRecorded result.GamesCreated result.GamesLinked result.GamesPromotedToFocus (List.length result.Ambiguous)
+                                return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = summary } : ScheduledJobs.JobRunOutcome)
+                            | Error err ->
+                                resultCell.Value <- Some (Error err)
+                                return ({ Disposition = ScheduledJobs.JobDisposition.Skipped; Summary = err } : ScheduledJobs.JobRunOutcome)
+                        }
+            }
+            match ScheduledJobs.tryStartJob jobRunRecorder wrappedSpec "manual" with
+            | Error () -> return Error "RomM sync is already running"
+            | Ok (_, body) ->
+                do! body
+                match resultCell.Value with
+                | Some r -> return r
+                | None -> return Error "RomM sync did not report a result"
+        }
+
     // Per-instance projection guards (ADR-0035): built exactly once here and
     // passed to every consumer below, so "one guard per process" is a
     // property of this wiring rather than of Administration.fs.
     let adminGuards = Administration.makeGuards ()
 
     // Create API
-    let api = Api.create connectionFactory httpClient qbittorrentHttpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig getQbittorrentConfig getOpenLibraryConfig getAudibleConfig runAudibleProgressSyncNow mountRoots imageBasePath projectionHandlers
+    let api = Api.create connectionFactory httpClient qbittorrentHttpClient getTmdbConfig getRawgConfig getSteamConfig getJellyfinConfig getQbittorrentConfig getOpenLibraryConfig getAudibleConfig runAudibleProgressSyncNow getRomMConfig runRomMSyncNow mountRoots imageBasePath projectionHandlers
     let adminApi = Administration.create connectionFactory dbPath imageBasePath projectionHandlers scheduledJobs jobRunRecorder adminGuards
 
     let remotingHandler =

@@ -2276,6 +2276,13 @@ module Api =
         // fire, rather than a bespoke un-recorded trigger
         // (`triggerPlaytimeSync`'s older shape, predating ADR-0026).
         (runAudibleProgressSyncNow: unit -> Async<Result<AudibleProgressSyncResult, string>>)
+        // integration-jkbm1 (ADR-0088/ADR-0078): same reasoning as
+        // `runAudibleProgressSyncNow` above -- built in Composition.fs as a
+        // wrapper `JobSpec` sharing the "RomM sync" scheduled entry's
+        // `tryStartJob` guard slot, so the Settings card's own "Sync now"
+        // click is recorded as a `job_runs` row too.
+        (getRomMConfig: unit -> RomM.RomMConfig)
+        (runRomMSyncNow: unit -> Async<Result<RomMSyncResult, string>>)
         (mountRoots: LocalCopyRemoval.MountRoots)
         (imageBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
@@ -5721,4 +5728,85 @@ module Api =
                     LibraryImportedAt = SettingsStore.getSetting conn "audible_library_imported_at"
                 }
             }
+
+            // RomM Integration (integration-jkbm1, ADR-0088/ADR-0078): a
+            // self-hosted RomM instance's closed play sessions imported as
+            // Games play sessions. The API token is a secret -- never
+            // round-tripped back to the client (mirrors `getSteamApiKey`'s
+            // masked-display convention, except the token isn't even
+            // partially shown here since the card only needs to know
+            // whether one is configured).
+            getRomMSettings = fun () -> async {
+                use conn = factory ()
+                let token = SettingsStore.getSetting conn "romm_api_token" |> Option.defaultValue ""
+                let platformIds =
+                    SettingsStore.getSetting conn "romm_platform_ids"
+                    |> Option.bind (fun json ->
+                        match Thoth.Json.Net.Decode.fromString (Thoth.Json.Net.Decode.list Thoth.Json.Net.Decode.int) json with
+                        | Ok ids -> Some ids
+                        | Error _ -> None)
+                    |> Option.defaultValue []
+                let syncHour =
+                    SettingsStore.getSetting conn "romm_sync_hour"
+                    |> Option.bind (fun s -> match System.Int32.TryParse(s) with true, v -> Some v | _ -> None)
+                    |> Option.defaultValue 9
+                return {
+                    BaseUrl = SettingsStore.getSetting conn "romm_base_url" |> Option.defaultValue ""
+                    TokenConfigured = not (System.String.IsNullOrWhiteSpace token)
+                    SelectedPlatformIds = platformIds
+                    SyncHour = syncHour
+                    LastSync = SettingsStore.getSetting conn "romm_last_sync"
+                    LastError = SettingsStore.getSetting conn "romm_last_error"
+                }
+            }
+
+            setRomMSettings = fun request -> async {
+                use conn = factory ()
+                try
+                    SettingsStore.setSetting conn "romm_base_url" request.BaseUrl
+                    match request.ApiToken with
+                    | Some token when not (System.String.IsNullOrWhiteSpace token) ->
+                        SettingsStore.setSetting conn "romm_api_token" token
+                        // A freshly-saved (presumably fresh) token replaces
+                        // whatever was rejected before -- mirrors
+                        // `setSteamApiKey`'s clear-on-save convention (ADR-0065).
+                        SettingsStore.deleteSetting conn "romm_last_error"
+                    | _ -> ()
+                    let platformIdsJson =
+                        request.SelectedPlatformIds
+                        |> List.map Thoth.Json.Net.Encode.int
+                        |> Thoth.Json.Net.Encode.list
+                        |> Thoth.Json.Net.Encode.toString 0
+                    SettingsStore.setSetting conn "romm_platform_ids" platformIdsJson
+                    SettingsStore.setSetting conn "romm_sync_hour" (string request.SyncHour)
+                    return Ok ()
+                with ex ->
+                    return Error $"Failed to save RomM settings: {ex.Message}"
+            }
+
+            fetchRomMPlatforms = fun () -> async {
+                let config = getRomMConfig ()
+                if System.String.IsNullOrWhiteSpace config.BaseUrl || System.String.IsNullOrWhiteSpace config.ApiToken then
+                    return Error "RomM is not configured -- set a base URL and API token first"
+                else
+                    let! result = RomM.getPlatforms httpClient config
+                    match result with
+                    | Ok platforms ->
+                        // A successful call is unambiguous proof the token is
+                        // valid -- clear any standing rejection notice the same
+                        // way `RomMSync.runSync`'s own successful fetch does,
+                        // so "Test connection" (this call) recovers the card
+                        // without waiting for the next scheduled sync.
+                        use conn = factory ()
+                        SettingsStore.deleteSetting conn "romm_last_error"
+                        return Ok (platforms |> List.map (fun p -> { RomMPlatformDto.Id = p.Id; Name = p.Name; Slug = p.Slug }))
+                    | Error RomM.TokenRejected ->
+                        use conn = factory ()
+                        SettingsStore.setSetting conn "romm_last_error" RomM.tokenRejectedMessage
+                        return Error RomM.tokenRejectedMessage
+                    | Error (RomM.RomMOtherFailure msg) ->
+                        return Error msg
+            }
+
+            runRomMSyncNow = fun () -> runRomMSyncNow ()
         }

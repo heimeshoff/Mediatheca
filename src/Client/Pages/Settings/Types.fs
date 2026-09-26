@@ -136,6 +136,26 @@ type Model = {
     /// is hidden and this date is shown instead -- the one-time bootstrap
     /// gate.
     AudibleLibraryImportedAt: string option
+    // RomM Integration (integration-jkbm1, ADR-0088/ADR-0078): a
+    // self-hosted RomM instance's closed play sessions imported as Games
+    // play sessions. `RomMTokenInput` mirrors `AudibleAuthFileInput` -- a
+    // masked token is never round-tripped back for the input to start
+    // from, so a save clears it back to "".
+    RomMBaseUrl: string
+    RomMBaseUrlInput: string
+    RomMTokenInput: string
+    RomMTokenConfigured: bool
+    RomMSelectedPlatformIds: int list
+    RomMSyncHour: int
+    IsSavingRomM: bool
+    RomMSaveResult: Result<unit, string> option
+    RomMPlatforms: RomMPlatformDto list
+    IsLoadingRomMPlatforms: bool
+    RomMPlatformsError: string option
+    RomMLastSync: string option
+    RomMLastError: string option
+    IsSyncingRomMNow: bool
+    RomMSyncResult: Result<RomMSyncResult, string> option
     // Sync Status
     PlaytimeSyncStatus: PlaytimeSyncStatus option
     JellyfinLastSyncTime: string option
@@ -282,6 +302,18 @@ type Msg =
     | Audible_import_completed of Result<AudibleImportResult, string>
     | Sync_audible_progress_now
     | Audible_progress_sync_completed of Result<AudibleProgressSyncResult, string>
+    // RomM Integration (integration-jkbm1, ADR-0088/ADR-0078)
+    | Load_romm_settings
+    | RomM_settings_loaded of RomMSettingsDto
+    | RomM_base_url_input_changed of string
+    | RomM_token_input_changed of string
+    | RomM_platform_toggled of int
+    | Load_romm_platforms
+    | RomM_platforms_loaded of Result<RomMPlatformDto list, string>
+    | Save_romm_settings
+    | RomM_save_result of Result<unit, string>
+    | Sync_romm_now
+    | RomM_sync_completed of Result<RomMSyncResult, string>
     // Sync Status
     | Load_playtime_sync_status
     | Playtime_sync_status_loaded of PlaytimeSyncStatus

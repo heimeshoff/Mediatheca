@@ -961,6 +961,19 @@ module GameProjection =
             rd.ReadInt32 "steam_app_id"
         )
 
+    /// integration-jkbm1: candidates for the RomM adapter's name+year
+    /// matching step (step 2 of its three-step "find or create" flow) --
+    /// every game's (slug, name, year), so the adapter can normalize both
+    /// sides and compare locally. `findByName`'s exact `COLLATE NOCASE`
+    /// match isn't reused here: RomM's own names carry punctuation/edition
+    /// noise `findByName` was never meant to shrug off, and the matching
+    /// step needs the release year alongside the name to disambiguate.
+    let allForNameMatching (conn: SqliteConnection) : (string * string * int) list =
+        conn
+        |> Db.newCommand "SELECT slug, name, year FROM game_detail"
+        |> Db.query (fun (rd: IDataReader) ->
+            rd.ReadString "slug", rd.ReadString "name", rd.ReadInt32 "year")
+
     let findByName (conn: SqliteConnection) (name: string) : (string * int option) list =
         conn
         |> Db.newCommand "SELECT slug, steam_app_id FROM game_detail WHERE name = @name COLLATE NOCASE"

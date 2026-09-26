@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-26 10:19 -- Task verified and completed: integration-jkbm1 - RomM adapter — on a scheduled sync, import play sessions from the self-hosted RomM instance for the platforms picked in Settings (Nintendo by default), linking or creating a Game only for roms that have played sessions
+
+**Type:** Work / Task completion
+**Task:** integration-jkbm1 - RomM adapter — on a scheduled sync, import play sessions from the self-hosted RomM instance for the platforms picked in Settings (Nintendo by default), linking or creating a Game only for roms that have played sessions
+**Summary:** add RomM adapter with sessions-first play-session sync, Settings card and scheduled RomM sync job
+**Duration:** 26m (iteration 2, 09:53-10:19; iteration 1 took 27m on 2026-09-25)
+**Verification:** PASS (iteration 2)
+**Result source:** sidecar · layout leading+sentinel · sidecar present
+**Files changed:** 34
+**Tests added:** 33
+**ADRs written:** none
+
+---
+
 ## 2026-09-25 18:04 -- Work session ended
 
 **Type:** Work / Session end

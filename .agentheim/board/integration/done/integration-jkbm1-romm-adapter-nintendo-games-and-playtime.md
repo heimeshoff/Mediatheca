@@ -1,7 +1,7 @@
 ---
 id: integration-jkbm1
 title: RomM adapter — on a scheduled sync, import play sessions from the self-hosted RomM instance for the platforms picked in Settings (Nintendo by default), linking or creating a Game only for roms that have played sessions
-status: doing
+status: done
 type: feature
 context: integration
 created: 2026-09-25
@@ -154,3 +154,25 @@ Paused by the builder after verification iteration 1 (2026-09-25 18:05) until a 
 - Worker's iteration-1 RESULT (README_DELTA + OUTCOME drafts) salvaged to `.agentheim/salvage/integration-jkbm1-escalated-iter1.bookkeeping.md`
 
 To resume: provide the token (a scratchpad file, never committed), then run `/agentheim:work integration-jkbm1`. Phase 1 recovery reuses this worktree and re-dispatches iteration 2 against the Verifier note above.
+
+## Outcome
+
+Iteration 2 addressed every point in the iteration-1 verifier note without changing the adapter's scope or shape:
+
+**1. Criterion 1 (Settings persistence) now has tests.** `tests/Server.Tests/RomMApiTests.fs` (new, 6 cases) exercises `Api.create`'s `getRomMSettings`/`setRomMSettings`/`fetchRomMPlatforms` end to end against a real `SettingsStore`-backed connection: `romm_platform_ids` persists as a JSON array (`[1,3,7]`, matching `Composition.getRomMConfig`'s own parser and `steam_family_members`'s convention); `getRomMSettings` never returns the raw token (only `TokenConfigured: bool`, pinned by asserting the token string never appears in the DTO's printed form, while confirming server-side it IS stored); `ApiToken = None` keeps the previously-saved token, matching Audible/Steam's "blank keeps existing" convention; an unset `romm_platform_ids` degrades to an empty selection, not an error; and `fetchRomMPlatforms` clears/sets `romm_last_error` on success/401 respectively. `src/Client/Pages/Settings/RomMPlatformPrecheck.test.fs` (new Vitest, 4 cases) exercises `RomM_platforms_loaded`'s Nintendo pre-check branch directly through `State.update`: both name- and slug-matched Nintendo platforms are pre-checked only when nothing is selected yet; a previously-saved non-empty selection is never overridden; and a failed fetch records the error without touching the selection.
+
+**2. Criterion 13 (recorded fixtures) is now met.** Recorded real responses from `https://romm.elver-minor.ts.net` (RomM v5.3.1) with the read-only Client API Token supplied for this purpose: `GET /api/platforms` (kept verbatim, 3 platforms — this instance has no non-Nintendo platform yet, so platform-filter *behaviour*, as opposed to wire decoding, stays covered by `RomMSyncTests.fs`'s synthetic platform ids), `GET /api/roms?limit=3&offset=0` (trimmed to 2 items, dropped `char_index`/`filter_values`), `GET /api/roms/33` ("3 Ninjas Kick Back", trimmed of unused metadata sibling blocks, kept every field the decoder reads plus `rom_user` verbatim), and `GET /api/play-sessions?limit=10&offset=0` (trimmed to 2 of 10 sessions). Replacing the hand-authored fixtures with these caught two real bugs, both fixed:
+- `metadatum.first_release_date` is Unix **milliseconds**, not seconds — proved by cross-checking the same rom's sibling `igdb_metadata.first_release_date` (genuine IGDB seconds) recorded alongside it, and by the millisecond interpretation (1994-11-19) matching "3 Ninjas Kick Back"'s real release year while the seconds interpretation would overflow `DateTimeOffset`'s representable range entirely. Fixed in `RomM.decodeRomDetail` (`FromUnixTimeMilliseconds`, was `FromUnixTimeSeconds`) and in `RomMSyncTests.fs`'s `romDetailJson` fixture-builder helper (`ToUnixTimeMilliseconds`, was `ToUnixTimeSeconds`).
+- `url_cover` is typically an absolute, third-party CDN URL (libretro's public thumbnail host), not a same-host RomM asset. Added `RomM.isSameHost` and made `RomM.downloadCover` attach the bearer token only when the cover URL's host matches `config.BaseUrl`'s host — never leaking the Client API Token to an unrelated third party. Three new Expecto cases in `RomMTests.fs` pin this (same-host sends the token, third-party host does not, `isSameHost` itself for scheme/query/path-independence and a graceful `false` on an unparseable URL).
+- `start_time`/`end_time` carry NO timezone suffix at all (`"2026-09-25T10:43:02"`) — confirmed the existing `decodeUtcDateTime`'s `AssumeUniversal` handling (unchanged) already parses this correctly as UTC; pinned with an explicit `DateTime(2026,9,25,10,43,2,DateTimeKind.Utc)` equality assertion.
+- All four `RomMTests.fs` decoding tests (platforms, roms list, rom detail, play sessions) were rewritten against the recorded values with updated assertions (real names/ids/years/URLs).
+
+**3. `fetchRomMPlatforms` now clears `romm_last_error` on success** (`src/Server/Api.fs`) — a successful platforms fetch is unambiguous proof the token is valid, mirroring `RomMSync.runSync`'s own successful-fetch clear. Covered by a new `RomMApiTests.fs` case.
+
+**4. `RomMSync.resolveSlug`'s discarded `Set_romm_rom_id` result is now handled.** Both the "matched by name" and "created" branches now match on `executeGameCommand`'s `Result` instead of `|> ignore`-ing it: a failure degrades to the existing `Failed` outcome (not counted as linked/created, sessions not imported, retried next run) exactly like a creation failure already did. Forced the failure in a fixture test the only reliable way available without real concurrency: seeded a normal Active game, then appended `Game_removed_from_library` directly to its event stream WITHOUT running the projection (so `game_detail` still lists it as a name-matching candidate while `Games.decide` itself now refuses `Set_romm_rom_id` with "Game has been removed") — the exact `executeGameCommand` failure path `resolveSlug` must degrade on.
+
+Verified the recorded token never leaked: `grep -rn "rmm_" tests src` (excluding the pre-existing UI placeholder string `"rmm_..."` and this iteration's own synthetic test tokens like `rmm_test_token`) returns nothing, and a direct `grep` for the literal token value across the full working-tree diff returns nothing.
+
+`npm run build` (Fable, clean), `dotnet run --project tests/Server.Tests/Server.Tests.fsproj` (1045 passed, up from 1035 after iteration 1, 0 failed), and `npm run test:client` (129 passed, up from 125, 0 failed) are all green.
+
+Key files: `src/Server/RomM.fs`, `src/Server/RomMSync.fs`, `src/Server/Api.fs`. Tests: `tests/Server.Tests/RomMApiTests.fs` (new), `tests/Server.Tests/RomMTests.fs`, `tests/Server.Tests/RomMSyncTests.fs`, `src/Client/Pages/Settings/RomMPlatformPrecheck.test.fs` (new).

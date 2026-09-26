@@ -57,6 +57,8 @@ let private createApi (factory: unit -> SqliteConnection) (httpClient: HttpClien
         (fun () -> testConfig)
         (fun () -> ({ AuthFile = None; Marketplace = "de"; CachedAccessToken = None; CachedAccessTokenExpiresAt = None } : Audible.AudibleConfig))
         (fun () -> async { return Error "not wired in tests" })
+        (fun () -> ({ BaseUrl = ""; ApiToken = ""; SelectedPlatformIds = [] } : RomM.RomMConfig))
+        (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         imageBasePath
         allProjectionHandlers

@@ -1874,6 +1874,185 @@ let private audibleDetail (model: Model) (dispatch: Msg -> unit) =
         ]
     ]
 
+// ── RomM Detail ──
+
+/// integration-jkbm1 (ADR-0088/ADR-0078): base URL + Client API Token
+/// (masked, never round-tripped back -- same convention as
+/// `AudibleAuthFileInput`), a platform picker populated live from
+/// `GET /api/platforms` (Nintendo pre-checked on first load), and a "Sync
+/// now" button sharing the Audible card's job-recorder shape. The picker is
+/// a plain inline checkbox list, not a floating dropdown -- no paper
+/// overlay needed (ADR-0016 only governs floating surfaces).
+let private rommDetail (model: Model) (dispatch: Msg -> unit) =
+    Html.div [
+        prop.children [
+            Html.p [
+                prop.className "text-base-content/70 mb-4 text-sm"
+                prop.children [
+                    Html.text "Connect to a self-hosted RomM instance so play sessions on the selected platforms import as Games play time."
+                ]
+            ]
+
+            if model.RomMTokenConfigured then
+                Html.div [
+                    prop.className "mb-3 flex items-center gap-2 text-sm text-base-content/60"
+                    prop.children [
+                        Html.span [ prop.text "Base URL:" ]
+                        Html.span [ prop.className "font-mono"; prop.text model.RomMBaseUrl ]
+                    ]
+                ]
+
+            // Base URL input
+            Html.div [
+                prop.className "form-control mb-3"
+                prop.children [
+                    Daisy.label [
+                        prop.className "label"
+                        prop.children [ Html.span [ prop.className "label-text"; prop.text "Base URL" ] ]
+                    ]
+                    Daisy.input [
+                        prop.className "w-full"
+                        prop.placeholder "https://romm.example.com"
+                        prop.value model.RomMBaseUrlInput
+                        prop.onChange (RomM_base_url_input_changed >> dispatch)
+                    ]
+                ]
+            ]
+
+            // API Token input (masked)
+            Html.div [
+                prop.className "form-control mb-3"
+                prop.children [
+                    Daisy.label [
+                        prop.className "label"
+                        prop.children [
+                            Html.span [
+                                prop.className "label-text"
+                                prop.text (if model.RomMTokenConfigured then "API Token (leave blank to keep current)" else "API Token")
+                            ]
+                        ]
+                    ]
+                    Daisy.input [
+                        prop.className "w-full"
+                        prop.type' "password"
+                        prop.placeholder (if model.RomMTokenConfigured then "••••••••" else "rmm_...")
+                        prop.value model.RomMTokenInput
+                        prop.onChange (RomM_token_input_changed >> dispatch)
+                    ]
+                ]
+            ]
+
+            // Platform picker
+            Html.div [
+                prop.className "form-control mb-4"
+                prop.children [
+                    Daisy.label [
+                        prop.className "label"
+                        prop.children [ Html.span [ prop.className "label-text"; prop.text "Platforms" ] ]
+                    ]
+                    Daisy.button.button [
+                        button.ghost
+                        button.sm
+                        prop.className "mb-2 self-start"
+                        if model.IsLoadingRomMPlatforms then button.disabled
+                        prop.onClick (fun _ -> dispatch Load_romm_platforms)
+                        prop.disabled model.IsLoadingRomMPlatforms
+                        prop.children [
+                            if model.IsLoadingRomMPlatforms then
+                                Daisy.loading [ loading.spinner; loading.sm ]
+                            Html.text "Load platforms"
+                        ]
+                    ]
+                    match model.RomMPlatformsError with
+                    | Some e -> Daisy.alert [ alert.error; prop.className "mb-2"; prop.text e ]
+                    | None -> Html.none
+                    if List.isEmpty model.RomMPlatforms then
+                        Html.p [
+                            prop.className "text-base-content/50 text-sm"
+                            prop.text "No platforms loaded yet -- save a base URL and token, then load platforms."
+                        ]
+                    else
+                        Html.div [
+                            prop.className "flex flex-wrap gap-2"
+                            prop.children [
+                                for platform in model.RomMPlatforms do
+                                    let checked_ = model.RomMSelectedPlatformIds |> List.contains platform.Id
+                                    Html.label [
+                                        prop.className "flex items-center gap-1.5 text-sm cursor-pointer"
+                                        prop.children [
+                                            Daisy.checkbox [
+                                                checkbox.sm
+                                                prop.isChecked checked_
+                                                prop.onChange (fun (_: bool) -> dispatch (RomM_platform_toggled platform.Id))
+                                            ]
+                                            Html.span [ prop.text platform.Name ]
+                                        ]
+                                    ]
+                            ]
+                        ]
+                ]
+            ]
+
+            if model.RomMLastSync.IsSome || model.RomMLastError.IsSome then
+                Html.div [
+                    prop.className "mb-3 text-sm"
+                    prop.children [
+                        match model.RomMLastSync with
+                        | Some t -> Html.div [ prop.className "text-base-content/60"; prop.text (sprintf "Last sync: %s" t) ]
+                        | None -> Html.none
+                        match model.RomMLastError with
+                        | Some e -> Daisy.alert [ alert.warning; prop.className "mt-1"; prop.text e ]
+                        | None -> Html.none
+                    ]
+                ]
+
+            feedbackAlert (model.RomMSaveResult |> Option.map (Result.map (fun () -> "Settings saved") >> Result.mapError id))
+            match model.RomMSyncResult with
+            | Some (Ok result) ->
+                Daisy.alert [
+                    alert.success
+                    prop.className "mb-4"
+                    prop.text (
+                        sprintf "%d session(s) recorded, %d game(s) created, %d game(s) linked, %d promoted to focus%s"
+                            result.SessionsRecorded result.GamesCreated result.GamesLinked result.GamesPromotedToFocus
+                            (if List.isEmpty result.Ambiguous then "" else sprintf ", %d ambiguous (%s)" (List.length result.Ambiguous) (String.concat ", " result.Ambiguous)))
+                ]
+            | Some (Error e) -> Daisy.alert [ alert.error; prop.className "mb-4"; prop.text e ]
+            | None -> Html.none
+
+            // Buttons
+            Html.div [
+                prop.className "flex gap-2 mb-4"
+                prop.children [
+                    Daisy.button.button [
+                        button.primary
+                        button.sm
+                        if model.IsSavingRomM then button.disabled
+                        prop.onClick (fun _ -> dispatch Save_romm_settings)
+                        prop.disabled model.IsSavingRomM
+                        prop.children [
+                            if model.IsSavingRomM then
+                                Daisy.loading [ loading.spinner; loading.sm ]
+                            Html.text "Save"
+                        ]
+                    ]
+                    Daisy.button.button [
+                        button.ghost
+                        button.sm
+                        if model.IsSyncingRomMNow then button.disabled
+                        prop.onClick (fun _ -> dispatch Sync_romm_now)
+                        prop.disabled model.IsSyncingRomMNow
+                        prop.children [
+                            if model.IsSyncingRomMNow then
+                                Daisy.loading [ loading.spinner; loading.sm ]
+                            Html.text "Sync now"
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+
 // ── Main View ──
 
 let view (model: Model) (dispatch: Msg -> unit) =
@@ -1958,6 +2137,14 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         "Audiobook catalog search and listening progress"
                         (statusBadge model.AudibleConfigured (if model.AudibleConfigured then "Connected" else "Not configured"))
                         (audibleDetail model dispatch)
+
+                    // integration-jkbm1 (ADR-0088/ADR-0078): appended after Audible.
+                    integrationCard
+                        Icons.gamepad
+                        "RomM"
+                        "Nintendo play sessions from a self-hosted RomM instance"
+                        (statusBadge (model.RomMTokenConfigured && model.RomMBaseUrl <> "") (if model.RomMTokenConfigured && model.RomMBaseUrl <> "" then "Connected" else "Not configured"))
+                        (rommDetail model dispatch)
                 ]
             ]
 

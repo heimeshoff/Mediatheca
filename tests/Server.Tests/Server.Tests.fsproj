@@ -76,6 +76,9 @@
     <Compile Include="AudibleTests.fs" />
     <Compile Include="AudibleApiTests.fs" />
     <Compile Include="AudibleLibrarySyncTests.fs" />
+    <Compile Include="RomMTests.fs" />
+    <Compile Include="RomMApiTests.fs" />
+    <Compile Include="RomMSyncTests.fs" />
     <Compile Include="CatalogProjectionTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

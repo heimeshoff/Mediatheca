@@ -29,6 +29,7 @@
     <Compile Include="DescriptionSanitizer.fs" />
     <Compile Include="Rawg.fs" />
     <Compile Include="Steam.fs" />
+    <Compile Include="RomM.fs" />
     <Compile Include="HowLongToBeat.fs" />
     <Compile Include="Jellyfin.fs" />
     <Compile Include="JellyfinImport.fs" />
@@ -52,6 +53,7 @@
     <Compile Include="BookProjection.fs" />
     <Compile Include="PlaySessionProjection.fs" />
     <Compile Include="PlaytimeTracker.fs" />
+    <Compile Include="RomMSync.fs" />
     <Compile Include="GameFacetBackfill.fs" />
     <Compile Include="GameDeckCompatBackfill.fs" />
     <Compile Include="GameReleaseDateBackfill.fs" />
