@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-26 10:19 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 27m (resumed 09:52, integration 10:20)
+**Completed:** 1 (first-try PASS: 0, re-dispatched: 1, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** integration-jkbm1: 2 (iteration 1 on 2026-09-25, iteration 2 this session after the builder supplied a read-only RomM token for recorded fixtures)
+**Commits:** 2
+**Vision-conformance:** none — batch aligns with vision
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task)
+**Carry-over:** none — working tree clean
+
+---
+
 ## 2026-09-26 10:19 -- Task verified and completed: integration-jkbm1 - RomM adapter — on a scheduled sync, import play sessions from the self-hosted RomM instance for the platforms picked in Settings (Nintendo by default), linking or creating a Game only for roms that have played sessions
 
 **Type:** Work / Task completion
