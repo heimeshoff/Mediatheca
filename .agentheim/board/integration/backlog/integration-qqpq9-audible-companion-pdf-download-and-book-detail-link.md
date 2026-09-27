@@ -6,11 +6,11 @@ type: feature
 context: integration
 created: 2026-09-27
 completed:
-depends_on: [design-system-001]
+depends_on: [design-system-001, integration-cc7ab]
 blocks: []
 tags: [audible, books, pdf, companion-file, sync]
 related_adrs: [0074, 0076, 0043]
-related_research: []
+related_research: [audible-api-surface-and-listening-progress-2026-09-16]
 prior_art: [integration-jkbm1]
 ---
 
@@ -28,8 +28,9 @@ book.
   URL. Titles without one decode to `None`.
 - **Download**: a new adapter function in `Audible.fs` fetches the companion PDF (audible-cli's
   shape is `https://www.audible.<tld>/companion-file/<asin>`, via the existing
-  `marketplaceHost`-style locale mapping) using the same `withAccessToken` bearer token the
-  library call already minted, and writes it to `<DATA_DIR>/pdfs/<asin>.pdf` (a sibling of the
+  `marketplaceHost`-style locale mapping), authenticating with **the route integration-cc7ab's
+  ADR-0074 amendment names** (signed x-adp requests or the refresh-token→website-cookie
+  exchange). A bearer token alone is proven not to work. It writes it to `<DATA_DIR>/pdfs/<asin>.pdf` (a sibling of the
   existing `images/` cache). Verify the body is a PDF (`%PDF` magic / content type) before
   keeping it; write to a temp name then rename, so a failed download never leaves a truncated
   file.
@@ -83,10 +84,13 @@ book.
   library item and the PDF download for *Do Not Die* (fixtures only — **never touch the live
   DB**; the builder supplies an auth file or recorded responses if needed, as with
   integration-jkbm1's iteration 2).
-- **Auth risk**: ADR-0074 made the adapter bearer-only. If the companion-file endpoint refuses a
-  bearer token (e.g. it needs signed `x-adp-*` requests or website cookies), **stop and bounce
-  back to backlog** with the recorded response — adding request signing is a decision that
-  amends ADR-0074, not something to slip in.
+- **Auth route (refined 2026-09-27)**: the first attempt bounced (see Worker note). Bearer-only
+  auth can't download the PDF. This task now waits on the spike **integration-cc7ab**, which
+  tests signed x-adp requests and then the refresh-token→cookie exchange, and reports an
+  ADR-0074 amendment for whichever works. Implement exactly that route, reusing the spike's
+  recorded fixture. If the spike finds **no** working route, re-refine this task into a
+  link-out: decode `pdf_url` and link to `audible.<tld>/companion-file/<asin>` in a new tab,
+  with no download, no `pdfs/` folder and no `/pdfs` route.
 - Consider whether `pdfs/` should be covered by whatever backup/export treats `images/`
   (Administration) — mention it in the Outcome if not handled.
 - Docker: `pdfs/` lives under `DATA_DIR`, so it's already on the mounted volume on harbour.

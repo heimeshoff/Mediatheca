@@ -5,6 +5,25 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 12:49 -- Modeling / Refined: integration-qqpq9 - Audible companion PDFs
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** backlog
+**Summary:** Bounced worker proved bearer-only auth cannot download the companion PDF (companion-file 302s to Amazon sign-in; CloudFront pdf_url 403s even with stored website_cookies). Builder chose spike-then-feature: qqpq9 now depends on a spike that picks the auth route and amends ADR-0074; the Download bullet points at that route, with a link-out fallback if no route works.
+**Split into:** integration-cc7ab (spike, todo)
+
+---
+
+## 2026-09-27 12:49 -- Modeling / Captured: integration-cc7ab - Spike — find an auth route that downloads an Audible companion PDF without a login, testing signed x-adp requests first and the refresh-token-to-website-cookie exchange second, and report an ADR-0074 amendment for the first one that works
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** Split out of integration-qqpq9's refinement after its bearer-only download bounced: a stop-loss spike tests signed x-adp requests, then the refresh-token-to-cookie exchange, against Do Not Die and reports an ADR-0074 amendment for the first route that works.
+
+---
+
 ## 2026-09-27 12:32 -- Work session ended
 
 **Type:** Work / Session end
