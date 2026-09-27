@@ -1314,7 +1314,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                             match editState with
                                                             | Adding draft -> renderDraftEditor draft
                                                             | _ -> ()
-                                                            for session in model.PlaySessions |> List.truncate 10 do
+                                                            for session in model.PlaySessions do
                                                                 if Some session.Date = editingId then
                                                                     match editState with
                                                                     | Editing (_, draft) -> renderDraftEditor draft

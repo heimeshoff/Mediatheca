@@ -5,6 +5,29 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 23:47 -- Modeling / Captured: games-hm3sf - Game detail page — "Change cover" / "Change backdrop" also accept an uploaded image file or a pasted image URL, downloaded to the server's images/ cache, for manual control when RAWG and Steam offer the wrong art
+
+**Type:** Modeling / Capture
+**BC:** games
+**Filed to:** todo
+**Summary:** Game detail image picker gains two manual entry points beside the RAWG/Steam candidate grid: upload a file, or paste an image URL the server downloads. Both converge on the existing fixed-ref save + Replace_cover/Replace_backdrop path, with new magic-byte and size validation.
+
+---
+
+## 2026-09-27 23:47 -- Task verified and completed: games-fbf3j - Game detail page — show a game's entire play history in the Play History card instead of only the 10 most recent sessions
+
+**Type:** Work / Task completion
+**Task:** games-fbf3j - Game detail page — show a game's entire play history in the Play History card instead of only the 10 most recent sessions
+**Summary:** Game detail page — Play History card shows a game's entire play history instead of only the 10 most recent sessions
+**Duration:** 6m
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 1
+**Tests added:** 0
+**ADRs written:** none
+
+---
+
 ## 2026-09-27 23:45 -- Modeling / Captured: games-zex36 - Games — attach friends to individual play sessions like Movies' watch sessions; adding one also adds them to the game's Played with set, and the Friend page shows the shared play dates
 
 **Type:** Modeling / Capture
