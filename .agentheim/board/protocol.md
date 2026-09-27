@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 22:29 -- Batch started: [integration-t4q7k]
+
+**Type:** Work / Batch start
+**Tasks:** integration-t4q7k - Wire companion-PDF download into the one-time "Import library" bootstrap path
+**Parallel:** no (1 worker)
+
+---
+
 ## 2026-09-27 22:27 -- Modeling / Promoted: integration-t4q7k - Wire companion-PDF download into the one-time "Import library" bootstrap path
 
 **Type:** Modeling / Promote

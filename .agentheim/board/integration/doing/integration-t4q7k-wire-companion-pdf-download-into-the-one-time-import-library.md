@@ -1,7 +1,7 @@
 ---
 id: integration-t4q7k
 title: Wire companion-PDF download into the one-time "Import library" bootstrap path
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-09-27
