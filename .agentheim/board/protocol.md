@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 12:32 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 30m (batch started 12:01)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 1 (integration-qqpq9 — Audible companion-file download refuses bearer auth: companion-file/<asin> 302s to Amazon sign-in, CloudFront pdf_url 403s even with stored website cookies; needs an ADR-0074 amendment)
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** integration-q748k: 1, integration-qqpq9: 1
+**Commits:** 4
+**Vision-conformance:** none — batch aligns with vision
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task)
+**Carry-over:** none — working tree clean
+
+---
+
 ## 2026-09-27 12:31 -- Task verified and completed: integration-q748k - RomM play button — a RomM-linked game whose platform RomM can play in the browser shows a Play button in the game page hero that opens RomM's web player for that rom in a new browser tab
 
 **Type:** Work / Task completion
