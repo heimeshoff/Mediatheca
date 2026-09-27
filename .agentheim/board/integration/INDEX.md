@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
-- **Todo:** 0
+- **Backlog:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 35
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **integration-t4q7k** — Wire companion-PDF download into the one-time "Import library" bootstrap path (feature) — `todo/integration-t4q7k-wire-companion-pdf-download-into-the-one-time-import-library.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -59,7 +60,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **integration-t4q7k** — Wire companion-PDF download into the one-time "Import library" bootstrap path (feature) — `backlog/integration-t4q7k-wire-companion-pdf-download-into-the-one-time-import-library.md`
 <!-- backlog-list:end -->
 
 
