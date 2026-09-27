@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 36
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **integration-q3cg7** — RomM sync fails outright when any play session has a null rom_id — skip orphaned sessions instead of rejecting the whole page (bug) — `todo/integration-q3cg7-romm-play-sessions-null-rom-id.md`
 <!-- todo-list:end -->
 
 ### Doing

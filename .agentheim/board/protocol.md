@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 23:36 -- Modeling / Captured: integration-q3cg7 - RomM sync fails outright when any play session has a null rom_id — skip orphaned sessions instead of rejecting the whole page
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** RomM play-session decoder rejects the whole page when one session has rom_id null (orphaned session of a deleted rom), wedging every sync. Skip orphans at the wire boundary.
+
+---
+
 ## 2026-09-27 22:59 -- Work session ended
 
 **Type:** Work / Session end
