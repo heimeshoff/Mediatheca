@@ -49,6 +49,25 @@ let createConnectionFactory (dbPath: string) : unit -> SqliteConnection =
 let deleteRetiredSteamRefreshToken (conn: SqliteConnection) : unit =
     SettingsStore.deleteSetting conn "steam_family_refresh_token"
 
+/// Mounts the companion-PDF cache tier at a stable `/pdfs` URL (integration-
+/// qqpq9's own "Serve" section) — the exact `UseStaticFiles`/
+/// `PhysicalFileProvider` shape the `/images` mount above already uses:
+/// the default `FileExtensionContentTypeProvider` already maps `.pdf ->
+/// application/pdf`, and `UseStaticFiles` never sets a `Content-Disposition`
+/// header on its own, so nothing forces `attachment` — the browser's own
+/// PDF viewer opens a served file inline. Extracted as its own function
+/// (rather than inlined in `buildApp`) so a lightweight `TestServer` can
+/// exercise the wiring directly (`PdfServingTests.fs`) without building the
+/// whole `buildApp` pipeline.
+let mountPdfStaticFiles (app: IApplicationBuilder) (pdfBasePath: string) : unit =
+    if Directory.Exists(pdfBasePath) then
+        app.UseStaticFiles(
+            StaticFileOptions(
+                FileProvider = new PhysicalFileProvider(pdfBasePath),
+                RequestPath = "/pdfs"
+            )
+        ) |> ignore
+
 /// Build (but do not run) the app. `urls` overrides Kestrel's bind address
 /// (ASPNETCORE_URLS / default) — used by the desktop shell to force a
 /// loopback-only, ephemeral-port bind (ADR-0007: no auth, so the desktop
@@ -316,6 +335,13 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
     let imageBasePath = Path.Combine(dataDir, "images")
     if not (Directory.Exists(imageBasePath)) then
         Directory.CreateDirectory(imageBasePath) |> ignore
+
+    // integration-qqpq9 (ADR-0043/ADR-0089): companion-PDF cache storage, a
+    // sibling of `images/` under `DATA_DIR` (so it's on the same mounted
+    // volume on harbour, per this task's own Notes).
+    let pdfBasePath = Path.Combine(dataDir, "pdfs")
+    if not (Directory.Exists(pdfBasePath)) then
+        Directory.CreateDirectory(pdfBasePath) |> ignore
 
     // Projection handlers
     let projectionHandlers = [
@@ -597,7 +623,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
           Hour = audibleSyncHour
           Run = fun () ->
             async {
-                match! AudibleSync.runProgressSync jobConn jobDbLock httpClient getAudibleConfig (persistAudibleAccessTokenForJob jobConn) createBookForAudibleSync projectionHandlers with
+                match! AudibleSync.runProgressSync jobConn jobDbLock httpClient getAudibleConfig (persistAudibleAccessTokenForJob jobConn) createBookForAudibleSync projectionHandlers pdfBasePath with
                 | Ok result ->
                     let summary = AudibleSync.formatResult result
                     eprintfn "[AudibleSync] Sync complete: %s" summary
@@ -665,7 +691,7 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
                 spec with
                     Run = fun () ->
                         async {
-                            match! AudibleSync.runProgressSync jobConn jobDbLock httpClient getAudibleConfig (persistAudibleAccessTokenForJob jobConn) createBookForAudibleSync projectionHandlers with
+                            match! AudibleSync.runProgressSync jobConn jobDbLock httpClient getAudibleConfig (persistAudibleAccessTokenForJob jobConn) createBookForAudibleSync projectionHandlers pdfBasePath with
                             | Ok result ->
                                 resultCell.Value <- Some (Ok result)
                                 return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = AudibleSync.formatResult result } : ScheduledJobs.JobRunOutcome)
@@ -798,6 +824,9 @@ let buildApp (args: string[]) (urls: string option) : WebApplication =
                 RequestPath = "/images"
             )
         ) |> ignore
+
+    // Serve companion PDFs from /pdfs (integration-qqpq9, ADR-0043/ADR-0089)
+    mountPdfStaticFiles app pdfBasePath
 
     app.UseGiraffe webApp
 

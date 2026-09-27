@@ -80,6 +80,7 @@
     <Compile Include="RomMApiTests.fs" />
     <Compile Include="RomMSyncTests.fs" />
     <Compile Include="RomMPlayButtonTests.fs" />
+    <Compile Include="PdfServingTests.fs" />
     <Compile Include="CatalogProjectionTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
@@ -92,6 +93,7 @@
   <ItemGroup>
     <PackageReference Include="Expecto" Version="10.*" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.*" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="9.*" />
   </ItemGroup>
 
 </Project>

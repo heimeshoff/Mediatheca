@@ -237,6 +237,21 @@ module MetadataCache =
             """
         |> Db.exec
 
+        // integration-qqpq9 (ADR-0043/ADR-0089): the companion-PDF's
+        // RELATIVE path (e.g. "B0XXXX.pdf", matching `PdfStore.relativePath`)
+        // once downloaded -- an idempotent `ALTER TABLE ... ADD COLUMN`, the
+        // same migration idiom every other cache-tier addition in this
+        // function uses. Written by `setBookCompanionPdfPath` below, a
+        // narrow `UPDATE` deliberately separate from `upsertBookMetadata`'s
+        // full-row `INSERT ... ON CONFLICT` -- the games-b8xnw/games-ev65k
+        // "independent writer, independent column, never clobber the other"
+        // lesson, now applied to Books' one cache table (its first
+        // independently-scheduled writer besides the OpenLibrary/Audnexus
+        // enrichment upsert).
+        try
+            conn |> Db.newCommand "ALTER TABLE book_metadata_cache ADD COLUMN companion_pdf_path TEXT" |> Db.exec
+        with _ -> () // Column already exists
+
         // games-a7dqx (ADR-0053): additive facet/genre/category-id columns on
         // `game_metadata_cache` — idempotent `ALTER TABLE ... ADD COLUMN`,
         // same try/with idiom as every migration in this function and in
@@ -1241,3 +1256,31 @@ module MetadataCache =
               Language = if rd.IsDBNull(rd.GetOrdinal("language")) then None else Some (rd.ReadString "language")
               Source = if rd.IsDBNull(rd.GetOrdinal("source")) then None else Some (rd.ReadString "source") })
         |> Option.defaultValue emptyBookMetadata
+
+    /// integration-qqpq9 (ADR-0043/ADR-0089): records a downloaded
+    /// companion-PDF's RELATIVE path (`PdfStore.relativePath asin`) — a
+    /// narrow `UPDATE`, never the full `upsertBookMetadata` row-replace, so
+    /// the Audible sync's PDF write can never clobber whatever the
+    /// OpenLibrary/Audnexus enrichment upsert wrote last, and vice versa.
+    /// `INSERT OR IGNORE` first guarantees a row exists even for a book
+    /// whose enrichment upsert hasn't run yet (e.g. one the nightly sync
+    /// just created).
+    let setBookCompanionPdfPath (conn: SqliteConnection) (slug: string) (relativePath: string) : unit =
+        conn
+        |> Db.newCommand "INSERT OR IGNORE INTO book_metadata_cache (book_slug) VALUES (@slug)"
+        |> Db.setParams [ "slug", SqlType.String slug ]
+        |> Db.exec
+        conn
+        |> Db.newCommand "UPDATE book_metadata_cache SET companion_pdf_path = @path WHERE book_slug = @slug"
+        |> Db.setParams [ "slug", SqlType.String slug; "path", SqlType.String relativePath ]
+        |> Db.exec
+
+    /// Honest-degradation read — `None` when no companion PDF has been
+    /// downloaded (or recorded) for this book yet.
+    let tryGetBookCompanionPdfPath (conn: SqliteConnection) (slug: string) : string option =
+        conn
+        |> Db.newCommand "SELECT companion_pdf_path FROM book_metadata_cache WHERE book_slug = @slug"
+        |> Db.setParams [ "slug", SqlType.String slug ]
+        |> Db.querySingle (fun (rd: IDataReader) ->
+            if rd.IsDBNull(rd.GetOrdinal("companion_pdf_path")) then None else Some (rd.ReadString "companion_pdf_path"))
+        |> Option.flatten

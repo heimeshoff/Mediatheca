@@ -79,6 +79,26 @@ let bookProjectionTests =
                 Expect.equal detail.AudibleAsin (Some "B08GB43BXN") "AudibleAsin should be projected"
                 Expect.equal detail.ProgressPercent 0 "ProgressPercent should default to 0"
                 Expect.isEmpty detail.ProgressHistory "No observations yet"
+                Expect.equal detail.CompanionPdfUrl None "no companion PDF downloaded yet"
+            | None -> failtest "Expected the book to be found"
+
+        // integration-qqpq9 (ADR-0043/ADR-0089): the companion-PDF's stable
+        // serving URL is derived at query time from
+        // `book_metadata_cache.companion_pdf_path` -- a cache fact, never an
+        // event (ADR-0043).
+        testCase "CompanionPdfUrl is Some \"/pdfs/<path>\" once the cache records a downloaded companion PDF, None before" <| fun _ ->
+            use conn = createConnection ()
+            let slug = "project-hail-mary-2021"
+            appendBookEvent conn slug (Books.Book_added_to_library sampleBookData)
+
+            match BookProjection.getBySlug conn slug with
+            | Some detail -> Expect.equal detail.CompanionPdfUrl None "no companion PDF recorded yet"
+            | None -> failtest "Expected the book to be found"
+
+            MetadataCache.setBookCompanionPdfPath conn slug "B08GB43BXN.pdf"
+
+            match BookProjection.getBySlug conn slug with
+            | Some detail -> Expect.equal detail.CompanionPdfUrl (Some "/pdfs/B08GB43BXN.pdf") "the stable serving URL, derived from the cache's stored relative path"
             | None -> failtest "Expected the book to be found"
 
         // books-wk67x (amending ADR-0076 §2): same-day same-source

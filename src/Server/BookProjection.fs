@@ -652,7 +652,7 @@ module BookProjection =
                 bd.isbn13, bd.openlibrary_work_key, bd.openlibrary_edition_key, bd.audible_asin,
                 bd.finished_at, bd.added_at, bd.recommended_by,
                 mc.description, mc.page_count, mc.runtime_minutes, mc.narrators, mc.series_name, mc.series_position,
-                mc.publisher, mc.published_date, mc.average_rating, mc.language
+                mc.publisher, mc.published_date, mc.average_rating, mc.language, mc.companion_pdf_path
             FROM book_detail bd
             LEFT JOIN book_metadata_cache mc ON mc.book_slug = bd.slug
             WHERE bd.slug = @slug
@@ -694,7 +694,12 @@ module BookProjection =
               ProgressHistory = getProgressHistory conn slug
               // curation-h98ve (ADR-0080): re-derived fresh from notes_blocks
               // on every read, never cached (ADR-0043).
-              HasNotesContent = NotesProjection.getForOwner conn MediaType.Book slug |> JournalBlock.hasContent }
+              HasNotesContent = NotesProjection.getForOwner conn MediaType.Book slug |> JournalBlock.hasContent
+              // integration-qqpq9 (ADR-0043/ADR-0089): the stable serving
+              // URL, derived from the cache's stored relative path -- never
+              // an event, never a projection column written by anything but
+              // this query-time join.
+              CompanionPdfUrl = readOptString rd "companion_pdf_path" |> Option.map (fun p -> sprintf "/pdfs/%s" p) }
         )
 
     /// `(kind, value)` -> the matching book's slug, for adapter duplicate/

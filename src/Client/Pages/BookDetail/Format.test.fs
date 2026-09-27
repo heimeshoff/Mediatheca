@@ -48,6 +48,29 @@ let formatTests =
         testCase "meta line is absent when publisher and language are both absent" <| fun () ->
             let result = metaLine None None
             Expect.equal result None "books-depwh: a published date alone renders no line"
+
+        // integration-qqpq9 (ADR-0043/ADR-0089): the Links panel's Companion
+        // PDF entry only appears when the book carries one -- proxy for the
+        // page's own "a Companion PDF link renders only when the DTO field
+        // is Some" acceptance criterion, since every entry this function
+        // returns renders through the SAME target="_blank"/rel="noopener"
+        // markup (Views.fs's `linksCard`).
+        testCase "bookLinks omits Companion PDF when the book has none" <| fun () ->
+            let result = bookLinks (Some "ASIN123") None None
+            Expect.equal result [ "Audible", "https://www.audible.de/pd/ASIN123" ] "no Companion PDF entry"
+
+        testCase "bookLinks includes Companion PDF, in order, when the book has one" <| fun () ->
+            let result = bookLinks (Some "ASIN123") (Some "/works/OL123W") (Some "/pdfs/ASIN123.pdf")
+            Expect.equal
+                result
+                [ "Audible", "https://www.audible.de/pd/ASIN123"
+                  "Open Library", "https://openlibrary.org/works/OL123W"
+                  "Companion PDF", "/pdfs/ASIN123.pdf" ]
+                "all three links, Companion PDF last"
+
+        testCase "bookLinks is empty when the book has none of the three" <| fun () ->
+            let result = bookLinks None None None
+            Expect.equal result [] "no links at all"
     ]
 
 Mocha.runTests formatTests |> ignore

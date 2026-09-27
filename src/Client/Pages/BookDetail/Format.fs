@@ -50,3 +50,15 @@ let seriesLine (seriesName: string option) (seriesPosition: int option) : string
     | Some name, Some position when not (System.String.IsNullOrWhiteSpace name) ->
         Some $"Book {position} of {name}"
     | _ -> None
+
+/// The Links panel's ordered (label, href) pairs (task's What §5, extended
+/// by integration-qqpq9's "Link" section) — pure and Feliz-free so "a
+/// Companion PDF entry appears only when the book has one" is unit-testable
+/// without rendering (books-f33e2's split). Order: Audible, Open Library,
+/// Companion PDF. A book with none of the three renders an empty list — the
+/// Links panel itself omits the whole card in that case.
+let bookLinks (audibleAsin: string option) (openLibraryWorkKey: string option) (companionPdfUrl: string option) : (string * string) list =
+    [ audibleAsin |> Option.map (fun asin -> "Audible", $"https://www.audible.de/pd/{asin}")
+      openLibraryWorkKey |> Option.map (fun workKey -> "Open Library", $"https://openlibrary.org{workKey}")
+      companionPdfUrl |> Option.map (fun url -> "Companion PDF", url) ]
+    |> List.choose id

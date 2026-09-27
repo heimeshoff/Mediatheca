@@ -505,12 +505,14 @@ let private detailsSection (book: BookDetail) : ReactElement =
     ]
 
 // ── Links panel (right column, GameDetail's Links row styling — task's
-// What §5). Audible/Open Library share `Icons.book`. ──
+// What §5, extended by integration-qqpq9's "Link" section). Audible/Open
+// Library/Companion PDF share `Icons.book` -- no dedicated PDF icon exists,
+// and this task's own instruction is "not a bespoke one-off". ──
 
 let private linksCard (book: BookDetail) : ReactElement =
-    let audibleLink = book.AudibleAsin |> Option.map (fun asin -> "Audible", $"https://www.audible.de/pd/{asin}", Icons.book)
-    let openLibraryLink = book.OpenLibraryWorkKey |> Option.map (fun workKey -> "Open Library", $"https://openlibrary.org{workKey}", Icons.book)
-    let links = [ audibleLink; openLibraryLink ] |> List.choose id
+    let links =
+        Format.bookLinks book.AudibleAsin book.OpenLibraryWorkKey book.CompanionPdfUrl
+        |> List.map (fun (label, href) -> label, href, Icons.book)
     if List.isEmpty links then
         Html.none
     else

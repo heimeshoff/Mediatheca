@@ -1795,7 +1795,7 @@ let private audibleDetail (model: Model) (dispatch: Msg -> unit) =
                                 prop.children [
                                     Html.span [
                                         prop.className "text-sm"
-                                        prop.text (sprintf "Synced: %d observed, %d created" result.Observed result.Created)
+                                        prop.text (sprintf "Synced: %d observed, %d created, %d PDFs downloaded" result.Observed result.Created result.PdfsDownloaded)
                                     ]
                                 ]
                             ]

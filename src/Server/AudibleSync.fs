@@ -166,7 +166,7 @@ module AudibleSync =
                     None
 
     let formatResult (r: AudibleProgressSyncResult) : string =
-        let base_ = sprintf "%d observed, %d created" r.Observed r.Created
+        let base_ = sprintf "%d observed, %d created, %d PDFs downloaded" r.Observed r.Created r.PdfsDownloaded
         if List.isEmpty r.Errors then base_
         else sprintf "%s (%d item error(s))" base_ (List.length r.Errors)
 
@@ -204,6 +204,32 @@ module AudibleSync =
     /// auth file itself was rejected -- the caller (`Composition.fs`'s job
     /// body) must surface THAT as a genuine job failure, never a `Skipped`
     /// disposition; any other `Error` means "not configured".
+    /// integration-qqpq9 (ADR-0043/ADR-0089): downloads one item's companion
+    /// PDF if it carries one and no file exists yet -- a no-op (`Ok None`)
+    /// when the item has no `PdfUrl` or the file is already on disk, `Ok
+    /// (Some bytes)` on a genuine new download (caller then writes the bytes
+    /// and stamps the cache), `Error` on a failed download. Shared shape so
+    /// a future caller (e.g. the one-time "Import library" bootstrap) can
+    /// reuse the exact same no-op/download/error decision.
+    let downloadCompanionPdfIfMissing
+        (httpClient: HttpClient)
+        (webHost: string)
+        (authFile: Audible.AudibleAuthFile)
+        (pdfBasePath: string)
+        (item: Audible.AudibleLibraryItem)
+        : Async<Result<byte[] option, string>> =
+        async {
+            match item.PdfUrl with
+            | None -> return Ok None
+            | Some _ ->
+                if PdfStore.exists pdfBasePath item.Asin then
+                    return Ok None
+                else
+                    match! Audible.downloadCompanionPdf httpClient webHost authFile item.Asin with
+                    | Ok bytes -> return Ok (Some bytes)
+                    | Error e -> return Error e
+        }
+
     let runProgressSync
         (conn: SqliteConnection)
         (jobLock: SemaphoreSlim)
@@ -212,6 +238,7 @@ module AudibleSync =
         (persistAccessToken: Audible.AudibleAccessToken -> unit)
         (createBook: Audible.AudibleLibraryItem -> Async<Result<AddBookOutcome, string>>)
         (projectionHandlers: Projection.ProjectionHandler list)
+        (pdfBasePath: string)
         : Async<Result<AudibleProgressSyncResult, string>> =
         async {
             let config = getAudibleConfig ()
@@ -249,6 +276,7 @@ module AudibleSync =
                     let today = DateTime.Now.ToString("yyyy-MM-dd")
                     let mutable observed = 0
                     let mutable created = 0
+                    let mutable pdfsDownloaded = 0
                     let mutable errors : string list = []
                     for item in items do
                         try
@@ -281,6 +309,26 @@ module AudibleSync =
                             match slugToObserve with
                             | None -> ()
                             | Some slug ->
+                                // integration-qqpq9 (ADR-0043/ADR-0089):
+                                // companion-PDF download, once per ASIN --
+                                // runs BEFORE the position fetch below so a
+                                // PDF failure never blocks progress (this
+                                // task's own "When" bullet: "it never aborts
+                                // the sync or blocks progress observations").
+                                // Covers BOTH a freshly-created item and one
+                                // already matched -- the nightly sync walks
+                                // the whole library, so this naturally
+                                // backfills PDFs for books already in the
+                                // library too (this task's own Notes).
+                                match! downloadCompanionPdfIfMissing httpClient (Audible.webHost authFile.LocaleCode) authFile pdfBasePath item with
+                                | Ok None -> ()
+                                | Ok (Some bytes) ->
+                                    PdfStore.save pdfBasePath item.Asin bytes
+                                    withLock jobLock (fun () -> MetadataCache.setBookCompanionPdfPath conn slug (PdfStore.relativePath item.Asin))
+                                    pdfsDownloaded <- pdfsDownloaded + 1
+                                | Error e ->
+                                    errors <- errors @ [ sprintf "%s (%s): companion PDF: %s" item.Title item.Asin e ]
+
                                 // integration-fn3yx (ADR-0086): every item --
                                 // matched, or one this loop just created --
                                 // gets its own last-position fetch now,
@@ -306,7 +354,7 @@ module AudibleSync =
                                             | Error e -> errors <- errors @ [ sprintf "%s (%s): %s" item.Title item.Asin e ]
                         with ex ->
                             errors <- errors @ [ sprintf "%s (%s): %s" item.Title item.Asin ex.Message ]
-                    let result = { Observed = observed; Created = created; Errors = errors }
+                    let result = { Observed = observed; Created = created; PdfsDownloaded = pdfsDownloaded; Errors = errors }
                     withLock jobLock (fun () ->
                         SettingsStore.setSetting conn "audible_last_sync" (DateTime.UtcNow.ToString("o"))
                         SettingsStore.setSetting conn "audible_last_sync_result" (formatResult result)

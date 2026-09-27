@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 13:48 -- Task verified and completed: integration-qqpq9 - Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab
+
+**Type:** Work / Task completion
+**Task:** integration-qqpq9 - Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab
+**Summary:** Audible companion PDFs — the nightly Audible sync downloads each library title's companion PDF via an adp-signed request, serves it at /pdfs/<asin>.pdf, and the book detail page links to it in a new tab
+**Duration:** 35m
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 19
+**Tests added:** 15
+**ADRs written:** 0090
+
+---
+
 ## 2026-09-27 13:12 -- Batch started: [integration-qqpq9]
 
 **Type:** Work / Batch start

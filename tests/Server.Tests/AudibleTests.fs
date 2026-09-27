@@ -451,3 +451,138 @@ let throttleMetadataCallTests =
             finally
                 Audible.throttleMetadataInterval <- originalInterval
     ]
+
+/// integration-qqpq9 (ADR-0043/ADR-0089): `Audible.getLibrary` now also
+/// requests the `pdf_url` response group and decodes it onto
+/// `AudibleLibraryItem.PdfUrl` -- `Some` for a title carrying a companion
+/// PDF, `None` for one that doesn't.
+[<Tests>]
+let getLibraryPdfUrlTests =
+    testList "Audible.getLibrary decodes pdf_url (integration-qqpq9)" [
+
+        testCase "a library item carrying pdf_url decodes to Some; one without it decodes to None" <| fun _ ->
+            let fixtureJson =
+                """
+                {"items": [
+                    {"asin": "DONOTDIE1", "title": "Do Not Die", "authors": [], "narrators": [], "is_finished": false,
+                     "pdf_url": "https://d2fahduf2624mg.cloudfront.net/post_purchase_docs/DONOTDIE1.pdf"},
+                    {"asin": "NOPDF1", "title": "No Companion File", "authors": [], "narrators": [], "is_finished": false}
+                ]}
+                """
+            let handler = new RecordingHandler(fun req ->
+                if req.RequestUri.ToString().Contains("/1.0/library") then jsonResponse HttpStatusCode.OK fixtureJson
+                else jsonResponse HttpStatusCode.OK """{"items": []}""")
+            let httpClient = new HttpClient(handler)
+
+            let result = Audible.getLibrary httpClient "api.audible.de" "some-token" |> Async.RunSynchronously
+
+            match result with
+            | Ok items ->
+                let doNotDie = items |> List.find (fun i -> i.Asin = "DONOTDIE1")
+                let noPdf = items |> List.find (fun i -> i.Asin = "NOPDF1")
+                Expect.equal doNotDie.PdfUrl (Some "https://d2fahduf2624mg.cloudfront.net/post_purchase_docs/DONOTDIE1.pdf") "decodes the companion-PDF URL"
+                Expect.equal noPdf.PdfUrl None "a title with no pdf_url field decodes to None"
+            | Error e -> failtestf "Expected Ok, got Error %A" e
+
+            Expect.isTrue
+                ((handler.Requests |> List.head).RequestUri.ToString().Contains("pdf_url"))
+                "the library request asks for the pdf_url response group"
+    ]
+
+/// integration-qqpq9 (ADR-0089): the adp-signed companion-file request --
+/// signing is pure/testable against a fixed date/key/token; the download
+/// itself distinguishes a successful CloudFront redirect from a rejected
+/// (Amazon sign-in) one and from a non-PDF body.
+[<Tests>]
+let companionPdfTests =
+    testList "Audible companion-PDF download (integration-qqpq9, ADR-0089)" [
+
+        testCase "signCompanionFileRequest produces a signature verifiable with the matching public key" <| fun _ ->
+            let rsa = System.Security.Cryptography.RSA.Create(2048)
+            let privatePem = rsa.ExportRSAPrivateKeyPem()
+            let date = "2026-09-27T00:00:00Z"
+            let path = "/companion-file/ASIN123"
+            let signatureHeader = Audible.signCompanionFileRequest privatePem "adp-token-value" "GET" path date ""
+
+            let parts = signatureHeader.Split(':', 2)
+            Expect.equal parts.[1] date "the header value is \"<base64 sig>:<date>\""
+            let sigBytes = Convert.FromBase64String(parts.[0])
+            let signedString = sprintf "GET\n%s\n%s\n\nadp-token-value" path date
+            let verified =
+                rsa.VerifyData(
+                    Encoding.UTF8.GetBytes(signedString),
+                    sigBytes,
+                    System.Security.Cryptography.HashAlgorithmName.SHA256,
+                    System.Security.Cryptography.RSASignaturePadding.Pkcs1)
+            Expect.isTrue verified "the signature verifies against the exact signed-string shape ADR-0089 records"
+
+        testCase "downloadCompanionPdf sends x-adp-token/x-adp-alg/x-adp-signature and NO Authorization/client-id header" <| fun _ ->
+            let rsa = System.Security.Cryptography.RSA.Create(2048)
+            let privatePem = rsa.ExportRSAPrivateKeyPem()
+            let authFile = { sampleAuthFile with DevicePrivateKey = privatePem }
+            let pdfBytes = Array.append (Encoding.ASCII.GetBytes("%PDF-1.6\r%")) [| 1uy; 2uy; 3uy |]
+            let handler = new RecordingHandler(fun _ ->
+                let resp = new HttpResponseMessage(HttpStatusCode.OK)
+                resp.Content <- new ByteArrayContent(pdfBytes)
+                resp)
+            let httpClient = new HttpClient(handler)
+
+            let result = Audible.downloadCompanionPdf httpClient "www.audible.de" authFile "ASIN123" |> Async.RunSynchronously
+
+            match result with
+            | Ok bytes -> Expect.equal bytes pdfBytes "returns the exact PDF bytes"
+            | Error e -> failtestf "Expected Ok, got Error %s" e
+
+            let sentRequest = handler.Requests |> List.head
+            Expect.isTrue (sentRequest.Headers.Contains("x-adp-token")) "carries x-adp-token"
+            Expect.isTrue (sentRequest.Headers.Contains("x-adp-alg")) "carries x-adp-alg"
+            Expect.isTrue (sentRequest.Headers.Contains("x-adp-signature")) "carries x-adp-signature"
+            Expect.isFalse (sentRequest.Headers.Contains("Authorization")) "no bearer -- ADR-0089 point 1"
+            Expect.isFalse (sentRequest.Headers.Contains("client-id")) "no client-id -- ADR-0089 point 1"
+            Expect.equal (sentRequest.RequestUri.ToString()) "https://www.audible.de/companion-file/ASIN123" "the web host, not the api host"
+
+        testCase "a redirect that lands on an Amazon host is a rejected-auth-file Error (ADR-0089 point 4)" <| fun _ ->
+            let rsa = System.Security.Cryptography.RSA.Create(2048)
+            let authFile = { sampleAuthFile with DevicePrivateKey = rsa.ExportRSAPrivateKeyPem() }
+            let handler = new RecordingHandler(fun _ ->
+                let resp = new HttpResponseMessage(HttpStatusCode.OK)
+                resp.RequestMessage <- new HttpRequestMessage(HttpMethod.Get, "https://www.amazon.de/ap/signin")
+                resp.Content <- new StringContent("<html>sign in</html>")
+                resp)
+            let httpClient = new HttpClient(handler)
+
+            let result = Audible.downloadCompanionPdf httpClient "www.audible.de" authFile "ASIN123" |> Async.RunSynchronously
+
+            match result with
+            | Error msg -> Expect.isTrue (msg.StartsWith(Audible.authFileRejectedPrefix)) (sprintf "Expected the fixed rejection prefix, got: %s" msg)
+            | Ok _ -> failtest "Expected Error"
+
+        testCase "a followed redirect landing on CloudFront but returning a non-PDF body is a plain Error (no rejection prefix)" <| fun _ ->
+            let rsa = System.Security.Cryptography.RSA.Create(2048)
+            let authFile = { sampleAuthFile with DevicePrivateKey = rsa.ExportRSAPrivateKeyPem() }
+            let handler = new RecordingHandler(fun _ ->
+                let resp = new HttpResponseMessage(HttpStatusCode.OK)
+                resp.RequestMessage <- new HttpRequestMessage(HttpMethod.Get, "https://d2fahduf2624mg.cloudfront.net/post_purchase_docs/x.pdf")
+                resp.Content <- new StringContent("not a pdf")
+                resp)
+            let httpClient = new HttpClient(handler)
+
+            let result = Audible.downloadCompanionPdf httpClient "www.audible.de" authFile "ASIN123" |> Async.RunSynchronously
+
+            match result with
+            | Error msg ->
+                Expect.isFalse (msg.StartsWith(Audible.authFileRejectedPrefix)) "not a rejected-auth-file failure"
+            | Ok _ -> failtest "Expected Error"
+
+        testCase "a non-success status after following the redirect is a plain Error" <| fun _ ->
+            let rsa = System.Security.Cryptography.RSA.Create(2048)
+            let authFile = { sampleAuthFile with DevicePrivateKey = rsa.ExportRSAPrivateKeyPem() }
+            let handler = new RecordingHandler(fun _ -> new HttpResponseMessage(HttpStatusCode.InternalServerError))
+            let httpClient = new HttpClient(handler)
+
+            let result = Audible.downloadCompanionPdf httpClient "www.audible.de" authFile "ASIN123" |> Async.RunSynchronously
+
+            match result with
+            | Error msg -> Expect.isFalse (msg.StartsWith(Audible.authFileRejectedPrefix)) "a plain 500 is not a rejected-auth-file failure"
+            | Ok _ -> failtest "Expected Error"
+    ]

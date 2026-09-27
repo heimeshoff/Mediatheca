@@ -183,6 +183,65 @@ let private httpClientForImportWithMetadata (libraryFixture: string) (metadataRe
             })
     new HttpClient(handler), (fun () -> metadataCalls |> List.ofSeq)
 
+/// integration-qqpq9: like `httpClientForImportWithMetadata`, but also
+/// dispatches `/companion-file/{asin}` (the adp-signed companion-PDF
+/// download) through `companionFileResponder`. Every companion-file URL hit
+/// is recorded (by ASIN) for the "exactly once"/"never called" assertions.
+let private httpClientForPdfSync
+    (libraryFixture: string)
+    (metadataResponses: Map<string, HttpStatusCode * string>)
+    (companionFileResponder: string -> HttpResponseMessage)
+    : HttpClient * (unit -> string list) =
+    let companionFileCalls = Collections.Generic.List<string>()
+    let handler =
+        new AsyncStubHandler(fun req ->
+            async {
+                let url = req.RequestUri.ToString()
+                if url.Contains("/auth/token") then
+                    return jsonResponse HttpStatusCode.OK """{"access_token": "minted-token", "expires_in": 3600}"""
+                elif url.Contains("/1.0/library") then
+                    return jsonResponse HttpStatusCode.OK libraryFixture
+                elif url.Contains("/1.0/content/") && url.Contains("/metadata") then
+                    let asinMatch = Text.RegularExpressions.Regex.Match(url, "/1\\.0/content/([^/]+)/metadata")
+                    let asin = if asinMatch.Success then asinMatch.Groups.[1].Value else ""
+                    match metadataResponses.TryFind asin with
+                    | Some (status, body) -> return jsonResponse status body
+                    | None -> return jsonResponse (fst doesNotExist) (snd doesNotExist)
+                elif url.Contains("/companion-file/") then
+                    let asinMatch = Text.RegularExpressions.Regex.Match(url, "/companion-file/([^/?]+)")
+                    let asin = if asinMatch.Success then asinMatch.Groups.[1].Value else ""
+                    companionFileCalls.Add(asin)
+                    return companionFileResponder asin
+                elif url.Contains("api.audnex.us") then
+                    return new HttpResponseMessage(HttpStatusCode.NotFound)
+                else
+                    let resp = new HttpResponseMessage(HttpStatusCode.OK)
+                    resp.Content <- new ByteArrayContent(fakeCoverBytes)
+                    return resp
+            })
+    new HttpClient(handler), (fun () -> companionFileCalls |> List.ofSeq)
+
+let private withTempPdfDir (f: string -> unit) =
+    let dir = Path.Combine(Path.GetTempPath(), sprintf "mediatheca-audible-sync-test-pdfs-%s" (Guid.NewGuid().ToString("N")))
+    Directory.CreateDirectory(dir) |> ignore
+    try f dir
+    finally (try Directory.Delete(dir, true) with _ -> ())
+
+/// A companion-file-capable auth file -- `Audible.signCompanionFileRequest`
+/// runs `RSA.ImportFromPem` on `DevicePrivateKey`, so the shared `authFile`
+/// value above (`DevicePrivateKey = "priv"`, never exercised by any OTHER
+/// test in this file) won't do here.
+let private pdfCapableAuthFile : Audible.AudibleAuthFile =
+    { authFile with DevicePrivateKey = System.Security.Cryptography.RSA.Create(2048).ExportRSAPrivateKeyPem() }
+
+let private pdfCapableAudibleConfig : Audible.AudibleConfig =
+    { AuthFile = Some pdfCapableAuthFile; Marketplace = "us"; CachedAccessToken = None; CachedAccessTokenExpiresAt = None }
+
+let private fakePdfBytes = Array.append (Text.Encoding.ASCII.GetBytes("%PDF-1.6\r%")) [| 1uy; 2uy; 3uy |]
+
+let private withPdfUrl (itemJson: string) (pdfUrl: string) : string =
+    (itemJson.TrimEnd()).TrimEnd('}') + sprintf ", \"pdf_url\": \"%s\"}" pdfUrl
+
 /// `/1.0/library` always 401s (any page); `/auth/token` always mints
 /// successfully -- exercises the single-refresh-and-retry-then-give-up path.
 let private httpClientAlwaysUnauthorized () : HttpClient =
@@ -494,7 +553,7 @@ let audibleProgressSyncJobTests =
                 let jobLock = new SemaphoreSlim(1, 1)
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers ""
                     |> Async.RunSynchronously
 
                 match result with
@@ -530,7 +589,7 @@ let audibleProgressSyncJobTests =
                 let httpClient, _ = httpClientForImportWithMetadata fixture metadataResponses
                 let jobLock = new SemaphoreSlim(1, 1)
 
-                AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers ""
                 |> Async.RunSynchronously
                 |> ignore
 
@@ -538,7 +597,7 @@ let audibleProgressSyncJobTests =
                 let eventsBeforeSecondRun = EventStore.readStream db.Connection (Books.streamId slug) |> List.length
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers ""
                     |> Async.RunSynchronously
 
                 match result with
@@ -560,7 +619,7 @@ let audibleProgressSyncJobTests =
                     else realCreateBook db.Connection httpClient imageBasePath item
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBook allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBook allProjectionHandlers ""
                     |> Async.RunSynchronously
 
                 match result with
@@ -601,7 +660,7 @@ let audibleProgressSyncJobTests =
                 let jobLock = new SemaphoreSlim(1, 1)
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient2 (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient2 (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers ""
                     |> Async.RunSynchronously
 
                 match result with
@@ -638,7 +697,7 @@ let audibleProgressSyncJobTests =
                 let jobLock = new SemaphoreSlim(1, 1)
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers ""
                     |> Async.RunSynchronously
 
                 match result with
@@ -662,7 +721,7 @@ let audibleProgressSyncJobTests =
                 let firstMetadata = Map.ofList [ asin, existsAt today 60 ]
                 let httpClient1, _ = httpClientForImportWithMetadata fixture firstMetadata
                 let jobLock = new SemaphoreSlim(1, 1)
-                AudibleSync.runProgressSync db.Connection jobLock httpClient1 (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient1 imageBasePath) allProjectionHandlers
+                AudibleSync.runProgressSync db.Connection jobLock httpClient1 (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient1 imageBasePath) allProjectionHandlers ""
                 |> Async.RunSynchronously
                 |> ignore
 
@@ -673,7 +732,7 @@ let audibleProgressSyncJobTests =
                 let httpClient2, _ = httpClientForImportWithMetadata fixture secondMetadata
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient2 (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient2 (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers ""
                     |> Async.RunSynchronously
 
                 match result with
@@ -699,7 +758,7 @@ let audibleProgressSyncJobTests =
                 let metadataResponses = Map.ofList [ asin, existsAt today 60 ]
                 let httpClient, _ = httpClientForImportWithMetadata fixture metadataResponses
                 let jobLock = new SemaphoreSlim(1, 1)
-                AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers ""
                 |> Async.RunSynchronously
                 |> ignore
 
@@ -707,7 +766,7 @@ let audibleProgressSyncJobTests =
                 let eventsBeforeSecondRun = EventStore.readStream db.Connection (Books.streamId slug) |> List.length
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers ""
                     |> Async.RunSynchronously
 
                 match result with
@@ -734,7 +793,7 @@ let audibleProgressSyncJobTests =
                 let jobLock = new SemaphoreSlim(1, 1)
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers ""
                     |> Async.RunSynchronously
 
                 match result with
@@ -766,7 +825,7 @@ let audibleProgressSyncJobTests =
                 let jobLock = new SemaphoreSlim(1, 1)
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers ""
                     |> Async.RunSynchronously
 
                 match result with
@@ -794,7 +853,7 @@ let audibleProgressSyncJobTests =
                 let jobLock = new SemaphoreSlim(1, 1)
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers ""
                     |> Async.RunSynchronously
 
                 match result with
@@ -827,7 +886,7 @@ let audibleProgressSyncJobTests =
                 let httpClient, metadataCalls = httpClientForImportWithMetadata fixture metadataResponses
                 let jobLock = new SemaphoreSlim(1, 1)
 
-                AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers
+                AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers ""
                 |> Async.RunSynchronously
                 |> ignore
 
@@ -862,7 +921,7 @@ let audibleProgressSyncJobTests =
                 let httpClient, _ = httpClientForLibrary Map.empty
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> noAuthFileConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> noAuthFileConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers ""
                     |> Async.RunSynchronously
 
                 match result with
@@ -877,7 +936,7 @@ let audibleProgressSyncJobTests =
                 let httpClient = httpClientAlwaysUnauthorized ()
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers ""
                     |> Async.RunSynchronously
 
                 match result with
@@ -897,7 +956,7 @@ let audibleProgressSyncJobTests =
                 let httpClient, _ = httpClientForLibrary (Map.ofList [ 1, emptyFixture ])
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers ""
                     |> Async.RunSynchronously
 
                 match result with
@@ -937,7 +996,7 @@ let audibleProgressSyncJobTests =
                 let jobLock = new SemaphoreSlim(1, 1)
 
                 let result =
-                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
+                    AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers ""
                     |> Async.RunSynchronously
 
                 match result with
@@ -963,6 +1022,114 @@ let audibleProgressSyncJobTests =
     ]
     |> testSequenced
 
+/// integration-qqpq9 (ADR-0043/ADR-0089): the nightly sync (+ "Sync progress
+/// now") downloads a companion PDF for any item that carries one and has no
+/// file on disk yet, throttled through the same run, never blocking progress
+/// observations.
+[<Tests>]
+let audibleProgressSyncPdfDownloadTests =
+    testList "AudibleSync.runProgressSync -- companion-PDF download (integration-qqpq9, ADR-0089)" [
+
+        testCase "a PDF-bearing item downloads its companion PDF, writes <pdfBasePath>/<asin>.pdf, and reports PdfsDownloaded = 1; a second run with the file present makes no companion-file request and reports 0" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                withTempPdfDir (fun pdfBasePath ->
+                    use db = TestDb.withTempDbFactory bootstrap
+                    let today = DateTime.Now.ToString("yyyy-MM-dd")
+                    let asin = "DONOTDIE1"
+                    let itemJson = withPdfUrl (libraryItemJson asin "Do Not Die" (Some 10.0) false (Some 400)) "https://d2fahduf2624mg.cloudfront.net/post_purchase_docs/DONOTDIE1.pdf"
+                    let fixture = libraryResponseJson [ itemJson ]
+                    let metadataResponses = Map.ofList [ asin, existsAt today 40 ]
+                    let httpClient, companionFileCalls =
+                        httpClientForPdfSync fixture metadataResponses (fun _ ->
+                            let resp = new HttpResponseMessage(HttpStatusCode.OK)
+                            resp.Content <- new ByteArrayContent(fakePdfBytes)
+                            resp)
+                    let jobLock = new SemaphoreSlim(1, 1)
+
+                    let firstResult =
+                        AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> pdfCapableAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers pdfBasePath
+                        |> Async.RunSynchronously
+
+                    match firstResult with
+                    | Ok r -> Expect.equal r.PdfsDownloaded 1 "one new companion PDF downloaded"
+                    | Error e -> failtestf "Expected Ok, got Error %s" e
+
+                    Expect.equal (companionFileCalls ()) [ asin ] "the companion-file endpoint was hit exactly once"
+                    let pdfPath = Path.Combine(pdfBasePath, sprintf "%s.pdf" asin)
+                    Expect.isTrue (File.Exists pdfPath) "the PDF file was written to <pdfBasePath>/<asin>.pdf"
+                    Expect.equal (File.ReadAllBytes pdfPath) fakePdfBytes "the file's bytes are the downloaded PDF"
+
+                    let slug = BookProjection.findByExternalId db.Connection (AudibleAsin asin) |> Option.get
+                    let detail = BookProjection.getBySlug db.Connection slug |> Option.get
+                    Expect.equal detail.CompanionPdfUrl (Some (sprintf "/pdfs/%s.pdf" asin)) "the book detail DTO carries the stable serving URL"
+
+                    let secondResult =
+                        AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> pdfCapableAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers pdfBasePath
+                        |> Async.RunSynchronously
+
+                    match secondResult with
+                    | Ok r -> Expect.equal r.PdfsDownloaded 0 "the file already exists -- never re-downloaded"
+                    | Error e -> failtestf "Expected Ok, got Error %s" e
+                    Expect.equal (companionFileCalls ()) [ asin ] "still exactly one companion-file request across both runs"))
+
+        testCase "a book with no pdf_url at all never triggers a companion-file request" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                withTempPdfDir (fun pdfBasePath ->
+                    use db = TestDb.withTempDbFactory bootstrap
+                    let today = DateTime.Now.ToString("yyyy-MM-dd")
+                    let asin = "NOPDF1"
+                    let fixture = libraryResponseJson [ libraryItemJson asin "No Companion File" (Some 10.0) false (Some 400) ]
+                    let metadataResponses = Map.ofList [ asin, existsAt today 40 ]
+                    let httpClient, companionFileCalls =
+                        httpClientForPdfSync fixture metadataResponses (fun _ -> failtest "companion-file should never be requested")
+                    let jobLock = new SemaphoreSlim(1, 1)
+
+                    let result =
+                        AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> pdfCapableAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers pdfBasePath
+                        |> Async.RunSynchronously
+
+                    match result with
+                    | Ok r ->
+                        Expect.equal r.PdfsDownloaded 0 "no companion PDF to download"
+                        Expect.equal r.Observed 1 "the ordinary progress observation still happens"
+                    | Error e -> failtestf "Expected Ok, got Error %s" e
+                    Expect.isEmpty (companionFileCalls ()) "no companion-file request was ever made"))
+
+        testCase "a failed companion-PDF download leaves no file on disk, lists the item in Errors, and the run's progress observation still happens" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                withTempPdfDir (fun pdfBasePath ->
+                    use db = TestDb.withTempDbFactory bootstrap
+                    let today = DateTime.Now.ToString("yyyy-MM-dd")
+                    let asin = "BADPDF1"
+                    let itemJson = withPdfUrl (libraryItemJson asin "Bad Companion File" (Some 10.0) false (Some 400)) "https://d2fahduf2624mg.cloudfront.net/post_purchase_docs/BADPDF1.pdf"
+                    let fixture = libraryResponseJson [ itemJson ]
+                    let metadataResponses = Map.ofList [ asin, existsAt today 40 ]
+                    let httpClient, companionFileCalls =
+                        httpClientForPdfSync fixture metadataResponses (fun _ ->
+                            // A non-PDF body -- the exact shape `Audible.downloadCompanionPdf`
+                            // rejects on the magic-bytes check.
+                            let resp = new HttpResponseMessage(HttpStatusCode.OK)
+                            resp.Content <- new StringContent("not a pdf")
+                            resp)
+                    let jobLock = new SemaphoreSlim(1, 1)
+
+                    let result =
+                        AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> pdfCapableAudibleConfig) noopPersistToken (realCreateBook db.Connection httpClient imageBasePath) allProjectionHandlers pdfBasePath
+                        |> Async.RunSynchronously
+
+                    match result with
+                    | Ok r ->
+                        Expect.equal r.PdfsDownloaded 0 "the failed download is not counted"
+                        Expect.isNonEmpty r.Errors "the failure is listed in Errors"
+                        Expect.equal r.Observed 1 "the progress observation still happens despite the PDF failure"
+                    | Error e -> failtestf "Expected Ok, got Error %s" e
+
+                    Expect.equal (companionFileCalls ()) [ asin ] "the companion-file endpoint was attempted"
+                    let pdfPath = Path.Combine(pdfBasePath, sprintf "%s.pdf" asin)
+                    Expect.isFalse (File.Exists pdfPath) "no file is left on disk after a failed download"))
+    ]
+    |> testSequenced
+
 [<Tests>]
 let audibleProgressSyncJobRegistrationTests =
     testList "Audible progress sync job registration (integration-jjvg2, ADR-0026)" [
@@ -981,7 +1148,7 @@ let audibleProgressSyncJobRegistrationTests =
                     Hour = 5
                     Run = fun () ->
                         async {
-                            match! AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers with
+                            match! AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers "" with
                             | Ok result -> return ({ Disposition = ScheduledJobs.JobDisposition.Ok; Summary = AudibleSync.formatResult result } : ScheduledJobs.JobRunOutcome)
                             | Error err when err.StartsWith(Audible.authFileRejectedPrefix) -> return failwith err
                             | Error err -> return ({ Disposition = ScheduledJobs.JobDisposition.Skipped; Summary = err } : ScheduledJobs.JobRunOutcome)
@@ -1035,7 +1202,7 @@ let audibleSyncStatusPersistenceTests =
                 Expect.isNone afterImport.LastSync "no sync has run yet"
 
                 let jobLock = new SemaphoreSlim(1, 1)
-                AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers
+                AudibleSync.runProgressSync db.Connection jobLock httpClient (fun () -> configuredAudibleConfig) noopPersistToken createBookMustNotBeCalled allProjectionHandlers ""
                 |> Async.RunSynchronously
                 |> ignore
 
@@ -1052,7 +1219,7 @@ let observationForTests =
     let baseItem : Audible.AudibleLibraryItem =
         { Asin = "X1"; Title = "Book X"; Authors = []; Narrators = []; RuntimeMinutes = Some 600
           PercentComplete = Some 50.0; IsFinished = false; PurchaseDate = None; CoverUrl = None
-          SeriesName = None; SeriesPosition = None; ReleaseDate = None; Description = None }
+          SeriesName = None; SeriesPosition = None; ReleaseDate = None; Description = None; PdfUrl = None }
     testList "AudibleSync.observationFor (integration-dtdbb/ADR-0082, minutes decide/ADR-0086)" [
 
         testCase "lastListened = None (never fetched -- Api.fs's already-has-an-Audible-row re-observation branch): ObservedOn defaults to today, Position is the percent x runtime estimate, from the listing's own percent" <| fun _ ->

@@ -38,6 +38,7 @@
     <Compile Include="OpenLibrary.fs" />
     <Compile Include="Audible.fs" />
     <Compile Include="ImageStore.fs" />
+    <Compile Include="PdfStore.fs" />
     <Compile Include="CastStore.fs" />
     <Compile Include="SettingsStore.fs" />
     <Compile Include="JellyfinStore.fs" />

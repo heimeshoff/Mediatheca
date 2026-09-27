@@ -82,6 +82,13 @@ module Audible =
     let amazonTokenHost (locale: string) : string =
         sprintf "api.amazon.%s" (localeDomain locale)
 
+    /// `us -> www.audible.com`, `de -> www.audible.de`, … — the WEB host
+    /// (distinct from `marketplaceHost`'s `api.audible.*`), used ONLY by the
+    /// companion-PDF download (ADR-0089): `GET /companion-file/{asin}` lives
+    /// on the web host, not the API host.
+    let webHost (locale: string) : string =
+        sprintf "www.audible.%s" (localeDomain locale)
+
     // ── Shared error shapes ──────────────────────────────────────────────
 
     /// Every rejection of the imported auth file (a bad refresh token, or an
@@ -443,6 +450,14 @@ module Audible =
         SeriesPosition: int option
         ReleaseDate: string option
         Description: string option
+        /// integration-qqpq9 (ADR-0043/ADR-0089): the `pdf_url` response
+        /// group's companion-PDF link -- `None` for a title with no
+        /// companion PDF. Never downloaded from here; this is only the
+        /// library listing's own signal that one exists at all.
+        /// `Audible.downloadCompanionPdf` fetches the actual bytes through
+        /// a DIFFERENT, adp-signed request -- this raw, unsigned link 403s
+        /// (see ADR-0089's Context).
+        PdfUrl: string option
     }
 
     let private decodeLibraryItem : Decoder<AudibleLibraryItem> =
@@ -471,7 +486,8 @@ module Audible =
                 |> List.tryHead
                 |> Option.bind (fun s -> match Int32.TryParse(s) with true, v -> Some v | _ -> None)
               ReleaseDate = get.Optional.Field "release_date" Decode.string
-              Description = get.Optional.Field "publisher_summary" Decode.string |> Option.map sanitizeDescription })
+              Description = get.Optional.Field "publisher_summary" Decode.string |> Option.map sanitizeDescription
+              PdfUrl = get.Optional.Field "pdf_url" Decode.string })
 
     let private decodeLibraryResponse : Decoder<AudibleLibraryItem list> =
         Decode.object (fun get -> get.Required.Field "items" (Decode.list decodeLibraryItem))
@@ -489,7 +505,7 @@ module Audible =
             async {
                 let url =
                     sprintf
-                        "https://%s/1.0/library?num_results=%d&page=%d&response_groups=product_desc,product_attrs,media,contributors,series,percent_complete,is_finished,listening_status,order_details&image_sizes=500"
+                        "https://%s/1.0/library?num_results=%d&page=%d&response_groups=product_desc,product_attrs,media,contributors,series,percent_complete,is_finished,listening_status,order_details,pdf_url&image_sizes=500"
                         host libraryPageSize page
                 let! result = sendAuthenticated httpClient url token
                 match result with
@@ -505,6 +521,83 @@ module Audible =
                             return! loop (page + 1) combined
             }
         loop 1 []
+
+    // ── Companion-PDF download (integration-qqpq9, ADR-0043/ADR-0089) ──────
+    //
+    // ADR-0089: the ONLY working auth route is an adp-signed request against
+    // the WEB host's `/companion-file/{asin}` -- no bearer, no client-id. A
+    // rejection redirects to `amazon.<tld>/ap/signin`; success redirects to
+    // a freshly-signed CloudFront URL that must be followed to get the PDF
+    // bytes. Both cases are ordinary HTTP redirects, so `downloadCompanionPdf`
+    // relies on `HttpClient`'s own default auto-redirect-following (verified
+    // live: `SocketsHttpHandler` sets the returned `HttpResponseMessage.
+    // RequestMessage` to the FINAL, post-redirect request) rather than
+    // inspecting the 302 itself -- inspecting `response.RequestMessage.
+    // RequestUri.Host` afterwards tells the two cases apart. A stub
+    // `HttpMessageHandler` in tests simulates "the redirect already landed
+    // on host X" the same way, by setting `RequestMessage` on the response it
+    // returns.
+
+    /// `%PDF` magic bytes -- the response arrives as
+    /// `application/octet-stream`, so the content type header is never
+    /// trustworthy here; only the body's own first bytes are (ADR-0089's
+    /// Notes).
+    let private isPdfMagic (bytes: byte[]) : bool =
+        bytes.Length >= 4 && bytes.[0] = byte '%' && bytes.[1] = byte 'P' && bytes.[2] = byte 'D' && bytes.[3] = byte 'F'
+
+    /// The `x-adp-signature` header value (`mkb79/audible`'s
+    /// `Authenticator.sign_request` shape, ADR-0089): RSA-SHA256 (PKCS1v1.5
+    /// padding) over `"{method}\n{path}\n{date}\n{body}\n{adp_token}"`,
+    /// signed with the auth file's `device_private_key` (PKCS1 PEM),
+    /// base64-encoded and suffixed with `:{date}`. `date` is a caller-
+    /// supplied parameter (never read internally from `DateTime.UtcNow`) so
+    /// this stays pure and unit-testable against a fixed date/key/token.
+    let signCompanionFileRequest (devicePrivateKeyPem: string) (adpToken: string) (httpMethod: string) (path: string) (date: string) (body: string) : string =
+        let signedString = sprintf "%s\n%s\n%s\n%s\n%s" httpMethod path date body adpToken
+        use rsa = System.Security.Cryptography.RSA.Create()
+        rsa.ImportFromPem(devicePrivateKeyPem.ToCharArray())
+        let signatureBytes =
+            rsa.SignData(
+                System.Text.Encoding.UTF8.GetBytes(signedString),
+                System.Security.Cryptography.HashAlgorithmName.SHA256,
+                System.Security.Cryptography.RSASignaturePadding.Pkcs1)
+        sprintf "%s:%s" (Convert.ToBase64String(signatureBytes)) date
+
+    /// Downloads one companion PDF (ADR-0089): an adp-signed
+    /// `GET https://{webHost}/companion-file/{asin}`, following the
+    /// resulting redirect (via `HttpClient`'s own default auto-redirect).
+    /// `Error` carries `authFileRejectedPrefix` ONLY when the final request
+    /// landed on an Amazon host (a rejected signature/token, ADR-0089 point
+    /// 4) -- any other non-2xx or a non-PDF body is a plain, un-prefixed
+    /// failure (the caller lists it in the run's `Errors`, never a standing
+    /// Settings notice, since a single title's companion file can fail for
+    /// reasons unrelated to the auth file itself).
+    let downloadCompanionPdf (httpClient: HttpClient) (webHost: string) (authFile: AudibleAuthFile) (asin: string) : Async<Result<byte[], string>> =
+        async {
+            try
+                let path = sprintf "/companion-file/%s" asin
+                let date = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                let signature = signCompanionFileRequest authFile.DevicePrivateKey authFile.AdpToken "GET" path date ""
+                use request = new HttpRequestMessage(HttpMethod.Get, sprintf "https://%s%s" webHost path)
+                request.Headers.Add("x-adp-token", authFile.AdpToken)
+                request.Headers.Add("x-adp-alg", "SHA256withRSA:1.0")
+                request.Headers.Add("x-adp-signature", signature)
+                let! response = httpClient.SendAsync(request) |> Async.AwaitTask
+                let finalHost =
+                    match response.RequestMessage with
+                    | null -> webHost
+                    | rm -> rm.RequestUri.Host
+                if finalHost.ToLowerInvariant().Contains("amazon") then
+                    return Error (authFileRejectedPrefix + "companion PDF request redirected to Amazon sign-in")
+                elif not response.IsSuccessStatusCode then
+                    return Error (sprintf "companion PDF download failed: HTTP %d" (int response.StatusCode))
+                else
+                    let! bytes = response.Content.ReadAsByteArrayAsync() |> Async.AwaitTask
+                    if isPdfMagic bytes then return Ok bytes
+                    else return Error "companion PDF download did not return a PDF"
+            with ex ->
+                return Error (sprintf "Failed to download companion PDF: %s" ex.Message)
+        }
 
     // ── Last-listened metadata (integration-dtdbb, ADR-0082) ────────────────
     //

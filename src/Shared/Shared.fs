@@ -952,6 +952,12 @@ type BookDetail = {
     ProgressHistory: ReadingProgressDto list
     /// curation-h98ve (ADR-0080): see `MovieDetail.HasNotesContent`.
     HasNotesContent: bool
+    /// integration-qqpq9 (ADR-0043/ADR-0089): the stable `/pdfs/<asin>.pdf`
+    /// URL for a downloaded companion PDF -- `None` when the book has no
+    /// companion PDF (or one is not downloaded yet). Derived from
+    /// `book_metadata_cache.companion_pdf_path` at query time, never an
+    /// event -- PDF presence is a re-fetchable third-party fact (ADR-0043).
+    CompanionPdfUrl: string option
 }
 
 type AddBookRequest = {
@@ -1088,6 +1094,10 @@ type AudibleImportResult = {
 type AudibleProgressSyncResult = {
     Observed: int
     Created: int
+    /// integration-qqpq9 (ADR-0043/ADR-0089): how many companion PDFs this
+    /// run downloaded for the first time (a title with a companion-PDF URL
+    /// and no file on disk yet). Never re-downloads a file already present.
+    PdfsDownloaded: int
     Errors: string list
 }
 

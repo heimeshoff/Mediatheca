@@ -246,7 +246,8 @@ let private sampleBook (history: ReadingProgressDto list) : BookDetail =
       AverageRating = None
       Language = None
       ProgressHistory = history
-      HasNotesContent = false }
+      HasNotesContent = false
+      CompanionPdfUrl = None }
 
 let private twoSameDaySameSourceRows : ReadingProgressDto list =
     [ { EntryId = 101L; ObservedOn = "2026-09-18"; Source = ProgressSource.Audible; Percent = 20; Position = None; Kind = Observed }

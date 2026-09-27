@@ -10,10 +10,10 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 34
+- **Doing:** 0
+- **Done:** 35
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **integration-qqpq9** — Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab (feature) — `doing/integration-qqpq9-audible-companion-pdf-download-and-book-detail-link.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (current-month entries live; older months archived verbatim under `done-archive/` — kept for prior-art search, ADR-0039 convention)
 <!-- done-list:start -->
+- **integration-qqpq9** — Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab (feature) — `done/integration-qqpq9-audible-companion-pdf-download-and-book-detail-link.md`
 - **integration-cc7ab** — Spike — find an auth route that downloads an Audible companion PDF without a login, testing signed x-adp requests first and the refresh-token-to-website-cookie exchange second, and report an ADR-0074 amendment for the first one that works (spike) — `done/integration-cc7ab-spike-audible-companion-pdf-download-auth-route.md`
 - **integration-q748k** — RomM play button — a RomM-linked game whose platform RomM can play in the browser shows a Play button in the game page hero that opens RomM's web player for that rom in a new browser tab (feature) — `done/integration-q748k-romm-play-button.md`
 - **integration-jkbm1** — RomM adapter — on a scheduled sync, import play sessions from the self-hosted RomM instance for the platforms picked in Settings (Nintendo by default), linking or creating a Game only for roms that have played sessions (feature) — `done/integration-jkbm1-romm-adapter-nintendo-games-and-playtime.md`
@@ -62,6 +62,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **integration-t4q7k** — Wire companion-PDF download into the one-time "Import library" bootstrap path (feature) — `backlog/integration-t4q7k-wire-companion-pdf-download-into-the-one-time-import-library.md`
 <!-- backlog-list:end -->
 
 

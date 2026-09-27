@@ -61,7 +61,7 @@ let audibleImportSyncTests =
 
         testCase "a successful progress sync leaves any existing notice untouched -- the follow-up Load_audible_sync_status is the single source of truth" <| fun () ->
             let model, _ = init ()
-            let result : AudibleProgressSyncResult = { Observed = 1; Created = 0; Errors = [] }
+            let result : AudibleProgressSyncResult = { Observed = 1; Created = 0; PdfsDownloaded = 0; Errors = [] }
             let updated, _ = update fakeApi fakeAdminApi (Audible_progress_sync_completed (Ok result)) { model with IsSyncingAudibleProgress = true; AudibleLastError = Some "stale notice" }
             Expect.isFalse updated.IsSyncingAudibleProgress "the spinner stops"
             Expect.equal updated.AudibleLastError (Some "stale notice") "the reducer itself never clears the notice out of band"
