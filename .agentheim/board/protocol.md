@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 23:49 -- Modeling / Captured: series-zdqwm - Series detail hero — move the upcoming air date ("Next episode airs …" / "Returns …") out of the genre/status/rating row and into the Next Up card, which now also shows when caught up and on mobile
+
+**Type:** Modeling / Capture
+**BC:** series
+**Filed to:** todo
+**Summary:** Move the upcoming air date (episode or season-return) from the hero's genre/status/rating row into the Next Up card; the card now also renders when caught up with a known air date, and on mobile.
+
+---
+
 ## 2026-09-27 23:47 -- Modeling / Captured: games-hm3sf - Game detail page — "Change cover" / "Change backdrop" also accept an uploaded image file or a pasted image URL, downloaded to the server's images/ cache, for manual control when RAWG and Steam offer the wrong art
 
 **Type:** Modeling / Capture
