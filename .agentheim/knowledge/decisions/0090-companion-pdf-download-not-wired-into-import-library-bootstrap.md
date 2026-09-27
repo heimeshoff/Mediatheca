@@ -4,7 +4,7 @@ title: Companion-PDF download runs only through the nightly/manual progress sync
 scope: integration
 status: accepted
 date: 2026-09-27
-related_tasks: [integration-qqpq9]
+related_tasks: [integration-qqpq9, integration-t4q7k]
 related_adrs: [0043, 0089]
 amends: []
 ---
@@ -82,3 +82,16 @@ itself.
 - `.agentheim/knowledge/decisions/0089-audible-companion-pdf-download-adp-signed-request.md`
 - `src/Server/AudibleSync.fs` (`downloadCompanionPdfIfMissing`, `runProgressSync`)
 - `src/Server/Api.fs` (`importAudibleLibraryImpl`, `create`) — the untouched call site
+## Amendment (2026-09-27) -- integration-t4q7k reverses §2
+
+The follow-up this ADR's §3 recorded has been refined. The builder chose the "Add `pdfBasePath` to
+`Api.create`" alternative that this ADR rejected *for integration-qqpq9's scope*: integration-t4q7k
+adds an explicit `(pdfBasePath: string)` parameter directly after `imageBasePath`, threads it into
+`importAudibleLibraryImpl`, and calls `AudibleSync.downloadCompanionPdfIfMissing` at the top of the
+import's per-item `observe` closure, which covers matched, created and duplicate-found items.
+`AudibleImportResult` gains `PdfsDownloaded`. Two other options were rejected: chaining
+`runAudibleProgressSyncNow` after the import (a second library walk, plus a second round of
+observations right after the priors) and deriving the path from `imageBasePath`'s parent (hidden
+coupling, and `pdfs/` folders collide between tests that share a temp directory). §1 still stands:
+the nightly/manual sync keeps its download. Once integration-t4q7k ships, §2 no longer describes the
+code.

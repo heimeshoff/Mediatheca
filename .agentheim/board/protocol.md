@@ -5,6 +5,16 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 22:27 -- Modeling / Refined: integration-t4q7k - Wire companion-PDF download into the one-time "Import library" bootstrap path
+
+**Type:** Modeling / Refine
+**BC:** integration
+**Status after:** todo
+**Summary:** Builder picked an explicit `pdfBasePath` parameter on `Api.create` (after `imageBasePath`). Rejected: chaining the progress sync after import, deriving the path from imageBasePath's parent, and dismissing the task. The download runs at the top of the import's `observe` closure, so matched, created and duplicate-found items are all covered. `AudibleImportResult` gains `PdfsDownloaded` and the Settings import summary shows it. Acceptance criteria sharpened into Expecto tests plus the full build and test suite.
+**ADRs written:** 0090 amendment (reverses §2)
+
+---
+
 ## 2026-09-27 13:49 -- Work session ended
 
 **Type:** Work / Session end
