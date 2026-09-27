@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 13:12 -- Batch started: [integration-qqpq9]
+
+**Type:** Work / Batch start
+**Tasks:** integration-qqpq9 - Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab
+**Parallel:** no (1 worker)
+
+---
+
 ## 2026-09-27 13:11 -- Modeling / Promoted: integration-qqpq9 - Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab
 
 **Type:** Modeling / Promote
