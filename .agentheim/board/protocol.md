@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 01:30 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 1h21m (batch started 00:08)
+**Completed:** 5 (first-try PASS: 2, re-dispatched: 3, skipped: 0)
+**Bounced:** 1 — design-system-k4tw8 (filmstrip jitter not reproducible by the criterion's own getBoundingClientRect method across headless/headed Chromium, DPR 1/1.25/1.5 and two layouts; iteration-1 mechanism unification salvaged to .agentheim/salvage/design-system-k4tw8-bounced.patch)
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** series-zdqwm: 1, games-hm3sf: 2, books-r8cfn: 2, games-q7vnd: 3, games-zex36: 1, design-system-k4tw8: 2
+**Commits:** 9
+**Vision-conformance:** none — batch aligns with vision
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (5 tasks)
+**Carry-over:** none — working tree clean (11 stranded RESULT sidecars removed). Full suite green on main after integration: npm run build, Vitest 149/149, Expecto 1106/1106.
+
+---
+
 ## 2026-09-28 01:25 -- Task bounced: design-system-k4tw8 - Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference
 
 **Type:** Work / Task bounced
