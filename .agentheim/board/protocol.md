@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 01:25 -- Task bounced: design-system-k4tw8 - Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference
+
+**Type:** Work / Task bounced
+**BC:** design-system
+**From → To:** doing → backlog
+**Reason:** Reproduced the task's own prescribed methodology exactly (fixture DB, temp DATA_DIR, real decoded PNG posters, booted the built server on 127.0.0.1:5103, Dashboard All tab's actual "Movies to Watch" filmstrip, getBoundingClientRect sampled via requestAnimationFrame across the full 300ms hover-in/hover-out transition) and found ZERO measurable vertical drift on BOTH the unfixed (pre-iteration-1) code and the current fixed code. Method validated (not a false negative): raw per-frame samples show the poster's width smoothly interpolating 130px -> 136.5px (exactly 1.05x) over ~300ms while its vertical centre stays at exactly the same value on every single frame (max delta ~1e-5px, floating-point noise) -- so getBoundingClientRect is genuinely observing the live scale transition, it just never sees any translate. Tested across: headless + headed Chromium; deviceScaleFactor 1, 1.25, 1.5; an ample-space layout (3 items, each grown to 308px, no scroll) and a scroll-engaged layout (14 items at their 130px flex-basis, overflow-x-auto active); first/middle/last(-clipped-edge) tiles; both hover directions. Tile wrapper and caption rects never moved in any run either. Criterion 2 (shared `.poster-card`/`.poster-image-container` transform mechanism, done in iteration 1) stands and is left in place per the dispatch's instruction, but criterion 1's claimed vertical jitter could not be reproduced by the acceptance criterion's own prescribed method under a genuine, thorough attempt -- escalating rather than claiming it's met. Possible explanations outside this method's reach: a real (non-"Chrome for Testing") browser/GPU-driver-specific compositing artifact only visible via actual screen capture/pixel diffing, not layout-geometry sampling; or the reported motion is a perceptual illusion from the `.poster-shine` diagonal-gradient hover overlay fading in/out over the poster, not an actual position change. Builder should decide whether to close this as unreproducible-as-specified, retarget the acceptance criterion to a pixel/screenshot-based check, or ask for a screen recording from the original report.
+
+---
+
 ## 2026-09-28 01:21 -- Task verified and completed: games-zex36 - Games — attach friends to individual play sessions like Movies' watch sessions; adding one also adds them to the game's Played with set, and the Friend page shows the shared play dates
 
 **Type:** Work / Task completion

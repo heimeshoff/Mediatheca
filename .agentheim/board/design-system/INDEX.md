@@ -10,9 +10,9 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 0
-- **Doing:** 1
+- **Doing:** 0
 - **Done:** 25
 <!-- task-counts:end -->
 
@@ -22,7 +22,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **design-system-k4tw8** — Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference (bug) — `doing/design-system-k4tw8-filmstrip-hover-vertical-jitter.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
@@ -57,6 +56,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **design-system-k4tw8** — Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference (bug) — `backlog/design-system-k4tw8-filmstrip-hover-vertical-jitter.md`
 <!-- backlog-list:end -->
 
 
