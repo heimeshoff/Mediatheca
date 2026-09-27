@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 36
+- **Doing:** 0
+- **Done:** 37
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **integration-q3cg7** — RomM sync fails outright when any play session has a null rom_id — skip orphaned sessions instead of rejecting the whole page (bug) — `doing/integration-q3cg7-romm-play-sessions-null-rom-id.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (current-month entries live; older months archived verbatim under `done-archive/` — kept for prior-art search, ADR-0039 convention)
 <!-- done-list:start -->
+- **integration-q3cg7** — RomM sync fails outright when any play session has a null rom_id — skip orphaned sessions instead of rejecting the whole page (bug) — `done/integration-q3cg7-romm-play-sessions-null-rom-id.md`
 - **integration-t4q7k** — Wire companion-PDF download into the one-time "Import library" bootstrap path (feature) — `done/integration-t4q7k-wire-companion-pdf-download-into-the-one-time-import-library.md`
 - **integration-qqpq9** — Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab (feature) — `done/integration-qqpq9-audible-companion-pdf-download-and-book-detail-link.md`
 - **integration-cc7ab** — Spike — find an auth route that downloads an Audible companion PDF without a login, testing signed x-adp requests first and the refresh-token-to-website-cookie exchange second, and report an ADR-0074 amendment for the first one that works (spike) — `done/integration-cc7ab-spike-audible-companion-pdf-download-auth-route.md`

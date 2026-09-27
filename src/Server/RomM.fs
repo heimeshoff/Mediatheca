@@ -138,17 +138,53 @@ module RomM =
             | Some dt -> Decode.succeed dt
             | None -> Decode.fail (sprintf "Invalid date/time: %s" s))
 
-    let private decodePlaySession: Decoder<RomMPlaySession> =
+    /// Wire-shape mirror of `RomMPlaySession` with `rom_id` decoded as
+    /// OPTIONAL -- RomM's `GET /api/play-sessions` can return a session whose
+    /// `rom_id` is `null` (or the key absent entirely), typically a session
+    /// whose rom was since deleted/rescanned away in RomM (the FK is nulled,
+    /// the session row survives) -- integration-q3cg7. `Decode.Optional.
+    /// Field` already treats a JSON `null` and a missing key identically
+    /// (both decode to `None`, `Thoth.Json.Core`'s `decodeMaybeNull`), so no
+    /// separate absent/null handling is needed here. A `rom_id` present but
+    /// of the wrong wire type (e.g. a string) is NOT tolerated -- `Decode.
+    /// Optional.Field` only swallows null/absent, so a genuinely malformed
+    /// value still surfaces as a hard per-page decode error, same as any
+    /// other required field.
+    type private RawPlaySession = {
+        Id: int
+        RomId: int option
+        StartTime: DateTime
+        EndTime: DateTime option
+        DurationMs: int64 option
+    }
+
+    let private decodeRawPlaySession: Decoder<RawPlaySession> =
         Decode.object (fun get -> {
             Id = get.Required.Field "id" Decode.int
-            RomId = get.Required.Field "rom_id" Decode.int
+            RomId = get.Optional.Field "rom_id" Decode.int
             StartTime = get.Required.Field "start_time" decodeUtcDateTime
             EndTime = get.Optional.Field "end_time" decodeUtcDateTime
             DurationMs = get.Optional.Field "duration_ms" Decode.int64
         })
 
-    let private decodePlaySessions: Decoder<RomMPlaySession list> =
-        Decode.list decodePlaySession
+    let private decodeRawPlaySessions: Decoder<RawPlaySession list> =
+        Decode.list decodeRawPlaySession
+
+    /// Drops a session with no rom (an orphan -- see `RawPlaySession`'s doc
+    /// comment) rather than fail-fast: an orphan cannot be attributed to any
+    /// Game, so it is simply not importable, not fatal to the whole page
+    /// (integration-q3cg7). `RomMPlaySession.RomId` stays a plain `int` --
+    /// parse, don't validate: downstream grouping by rom (`RomMSync.fs`'s
+    /// `List.groupBy RomId`) never sees an orphan.
+    let private toOwnedPlaySession (raw: RawPlaySession) : RomMPlaySession option =
+        raw.RomId
+        |> Option.map (fun romId -> {
+            Id = raw.Id
+            RomId = romId
+            StartTime = raw.StartTime
+            EndTime = raw.EndTime
+            DurationMs = raw.DurationMs
+        })
 
     type private RomMetadatum = {
         Genres: string list
@@ -253,16 +289,22 @@ module RomM =
 
     /// One page of `GET /api/play-sessions` -- no `rom_id` filter (the
     /// live schema allows this per the task's own research), so this pages
-    /// through every session on the instance.
-    let private getPlaySessionsPage (httpClient: HttpClient) (config: RomMConfig) (limit: int) (offset: int) : Async<Result<RomMPlaySession list, RomMError>> =
+    /// through every session on the instance. Returns the page's RAW item
+    /// count alongside the owned (non-orphan) sessions -- integration-q3cg7's
+    /// paging invariant needs the count BEFORE orphans are filtered out, so
+    /// a full-size page that happens to contain an orphan still reads as a
+    /// full page (see `getAllPlaySessions`).
+    let private getPlaySessionsPage (httpClient: HttpClient) (config: RomMConfig) (limit: int) (offset: int) : Async<Result<int * RomMPlaySession list, RomMError>> =
         async {
             let url = buildUrl config.BaseUrl (sprintf "/api/play-sessions?limit=%d&offset=%d" limit offset)
             let! result = fetchJsonRejectable httpClient url config.ApiToken
             match result with
             | Error e -> return Error e
             | Ok json ->
-                match Decode.fromString decodePlaySessions json with
-                | Ok sessions -> return Ok sessions
+                match Decode.fromString decodeRawPlaySessions json with
+                | Ok rawSessions ->
+                    let owned = rawSessions |> List.choose toOwnedPlaySession
+                    return Ok (List.length rawSessions, owned)
                 | Error e -> return Error (RomMOtherFailure (sprintf "Failed to parse RomM play sessions: %s" e))
         }
 
@@ -270,18 +312,21 @@ module RomM =
     let PlaySessionsPageSize = 100
 
     /// Pages through `GET /api/play-sessions` until a page returns fewer
-    /// than `PlaySessionsPageSize` items (or an empty page) -- the one
+    /// than `PlaySessionsPageSize` RAW items (or an empty page) -- the one
     /// paged call per run the task's Notes call for, rather than one call
-    /// per rom.
+    /// per rom. The short-page check uses the RAW item count, not the count
+    /// of owned (non-orphan) sessions -- a full-size page containing one or
+    /// more orphaned (`rom_id: null`/absent) sessions still requests the
+    /// next page (integration-q3cg7).
     let getAllPlaySessions (httpClient: HttpClient) (config: RomMConfig) : Async<Result<RomMPlaySession list, RomMError>> =
         let rec loop (offset: int) (acc: RomMPlaySession list) : Async<Result<RomMPlaySession list, RomMError>> =
             async {
                 let! pageResult = getPlaySessionsPage httpClient config PlaySessionsPageSize offset
                 match pageResult with
                 | Error e -> return Error e
-                | Ok page ->
-                    let acc = acc @ page
-                    if List.length page < PlaySessionsPageSize then
+                | Ok (rawCount, ownedSessions) ->
+                    let acc = acc @ ownedSessions
+                    if rawCount < PlaySessionsPageSize then
                         return Ok acc
                     else
                         return! loop (offset + PlaySessionsPageSize) acc

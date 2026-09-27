@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 23:53 -- Task verified and completed: integration-q3cg7 - RomM sync fails outright when any play session has a null rom_id — skip orphaned sessions instead of rejecting the whole page
+
+**Type:** Work / Task completion
+**Task:** integration-q3cg7 - RomM sync fails outright when any play session has a null rom_id — skip orphaned sessions instead of rejecting the whole page
+**Summary:** RomM sync skips orphaned play sessions (null or absent rom_id) at the wire boundary instead of rejecting the whole page; paging keeps using the raw page count
+**Duration:** 13m
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 3
+**Tests added:** 5
+**ADRs written:** none
+
+---
+
 ## 2026-09-27 23:52 -- Modeling / Captured: design-system-k4tw8 - Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference
 
 **Type:** Modeling / Capture

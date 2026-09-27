@@ -128,6 +128,63 @@ let rommDecodingTests =
                 Expect.equal s.StartTime (DateTime(2026, 9, 25, 10, 43, 2, DateTimeKind.Utc)) "The offset-less timestamp is parsed as UTC, not local time"
             | Error e -> failtestf "Expected play sessions to decode, got %A" e
 
+        testCase "integration-q3cg7: a null rom_id is skipped, every other session in the page still decodes" <| fun _ ->
+            let sessionsJson =
+                """[{"id":1,"rom_id":33,"start_time":"2026-09-25T10:00:00Z","end_time":"2026-09-25T10:10:00Z","duration_ms":600000},{"id":15,"rom_id":null,"start_time":"2026-09-25T11:00:00Z","end_time":"2026-09-25T11:10:00Z","duration_ms":600000},{"id":9,"rom_id":20,"start_time":"2026-09-24T08:03:30Z","end_time":"2026-09-24T08:12:06Z","duration_ms":516090}]"""
+            let http = new HttpClient(new StubHandler(fun _ -> jsonResponse sessionsJson))
+            match RomM.getAllPlaySessions http config |> Async.RunSynchronously with
+            | Ok sessions ->
+                Expect.equal (List.length sessions) 2 "The orphaned session (rom_id: null) is skipped -- only the two owned sessions decode"
+                Expect.equal (sessions |> List.map (fun s -> s.Id) |> List.sort) [ 1; 9 ] "The orphan's id (15) is absent"
+            | Error e -> failtestf "Expected the page to decode, orphan skipped, got %A" e
+
+        testCase "integration-q3cg7: an absent rom_id key is treated the same as a null rom_id -- skipped, no error" <| fun _ ->
+            let sessionsJson =
+                """[{"id":1,"rom_id":33,"start_time":"2026-09-25T10:00:00Z","end_time":"2026-09-25T10:10:00Z","duration_ms":600000},{"id":16,"start_time":"2026-09-25T11:00:00Z","end_time":"2026-09-25T11:10:00Z","duration_ms":600000}]"""
+            let http = new HttpClient(new StubHandler(fun _ -> jsonResponse sessionsJson))
+            match RomM.getAllPlaySessions http config |> Async.RunSynchronously with
+            | Ok sessions ->
+                Expect.equal (List.length sessions) 1 "The session missing rom_id entirely is skipped"
+                Expect.equal sessions.[0].Id 1 "Only the owned session remains"
+            | Error e -> failtestf "Expected the page to decode, orphan (absent key) skipped, got %A" e
+
+        testCase "integration-q3cg7: a non-integer, non-null rom_id still fails the whole page's decode" <| fun _ ->
+            let sessionsJson =
+                """[{"id":1,"rom_id":"not-an-int","start_time":"2026-09-25T10:00:00Z","end_time":"2026-09-25T10:10:00Z","duration_ms":600000}]"""
+            let http = new HttpClient(new StubHandler(fun _ -> jsonResponse sessionsJson))
+            match RomM.getAllPlaySessions http config |> Async.RunSynchronously with
+            | Error (RomM.RomMOtherFailure msg) ->
+                Expect.stringStarts msg "Failed to parse RomM play sessions" "A malformed (non-int, non-null) rom_id is still a hard decode failure"
+            | other -> failtestf "Expected a decode failure for a string rom_id, got %A" other
+
+        testCase "integration-q3cg7: paging uses the raw item count, not the filtered count -- a full page with one orphan still fetches the next page" <| fun _ ->
+            let mutable callCount = 0
+            let makeSession id romId = sprintf """{"id":%d,"rom_id":%s,"start_time":"2026-09-20T10:00:00Z","end_time":"2026-09-20T10:30:00Z","duration_ms":1800000}""" id romId
+            // Exactly PlaySessionsPageSize raw items on the first page, one of
+            // them an orphan -- the RAW count (PageSize) must still decide
+            // this is a full page, even though the FILTERED count is one
+            // less.
+            let fullPageWithOrphan =
+                "[" +
+                (String.concat "," [
+                    for i in 1 .. RomM.PlaySessionsPageSize ->
+                        if i = 1 then makeSession i "null" else makeSession i "10"
+                ]) +
+                "]"
+            let shortPage = "[" + makeSession (RomM.PlaySessionsPageSize + 1) "10" + "]"
+            let http =
+                new HttpClient(new StubHandler(fun request ->
+                    callCount <- callCount + 1
+                    if request.RequestUri.Query.Contains(sprintf "offset=%d" RomM.PlaySessionsPageSize) then
+                        jsonResponse shortPage
+                    else
+                        jsonResponse fullPageWithOrphan))
+            match RomM.getAllPlaySessions http config |> Async.RunSynchronously with
+            | Ok sessions ->
+                Expect.equal callCount 2 "Paged exactly twice -- the raw (unfiltered) first-page count of PageSize items still triggered the second page"
+                Expect.equal (List.length sessions) RomM.PlaySessionsPageSize "PageSize - 1 owned sessions from the first page, plus 1 from the short page"
+            | Error e -> failtestf "Expected paging to succeed, got %A" e
+
         testCase "getAllPlaySessions pages until a short page" <| fun _ ->
             let mutable callCount = 0
             let makeSession id = sprintf """{"id":%d,"rom_id":10,"start_time":"2026-09-20T10:00:00Z","end_time":"2026-09-20T10:30:00Z","duration_ms":1800000}""" id

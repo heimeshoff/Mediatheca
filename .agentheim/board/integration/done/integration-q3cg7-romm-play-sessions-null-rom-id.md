@@ -1,7 +1,7 @@
 ---
 id: integration-q3cg7
 title: RomM sync fails outright when any play session has a null rom_id — skip orphaned sessions instead of rejecting the whole page
-status: doing
+status: done
 type: bug
 context: integration
 created: 2026-09-27
@@ -41,3 +41,15 @@ An orphaned play session (no rom) cannot be attributed to any Game, so it is sim
 - Session-id cursor (games-rmxg2, ADR-0088) is per-Game, so a skipped orphan never needs to consume an id — there is no Game to record it on.
 - Tests: `tests/Server.Tests/RomMTests.fs` (decoder fixtures), `RomMSyncTests.fs` (fake-RomM sync runs).
 - Optional nicety, not required: count skipped orphans in the run summary/log line so they are visible rather than silently dropped.
+
+## Outcome
+
+`RomM.decodePlaySession` (`src/Server/RomM.fs`) required `rom_id` as an int, so a single orphaned play session (RomM's FK nulled after its rom was deleted/rescanned) made `decodePlaySessions`/`Decode.list` fail the entire page, wedging RomM sync permanently.
+
+Fixed by introducing a private `RawPlaySession` wire-shape with `RomId: int option` (decoded via `get.Optional.Field "rom_id" Decode.int`, which treats a JSON `null` and an absent key identically), and `toOwnedPlaySession` which maps a raw session to `RomMPlaySession option`, dropping orphans via `List.choose`. `RomMPlaySession.RomId` itself is unchanged (still a plain `int`), so `RomMSync.fs`'s `List.groupBy RomId` and the rest of the sync flow never see an orphan.
+
+A genuinely malformed `rom_id` (e.g. a string) is NOT swallowed — `Optional.Field` only tolerates null/absent, so any other wrong type still surfaces as the pre-existing `Failed to parse RomM play sessions` error.
+
+Paging: `getPlaySessionsPage` now returns `(rawItemCount, ownedSessions)`, and `getAllPlaySessions`'s short-page check uses the raw count — a full-size page containing orphans still triggers the next page fetch.
+
+Tests: four in `tests/Server.Tests/RomMTests.fs` (null rom_id skipped; absent key treated the same; full page with an orphan still fetches page 2; string rom_id still fails the page) and one in `tests/Server.Tests/RomMSyncTests.fs` (`RomMSync.runSync` against a fake RomM with an orphan imports the owned session, no `romm_last_error`). Full Expecto suite: 1,080 passed, 0 failed. The optional skipped-orphan count in the run summary was not implemented (marked not required).

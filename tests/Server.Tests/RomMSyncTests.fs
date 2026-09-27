@@ -292,6 +292,27 @@ let rommSyncTests =
             | Error e -> failtestf "Expected the sync overall to succeed (this rom's failure is isolated), got %s" e
             Expect.isNone (GameProjection.findByRommRomId db.Connection 90) "Rom id never attached -- retried on a later run"
 
+        testCase "integration-q3cg7: an orphaned session (null rom_id) in the page is skipped -- the other closed session still imports and the run reports success" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrap
+            let closedSession = sessionJson 1 110 (DateTime.UtcNow.AddHours(-2.0)) (Some 1200000L) true
+            // An orphaned session -- `rom_id: null` -- sitting alongside the
+            // owned one in the SAME page. `sessionJson` always writes a
+            // concrete rom id, so this orphan is hand-authored to pin the
+            // null wire shape directly (integration-q3cg7's own bug report).
+            let orphanSession =
+                sprintf """{"id":2,"rom_id":null,"start_time":"%s","end_time":"%s","duration_ms":600000}"""
+                    (isoUtc (DateTime.UtcNow.AddHours(-3.0)))
+                    (isoUtc (DateTime.UtcNow.AddHours(-3.0).AddMinutes(10.0)))
+            let sessions = sprintf "[%s,%s]" closedSession orphanSession
+            let roms = Map.ofList [ 110, romDetailJson 110 "Orphan Neighbour Game" 1 "snes" (Some 2018) None ]
+            let http = new HttpClient(router sessions roms)
+            match runSync db.Connection http with
+            | Ok result ->
+                Expect.equal result.GamesCreated 1 "The owned session's rom still creates its Game"
+                Expect.equal result.SessionsRecorded 1 "Exactly one session recorded -- the orphan contributes nothing"
+            | Error e -> failtestf "Expected the sync to succeed despite the orphaned session, got %s" e
+            Expect.isNone (SettingsStore.getSetting db.Connection "romm_last_error") "No romm_last_error is set -- an orphan is not a sync failure"
+
         testCase "A 401 from the play-sessions call becomes a persisted romm_last_error, cleared by the next successful sync" <| fun _ ->
             use db = TestDb.withTempDbFactory bootstrap
             let http401 = new HttpClient(new RoutedStubHandler(fun _ -> new HttpResponseMessage(HttpStatusCode.Unauthorized)))
