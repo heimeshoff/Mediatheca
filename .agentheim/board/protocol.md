@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 23:52 -- Modeling / Captured: design-system-k4tw8 - Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference
+
+**Type:** Modeling / Capture
+**BC:** design-system
+**Filed to:** todo
+**Summary:** All-tab Movies to Watch filmstrip posters nudge down/up around the hover zoom; align the filmstrip tile's hover with the .poster-card transform mechanism the Games/Books/Series cards use.
+
+---
+
 ## 2026-09-27 23:49 -- Modeling / Captured: series-zdqwm - Series detail hero — move the upcoming air date ("Next episode airs …" / "Returns …") out of the genre/status/rating row and into the Next Up card, which now also shows when caught up and on mobile
 
 **Type:** Modeling / Capture
