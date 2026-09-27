@@ -7,29 +7,7 @@ open Mediatheca.Shared
 open Mediatheca.Client.Pages.SeriesDetail.Types
 open Mediatheca.Client
 open Mediatheca.Client.Components
-
-let private formatDateOnly (date: string) =
-    match date.IndexOf('T') with
-    | -1 -> date
-    | i -> date.[..i-1]
-
-/// Days between today (local) and an ISO YYYY-MM-DD date. None if unparseable.
-let private daysUntil (isoDate: string) : int option =
-    let trimmed = formatDateOnly isoDate
-    match System.DateTime.TryParse(trimmed) with
-    | true, d ->
-        let today = System.DateTime.Today
-        Some ((d.Date - today).Days)
-    | _ -> None
-
-/// Pretty "in X days" / "today" / "tomorrow" suffix. Returns empty string
-/// when already past or not parseable.
-let private countdownLabel (isoDate: string) : string =
-    match daysUntil isoDate with
-    | Some 0 -> "today"
-    | Some 1 -> "tomorrow"
-    | Some n when n > 1 -> sprintf "in %d days" n
-    | _ -> ""
+open Mediatheca.Client.Pages.SeriesDetail.NextUpCard
 
 // ── Helpers ──
 
@@ -78,6 +56,46 @@ let private detailCard (children: ReactElement list) =
         prop.className (DesignSystem.velvetCard + " p-6")
         prop.children children
     ]
+
+/// series-zdqwm: the Next Up card's contents, shared verbatim between its
+/// desktop (bottom-right of hero) and mobile (below title/meta) placements
+/// so the two never drift. Renders nothing for `NoCard` — callers decide
+/// visibility/positioning via the wrapping element's className.
+let private nextUpCardBody (content: NextUpCard.CardContent) : ReactElement list =
+    match content with
+    | NextUpCard.NoCard -> []
+    | NextUpCard.ShowCard (episodeOpt, airDateLabel) ->
+        [ Html.div [
+            prop.className (DesignSystem.velvetCard + " p-4 min-w-[180px]")
+            prop.children [
+                Html.p [
+                    prop.className "text-xs font-bold text-primary uppercase tracking-wider mb-1"
+                    prop.text "Next Up"
+                ]
+                match episodeOpt with
+                | Some (sNum, ep) ->
+                    Html.p [
+                        prop.className "font-semibold text-sm"
+                        prop.text $"Season {sNum}, Episode {ep.EpisodeNumber}"
+                    ]
+                    Html.p [
+                        prop.className "text-xs text-base-content/50 line-clamp-1"
+                        prop.text ep.Name
+                    ]
+                | None ->
+                    Html.p [
+                        prop.className "font-semibold text-sm"
+                        prop.text "All caught up"
+                    ]
+                match airDateLabel with
+                | Some label ->
+                    Html.p [
+                        prop.className "text-xs text-primary/80 font-mono mt-1"
+                        prop.text label
+                    ]
+                | None -> ()
+            ]
+          ] ]
 
 let private friendAvatar (size: string) (fr: FriendRef) (extraClass: string) =
     Html.div [
@@ -1504,6 +1522,15 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                     ]
                                             ]
                                         ]
+                                        // Next Up card content decision (series-zdqwm): shared by
+                                        // both the desktop placement (bottom-right of hero, below)
+                                        // and the mobile placement (below title/meta, inside this
+                                        // Title & Meta block) so they never disagree.
+                                        let nextUpContent =
+                                            NextUpCard.decide
+                                                (NextUp.compute series.Seasons)
+                                                series.NextEpisodeAirDate
+                                                series.NextSeasonAirDate
                                         // Title & Meta
                                         Html.div [
                                             prop.className "flex-grow pb-2"
@@ -1518,27 +1545,6 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                                 prop.text genre
                                                             ]
                                                         statusBadge series.Status
-                                                        // Next-air-date indicator (episode preferred, season fallback)
-                                                        match series.NextEpisodeAirDate, series.NextSeasonAirDate with
-                                                        | Some d, _ ->
-                                                            let suffix = countdownLabel d
-                                                            Html.span [
-                                                                prop.className "text-xs text-primary/80 font-medium"
-                                                                prop.text (
-                                                                    if suffix <> ""
-                                                                    then $"Next episode airs {formatDateOnly d} ({suffix})"
-                                                                    else $"Next episode airs {formatDateOnly d}")
-                                                            ]
-                                                        | None, Some d ->
-                                                            let suffix = countdownLabel d
-                                                            Html.span [
-                                                                prop.className "text-xs text-primary/80 font-medium"
-                                                                prop.text (
-                                                                    if suffix <> ""
-                                                                    then $"Returns {formatDateOnly d} ({suffix})"
-                                                                    else $"Returns {formatDateOnly d}")
-                                                            ]
-                                                        | None, None -> ()
                                                         HeroRating (series.TmdbRating, series.PersonalRating, model.IsRatingOpen, dispatch)
                                                     ]
                                                 ]
@@ -1621,38 +1627,28 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                             ]
                                                     ]
                                                 ]
+                                                // Next Up card, mobile placement (series-zdqwm) —
+                                                // below the title/meta block on small screens; the
+                                                // desktop placement (bottom-right of hero) is the
+                                                // sibling block right after this Title & Meta div.
+                                                if nextUpContent <> NextUpCard.NoCard then
+                                                    Html.div [
+                                                        prop.className "lg:hidden mt-4"
+                                                        prop.children (nextUpCardBody nextUpContent)
+                                                    ]
                                             ]
                                         ]
                                         // Next Up card (bottom-right of hero, desktop only) —
                                         // series-k4zpn: the episode strictly after the
-                                        // furthest-watched one, not merely the first
-                                        // unwatched episode (see NextUp.fs).
-                                        let nextUp = NextUp.compute series.Seasons
-                                        match nextUp with
-                                        | Some (sNum, ep) ->
+                                        // furthest-watched one, not merely the first unwatched
+                                        // episode (see NextUp.fs). series-zdqwm: the card now also
+                                        // shows when caught up with a known upcoming air date, and
+                                        // the same content renders below title/meta on mobile above.
+                                        if nextUpContent <> NextUpCard.NoCard then
                                             Html.div [
                                                 prop.className "hidden lg:block flex-shrink-0"
-                                                prop.children [
-                                                    Html.div [
-                                                        prop.className (DesignSystem.velvetCard + " p-4 min-w-[180px]")
-                                                        prop.children [
-                                                            Html.p [
-                                                                prop.className "text-xs font-bold text-primary uppercase tracking-wider mb-1"
-                                                                prop.text "Next Up"
-                                                            ]
-                                                            Html.p [
-                                                                prop.className "font-semibold text-sm"
-                                                                prop.text $"Season {sNum}, Episode {ep.EpisodeNumber}"
-                                                            ]
-                                                            Html.p [
-                                                                prop.className "text-xs text-base-content/50 line-clamp-1"
-                                                                prop.text ep.Name
-                                                            ]
-                                                        ]
-                                                    ]
-                                                ]
+                                                prop.children (nextUpCardBody nextUpContent)
                                             ]
-                                        | None -> ()
                                     ]
                                 ]
                             ]

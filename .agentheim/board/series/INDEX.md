@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 9
+- **Doing:** 0
+- **Done:** 10
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **series-zdqwm** — Series detail hero — move the upcoming air date ("Next episode airs …" / "Returns …") out of the genre/status/rating row and into the Next Up card, which now also shows when caught up and on mobile (feature) — `doing/series-zdqwm-upcoming-air-date-in-next-up-card.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **series-zdqwm** — Series detail hero — move the upcoming air date ("Next episode airs …" / "Returns …") out of the genre/status/rating row and into the Next Up card, which now also shows when caught up and on mobile (feature) — `done/series-zdqwm-upcoming-air-date-in-next-up-card.md`
 - **series-x4qte** — Add client-side regression coverage for `NextUp.compute` — the frontier rule (gaps behind the furthest-watched episode are history, not a queue) currently has no client test, only its server-side mirror (chore) — `done/series-x4qte-nextup-compute-regression-coverage.md`
 - **series-ww1rb** — Dashboard series cards show only the *current season's* episode dots with a season rail above, and mark the episodes actually watched — extend `DashboardSeriesNextUp` with per-season touched flags and current-season per-episode watched flags, joined at query time per ADR-0048 (feature) — `done/series-ww1rb-dashboard-current-season-dots-real-watch-state.md`
 - **series-k4zpn** — Next Up must follow the furthest-watched episode, not the first unwatched one — a skipped episode currently pins Next Up forever; when nothing remains beyond the furthest watched, show the fully-watched state even if a gap exists (bug) — `done/series-k4zpn-next-up-follows-furthest-watched.md`

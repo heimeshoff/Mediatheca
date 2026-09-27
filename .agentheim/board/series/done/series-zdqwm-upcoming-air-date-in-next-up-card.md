@@ -1,7 +1,7 @@
 ---
 id: series-zdqwm
 title: Series detail hero — move the upcoming air date ("Next episode airs …" / "Returns …") out of the genre/status/rating row and into the Next Up card, which now also shows when caught up and on mobile
-status: doing
+status: done
 type: feature
 context: series
 created: 2026-09-27
@@ -63,3 +63,43 @@ disconnected from the thing it's actually about: what you'll watch next. The Nex
 - Card uses `DesignSystem.velvetCard` (page chrome, not a floating surface) — keep it; don't switch to
   paper overlay. Monospace (`font-mono`) is the convention for dates/countdowns.
 - Exact caught-up wording is the worker's call within the styleguide voice; "All caught up" is a fine default.
+
+## Outcome
+
+Removed the "Next episode airs …" / "Returns …" indicator from the genre/status/rating row of the
+series detail hero (`src/Client/Pages/SeriesDetail/Views.fs`) — that row now carries only genre
+badges, `statusBadge`, and `HeroRating`.
+
+Extracted the card-content decision into a new pure, Feliz-free module,
+`src/Client/Pages/SeriesDetail/NextUpCard.fs` (mirroring `NextUp.fs`'s discipline), which now also
+owns `formatDateOnly`/`countdownLabel` (moved from `Views.fs`, still used for the episode
+watched-date display) and adds:
+- `airDateLine` — formats the upcoming air-date text, episode date preferred over the season
+  fallback, same wording/precedence the badge row used to carry.
+- `CardContent` (`NoCard` | `ShowCard of episode option * airDateLabel option`) and `decide` — the
+  card now renders whenever `NextUp.compute` is `Some` *or* an air date is known; a caught-up
+  series with a known air date gets `ShowCard(None, Some airLine)`, rendered with an "All caught
+  up" line standing in for the episode line.
+
+`src/Client/Pages/SeriesDetail/NextUpCard.test.fs` adds 5 Fable.Mocha cases (`npm run test:client`,
+ADR-0064) covering `decide`'s five combinations: Next Up + episode air date, Next Up + season
+fallback only, Next Up with no air date (unchanged behavior), caught up with a known air date, and
+neither (no card) — using dates computed relative to `DateTime.Today` so the countdown wording is
+deterministic regardless of run date.
+
+`Views.fs`'s hero now computes `nextUpContent` once (`NextUpCard.decide (NextUp.compute
+series.Seasons) series.NextEpisodeAirDate series.NextSeasonAirDate`) and renders it via a shared
+`nextUpCardBody` helper in two places: the existing desktop slot (`hidden lg:block flex-shrink-0`,
+bottom-right of hero, unchanged position) and a new mobile slot (`lg:hidden mt-4`) appended inside
+the Title & Meta block, below the action-buttons row — both render nothing when `nextUpContent =
+NoCard`. The air-date line inside the card uses `font-mono` per the task's styleguide-voice note
+for dates/countdowns.
+
+`Client.fsproj` gained two `<Compile>` entries for the new module and its test file, positioned
+right after `NextUp.fs`/`NextUp.test.fs` respectively.
+
+`npm run build` succeeds; `npx vitest run` passes all 19 test files / 137 tests, including the 5
+new cases. The acceptance criterion marked `[human-eye]` (card reads well with the extra line on
+both desktop and mobile, no awkward wrapping) was not visually verified in a browser — it follows
+existing `DesignSystem.velvetCard` conventions and the task's explicit `font-mono` guidance, but a
+human should give it a look.

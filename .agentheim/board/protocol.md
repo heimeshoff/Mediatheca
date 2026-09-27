@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 00:18 -- Task verified and completed: series-zdqwm - Series detail hero — move the upcoming air date ("Next episode airs …" / "Returns …") out of the genre/status/rating row and into the Next Up card, which now also shows when caught up and on mobile
+
+**Type:** Work / Task completion
+**Task:** series-zdqwm - Series detail hero — move the upcoming air date ("Next episode airs …" / "Returns …") out of the genre/status/rating row and into the Next Up card, which now also shows when caught up and on mobile
+**Summary:** Series detail hero moves the upcoming air date into the Next Up card, which now also shows when caught up and on mobile
+**Duration:** 11m
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 4
+**Tests added:** 5
+**ADRs written:** none
+
+---
+
 ## 2026-09-28 00:06 -- Batch started: [books-r8cfn, games-hm3sf, series-zdqwm]
 
 **Type:** Work / Batch start
