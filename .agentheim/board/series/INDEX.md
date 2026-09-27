@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 9
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **series-zdqwm** — Series detail hero — move the upcoming air date ("Next episode airs …" / "Returns …") out of the genre/status/rating row and into the Next Up card, which now also shows when caught up and on mobile (feature) — `todo/series-zdqwm-upcoming-air-date-in-next-up-card.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **series-zdqwm** — Series detail hero — move the upcoming air date ("Next episode airs …" / "Returns …") out of the genre/status/rating row and into the Next Up card, which now also shows when caught up and on mobile (feature) — `doing/series-zdqwm-upcoming-air-date-in-next-up-card.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

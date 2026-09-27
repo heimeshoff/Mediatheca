@@ -1,7 +1,7 @@
 ---
 id: games-hm3sf
 title: Game detail page — "Change cover" / "Change backdrop" also accept an uploaded image file or a pasted image URL, downloaded to the server's images/ cache, for manual control when RAWG and Steam offer the wrong art
-status: todo
+status: doing
 type: feature
 context: games
 created: 2026-09-27

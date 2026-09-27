@@ -1,7 +1,7 @@
 ---
 id: series-zdqwm
 title: Series detail hero — move the upcoming air date ("Next episode airs …" / "Returns …") out of the genre/status/rating row and into the Next Up card, which now also shows when caught up and on mobile
-status: todo
+status: doing
 type: feature
 context: series
 created: 2026-09-27

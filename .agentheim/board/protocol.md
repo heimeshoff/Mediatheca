@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 00:06 -- Batch started: [books-r8cfn, games-hm3sf, series-zdqwm]
+
+**Type:** Work / Batch start
+**Tasks:** books-r8cfn - Dashboard book poster cards all share one size and show the whole cover — the Books tab rails (Currently Reading / Recently Finished / Recently Added) and the All tab's Reading card stop sizing each card from its image and stop cropping covers to the 2:3 frame, games-hm3sf - Game detail page — "Change cover" / "Change backdrop" also accept an uploaded image file or a pasted image URL, downloaded to the server's images/ cache, for manual control when RAWG and Steam offer the wrong art, series-zdqwm - Series detail hero — move the upcoming air date ("Next episode airs …" / "Returns …") out of the genre/status/rating row and into the Next Up card, which now also shows when caught up and on mobile
+**Parallel:** yes (3 workers — wave 1 of 2; 6 ready, cap 3. games-q7vnd held to wave 2 to reuse books-r8cfn's soft-letterbox composition; games-zex36 held to wave 2 (shares GameDetail/Api.fs/Shared.fs with games-hm3sf); design-system-k4tw8 held to wave 2 (poster-card CSS near books-r8cfn))
+
+---
+
 ## 2026-09-28 00:01 -- Modeling / Captured: games-q7vnd - Game poster cards show off-ratio box art whole — NES/SNES (and any clearly non-2:3) covers fit inside the 2:3 frame with soft bands above and below, like books-r8cfn does for book covers; true 2:3 covers (Steam) keep today's fill
 
 **Type:** Modeling / Capture

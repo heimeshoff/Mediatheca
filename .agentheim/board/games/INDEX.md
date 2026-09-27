@@ -11,20 +11,20 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 3
-- **Doing:** 0
+- **Todo:** 2
+- **Doing:** 1
 - **Done:** 17
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
 - **games-q7vnd** — Game poster cards show off-ratio box art whole — NES/SNES (and any clearly non-2:3) covers fit inside the 2:3 frame with soft bands above and below, like books-r8cfn does for book covers; true 2:3 covers (Steam) keep today's fill (bug) — `todo/games-q7vnd-game-poster-cards-fit-off-ratio-box-art.md`
-- **games-hm3sf** — Game detail page — "Change cover" / "Change backdrop" also accept an uploaded image file or a pasted image URL, downloaded to the server's images/ cache, for manual control when RAWG and Steam offer the wrong art (feature) — `todo/games-hm3sf-manual-cover-backdrop-upload-or-url.md`
 - **games-zex36** — Games — attach friends to individual play sessions like Movies' watch sessions; adding one also adds them to the game's Played with set, and the Friend page shows the shared play dates (feature) — `todo/games-zex36-friends-on-play-sessions.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **games-hm3sf** — Game detail page — "Change cover" / "Change backdrop" also accept an uploaded image file or a pasted image URL, downloaded to the server's images/ cache, for manual control when RAWG and Steam offer the wrong art (feature) — `doing/games-hm3sf-manual-cover-backdrop-upload-or-url.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

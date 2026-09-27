@@ -1,7 +1,7 @@
 ---
 id: books-r8cfn
 title: Dashboard book poster cards all share one size and show the whole cover — the Books tab rails (Currently Reading / Recently Finished / Recently Added) and the All tab's Reading card stop sizing each card from its image and stop cropping covers to the 2:3 frame
-status: todo
+status: doing
 type: bug
 context: books
 created: 2026-09-27
