@@ -59,6 +59,9 @@ type Model = {
     IsLoadingImages: bool
     IsSelectingImage: bool
     ImageVersion: int
+    // games-hm3sf: the "From URL" text field's current value, alongside the
+    // candidate grid in the same picker.
+    ImageUrlText: string
     ActiveTab: GameTab
     PlaySessions: PlaySessionDto list
     PlaySessionEditState: PlaySessionEditState
@@ -118,6 +121,9 @@ type Msg =
     | Image_candidates_loaded of GameImageCandidate list
     | Select_image of url: string
     | Image_selected of Result<unit, string>
+    // games-hm3sf: manual cover/backdrop control, alongside the candidate grid.
+    | Image_url_changed of string
+    | Upload_image_file of bytes: byte array * filename: string
     | Toggle_description_expanded
     | Confirm_remove_game
     | Cancel_remove_game

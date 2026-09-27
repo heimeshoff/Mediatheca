@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 2
-- **Doing:** 1
-- **Done:** 17
+- **Doing:** 0
+- **Done:** 18
 <!-- task-counts:end -->
 
 ### Todo
@@ -24,12 +24,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **games-hm3sf** — Game detail page — "Change cover" / "Change backdrop" also accept an uploaded image file or a pasted image URL, downloaded to the server's images/ cache, for manual control when RAWG and Steam offer the wrong art (feature) — `doing/games-hm3sf-manual-cover-backdrop-upload-or-url.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **games-hm3sf** — Game detail page — "Change cover" / "Change backdrop" also accept an uploaded image file or a pasted image URL, downloaded to the server's images/ cache, for manual control when RAWG and Steam offer the wrong art (feature) — `done/games-hm3sf-manual-cover-backdrop-upload-or-url.md`
 - **games-fbf3j** — Game detail page — show a game's entire play history in the Play History card instead of only the 10 most recent sessions (bug) — `done/games-fbf3j-show-full-play-history.md`
 - **games-rmxg2** — Games — RomM as a third play-session source, with a RomM rom id as external identity and a session-id cursor; fixes PlaySessionProjection mapping every non-Manual source to SteamSync (feature) — `done/games-rmxg2-romm-play-session-source-and-rom-id.md`
 - **games-kfpqp** — Deck-compat job — re-check already recorded verdicts once they pass an age limit (Unknown 30 days, Playable/Unsupported 90, Verified 180), capped per night, so Valve's verdict changes reach existing games (feature) — `done/games-kfpqp-deck-compat-age-based-verdict-recheck.md`

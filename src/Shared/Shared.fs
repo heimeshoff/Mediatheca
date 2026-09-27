@@ -2051,6 +2051,13 @@ type IMediathecaApi = {
     getCatalogsForGame: string -> Async<CatalogRef list>
     getGameImageCandidates: string -> Async<GameImageCandidate list>
     selectGameImage: string -> string -> string -> Async<Result<unit, string>>
+    /// games-hm3sf: manual cover/backdrop control alongside the candidate
+    /// grid — uploads bytes read client-side from a chosen file (the same
+    /// byte-array transport `uploadFriendImage`/`uploadContentImage` use; no
+    /// multipart route). `filename` rides along for parity with those two
+    /// but is not used to pick a ref/extension — see `Api.fs`'s
+    /// `saveGameImageAndReplace` doc comment for why the ref stays fixed.
+    uploadGameImage: string -> byte array -> string -> string -> Async<Result<unit, string>>
     getGameTrailers: string -> Async<GameTrailerInfo list>
     // Games Settings
     getRawgApiKey: unit -> Async<string>

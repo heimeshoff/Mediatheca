@@ -23,6 +23,7 @@ let init (slug: string) : Model * Cmd<Msg> =
       IsLoadingImages = false
       IsSelectingImage = false
       ImageVersion = 0
+      ImageUrlText = ""
       ActiveTab = Overview
       PlaySessions = []
       PlaySessionEditState = EditIdle
@@ -306,7 +307,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with Error = Some err }, Cmd.none
 
     | Open_image_picker kind ->
-        { model with ShowImagePicker = Some kind; IsLoadingImages = true; ImageCandidates = [] },
+        { model with ShowImagePicker = Some kind; IsLoadingImages = true; ImageCandidates = []; ImageUrlText = ""; Error = None },
         Cmd.OfAsync.either
             (fun () -> api.getGameImageCandidates model.Slug)
             ()
@@ -314,7 +315,7 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             (fun _ -> Image_candidates_loaded [])
 
     | Close_image_picker ->
-        { model with ShowImagePicker = None; ImageCandidates = []; IsLoadingImages = false; IsSelectingImage = false }, Cmd.none
+        { model with ShowImagePicker = None; ImageCandidates = []; IsLoadingImages = false; IsSelectingImage = false; ImageUrlText = "" }, Cmd.none
 
     | Image_candidates_loaded candidates ->
         { model with ImageCandidates = candidates; IsLoadingImages = false }, Cmd.none
@@ -324,15 +325,34 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             match model.ShowImagePicker with
             | Some Cover_picker -> "cover"
             | _ -> "backdrop"
-        { model with IsSelectingImage = true },
+        { model with IsSelectingImage = true; Error = None },
         Cmd.OfAsync.either
             (fun () -> api.selectGameImage model.Slug url imageKind)
             ()
             Image_selected
             (fun ex -> Image_selected (Error ex.Message))
 
+    // games-hm3sf: the upload counterpart to `Select_image` above — reuses
+    // the same `Image_selected` result handling (ImageVersion bump, picker
+    // close on success, error stays inline + picker open on failure) so the
+    // hero/cover/picker "Current" tile refresh identically for both paths.
+    | Upload_image_file (bytes, filename) ->
+        let imageKind =
+            match model.ShowImagePicker with
+            | Some Cover_picker -> "cover"
+            | _ -> "backdrop"
+        { model with IsSelectingImage = true; Error = None },
+        Cmd.OfAsync.either
+            (fun () -> api.uploadGameImage model.Slug bytes filename imageKind)
+            ()
+            Image_selected
+            (fun ex -> Image_selected (Error ex.Message))
+
+    | Image_url_changed text ->
+        { model with ImageUrlText = text }, Cmd.none
+
     | Image_selected (Ok ()) ->
-        { model with ShowImagePicker = None; ImageCandidates = []; IsSelectingImage = false; ImageVersion = model.ImageVersion + 1 },
+        { model with ShowImagePicker = None; ImageCandidates = []; IsSelectingImage = false; ImageVersion = model.ImageVersion + 1; ImageUrlText = "" },
         Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
 
     | Image_selected (Error err) ->

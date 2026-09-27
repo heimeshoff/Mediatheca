@@ -1,5 +1,6 @@
 module Mediatheca.Client.Pages.GameDetail.Views
 
+open Fable.Core.JsInterop
 open Feliz
 open Feliz.DaisyUI
 open Feliz.Router
@@ -7,6 +8,17 @@ open Mediatheca.Shared
 open Mediatheca.Client.Pages.GameDetail.Types
 open Mediatheca.Client
 open Mediatheca.Client.Components
+
+// games-hm3sf: same `FileReader` -> `Uint8Array` pattern as
+// `Components/NotesEditor.fs`'s `readFileAsBytes` and
+// `Pages/FriendDetail/Views.fs`'s private copy of the same helper.
+let private readFileAsBytes (file: Browser.Types.File) (onDone: byte array * string -> unit) =
+    let reader = Browser.Dom.FileReader.Create()
+    reader.onload <- fun _ ->
+        let result: obj = unbox reader.result
+        let uint8Array: byte array = emitJsExpr result "new Uint8Array($0)"
+        onDone (uint8Array, file.name)
+    reader.readAsArrayBuffer(file)
 
 let private sectionHeader (title: string) =
     Html.h2 [
@@ -1622,14 +1634,16 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                             // replacement badge/control is built here (games-j6wkr's
                                             // scope). No play-mode/facet information shows on this
                                             // page for the duration between this task and that one.
-                                            // Error display
+                                            // Error display — games-hm3sf: suppressed while the image
+                                            // picker is open, since a Select_image/Upload_image_file
+                                            // failure now shows inline inside that modal instead.
                                             match model.Error with
-                                            | Some err ->
+                                            | Some err when model.ShowImagePicker.IsNone ->
                                                 Daisy.alert [
                                                     alert.error
                                                     prop.text err
                                                 ]
-                                            | None -> ()
+                                            | Some _ | None -> ()
                                     ]
                                 ]
                             ]
@@ -1682,6 +1696,74 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                 | Some pickerKind ->
                     let title = match pickerKind with Cover_picker -> "Choose Cover Image" | Backdrop_picker -> "Choose Backdrop Image"
                     let isCoverPicker = match pickerKind with Cover_picker -> true | Backdrop_picker -> false
+                    // games-hm3sf: manual entry points, alongside the candidate grid below —
+                    // never replacing it. Both converge server-side on Select_image /
+                    // Upload_image_file -> the shared Image_selected handling.
+                    let uploadInputId = "game-image-upload-input"
+                    let trimmedUrl = model.ImageUrlText.Trim()
+                    let manualControls =
+                        Html.div [
+                            prop.className "flex flex-col gap-3 mb-4"
+                            prop.children [
+                                Html.div [
+                                    prop.className "flex items-center gap-3"
+                                    prop.children [
+                                        Html.label [
+                                            prop.htmlFor uploadInputId
+                                            prop.className ("btn btn-outline btn-sm" + (if model.IsSelectingImage then " btn-disabled" else ""))
+                                            prop.text "Upload image"
+                                        ]
+                                        Html.input [
+                                            prop.id uploadInputId
+                                            prop.type' "file"
+                                            prop.accept "image/*"
+                                            prop.className "hidden"
+                                            prop.disabled model.IsSelectingImage
+                                            prop.onChange (fun (e: Browser.Types.Event) ->
+                                                let input: Browser.Types.HTMLInputElement = unbox e.target
+                                                let files = input.files
+                                                if files.length > 0 then
+                                                    let file = files.[0]
+                                                    readFileAsBytes file (fun (bytes, filename) ->
+                                                        dispatch (Upload_image_file (bytes, filename)))
+                                                    input.value <- "")
+                                        ]
+                                        Html.span [ prop.className "text-xs text-base-content/40"; prop.text "or" ]
+                                    ]
+                                ]
+                                Html.div [
+                                    prop.className "flex items-center gap-2"
+                                    prop.children [
+                                        Daisy.input [
+                                            prop.className "flex-1"
+                                            prop.type' "text"
+                                            prop.placeholder "Paste an image URL..."
+                                            prop.value model.ImageUrlText
+                                            prop.disabled model.IsSelectingImage
+                                            prop.onChange (Image_url_changed >> dispatch)
+                                            prop.onKeyDown (fun e ->
+                                                if e.key = "Enter" && trimmedUrl <> "" then
+                                                    dispatch (Select_image trimmedUrl))
+                                        ]
+                                        Daisy.button.button [
+                                            button.outline
+                                            button.sm
+                                            prop.disabled (model.IsSelectingImage || trimmedUrl = "")
+                                            prop.onClick (fun _ -> dispatch (Select_image trimmedUrl))
+                                            prop.text "Use this image"
+                                        ]
+                                    ]
+                                ]
+                                match model.Error with
+                                | Some err ->
+                                    Daisy.alert [
+                                        alert.error
+                                        prop.className "text-sm py-2"
+                                        prop.text err
+                                    ]
+                                | None -> ()
+                            ]
+                        ]
                     let filtered =
                         if isCoverPicker then
                             model.ImageCandidates
@@ -1762,7 +1844,7 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                 ]
                             ]
                     ]
-                    ModalPanel.view title (fun () -> dispatch Close_image_picker) content
+                    ModalPanel.viewCustom title (fun () -> dispatch Close_image_picker) [ manualControls ] content []
                 | None -> ()
                 // Event History Modal
                 if model.ShowEventHistory then

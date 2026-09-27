@@ -5,6 +5,42 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 00:37 -- Task verified and completed: games-hm3sf - Game detail page — "Change cover" / "Change backdrop" also accept an uploaded image file or a pasted image URL, downloaded to the server's images/ cache, for manual control when RAWG and Steam offer the wrong art
+
+**Type:** Work / Task completion
+**Task:** games-hm3sf - Game detail page — "Change cover" / "Change backdrop" also accept an uploaded image file or a pasted image URL, downloaded to the server's images/ cache, for manual control when RAWG and Steam offer the wrong art
+**Summary:** Game detail cover/backdrop picker accepts an uploaded image file or a pasted image URL, both through one validate-save-command helper onto the fixed image refs
+**Duration:** 44m
+**Verification:** PASS (iteration 2)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 7
+**Tests added:** 9
+**ADRs written:** none
+
+---
+
+## 2026-09-28 00:30 -- Verification failed: books-r8cfn - Dashboard book poster cards all share one size and show the whole cover
+
+**Type:** Work / Verification failure
+**Task:** books-r8cfn - Dashboard book poster cards all share one size and show the whole cover — the Books tab rails (Currently Reading / Recently Finished / Recently Added) and the All tab's Reading card stop sizing each card from its image and stop cropping covers to the 2:3 frame
+**Iteration:** 1 of 3
+**Reasons:** duplicated comment block in bookReadingPosterCard, uniform-size e2e spec seeds only coverless books so never exercises the mixed-cover rail, spec run unconfirmed by a runner
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
+## 2026-09-28 00:25 -- Verification failed: games-hm3sf - Game detail page — "Change cover" / "Change backdrop" also accept an uploaded image file or a pasted image URL
+
+**Type:** Work / Verification failure
+**Task:** games-hm3sf - Game detail page — "Change cover" / "Change backdrop" also accept an uploaded image file or a pasted image URL, downloaded to the server's images/ cache, for manual control when RAWG and Steam offer the wrong art
+**Iteration:** 1 of 3
+**Reasons:** 25 MB cap tests use all-zero fixtures that the magic-byte check already rejects, so neither test would fail without the cap
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-09-28 00:18 -- Task verified and completed: series-zdqwm - Series detail hero — move the upcoming air date ("Next episode airs …" / "Returns …") out of the genre/status/rating row and into the Next Up card, which now also shows when caught up and on mobile
 
 **Type:** Work / Task completion

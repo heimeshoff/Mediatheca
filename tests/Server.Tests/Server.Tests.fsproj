@@ -82,6 +82,7 @@
     <Compile Include="RomMPlayButtonTests.fs" />
     <Compile Include="PdfServingTests.fs" />
     <Compile Include="CatalogProjectionTests.fs" />
+    <Compile Include="GameImageUploadTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

@@ -110,6 +110,84 @@ module Api =
                         Projection.runProjection conn handler
                     Ok ()
 
+    /// games-hm3sf: the accepted cap for a manually supplied game
+    /// cover/backdrop, either uploaded from disk or downloaded from a
+    /// pasted URL.
+    let private maxGameImageBytes = 25 * 1024 * 1024
+
+    /// games-hm3sf: sniffs the magic bytes for JPEG, PNG, or WebP. GIF and
+    /// SVG (and anything else) are refused — SVG in particular is never
+    /// stored, per this task's validation requirement.
+    let private isRasterImage (bytes: byte[]) : bool =
+        let startsWith (signature: byte[]) =
+            bytes.Length >= signature.Length && Array.sub bytes 0 signature.Length = signature
+        let isJpeg = startsWith [| 0xFFuy; 0xD8uy; 0xFFuy |]
+        let isPng = startsWith [| 0x89uy; 0x50uy; 0x4Euy; 0x47uy; 0x0Duy; 0x0Auy; 0x1Auy; 0x0Auy |]
+        let isWebp =
+            bytes.Length >= 12
+            && Array.sub bytes 0 4 = [| 0x52uy; 0x49uy; 0x46uy; 0x46uy |] // "RIFF"
+            && Array.sub bytes 8 4 = [| 0x57uy; 0x45uy; 0x42uy; 0x50uy |] // "WEBP"
+        isJpeg || isPng || isWebp
+
+    /// games-hm3sf: the single validate-save-command tail shared by
+    /// `selectGameImage` (URL path, bytes already downloaded by the caller)
+    /// and `uploadGameImage` (upload path, bytes already read client-side) —
+    /// so the two paths cannot drift. Validates the byte budget and the
+    /// sniffed format, then writes to the game's FIXED ref
+    /// (`posters/game-{slug}.jpg` for a cover, `backdrops/game-{slug}.jpg`
+    /// for a backdrop) via `ImageStore.saveImage` and executes
+    /// `Games.Replace_cover`/`Games.Replace_backdrop` through the normal
+    /// `executeCommandCore` path, so `Game_cover_replaced`/
+    /// `Game_backdrop_replaced` fires exactly as it does for a picked
+    /// candidate (ADR-0043 — `CoverRef`/`BackdropRef` stay identity-card
+    /// projection columns written only by those events; nothing here
+    /// touches `game_metadata_cache`).
+    ///
+    /// Ref/extension decision: the ref is ALWAYS the fixed `.jpg` name,
+    /// regardless of the validated image's real encoding — a validated
+    /// PNG/WebP upload is stored as-is under the `.jpg` ref. Steam and RAWG
+    /// candidates already do this today (a RAWG screenshot can be PNG), and
+    /// the game-removal path elsewhere in this module deletes both refs by
+    /// their hardcoded names, so a format-dependent extension would
+    /// silently orphan files on removal (ADR-0025's orphan guard) unless
+    /// that removal path were reworked to delete by the projection's
+    /// `CoverRef`/`BackdropRef` instead — do not do half of that. No image
+    /// library is referenced by this server (no transcoding available), so
+    /// the static file server labels a stored PNG/WebP `image/jpeg` and
+    /// browsers render it by sniffing — the same situation the URL path was
+    /// already in.
+    let private saveGameImageAndReplace
+        (conn: SqliteConnection)
+        (imageBasePath: string)
+        (projectionHandlers: Projection.ProjectionHandler list)
+        (slug: string)
+        (imageKind: string)
+        (bytes: byte[])
+        : Result<unit, string> =
+        if bytes.Length = 0 then
+            Error "No image data received"
+        elif bytes.Length > maxGameImageBytes then
+            Error "Image exceeds the 25 MB size limit"
+        elif not (isRasterImage bytes) then
+            Error "Unsupported image format — only JPEG, PNG, and WebP are accepted"
+        else
+            let ref =
+                if imageKind = "cover" then $"posters/game-{slug}.jpg"
+                else $"backdrops/game-{slug}.jpg"
+            ImageStore.saveImage imageBasePath ref bytes
+            let sid = Games.streamId slug
+            let command =
+                if imageKind = "cover" then Games.Replace_cover ref
+                else Games.Replace_backdrop ref
+            executeCommandCore
+                conn sid
+                Games.Serialization.fromStoredEvent
+                Games.reconstitute
+                Games.decide
+                Games.Serialization.toEventData
+                command
+                projectionHandlers
+
     /// books-wk67x (amending ADR-0076 §2): every Books command goes through
     /// this Books-specific executor now, never the generic
     /// `executeCommandCore` above — `Books.reconstitute` needs each
@@ -4215,27 +4293,24 @@ module Api =
                 use conn = factory ()
                 try
                     let! response = httpClient.GetAsync(sourceUrl) |> Async.AwaitTask
-                    response.EnsureSuccessStatusCode() |> ignore
-                    let! bytes = response.Content.ReadAsByteArrayAsync() |> Async.AwaitTask
-                    let ref =
-                        if imageKind = "cover" then $"posters/game-{slug}.jpg"
-                        else $"backdrops/game-{slug}.jpg"
-                    ImageStore.saveImage imageBasePath ref bytes
-                    let sid = Games.streamId slug
-                    let command =
-                        if imageKind = "cover" then Games.Replace_cover ref
-                        else Games.Replace_backdrop ref
-                    return
-                        executeCommand
-                            conn sid
-                            Games.Serialization.fromStoredEvent
-                            Games.reconstitute
-                            Games.decide
-                            Games.Serialization.toEventData
-                            command
-                            projectionHandlers
+                    if not response.IsSuccessStatusCode then
+                        return Error $"Failed to download image: server returned {int response.StatusCode}"
+                    else
+                        let! bytes = response.Content.ReadAsByteArrayAsync() |> Async.AwaitTask
+                        return saveGameImageAndReplace conn imageBasePath projectionHandlers slug imageKind bytes
                 with ex ->
                     return Error $"Failed to download image: {ex.Message}"
+            }
+
+            // games-hm3sf: the upload counterpart to `selectGameImage` above —
+            // bytes are already read client-side (`FileReader` -> `Uint8Array`),
+            // so this never touches the network. `filename` is accepted for
+            // shape parity with `uploadFriendImage`/`uploadContentImage` but
+            // deliberately unused — see `saveGameImageAndReplace`'s doc comment
+            // for the fixed-`.jpg`-ref decision.
+            uploadGameImage = fun slug data _filename imageKind -> async {
+                use conn = factory ()
+                return saveGameImageAndReplace conn imageBasePath projectionHandlers slug imageKind data
             }
 
             getGameTrailers = fun slug -> async {
