@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 1
+- **Todo:** 2
 - **Doing:** 0
 - **Done:** 32
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **integration-q748k** — RomM play button — a RomM-linked game whose platform RomM can play in the browser shows a Play button in the game page hero that opens RomM's web player for that rom in a new browser tab (feature) — `todo/integration-q748k-romm-play-button.md`
 - **integration-qqpq9** — Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab (feature) — `todo/integration-qqpq9-audible-companion-pdf-download-and-book-detail-link.md`
 <!-- todo-list:end -->
 

@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 11:33 -- Modeling / Captured: integration-q748k - RomM play button — a RomM-linked game whose platform RomM can play in the browser shows a Play button in the game page hero that opens RomM's web player for that rom in a new browser tab
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** Play button in the game detail hero for RomM-linked games on browser-playable platforms; opens RomM's web player (/rom/{id}/ejs|ruffle|jsdos|pico8) in a new tab. Server builds the URL from romm_base_url + rom id + a sync-cached platform slug.
+
+---
+
 ## 2026-09-27 11:26 -- Modeling / Captured: integration-qqpq9 - Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab
 
 **Type:** Modeling / Capture
