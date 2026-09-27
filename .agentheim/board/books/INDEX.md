@@ -11,13 +11,14 @@ Catalog of this bounded context's tasks by status.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 12
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **books-r8cfn** — Dashboard book poster cards all share one size and show the whole cover — the Books tab rails (Currently Reading / Recently Finished / Recently Added) and the All tab's Reading card stop sizing each card from its image and stop cropping covers to the 2:3 frame (bug) — `todo/books-r8cfn-dashboard-book-cards-uniform-size-full-cover.md`
 <!-- todo-list:end -->
 
 ### Doing

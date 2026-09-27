@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 23:58 -- Modeling / Captured: books-r8cfn - Dashboard book poster cards all share one size and show the whole cover — the Books tab rails (Currently Reading / Recently Finished / Recently Added) and the All tab's Reading card stop sizing each card from its image and stop cropping covers to the 2:3 frame
+
+**Type:** Modeling / Capture
+**BC:** books
+**Filed to:** todo
+**Summary:** Books dashboard poster cards lack the fixed rail width (so each sizes from its image) and crop square covers via object-cover; give them the games cards' fixed width and show the whole cover with object-contain in the kept 2:3 frame.
+
+---
+
 ## 2026-09-27 23:53 -- Task verified and completed: integration-q3cg7 - RomM sync fails outright when any play session has a null rom_id — skip orphaned sessions instead of rejecting the whole page
 
 **Type:** Work / Task completion
