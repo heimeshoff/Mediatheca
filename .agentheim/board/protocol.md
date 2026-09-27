@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 11:26 -- Modeling / Captured: integration-qqpq9 - Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** Nightly Audible sync (with natural backfill) downloads companion PDFs to DATA_DIR/pdfs; book detail links to them in a new tab. Wire shape and bearer-auth acceptance of the companion-file endpoint are unverified — bounce if bearer is refused.
+
+---
+
 ## 2026-09-26 10:19 -- Work session ended
 
 **Type:** Work / Session end

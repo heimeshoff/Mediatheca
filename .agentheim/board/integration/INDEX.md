@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 32
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **integration-qqpq9** — Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab (feature) — `todo/integration-qqpq9-audible-companion-pdf-download-and-book-detail-link.md`
 <!-- todo-list:end -->
 
 ### Doing
