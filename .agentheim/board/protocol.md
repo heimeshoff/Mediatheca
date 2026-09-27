@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 23:45 -- Modeling / Captured: games-zex36 - Games — attach friends to individual play sessions like Movies' watch sessions; adding one also adds them to the game's Played with set, and the Friend page shows the shared play dates
+
+**Type:** Modeling / Capture
+**BC:** games
+**Filed to:** todo
+**Summary:** Friends on individual play sessions (new Friend_added/removed_to_play_session events, parallel PlaySessionFriends map); adding one emits Game_played_with; Friend page gains real play dates. ADR-0091.
+
+---
+
 ## 2026-09-27 23:39 -- Batch started: [games-fbf3j, integration-q3cg7]
 
 **Type:** Work / Batch start
