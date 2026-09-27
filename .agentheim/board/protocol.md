@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 23:39 -- Batch started: [games-fbf3j, integration-q3cg7]
+
+**Type:** Work / Batch start
+**Tasks:** games-fbf3j - Game detail page — show a game's entire play history in the Play History card instead of only the 10 most recent sessions, integration-q3cg7 - RomM sync fails outright when any play session has a null rom_id — skip orphaned sessions instead of rejecting the whole page
+**Parallel:** yes (2 workers)
+
+---
+
 ## 2026-09-27 23:38 -- Modeling / Captured: games-fbf3j - Game detail page — show a game's entire play history in the Play History card instead of only the 10 most recent sessions
 
 **Type:** Modeling / Capture

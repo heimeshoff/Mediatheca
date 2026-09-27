@@ -1,7 +1,7 @@
 ---
 id: games-fbf3j
 title: Game detail page — show a game's entire play history in the Play History card instead of only the 10 most recent sessions
-status: todo
+status: doing
 type: bug
 context: games
 created: 2026-09-27

@@ -1,7 +1,7 @@
 ---
 id: integration-q3cg7
 title: RomM sync fails outright when any play session has a null rom_id — skip orphaned sessions instead of rejecting the whole page
-status: todo
+status: doing
 type: bug
 context: integration
 created: 2026-09-27
