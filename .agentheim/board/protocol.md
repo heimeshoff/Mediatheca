@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 23:58 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 20m (batch started 23:40)
+**Completed:** 2 (first-try PASS: 2, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** games-fbf3j: 1, integration-q3cg7: 1
+**Commits:** 4
+**Vision-conformance:** none — batch aligns with vision
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (2 tasks)
+**Carry-over:** none — working tree clean. Note: games-fbf3j's code, INDEX edit and completion entry were swept into b3bddf6 (a concurrent modeling capture of games-hm3sf) while the squash-merge sat staged on main; d9e76b2 carries the remaining task-file move.
+
+---
+
 ## 2026-09-27 23:58 -- Modeling / Captured: books-r8cfn - Dashboard book poster cards all share one size and show the whole cover — the Books tab rails (Currently Reading / Recently Finished / Recently Added) and the All tab's Reading card stop sizing each card from its image and stop cropping covers to the 2:3 frame
 
 **Type:** Modeling / Capture
