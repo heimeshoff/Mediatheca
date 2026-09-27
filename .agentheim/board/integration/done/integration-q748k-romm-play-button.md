@@ -1,7 +1,7 @@
 ---
 id: integration-q748k
 title: RomM play button — a RomM-linked game whose platform RomM can play in the browser shows a Play button in the game page hero that opens RomM's web player for that rom in a new browser tab
-status: doing
+status: done
 type: feature
 context: integration
 created: 2026-09-27
@@ -102,3 +102,58 @@ source path in a comment. Switch, GameCube and Wii map to `None`. Emulator **str
   sync imports the session. It is worth checking once while doing the eye-check above.
 - RomM also has a console-mode route (`/console/rom/:rom/play`). It isn't used here because the
   per-player routes skip RomM's own detail page.
+
+## Outcome
+
+Added a **Play** button to the game detail hero (`src/Client/Pages/GameDetail/Views.fs`, in the
+title/meta block, right below the year/playtime line so it doesn't crowd the status/rating row).
+It renders only when `GameDetail.RommPlayUrl` (new `string option` field, `src/Shared/Shared.fs`)
+is `Some`, as an anchor with `target="_blank"`/`rel="noopener noreferrer"`. Styling reuses
+`DesignSystem.heroCard`'s "▶ Watch" button tokens verbatim (`bg-gold text-primary-content
+rounded-full ...`) inline rather than adding a new composition, since no new visual shape was
+needed — nothing added to the StyleGuide page.
+
+Server side, `GameDetail.RommPlayUrl` is computed entirely in `GameProjection.getBySlug`
+(`src/Server/GameProjection.fs`): a new LEFT JOIN through a new `romm_rom_platform(rom_id,
+platform_slug)` table (created in `GameProjection.createTables`, classified `Cache "RomMSync"` in
+`Administration.tableRegistry`) resolves the linked rom's platform slug, `RomM.playerRouteFor`
+(`src/Server/RomM.fs`) maps it to a player route, and a non-empty `romm_base_url`
+(`SettingsStore`) completes the URL — trimming any trailing slash. Any missing piece (no
+`romm_rom_id`, no base URL, unplayable platform, no platform row yet) degrades to `None`, never a
+partial URL; the token is never read into the URL at all.
+
+`RomM.RomMRomDetail` gained a `PlatformSlug: string` field, decoded from the SAME `platform_id`
+rom-detail response `RomMSync` already fetches per rom with a closed session — no second HTTP
+call. `RomMSync.runSync`'s `importFor` (called for AlreadyLinked/Matched/Created roms, never for
+Ambiguous/Failed ones) now upserts `(rom.Id, rom.PlatformSlug)` into `romm_rom_platform` via the
+new `GameProjection.upsertRommRomPlatform`, mirroring the existing `findByRommRomId` call site.
+Already-linked games get backfilled the next time they have a closed session, per the task's own
+design — no separate backfill job.
+
+`RomM.playerRouteFor`'s slug lists were pulled from RomM's real source (tag `5.3.1`,
+`rommapp/romm`, commit `95599dadbe93c8f7b8a8647148fafbe293df3167`,
+`frontend/src/utils/index.ts`'s `isEJSEmulationSupported`/`isRuffleEmulationSupported`/
+`isJsDosEmulationSupported`/`isPico8EmulationSupported`), not reconstructed from general
+knowledge — fetched and transcribed via a research pass, cited in the function's own doc comment.
+Deliberately excludes EmulatorJS's netplay-only nightly-core slugs (3ds, new-nintendo-3ds,
+intellivision), which RomM only shows behind a server-side heartbeat flag this adapter can't read
+— treated as unplayable rather than guessed.
+
+Tests: `RomMTests.fs` gained 6 new `playerRouteFor` cases (EJS Nintendo handhelds/consoles,
+Ruffle, js-dos, PICO-8, Switch/GameCube/Wii/unknown → `None`, case-insensitivity) plus a
+`PlatformSlug` decode assertion on the existing recorded fixture. `RomMSyncTests.fs`'s
+`romDetailJson` helper gained a `platformSlug` parameter (all 9 call sites updated) and a new
+test proves a sync run upserts the linked rom's platform slug and a second identical run leaves
+both the table and the event stream position unchanged. A new `RomMPlayButtonTests.fs` covers
+`getBySlug`'s `RommPlayUrl` directly against seeded projection state: the happy path, each `None`
+degradation (no rom id, no base URL, unplayable platform, no platform row yet), the
+trailing-slash-safe URL, and that the API token never appears in the built URL.
+`GameDetail/DefaultTab.test.fs`'s mock `GameDetail` record gained `RommPlayUrl = None`.
+
+Verified: `dotnet build` (Server + Server.Tests) clean; full Expecto suite 1059/1059 passing;
+`npm run build` (Fable/Vite) clean; `npm run test:client` (Vitest) 129/129 passing.
+
+**For the builder's eye-check (human-eye criteria not verifiable from a worktree):** confirm the
+Play button reads as the hero's primary action (not crowding status/rating) on desktop and phone
+width, and — per the task's own open question — check once whether playing via RomM's web player
+records a RomM play session, since if it does the loop closes itself on the next sync.

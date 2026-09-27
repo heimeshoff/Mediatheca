@@ -298,6 +298,12 @@ module RomMSync =
                                 | Ok rom ->
                                     let! slugOutcome = resolveSlug conn jobLock httpClient config imageBasePath projectionHandlers rom
                                     let importFor slug =
+                                        // integration-q748k (ADR-0088 concept extended): record this
+                                        // rom's platform slug for every rom that ends up linked this
+                                        // run (already-linked, matched, or newly created) -- ambiguous/
+                                        // failed roms below never call `importFor` at all, so nothing
+                                        // is recorded for a rom that has no Game to join through.
+                                        withLock jobLock (fun () -> GameProjection.upsertRommRomPlatform conn rom.Id rom.PlatformSlug)
                                         let recorded, promoted =
                                             importSessionsForRom conn jobLock syncHour slug sessions projectionHandlers
                                         sessionsRecorded <- sessionsRecorded + recorded

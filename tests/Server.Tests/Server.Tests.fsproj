@@ -79,6 +79,7 @@
     <Compile Include="RomMTests.fs" />
     <Compile Include="RomMApiTests.fs" />
     <Compile Include="RomMSyncTests.fs" />
+    <Compile Include="RomMPlayButtonTests.fs" />
     <Compile Include="CatalogProjectionTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

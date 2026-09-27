@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 12:31 -- Task verified and completed: integration-q748k - RomM play button — a RomM-linked game whose platform RomM can play in the browser shows a Play button in the game page hero that opens RomM's web player for that rom in a new browser tab
+
+**Type:** Work / Task completion
+**Task:** integration-q748k - RomM play button — a RomM-linked game whose platform RomM can play in the browser shows a Play button in the game page hero that opens RomM's web player for that rom in a new browser tab
+**Summary:** add RomM Play button to the game detail hero, backed by a romm_rom_platform lookup and RomM.playerRouteFor
+**Duration:** 29m
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 11
+**Tests added:** 14
+**ADRs written:** none
+
+---
+
 ## 2026-09-27 12:05 -- Task bounced: integration-qqpq9 - Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab
 
 **Type:** Work / Task bounced

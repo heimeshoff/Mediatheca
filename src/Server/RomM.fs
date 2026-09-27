@@ -70,6 +70,13 @@ module RomM =
         Summary: string option
         Genres: string list
         PlatformId: int
+        /// games-q748k (ADR-0088 concept extended): the platform's short
+        /// slug (e.g. "snes"), decoded straight off `platform_slug` on the
+        /// SAME rom-detail response the sync already fetches for every rom
+        /// with closed sessions -- no second HTTP call needed. Defaults to
+        /// "" when absent (an old/unexpected wire shape), which
+        /// `playerRouteFor` below always maps to `None`.
+        PlatformSlug: string
         CoverUrl: string option
         /// Derived from `metadatum.first_release_date` (a Unix-seconds
         /// timestamp, IGDB-shaped) -- `None` when RomM has no release date
@@ -182,6 +189,7 @@ module RomM =
                 Summary = get.Optional.Field "summary" Decode.string
                 Genres = metadatum.Genres
                 PlatformId = get.Required.Field "platform_id" Decode.int
+                PlatformSlug = get.Optional.Field "platform_slug" Decode.string |> Option.defaultValue ""
                 CoverUrl = get.Optional.Field "url_cover" Decode.string
                 ReleaseYear = releaseYear
             })
@@ -342,3 +350,71 @@ module RomM =
     let minutesFromDurationMs (durationMs: int64) : int =
         if durationMs <= 0L then 0
         else max 1 (int (Math.Round(float durationMs / 60000.0, MidpointRounding.AwayFromZero)))
+
+    // ── Play button (integration-q748k, ADR-0088) ──
+
+    /// Platform slugs EmulatorJS supports -- the BASE `_EJS_CORES_MAP` keys
+    /// only (source below). Deliberately excludes `_EJS_NIGHTLY_CORES_MAP`'s
+    /// extra slugs ("3ds", "new-nintendo-3ds", "intellivision"), which
+    /// RomM's frontend only turns on when a server-side heartbeat flag
+    /// (`config.EJS_NETPLAY_ENABLED`) is set -- this adapter has no way to
+    /// read that flag, so treating those platforms as unplayable is the
+    /// safe default rather than guessing the flag's state. Several slugs
+    /// below are literal typos in RomM's own source ("commmodore-128",
+    /// "game-televisison", "game-boy-adavance-sp") -- kept verbatim, since
+    /// the whole point is matching RomM's real, as-shipped slugs.
+    let private ejsPlatformSlugs =
+        set [
+            "3do"; "acpc"; "amiga"; "amiga-cd32"; "arcade"; "neogeoaes"; "neogeomvs"
+            "atari2600"; "atari-2600-plus"; "atari5200"; "atari7800"; "c-plus-4"; "c64"
+            "cpet"; "commodore-64c"; "c128"; "commmodore-128"; "colecovision"; "doom"
+            "dos"; "jaguar"; "lynx"; "atari-lynx-mkii"; "neo-geo-pocket"
+            "neo-geo-pocket-color"; "nes"; "famicom"; "fds"; "game-televisison"
+            "new-style-nes"; "n64"; "ique-player"; "nds"; "nintendo-ds-lite"
+            "nintendo-dsi"; "nintendo-dsi-xl"; "gb"; "game-boy-pocket"; "game-boy-light"
+            "gba"; "game-boy-adavance-sp"; "game-boy-micro"; "gbc"; "pc-fx"; "psx"
+            "philips-cd-i"; "psp"; "segacd"; "sega32"; "gamegear"; "sms"
+            "sega-mark-iii"; "sega-game-box-9"; "sega-master-system-ii"
+            "master-system-super-compact"; "master-system-girl"; "genesis"
+            "sega-mega-drive-2-slash-genesis"; "sega-mega-jet"; "mega-pc"
+            "tera-drive"; "sega-nomad"; "saturn"; "snes"; "sfam"
+            "super-nintendo-original-european-version"; "super-famicom-shvc-001"
+            "super-famicom-jr-model-shvc-101"; "new-style-super-nes-model-sns-101"
+            "tg16"; "turbografx-cd"; "supergrafx"; "vic-20"; "virtualboy"
+            "wonderswan"; "swancrystal"; "wonderswan-color"; "zxs"
+        ]
+
+    /// `isRuffleEmulationSupported`'s exact check: `["flash"; "browser"]`.
+    let private rufflePlatformSlugs = set [ "flash"; "browser" ]
+
+    /// `isJsDosEmulationSupported`'s exact check: `["win3x"; "win9x"]` --
+    /// RomM's js-dos player targets Windows 3.x/9x DOS-era environments,
+    /// not a bare "dos" slug (that one is an EmulatorJS core instead, via
+    /// `dosbox_pure` -- see `ejsPlatformSlugs` above).
+    let private jsdosPlatformSlugs = set [ "win3x"; "win9x" ]
+
+    /// `isPico8EmulationSupported`'s exact check -- singular "pico" (the
+    /// PLATFORM slug), not "pico8" (that is only the PLAYER ROUTE name).
+    let private pico8PlatformSlugs = set [ "pico" ]
+
+    /// Maps a RomM platform SLUG to the player-route segment RomM's own
+    /// frontend (`frontend/src/plugins/router.ts`'s `ROUTES.EMULATORJS` /
+    /// `ROUTES.RUFFLE` / `ROUTES.JSDOS` / `ROUTES.PICO8`) would open for it,
+    /// or `None` when RomM's frontend shows no Play button at all for that
+    /// platform -- confirmed absent from every `isXEmulationSupported`
+    /// check for "switch", "ngc" (GameCube) and "wii". Source: RomM tag
+    /// `5.3.1` (`rommapp/romm`, commit
+    /// `95599dadbe93c8f7b8a8647148fafbe293df3167`),
+    /// `frontend/src/utils/index.ts`'s `isEJSEmulationSupported` /
+    /// `isRuffleEmulationSupported` / `isJsDosEmulationSupported` /
+    /// `isPico8EmulationSupported`. Comparison is case-insensitive, mirroring
+    /// those functions' own `slug.toLowerCase()` checks.
+    let playerRouteFor (platformSlug: string) : string option =
+        let slug =
+            if String.IsNullOrEmpty platformSlug then ""
+            else platformSlug.ToLowerInvariant()
+        if ejsPlatformSlugs.Contains slug then Some "ejs"
+        elif rufflePlatformSlugs.Contains slug then Some "ruffle"
+        elif jsdosPlatformSlugs.Contains slug then Some "jsdos"
+        elif pico8PlatformSlugs.Contains slug then Some "pico8"
+        else None

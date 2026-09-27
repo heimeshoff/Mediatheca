@@ -837,6 +837,29 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                             ]
                                                     ]
                                                 ]
+                                                // integration-q748k (ADR-0088 concept extended): the hero's
+                                                // primary action, server-gated (`GameDetail.RommPlayUrl`) --
+                                                // the client never assembles RomM URLs or knows the platform
+                                                // rules, it only renders this when the server says the rom is
+                                                // linked, configured, and playable in RomM's own web player.
+                                                // Reuses `DesignSystem.heroCard`'s "▶ Watch" button tokens
+                                                // verbatim (bg-gold + primary-content pill) rather than adding
+                                                // a new composition, since this is the same "hero primary
+                                                // action" shape, just an external `target="_blank"` link
+                                                // instead of an in-app dispatch.
+                                                match game.RommPlayUrl with
+                                                | Some url ->
+                                                    Html.a [
+                                                        prop.href url
+                                                        prop.target "_blank"
+                                                        prop.rel "noopener noreferrer"
+                                                        prop.className "inline-flex items-center gap-2 bg-gold text-primary-content rounded-full px-4 py-2 text-sm font-sans font-semibold w-fit"
+                                                        prop.children [
+                                                            Html.span [ prop.className "[&>svg]:w-4 [&>svg]:h-4"; prop.children [ Icons.play () ] ]
+                                                            Html.span [ prop.text "Play" ]
+                                                        ]
+                                                    ]
+                                                | None -> ()
                                             ]
                                         ]
                                     ]

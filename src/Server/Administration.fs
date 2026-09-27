@@ -439,6 +439,14 @@ module Administration =
         // movie_metadata_cache ships empty and unread until movies-v2gkh cuts
         // over a real refresh path for it.
         "game_metadata_cache", Cache "MetadataCache"
+        // integration-q748k (ADR-0088 concept extended): each RomM-linked
+        // rom's platform slug, upserted every sync run by `RomMSync`
+        // (re-derivable by re-fetching rom detail from RomM), read by
+        // `GameProjection.getBySlug`'s Play-button join. Owned/created in
+        // `GameProjection.fs` (not `RomMSync.fs`) so the table exists for
+        // every caller of `GameProjection.handler.Init`, but it is never
+        // event-sourced or checkpoint-tracked -- Cache, not Projected.
+        "romm_rom_platform", Cache "RomMSync"
         "movie_metadata_cache", Cache "(none yet)"
         // books-y9kxy (ADR-0076 §3 / ADR-0045): length/description/series
         // metadata, refreshed by Integration's Open Library/Audible/

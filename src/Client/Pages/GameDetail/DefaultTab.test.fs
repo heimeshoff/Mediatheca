@@ -63,7 +63,8 @@ let private gameDetail (hasJournalContent: bool) : GameDetail =
       RecommendedBy = []
       WantToPlayWith = []
       PlayedWith = []
-      HasNotesContent = hasJournalContent }
+      HasNotesContent = hasJournalContent
+      RommPlayUrl = None }
 
 let private fakeApi : IMediathecaApi = Unchecked.defaultof<IMediathecaApi>
 

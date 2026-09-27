@@ -1334,6 +1334,13 @@ type GameDetail = {
     /// pick Notes-first vs. Overview-first without a second round-trip to
     /// `getNotes`.
     HasNotesContent: bool
+    /// integration-q748k (ADR-0088 concept extended): the server-built URL
+    /// for RomM's own in-browser player for this game's linked rom — `Some`
+    /// only when the game has a `romm_rom_id`, `romm_base_url` is
+    /// configured, and the rom's platform is one RomM's web player
+    /// supports. The client never assembles RomM URLs or knows the
+    /// platform rules; it only renders a Play button when this is `Some`.
+    RommPlayUrl: string option
 }
 
 type AddGameRequest = {

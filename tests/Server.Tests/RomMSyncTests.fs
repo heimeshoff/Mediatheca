@@ -48,7 +48,7 @@ let private config: RomM.RomMConfig =
 /// (the live wire shape always carries it) -- proving decoding tolerates
 /// it while `RomM.RomMRomDetail` never models it at all (the acceptance
 /// criterion's enforcement mechanism, pinned directly in `RomMTests.fs`).
-let private romDetailJson (id: int) (name: string) (platformId: int) (releaseYear: int option) (coverUrl: string option) : string =
+let private romDetailJson (id: int) (name: string) (platformId: int) (platformSlug: string) (releaseYear: int option) (coverUrl: string option) : string =
     let firstReleaseDate =
         // `metadatum.first_release_date` is Unix MILLISECONDS, not seconds
         // (iteration 2 -- confirmed against a live recording, see
@@ -58,8 +58,8 @@ let private romDetailJson (id: int) (name: string) (platformId: int) (releaseYea
         |> Option.defaultValue "null"
     let cover = coverUrl |> Option.map (sprintf "\"%s\"") |> Option.defaultValue "null"
     sprintf
-        """{"id":%d,"name":"%s","summary":"Summary of %s","platform_id":%d,"url_cover":%s,"metadatum":{"genres":["Platformer"],"companies":["Nintendo"],"first_release_date":%s},"rom_user":{"status":"finished","completion":100,"rating":5,"backlogged":false,"now_playing":true}}"""
-        id name name platformId cover firstReleaseDate
+        """{"id":%d,"name":"%s","summary":"Summary of %s","platform_id":%d,"platform_slug":"%s","url_cover":%s,"metadatum":{"genres":["Platformer"],"companies":["Nintendo"],"first_release_date":%s},"rom_user":{"status":"finished","completion":100,"rating":5,"backlogged":false,"now_playing":true}}"""
+        id name name platformId platformSlug cover firstReleaseDate
 
 let private isoUtc (dt: DateTime) = dt.ToUniversalTime().ToString("o")
 
@@ -120,7 +120,7 @@ let rommSyncTests =
             use db = TestDb.withTempDbFactory bootstrap
             let closedSession = sessionJson 1 30 (DateTime.UtcNow.AddHours(-1.0)) (Some 600000L) true
             let sessions = sprintf "[%s]" closedSession
-            let roms = Map.ofList [ 30, romDetailJson 30 "Off Platform Game" 99 (Some 2020) None ]
+            let roms = Map.ofList [ 30, romDetailJson 30 "Off Platform Game" 99 "unknown-platform" (Some 2020) None ]
             let http = new HttpClient(router sessions roms)
             match runSync db.Connection http with
             | Ok result -> Expect.equal result.GamesCreated 0 "No game created -- platform 99 isn't selected"
@@ -131,7 +131,7 @@ let rommSyncTests =
             use db = TestDb.withTempDbFactory bootstrap
             let closedSession = sessionJson 1 10 (DateTime.UtcNow.AddHours(-2.0)) (Some 1800000L) true
             let sessions = sprintf "[%s]" closedSession
-            let roms = Map.ofList [ 10, romDetailJson 10 "Super Mario Odyssey" 1 (Some 2017) None ]
+            let roms = Map.ofList [ 10, romDetailJson 10 "Super Mario Odyssey" 1 "snes" (Some 2017) None ]
             let http = new HttpClient(router sessions roms)
             match runSync db.Connection http with
             | Ok result ->
@@ -153,7 +153,7 @@ let rommSyncTests =
             seedGame db.Connection "chrono-trigger-1995" "Chrono Trigger" 1995
             let closedSession = sessionJson 1 40 (DateTime.UtcNow.AddHours(-2.0)) (Some 1200000L) true
             let sessions = sprintf "[%s]" closedSession
-            let roms = Map.ofList [ 40, romDetailJson 40 "Chrono Trigger" 1 (Some 1995) None ]
+            let roms = Map.ofList [ 40, romDetailJson 40 "Chrono Trigger" 1 "snes" (Some 1995) None ]
             let http = new HttpClient(router sessions roms)
             match runSync db.Connection http with
             | Ok result ->
@@ -169,7 +169,7 @@ let rommSyncTests =
             seedGame db.Connection "duplicate-name-1999-b" "Duplicate Name" 1999
             let closedSession = sessionJson 1 50 (DateTime.UtcNow.AddHours(-2.0)) (Some 1200000L) true
             let sessions = sprintf "[%s]" closedSession
-            let roms = Map.ofList [ 50, romDetailJson 50 "Duplicate Name" 1 (Some 1999) None ]
+            let roms = Map.ofList [ 50, romDetailJson 50 "Duplicate Name" 1 "snes" (Some 1999) None ]
             let http = new HttpClient(router sessions roms)
             match runSync db.Connection http with
             | Ok result ->
@@ -184,7 +184,7 @@ let rommSyncTests =
             use db = TestDb.withTempDbFactory bootstrap
             let closedSession = sessionJson 1 60 (DateTime.UtcNow.AddHours(-3.0)) (Some 500L) true
             let sessions = sprintf "[%s]" closedSession
-            let roms = Map.ofList [ 60, romDetailJson 60 "Short Session Game" 1 (Some 2021) None ]
+            let roms = Map.ofList [ 60, romDetailJson 60 "Short Session Game" 1 "snes" (Some 2021) None ]
             let http = new HttpClient(router sessions roms)
             match runSync db.Connection http with
             | Ok result -> Expect.equal result.SessionsRecorded 1 "The short session is still recorded"
@@ -210,7 +210,7 @@ let rommSyncTests =
             let sBefore = sessionJson 1 70 justBefore (Some 600000L) true
             let sAfter = sessionJson 2 70 justAfter (Some 600000L) true
             let sessions = sprintf "[%s,%s]" sBefore sAfter
-            let roms = Map.ofList [ 70, romDetailJson 70 "Boundary Game" 1 (Some 2022) None ]
+            let roms = Map.ofList [ 70, romDetailJson 70 "Boundary Game" 1 "snes" (Some 2022) None ]
             let http = new HttpClient(router sessions roms)
             match runSync db.Connection http with
             | Ok result -> Expect.equal result.SessionsRecorded 2 "Two separate gaming days -> two Play_session_recorded events"
@@ -223,7 +223,7 @@ let rommSyncTests =
             use db = TestDb.withTempDbFactory bootstrap
             let closedSession = sessionJson 1 80 (DateTime.UtcNow.AddHours(-2.0)) (Some 1500000L) true
             let sessions = sprintf "[%s]" closedSession
-            let roms = Map.ofList [ 80, romDetailJson 80 "Idempotency Game" 1 (Some 2019) None ]
+            let roms = Map.ofList [ 80, romDetailJson 80 "Idempotency Game" 1 "snes" (Some 2019) None ]
             let http1 = new HttpClient(router sessions roms)
             match runSync db.Connection http1 with
             | Ok result -> Expect.equal result.SessionsRecorded 1 "First run records the session"
@@ -237,6 +237,27 @@ let rommSyncTests =
             | Error e -> failtestf "Expected second sync to succeed, got %s" e
             let positionAfterSecond = EventStore.getStreamPosition db.Connection (Games.streamId slug)
             Expect.equal positionAfterSecond positionAfterFirst "The game stream's position is unchanged after a second identical sync"
+
+        testCase "integration-q748k: a sync run upserts the linked rom's platform slug; a second identical run leaves it unchanged and still appends zero events" <| fun _ ->
+            use db = TestDb.withTempDbFactory bootstrap
+            let closedSession = sessionJson 1 100 (DateTime.UtcNow.AddHours(-2.0)) (Some 1500000L) true
+            let sessions = sprintf "[%s]" closedSession
+            let roms = Map.ofList [ 100, romDetailJson 100 "Platform Slug Game" 1 "snes" (Some 2019) None ]
+            let http1 = new HttpClient(router sessions roms)
+            match runSync db.Connection http1 with
+            | Ok result -> Expect.equal result.GamesCreated 1 "First run creates the game"
+            | Error e -> failtestf "Expected first sync to succeed, got %s" e
+            let slug = GameProjection.findByRommRomId db.Connection 100 |> Option.get
+            Expect.equal (GameProjection.getRommRomPlatformSlug db.Connection 100) (Some "snes") "Platform slug recorded for the newly-linked rom"
+            let positionAfterFirst = EventStore.getStreamPosition db.Connection (Games.streamId slug)
+
+            let http2 = new HttpClient(router sessions roms)
+            match runSync db.Connection http2 with
+            | Ok result -> Expect.equal result.SessionsRecorded 0 "Second, identical run records no new sessions"
+            | Error e -> failtestf "Expected second sync to succeed, got %s" e
+            Expect.equal (GameProjection.getRommRomPlatformSlug db.Connection 100) (Some "snes") "Platform slug is unchanged after the second, identical run"
+            let positionAfterSecond = EventStore.getStreamPosition db.Connection (Games.streamId slug)
+            Expect.equal positionAfterSecond positionAfterFirst "No new events appended on the second run either"
 
         testCase "A matched game whose Set_romm_rom_id command fails is not linked, not counted, and its sessions are not imported" <| fun _ ->
             // Iteration 2 (verifier note): `resolveSlug` used to discard the
@@ -260,7 +281,7 @@ let rommSyncTests =
 
             let closedSession = sessionJson 1 90 (DateTime.UtcNow.AddHours(-2.0)) (Some 1200000L) true
             let sessions = sprintf "[%s]" closedSession
-            let roms = Map.ofList [ 90, romDetailJson 90 "Ghost Game" 1 (Some 2020) None ]
+            let roms = Map.ofList [ 90, romDetailJson 90 "Ghost Game" 1 "snes" (Some 2020) None ]
             let http = new HttpClient(router sessions roms)
             match runSync db.Connection http with
             | Ok result ->

@@ -127,6 +127,24 @@ module GameProjection =
             conn |> Db.newCommand "ALTER TABLE game_detail ADD COLUMN romm_rom_id INTEGER" |> Db.exec
         with _ -> ()
 
+        // integration-q748k (ADR-0088 concept extended): a small
+        // integration-owned lookup, external-metadata-cache shaped like
+        // `MetadataCache` (upserted every RomM sync run, never event-
+        // sourced — no `GameCommand`/`GameEvent`, no new event stream).
+        // Owned here (not `RomM.fs`/`RomMSync.fs`) so it lives next to the
+        // `getBySlug` join that reads it and every existing test bootstrap
+        // that already calls `GameProjection.handler.Init` gets the table
+        // for free. `RomMSync.fs` writes to it via `upsertRommRomPlatform`
+        // below, mirroring how it already calls `findByRommRomId`.
+        conn
+        |> Db.newCommand """
+            CREATE TABLE IF NOT EXISTS romm_rom_platform (
+                rom_id        INTEGER PRIMARY KEY,
+                platform_slug TEXT NOT NULL
+            );
+        """
+        |> Db.exec
+
         // intelligence-b1nz5: WHEN a game was retired, event-derived (written
         // by the `Game_status_changed Retired` handler below from that
         // event's own `StoredEvent.Timestamp`, therefore replayable,
@@ -747,9 +765,11 @@ module GameProjection =
                 gd.facet_override_solo, gd.facet_override_coop_couch, gd.facet_override_coop_online,
                 gd.facet_override_versus_couch, gd.facet_override_versus_online,
                 gd.facet_override_remote_play_together, gd.facet_override_vr,
-                mc.deck_compat, mc.release_date_raw, mc.release_date_parsed, mc.coming_soon
+                mc.deck_compat, mc.release_date_raw, mc.release_date_parsed, mc.coming_soon,
+                gd.romm_rom_id, rrp.platform_slug AS romm_platform_slug
             FROM game_detail gd
             LEFT JOIN game_metadata_cache mc ON mc.game_slug = gd.slug
+            LEFT JOIN romm_rom_platform rrp ON rrp.rom_id = gd.romm_rom_id
             WHERE gd.slug = @slug
         """
         |> Db.setParams [ "slug", SqlType.String slug ]
@@ -838,7 +858,29 @@ module GameProjection =
               // deleted the legacy game_journal_blocks table, so this reads
               // notes_blocks only.
               HasNotesContent =
-                NotesProjection.getForOwner conn MediaType.Game slug |> JournalBlock.hasContent }
+                NotesProjection.getForOwner conn MediaType.Game slug |> JournalBlock.hasContent
+              // integration-q748k (ADR-0088 concept extended): `Some url`
+              // only when ALL of — a linked romm_rom_id, a recorded
+              // platform slug RomM's own frontend can actually play
+              // in-browser (`RomM.playerRouteFor`), and a non-empty
+              // `romm_base_url` setting. Any missing piece degrades to
+              // `None` — no button — rather than a partial/broken URL.
+              RommPlayUrl =
+                let rommRomId =
+                    if rd.IsDBNull(rd.GetOrdinal("romm_rom_id")) then None
+                    else Some (rd.ReadInt32 "romm_rom_id")
+                match rommRomId with
+                | None -> None
+                | Some romId ->
+                    let platformSlug =
+                        if rd.IsDBNull(rd.GetOrdinal("romm_platform_slug")) then None
+                        else Some (rd.ReadString "romm_platform_slug")
+                    platformSlug
+                    |> Option.bind RomM.playerRouteFor
+                    |> Option.bind (fun player ->
+                        let baseUrl = SettingsStore.getSetting conn "romm_base_url" |> Option.defaultValue ""
+                        if System.String.IsNullOrWhiteSpace baseUrl then None
+                        else Some (sprintf "%s/rom/%d/%s" (baseUrl.TrimEnd('/')) romId player)) }
         )
 
     /// ADR-0053: composes the display-ready `PlayFacets` for one game by
@@ -940,6 +982,37 @@ module GameProjection =
         |> Db.newCommand "SELECT slug FROM game_detail WHERE romm_rom_id = @romm_rom_id LIMIT 1"
         |> Db.setParams [ "romm_rom_id", SqlType.Int32 rommRomId ]
         |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "slug")
+
+    /// integration-q748k (ADR-0088 concept extended): upserts `romm_rom_platform`
+    /// (rom_id, platform_slug) — called by `RomMSync` once per rom whose
+    /// detail it fetched AND that ends up linked (already-linked, matched,
+    /// or newly created) this run. Idempotent, never event-sourced: a
+    /// second identical sync run leaves the row unchanged. Any rom linked
+    /// before this concept existed is backfilled the next time it has a
+    /// closed session (`RomMSync` already re-fetches rom detail for
+    /// already-linked roms too), so no separate backfill job is needed.
+    let upsertRommRomPlatform (conn: SqliteConnection) (romId: int) (platformSlug: string) : unit =
+        conn
+        |> Db.newCommand """
+            INSERT INTO romm_rom_platform (rom_id, platform_slug)
+            VALUES (@rom_id, @platform_slug)
+            ON CONFLICT(rom_id) DO UPDATE SET platform_slug = @platform_slug
+        """
+        |> Db.setParams [
+            "rom_id", SqlType.Int32 romId
+            "platform_slug", SqlType.String platformSlug
+        ]
+        |> Db.exec
+
+    /// integration-q748k: the platform slug recorded for a rom id, or
+    /// `None` if no sync has ever recorded one — used directly by test
+    /// assertions (`getBySlug`'s own `RommPlayUrl` computation reads the
+    /// same table via a SQL join, not through this function).
+    let getRommRomPlatformSlug (conn: SqliteConnection) (romId: int) : string option =
+        conn
+        |> Db.newCommand "SELECT platform_slug FROM romm_rom_platform WHERE rom_id = @rom_id"
+        |> Db.setParams [ "rom_id", SqlType.Int32 romId ]
+        |> Db.querySingle (fun (rd: IDataReader) -> rd.ReadString "platform_slug")
 
     /// games-v4nqe: rewritten to query the cache tier — description/
     /// short_description no longer live on `game_detail`. Kept (not retired

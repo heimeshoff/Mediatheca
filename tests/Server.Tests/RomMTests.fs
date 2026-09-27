@@ -113,6 +113,7 @@ let rommDecodingTests =
                 Expect.equal rom.Genres [ "Adventure"; "Platform" ] "Genres from metadatum"
                 Expect.equal rom.ReleaseYear (Some 1994) "Release year derived from first_release_date, treated as milliseconds"
                 Expect.equal rom.CoverUrl (Some "https://thumbnails.libretro.com/Nintendo%20-%20Super%20Nintendo%20Entertainment%20System/Named_Boxarts/3%20Ninjas%20Kick%20Back%20%28USA%29.png") "Cover URL is the real, third-party libretro CDN URL"
+                Expect.equal rom.PlatformSlug "snes" "Platform slug decoded from the recorded fixture's platform_slug field"
             | Error e -> failtestf "Expected rom detail to decode, got %A" e
 
         testCase "Decodes a play sessions page, tolerating timestamps with no timezone suffix at all" <| fun _ ->
@@ -209,6 +210,31 @@ let rommDecodingTests =
             Expect.isTrue (RomM.isSameHost "https://romm.example.com/" "http://romm.example.com/assets/x.png?ts=1") "Scheme/trailing slash/query don't matter"
             Expect.isFalse (RomM.isSameHost "https://romm.example.com" "https://thumbnails.libretro.com/foo.png") "Different host"
             Expect.isFalse (RomM.isSameHost "https://romm.example.com" "not a url") "An unparseable cover URL degrades to false, not an exception"
+
+        testCase "playerRouteFor: EmulatorJS platforms (Nintendo handhelds and home consoles) map to Some \"ejs\"" <| fun _ ->
+            for slug in [ "nes"; "snes"; "n64"; "gb"; "gbc"; "gba"; "nds" ] do
+                Expect.equal (RomM.playerRouteFor slug) (Some "ejs") (sprintf "%s is an EmulatorJS platform" slug)
+
+        testCase "playerRouteFor: Flash maps to Some \"ruffle\"" <| fun _ ->
+            Expect.equal (RomM.playerRouteFor "flash") (Some "ruffle") "flash -> ruffle"
+            Expect.equal (RomM.playerRouteFor "browser") (Some "ruffle") "browser -> ruffle"
+
+        testCase "playerRouteFor: DOS-era platforms map to Some \"jsdos\"" <| fun _ ->
+            Expect.equal (RomM.playerRouteFor "win3x") (Some "jsdos") "win3x -> jsdos"
+            Expect.equal (RomM.playerRouteFor "win9x") (Some "jsdos") "win9x -> jsdos"
+
+        testCase "playerRouteFor: PICO-8 maps to Some \"pico8\"" <| fun _ ->
+            Expect.equal (RomM.playerRouteFor "pico") (Some "pico8") "pico -> pico8"
+
+        testCase "playerRouteFor: Switch, GameCube, Wii and an unknown slug all map to None" <| fun _ ->
+            Expect.equal (RomM.playerRouteFor "switch") None "Switch has no in-browser player"
+            Expect.equal (RomM.playerRouteFor "ngc") None "GameCube has no in-browser player"
+            Expect.equal (RomM.playerRouteFor "wii") None "Wii has no in-browser player"
+            Expect.equal (RomM.playerRouteFor "some-unknown-platform") None "An unrecognized slug is never playable"
+
+        testCase "playerRouteFor is case-insensitive, mirroring RomM's own slug.toLowerCase() checks" <| fun _ ->
+            Expect.equal (RomM.playerRouteFor "SNES") (Some "ejs") "Uppercase slug still matches"
+            Expect.equal (RomM.playerRouteFor "") None "Empty slug is never playable"
 
         testCase "The token never appears in a log line -- fetchJsonRejectable has no logging call at all" <| fun _ ->
             // A structural guarantee, not a runtime-observable one: there is
