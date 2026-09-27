@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 22:59 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 31m (batch started 22:29)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** integration-t4q7k: 1
+**Commits:** 2
+**Vision-conformance:** none — batch aligns with vision
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task)
+**Carry-over:** none — working tree clean
+
+---
+
 ## 2026-09-27 22:58 -- Task verified and completed: integration-t4q7k - Wire companion-PDF download into the one-time "Import library" bootstrap path
 
 **Type:** Work / Task completion
