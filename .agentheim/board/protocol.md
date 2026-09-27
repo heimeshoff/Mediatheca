@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 23:38 -- Modeling / Captured: games-fbf3j - Game detail page — show a game's entire play history in the Play History card instead of only the 10 most recent sessions
+
+**Type:** Modeling / Capture
+**BC:** games
+**Filed to:** todo
+**Summary:** Remove the 10-session cap on the game detail Play History card so the entire play history renders inline.
+
+---
+
 ## 2026-09-27 23:36 -- Modeling / Captured: integration-q3cg7 - RomM sync fails outright when any play session has a null rom_id — skip orphaned sessions instead of rejecting the whole page
 
 **Type:** Modeling / Capture

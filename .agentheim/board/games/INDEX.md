@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 16
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **games-fbf3j** — Game detail page — show a game's entire play history in the Play History card instead of only the 10 most recent sessions (bug) — `todo/games-fbf3j-show-full-play-history.md`
 <!-- todo-list:end -->
 
 ### Doing
