@@ -59,6 +59,12 @@ let view
     ]
 
 /// Poster card with configurable route prefix (e.g. "movies" or "series").
+/// games-q7vnd: only when `routePrefix` is "games" does the image wire
+/// `PosterFit.onImageLoad`, so off-ratio box art (RomM's NES/SNES covers,
+/// RAWG's 16:9 screenshots) gets the shared `.poster-image--contain`
+/// letterbox treatment once its decoded size proves it isn't close to 2:3.
+/// Movie and series art authored at 2:3 never runs the check and keeps
+/// `posterImage`'s default `cover`.
 let viewForRoute
     (routePrefix: string)
     (slug: string)
@@ -85,6 +91,8 @@ let viewForRoute
                                     prop.src $"/images/{ref}"
                                     prop.alt name
                                     prop.className DesignSystem.posterImage
+                                    if routePrefix = "games" then
+                                        prop.onLoad PosterFit.onImageLoad
                                 ]
                             | None ->
                                 Html.div [

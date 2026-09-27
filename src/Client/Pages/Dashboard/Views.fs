@@ -754,6 +754,15 @@ let private seriesNextEpisodeCard (card: DashboardCard) (jellyfinServerUrl: stri
 
 // ── Games: In Focus — Poster Cards (restyle) ──
 
+/// games-q7vnd: every game poster card wires `PosterFit.onImageLoad` on its
+/// `<img>`. Steam's 600x900 library art is already 2:3 and stays
+/// `DesignSystem.posterImage`'s default `cover`; RomM's off-ratio NES/SNES
+/// box art (and RAWG's 16:9 screenshots) get the shared `.poster-image--contain`
+/// modifier (books-r8cfn) added on load, once `PosterFit.decide` measures
+/// the decoded image's actual `naturalWidth`/`naturalHeight` against the
+/// 2:3 frame. The 2:3 frame itself (`.poster-image-container`'s
+/// `aspect-ratio: 2/3`) and each card's fixed rail width are unaffected by
+/// this decision -- only what happens *inside* the frame changes.
 let private gameInFocusPosterCard (card: DashboardCard) (item: DashboardGameInFocus) =
     Html.a (Motion.flipKey (cardItemKey card item.Slug) @ [
         prop.href (Router.format ("games", item.Slug))
@@ -775,6 +784,7 @@ let private gameInFocusPosterCard (card: DashboardCard) (item: DashboardGameInFo
                                     prop.src $"/images/{ref}"
                                     prop.alt item.Name
                                     prop.className DesignSystem.posterImage
+                                    prop.onLoad PosterFit.onImageLoad
                                 ]
                             | None ->
                                 Html.div [
@@ -2609,6 +2619,7 @@ let private gameRecentlyPlayedPosterCard (card: DashboardCard) (item: DashboardG
                                     prop.src $"/images/{ref}"
                                     prop.alt item.Name
                                     prop.className DesignSystem.posterImage
+                                    prop.onLoad PosterFit.onImageLoad
                                 ]
                             | None ->
                                 Html.div [
@@ -2663,6 +2674,7 @@ let private gameRecentlyAddedPosterCard (card: DashboardCard) (item: GameListIte
                                     prop.src $"/images/{ref}"
                                     prop.alt item.Name
                                     prop.className DesignSystem.posterImage
+                                    prop.onLoad PosterFit.onImageLoad
                                 ]
                             | None ->
                                 Html.div [
@@ -2722,6 +2734,7 @@ let private gameUpcomingPosterCard (card: DashboardCard) (item: GameListItem) =
                                     prop.src $"/images/{ref}"
                                     prop.alt item.Name
                                     prop.className DesignSystem.posterImage
+                                    prop.onLoad PosterFit.onImageLoad
                                 ]
                             | None ->
                                 Html.div [

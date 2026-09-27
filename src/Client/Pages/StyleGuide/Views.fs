@@ -42,6 +42,14 @@ let private specimen (label: string) (reference: string) (element: ReactElement)
 let private squareCoverSwatch =
     "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect width='200' height='200' fill='%23c9a876'/><text x='100' y='112' font-size='30' text-anchor='middle' fill='%23241b14'>SQ</text></svg>"
 
+/// A landscape swatch (ratio ~1.4, like a SNES box) standing in for
+/// off-ratio game box art in the "Poster Image Fit" specimen (games-q7vnd)
+/// -- wired through the real `PosterFit.onImageLoad` handler, the same one
+/// production game poster cards use, so the specimen proves the live
+/// auto-detect path rather than just showing the static class.
+let private landscapeCoverSwatch =
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='280' height='200'><rect width='280' height='200' fill='%235a7a9c'/><text x='140' y='112' font-size='26' text-anchor='middle' fill='%23101820'>SNES</text></svg>"
+
 /// Annotation paragraph for design decisions
 let private decision (text: string) =
     Html.p [
@@ -981,7 +989,7 @@ let private animationsSection () =
             ]
 
             Html.div [
-                prop.className "grid grid-cols-2 gap-6 mt-4 max-w-sm"
+                prop.className "grid grid-cols-3 gap-6 mt-4 max-w-2xl"
                 prop.children [
                     Html.div [
                         prop.className "flex flex-col gap-2"
@@ -1025,6 +1033,34 @@ let private animationsSection () =
                             ]
                             Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "DesignSystem.posterImageContain" ]
                             Html.span [ prop.className DesignSystem.faintText; prop.text "contain -- whole cover, letterboxed" ]
+                        ]
+                    ]
+                    // games-q7vnd: a landscape swatch through the real
+                    // `PosterFit.onImageLoad` wiring -- proves the live
+                    // decision (not just the static class), the same path
+                    // every game poster card in the Dashboard and via
+                    // `PosterCard.viewForRoute` uses.
+                    Html.div [
+                        prop.className "flex flex-col gap-2"
+                        prop.children [
+                            Html.div [
+                                prop.className (DesignSystem.posterCard + " w-28")
+                                prop.children [
+                                    Html.div [
+                                        prop.className DesignSystem.posterImageContainer
+                                        prop.children [
+                                            Html.img [
+                                                prop.src landscapeCoverSwatch
+                                                prop.alt "SNES-style box art, auto-detected"
+                                                prop.className DesignSystem.posterImage
+                                                prop.onLoad PosterFit.onImageLoad
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "PosterFit.onImageLoad" ]
+                            Html.span [ prop.className DesignSystem.faintText; prop.text "auto-detected -- off-ratio box art (games)" ]
                         ]
                     ]
                 ]

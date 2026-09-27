@@ -16,6 +16,7 @@
     <Compile Include="Components\EditableDateInput.fs" />
     <Compile Include="Components\ModalPanel.fs" />
     <Compile Include="Components\LocalCopyRemovalDialog.fs" />
+    <Compile Include="Components\PosterFit.fs" />
     <Compile Include="Components\PosterCard.fs" />
     <Compile Include="Components\EntryList.fs" />
     <Compile Include="Components\ActionMenu.fs" />
@@ -101,6 +102,7 @@
     <Compile Include="Route.test.fs" />
     <Compile Include="Components\SearchModal.test.fs" />
     <Compile Include="Components\LocalCopyRemovalDialog.test.fs" />
+    <Compile Include="Components\PosterFit.test.fs" />
     <Compile Include="Components\RichText.test.fs" />
     <Compile Include="Pages\SeriesDetail\NextUp.test.fs" />
     <Compile Include="Pages\SeriesDetail\NextUpCard.test.fs" />

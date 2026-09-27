@@ -5,6 +5,53 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 01:15 -- Task verified and completed: games-q7vnd - Game poster cards show off-ratio box art whole — NES/SNES (and any clearly non-2:3) covers fit inside the 2:3 frame with soft bands above and below, like books-r8cfn does for book covers; true 2:3 covers (Steam) keep today's fill
+
+**Type:** Work / Task completion
+**Task:** games-q7vnd - Game poster cards show off-ratio box art whole — NES/SNES (and any clearly non-2:3) covers fit inside the 2:3 frame with soft bands above and below, like books-r8cfn does for book covers; true 2:3 covers (Steam) keep today's fill
+**Summary:** Game poster cards pick object-fit per loaded cover — near-2:3 art keeps cover, off-ratio NES/SNES/screenshot art letterboxes via the shared poster-image--contain modifier (5% tolerance)
+**Duration:** 44m
+**Verification:** PASS (iteration 3)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 6
+**Tests added:** 7
+**ADRs written:** none
+
+---
+
+## 2026-09-28 01:11 -- Verification failed: games-q7vnd - Game poster cards show off-ratio box art whole
+
+**Type:** Work / Verification failure
+**Task:** games-q7vnd - Game poster cards show off-ratio box art whole — NES/SNES (and any clearly non-2:3) covers fit inside the 2:3 frame with soft bands above and below, like books-r8cfn does for book covers; true 2:3 covers (Steam) keep today's fill
+**Iteration:** 2 of 3
+**Reasons:** OUTCOME claims PosterCard.view is wired to PosterFit.onImageLoad, only viewForRoute (games route) is — code passes every other check
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
+## 2026-09-28 01:04 -- Verification failed: games-q7vnd - Game poster cards show off-ratio box art whole
+
+**Type:** Work / Verification failure
+**Task:** games-q7vnd - Game poster cards show off-ratio box art whole — NES/SNES (and any clearly non-2:3) covers fit inside the 2:3 frame with soft bands above and below, like books-r8cfn does for book covers; true 2:3 covers (Steam) keep today's fill
+**Iteration:** 1 of 3
+**Reasons:** 10% tolerance band (0.600–0.733) swallows real portrait NES boxes (~0.71), the NES test uses a square input so it hides the gap
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
+## 2026-09-28 01:03 -- Verification failed: design-system-k4tw8 - Movies filmstrip poster hover jitters vertically
+
+**Type:** Work / Verification failure
+**Task:** design-system-k4tw8 - Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference
+**Iteration:** 1 of 3
+**Reasons:** jitter never reproduced — measured the StyleGuide placeholder specimen, which showed 0.000px drift before and after the fix, root cause unconfirmed, criterion 2 (shared transform mechanism) met
+**Iteration hint:** likely-fixable
+**Next:** re-dispatched worker
+
+---
+
 ## 2026-09-28 00:45 -- Batch started: [games-q7vnd, games-zex36, design-system-k4tw8]
 
 **Type:** Work / Batch start
