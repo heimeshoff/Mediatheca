@@ -62,6 +62,7 @@ let private createApi (factory: unit -> SqliteConnection) (imageBasePath: string
         (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         imageBasePath
+        "" // integration-t4q7k: pdfBasePath, unused -- addFriend never touches Audible
         [] // no projection handlers needed — addFriend only touches the event store
 
 [<Tests>]

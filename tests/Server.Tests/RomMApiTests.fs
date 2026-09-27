@@ -77,6 +77,7 @@ let private createApi (factory: unit -> Microsoft.Data.Sqlite.SqliteConnection) 
         (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         noImagesDir
+        "" // integration-t4q7k: pdfBasePath, unused in this test
         allProjectionHandlers
 
 [<Tests>]

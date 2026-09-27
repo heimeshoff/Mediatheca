@@ -361,6 +361,7 @@ let private createApi (factory: unit -> SqliteConnection) : IMediathecaApi =
         (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         "test-fixtures-do-not-exist/images"
+        "" // integration-t4q7k: pdfBasePath, unused in this test
         [ MovieProjection.handler; SeriesProjection.handler; GameProjection.handler; BookProjection.handler; PlaySessionProjection.handler ]
 
 let cardItemsParityTests =

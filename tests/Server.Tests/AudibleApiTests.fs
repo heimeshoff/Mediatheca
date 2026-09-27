@@ -58,6 +58,7 @@ let private createApi (factory: unit -> SqliteConnection) (httpClient: HttpClien
         (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         imageBasePath
+        "" // integration-t4q7k: pdfBasePath, unused -- addBookFromAudible never downloads a companion PDF
         allProjectionHandlers
 
 /// A live `createApi` that also uses the real `Composition`-shaped config

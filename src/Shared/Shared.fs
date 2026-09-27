@@ -1081,6 +1081,11 @@ type AudibleImportResult = {
     /// `book_progress` row predated priors, repaired this run (its
     /// import-day observation replaced by a correctly-dated prior).
     Repaired: int
+    /// integration-t4q7k (ADR-0043/ADR-0089/ADR-0090 amendment): how many
+    /// companion PDFs this run downloaded for the first time, same
+    /// semantics as `AudibleProgressSyncResult.PdfsDownloaded` below --
+    /// never re-downloads a file already present.
+    PdfsDownloaded: int
     Errors: string list
 }
 

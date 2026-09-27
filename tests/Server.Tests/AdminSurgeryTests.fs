@@ -391,6 +391,7 @@ let adminSurgeryTests =
                         (fun () -> async { return Error "not wired in tests" })
                         LocalCopyRemoval.defaultMountRoots
                         noImagesDir
+                        "" // integration-t4q7k: pdfBasePath, unused here
                         []
 
                 let target = (EventStore.readStream conn "books-1").[0]

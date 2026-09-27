@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 22:58 -- Task verified and completed: integration-t4q7k - Wire companion-PDF download into the one-time "Import library" bootstrap path
+
+**Type:** Work / Task completion
+**Task:** integration-t4q7k - Wire companion-PDF download into the one-time "Import library" bootstrap path
+**Summary:** Wire companion-PDF download into the one-time Import library bootstrap — Api.create gains pdfBasePath, the import's observe closure downloads each item's companion PDF, AudibleImportResult reports PdfsDownloaded
+**Duration:** 29m
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 25
+**Tests added:** 4
+**ADRs written:** none
+
+---
+
 ## 2026-09-27 22:29 -- Batch started: [integration-t4q7k]
 
 **Type:** Work / Batch start

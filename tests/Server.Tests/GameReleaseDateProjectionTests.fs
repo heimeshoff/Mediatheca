@@ -72,6 +72,7 @@ let private createDashboardApi (factory: unit -> SqliteConnection) : IMediatheca
         (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         noImagesDir
+        "" // integration-t4q7k: pdfBasePath, unused in this test
         [ GameProjection.handler; PlaySessionProjection.handler ]
 
 [<Tests>]

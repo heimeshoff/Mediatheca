@@ -258,7 +258,7 @@ let private httpClientAlwaysUnauthorized () : HttpClient =
             })
     new HttpClient(handler)
 
-let private createApi (factory: unit -> SqliteConnection) (httpClient: HttpClient) (imageBasePath: string) (getAudibleConfig: unit -> Audible.AudibleConfig) : IMediathecaApi =
+let private createApi (factory: unit -> SqliteConnection) (httpClient: HttpClient) (imageBasePath: string) (pdfBasePath: string) (getAudibleConfig: unit -> Audible.AudibleConfig) : IMediathecaApi =
     Api.create
         factory
         httpClient
@@ -275,6 +275,7 @@ let private createApi (factory: unit -> SqliteConnection) (httpClient: HttpClien
         (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         imageBasePath
+        pdfBasePath
         allProjectionHandlers
 
 let private totalEventCount (conn: SqliteConnection) : int64 =
@@ -331,7 +332,7 @@ let importAudibleLibraryTests =
                         "B1", existsAt "2026-01-02" 252    // 252 / 600 = 42%
                     ]
                 let httpClient, _ = httpClientForImportWithMetadata fixture metadataResponses
-                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+                let api = createApi db.Factory httpClient imageBasePath "" (fun () -> configuredAudibleConfig)
 
                 let result =
                     match api.importAudibleLibrary () |> Async.RunSynchronously with
@@ -379,7 +380,7 @@ let importAudibleLibraryTests =
                 use db = TestDb.withTempDbFactory bootstrap
                 let fixture = libraryResponseJson [ libraryItemJson "OK1" "Book OK" (Some 10.0) false (Some 300) ]
                 let httpClient, _ = httpClientForLibrary (Map.ofList [ 1, fixture ])
-                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+                let api = createApi db.Factory httpClient imageBasePath "" (fun () -> configuredAudibleConfig)
                 match api.importAudibleLibrary () |> Async.RunSynchronously with
                 | Ok r -> Expect.equal r.Created 1 "the one valid item is still created despite no other items"
                 | Error e -> failtestf "Expected Ok, got Error %s" e)
@@ -390,7 +391,7 @@ let importAudibleLibraryTests =
                 SettingsStore.setSetting db.Connection "audible_last_error" "audible auth file rejected: a prior run"
                 let emptyFixture = libraryResponseJson []
                 let httpClient, _ = httpClientForLibrary (Map.ofList [ 1, emptyFixture ])
-                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+                let api = createApi db.Factory httpClient imageBasePath "" (fun () -> configuredAudibleConfig)
 
                 let result =
                     match api.importAudibleLibrary () |> Async.RunSynchronously with
@@ -416,7 +417,7 @@ let importAudibleLibraryTests =
                 // since a DoesNotExist body carries no last_updated either.
                 let fixture = libraryResponseJson [ libraryItemJson "D1" "Book D" None true (Some 400) ]
                 let httpClient, _ = httpClientForImportWithMetadata fixture Map.empty
-                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+                let api = createApi db.Factory httpClient imageBasePath "" (fun () -> configuredAudibleConfig)
 
                 api.importAudibleLibrary () |> Async.RunSynchronously |> ignore
 
@@ -467,7 +468,7 @@ let importAudibleLibraryTests =
                                 return resp
                         })
                 use httpClient = new HttpClient(handler)
-                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+                let api = createApi db.Factory httpClient imageBasePath "" (fun () -> configuredAudibleConfig)
 
                 match api.importAudibleLibrary () |> Async.RunSynchronously with
                 | Ok r -> Expect.equal r.Created 1 "the one item is still created"
@@ -496,13 +497,13 @@ let audibleOneTimeImportGateTests =
                 use db = TestDb.withTempDbFactory bootstrap
                 let emptyFixture = libraryResponseJson []
                 let httpClientEmpty, _ = httpClientForLibrary (Map.ofList [ 1, emptyFixture ])
-                let apiEmpty = createApi db.Factory httpClientEmpty imageBasePath (fun () -> configuredAudibleConfig)
+                let apiEmpty = createApi db.Factory httpClientEmpty imageBasePath "" (fun () -> configuredAudibleConfig)
                 apiEmpty.importAudibleLibrary () |> Async.RunSynchronously |> ignore
                 Expect.isNone (SettingsStore.getSetting db.Connection "audible_library_imported_at") "an empty-but-200 response never stamps the one-time gate (ADR-0068's lesson)"
 
                 let fixture = libraryResponseJson [ libraryItemJson "S1" "Stamped Book" (Some 10.0) false (Some 300) ]
                 let httpClient, _ = httpClientForLibrary (Map.ofList [ 1, fixture ])
-                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+                let api = createApi db.Factory httpClient imageBasePath "" (fun () -> configuredAudibleConfig)
                 match api.importAudibleLibrary () |> Async.RunSynchronously with
                 | Ok _ -> ()
                 | Error e -> failtestf "Expected Ok, got Error %s" e
@@ -513,7 +514,7 @@ let audibleOneTimeImportGateTests =
                 use db = TestDb.withTempDbFactory bootstrap
                 SettingsStore.setSetting db.Connection "audible_library_imported_at" "2026-09-18T05:00:00.0000000Z"
                 let httpClient = httpClientThatMustNotBeCalled ()
-                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+                let api = createApi db.Factory httpClient imageBasePath "" (fun () -> configuredAudibleConfig)
 
                 match api.importAudibleLibrary () |> Async.RunSynchronously with
                 | Error msg ->
@@ -526,7 +527,7 @@ let audibleOneTimeImportGateTests =
                 use db = TestDb.withTempDbFactory bootstrap
                 let fixture = libraryResponseJson [ libraryItemJson "R1" "Roundtrip Book" (Some 10.0) false (Some 300) ]
                 let httpClient, _ = httpClientForLibrary (Map.ofList [ 1, fixture ])
-                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+                let api = createApi db.Factory httpClient imageBasePath "" (fun () -> configuredAudibleConfig)
 
                 let beforeImport = api.getAudibleSyncStatus () |> Async.RunSynchronously
                 Expect.isNone beforeImport.LibraryImportedAt "not stamped before any import runs"
@@ -640,7 +641,7 @@ let audibleProgressSyncJobTests =
                 // 252 / 600 = 42%.
                 let firstMetadata = Map.ofList [ "B1", existsAt today 252 ]
                 let httpClient1, _ = httpClientForImportWithMetadata firstFixture firstMetadata
-                let api = createApi db.Factory httpClient1 imageBasePath (fun () -> configuredAudibleConfig)
+                let api = createApi db.Factory httpClient1 imageBasePath "" (fun () -> configuredAudibleConfig)
                 api.importAudibleLibrary () |> Async.RunSynchronously |> ignore
 
                 let slugB = BookProjection.findByExternalId db.Connection (AudibleAsin "B1") |> Option.get
@@ -1194,7 +1195,7 @@ let audibleSyncStatusPersistenceTests =
                 use db = TestDb.withTempDbFactory bootstrap
                 let fixture = libraryResponseJson [ libraryItemJson "P1" "Persisted Book" (Some 20.0) false (Some 300) ]
                 let httpClient, _ = httpClientForLibrary (Map.ofList [ 1, fixture ])
-                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+                let api = createApi db.Factory httpClient imageBasePath "" (fun () -> configuredAudibleConfig)
 
                 api.importAudibleLibrary () |> Async.RunSynchronously |> ignore
                 let afterImport = api.getAudibleSyncStatus () |> Async.RunSynchronously
@@ -1294,7 +1295,7 @@ let importPriorRecordingTests =
                         "F1", (HttpStatusCode.OK, """{"content_metadata": {"last_position_heard": {"last_updated": "2023-09-23 21:03:18.228", "position_ms": 896068, "status": "Exists"}}}""")
                     ]
                 let httpClient, metadataCalls = httpClientForImportWithMetadata fixture metadataResponses
-                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+                let api = createApi db.Factory httpClient imageBasePath "" (fun () -> configuredAudibleConfig)
 
                 let result =
                     match api.importAudibleLibrary () |> Async.RunSynchronously with
@@ -1346,7 +1347,7 @@ let importPriorRecordingTests =
 
                 let fixture = libraryResponseJson [ libraryItemJson "G1" "Book G" (Some 40.0) false (Some 600) ]
                 let httpClient, metadataCalls = httpClientForImportWithMetadata fixture Map.empty
-                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+                let api = createApi db.Factory httpClient imageBasePath "" (fun () -> configuredAudibleConfig)
                 let result =
                     match api.importAudibleLibrary () |> Async.RunSynchronously with
                     | Ok r -> r
@@ -1377,7 +1378,7 @@ let importPriorRecordingTests =
                 let fixture = libraryResponseJson [ libraryItemJson "H1" "Book H" (Some 15.0) false (Some 600) ]
                 let metadataResponses = Map.ofList [ "H1", (HttpStatusCode.Unauthorized, "") ]
                 let httpClient, metadataCalls = httpClientForImportWithMetadata fixture metadataResponses
-                let api = createApi db.Factory httpClient imageBasePath (fun () -> configuredAudibleConfig)
+                let api = createApi db.Factory httpClient imageBasePath "" (fun () -> configuredAudibleConfig)
 
                 let result =
                     match api.importAudibleLibrary () |> Async.RunSynchronously with
@@ -1432,7 +1433,7 @@ let importPriorRecordingTests =
                         "L1", (HttpStatusCode.OK, """{"content_metadata": {"last_position_heard": {"last_updated": "2024-03-01 10:00:00.000", "position_ms": 21600000, "status": "Exists"}}}""")
                     ]
                 let httpClient, _ = httpClientForImportWithMetadata fixture metadataResponses
-                let api = createApi db.Factory httpClient "unused-image-dir" (fun () -> configuredAudibleConfig)
+                let api = createApi db.Factory httpClient "unused-image-dir" "" (fun () -> configuredAudibleConfig)
 
                 let result =
                     match api.importAudibleLibrary () |> Async.RunSynchronously with
@@ -1499,7 +1500,7 @@ let importPriorRecordingTests =
                         "M1", (HttpStatusCode.OK, """{"content_metadata": {"last_position_heard": {"last_updated": "2023-09-23 21:03:18.228", "position_ms": 36000000, "status": "Exists"}}}""")
                     ]
                 let httpClient, _ = httpClientForImportWithMetadata fixture metadataResponses
-                let api = createApi db.Factory httpClient "unused-image-dir" (fun () -> configuredAudibleConfig)
+                let api = createApi db.Factory httpClient "unused-image-dir" "" (fun () -> configuredAudibleConfig)
 
                 let result =
                     match api.importAudibleLibrary () |> Async.RunSynchronously with
@@ -1524,3 +1525,155 @@ let importPriorRecordingTests =
                 | Ok r -> failtestf "Expected the one-time gate to refuse a second call, got Ok %A" r
                 Expect.equal (EventStore.readStream db.Connection (Books.streamId slug) |> List.length) eventsBeforeSecondRun "the refused second call appends zero events")
     ]
+
+
+/// integration-t4q7k (ADR-0043/ADR-0089, ADR-0090 amendment): the one-time
+/// "Import library" bootstrap downloads companion PDFs too now, mirroring
+/// AudibleSync.runProgressSync's own per-item block above -- covers matched,
+/// created, and duplicate-found items, never aborts the item or the import on
+/// a download failure.
+[<Tests>]
+let importAudibleLibraryPdfDownloadTests =
+    testList "Api.importAudibleLibrary -- companion-PDF download (integration-t4q7k, ADR-0090 amendment)" [
+
+        testCase "a previously unknown item with a pdf_url downloads its companion PDF during import, writes <pdfBasePath>/<asin>.pdf, sets the book's companion-PDF path, and reports PdfsDownloaded = 1" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                withTempPdfDir (fun pdfBasePath ->
+                    use db = TestDb.withTempDbFactory bootstrap
+                    let today = DateTime.Now.ToString("yyyy-MM-dd")
+                    let asin = "IMPORTPDF1"
+                    let itemJson = withPdfUrl (libraryItemJson asin "Import PDF Book" (Some 10.0) false (Some 400)) "https://d2fahduf2624mg.cloudfront.net/post_purchase_docs/IMPORTPDF1.pdf"
+                    let fixture = libraryResponseJson [ itemJson ]
+                    let metadataResponses = Map.ofList [ asin, existsAt today 40 ]
+                    let httpClient, companionFileCalls =
+                        httpClientForPdfSync fixture metadataResponses (fun _ ->
+                            let resp = new HttpResponseMessage(HttpStatusCode.OK)
+                            resp.Content <- new ByteArrayContent(fakePdfBytes)
+                            resp)
+                    let api = createApi db.Factory httpClient imageBasePath pdfBasePath (fun () -> pdfCapableAudibleConfig)
+
+                    let result =
+                        match api.importAudibleLibrary () |> Async.RunSynchronously with
+                        | Ok r -> r
+                        | Error e -> failtestf "Expected Ok, got Error %s" e
+
+                    Expect.equal result.PdfsDownloaded 1 "one new companion PDF downloaded during import"
+                    Expect.equal (companionFileCalls ()) [ asin ] "the companion-file endpoint was hit exactly once"
+
+                    let pdfPath = Path.Combine(pdfBasePath, sprintf "%s.pdf" asin)
+                    Expect.isTrue (File.Exists pdfPath) "the PDF file was written to <pdfBasePath>/<asin>.pdf"
+                    Expect.equal (File.ReadAllBytes pdfPath) fakePdfBytes "the file's bytes are the downloaded PDF"
+
+                    let slug = BookProjection.findByExternalId db.Connection (AudibleAsin asin) |> Option.get
+                    let detail = BookProjection.getBySlug db.Connection slug |> Option.get
+                    Expect.equal detail.CompanionPdfUrl (Some (sprintf "/pdfs/%s.pdf" asin)) "the book detail DTO carries the stable serving URL, set during import"))
+
+        testCase "a library item whose companion PDF already exists on disk makes no companion-file HTTP request during import and reports PdfsDownloaded = 0" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                withTempPdfDir (fun pdfBasePath ->
+                    use db = TestDb.withTempDbFactory bootstrap
+                    let today = DateTime.Now.ToString("yyyy-MM-dd")
+                    let asin = "IMPORTPDF2"
+                    let itemJson = withPdfUrl (libraryItemJson asin "Already Downloaded" (Some 10.0) false (Some 400)) "https://d2fahduf2624mg.cloudfront.net/post_purchase_docs/IMPORTPDF2.pdf"
+                    let fixture = libraryResponseJson [ itemJson ]
+                    let metadataResponses = Map.ofList [ asin, existsAt today 40 ]
+                    PdfStore.save pdfBasePath asin fakePdfBytes
+                    let httpClient, companionFileCalls =
+                        httpClientForPdfSync fixture metadataResponses (fun _ -> failtest "companion-file should never be requested when the file already exists")
+                    let api = createApi db.Factory httpClient imageBasePath pdfBasePath (fun () -> pdfCapableAudibleConfig)
+
+                    match api.importAudibleLibrary () |> Async.RunSynchronously with
+                    | Ok r -> Expect.equal r.PdfsDownloaded 0 "the file already exists -- never re-downloaded during import"
+                    | Error e -> failtestf "Expected Ok, got Error %s" e
+                    Expect.isEmpty (companionFileCalls ()) "no companion-file request was made"))
+
+        testCase "a companion-PDF download failure (e.g. a 500) during import is recorded in Errors but never aborts the item -- Ok is still returned and ProgressObserved is unchanged from the no-PDF case" <| fun _ ->
+            let today = DateTime.Now.ToString("yyyy-MM-dd")
+            let asin = "IMPORTPDF3"
+            let metadataResponses = Map.ofList [ asin, existsAt today 40 ]
+
+            let mutable progressObservedWithFailingPdf = -1
+            withTempImageDir (fun imageBasePath ->
+                withTempPdfDir (fun pdfBasePath ->
+                    use db = TestDb.withTempDbFactory bootstrap
+                    let itemJson = withPdfUrl (libraryItemJson asin "Failing PDF Book" (Some 10.0) false (Some 400)) "https://d2fahduf2624mg.cloudfront.net/post_purchase_docs/IMPORTPDF3.pdf"
+                    let fixture = libraryResponseJson [ itemJson ]
+                    let httpClient, companionFileCalls =
+                        httpClientForPdfSync fixture metadataResponses (fun _ -> new HttpResponseMessage(HttpStatusCode.InternalServerError))
+                    let api = createApi db.Factory httpClient imageBasePath pdfBasePath (fun () -> pdfCapableAudibleConfig)
+
+                    match api.importAudibleLibrary () |> Async.RunSynchronously with
+                    | Ok r ->
+                        Expect.equal r.PdfsDownloaded 0 "the failed download is not counted"
+                        Expect.isNonEmpty r.Errors "the failure is listed in Errors"
+                        Expect.stringContains r.Errors.[0] "companion PDF:" "the error names the companion-PDF failure"
+                        progressObservedWithFailingPdf <- r.ProgressObserved
+                    | Error e -> failtestf "Expected Ok even with a failing companion-PDF download, got Error %s" e
+                    Expect.equal (companionFileCalls ()) [ asin ] "the companion-file endpoint was attempted"
+                    let pdfPath = Path.Combine(pdfBasePath, sprintf "%s.pdf" asin)
+                    Expect.isFalse (File.Exists pdfPath) "no file is left on disk after a failed download"))
+
+            let mutable progressObservedWithoutPdf = -1
+            withTempImageDir (fun imageBasePath ->
+                withTempPdfDir (fun pdfBasePath ->
+                    use db = TestDb.withTempDbFactory bootstrap
+                    let fixture = libraryResponseJson [ libraryItemJson asin "Failing PDF Book" (Some 10.0) false (Some 400) ]
+                    let httpClient, _ = httpClientForPdfSync fixture metadataResponses (fun _ -> failtest "this item carries no pdf_url -- companion-file should never be requested")
+                    let api = createApi db.Factory httpClient imageBasePath pdfBasePath (fun () -> pdfCapableAudibleConfig)
+                    match api.importAudibleLibrary () |> Async.RunSynchronously with
+                    | Ok r -> progressObservedWithoutPdf <- r.ProgressObserved
+                    | Error e -> failtestf "Expected Ok, got Error %s" e))
+
+            Expect.equal progressObservedWithFailingPdf progressObservedWithoutPdf "ProgressObserved is unchanged whether or not the companion-PDF download failed"
+            Expect.equal progressObservedWithFailingPdf 1 "sanity: the item's first-ever prior is recorded in both cases"
+
+        testCase "a matched item (already in the library, found by ASIN before this import run) also gets its companion PDF downloaded during import, just like a newly created one" <| fun _ ->
+            withTempImageDir (fun imageBasePath ->
+                withTempPdfDir (fun pdfBasePath ->
+                    use db = TestDb.withTempDbFactory bootstrap
+                    let today = DateTime.Now.ToString("yyyy-MM-dd")
+                    let asin = "IMPORTPDF4"
+                    // Pre-create the book directly (bypassing the import's
+                    // own create path) so the import's `for item in items`
+                    // loop takes the `Some slug` (matched) branch below,
+                    // not the create branch -- the same real create path
+                    // `realCreateBook` above uses.
+                    let precreateHttpClient =
+                        new HttpClient(new AsyncStubHandler(fun _ ->
+                            async {
+                                let resp = new HttpResponseMessage(HttpStatusCode.OK)
+                                resp.Content <- new ByteArrayContent(fakeCoverBytes)
+                                return resp
+                            }))
+                    let precreateItem : Audible.AudibleLibraryItem =
+                        { Asin = asin; Title = "Matched Book"; Authors = [ "Author" ]; Narrators = []
+                          RuntimeMinutes = Some 400; PercentComplete = None; IsFinished = false
+                          PurchaseDate = None; CoverUrl = None; SeriesName = None; SeriesPosition = None
+                          ReleaseDate = None; Description = None; PdfUrl = None }
+                    match Api.createBookFromAudibleItem db.Connection precreateHttpClient imageBasePath allProjectionHandlers Api.noLocker "us" precreateItem |> Async.RunSynchronously with
+                    | Ok (AddBookOutcome.Book_added _) -> ()
+                    | other -> failtestf "Expected the pre-create step to succeed with Book_added, got %A" other
+                    Expect.isSome (BookProjection.findByExternalId db.Connection (AudibleAsin asin)) "sanity: the book is matched by ASIN before the import runs"
+
+                    let itemJson = withPdfUrl (libraryItemJson asin "Matched Book" (Some 10.0) false (Some 400)) "https://d2fahduf2624mg.cloudfront.net/post_purchase_docs/IMPORTPDF4.pdf"
+                    let fixture = libraryResponseJson [ itemJson ]
+                    let metadataResponses = Map.ofList [ asin, existsAt today 40 ]
+                    let httpClient, companionFileCalls =
+                        httpClientForPdfSync fixture metadataResponses (fun _ ->
+                            let resp = new HttpResponseMessage(HttpStatusCode.OK)
+                            resp.Content <- new ByteArrayContent(fakePdfBytes)
+                            resp)
+                    let api = createApi db.Factory httpClient imageBasePath pdfBasePath (fun () -> pdfCapableAudibleConfig)
+
+                    match api.importAudibleLibrary () |> Async.RunSynchronously with
+                    | Ok r ->
+                        Expect.equal r.AlreadyKnown 1 "the pre-created book is matched, not re-created"
+                        Expect.equal r.Created 0 "the matched item is not re-created"
+                        Expect.equal r.PdfsDownloaded 1 "the matched item's companion PDF is downloaded too, just like a newly created one"
+                    | Error e -> failtestf "Expected Ok, got Error %s" e
+
+                    Expect.equal (companionFileCalls ()) [ asin ] "the companion-file endpoint was hit exactly once for the matched item"
+                    let pdfPath = Path.Combine(pdfBasePath, sprintf "%s.pdf" asin)
+                    Expect.isTrue (File.Exists pdfPath) "the PDF file was written for the matched item too"))
+    ]
+    |> testSequenced

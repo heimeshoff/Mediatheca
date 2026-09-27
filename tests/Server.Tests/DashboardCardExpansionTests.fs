@@ -38,6 +38,7 @@ let private createApi (factory: unit -> SqliteConnection) : IMediathecaApi =
         (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         noImagesDir
+        "" // integration-t4q7k: pdfBasePath, unused in this test
         [ GameProjection.handler; PlaySessionProjection.handler ]
 
 let private sampleGameData (name: string) (year: int) : Games.GameAddedData = {

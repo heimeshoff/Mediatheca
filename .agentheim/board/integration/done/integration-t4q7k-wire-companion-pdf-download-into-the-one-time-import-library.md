@@ -1,7 +1,7 @@
 ---
 id: integration-t4q7k
 title: Wire companion-PDF download into the one-time "Import library" bootstrap path
-status: doing
+status: done
 type: feature
 context: integration
 created: 2026-09-27
@@ -94,3 +94,48 @@ priors) and deriving the path from `imageBasePath`'s parent directory (hidden co
   `Api.create`'s parameter list, or run the full suite on main right after integrating.
 - ADR-0090 gained an amendment on 2026-09-27 recording that this task reverses its decision §2
   with the seam described above.
+
+## Outcome
+
+Wired the companion-PDF download into the one-time "Import library" bootstrap, reversing ADR-0090
+§2 per its 2026-09-27 amendment.
+
+- `src/Server/Api.fs`: `importAudibleLibraryImpl` gains `(pdfBasePath: string)` after `imageBasePath`.
+  Its `observe slug item` closure (called for matched, freshly-created, and duplicate-found items
+  alike — every slug-bearing branch of the `for item in items` loop) now opens with the same
+  companion-PDF download block `AudibleSync.runProgressSync` already runs: `AudibleSync.
+  downloadCompanionPdfIfMissing`, then on `Ok (Some bytes)` `PdfStore.save` + `MetadataCache.
+  setBookCompanionPdfPath` + increment a new `pdfsDownloaded` counter; on `Error e` append
+  `"<title> (<asin>): companion PDF: <e>"` to `errors` and continue — the item's progress/prior
+  recording is unaffected either way. `Api.create` gains `(pdfBasePath: string)` after
+  `imageBasePath`, threaded straight through.
+- `src/Server/Composition.fs`: the `Api.create` call now passes the existing `pdfBasePath` binding
+  (`Path.Combine(dataDir, "pdfs")`).
+- `src/Shared/Shared.fs`: `AudibleImportResult` gains `PdfsDownloaded: int`.
+- `src/Server/AudibleSync.fs`: `formatImportResult` (the persisted `audible_last_import_result`
+  string) now also reports the PDF count, for parity with `formatResult`'s existing "PDFs
+  downloaded" clause.
+- `src/Client/Pages/Settings/Views.fs`: the "Imported: …" alert text appends `, %d PDFs downloaded`.
+  `src/Client/Pages/Settings/AudibleImportSync.test.fs`'s `AudibleImportResult` literal updated for
+  the new field.
+- Every `Api.create` call site across 20 test files (grepped, none missed) got the new positional
+  argument — `""` where the test's fixtures never carry a `pdf_url` (image-only concerns), a fresh
+  `withTempPdfDir` temp directory in `tests/Server.Tests/AudibleLibrarySyncTests.fs` where the new
+  tests exercise the real download path.
+- `tests/Server.Tests/AudibleLibrarySyncTests.fs` gains `importAudibleLibraryPdfDownloadTests` (4
+  cases), mirroring the existing `audibleProgressSyncPdfDownloadTests` pattern: a new item with a
+  `pdf_url` downloads to `<pdfBasePath>/<asin>.pdf` and reports `PdfsDownloaded = 1`; a
+  pre-existing file on disk skips the HTTP request and reports 0; a failed download (500) is
+  recorded in `Errors` with `ProgressObserved` unchanged from an otherwise-identical no-PDF run; a
+  book pre-created and matched by ASIN (not created by this import run) also gets its companion PDF
+  downloaded.
+
+Verification: `dotnet build` (Server + Server.Tests) clean; full Expecto suite
+(`dotnet run --project tests/Server.Tests/Server.Tests.fsproj`) — 1075 tests, 0 failed, 0 errored,
+0 ignored; `npm run test:client` (Vitest) — 18 files / 132 tests, all passing, including the updated
+`AudibleImportSync.test.fs`; `npm run build` (Fable/Vite production build) succeeds with no type
+errors.
+
+Key files: `src/Server/Api.fs` (`importAudibleLibraryImpl`, `create`), `src/Server/Composition.fs`,
+`src/Shared/Shared.fs` (`AudibleImportResult`), `src/Client/Pages/Settings/Views.fs`,
+`tests/Server.Tests/AudibleLibrarySyncTests.fs` (`importAudibleLibraryPdfDownloadTests`).

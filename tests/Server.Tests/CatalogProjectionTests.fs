@@ -51,6 +51,7 @@ let private createApi (factory: unit -> SqliteConnection) : IMediathecaApi =
         (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         noImagesDir
+        "" // integration-t4q7k: pdfBasePath, unused in this test
         allProjectionHandlers
 
 // ── Seeding helpers: real events through the real aggregate + projection,

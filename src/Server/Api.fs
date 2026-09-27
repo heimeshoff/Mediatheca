@@ -2081,6 +2081,7 @@ module Api =
         (httpClient: HttpClient)
         (getAudibleConfig: unit -> Audible.AudibleConfig)
         (imageBasePath: string)
+        (pdfBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
         : Async<Result<AudibleImportResult, string>> = async {
             let config = getAudibleConfig ()
@@ -2125,6 +2126,7 @@ module Api =
                     let mutable priorsFromAudible = 0
                     let mutable priorsToday = 0
                     let mutable repaired = 0
+                    let mutable pdfsDownloaded = 0
                     let mutable errors : string list = []
 
                     // integration-dtdbb, ADR-0082 §2/§5: `None` on a failed
@@ -2145,6 +2147,29 @@ module Api =
 
                     let observe (slug: string) (item: Audible.AudibleLibraryItem) : Async<unit> =
                         async {
+                            // integration-t4q7k (ADR-0043/ADR-0089, ADR-0090
+                            // amendment): companion-PDF download, mirroring
+                            // AudibleSync.runProgressSync's own per-item
+                            // block -- runs at the top of `observe`, which
+                            // every slug-bearing branch of the `for item in
+                            // items` loop below already calls (a matched
+                            // item, a freshly created one, and a
+                            // Duplicate_found one), so all three get their
+                            // companion PDF the same way the nightly sync's
+                            // full-library walk does. A download failure
+                            // never aborts the item or the import -- it's
+                            // recorded in `errors` and progress/prior
+                            // recording proceeds exactly as if there were no
+                            // PdfUrl at all.
+                            match! AudibleSync.downloadCompanionPdfIfMissing httpClient (Audible.webHost authFile.LocaleCode) authFile pdfBasePath item with
+                            | Ok None -> ()
+                            | Ok (Some bytes) ->
+                                PdfStore.save pdfBasePath item.Asin bytes
+                                MetadataCache.setBookCompanionPdfPath conn slug (PdfStore.relativePath item.Asin)
+                                pdfsDownloaded <- pdfsDownloaded + 1
+                            | Error e ->
+                                errors <- errors @ [ sprintf "%s (%s): companion PDF: %s" item.Title item.Asin e ]
+
                             // Legacy repair (ADR-0082 §7): a book whose ONLY
                             // Audible row predates priors -- exactly one row,
                             // `kind = 'observation'` -- is removed so the
@@ -2234,6 +2259,7 @@ module Api =
                         PriorsFromAudible = priorsFromAudible
                         PriorsToday = priorsToday
                         Repaired = repaired
+                        PdfsDownloaded = pdfsDownloaded
                         Errors = errors
                     }
                     SettingsStore.setSetting conn "audible_last_import_result" (AudibleSync.formatImportResult result)
@@ -2285,6 +2311,7 @@ module Api =
         (runRomMSyncNow: unit -> Async<Result<RomMSyncResult, string>>)
         (mountRoots: LocalCopyRemoval.MountRoots)
         (imageBasePath: string)
+        (pdfBasePath: string)
         (projectionHandlers: Projection.ProjectionHandler list)
         : IMediathecaApi =
 
@@ -5714,7 +5741,7 @@ module Api =
                 | Some importedAt ->
                     return Error (sprintf "Audible library already imported on %s — new purchases arrive with the nightly sync" (formatImportedOnDate importedAt))
                 | None ->
-                    return! importAudibleLibraryImpl conn httpClient getAudibleConfig imageBasePath projectionHandlers
+                    return! importAudibleLibraryImpl conn httpClient getAudibleConfig imageBasePath pdfBasePath projectionHandlers
             }
 
             runAudibleProgressSync = fun () -> runAudibleProgressSyncNow ()

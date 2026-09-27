@@ -179,8 +179,8 @@ module AudibleSync =
     let formatImportResult (r: AudibleImportResult) : string =
         let base_ =
             sprintf
-                "%d total, %d created, %d already known, %d progress observed, %d priors from Audible, %d priors dated today, %d repaired"
-                r.Total r.Created r.AlreadyKnown r.ProgressObserved r.PriorsFromAudible r.PriorsToday r.Repaired
+                "%d total, %d created, %d already known, %d progress observed, %d priors from Audible, %d priors dated today, %d repaired, %d PDFs downloaded"
+                r.Total r.Created r.AlreadyKnown r.ProgressObserved r.PriorsFromAudible r.PriorsToday r.Repaired r.PdfsDownloaded
         if List.isEmpty r.Errors then base_
         else sprintf "%s (%d item error(s))" base_ (List.length r.Errors)
 

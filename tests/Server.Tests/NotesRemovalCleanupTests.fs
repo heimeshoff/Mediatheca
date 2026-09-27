@@ -46,6 +46,7 @@ let private createApi (factory: unit -> SqliteConnection) (imageBasePath: string
         (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         imageBasePath
+        "" // integration-t4q7k: pdfBasePath, unused in this test
         allProjectionHandlers
 
 /// A real temp image directory (AudibleApiTests.fs's `withTempImageDir`

@@ -61,6 +61,7 @@ let private createApi (factory: unit -> SqliteConnection) (httpClient: HttpClien
         (fun () -> async { return Error "not wired in tests" })
         LocalCopyRemoval.defaultMountRoots
         imageBasePath
+        "" // integration-t4q7k: pdfBasePath, unused in this test
         allProjectionHandlers
 
 let private workJson =
