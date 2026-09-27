@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 13:08 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 20m (batch started 12:55)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0
+**Lost-result escalations:** 0
+**Dispatches:** integration-cc7ab: 1
+**Commits:** 2
+**Vision-conformance:** none — batch aligns with vision
+**Batch mix:** 0% product-facing / 100% harness / 0% bookkeeping (1 task)
+**Carry-over:** none — working tree clean
+
+---
+
 ## 2026-09-27 13:08 -- Task verified and completed: integration-cc7ab - Spike — find an auth route that downloads an Audible companion PDF without a login, testing signed x-adp requests first and the refresh-token-to-website-cookie exchange second, and report an ADR-0074 amendment for the first one that works
 
 **Type:** Work / Task completion
