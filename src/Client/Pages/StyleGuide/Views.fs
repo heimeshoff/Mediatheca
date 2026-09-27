@@ -36,6 +36,12 @@ let private specimen (label: string) (reference: string) (element: ReactElement)
         ]
     ]
 
+/// A square swatch (SVG data URI, no network asset needed) standing in for
+/// a real book cover in the "Poster Image Fit" specimen (books-r8cfn) --
+/// square art is exactly the shape `posterImageContain` exists for.
+let private squareCoverSwatch =
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect width='200' height='200' fill='%23c9a876'/><text x='100' y='112' font-size='30' text-anchor='middle' fill='%23241b14'>SQ</text></svg>"
+
 /// Annotation paragraph for design decisions
 let private decision (text: string) =
     Html.p [
@@ -955,6 +961,70 @@ let private animationsSection () =
                                     Html.p [ prop.className (DesignSystem.faintText + " mt-1"); prop.text "Hover: scale(1.05) + translateY(-4px) + shine overlay" ]
                                 ]
                             ]
+                        ]
+                    ]
+                ]
+            ]
+
+            // Whole-cover poster image fit (books-r8cfn). `posterImage`
+            // stays `cover` for art authored at 2:3 (movies/series/games);
+            // `posterImageContain` is the media-agnostic opt-in for art
+            // that isn't -- Audible's square covers, and off-ratio game box
+            // art (reused verbatim by games-q7vnd). A square swatch (SVG
+            // data URI, no network asset needed) stands in for a real
+            // cover so both fits are visibly comparable side by side.
+            subheading "Poster Image Fit"
+
+            Html.p [
+                prop.className DesignSystem.secondaryText
+                prop.text "`posterImageContain` shows the whole image inside the 2:3 frame instead of cropping it -- the container's own soft background shows through as letterbox space."
+            ]
+
+            Html.div [
+                prop.className "grid grid-cols-2 gap-6 mt-4 max-w-sm"
+                prop.children [
+                    Html.div [
+                        prop.className "flex flex-col gap-2"
+                        prop.children [
+                            Html.div [
+                                prop.className (DesignSystem.posterCard + " w-28")
+                                prop.children [
+                                    Html.div [
+                                        prop.className DesignSystem.posterImageContainer
+                                        prop.children [
+                                            Html.img [
+                                                prop.src squareCoverSwatch
+                                                prop.alt "Square cover, cropped"
+                                                prop.className DesignSystem.posterImage
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "DesignSystem.posterImage" ]
+                            Html.span [ prop.className DesignSystem.faintText; prop.text "cover -- sides cropped" ]
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "flex flex-col gap-2"
+                        prop.children [
+                            Html.div [
+                                prop.className (DesignSystem.posterCard + " w-28")
+                                prop.children [
+                                    Html.div [
+                                        prop.className DesignSystem.posterImageContainer
+                                        prop.children [
+                                            Html.img [
+                                                prop.src squareCoverSwatch
+                                                prop.alt "Square cover, whole"
+                                                prop.className DesignSystem.posterImageContain
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                            Html.code [ prop.className "text-xs font-mono text-primary/70"; prop.text "DesignSystem.posterImageContain" ]
+                            Html.span [ prop.className DesignSystem.faintText; prop.text "contain -- whole cover, letterboxed" ]
                         ]
                     ]
                 ]

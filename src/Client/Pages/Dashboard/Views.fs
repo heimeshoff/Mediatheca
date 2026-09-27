@@ -838,7 +838,16 @@ let private bookReadingPosterCard (card: DashboardCard) (item: DashboardBookItem
             e.preventDefault()
             Router.navigate ("books", item.Slug)
         )
-        prop.className "cursor-pointer group"
+        // Fixed rail width (books-r8cfn), matching every other dashboard
+        // rail card (`gameRecentlyAddedPosterCard` etc) -- without it, in
+        // `posterScroller`'s flex row / `WrappingRow`'s flex-wrap, each
+        // card's width came from its own content (title length, image),
+        // producing the "small, larger, very large, small again" pattern.
+        // Harmless in the `PosterGrid` layout too (the All tab's Reading
+        // card): `flex-shrink-0`/`snap-start` are no-ops outside a flex
+        // container, and the fixed width matches that grid's own
+        // `minmax(0, 130px)` column cap.
+        prop.className "flex-shrink-0 w-[120px] sm:w-[130px] cursor-pointer group snap-start"
         prop.children [
             Html.div [
                 prop.className (DesignSystem.posterCard + " relative w-full")
@@ -851,7 +860,12 @@ let private bookReadingPosterCard (card: DashboardCard) (item: DashboardBookItem
                                 Html.img [
                                     prop.src $"/images/{ref}"
                                     prop.alt item.Title
-                                    prop.className DesignSystem.posterImage
+                                    // Whole-cover, not cropped (books-r8cfn):
+                                    // book covers aren't authored at 2:3 the
+                                    // way movie/series/game art is --
+                                    // Audible covers are square, so `cover`
+                                    // cut off their sides.
+                                    prop.className DesignSystem.posterImageContain
                                 ]
                             | None ->
                                 Html.div [

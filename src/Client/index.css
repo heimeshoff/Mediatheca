@@ -567,6 +567,20 @@ h1, h2, h3, h4, h5, h6 {
     object-fit: cover;
 }
 
+/* Whole-cover treatment (books-r8cfn): reused verbatim by games-q7vnd for
+   off-ratio game box art (NES/SNES etc) — a single, media-agnostic modifier,
+   not a book-specific hack. Shows the entire image inside the 2:3
+   `.poster-image-container` frame rather than cropping its sides, letting
+   the container's own soft gradient background show through as letterbox
+   space above/below (or at the sides). Movie/series posters and true 2:3
+   game covers keep `.poster-image`'s default `cover` — their art IS
+   authored at 2:3. Add this class alongside `.poster-image`, never in
+   place of it. */
+.poster-image--contain {
+    object-fit: contain;
+    object-position: center;
+}
+
 .poster-shadow {
     box-shadow:
         0 4px 12px -2px oklch(0% 0 0 / 0.5),

@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 00:45 -- Task verified and completed: books-r8cfn - Dashboard book poster cards all share one size and show the whole cover — the Books tab rails (Currently Reading / Recently Finished / Recently Added) and the All tab's Reading card stop sizing each card from its image and stop cropping covers to the 2:3 frame
+
+**Type:** Work / Task completion
+**Task:** books-r8cfn - Dashboard book poster cards all share one size and show the whole cover — the Books tab rails (Currently Reading / Recently Finished / Recently Added) and the All tab's Reading card stop sizing each card from its image and stop cropping covers to the 2:3 frame
+**Summary:** Dashboard book poster cards share the games rail's fixed width and show the whole cover via a reusable poster-image--contain modifier
+**Duration:** 36m
+**Verification:** PASS (iteration 2)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 6
+**Tests added:** 1
+**ADRs written:** none
+
+---
+
 ## 2026-09-28 00:37 -- Task verified and completed: games-hm3sf - Game detail page — "Change cover" / "Change backdrop" also accept an uploaded image file or a pasted image URL, downloaded to the server's images/ cache, for manual control when RAWG and Steam offer the wrong art
 
 **Type:** Work / Task completion

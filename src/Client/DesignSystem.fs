@@ -125,6 +125,14 @@ let posterImageContainer = "poster-image-container poster-shadow"
 /// Poster image element
 let posterImage = "poster-image"
 
+/// Poster image, whole-cover variant (books-r8cfn): shows the entire image
+/// inside the 2:3 frame via `object-fit: contain` instead of cropping it,
+/// for art that isn't authored at 2:3 (Audible's square covers; off-ratio
+/// game box art, reused verbatim by games-q7vnd). A media-agnostic
+/// composition -- callers opt individual poster images into it, they never
+/// swap `posterImage` itself, which stays `cover` for art authored at 2:3.
+let posterImageContain = posterImage + " poster-image--contain"
+
 /// Poster shine overlay
 let posterShine = "poster-shine"
 
