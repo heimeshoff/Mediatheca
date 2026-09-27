@@ -11,18 +11,18 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 1
-- **Todo:** 1
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 1
 - **Done:** 33
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **integration-cc7ab** — Spike — find an auth route that downloads an Audible companion PDF without a login, testing signed x-adp requests first and the refresh-token-to-website-cookie exchange second, and report an ADR-0074 amendment for the first one that works (spike) — `todo/integration-cc7ab-spike-audible-companion-pdf-download-auth-route.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **integration-cc7ab** — Spike — find an auth route that downloads an Audible companion PDF without a login, testing signed x-adp requests first and the refresh-token-to-website-cookie exchange second, and report an ADR-0074 amendment for the first one that works (spike) — `doing/integration-cc7ab-spike-audible-companion-pdf-download-auth-route.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

@@ -1,7 +1,7 @@
 ---
 id: integration-cc7ab
 title: Spike — find an auth route that downloads an Audible companion PDF without a login, testing signed x-adp requests first and the refresh-token-to-website-cookie exchange second, and report an ADR-0074 amendment for the first one that works
-status: todo
+status: doing
 type: spike
 context: integration
 created: 2026-09-27

@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 12:55 -- Batch started: [integration-cc7ab]
+
+**Type:** Work / Batch start
+**Tasks:** integration-cc7ab - Spike — find an auth route that downloads an Audible companion PDF without a login, testing signed x-adp requests first and the refresh-token-to-website-cookie exchange second, and report an ADR-0074 amendment for the first one that works
+**Parallel:** no (1 worker)
+
+---
+
 ## 2026-09-27 12:49 -- Modeling / Refined: integration-qqpq9 - Audible companion PDFs
 
 **Type:** Modeling / Refine
