@@ -1,7 +1,7 @@
 ---
 id: integration-q748k
 title: RomM play button — a RomM-linked game whose platform RomM can play in the browser shows a Play button in the game page hero that opens RomM's web player for that rom in a new browser tab
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-09-27

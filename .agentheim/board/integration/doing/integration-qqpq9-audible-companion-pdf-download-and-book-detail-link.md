@@ -1,7 +1,7 @@
 ---
 id: integration-qqpq9
 title: Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-09-27

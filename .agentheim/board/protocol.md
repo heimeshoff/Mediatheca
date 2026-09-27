@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 11:40 -- Batch started: [integration-q748k, integration-qqpq9]
+
+**Type:** Work / Batch start
+**Tasks:** integration-q748k - RomM play button — a RomM-linked game whose platform RomM can play in the browser shows a Play button in the game page hero that opens RomM's web player for that rom in a new browser tab, integration-qqpq9 - Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab
+**Parallel:** yes (2 workers — both touch src/Shared/Shared.fs and src/Server/Api.fs; merge-ordered q748k then qqpq9)
+
+---
+
 ## 2026-09-27 11:33 -- Modeling / Captured: integration-q748k - RomM play button — a RomM-linked game whose platform RomM can play in the browser shows a Play button in the game page hero that opens RomM's web player for that rom in a new browser tab
 
 **Type:** Modeling / Capture
