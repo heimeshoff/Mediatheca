@@ -10,14 +10,15 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 1
-- **Todo:** 0
+- **Backlog:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 34
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **integration-qqpq9** — Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab (feature) — `todo/integration-qqpq9-audible-companion-pdf-download-and-book-detail-link.md`
 <!-- todo-list:end -->
 
 ### Doing
@@ -61,7 +62,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
-- **integration-qqpq9** — Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab (feature) — `backlog/integration-qqpq9-audible-companion-pdf-download-and-book-detail-link.md`
 <!-- backlog-list:end -->
 
 

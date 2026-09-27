@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 13:11 -- Modeling / Promoted: integration-qqpq9 - Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab
+
+**Type:** Modeling / Promote
+**BC:** integration
+**From → To:** backlog → todo
+
+---
+
 ## 2026-09-27 13:08 -- Work session ended
 
 **Type:** Work / Session end

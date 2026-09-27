@@ -1,7 +1,7 @@
 ---
 id: integration-qqpq9
 title: Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab
-status: backlog
+status: todo
 type: feature
 context: integration
 created: 2026-09-27
@@ -9,7 +9,7 @@ completed:
 depends_on: [design-system-001, integration-cc7ab]
 blocks: []
 tags: [audible, books, pdf, companion-file, sync]
-related_adrs: [0074, 0076, 0043]
+related_adrs: [0074, 0076, 0043, 0089]
 related_research: [audible-api-surface-and-listening-progress-2026-09-16]
 prior_art: [integration-jkbm1]
 ---
@@ -91,6 +91,14 @@ book.
   recorded fixture. If the spike finds **no** working route, re-refine this task into a
   link-out: decode `pdf_url` and link to `audible.<tld>/companion-file/<asin>` in a new tab,
   with no download, no `pdfs/` folder and no `/pdfs` route.
+- **Auth route settled (2026-09-27, ADR-0089)**: the spike shipped. Use **adp-signed requests**:
+  `x-adp-token` / `x-adp-alg: SHA256withRSA:1.0` / `x-adp-signature` headers, built from the auth
+  file's `AdpToken` + `DevicePrivateKey`, with no bearer and no `client-id`, on
+  `GET www.audible.<tld>/companion-file/<asin>`. **Follow the 302** to the signed CloudFront URL
+  to get the bytes. The cookie exchange is **not** adopted. The body arrives as
+  `application/octet-stream`, so check the `%PDF` magic bytes, not the content type. Reuse the
+  redacted fixture `tests/Server.Tests/fixtures/audible/companion-pdf-signed-request.json`.
+  The link-out fallback above no longer applies.
 - Consider whether `pdfs/` should be covered by whatever backup/export treats `images/`
   (Administration) — mention it in the Outcome if not handled.
 - Docker: `pdfs/` lives under `DATA_DIR`, so it's already on the mounted volume on harbour.
