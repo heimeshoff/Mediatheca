@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 00:01 -- Modeling / Captured: games-q7vnd - Game poster cards show off-ratio box art whole — NES/SNES (and any clearly non-2:3) covers fit inside the 2:3 frame with soft bands above and below, like books-r8cfn does for book covers; true 2:3 covers (Steam) keep today's fill
+
+**Type:** Modeling / Capture
+**BC:** games
+**Filed to:** todo
+**Summary:** Game poster cards fit clearly off-2:3 box art (NES/SNES from RomM, also RAWG screenshots) with contain + the soft letterbox shared with books-r8cfn; near-2:3 Steam covers keep cover. Fit decided client-side from natural aspect ratio.
+
+---
+
 ## 2026-09-27 23:58 -- Work session ended
 
 **Type:** Work / Session end
