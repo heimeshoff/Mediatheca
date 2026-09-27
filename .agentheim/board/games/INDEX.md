@@ -11,19 +11,19 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 2
-- **Doing:** 0
+- **Todo:** 0
+- **Doing:** 2
 - **Done:** 18
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
-- **games-q7vnd** — Game poster cards show off-ratio box art whole — NES/SNES (and any clearly non-2:3) covers fit inside the 2:3 frame with soft bands above and below, like books-r8cfn does for book covers; true 2:3 covers (Steam) keep today's fill (bug) — `todo/games-q7vnd-game-poster-cards-fit-off-ratio-box-art.md`
-- **games-zex36** — Games — attach friends to individual play sessions like Movies' watch sessions; adding one also adds them to the game's Played with set, and the Friend page shows the shared play dates (feature) — `todo/games-zex36-friends-on-play-sessions.md`
 <!-- todo-list:end -->
 
 ### Doing
 <!-- doing-list:start -->
+- **games-zex36** — Games — attach friends to individual play sessions like Movies' watch sessions; adding one also adds them to the game's Played with set, and the Friend page shows the shared play dates (feature) — `doing/games-zex36-friends-on-play-sessions.md`
+- **games-q7vnd** — Game poster cards show off-ratio box art whole — NES/SNES (and any clearly non-2:3) covers fit inside the 2:3 frame with soft bands above and below, like books-r8cfn does for book covers; true 2:3 covers (Steam) keep today's fill (bug) — `doing/games-q7vnd-game-poster-cards-fit-off-ratio-box-art.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 

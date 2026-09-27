@@ -1,7 +1,7 @@
 ---
 id: games-q7vnd
 title: Game poster cards show off-ratio box art whole — NES/SNES (and any clearly non-2:3) covers fit inside the 2:3 frame with soft bands above and below, like books-r8cfn does for book covers; true 2:3 covers (Steam) keep today's fill
-status: todo
+status: doing
 type: bug
 context: games
 created: 2026-09-28

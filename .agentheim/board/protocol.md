@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 00:45 -- Batch started: [games-q7vnd, games-zex36, design-system-k4tw8]
+
+**Type:** Work / Batch start
+**Tasks:** games-q7vnd - Game poster cards show off-ratio box art whole — NES/SNES (and any clearly non-2:3) covers fit inside the 2:3 frame with soft bands above and below, like books-r8cfn does for book covers; true 2:3 covers (Steam) keep today's fill, games-zex36 - Games — attach friends to individual play sessions like Movies' watch sessions; adding one also adds them to the game's Played with set, and the Friend page shows the shared play dates, design-system-k4tw8 - Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference
+**Parallel:** yes (3 workers — wave 2 of 2; all remaining ready tasks. games-q7vnd and design-system-k4tw8 both near poster-card CSS/Dashboard Views.fs — merge-ordered q7vnd first)
+
+---
+
 ## 2026-09-28 00:45 -- Task verified and completed: books-r8cfn - Dashboard book poster cards all share one size and show the whole cover — the Books tab rails (Currently Reading / Recently Finished / Recently Added) and the All tab's Reading card stop sizing each card from its image and stop cropping covers to the 2:3 frame
 
 **Type:** Work / Task completion

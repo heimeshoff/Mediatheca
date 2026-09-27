@@ -1,7 +1,7 @@
 ---
 id: games-zex36
 title: Games — attach friends to individual play sessions like Movies' watch sessions; adding one also adds them to the game's Played with set, and the Friend page shows the shared play dates
-status: todo
+status: doing
 type: feature
 context: games
 created: 2026-09-27
