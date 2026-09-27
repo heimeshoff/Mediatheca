@@ -1,0 +1,116 @@
+{
+  "_comment": "integration-cc7ab spike evidence. Redacted request/response sequence for the WORKING auth route (adp-signed request, ADR-0074 amendment). Recorded live against the marketplace `de` host using the builder's own audible-cli auth file. Every token, signature, cookie value, customer id, device serial and key below is `<redacted>`; a real capture would have full-length base64/opaque strings in their place. Not wired into any test (TDD_SKIPPED: spike — evidence only) — a real test would need a live network stub, which is out of this spike's scope.",
+  "marketplace": {
+    "localeCode": "de",
+    "apiHost": "api.audible.de",
+    "webHost": "www.audible.de",
+    "amazonTokenHost": "api.amazon.de"
+  },
+  "sequence": [
+    {
+      "step": 1,
+      "purpose": "Mint an access token from the imported refresh_token (existing Audible.fs refreshAccessToken flow — unchanged by this spike, included only for sequence completeness).",
+      "request": {
+        "method": "POST",
+        "url": "https://api.amazon.de/auth/token",
+        "contentType": "application/x-www-form-urlencoded",
+        "bodyFields": {
+          "app_name": "Audible",
+          "app_version": "3.56.2",
+          "source_token": "<redacted refresh_token>",
+          "requested_token_type": "access_token",
+          "source_token_type": "refresh_token"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": { "access_token": "<redacted>", "expires_in": "<redacted>" }
+      }
+    },
+    {
+      "step": 2,
+      "purpose": "Find a library item with a companion PDF (existing GET /1.0/library shape — unchanged by this spike).",
+      "request": {
+        "method": "GET",
+        "url": "https://api.audible.de/1.0/library?num_results=200&response_groups=product_desc,pdf_url",
+        "headers": { "Authorization": "Bearer <redacted access_token>" }
+      },
+      "response": {
+        "status": 200,
+        "itemCountObserved": 86,
+        "sampleItemWithPdf": {
+          "asin": "<redacted>",
+          "title": "<redacted>",
+          "pdf_url": "https://d2fahduf2624mg.cloudfront.net/post_purchase_docs/<redacted>.pdf"
+        }
+      }
+    },
+    {
+      "step": 3,
+      "purpose": "ROUTE 1 (WORKS): signed x-adp request against the companion-file endpoint, following its redirect. This is the request the ADR amendment newly allows. Matches mkb79/audible's Authenticator.sign_request shape.",
+      "signing": {
+        "algorithm": "SHA256withRSA:1.0",
+        "signedString": "GET\\n/companion-file/<asin>\\n<date: yyyy-MM-ddTHH:mm:ssZ>\\n<empty body>\\n<adp_token>",
+        "signatureComputation": "RSA-SHA256 sign of signedString using the auth file's device_private_key (PKCS1 PEM, 'RSA PRIVATE KEY'); result base64-encoded",
+        "headerValue": "<base64 signature>:<date>"
+      },
+      "request": {
+        "method": "GET",
+        "url": "https://www.audible.de/companion-file/<asin>",
+        "headers": {
+          "x-adp-token": "<redacted adp_token>",
+          "x-adp-alg": "SHA256withRSA:1.0",
+          "x-adp-signature": "<redacted signature>:<redacted date>"
+        },
+        "note": "No Authorization/bearer header, no client-id header — signing headers alone."
+      },
+      "response": {
+        "firstAttempt": {
+          "status": 302,
+          "redirectLocationHost": "d2fahduf2624mg.cloudfront.net",
+          "note": "A fresh, signed redirect target — NOT the same as the static, unsigned pdf_url from step 2's library response. This is the key difference from the prior bounced attempt (integration-qqpq9), which only ever tried a bearer token and got redirected to www.amazon.de/ap/signin, or hit the raw pdf_url directly and got a CloudFront 403 AccessDenied."
+        },
+        "followedRedirect": {
+          "status": 200,
+          "finalUrlHost": "d2fahduf2624mg.cloudfront.net",
+          "contentType": "application/octet-stream",
+          "firstBytes": "%PDF-1.6\\r%<redacted binary>\\r\\n",
+          "verdict": "Real PDF body. Route 1 alone is sufficient — no cookie exchange needed."
+        }
+      }
+    },
+    {
+      "step": 4,
+      "purpose": "ROUTE 2 (also confirmed to work, but NOT recommended — route 1 is simpler and was tried first per the task's ordering). refresh_token -> website cookie exchange (mkb79/audible's refresh_website_cookies / alexapy's exchangetoken pattern), then companion-file with the minted cookies.",
+      "request": {
+        "method": "POST",
+        "url": "https://www.amazon.de/ap/exchangetoken/cookies",
+        "contentType": "application/x-www-form-urlencoded",
+        "bodyFields": {
+          "app_name": "Audible",
+          "app_version": "3.56.2",
+          "source_token": "<redacted refresh_token>",
+          "requested_token_type": "auth_cookies",
+          "source_token_type": "refresh_token",
+          "domain": ".amazon.de"
+        }
+      },
+      "response": {
+        "status": 200,
+        "cookiesMinted": 6,
+        "followUpRequest": {
+          "method": "GET",
+          "url": "https://www.audible.de/companion-file/<asin>",
+          "headers": { "Cookie": "<redacted 6 cookie name=value pairs>" },
+          "response": {
+            "status": 200,
+            "finalUrlHost": "d2fahduf2624mg.cloudfront.net",
+            "contentType": "application/octet-stream",
+            "firstBytes": "%PDF-1.6\\r%<redacted binary>\\r\\n"
+          }
+        }
+      }
+    }
+  ],
+  "conclusion": "Route 1 (adp-signed request to /companion-file/<asin>, following its redirect) reaches a real PDF body using only the imported auth file's adp_token + device_private_key — the same two fields ADR-0074 already imports 'for signed requests' but the adapter never used until now. No login, no /auth/register, no cookie exchange required. See the ADR amendment reported in this task's Outcome."
+}

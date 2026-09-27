@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 13:08 -- Task verified and completed: integration-cc7ab - Spike — find an auth route that downloads an Audible companion PDF without a login, testing signed x-adp requests first and the refresh-token-to-website-cookie exchange second, and report an ADR-0074 amendment for the first one that works
+
+**Type:** Work / Task completion
+**Task:** integration-cc7ab - Spike — find an auth route that downloads an Audible companion PDF without a login, testing signed x-adp requests first and the refresh-token-to-website-cookie exchange second, and report an ADR-0074 amendment for the first one that works
+**Summary:** spike — adp-signed companion-file request (following its redirect) downloads Audible companion PDFs; ADR-0089 amends ADR-0074
+**Duration:** 12m
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 1
+**Tests added:** 0
+**ADRs written:** 0089
+
+---
+
 ## 2026-09-27 12:55 -- Batch started: [integration-cc7ab]
 
 **Type:** Work / Batch start
