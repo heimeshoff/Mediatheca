@@ -10,9 +10,9 @@ research touching this BC, and concept synthesis pages.
 ## Tasks by status
 
 <!-- task-counts:start -->
-- **Backlog:** 0
+- **Backlog:** 1
 - **Todo:** 0
-- **Doing:** 2
+- **Doing:** 1
 - **Done:** 32
 <!-- task-counts:end -->
 
@@ -22,7 +22,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **integration-qqpq9** — Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab (feature) — `doing/integration-qqpq9-audible-companion-pdf-download-and-book-detail-link.md`
 - **integration-q748k** — RomM play button — a RomM-linked game whose platform RomM can play in the browser shows a Play button in the game page hero that opens RomM's web player for that rom in a new browser tab (feature) — `doing/integration-q748k-romm-play-button.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
@@ -61,6 +60,7 @@ research touching this BC, and concept synthesis pages.
 
 ### Backlog
 <!-- backlog-list:start -->
+- **integration-qqpq9** — Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab (feature) — `backlog/integration-qqpq9-audible-companion-pdf-download-and-book-detail-link.md`
 <!-- backlog-list:end -->
 
 

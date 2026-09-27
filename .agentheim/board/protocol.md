@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-27 12:05 -- Task bounced: integration-qqpq9 - Audible companion PDFs — the nightly Audible sync (plus a one-time backfill) downloads the companion PDF of every library title that has one, and the book detail page links to it, opening in a new tab
+
+**Type:** Work / Task bounced
+**BC:** integration
+**From → To:** doing → backlog
+**Reason:** Recorded live evidence (via the supplied auth file, marketplace `de`, bearer access token minted through `Audible.refreshAccessToken`'s own `/auth/token` flow) shows the companion-PDF download is not reachable with ADR-0074's bearer-only auth, matching the task's own named stop condition. `GET /1.0/library?response_groups=product_desc,pdf_url` decodes fine and returns items carrying a `pdf_url` (e.g. a real title's `pdf_url` pointed at `https://d2fahduf2624mg.cloudfront.net/post_purchase_docs/.../*.pdf`, `is_pdf_url_available` was `null` on every item seen), so the detect/decode half of this task is low-risk. But both plausible download paths refuse the bearer token: (1) `GET https://www.audible.de/companion-file/<asin>` with `Authorization: Bearer <token>` returns HTTP 302 redirecting to `www.amazon.de/ap/signin` (Amazon's login page) -- byte-identical behaviour to sending the exact same request with no Authorization header at all, i.e. the endpoint ignores the bearer token entirely and demands a real logged-in browser session; (2) fetching the `pdf_url` CloudFront link directly returns HTTP 403 with a CloudFront `AccessDenied` XML body -- both unauthenticated and with the auth file's own stored `website_cookies` attached (5 cookies present in the file; still 403), confirming the link needs CloudFront *signed* cookies minted by a live, successful web-session hit of the companion-file page, not the static cookies quickstart happened to capture. This is exactly the task's Notes/spawn-prompt stop clause ("if the companion-file endpoint refuses a bearer token -- e.g. it needs signed x-adp-* requests or website cookies -- stop and bounce... adding request signing/cookie-session auth is a decision that amends ADR-0074, not something to slip in"). Implementing a fix (a login-derived, refreshed CloudFront-signed-cookie session, or x-adp request signing) is a decision this worker is not authorized to make. No repo files were written; no fixtures, tokens, or cookies were committed (verified via `git status`/`git diff --stat` in the worktree, both empty).
+
+---
+
 ## 2026-09-27 11:40 -- Batch started: [integration-q748k, integration-qqpq9]
 
 **Type:** Work / Batch start
