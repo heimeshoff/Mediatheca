@@ -417,6 +417,10 @@ module Administration =
         // (game, gaming day); the table is now checkpoint-tracked and
         // rebuildable, no longer PlaytimeTracker's imperative write.
         "game_play_session", Projected "PlaySessionProjection"
+        // games-zex36 (ADR-0091): friends attached to an individual play
+        // session — a second table owned by the same PlaySessionProjection
+        // handler/checkpoint.
+        "game_play_session_friend", Projected "PlaySessionProjection"
         // books-y9kxy (ADR-0076/ADR-0077): the Book aggregate's read model.
         "book_list", Projected "BookProjection"
         "book_detail", Projected "BookProjection"

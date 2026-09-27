@@ -109,7 +109,9 @@ let tests =
                 // checkpoint-tracked projection.
                 "SeriesProjection", [ "series_list"; "series_detail"; "series_rewatch_sessions"; "series_episode_progress" ]
                 "GameProjection", [ "game_list"; "game_detail" ]
-                "PlaySessionProjection", [ "game_play_session" ]
+                // games-zex36 (ADR-0091): play-session friends, a second
+                // table owned by the same checkpoint.
+                "PlaySessionProjection", [ "game_play_session"; "game_play_session_friend" ]
                 "BookProjection", [ "book_list"; "book_detail"; "book_progress" ]
                 // curation-h98ve (ADR-0080): Notes' document-stream snapshot
                 // projection.

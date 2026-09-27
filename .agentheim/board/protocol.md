@@ -5,6 +5,20 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 01:21 -- Task verified and completed: games-zex36 - Games — attach friends to individual play sessions like Movies' watch sessions; adding one also adds them to the game's Played with set, and the Friend page shows the shared play dates
+
+**Type:** Work / Task completion
+**Task:** games-zex36 - Games — attach friends to individual play sessions like Movies' watch sessions; adding one also adds them to the game's Played with set, and the Friend page shows the shared play dates
+**Summary:** Games attach friends to individual play sessions; the first attach also adds them to Played with (decide-emitted, ADR-0091), and the Friend page shows real shared play dates
+**Duration:** 37m
+**Verification:** PASS (iteration 1)
+**Result source:** sidecar · layout both+sentinel · sidecar present
+**Files changed:** 16
+**Tests added:** 22
+**ADRs written:** none
+
+---
+
 ## 2026-09-28 01:15 -- Task verified and completed: games-q7vnd - Game poster cards show off-ratio box art whole — NES/SNES (and any clearly non-2:3) covers fit inside the 2:3 frame with soft bands above and below, like books-r8cfn does for book covers; true 2:3 covers (Steam) keep today's fill
 
 **Type:** Work / Task completion

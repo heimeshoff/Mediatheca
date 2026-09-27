@@ -1683,6 +1683,9 @@ type PlaySessionDto = {
     Date: string
     MinutesPlayed: int
     Source: PlaySessionSource
+    /// Friends attached to this individual play session (games-zex36,
+    /// ADR-0091), like `WatchSessionDto.Friends`.
+    Friends: FriendRef list
 }
 
 /// Editing a session (games-p6vkz): natural-key identity is `(GameSlug, Date)`
@@ -2123,6 +2126,10 @@ type IMediathecaApi = {
     addManualPlaySession: string * string * int -> Async<Result<PlaySessionDto, string>>
     updatePlaySession: PlaySessionEdit -> Async<Result<PlaySessionDto, string>>
     deletePlaySession: string * string -> Async<Result<unit, string>>
+    /// games-zex36: attach/detach a friend on an individual play session
+    /// (gameSlug, day, friendSlug), shaped like `addFriendToWatchSession`.
+    addFriendToPlaySession: string -> string -> string -> Async<Result<unit, string>>
+    removeFriendFromPlaySession: string -> string -> string -> Async<Result<unit, string>>
     getPlaytimeSummary: string -> string -> Async<PlaytimeSummaryItem list>
     getPlaytimeSyncStatus: unit -> Async<PlaytimeSyncStatus>
     triggerPlaytimeSync: unit -> Async<Result<PlaytimeSyncResult, string>>

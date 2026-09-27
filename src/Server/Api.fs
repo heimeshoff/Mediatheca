@@ -3292,7 +3292,20 @@ module Api =
                 let gamePlayed = GameProjection.getGamesPlayedWithFriend conn friendSlug
                 let movieWatched = MovieProjection.getMoviesWatchedWithFriend conn friendSlug
                 let seriesWatched = SeriesProjection.getSeriesWatchedWithFriend conn friendSlug
-                let gamePlayedAsWatched = gamePlayed |> List.map (fun g -> { Slug = g.Slug; Name = g.Name; Year = g.Year; PosterRef = g.PosterRef; Dates = []; MediaType = g.MediaType })
+                // games-zex36: membership stays driven by played_with
+                // (`gamePlayed` above) — session dates are only layered on
+                // top for games that have them; a manual-only Played with
+                // entry still appears, with Dates = [].
+                let gameSessionDates = PlaySessionProjection.getGamePlaySessionDatesForFriend conn friendSlug
+                let gamePlayedAsWatched =
+                    gamePlayed
+                    |> List.map (fun g ->
+                        { Slug = g.Slug
+                          Name = g.Name
+                          Year = g.Year
+                          PosterRef = g.PosterRef
+                          Dates = gameSessionDates |> Map.tryFind g.Slug |> Option.defaultValue []
+                          MediaType = g.MediaType })
                 return {
                     Mediatheca.Shared.FriendMedia.Recommended = (movieRec @ seriesRec @ gameRec) |> List.sortBy (fun i -> i.Name)
                     WantToWatch = (movieWant @ seriesWant @ gameWant) |> List.sortBy (fun i -> i.Name)
@@ -5611,6 +5624,34 @@ module Api =
                         c
                         projectionHandlers
                 return PlaytimeTracker.deletePlaySessionApi conn slug day runCmd
+            }
+
+            addFriendToPlaySession = fun slug day friendSlug -> async {
+                use conn = factory ()
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Add_friend_to_play_session (day, friendSlug))
+                        projectionHandlers
+            }
+
+            removeFriendFromPlaySession = fun slug day friendSlug -> async {
+                use conn = factory ()
+                let sid = Games.streamId slug
+                return
+                    executeCommand
+                        conn sid
+                        Games.Serialization.fromStoredEvent
+                        Games.reconstitute
+                        Games.decide
+                        Games.Serialization.toEventData
+                        (Games.Remove_friend_from_play_session (day, friendSlug))
+                        projectionHandlers
             }
 
             getPlaytimeSummary = fun fromDate toDate -> async {

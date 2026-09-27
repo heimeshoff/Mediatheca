@@ -1,7 +1,7 @@
 ---
 id: games-zex36
 title: Games — attach friends to individual play sessions like Movies' watch sessions; adding one also adds them to the game's Played with set, and the Friend page shows the shared play dates
-status: doing
+status: done
 type: feature
 context: games
 created: 2026-09-27
@@ -148,3 +148,20 @@ Builder decisions (2026-09-27):
   asked for it. Leave it out.
 - Sibling games-fbf3j (remove the 10-row Play History cap) touches the same card.
   Expect a trivial merge.
+
+## Outcome
+
+Implemented per ADR-0091 (parallel `PlaySessionFriends` map on `ActiveGame`, decide-emitted `Game_played_with` implication):
+
+- **`src/Server/Games.fs`** — new events `Friend_added_to_play_session`/`Friend_removed_from_play_session`, new commands `Add_friend_to_play_session`/`Remove_friend_from_play_session`, `ActiveGame.PlaySessionFriends: Map<string, Set<string>>` (initialized empty on `Game_added_to_library`). `evolve` folds add/remove, extends `Play_session_moved`'s merge arm to union friend sets, and extends `Play_session_removed` to drop the day's friend entry (load-bearing per the task notes). `decide`'s `Add_friend_to_play_session` is idempotent (`Ok []` if already on the session, no re-check of `PlayedWith`) and otherwise emits `[Friend_added_to_play_session] @ (promotion into Game_played_with if not already in PlayedWith)`; `Remove_friend_from_play_session` never touches `PlayedWith`. Both events are added to the codec (serialize/deserialize/handledEventTypes) and `EventFormatting.fs`.
+- **`src/Server/PlaySessionProjection.fs`** — new table `game_play_session_friend (game_slug, date, friend_slug)`, natural PK, plus a `friend_slug` index; handlers for add (INSERT OR IGNORE), remove (DELETE), move (copy-then-delete, INSERT OR IGNORE so a friend already on the destination day is a no-op), and session removal (DELETE). `getForGame`/`getBySlugAndDay` now fill each `PlaySessionDto`'s `Friends` via a join helper (`resolveFriendRefs`/`friendsForSession`, mirroring `MovieProjection`/`GameProjection`'s own helpers). New `getGamePlaySessionDatesForFriend` powers the Friend page.
+- **`src/Server/Administration.fs`** — `game_play_session_friend` registered `Projected "PlaySessionProjection"` in `tableRegistry`, so it's automatically covered by `checkProjectionDrift`, the projection dashboard, and the table-classification coverage test.
+- **`src/Server/GameProjection.fs`** — explicit no-op arms for the two new events (session-friend state lives only in `PlaySessionProjection`; the implied `Game_played_with` rides `GameProjection`'s existing arm).
+- **`src/Server/Api.fs`** — `addFriendToPlaySession`/`removeFriendFromPlaySession` (new `IMediathecaApi` members), and `getFriendMedia`'s previously hard-coded `Dates = []` for games is replaced with real session dates from `PlaySessionProjection.getGamePlaySessionDatesForFriend`, defaulting to `[]` for a manual-only `Played with` entry (membership itself is untouched, still driven by `played_with`).
+- **`src/Shared/Shared.fs`** — `PlaySessionDto` gains `Friends: FriendRef list`; `IMediathecaApi` gains the two new play-session-friend members.
+- **Client (`src/Client/Pages/GameDetail/`)** — `Types.fs`/`State.fs`/`Views.fs`: a `Session_friend_picker of day` case on the existing `FriendPickerKind`, new messages (`Add_friend_to_session`/`Remove_friend_from_session`/`Add_new_friend_to_session`/`New_friend_for_session_result`/`Session_friend_command_result`), and the Play History card now shows `FriendPill` chips per session plus a `+` button opening the existing `FriendManager` picker (same paper-overlay pattern already used for Recommended/Play-with/Played-with) — no new visual vocabulary introduced.
+- **Tests**: `tests/Server.Tests/GamesTests.fs` (`playSessionFriendTests`, 13 cases covering every acceptance criterion on `decide`/`evolve`, plus the sync-merge regression and a round-trip); `tests/Server.Tests/PlaySessionFriendTests.fs` (new file — projection-level add/remove/move/removal + rebuild-consistency, `getForGame`/`getBySlugAndDay` filling `Friends`, a `checkProjectionDrift` zero-discrepancy case, and an `Api.fs`-level `getFriendMedia` test proving real dates vs. `Dates = []`); `tests/Server.Tests/TableClassificationTests.fs` updated for the new table's hardcoded expectation; `src/Client/Pages/GameDetail/State.test.fs` (new file, Vitest/Fable.Mocha) covering the add/remove/new-friend/command-result MVU wiring.
+
+Verified: `dotnet build src/Server/Server.fsproj` (0 warnings/errors), full Expecto suite (`dotnet run --project tests/Server.Tests/Server.Tests.fsproj`, 0 failed/errored), `npm run build` (Fable compiles clean), `npm run test:client` (142/142 passing, including the new GameDetail State tests).
+
+Out of scope, per the task notes: session-friend removal does not cascade to `PlayedWith`; adding a friend to a session does not clear them from Want-to-play-with; `mergeSession`'s pre-existing non-idempotent-under-rewind behavior is untouched (the new friend-table handlers are ordinary idempotent SQL).

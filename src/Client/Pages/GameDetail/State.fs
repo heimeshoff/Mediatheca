@@ -480,6 +480,47 @@ let update (api: IMediathecaApi) (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | Delete_session_completed (Error err) ->
         { model with PendingDelete = None; Error = Some err }, Cmd.none
 
+    | Add_friend_to_session (day, friendSlug) ->
+        model,
+        Cmd.OfAsync.perform (fun () -> api.addFriendToPlaySession model.Slug day friendSlug) () Session_friend_command_result
+
+    | Remove_friend_from_session (day, friendSlug) ->
+        model,
+        Cmd.OfAsync.perform (fun () -> api.removeFriendFromPlaySession model.Slug day friendSlug) () Session_friend_command_result
+
+    | Add_new_friend_to_session (day, name) ->
+        model,
+        Cmd.OfAsync.perform (fun () ->
+            async {
+                match! api.addFriend name with
+                | Ok slug ->
+                    match! api.addFriendToPlaySession model.Slug day slug with
+                    | Ok () -> return Ok ()
+                    | Error e -> return Error e
+                | Error e -> return Error e
+            }) () New_friend_for_session_result
+
+    | New_friend_for_session_result (Ok ()) ->
+        model,
+        Cmd.batch [
+            Cmd.OfAsync.perform api.getGamePlaySessions model.Slug Play_sessions_loaded
+            Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
+            Cmd.OfAsync.perform api.getFriends () Friends_loaded
+        ]
+
+    | New_friend_for_session_result (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
+    | Session_friend_command_result (Ok ()) ->
+        model,
+        Cmd.batch [
+            Cmd.OfAsync.perform api.getGamePlaySessions model.Slug Play_sessions_loaded
+            Cmd.OfAsync.perform api.getGameDetail model.Slug Game_loaded
+        ]
+
+    | Session_friend_command_result (Error err) ->
+        { model with Error = Some err }, Cmd.none
+
     | Fetch_hltb ->
         { model with HltbFetching = true; HltbNoData = false },
         Cmd.OfAsync.either

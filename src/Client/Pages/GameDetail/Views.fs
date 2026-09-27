@@ -1337,17 +1337,37 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                                                                         prop.className "flex items-center justify-between py-1.5 border-b border-base-content/5 last:border-0 group"
                                                                         prop.children [
                                                                             Html.div [
-                                                                                prop.className "flex items-center gap-2"
+                                                                                prop.className "flex flex-col gap-1"
                                                                                 prop.children [
-                                                                                    Html.span [
-                                                                                        prop.className "text-sm text-base-content/60"
-                                                                                        prop.text session.Date
-                                                                                    ]
-                                                                                    if session.Source = Manual then
-                                                                                        Html.span [
-                                                                                            prop.className "text-[10px] uppercase tracking-wider text-base-content/40 border border-base-content/15 rounded px-1.5 py-0.5"
-                                                                                            prop.text "manual"
+                                                                                    Html.div [
+                                                                                        prop.className "flex items-center gap-2"
+                                                                                        prop.children [
+                                                                                            Html.span [
+                                                                                                prop.className "text-sm text-base-content/60"
+                                                                                                prop.text session.Date
+                                                                                            ]
+                                                                                            if session.Source = Manual then
+                                                                                                Html.span [
+                                                                                                    prop.className "text-[10px] uppercase tracking-wider text-base-content/40 border border-base-content/15 rounded px-1.5 py-0.5"
+                                                                                                    prop.text "manual"
+                                                                                                ]
                                                                                         ]
+                                                                                    ]
+                                                                                    // games-zex36: friends attached to this session, plus an
+                                                                                    // add picker — mirrors MovieDetail's watch-session friend pills.
+                                                                                    Html.div [
+                                                                                        prop.className "flex flex-wrap gap-1.5 items-center"
+                                                                                        prop.children [
+                                                                                            for fr in session.Friends do
+                                                                                                FriendPill.view fr
+                                                                                            Html.button [
+                                                                                                prop.className "w-5 h-5 rounded-full bg-base-content/10 flex items-center justify-center text-[10px] text-base-content/40 hover:bg-primary/30 hover:text-primary transition-colors"
+                                                                                                prop.title "Add friend to session"
+                                                                                                prop.onClick (fun _ -> dispatch (Open_friend_picker (Session_friend_picker session.Date)))
+                                                                                                prop.text "+"
+                                                                                            ]
+                                                                                        ]
+                                                                                    ]
                                                                                 ]
                                                                             ]
                                                                             Html.div [
@@ -1678,6 +1698,20 @@ let view (model: Model) (dispatch: Msg -> unit) (onBack: unit -> unit) =
                         (fun slug -> dispatch (Add_played_with slug))
                         (fun slug -> dispatch (Remove_played_with slug))
                         (fun name -> dispatch (Add_friend_and_played_with name))
+                        (fun () -> dispatch Close_friend_picker)
+                | Some (Session_friend_picker day) ->
+                    let sessionFriends =
+                        model.PlaySessions
+                        |> List.tryFind (fun s -> s.Date = day)
+                        |> Option.map (fun s -> s.Friends)
+                        |> Option.defaultValue []
+                    FriendManager
+                        "Played With (this session)"
+                        model.AllFriends
+                        sessionFriends
+                        (fun slug -> dispatch (Add_friend_to_session (day, slug)))
+                        (fun slug -> dispatch (Remove_friend_from_session (day, slug)))
+                        (fun name -> dispatch (Add_new_friend_to_session (day, name)))
                         (fun () -> dispatch Close_friend_picker)
                 | None -> ()
                 // Catalog picker modal

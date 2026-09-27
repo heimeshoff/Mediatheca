@@ -36,12 +36,21 @@ module PlaySessionProjection =
 
             CREATE INDEX IF NOT EXISTS idx_play_session_slug ON game_play_session(game_slug);
             CREATE INDEX IF NOT EXISTS idx_play_session_date ON game_play_session(date);
+
+            CREATE TABLE IF NOT EXISTS game_play_session_friend (
+                game_slug   TEXT NOT NULL,
+                date        TEXT NOT NULL,
+                friend_slug TEXT NOT NULL,
+                PRIMARY KEY (game_slug, date, friend_slug)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_play_session_friend_friend ON game_play_session_friend(friend_slug);
         """
         |> Db.exec
 
     let private dropTables (conn: SqliteConnection) : unit =
         conn
-        |> Db.newCommand "DROP TABLE IF EXISTS game_play_session;"
+        |> Db.newCommand "DROP TABLE IF EXISTS game_play_session; DROP TABLE IF EXISTS game_play_session_friend;"
         |> Db.exec
 
     let private encodeSource (source: PlaySessionSource) =
@@ -122,11 +131,43 @@ module PlaySessionProjection =
                     |> Db.newCommand "DELETE FROM game_play_session WHERE game_slug = @slug AND date = @day"
                     |> Db.setParams [ "slug", SqlType.String slug; "day", SqlType.String fromDay ]
                     |> Db.exec
+                    // games-zex36: carry the origin day's friends across too
+                    // (copy-then-delete, same shape as the minutes merge
+                    // above) — INSERT OR IGNORE so a friend already present
+                    // on the destination day is a no-op, not a PK conflict.
+                    conn
+                    |> Db.newCommand """
+                        INSERT OR IGNORE INTO game_play_session_friend (game_slug, date, friend_slug)
+                        SELECT game_slug, @toDay, friend_slug FROM game_play_session_friend
+                        WHERE game_slug = @slug AND date = @fromDay
+                    """
+                    |> Db.setParams [ "slug", SqlType.String slug; "fromDay", SqlType.String fromDay; "toDay", SqlType.String toDay ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "DELETE FROM game_play_session_friend WHERE game_slug = @slug AND date = @day"
+                    |> Db.setParams [ "slug", SqlType.String slug; "day", SqlType.String fromDay ]
+                    |> Db.exec
 
                 | Games.Play_session_removed (day, _previousMinutes) ->
                     conn
                     |> Db.newCommand "DELETE FROM game_play_session WHERE game_slug = @slug AND date = @day"
                     |> Db.setParams [ "slug", SqlType.String slug; "day", SqlType.String day ]
+                    |> Db.exec
+                    conn
+                    |> Db.newCommand "DELETE FROM game_play_session_friend WHERE game_slug = @slug AND date = @day"
+                    |> Db.setParams [ "slug", SqlType.String slug; "day", SqlType.String day ]
+                    |> Db.exec
+
+                | Games.Friend_added_to_play_session (day, friendSlug) ->
+                    conn
+                    |> Db.newCommand "INSERT OR IGNORE INTO game_play_session_friend (game_slug, date, friend_slug) VALUES (@slug, @day, @friend)"
+                    |> Db.setParams [ "slug", SqlType.String slug; "day", SqlType.String day; "friend", SqlType.String friendSlug ]
+                    |> Db.exec
+
+                | Games.Friend_removed_from_play_session (day, friendSlug) ->
+                    conn
+                    |> Db.newCommand "DELETE FROM game_play_session_friend WHERE game_slug = @slug AND date = @day AND friend_slug = @friend"
+                    |> Db.setParams [ "slug", SqlType.String slug; "day", SqlType.String day; "friend", SqlType.String friendSlug ]
                     |> Db.exec
 
                 // Prior playtime writes no session row — by construction, not
@@ -143,24 +184,71 @@ module PlaySessionProjection =
 
     // Query functions
 
-    let private toPlaySessionDto (rd: IDataReader) : PlaySessionDto =
+    /// Mirrors `GameProjection.resolveFriendRefs`/`MovieProjection.resolveFriendRefs`
+    /// (games-zex36) — resolves session-friend slugs to display refs via
+    /// `friend_list`.
+    let private resolveFriendRefs (conn: SqliteConnection) (slugs: string list) : FriendRef list =
+        if List.isEmpty slugs then []
+        else
+            let friendMap =
+                conn
+                |> Db.newCommand "SELECT slug, name, image_ref FROM friend_list"
+                |> Db.query (fun (rd: IDataReader) ->
+                    rd.ReadString "slug",
+                    (rd.ReadString "name",
+                     if rd.IsDBNull(rd.GetOrdinal("image_ref")) then None
+                     else Some (rd.ReadString "image_ref")))
+                |> Map.ofList
+            slugs |> List.map (fun s ->
+                let name, imageRef =
+                    friendMap |> Map.tryFind s |> Option.defaultValue (s, None)
+                { FriendRef.Slug = s
+                  Name = name
+                  ImageRef = imageRef })
+
+    let private friendsForSession (conn: SqliteConnection) (slug: string) (day: string) : FriendRef list =
+        conn
+        |> Db.newCommand "SELECT friend_slug FROM game_play_session_friend WHERE game_slug = @slug AND date = @day ORDER BY friend_slug"
+        |> Db.setParams [ "slug", SqlType.String slug; "day", SqlType.String day ]
+        |> Db.query (fun (rd: IDataReader) -> rd.ReadString "friend_slug")
+        |> resolveFriendRefs conn
+
+    let private toPlaySessionDto (conn: SqliteConnection) (rd: IDataReader) : PlaySessionDto =
         let source = decodeSource (rd.ReadString "source")
-        { GameSlug = rd.ReadString "game_slug"
-          Date = rd.ReadString "date"
+        let slug = rd.ReadString "game_slug"
+        let date = rd.ReadString "date"
+        { GameSlug = slug
+          Date = date
           MinutesPlayed = rd.ReadInt32 "minutes_played"
-          Source = source }
+          Source = source
+          Friends = friendsForSession conn slug date }
 
     let getForGame (conn: SqliteConnection) (slug: string) : PlaySessionDto list =
         conn
         |> Db.newCommand "SELECT game_slug, date, minutes_played, source FROM game_play_session WHERE game_slug = @slug ORDER BY date DESC"
         |> Db.setParams [ "slug", SqlType.String slug ]
-        |> Db.query toPlaySessionDto
+        |> Db.query (toPlaySessionDto conn)
 
     let getBySlugAndDay (conn: SqliteConnection) (slug: string) (day: string) : PlaySessionDto option =
         conn
         |> Db.newCommand "SELECT game_slug, date, minutes_played, source FROM game_play_session WHERE game_slug = @slug AND date = @day"
         |> Db.setParams [ "slug", SqlType.String slug; "day", SqlType.String day ]
-        |> Db.querySingle toPlaySessionDto
+        |> Db.querySingle (toPlaySessionDto conn)
+
+    /// Friend-page query, shaped like `MovieProjection.getMoviesWatchedWithFriend`
+    /// (games-zex36): every gaming day a friend was attached to a session,
+    /// grouped by game slug -> its dates. Membership itself (whether a game
+    /// counts as "played with" at all) stays driven by `played_with` — see
+    /// `GameProjection.getGamesPlayedWithFriend` — this only supplies real
+    /// dates on top for games that have session friends recorded.
+    let getGamePlaySessionDatesForFriend (conn: SqliteConnection) (friendSlug: string) : Map<string, string list> =
+        conn
+        |> Db.newCommand "SELECT game_slug, date FROM game_play_session_friend WHERE friend_slug = @friend ORDER BY game_slug, date DESC"
+        |> Db.setParams [ "friend", SqlType.String friendSlug ]
+        |> Db.query (fun (rd: IDataReader) -> rd.ReadString "game_slug", rd.ReadString "date")
+        |> List.groupBy fst
+        |> List.map (fun (slug, rows) -> slug, rows |> List.map snd)
+        |> Map.ofList
 
     let hasAnySessions (conn: SqliteConnection) (slug: string) : bool =
         conn

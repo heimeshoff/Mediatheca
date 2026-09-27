@@ -8,6 +8,10 @@ type FriendPickerKind =
     | Recommend_picker
     | Play_with_picker
     | Played_with_picker
+    /// games-zex36: friends on one individual play session, keyed by the
+    /// session's natural key (the gaming day) — mirrors MovieDetail's
+    /// `Session_friend_picker of sessionId`.
+    | Session_friend_picker of day: string
 
 type ImagePickerKind = Cover_picker | Backdrop_picker
 
@@ -140,6 +144,12 @@ type Msg =
     | Delete_session_confirmed
     | Delete_session_cancelled
     | Delete_session_completed of Result<unit, string>
+    // games-zex36: attach/detach a friend on an individual play session.
+    | Add_friend_to_session of day: string * friendSlug: string
+    | Remove_friend_from_session of day: string * friendSlug: string
+    | Add_new_friend_to_session of day: string * name: string
+    | New_friend_for_session_result of Result<unit, string>
+    | Session_friend_command_result of Result<unit, string>
     | Fetch_hltb
     | Hltb_fetched of Result<float option, string>
     | Game_removed of Result<unit, string>

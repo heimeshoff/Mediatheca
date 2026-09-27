@@ -808,6 +808,8 @@ let gameSerializationTests =
                 Play_session_minutes_corrected ("2024-06-01", 90, 60)
                 Play_session_moved ("2024-06-01", "2024-06-02", 60)
                 Play_session_removed ("2024-06-01", 60)
+                Friend_added_to_play_session ("2024-06-01", "marco")
+                Friend_removed_from_play_session ("2024-06-01", "marco")
                 Steam_observed_total_reconciled 2952
                 Game_short_description_set "A short description"
                 Game_website_url_set (Some "https://example.com")
@@ -1087,4 +1089,166 @@ let rommPlaySessionDecideTests =
                 | Ok events -> Expect.equal events [] "No new ids: should be a no-op"
                 | Error e -> failtest $"Expected success but got: {e}"
             | Error e -> failtest $"Expected success but got: {e}"
+    ]
+
+/// games-zex36 (ADR-0091): friends attached to an individual play session,
+/// and the decide-emitted implication onto the game-level PlayedWith set.
+[<Tests>]
+let playSessionFriendTests =
+    testList "Games play-session friends (games-zex36, ADR-0091)" [
+
+        testCase "Add_friend_to_play_session on a day with no session returns Error" <| fun _ ->
+            let given = [ Game_added_to_library sampleGameData ]
+            match givenWhenThen given (Add_friend_to_play_session ("2024-06-01", "marco")) with
+            | Error msg -> Expect.equal msg "Play session not found" "Should report the same message as Correct/Move/Remove against a nonexistent session"
+            | Ok _ -> failtest "Expected an error — no session exists on that day"
+
+        testCase "adding a friend neither on the session nor in PlayedWith emits both Friend_added_to_play_session and Game_played_with, in that order" <| fun _ ->
+            let given =
+                [ Game_added_to_library sampleGameData
+                  Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty } ]
+            match givenWhenThen given (Add_friend_to_play_session ("2024-06-01", "marco")) with
+            | Ok events ->
+                Expect.equal events
+                    [ Friend_added_to_play_session ("2024-06-01", "marco"); Game_played_with "marco" ]
+                    "Should emit the session-friend event then the implied Game_played_with, in that order"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "adding a friend already in PlayedWith (but not on this session) emits only Friend_added_to_play_session" <| fun _ ->
+            let given =
+                [ Game_added_to_library sampleGameData
+                  Game_played_with "marco"
+                  Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty } ]
+            match givenWhenThen given (Add_friend_to_play_session ("2024-06-01", "marco")) with
+            | Ok events ->
+                Expect.equal events [ Friend_added_to_play_session ("2024-06-01", "marco") ]
+                    "Marco is already in PlayedWith, so no second Game_played_with should be emitted"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "adding a friend already on the session returns Ok [], even if PlayedWith no longer contains them" <| fun _ ->
+            let given =
+                [ Game_added_to_library sampleGameData
+                  Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty }
+                  Friend_added_to_play_session ("2024-06-01", "marco")
+                  Game_played_with "marco"
+                  Game_played_with_removed "marco" ]
+            match givenWhenThen given (Add_friend_to_play_session ("2024-06-01", "marco")) with
+            | Ok events -> Expect.equal events [] "Idempotent add on an already-present session friend must not re-assert PlayedWith (ADR-0091)"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "removing a friend who isn't on the session returns Ok []" <| fun _ ->
+            let given =
+                [ Game_added_to_library sampleGameData
+                  Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty } ]
+            match givenWhenThen given (Remove_friend_from_play_session ("2024-06-01", "marco")) with
+            | Ok events -> Expect.equal events [] "Nothing to remove: should be a no-op"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "removing a friend who is on the session emits Friend_removed_from_play_session and leaves PlayedWith untouched" <| fun _ ->
+            let given =
+                [ Game_added_to_library sampleGameData
+                  Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty }
+                  Friend_added_to_play_session ("2024-06-01", "marco")
+                  Game_played_with "marco" ]
+            match givenWhenThen given (Remove_friend_from_play_session ("2024-06-01", "marco")) with
+            | Ok events ->
+                Expect.equal events [ Friend_removed_from_play_session ("2024-06-01", "marco") ] "Should emit exactly the removal event, no PlayedWith event"
+                let state = applyEvents (given @ events)
+                match state with
+                | Active game -> Expect.isTrue (game.PlayedWith |> Set.contains "marco") "PlayedWith must still contain marco — session removal never retracts it"
+                | _ -> failtest "Expected Active state"
+            | Error e -> failtest $"Expected success but got: {e}"
+
+        testCase "Remove_friend_from_play_session on a day with no session returns Error" <| fun _ ->
+            let given = [ Game_added_to_library sampleGameData ]
+            match givenWhenThen given (Remove_friend_from_play_session ("2024-06-01", "marco")) with
+            | Error msg -> Expect.equal msg "Play session not found" "Should report the same message as the other session commands"
+            | Ok _ -> failtest "Expected an error — no session exists on that day"
+
+        testCase "Play_session_moved carries the day's friends to the destination" <| fun _ ->
+            let given =
+                [ Game_added_to_library sampleGameData
+                  Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty }
+                  Friend_added_to_play_session ("2024-06-01", "marco")
+                  Game_played_with "marco" ]
+            let state = applyEvents (given @ [ Play_session_moved ("2024-06-01", "2024-06-02", 60) ])
+            match state with
+            | Active game ->
+                Expect.equal (game.PlaySessionFriends |> Map.tryFind "2024-06-01") None "Origin day must no longer have a friends entry"
+                Expect.equal (game.PlaySessionFriends |> Map.tryFind "2024-06-02") (Some (Set.ofList [ "marco" ])) "Destination day must carry marco"
+            | _ -> failtest "Expected Active state"
+
+        testCase "Play_session_moved onto a day that already has friends combines both sets" <| fun _ ->
+            let given =
+                [ Game_added_to_library sampleGameData
+                  Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty }
+                  Friend_added_to_play_session ("2024-06-01", "marco")
+                  Game_played_with "marco"
+                  Play_session_recorded { Day = "2024-06-02"; Minutes = 30; Source = Manual; RommSessionIds = Set.empty }
+                  Friend_added_to_play_session ("2024-06-02", "sarah")
+                  Game_played_with "sarah" ]
+            let state = applyEvents (given @ [ Play_session_moved ("2024-06-01", "2024-06-02", 60) ])
+            match state with
+            | Active game ->
+                Expect.equal (game.PlaySessionFriends |> Map.tryFind "2024-06-02") (Some (Set.ofList [ "marco"; "sarah" ])) "Destination day must union both days' friends"
+            | _ -> failtest "Expected Active state"
+
+        testCase "Play_session_removed drops the day's friends" <| fun _ ->
+            let given =
+                [ Game_added_to_library sampleGameData
+                  Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty }
+                  Friend_added_to_play_session ("2024-06-01", "marco")
+                  Game_played_with "marco" ]
+            let state = applyEvents (given @ [ Play_session_removed ("2024-06-01", 60) ])
+            match state with
+            | Active game -> Expect.equal (game.PlaySessionFriends |> Map.tryFind "2024-06-01") None "Removed day must have no PlaySessionFriends entry"
+            | _ -> failtest "Expected Active state"
+
+        testCase "a session recorded again on a day whose earlier session (with friends) was removed starts with no friends" <| fun _ ->
+            let given =
+                [ Game_added_to_library sampleGameData
+                  Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty }
+                  Friend_added_to_play_session ("2024-06-01", "marco")
+                  Game_played_with "marco"
+                  Play_session_removed ("2024-06-01", 60) ]
+            for recordedAgain in [
+                Play_session_recorded { Day = "2024-06-01"; Minutes = 30; Source = Manual; RommSessionIds = Set.empty }
+                Play_session_recorded { Day = "2024-06-01"; Minutes = 30; Source = SteamSync; RommSessionIds = Set.empty }
+                Play_session_recorded { Day = "2024-06-01"; Minutes = 30; Source = RomM; RommSessionIds = Set.ofList [ "romm-1" ] }
+            ] do
+                let state = applyEvents (given @ [ recordedAgain ])
+                match state with
+                | Active game ->
+                    Expect.equal (game.PlaySessionFriends |> Map.tryFind "2024-06-01") None
+                        $"A fresh session recorded on the same day (via {recordedAgain}) must load-bearingly start with no friends, not inherit the removed session's marco"
+                | _ -> failtest "Expected Active state"
+
+        testCase "sync regression: a manual session's friend survives a merging Steam delta and a merging RomM session on the same day, and minutes still sum" <| fun _ ->
+            let given =
+                [ Game_added_to_library sampleGameData
+                  Play_session_recorded { Day = "2024-06-01"; Minutes = 60; Source = Manual; RommSessionIds = Set.empty }
+                  Friend_added_to_play_session ("2024-06-01", "marco")
+                  Game_played_with "marco" ]
+            // A Steam observed-total delta merging into the same day.
+            let steamEvents = [ Play_session_recorded { Day = "2024-06-01"; Minutes = 45; Source = SteamSync; RommSessionIds = Set.empty } ]
+            let stateAfterSteam = applyEvents (given @ steamEvents)
+            match stateAfterSteam with
+            | Active game ->
+                Expect.equal (game.PlaySessionFriends |> Map.tryFind "2024-06-01") (Some (Set.ofList [ "marco" ])) "Friend set must survive the Steam merge"
+                Expect.equal (game.PlaySessions |> Map.tryFind "2024-06-01") (Some 105) "Minutes must sum (60 + 45)"
+            | _ -> failtest "Expected Active state"
+            // Then a RomM session also merging into that day.
+            let rommEvents = [ Play_session_recorded { Day = "2024-06-01"; Minutes = 20; Source = RomM; RommSessionIds = Set.ofList [ "romm-1" ] } ]
+            let stateAfterRomm = applyEvents (given @ steamEvents @ rommEvents)
+            match stateAfterRomm with
+            | Active game ->
+                Expect.equal (game.PlaySessionFriends |> Map.tryFind "2024-06-01") (Some (Set.ofList [ "marco" ])) "Friend set must survive the RomM merge too"
+                Expect.equal (game.PlaySessions |> Map.tryFind "2024-06-01") (Some 125) "Minutes must sum (60 + 45 + 20)"
+            | _ -> failtest "Expected Active state"
+
+        testCase "Friend_added_to_play_session/Friend_removed_from_play_session round-trip" <| fun _ ->
+            for event in [ Friend_added_to_play_session ("2024-06-01", "marco"); Friend_removed_from_play_session ("2024-06-01", "marco") ] do
+                let eventType, data = Serialization.serialize event
+                let deserialized = Serialization.deserialize eventType data
+                Expect.equal deserialized (Some event) $"Should round-trip: {eventType}"
     ]

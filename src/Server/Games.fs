@@ -96,6 +96,14 @@ module Games =
         | Play_session_minutes_corrected of day: string * newMinutes: int * previousMinutes: int
         | Play_session_moved of fromDay: string * toDay: string * minutes: int
         | Play_session_removed of day: string * previousMinutes: int
+        /// Friends attached to an individual play session (games-zex36),
+        /// mirroring Movies' `Friend_added_to_watch_session`/
+        /// `Friend_removed_from_watch_session`. See ADR-0091: `evolve` folds
+        /// these into the parallel `PlaySessionFriends` map only — the
+        /// implied `Game_played_with` (when applicable) is a separate event
+        /// emitted by `decide`, not derived here.
+        | Friend_added_to_play_session of day: string * friendSlug: string
+        | Friend_removed_from_play_session of day: string * friendSlug: string
         | Steam_observed_total_reconciled of observedMinutes: int
         | Game_description_set of description: string
         | Game_short_description_set of shortDescription: string
@@ -144,6 +152,13 @@ module Games =
         /// Gaming day -> minutes for that day. The natural key IS the day —
         /// no synthetic session id (see the ADR's drift-detector argument).
         PlaySessions: Map<string, int>
+        /// Gaming day -> friend slugs attached to that day's session
+        /// (games-zex36, ADR-0091) — a parallel map, not a richer
+        /// `PlaySessions` value. Two invariants, maintained entirely by
+        /// `evolve`: its keys are always a subset of `PlaySessions`' keys,
+        /// and it never holds an empty set (a day that becomes empty is
+        /// removed from the map rather than stored as `Set.empty`).
+        PlaySessionFriends: Map<string, Set<string>>
         /// What Steam has told us, cumulatively — `PriorPlayTimeMinutes` plus
         /// every `Play_session_recorded` delta whose `Source` was `SteamSync`,
         /// **as originally recorded** (never reduced by a later correction,
@@ -210,6 +225,11 @@ module Games =
         | Correct_play_session_minutes of day: string * newMinutes: int
         | Move_play_session of fromDay: string * toDay: string
         | Remove_play_session of day: string
+        /// games-zex36: attach/detach a friend on an individual play session.
+        /// See ADR-0091 for the parallel-map/decide-emitted-implication
+        /// design and `decide`'s arms below for the exact event shapes.
+        | Add_friend_to_play_session of day: string * friendSlug: string
+        | Remove_friend_from_play_session of day: string * friendSlug: string
         | Reconcile_steam_observed_total of observedMinutes: int
         /// The Steam-sync entry point: the whole first-sight / prior-playtime /
         /// delta policy lives here as one pure decision (see `decide` below),
@@ -265,6 +285,7 @@ module Games =
                 TotalPlayTimeMinutes = 0
                 PriorPlayTimeMinutes = 0
                 PlaySessions = Map.empty
+                PlaySessionFriends = Map.empty
                 SteamObservedMinutes = 0
                 ImportedRommSessionIds = Set.empty
                 FamilyOwners = Set.empty
@@ -343,9 +364,34 @@ module Games =
         | Active game, Play_session_moved (fromDay, toDay, minutes) ->
             let withoutFrom = game.PlaySessions |> Map.remove fromDay
             let mergedAtToDay = (withoutFrom |> Map.tryFind toDay |> Option.defaultValue 0) + minutes
-            Active (recomputeTotal { game with PlaySessions = withoutFrom |> Map.add toDay mergedAtToDay })
+            // ADR-0091: friends move (union) with the session, mirroring the
+            // minutes merge-on-collision rule exactly.
+            let fromFriends = game.PlaySessionFriends |> Map.tryFind fromDay |> Option.defaultValue Set.empty
+            let toFriends = game.PlaySessionFriends |> Map.tryFind toDay |> Option.defaultValue Set.empty
+            let mergedFriends = Set.union fromFriends toFriends
+            let updatedPlaySessionFriends =
+                let withoutFromFriends = game.PlaySessionFriends |> Map.remove fromDay
+                if Set.isEmpty mergedFriends then withoutFromFriends
+                else withoutFromFriends |> Map.add toDay mergedFriends
+            Active (recomputeTotal { game with
+                                        PlaySessions = withoutFrom |> Map.add toDay mergedAtToDay
+                                        PlaySessionFriends = updatedPlaySessionFriends })
         | Active game, Play_session_removed (day, _previousMinutes) ->
-            Active (recomputeTotal { game with PlaySessions = game.PlaySessions |> Map.remove day })
+            // Load-bearing (ADR-0091): without dropping `day` here, a later
+            // session recorded on the same day would bring the old friends
+            // back via `PlaySessionFriends`' subset-of-`PlaySessions` intent.
+            Active (recomputeTotal { game with
+                                        PlaySessions = game.PlaySessions |> Map.remove day
+                                        PlaySessionFriends = game.PlaySessionFriends |> Map.remove day })
+        | Active game, Friend_added_to_play_session (day, friendSlug) ->
+            let updated = (game.PlaySessionFriends |> Map.tryFind day |> Option.defaultValue Set.empty) |> Set.add friendSlug
+            Active { game with PlaySessionFriends = game.PlaySessionFriends |> Map.add day updated }
+        | Active game, Friend_removed_from_play_session (day, friendSlug) ->
+            let updated = (game.PlaySessionFriends |> Map.tryFind day |> Option.defaultValue Set.empty) |> Set.remove friendSlug
+            let updatedMap =
+                if Set.isEmpty updated then game.PlaySessionFriends |> Map.remove day
+                else game.PlaySessionFriends |> Map.add day updated
+            Active { game with PlaySessionFriends = updatedMap }
         | Active game, Steam_observed_total_reconciled observedMinutes ->
             // Sets SteamObservedMinutes only — TotalPlayTimeMinutes (what the
             // user asserts happened) is untouched, by design.
@@ -463,6 +509,31 @@ module Games =
             match game.PlaySessions |> Map.tryFind day with
             | None -> Error "Play session not found"
             | Some previousMinutes -> Ok [ Play_session_removed (day, previousMinutes) ]
+        | Active game, Add_friend_to_play_session (day, friendSlug) ->
+            if game.PlaySessions |> Map.containsKey day |> not then
+                Error "Play session not found"
+            else
+                let alreadyOnSession =
+                    game.PlaySessionFriends |> Map.tryFind day |> Option.defaultValue Set.empty |> Set.contains friendSlug
+                if alreadyOnSession then
+                    Ok []
+                else
+                    // ADR-0091: one pure decision, the same shape as
+                    // Record_play_session's promotionEvents — the implication
+                    // is emitted here, not derived in evolve or a read model.
+                    let promotion =
+                        if game.PlayedWith |> Set.contains friendSlug then [] else [ Game_played_with friendSlug ]
+                    Ok ([ Friend_added_to_play_session (day, friendSlug) ] @ promotion)
+        | Active game, Remove_friend_from_play_session (day, friendSlug) ->
+            if game.PlaySessions |> Map.containsKey day |> not then
+                Error "Play session not found"
+            else
+                let onSession =
+                    game.PlaySessionFriends |> Map.tryFind day |> Option.defaultValue Set.empty |> Set.contains friendSlug
+                if onSession then
+                    Ok [ Friend_removed_from_play_session (day, friendSlug) ]
+                else
+                    Ok []
         | Active game, Reconcile_steam_observed_total observedMinutes ->
             if game.SteamObservedMinutes = observedMinutes then Ok []
             else Ok [ Steam_observed_total_reconciled observedMinutes ]
@@ -702,6 +773,10 @@ module Games =
                     "day", Encode.string day
                     "previousMinutes", Encode.int previousMinutes
                 ])
+            | Friend_added_to_play_session (day, friendSlug) ->
+                "Friend_added_to_play_session", Encode.toString 0 (Encode.object [ "day", Encode.string day; "friendSlug", Encode.string friendSlug ])
+            | Friend_removed_from_play_session (day, friendSlug) ->
+                "Friend_removed_from_play_session", Encode.toString 0 (Encode.object [ "day", Encode.string day; "friendSlug", Encode.string friendSlug ])
             | Steam_observed_total_reconciled observedMinutes ->
                 "Steam_observed_total_reconciled", Encode.toString 0 (Encode.object [ "observedMinutes", Encode.int observedMinutes ])
             | Game_description_set description ->
@@ -863,6 +938,22 @@ module Games =
                 )) data
                 |> Result.toOption
                 |> Option.map Play_session_removed
+            | "Friend_added_to_play_session" ->
+                Decode.fromString (Decode.object (fun get ->
+                    let day = get.Required.Field "day" Decode.string
+                    let friendSlug = get.Required.Field "friendSlug" Decode.string
+                    (day, friendSlug)
+                )) data
+                |> Result.toOption
+                |> Option.map Friend_added_to_play_session
+            | "Friend_removed_from_play_session" ->
+                Decode.fromString (Decode.object (fun get ->
+                    let day = get.Required.Field "day" Decode.string
+                    let friendSlug = get.Required.Field "friendSlug" Decode.string
+                    (day, friendSlug)
+                )) data
+                |> Result.toOption
+                |> Option.map Friend_removed_from_play_session
             | "Steam_observed_total_reconciled" ->
                 Decode.fromString (Decode.field "observedMinutes" Decode.int) data
                 |> Result.toOption
@@ -943,6 +1034,8 @@ module Games =
             "Play_session_minutes_corrected"
             "Play_session_moved"
             "Play_session_removed"
+            "Friend_added_to_play_session"
+            "Friend_removed_from_play_session"
             "Steam_observed_total_reconciled"
             "Game_description_set"
             "Game_short_description_set"

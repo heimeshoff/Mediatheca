@@ -44,6 +44,7 @@
     <Compile Include="ReleaseDateParsingTests.fs" />
     <Compile Include="PlayFacetsOverrideTests.fs" />
     <Compile Include="PlaytimeTrackerTests.fs" />
+    <Compile Include="PlaySessionFriendTests.fs" />
     <Compile Include="GameFacetProjectionTests.fs" />
     <Compile Include="GameFacetBackfillTests.fs" />
     <Compile Include="SteamDeckCompatTests.fs" />

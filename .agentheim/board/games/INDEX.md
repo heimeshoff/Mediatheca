@@ -12,8 +12,8 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
-- **Done:** 19
+- **Doing:** 0
+- **Done:** 20
 <!-- task-counts:end -->
 
 ### Todo
@@ -22,12 +22,12 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **games-zex36** — Games — attach friends to individual play sessions like Movies' watch sessions; adding one also adds them to the game's Played with set, and the Friend page shows the shared play dates (feature) — `doing/games-zex36-friends-on-play-sessions.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
 ### Done (most recent first; older entries kept for prior-art search)
 <!-- done-list:start -->
+- **games-zex36** — Games — attach friends to individual play sessions like Movies' watch sessions; adding one also adds them to the game's Played with set, and the Friend page shows the shared play dates (feature) — `done/games-zex36-friends-on-play-sessions.md`
 - **games-q7vnd** — Game poster cards show off-ratio box art whole — NES/SNES (and any clearly non-2:3) covers fit inside the 2:3 frame with soft bands above and below, like books-r8cfn does for book covers; true 2:3 covers (Steam) keep today's fill (bug) — `done/games-q7vnd-game-poster-cards-fit-off-ratio-box-art.md`
 - **games-hm3sf** — Game detail page — "Change cover" / "Change backdrop" also accept an uploaded image file or a pasted image URL, downloaded to the server's images/ cache, for manual control when RAWG and Steam offer the wrong art (feature) — `done/games-hm3sf-manual-cover-backdrop-upload-or-url.md`
 - **games-fbf3j** — Game detail page — show a game's entire play history in the Play History card instead of only the 10 most recent sessions (bug) — `done/games-fbf3j-show-full-play-history.md`

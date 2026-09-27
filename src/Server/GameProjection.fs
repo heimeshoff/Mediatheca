@@ -512,6 +512,18 @@ module GameProjection =
                     // the sum across all days — no total_play_time change.
                     ()
 
+                | Games.Friend_added_to_play_session _ ->
+                    // games-zex36 (ADR-0091): session-friend state lives only
+                    // in `PlaySessionProjection`'s `game_play_session_friend`
+                    // table. The implied `Game_played_with` (when it fires)
+                    // is a separate event, handled by its own arm above.
+                    ()
+
+                | Games.Friend_removed_from_play_session _ ->
+                    // Mirrors the arm above — removing a friend from a
+                    // session never touches `played_with` (ADR-0091).
+                    ()
+
                 | Games.Play_session_removed (_day, previousMinutes) ->
                     conn
                     |> Db.newCommand "UPDATE game_detail SET total_play_time = total_play_time - @minutes WHERE slug = @slug"

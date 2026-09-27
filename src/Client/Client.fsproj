@@ -108,6 +108,7 @@
     <Compile Include="Pages\SeriesDetail\NextUpCard.test.fs" />
     <Compile Include="Pages\GameDetail\JournalHasContent.test.fs" />
     <Compile Include="Pages\GameDetail\DefaultTab.test.fs" />
+    <Compile Include="Pages\GameDetail\State.test.fs" />
     <Compile Include="Pages\BookDetail\Progress.test.fs" />
     <Compile Include="Pages\BookDetail\Format.test.fs" />
     <Compile Include="Pages\BookDetail\History.test.fs" />

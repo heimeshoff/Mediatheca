@@ -313,6 +313,14 @@ module EventFormatting =
             let day = tryField "day" data |> Option.defaultValue "?"
             let previousMinutes = tryFieldInt "previousMinutes" data |> Option.defaultValue 0
             Some { Timestamp = ts; Label = "Play session removed"; Details = [ $"{day}: {previousMinutes} min" ] }
+        | "Friend_added_to_play_session" ->
+            let day = tryField "day" data |> Option.defaultValue "?"
+            let friend = tryField "friendSlug" data |> Option.defaultValue "?"
+            Some { Timestamp = ts; Label = "Friend added to play session"; Details = [ $"{day}: {friend}" ] }
+        | "Friend_removed_from_play_session" ->
+            let day = tryField "day" data |> Option.defaultValue "?"
+            let friend = tryField "friendSlug" data |> Option.defaultValue "?"
+            Some { Timestamp = ts; Label = "Friend removed from play session"; Details = [ $"{day}: {friend}" ] }
         | "Steam_observed_total_reconciled" ->
             let mins = tryFieldInt "observedMinutes" data |> Option.defaultValue 0
             Some { Timestamp = ts; Label = "Steam observed total reconciled"; Details = [ $"{mins} min" ] }
