@@ -5,6 +5,23 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 16:20 -- Modeling / Dismissed: integration-f8ncw
+
+**Type:** Modeling / Dismiss
+**Dismissed:**
+- integration-f8ncw - RomM Play boots the game directly — the game page's Play button starts EmulatorJS via RomM's console-mode route and resumes the rom's newest save state, instead of landing on RomM's pre-game setup screen (integration)
+
+---
+
+## 2026-09-28 16:20 -- Task bounced: integration-f8ncw - RomM Play boots the game directly — the game page's Play button starts EmulatorJS via RomM's console-mode route and resumes the rom's newest save state, instead of landing on RomM's pre-game setup screen
+
+**Type:** Work / Task bounced
+**BC:** integration
+**From → To:** doing → backlog
+**Reason:** Feature reverted on main (fc8a8f7); task is being deleted at the builder's request.
+
+---
+
 ## 2026-09-28 15:25 -- Task verified and completed: series-q7vhm - Series detail Next Up card — the "Next episode airs …" line names the episode that airs; when it isn't the Next Up episode shown above it (or the series is caught up), the line spells out its season and episode number
 
 **Type:** Work / Task completion

@@ -12,7 +12,7 @@ research touching this BC, and concept synthesis pages.
 <!-- task-counts:start -->
 - **Backlog:** 0
 - **Todo:** 0
-- **Doing:** 1
+- **Doing:** 0
 - **Done:** 37
 <!-- task-counts:end -->
 
@@ -22,7 +22,6 @@ research touching this BC, and concept synthesis pages.
 
 ### Doing
 <!-- doing-list:start -->
-- **integration-f8ncw** — RomM Play boots the game directly — the game page's Play button starts EmulatorJS via RomM's console-mode route and resumes the rom's newest save state, instead of landing on RomM's pre-game setup screen (feature) — `doing/integration-f8ncw-romm-play-boots-directly-resuming-latest-state.md`
 <!-- no tasks in doing -->
 <!-- doing-list:end -->
 
