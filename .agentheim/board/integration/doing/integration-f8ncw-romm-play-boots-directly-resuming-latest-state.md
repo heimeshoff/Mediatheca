@@ -1,7 +1,7 @@
 ---
 id: integration-f8ncw
 title: RomM Play boots the game directly — the game page's Play button starts EmulatorJS via RomM's console-mode route and resumes the rom's newest save state, instead of landing on RomM's pre-game setup screen
-status: todo
+status: doing
 type: feature
 context: integration
 created: 2026-09-28

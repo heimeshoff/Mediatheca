@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 15:17 -- Batch started: [integration-f8ncw, series-q7vhm]
+
+**Type:** Work / Batch start
+**Tasks:** integration-f8ncw - RomM Play boots the game directly — the game page's Play button starts EmulatorJS via RomM's console-mode route and resumes the rom's newest save state, instead of landing on RomM's pre-game setup screen, series-q7vhm - Series detail Next Up card — the "Next episode airs …" line names the episode that airs; when it isn't the Next Up episode shown above it (or the series is caught up), the line spells out its season and episode number
+**Parallel:** yes (2 workers — the whole ready set; different BCs, no shared source files: integration-f8ncw is server-side RomM adapter + redirect route, series-q7vhm is client-only NextUpCard.fs)
+
+---
+
 ## 2026-09-28 15:11 -- Modeling / Captured: series-q7vhm - Series detail Next Up card — the "Next episode airs …" line names the episode that airs; when it isn't the Next Up episode shown above it (or the series is caught up), the line spells out its season and episode number
 
 **Type:** Modeling / Capture

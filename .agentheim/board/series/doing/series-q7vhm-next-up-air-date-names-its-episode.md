@@ -1,7 +1,7 @@
 ---
 id: series-q7vhm
 title: Series detail Next Up card — the "Next episode airs …" line names the episode that airs; when it isn't the Next Up episode shown above it (or the series is caught up), the line spells out its season and episode number
-status: todo
+status: doing
 type: feature
 context: series
 created: 2026-09-28
