@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 11:43 -- Modeling / Captured: design-system-v3qh6 - Games, Books and Series poster hovers get the same smooth mechanism the Movies filmstrip got in design-system-k4tw8 — one shared transform-scale rule on a permanent compositor layer
+
+**Type:** Modeling / Capture
+**BC:** design-system
+**Filed to:** todo
+**Summary:** Builder confirmed the k4tw8 filmstrip hover fix; Games/Books posters get the same permanent compositor layer (will-change: transform on .poster-image-container) and the All-tab Next-episode hero card moves off Tailwind's group-hover:scale path onto the shared transform-scale rule.
+
+---
+
 ## 2026-09-28 11:27 -- Work session ended
 
 **Type:** Work / Session end
