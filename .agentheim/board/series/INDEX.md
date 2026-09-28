@@ -11,13 +11,14 @@ research touching this BC, and concept synthesis pages.
 
 <!-- task-counts:start -->
 - **Backlog:** 0
-- **Todo:** 0
+- **Todo:** 1
 - **Doing:** 0
 - **Done:** 10
 <!-- task-counts:end -->
 
 ### Todo
 <!-- todo-list:start -->
+- **series-q7vhm** — Series detail Next Up card — the "Next episode airs …" line names the episode that airs; when it isn't the Next Up episode shown above it (or the series is caught up), the line spells out its season and episode number (feature) — `todo/series-q7vhm-next-up-air-date-names-its-episode.md`
 <!-- todo-list:end -->
 
 ### Doing
