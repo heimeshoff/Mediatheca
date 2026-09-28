@@ -57,7 +57,6 @@ research touching this BC, and concept synthesis pages.
 - **integration-hebjs** — One-click Steam Family import — automatic access-token acquisition (feature) — `done/integration-hebjs-one-click-steam-family-import.md`
 - **integration-q7wv3** — Episodes materialized before integration-007 never get a still — the backfill gap (bug) — `done/integration-q7wv3-backfill-jellyfin-stills-for-existing-materialized-episodes.md`
 - **integration-007** — Fetch Jellyfin episode stills when materializing a missing season (feature) — `done/integration-007-fetch-jellyfin-episode-stills-on-materialize.md`
-- **integration-ygwsa** — Spike — mint Steam Family access tokens from a stored refresh token (SteamKit2) (spike) — `done/integration-ygwsa-steam-family-token-spike.md`
 <!-- done-list:end -->
 
 ### Backlog
