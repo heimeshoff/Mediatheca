@@ -19,7 +19,7 @@ Newest entries on top.
 **Commits:** 2
 **Vision-conformance:** none — batch aligns with vision
 **Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task)
-**Carry-over:** none — working tree clean except an empty  directory (worktree deregistered and branch deleted; directory held busy by a lingering shell handle — safe to delete later). 1 RESULT sidecar removed. Verifier ran npm run build + Vitest 150/150 on the fast-forwarded tree; Expecto not run (client-only change). Criterion 5 [human-eye] pending builder eye-check on the All tab filmstrip.
+**Carry-over:** none — working tree clean except an empty `.worktrees/design-system-k4tw8` directory (worktree deregistered and branch deleted; directory held busy by a lingering shell handle — safe to delete later). 1 RESULT sidecar removed. Verifier ran npm run build + Vitest 150/150 on the fast-forwarded tree; Expecto not run (client-only change). Criterion 5 [human-eye] pending builder eye-check on the All tab filmstrip.
 
 ---
 
