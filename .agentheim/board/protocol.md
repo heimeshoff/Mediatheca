@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 11:27 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 18m (batch started 11:10)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0 (1 RESULT re-emit via SendMessage to the same worker — sidecar rejected missing-block for three-backtick fences; not a lost result)
+**Lost-result escalations:** 0
+**Dispatches:** design-system-k4tw8: 1
+**Commits:** 2
+**Vision-conformance:** none — batch aligns with vision
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task)
+**Carry-over:** none — working tree clean except an empty  directory (worktree deregistered and branch deleted; directory held busy by a lingering shell handle — safe to delete later). 1 RESULT sidecar removed. Verifier ran npm run build + Vitest 150/150 on the fast-forwarded tree; Expecto not run (client-only change). Criterion 5 [human-eye] pending builder eye-check on the All tab filmstrip.
+
+---
+
 ## 2026-09-28 11:26 -- Task verified and completed: design-system-k4tw8 - Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference
 
 **Type:** Work / Task completion
