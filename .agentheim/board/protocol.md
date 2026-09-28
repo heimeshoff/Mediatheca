@@ -5,6 +5,24 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 13:21 -- Work session ended
+
+**Type:** Work / Session end
+**Duration:** 15m (batch started 13:06)
+**Completed:** 1 (first-try PASS: 1, re-dispatched: 0, skipped: 0)
+**Bounced:** 0
+**Failed:** 0
+**Escalated after verification:** 0
+**Lost-result re-dispatches:** 0 (1 RESULT re-emit via SendMessage to the same worker — sidecar rejected missing-block for three-backtick fences again, same as the previous session; not a lost result)
+**Lost-result escalations:** 0
+**Dispatches:** design-system-v3qh6: 1
+**Commits:** 2
+**Vision-conformance:** none — batch aligns with vision
+**Batch mix:** 100% product-facing / 0% harness / 0% bookkeeping (1 task)
+**Carry-over:** none — working tree clean except the empty `.worktrees/design-system-k4tw8` directory from the previous session (still held busy by a lingering handle — safe to delete later). 1 RESULT sidecar removed. Verifier ran npm run build + Vitest 151/151 on the fast-forwarded tree and re-measured the computed hover styles itself; Expecto not run (client-only change). Criterion 6 [human-eye] pending builder eye-check on Games in focus / Currently Reading / TV Series Next Up hovers on the All tab.
+
+---
+
 ## 2026-09-28 13:20 -- Task verified and completed: design-system-v3qh6 - Games, Books and Series poster hovers get the same smooth mechanism the Movies filmstrip got in design-system-k4tw8 — one shared transform-scale rule on a permanent compositor layer
 
 **Type:** Work / Task completion
