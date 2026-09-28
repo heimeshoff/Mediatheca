@@ -1,7 +1,7 @@
 ---
 id: design-system-k4tw8
 title: Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference
-status: backlog
+status: todo
 type: bug
 context: design-system
 created: 2026-09-27
