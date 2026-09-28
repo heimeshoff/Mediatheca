@@ -5,6 +5,14 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 11:10 -- Batch started: [design-system-k4tw8]
+
+**Type:** Work / Batch start
+**Tasks:** design-system-k4tw8 - Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference
+**Parallel:** no (1 worker — the only ready task)
+
+---
+
 ## 2026-09-28 11:07 -- Modeling / Promoted: design-system-k4tw8 - Movies filmstrip poster hover jitters vertically — on hover-in the poster nudges down before it zooms, on hover-out it shrinks back then nudges up; the Games/Books/Series poster cards scale cleanly and are the reference
 
 **Type:** Modeling / Promote
