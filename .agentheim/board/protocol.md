@@ -5,6 +5,15 @@ Newest entries on top.
 
 ---
 
+## 2026-09-28 15:02 -- Modeling / Captured: integration-f8ncw - RomM Play boots the game directly — the game page's Play button starts EmulatorJS via RomM's console-mode route and resumes the rom's newest save state, instead of landing on RomM's pre-game setup screen
+
+**Type:** Modeling / Capture
+**BC:** integration
+**Filed to:** todo
+**Summary:** RomM's /rom/{id}/ejs player always shows a pre-game setup screen; the Play button will route through a Mediatheca redirect endpoint to RomM's console-mode /console/rom/{id}/play route, which boots immediately, passing ?state= for the rom's newest save state (fresh boot fallback). Ruffle/js-dos/PICO-8 keep their routes.
+
+---
+
 ## 2026-09-28 13:21 -- Work session ended
 
 **Type:** Work / Session end
